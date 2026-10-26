@@ -1,0 +1,7 @@
+# Netscape HTTP Cookie File
+# comment
+
+#HttpOnly_.instagram.com	TRUE	/	TRUE	4102444800	sessionid	VALID
+.instagram.com	TRUE	/	TRUE	0	csrftoken	TOKEN
+.instagram.com	TRUE	/	TRUE	1	mid	EXPIRED
+.otra.com	TRUE	/	TRUE	4102444800	foo	OTHER

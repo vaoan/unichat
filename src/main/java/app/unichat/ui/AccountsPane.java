@@ -1,5 +1,9 @@
 package app.unichat.ui;
 
+import app.unichat.login.BrowserSession;
+import app.unichat.login.CookieLogin;
+import app.unichat.login.CookieSpec;
+import app.unichat.login.SessionCookies;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Message;
@@ -26,7 +30,9 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 
+import java.io.File;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -258,8 +264,8 @@ public final class AccountsPane extends VBox {
     static String method(Network n) {
         return switch (n) {
             case WHATSAPP, SIGNAL, TELEGRAM, DISCORD -> "Escanea un código QR con tu teléfono";
-            case INSTAGRAM, MESSENGER, X, LINKEDIN -> "Pega las cookies de tu navegador";
-            case GOOGLE_MESSAGES -> "Cookies de Google + confirmación en el teléfono";
+            case INSTAGRAM, MESSENGER, X, LINKEDIN -> "Usa tu sesión del navegador o inicia sesión aquí";
+            case GOOGLE_MESSAGES -> "Tu sesión de Google + confirmación en el teléfono";
             case SLACK -> "Tu correo y el código que te llega";
             default -> "";
         };
@@ -314,11 +320,164 @@ public final class AccountsPane extends VBox {
                 return;
             }
             wizard = new Wizard(n, botChatId, since);
-            setView("Conectar " + n.displayName(), wizard.root, () -> {
+            Runnable cancel = () -> {
                 wizard.cancel();
                 showPicker();
-            });
+            };
+            if (CookieLogin.isCookieNetwork(n)) {
+                showCookieSources(n, botChatId, cancel);
+            } else {
+                setView("Conectar " + n.displayName(), wizard.root, cancel);
+            }
         }));
+    }
+
+    // ------------------------------------------------------------------ 3b. cookie-source chooser
+
+    /**
+     * Friendly login for cookie networks: reuse a browser session, log in inside the app, or load a cookies.txt.
+     * Cookies are read only for {@code n}, sent only to the user's own bridge bot, and never logged.
+     */
+    private void showCookieSources(Network n, String botChatId, Runnable cancel) {
+        Wizard w = wizard;
+        String net = n.displayName();
+        Label searching = new Label("Buscando tu sesión de " + net + " en tus navegadores…");
+        searching.setWrapText(true);
+        searching.getStyleClass().add("settings-help");
+        ProgressIndicator spin = new ProgressIndicator();
+        spin.setMaxSize(22, 22);
+        HBox searchRow = new HBox(10, spin, searching);
+        searchRow.setAlignment(Pos.CENTER_LEFT);
+        VBox found = new VBox(10);
+        VBox top = new VBox(8, searchRow);
+        if (macNotice()) {
+            Label notice = new Label("macOS puede pedirte permiso para usar tu sesión del navegador.");
+            notice.setWrapText(true);
+            notice.getStyleClass().add("settings-help");
+            top.getChildren().add(notice);
+        }
+
+        Label status = new Label();
+        status.setWrapText(true);
+        status.setMinHeight(Region.USE_PREF_SIZE);
+        status.getStyleClass().add("settings-help");
+        status.setVisible(false);
+        status.setManaged(false);
+
+        ScrollPane[] chooser = new ScrollPane[1];
+        Consumer<SessionCookies> sendSession = cookies -> {
+            setView("Conectar " + net, w.root, cancel);
+            w.sessionSent();
+            svc.sendLoginInput(n, botChatId, cookies.toBridgeJson()).exceptionally(err -> {
+                Platform.runLater(() -> {
+                    toast.accept("No se pudo enviar: " + rootMessage(err));
+                    // undo the waiting state so the user can retry from the chooser
+                    if (wizard == w && !w.finished) {
+                        w.sessionFailed();
+                        setView("Conectar " + net, chooser[0], cancel);
+                    }
+                });
+                return null;
+            });
+        };
+
+        Label heading = new Label("Elige cómo conectar tu cuenta de " + net);
+        heading.setWrapText(true);
+        heading.getStyleClass().add("wizard-instructions");
+
+        Button other = new Button("Iniciar sesión con otra cuenta");
+        other.getStyleClass().add("secondary-button");
+        other.setMaxWidth(Double.MAX_VALUE);
+        other.setOnAction(e -> {
+            if (LoginWebView.isOpen() || getScene() == null) return;
+            LoginWebView.open(getScene().getWindow(), n, CookieSpec.forNetwork(n), sendSession, () -> { });
+        });
+        other.setDisable(LoginWebView.isOpen());
+
+        Button file = new Button("Elegir archivo cookies.txt…");
+        file.getStyleClass().add("secondary-button");
+        file.setMaxWidth(Double.MAX_VALUE);
+        file.setOnAction(e -> {
+            if (getScene() == null) return;
+            FileChooser fc = new FileChooser();
+            fc.setTitle("Elige tu archivo cookies.txt");
+            fc.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("cookies.txt", "*.txt"),
+                    new FileChooser.ExtensionFilter("Todos los archivos", "*.*"));
+            File f = fc.showOpenDialog(getScene().getWindow());
+            if (f == null) return;
+            CookieLogin.TxtResult r = CookieLogin.fromCookieTxt(f.toPath(), n);
+            switch (r.kind()) {
+                case OK -> sendSession.accept(r.cookies());
+                case MISSING -> showStatus(status, missingMessage(n, r.missing()));
+                default -> showStatus(status, r.message());
+            }
+        });
+
+        Button paste = new Button("Pegar cookies manualmente");
+        paste.getStyleClass().add("link-button");
+        paste.setOnAction(e -> {
+            w.chooserActive = false;
+            setView("Conectar " + net, w.root, cancel);
+            w.update();
+        });
+
+        VBox content = new VBox(12, heading, top, found, other, file, status, paste);
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.setFitToWidth(true);
+        scroll.getStyleClass().add("sheet-scroll");
+        chooser[0] = scroll;
+        w.chooserActive = true;
+        setView("Conectar " + net, scroll, cancel);
+
+        CookieLogin.findBrowserSessions(n).whenComplete((sessions, err) -> Platform.runLater(() -> {
+            if (wizard != w) return; // user left the screen meanwhile
+            top.getChildren().remove(searchRow);
+            List<BrowserSession> list = err != null || sessions == null ? List.of() : sessions;
+            if (list.isEmpty()) {
+                Label none = new Label("No encontramos una sesión en tus navegadores.");
+                none.setWrapText(true);
+                none.getStyleClass().add("settings-help");
+                found.getChildren().add(none);
+            }
+            for (BrowserSession s : list) {
+                String label = sessionLabel(net, s);
+                Label l = new Label(label);
+                l.setWrapText(true);
+                l.getStyleClass().add("settings-label");
+                HBox.setHgrow(l, Priority.ALWAYS);
+                l.setMaxWidth(Double.MAX_VALUE);
+                Button use = new Button("Usar esta sesión");
+                use.getStyleClass().add("primary-button");
+                use.setAccessibleText(label);
+                use.setOnAction(e -> sendSession.accept(s.cookies()));
+                HBox card = new HBox(12, l, use);
+                card.setAlignment(Pos.CENTER_LEFT);
+                card.getStyleClass().add("settings-row");
+                found.getChildren().add(card);
+            }
+        }));
+    }
+
+    private static void showStatus(Label status, String text) {
+        status.setText(text);
+        status.setVisible(true);
+        status.setManaged(true);
+    }
+
+    private static boolean macNotice() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
+    }
+
+    /** Card caption for a browser session, e.g. "Usar tu sesión de Instagram de Firefox (default)". */
+    static String sessionLabel(String net, BrowserSession s) {
+        String profile = s.profile() == null || s.profile().isBlank() ? "" : " (" + s.profile() + ")";
+        return "Usar tu sesión de " + net + " de " + s.browser() + profile;
+    }
+
+    /** Message shown when a cookies.txt lacks required cookies. */
+    static String missingMessage(Network n, List<String> missing) {
+        return "Al archivo le falta: " + String.join(", ", missing)
+                + ". Exporta las cookies con la sesión de " + n.displayName() + " abierta.";
     }
 
     /** Mirrors the bridge-bot conversation as a friendly form. */
@@ -337,6 +496,10 @@ public final class AccountsPane extends VBox {
         final VBox done = new VBox(12);
         String shownQr;
         boolean finished;
+        boolean sent;
+        Instant sentAt = Instant.EPOCH;
+        /** True while the cookie-source chooser is on screen: bot messages must not replace it. */
+        boolean chooserActive;
 
         Wizard(Network network, String botChatId, Instant since) {
             this.network = network;
@@ -395,6 +558,25 @@ public final class AccountsPane extends VBox {
             update();
         }
 
+        /** A session was sent to the bridge: hide the manual-paste UI and wait for its answer. */
+        void sessionSent() {
+            sent = true;
+            chooserActive = false;
+            sentAt = Instant.now();
+            instructions.setText("Enviamos tu sesión al puente. Esperando su confirmación…");
+            inputRow.setVisible(false);
+            inputRow.setManaged(false);
+        }
+
+        /** Sending the session failed: back to the manual state. */
+        void sessionFailed() {
+            sent = false;
+            chooserActive = true;
+            instructions.setText(instructions(network));
+            inputRow.setVisible(true);
+            inputRow.setManaged(true);
+        }
+
         void dispose() {
             svc.removeListener(this);
         }
@@ -421,7 +603,7 @@ public final class AccountsPane extends VBox {
 
         /** Renders the newest bot state: QR image, last instruction text, success or failure. */
         void update() {
-            if (finished) return;
+            if (finished || chooserActive) return;
             List<Message> msgs = svc.messages(botChatId).stream()
                     .filter(m -> !m.outgoing() && !m.timestamp().isBefore(since)).toList();
             Message lastImage = null;
@@ -445,8 +627,10 @@ public final class AccountsPane extends VBox {
                 botText.setText("Puente: " + lastText.body());
                 boolean asksInput = !qrNetwork(network) || b.contains("password") || b.contains("contraseña")
                         || ((b.contains("code") || b.contains("código")) && !b.contains("qr"));
-                inputRow.setVisible(asksInput);
-                inputRow.setManaged(asksInput);
+                // after a session was sent, only a prompt newer than that send re-opens the input
+                boolean showInput = asksInput && (!sent || lastText.timestamp().isAfter(sentAt));
+                inputRow.setVisible(showInput);
+                inputRow.setManaged(showInput);
             }
             if (lastImage != null && !lastImage.mediaUrl().equals(shownQr)) {
                 String url = lastImage.mediaUrl();

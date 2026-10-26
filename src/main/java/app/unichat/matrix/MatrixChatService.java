@@ -314,12 +314,45 @@ public final class MatrixChatService implements ChatService {
         }
     }
 
+    /**
+     * Deep copy of a /sync response with bridge-bot room message content blanked, so login credentials
+     * (cookies, tokens, QR data) sent in those DMs never reach the on-disk cache. Input is not mutated.
+     */
+    static JsonNode redactForCache(JsonNode fullSync, Set<String> botRoomIds) {
+        JsonNode copy = fullSync.deepCopy();
+        for (String section : new String[]{"join", "invite", "leave"}) {
+            JsonNode sec = copy.path("rooms").path(section);
+            for (String id : botRoomIds) {
+                JsonNode room = sec.path(id);
+                if (!room.isObject()) continue;
+                blank(room.path("timeline").path("events"));
+                blank(room.path("state").path("events"));
+                blank(room.path("invite_state").path("events"));
+            }
+        }
+        return copy;
+    }
+
+    /** Blanks message-type events (no state_key); state events keep their content so the room still resolves. */
+    private static void blank(JsonNode events) {
+        if (!events.isArray()) return;
+        for (JsonNode ev : events) {
+            if (!(ev instanceof ObjectNode o)) continue;
+            if (o.has("state_key")) continue;
+            o.set("content", MatrixClient.JSON.createObjectNode());
+        }
+    }
+
     private void saveSyncCache(JsonNode fullSync) {
         try {
             Path f = syncCacheFile();
             Files.createDirectories(f.getParent());
             Path tmp = f.resolveSibling(f.getFileName() + ".tmp");
-            MatrixClient.JSON.writeValue(tmp.toFile(), fullSync);
+            Set<String> botRoomIds = new java.util.HashSet<>();
+            synchronized (proc) {
+                for (MatrixRoom r : proc.rooms()) if (r.chat.bridgeBot()) botRoomIds.add(r.id);
+            }
+            MatrixClient.JSON.writeValue(tmp.toFile(), redactForCache(fullSync, botRoomIds));
             Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
         } catch (Exception e) {
             System.err.println("Could not save sync cache: " + e);
@@ -1449,14 +1482,43 @@ public final class MatrixChatService implements ChatService {
     }
 
     private void addDirect(String otherUser, String roomId) throws IOException {
-        ObjectNode direct;
+        ObjectNode cached;
         synchronized (proc) {
-            direct = proc.directContentCopy();
+            cached = proc.directContentCopy();
         }
-        JsonNode existing = direct.get(otherUser);
-        ArrayNode arr = existing instanceof ArrayNode a ? a : direct.putArray(otherUser);
-        arr.add(roomId);
-        client.put(CLIENT + "/user/" + enc(userId) + "/account_data/m.direct", direct);
+        String path = CLIENT + "/user/" + enc(userId) + "/account_data/m.direct";
+        JsonNode server = null;
+        try {
+            server = client.get(path);
+        } catch (Exception e) {
+            // no m.direct on the server yet (404) or transient failure: fall back to the cached copy
+        }
+        client.put(path, mergeDirect(server, cached, otherUser, roomId));
+    }
+
+    /**
+     * Merges m.direct content: union of the server's and the locally cached room lists per user, then
+     * appends {@code roomId} under {@code otherUser} if absent. Never drops existing entries.
+     */
+    static ObjectNode mergeDirect(JsonNode serverContent, JsonNode cachedContent, String otherUser, String roomId) {
+        ObjectNode out = MatrixClient.JSON.createObjectNode();
+        for (JsonNode src : new JsonNode[] {serverContent, cachedContent}) {
+            if (src == null || !src.isObject()) continue;
+            src.fields().forEachRemaining(e -> {
+                ArrayNode arr = out.has(e.getKey()) && out.get(e.getKey()) instanceof ArrayNode a
+                        ? a : out.putArray(e.getKey());
+                if (!e.getValue().isArray()) return;
+                for (JsonNode r : e.getValue()) if (!containsText(arr, r.asText())) arr.add(r.asText());
+            });
+        }
+        ArrayNode target = out.get(otherUser) instanceof ArrayNode a ? a : out.putArray(otherUser);
+        if (!containsText(target, roomId)) target.add(roomId);
+        return out;
+    }
+
+    private static boolean containsText(ArrayNode arr, String v) {
+        for (JsonNode n : arr) if (v.equals(n.asText())) return true;
+        return false;
     }
 
     private void waitForJoin(String roomId, String user) throws InterruptedException {

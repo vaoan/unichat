@@ -124,13 +124,13 @@ el comando de inicio de sesión. Sigue las instrucciones del bot **en ese chat**
 | WhatsApp | `!whatsapp login qr` | Un **código QR**. En el móvil: WhatsApp → *Dispositivos vinculados* → *Vincular dispositivo* y escanéalo. Alternativa: `!whatsapp login phone` (código de emparejamiento). |
 | Telegram | `!telegram login qr` | Un **código QR**. En el móvil: Telegram → *Ajustes → Dispositivos → Vincular dispositivo de escritorio*. Si tienes verificación en dos pasos, el bot pedirá la contraseña. Alternativa: `!telegram login phone`. |
 | Signal | `!signal login` | Un **código QR**. En el móvil: Signal → *Ajustes → Dispositivos vinculados* → **+**. |
-| Google Messages | `!gmessages login` | Pide las **cookies de tu cuenta Google** (abre el enlace que da el bot, inicia sesión, copia las cookies como JSON o el comando cURL desde las herramientas de desarrollador y pégalo en el chat). Después confirma el **emoji** que aparece en Mensajes del móvil. Ya no existe el emparejamiento por QR. |
-| Instagram | `!instagram login` | Pide las **cookies** de instagram.com (JSON o cURL desde las herramientas de desarrollador). |
-| Messenger | `!facebook login facebook` | Pide las **cookies** de facebook.com. Alternativas: `!facebook login messenger` (cookies de messenger.com) o `!facebook login messenger-lite` (usuario y contraseña). |
+| Google Messages | `!gmessages login` | Unichat conecta tu cuenta de Google con el asistente de cookies (ver «Conectar redes de cookies» abajo). Después confirma el **emoji** que aparece en Mensajes del móvil. Ya no existe el emparejamiento por QR. |
+| Instagram | `!instagram login` | Se conecta con el asistente de cookies de Unichat (sesión del navegador, ventana de inicio de sesión o `cookies.txt`). |
+| Messenger | `!facebook login facebook` | Se conecta con el asistente de cookies de Unichat (facebook.com). Alternativas: `!facebook login messenger` (cookies de messenger.com) o `!facebook login messenger-lite` (usuario y contraseña). |
 | Discord | `!discord login` | Un **código QR**: escanéalo desde la app móvil de Discord (*Ajustes → Escanear código QR*). Alternativa: `!discord login-token`. |
 | Slack | `!slack login email` | Pide el **correo** de tu cuenta de Slack y luego el código que te llega por email. Alternativa: `!slack login token` (token `xoxc-…` + cookie `d` `xoxd-…`). |
-| X | `!twitter login cookies` | Pide las **cookies** `auth_token` y `ct0` (abre x.com en una ventana de incógnito, cópialas y cierra el navegador **antes** de pegarlas). Alternativa: `!twitter login password`. |
-| LinkedIn | `!linkedin login cookies` | Pide las **cookies** de linkedin.com (mejor desde una ventana de incógnito). Alternativa: `!linkedin login password`. |
+| X | `!twitter login cookies` | Se conecta con el asistente de cookies de Unichat (`auth_token` y `ct0`). Alternativa: `!twitter login password`. |
+| LinkedIn | `!linkedin login cookies` | Se conecta con el asistente de cookies de Unichat (linkedin.com). Alternativa: `!linkedin login password`. |
 
 Los QR caducan en un minuto o dos: si no te da tiempo, vuelve a pulsar **Conectar una red**.
 Para abandonar un inicio de sesión escribe `cancel` en el chat del bot; `help` muestra todos los comandos.
@@ -181,11 +181,29 @@ Copia de seguridad: para el stack y guarda la carpeta `server/data/`, `server/.e
 Si cambias nombres de bot o puppets en un `config.yaml`, borra el `registration.yaml` de ese bridge
 y vuelve a ejecutar el script para regenerarlo.
 
+## Conectar redes de cookies (Instagram, Messenger, X, LinkedIn, Google Messages)
+
+Ya no hace falta copiar cookies a mano ni sacar un cURL. En **Cuentas → Agregar cuenta → la red** Unichat
+ofrece tres caminos:
+
+1. **Usar tu sesión del navegador**: Unichat busca en Firefox y navegadores Chromium (Chrome, Edge, Brave…)
+   si ya tienes sesión iniciada en esa red y te muestra una tarjeta «Usar tu sesión de <red> de <navegador>».
+   En macOS puede pedirte permiso para leer el llavero del navegador.
+2. **Iniciar sesión con otra cuenta**: abre una ventana dentro de Unichat con la página de la red; inicias
+   sesión como siempre (incluida la verificación en dos pasos) y la ventana se cierra sola al terminar.
+3. **Elegir archivo cookies.txt…**: exporta las cookies con la sesión abierta (extensión tipo «Get cookies.txt»)
+   y elige el archivo. Si faltan cookies, Unichat dice cuáles.
+
+Además queda un enlace discreto **Pegar cookies manualmente** (JSON o cURL), como antes.
+
+Privacidad: solo se leen las cookies de la red que estás conectando, se envían únicamente a tu propio
+servidor Matrix (al bot del puente) y Unichat no las guarda ni las escribe en registros.
+
 ## Varias cuentas de la misma red
 
 Los bridges nuevos (WhatsApp, Signal, Instagram, Messenger, Google Messages, Slack, X, LinkedIn, Telegram)
 admiten varias sesiones. En Unichat: **Ajustes → Cuentas → Agregar cuenta → elige la red** (el botón + de la barra lateral lleva ahí); se abre un asistente
-con el QR o el campo para pegar cookies/códigos (el chat técnico con el bot queda oculto, con un enlace
+con el QR, las opciones de sesión (redes de cookies) o el campo para códigos (el chat técnico con el bot queda oculto, con un enlace
 para verlo). También con clic derecho sobre la red en la barra lateral. En **Ajustes → Redes conectadas** cada cuenta tiene su nombre
 (alias) y su botón **Desconectar**, que cierra solo esa sesión (`logout <id>`).
 
