@@ -49,4 +49,18 @@ class LoginCommandTest {
         assertEquals(false, MatrixChatService.startsLoginByItself(Network.DISCORD));
         assertEquals(true, MatrixChatService.startsLoginByItself(Network.WHATSAPP));
     }
+
+    @Test
+    void discordAccountsComeFromPing() {
+        assertEquals("ping", MatrixChatService.statusCommand(Network.DISCORD));
+        assertEquals("list-logins", MatrixChatService.statusCommand(Network.WHATSAPP));
+        var in = MatrixChatService.parseDiscordPing("You're logged in as @ejemplo (`123456789012345678`)");
+        assertEquals(1, in.size());
+        assertEquals("123456789012345678", in.get(0).id());
+        assertEquals("@ejemplo", in.get(0).name());
+        assertEquals("CONNECTED", in.get(0).state());
+        assertEquals(0, MatrixChatService.parseDiscordPing("You're not logged in").size());
+        assertEquals("TRANSIENT_DISCONNECT",
+                MatrixChatService.parseDiscordPing("You're logged in, but the Discord connection seems to be dead 💥").get(0).state());
+    }
 }

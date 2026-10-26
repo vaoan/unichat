@@ -1427,6 +1427,24 @@ public final class MatrixChatService implements ChatService {
         };
     }
 
+    /** Bot command that lists the accounts: the legacy Discord bridge has no {@code list-logins}, only {@code ping}. */
+    static String statusCommand(Network n) {
+        return n == Network.DISCORD ? "ping" : "list-logins";
+    }
+
+    private static final Pattern DISCORD_LOGGED_IN = Pattern.compile("logged in as @?([^\\s(]+)\\s*\\(`?(\\d+)`?\\)");
+
+    /** The legacy Discord bridge's {@code ping} answer as a login list (empty when not logged in). */
+    static List<Login> parseDiscordPing(String reply) {
+        if (reply == null) return new ArrayList<>();
+        Matcher m = DISCORD_LOGGED_IN.matcher(reply);
+        if (m.find()) return new ArrayList<>(List.of(new Login(m.group(2), "@" + m.group(1), "CONNECTED")));
+        if (reply.contains("not connected") || reply.contains("seems to be dead")) {
+            return new ArrayList<>(List.of(new Login("discord", null, "TRANSIENT_DISCONNECT")));
+        }
+        return new ArrayList<>();
+    }
+
     /** Parses a {@code list-logins} reply; empty when the bot says we're not logged in. */
     static List<Login> parseLogins(String reply) {
         List<Login> out = new ArrayList<>();
@@ -1468,14 +1486,14 @@ public final class MatrixChatService implements ChatService {
             String roomId = findBotRoom(n);
             if (roomId == null) return;
             int before = botMessageCount(roomId);
-            sendCommand(roomId, botCommand(n, "list-logins"));
+            sendCommand(roomId, botCommand(n, statusCommand(n)));
             String reply = null;
             for (int i = 0; i < 20 && reply == null; i++) {
                 Thread.sleep(500);
                 reply = botReplyAfter(roomId, before);
             }
             if (reply == null) return;
-            parsed = parseLogins(reply);
+            parsed = n == Network.DISCORD ? parseDiscordPing(reply) : parseLogins(reply);
         }
         logins.put(n, parsed);
         StringBuilder sb = new StringBuilder();
