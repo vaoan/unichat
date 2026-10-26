@@ -52,7 +52,7 @@ public final class BridgeContacts {
     /** A phone number, @username… as the network knows it; null when nobody matches. */
     public Contact resolve(String identifier) throws IOException, InterruptedException {
         try {
-            JsonNode j = call("GET", "/v3/resolve_identifier/" + enc(identifier), null);
+            JsonNode j = call("GET", "/v3/resolve_identifier/" + segment(identifier), null);
             return j == null || j.path("id").asText("").isEmpty() ? null : contact(j);
         } catch (BridgeLogin.BridgeLoginException e) {
             if ("M_NOT_FOUND".equals(e.errcode())) return null;
@@ -62,7 +62,7 @@ public final class BridgeContacts {
 
     /** Opens (creating if needed) the DM with {@code contactId}; returns its room id. */
     public String createDm(String contactId) throws IOException, InterruptedException {
-        JsonNode j = call("POST", "/v3/create_dm/" + enc(contactId), JSON.createObjectNode());
+        JsonNode j = call("POST", "/v3/create_dm/" + segment(contactId), JSON.createObjectNode());
         if (j == null) throw new BridgeLogin.BridgeLoginException("M_UNRECOGNIZED", "Esta red no permite abrir chats nuevos desde Unichat");
         String room = j.path("dm_room_mxid").asText("");
         if (room.isEmpty()) throw new BridgeLogin.BridgeLoginException("M_UNKNOWN", "El puente no devolvió el chat");
@@ -100,6 +100,11 @@ public final class BridgeContacts {
             throw new BridgeLogin.BridgeLoginException(j.path("errcode").asText("M_UNKNOWN"), j.path("error").asText("HTTP " + r.statusCode()));
         }
         return j;
+    }
+
+    /** A URL path segment: URLEncoder writes spaces as "+", which in a path is a literal plus. */
+    private static String segment(String s) {
+        return enc(s).replace("+", "%20");
     }
 
     private static String enc(String s) {

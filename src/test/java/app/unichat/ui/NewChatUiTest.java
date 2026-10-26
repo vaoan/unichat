@@ -100,6 +100,63 @@ class NewChatUiTest {
         svc.stop();
     }
 
+    private Scene start(MockChatService svc) throws Exception {
+        Scene scene = fx(() -> {
+            Stage stage = new Stage();
+            stage.setOpacity(0);
+            MainView view = new MainView(svc, stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            Scene sc = new Scene(view, 1100, 760);
+            Theme.register(sc);
+            stage.setScene(sc);
+            stage.show();
+            return sc;
+        });
+        Thread.sleep(400);
+        return scene;
+    }
+
+    @Test
+    void typingBeforeASlowBridgeAnswersStillSearches() throws Exception {
+        MockChatService svc = new MockChatService();
+        svc.simulateSlowBridge(1200);
+        Scene scene = start(svc);
+        shortcutN(scene);
+        chooseNetwork(scene, "WhatsApp");
+        type(scene, "Carlos");
+        Thread.sleep(2000);
+        assertEquals(List.of("Carlos Peña"), names(scene), "not stuck on 'no disponible'");
+        svc.stop();
+    }
+
+    @Test
+    void aClosedPaneDoesNotJumpToTheChatLater() throws Exception {
+        MockChatService svc = new MockChatService();
+        svc.simulateSlowBridge(800);
+        Scene scene = start(svc);
+        fx(() -> { scene.getRoot().lookupAll("*").stream().filter(n -> n instanceof MainView).map(n -> (MainView) n)
+                .findFirst().orElseThrow().openChatId("!familia:demo"); return null; });
+        shortcutN(scene);
+        chooseNetwork(scene, "WhatsApp");
+        Thread.sleep(1200);
+        type(scene, "Pedro");
+        Thread.sleep(1500);
+        enter(scene);
+        fx(() -> {
+            Event.fireEvent(search(scene), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
+            return null;
+        });
+        fx(() -> {
+            boolean mac = MainView.MAC;
+            Event.fireEvent(scene.getRoot(), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.K, false, !mac, false, mac));
+            return null;
+        });
+        Thread.sleep(1500);
+        assertTrue(fx(() -> scene.getRoot().lookup(".command-bar") != null && scene.getRoot().lookup(".command-bar").getScene() != null),
+                "the command bar opened afterwards stays open");
+        assertEquals("!familia:demo", fx(() -> thread(scene).chat().id()), "no jump to the chat you gave up on");
+        svc.stop();
+    }
+
     private static boolean n(String t) {
         return t != null && !t.isBlank();
     }

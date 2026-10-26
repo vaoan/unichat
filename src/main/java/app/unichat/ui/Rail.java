@@ -82,7 +82,7 @@ public final class Rail extends VBox {
             Account acc = accounts.stream().filter(a -> a.network() == n).findFirst().orElse(null);
             // Only networks you actually use: a working account, or native Matrix chats.
             boolean shown = n == Network.MATRIX
-                    ? chats.stream().anyMatch(c -> c.network() == n && !c.bridgeBot())
+                    ? chats.stream().anyMatch(c -> c.network() == n && !c.bridgeBot() && !c.space())
                     : !Accounts.of(svc, n).isEmpty();
             if (!shown) continue;
             Label letter = NetworkIcons.tile(n, 26, "rail-network");

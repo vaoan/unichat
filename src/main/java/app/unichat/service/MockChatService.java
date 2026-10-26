@@ -132,9 +132,21 @@ public final class MockChatService implements ChatService {
             new app.unichat.model.Contact("c-dentista", "Consultorio dental", List.of("tel:+573001110005"), null, null),
             new app.unichat.model.Contact("c-pedro", "Pedro", List.of("tel:+573001110006"), null, null));
 
+    private volatile long bridgeDelayMs;
+
+    /** Demo/tests: the contacts API answers after {@code ms} and new DMs arrive that much later, like a real bridge. */
+    public void simulateSlowBridge(long ms) {
+        bridgeDelayMs = ms;
+    }
+
+    private <T> CompletableFuture<T> later(java.util.function.Supplier<T> s) {
+        if (bridgeDelayMs <= 0) return CompletableFuture.completedFuture(s.get());
+        return CompletableFuture.supplyAsync(s, CompletableFuture.delayedExecutor(bridgeDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS));
+    }
+
     @Override
     public CompletableFuture<ContactSupport> contactSupport(Account account) {
-        return CompletableFuture.completedFuture(switch (account.network()) {
+        return later(() -> switch (account.network()) {
             case WHATSAPP, TELEGRAM -> new ContactSupport(true, true);
             case INSTAGRAM, MESSENGER -> new ContactSupport(false, true);
             default -> new ContactSupport(false, false);
@@ -148,7 +160,8 @@ public final class MockChatService implements ChatService {
 
     @Override
     public CompletableFuture<List<app.unichat.model.Contact>> searchContacts(Account account, String query) {
-        if (!contactSupport(account).join().search()) return CompletableFuture.failedFuture(new UnsupportedOperationException("search"));
+        if (account.network() != Network.WHATSAPP && account.network() != Network.TELEGRAM
+                && account.network() != Network.INSTAGRAM && account.network() != Network.MESSENGER) return CompletableFuture.failedFuture(new UnsupportedOperationException("search"));
         String q = query.toLowerCase(java.util.Locale.ROOT);
         return CompletableFuture.completedFuture(DEMO_CONTACTS.stream()
                 .filter(c -> c.name().toLowerCase(java.util.Locale.ROOT).contains(q)).toList());
@@ -165,10 +178,14 @@ public final class MockChatService implements ChatService {
     public CompletableFuture<String> openDm(Account account, app.unichat.model.Contact contact) {
         if (contact.dmRoomId() != null) return CompletableFuture.completedFuture(contact.dmRoomId());
         String key = "dm-" + contact.id();
-        if (!chats.containsKey("!" + key + ":demo")) {
-            ChatBuilder.dm(this, key, account.network(), contact.name()).done();
-            fireChats();
-        }
+        Runnable create = () -> {
+            if (!chats.containsKey("!" + key + ":demo")) {
+                ChatBuilder.dm(this, key, account.network(), contact.name()).done();
+                fireChats();
+            }
+        };
+        if (bridgeDelayMs <= 0) create.run();
+        else CompletableFuture.delayedExecutor(bridgeDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS).execute(create);
         return CompletableFuture.completedFuture("!" + key + ":demo");
     }
 

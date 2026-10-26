@@ -169,6 +169,7 @@ public final class ChatListPane extends VBox {
     }
 
     public void setSelected(String chatId) {
+        groups.setSelected(chatId);
         selectedId = chatId;
         selectInList();
     }
@@ -204,7 +205,7 @@ public final class ChatListPane extends VBox {
                 : "No hay chats aquí todavía");
 
         boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && !showingGroups;
-        List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.archived() && !c.bridgeBot()
+        List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.space() && !c.archived() && !c.bridgeBot()
                 && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).limit(8).toList() : List.of();
         favorites.getChildren().setAll(favs.stream().map(this::favoriteTile).toList());
         favorites.setVisible(!favs.isEmpty());
@@ -226,7 +227,7 @@ public final class ChatListPane extends VBox {
     /** Bandeja (the list) or Grupos (the tree), remembered per network; a search always shows the list. */
     private void refreshView(ChatFilter f) {
         app.unichat.model.Network n = f.network();
-        boolean can = n != null && f.view() == ChatFilter.View.INBOX && groups.hasGroups(n);
+        boolean can = n != null && f.view() == ChatFilter.View.INBOX && groups.hasGroups(n, f.accountId());
         viewToggle.setVisible(can);
         viewToggle.setManaged(can);
         showingGroups = can && !f.searching() && "GROUPS".equals(Settings.get().getString("list.view." + n.name(), "INBOX"));
@@ -238,8 +239,7 @@ public final class ChatListPane extends VBox {
         groups.setVisible(showingGroups);
         groups.setManaged(showingGroups);
         if (showingGroups) {
-            groups.setSelected(selectedId);
-            groups.refresh(n);
+            groups.refresh(n, f.accountId());
         }
     }
 
@@ -352,6 +352,7 @@ public final class ChatListPane extends VBox {
     private void open(Chat c) {
         if (c == null) return;
         selectedId = c.id();
+        groups.setSelected(c.id());
         onOpen.accept(c);
     }
 

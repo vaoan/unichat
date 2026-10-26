@@ -90,13 +90,20 @@ public final class CommandBar extends VBox {
         field.requestFocus();
     }
 
-    private void filter(String q) {
+    /** Chats offered for {@code q}: never a space (a server/forum container, not a chat you can write in). */
+    static List<Chat> chatsFor(List<Chat> all, String q) {
         String nq = ChatFilter.normalize(q);
-        List<Item> out = new ArrayList<>();
-        List<Chat> chats = svc.chats().stream()
+        return all.stream()
+                .filter(c -> !c.space())
                 .filter(c -> !c.bridgeBot() || !nq.isEmpty())
                 .filter(c -> nq.isEmpty() || ChatFilter.normalize(c.title()).contains(nq))
                 .sorted(ChatFilter.ORDER).limit(nq.isEmpty() ? 6 : 30).toList();
+    }
+
+    private void filter(String q) {
+        String nq = ChatFilter.normalize(q);
+        List<Item> out = new ArrayList<>();
+        List<Chat> chats = chatsFor(svc.chats(), q);
         for (Chat c : chats) {
             out.add(new Item(c.title(), c.archived() ? "Archivado · " + c.network().displayName() : c.network().displayName(), c, null));
         }

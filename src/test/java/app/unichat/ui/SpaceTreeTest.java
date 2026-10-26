@@ -116,4 +116,16 @@ class SpaceTreeTest {
         chat("!bot", Network.DISCORD).setBridgeBot(true);
         assertEquals(List.of("srv"), names(SpaceTree.build(chats, Network.DISCORD, Map.of())));
     }
+
+    @Test
+    void accountFilterKeepsOnlyThatAccountsGroups() {
+        space("!work", Network.TELEGRAM, "!w1");
+        chat("!w1", Network.TELEGRAM).setAccountId("telegram:work");
+        space("!home", Network.TELEGRAM, "!h1");
+        chat("!h1", Network.TELEGRAM).setAccountId("telegram:home");
+        chat("!h2", Network.TELEGRAM).setAccountId("telegram:home");
+        assertEquals(List.of("work"), names(SpaceTree.build(chats, Network.TELEGRAM, "telegram:work", Map.of())));
+        assertEquals(List.of("home", SpaceTree.LOOSE), names(SpaceTree.build(chats, Network.TELEGRAM, "telegram:home", Map.of())));
+        assertEquals(List.of("home", "work", SpaceTree.LOOSE), names(SpaceTree.build(chats, Network.TELEGRAM, null, Map.of())));
+    }
 }

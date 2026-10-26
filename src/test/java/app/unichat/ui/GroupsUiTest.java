@@ -99,7 +99,9 @@ class GroupsUiTest {
         TreeView<SpaceTree.Node> tree = fx(() -> tree(scene));
         assertTrue(fx(tree::isVisible));
         List<String> rows = fx(() -> rowTexts(scene));
-        assertTrue(rows.get(0).startsWith("Servidor Unichat") && rows.get(0).contains("3 canales") && rows.get(0).contains("2 sin leer"), rows.toString());
+        // Cells are recycled, so lookup order isn't row order: find the server row by its text.
+        assertTrue(rows.stream().anyMatch(r -> r.startsWith("Servidor Unichat") && r.contains("3 canales") && r.contains("2 sin leer")), rows.toString());
+        assertEquals("!servidor:demo", fx(() -> tree.getTreeItem(0).getValue().id()), "servers first, loose chats last");
 
         fx(() -> { tree.requestFocus(); tree.getSelectionModel().select(0); return null; });
         key(tree, KeyCode.RIGHT);
@@ -139,6 +141,46 @@ class GroupsUiTest {
         fx(() -> { view.showNetwork(Network.DISCORD); return null; });
         Thread.sleep(200);
         assertTrue(fx(() -> tree(scene).isVisible()), "Discord comes back in Grupos");
+        svc.stop();
+    }
+
+    @Test
+    void selectionSurvivesASyncAndAClickExpandsAServer() throws Exception {
+        Scene scene = open(Network.DISCORD);
+        fx(() -> { button(scene, "Grupos").fire(); return null; });
+        Thread.sleep(300);
+        TreeView<SpaceTree.Node> tree = fx(() -> tree(scene));
+        javafx.scene.control.TreeCell<?> serverCell = fx(() -> (javafx.scene.control.TreeCell<?>) scene.getRoot()
+                .lookupAll(".groups-tree .tree-cell").stream()
+                .filter(n -> n instanceof javafx.scene.control.TreeCell<?> c && c.getItem() instanceof SpaceTree.Node sn && sn.id().equals("!servidor:demo"))
+                .findFirst().orElseThrow());
+        fx(() -> {
+            Event.fireEvent(serverCell, new javafx.scene.input.MouseEvent(javafx.scene.input.MouseEvent.MOUSE_CLICKED, 5, 5, 5, 5,
+                    javafx.scene.input.MouseButton.PRIMARY, 1, false, false, false, false, true, false, false, true, false, false, null));
+            return null;
+        });
+        Thread.sleep(200);
+        assertTrue(fx(() -> tree.getTreeItem(0).isExpanded()), "a click on a server opens it");
+
+        int memes = fx(() -> indexOf(tree, "!srv-memes:demo"));
+        fx(() -> { tree.requestFocus(); tree.getSelectionModel().select(memes); return null; });
+        svc.setMuted("!srv-general:demo", true); // any change → chatsChanged → the tree is redrawn
+        Thread.sleep(500);
+        assertEquals("!srv-memes:demo", fx(() -> tree.getSelectionModel().getSelectedItem().getValue().id()),
+                "arrowing through channels isn't reset by incoming changes");
+        svc.stop();
+    }
+
+    @Test
+    void aFavouriteServerIsNotAFavouriteChat() throws Exception {
+        Scene scene = open(Network.DISCORD);
+        svc.setFavorite("!servidor:demo", true);
+        Thread.sleep(400);
+        assertTrue(fx(() -> scene.getRoot().lookupAll(".favorites *").stream()
+                .noneMatch(n -> n instanceof javafx.scene.control.Label l && "Servidor".equals(l.getText()))));
+        assertTrue(fx(() -> scene.getRoot().lookupAll(".favorites > *").stream()
+                .map(n -> (String) n.queryAccessibleAttribute(javafx.scene.AccessibleAttribute.TEXT))
+                .noneMatch(t -> t != null && t.contains("Servidor Unichat"))));
         svc.stop();
     }
 

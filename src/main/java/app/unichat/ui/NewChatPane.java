@@ -58,6 +58,11 @@ final class NewChatPane extends VBox {
     private ChatService.ContactSupport support = new ChatService.ContactSupport(false, false);
     private List<Contact> all = List.of();
     private int generation;
+    /** Separate from {@code generation} (searches): a search typed while the account loads must not discard it. */
+    private int loadGeneration;
+    private boolean loading;
+    private ChatService.Listener pendingListener;
+    private PauseTransition pendingTimeout;
 
     NewChatPane(ChatService svc, Network preferred, Consumer<String> openChatId, Runnable close, Consumer<String> toast) {
         super(10);
@@ -114,6 +119,8 @@ final class NewChatPane extends VBox {
         networks.setAccessibleText("Red");
         accountRow.setAccessibleText("Cuenta");
         getChildren().addAll(title, networks, accountRow, search, status, list);
+        // Closed (Esc, another overlay): a chat still being created must not take over the screen later.
+        sceneProperty().addListener((o, a, b) -> { if (b == null) cancelPending(); });
 
         ToggleGroup group = new ToggleGroup();
         List<Network> connected = connectedNetworks();
@@ -171,17 +178,23 @@ final class NewChatPane extends VBox {
 
     private void chooseAccount(Account a) {
         account = a;
-        int gen = ++generation;
+        int gen = ++loadGeneration;
+        ++generation;
+        loading = true;
+        support = new ChatService.ContactSupport(false, false);
         all = List.of();
         list.getItems().clear();
         search.setAccessibleText("Buscar contacto en " + a.network().displayName());
         search.setDisable(false);
         status.setText("Cargando…");
+        ChatService.ContactSupport[] found = new ChatService.ContactSupport[1];
         svc.contactSupport(a).thenCompose(s -> {
-            Platform.runLater(() -> { if (gen == generation) support = s; });
+            found[0] = s;
             return s.list() ? svc.contacts(a) : java.util.concurrent.CompletableFuture.completedFuture(List.<Contact>of());
         }).whenComplete((contacts, err) -> Platform.runLater(() -> {
-            if (gen != generation) return;
+            if (gen != loadGeneration) return; // another network/account was chosen meanwhile
+            loading = false;
+            support = found[0] != null ? found[0] : new ChatService.ContactSupport(false, false);
             all = err == null ? contacts : List.of();
             runQuery();
         }));
@@ -194,6 +207,11 @@ final class NewChatPane extends VBox {
 
     private void runQuery() {
         if (account == null) return;
+        if (loading) {
+            ++generation;
+            show(List.of(), "Cargando…");
+            return;
+        }
         if (!support.list() && !support.search()) {
             ++generation;
             show(List.of(), unavailable(account.network()));
@@ -245,6 +263,12 @@ final class NewChatPane extends VBox {
         status.setManaged(message != null);
     }
 
+    /** What the bridge gets for a typed phone/@user: no spaces, dashes, dots or parentheses around digits. */
+    static String normalizeIdentifier(String q) {
+        String t = q.strip();
+        return t.startsWith("@") ? t : t.replaceAll("[\\s()\\-.]", "");
+    }
+
     /** A phone number or an @username: offer to write to it even if it's not in the list. */
     static boolean looksLikeIdentifier(String q) {
         String digits = q.replaceAll("[\\s()\\-.]", "");
@@ -253,12 +277,12 @@ final class NewChatPane extends VBox {
 
     private void choose(Row r) {
         Account a = account;
-        if (a == null) return;
+        if (a == null || pendingListener != null) return; // already opening one
         status.setText("Abriendo…");
         status.setVisible(true);
         status.setManaged(true);
         java.util.concurrent.CompletableFuture<Contact> contact = r.contact() != null
-                ? java.util.concurrent.CompletableFuture.completedFuture(r.contact()) : svc.resolveContact(a, r.typed());
+                ? java.util.concurrent.CompletableFuture.completedFuture(r.contact()) : svc.resolveContact(a, normalizeIdentifier(r.typed()));
         contact.thenCompose(c -> {
             if (c == null) throw new java.util.concurrent.CompletionException(new IllegalArgumentException("not found"));
             return svc.openDm(a, c);
@@ -270,7 +294,7 @@ final class NewChatPane extends VBox {
                         : "No se pudo abrir el chat. Intenta de nuevo.");
                 return;
             }
-            openWhenReady(roomId);
+            if (getScene() != null) openWhenReady(roomId);
         }));
     }
 
@@ -281,33 +305,36 @@ final class NewChatPane extends VBox {
             openChatId.accept(roomId);
             return;
         }
+        if (getScene() == null) return; // closed while the bridge answered
         status.setText("Creando el chat…");
-        long deadline = System.currentTimeMillis() + WAIT_FOR_ROOM_MS;
-        ChatService.Listener[] holder = new ChatService.Listener[1];
-        holder[0] = new ChatService.Listener() {
+        ChatService.Listener l = new ChatService.Listener() {
             @Override
             public void chatsChanged() {
                 Platform.runLater(() -> {
-                    if (holder[0] == null) return;
-                    if (svc.chat(roomId) != null) {
-                        svc.removeListener(holder[0]);
-                        holder[0] = null;
-                        close.run();
-                        openChatId.accept(roomId);
-                    }
+                    if (pendingListener != this || svc.chat(roomId) == null) return;
+                    cancelPending();
+                    close.run();
+                    openChatId.accept(roomId);
                 });
             }
         };
-        svc.addListener(holder[0]);
-        PauseTransition timeout = new PauseTransition(Duration.millis(Math.max(0, deadline - System.currentTimeMillis())));
-        timeout.setOnFinished(e -> {
-            if (holder[0] == null) return;
-            svc.removeListener(holder[0]);
-            holder[0] = null;
+        pendingListener = l;
+        svc.addListener(l);
+        pendingTimeout = new PauseTransition(Duration.millis(WAIT_FOR_ROOM_MS));
+        pendingTimeout.setOnFinished(e -> {
+            if (pendingListener != l) return;
+            cancelPending();
             close.run();
             toast.accept("El chat se está creando; aparecerá en la bandeja");
         });
-        timeout.play();
+        pendingTimeout.play();
+    }
+
+    private void cancelPending() {
+        if (pendingListener != null) svc.removeListener(pendingListener);
+        pendingListener = null;
+        if (pendingTimeout != null) pendingTimeout.stop();
+        pendingTimeout = null;
     }
 
     private final class Cell extends ListCell<Row> {

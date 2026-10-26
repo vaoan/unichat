@@ -114,4 +114,10 @@ class BridgeContactsTest {
         assertTrue(uris.get(1).contains("login_id=personal"));
         assertFalse(uris.get(1).contains("trabajo"));
     }
+
+    @Test
+    void pathSegmentsNeverTurnSpacesIntoPluses() throws Exception {
+        client("L1").resolve("ana maria");
+        assertTrue(uris.get(0).contains("/v3/resolve_identifier/ana%20maria"), uris.get(0));
+    }
 }

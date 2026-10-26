@@ -33,6 +33,8 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
     private final Set<String> namesAsked = new HashSet<>();
     private final Set<String> expanded = new HashSet<>();
     private Network network;
+    private String accountId;
+    private boolean rebuilding;
     private String pendingOpen;
     private String selectedId;
 
@@ -44,6 +46,10 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
         setShowRoot(false);
         setRoot(new TreeItem<>());
         setCellFactory(v -> new Cell());
+        // Arrowing through the tree is remembered, so a redraw from incoming messages keeps your place.
+        getSelectionModel().selectedItemProperty().addListener((o, a, b) -> {
+            if (!rebuilding && b != null && b.getValue() != null) selectedId = b.getValue().id();
+        });
         setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER) {
                 act(getSelectionModel().getSelectedItem());
@@ -53,12 +59,13 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
     }
 
     /** Whether {@code n} has any server/group (so the Bandeja | Grupos choice makes sense). */
-    boolean hasGroups(Network n) {
-        return SpaceTree.build(svc.chats(), n, names).stream().anyMatch(x -> !x.loose());
+    boolean hasGroups(Network n, String account) {
+        return SpaceTree.build(svc.chats(), n, account, names).stream().anyMatch(x -> !x.loose());
     }
 
-    void refresh(Network n) {
+    void refresh(Network n, String account) {
         this.network = n;
+        this.accountId = account;
         List<Chat> chats = svc.chats();
         if (pendingOpen != null) {
             Chat joined = svc.chat(pendingOpen);
@@ -68,9 +75,10 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
                 onOpen.accept(joined);
             }
         }
-        List<SpaceTree.Node> roots = SpaceTree.build(chats, n, names);
+        List<SpaceTree.Node> roots = SpaceTree.build(chats, n, account, names);
         askNames(roots);
         TreeItem<SpaceTree.Node> selected = null;
+        rebuilding = true;
         getRoot().getChildren().clear();
         for (SpaceTree.Node r : roots) {
             TreeItem<SpaceTree.Node> item = item(r);
@@ -79,6 +87,7 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
             if (s != null) selected = s;
         }
         if (selected != null) getSelectionModel().select(selected);
+        rebuilding = false;
     }
 
     void setSelected(String chatId) {
@@ -113,7 +122,7 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
                     && n.children().stream().anyMatch(c -> !c.joined())) {
                 svc.spaceNames(n.id()).thenAccept(m -> {
                     names.putAll(m);
-                    if (!m.isEmpty()) Platform.runLater(() -> refresh(network));
+                    if (!m.isEmpty()) Platform.runLater(() -> refresh(network, accountId));
                 });
             }
             askNames(n.children());
@@ -133,7 +142,7 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
             selectedId = n.id();
             svc.joinChat(n.id()).whenComplete((v, err) -> Platform.runLater(() -> {
                 if (err != null) pendingOpen = null;
-                refresh(network);
+                refresh(network, accountId);
             }));
         }
     }
@@ -159,7 +168,9 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
             box = new HBox(8, avatar, name, spacer, join, badge);
             box.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
             setOnMouseClicked(e -> {
-                if (e.getButton() == MouseButton.PRIMARY && !isEmpty() && getItem() != null && !getItem().container()) {
+                // The disclosure arrow toggles by itself; anywhere else on the row acts (opens, joins or expands).
+                if (e.getButton() == MouseButton.PRIMARY && !isEmpty() && getItem() != null
+                        && (getDisclosureNode() == null || !getDisclosureNode().isHover())) {
                     act(getTreeItem());
                 }
             });

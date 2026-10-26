@@ -30,12 +30,20 @@ public final class SpaceTree {
         public boolean container() { return loose() || (chat != null && chat.space()); }
     }
 
-    /** {@code names}: room id → name for children not joined yet (from {@code /hierarchy}). */
     public static List<Node> build(List<Chat> all, Network network, Map<String, String> names) {
+        return build(all, network, null, names);
+    }
+
+    /**
+     * {@code accountId}: only that account's chats (the account chips), and only groups that still have one of
+     * them; null = every account. {@code names}: room id → name for children not joined yet (from {@code /hierarchy}).
+     */
+    public static List<Node> build(List<Chat> all, Network network, String accountId, Map<String, String> names) {
         Map<String, Chat> byId = new HashMap<>();
         Map<String, List<String>> declaredChildren = new HashMap<>();
         for (Chat c : all) {
             if (c.network() != network || c.bridgeBot()) continue;
+            if (accountId != null && !c.space() && c.accountId() != null && !accountId.equals(c.accountId())) continue;
             byId.put(c.id(), c);
         }
         for (Chat c : byId.values()) {
@@ -55,6 +63,7 @@ public final class SpaceTree {
         for (Chat s : spaces) {
             if (!placed.contains(s.id())) roots.add(node(s, byId, declaredChildren, names, new LinkedHashSet<>(), placed));
         }
+        if (accountId != null) roots.removeIf(r -> !hasJoinedChat(r)); // another account's group
         List<Node> loose = byId.values().stream()
                 .filter(c -> !c.space() && !c.archived() && !placed.contains(c.id()))
                 .sorted(ChatFilter.ORDER)
@@ -87,6 +96,12 @@ public final class SpaceTree {
             }
         }
         return new Node(space.id(), space, space.title(), children);
+    }
+
+    private static boolean hasJoinedChat(Node n) {
+        if (n.chat() != null && !n.chat().space()) return true;
+        for (Node c : n.children()) if (hasJoinedChat(c)) return true;
+        return false;
     }
 
     /** Unread messages in a node: the same "demands attention" rule as the inbox (no muted/archived/low priority). */
