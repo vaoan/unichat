@@ -176,8 +176,12 @@ foreach ($b in $Active) {
             $expr += ' | .network.mode = "instagram" | .appservice.bot.displayname = "Instagram bridge bot"'
         }
         # Rooms only for the 50 most recent WhatsApp chats; older ones appear when a message arrives.
+        # Chats archived on the phone get Unichat's archive tag (u.archived, see SyncProcessor.TAG_ARCHIVED), also
+        # when archived later: tags keep syncing instead of only at room creation. One-way: WhatsApp -> Unichat.
         if ($b -eq "whatsapp") {
             $expr += ' | .network.history_sync.max_initial_conversations = 50'
+            $expr += ' | .network.archive_tag = "u.archived"'
+            $expr += ' | .bridge.only_bridge_tags = ["m.favourite", "m.lowpriority", "u.archived"] | .bridge.tag_only_on_create = false'
         }
         if ($b -eq "telegram") {
             $vars.TG_API_ID = $TgId; $vars.TG_API_HASH = $TgHash

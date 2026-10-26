@@ -163,8 +163,12 @@ for b in $ACTIVE; do
     fi
     # Create rooms only for the 50 most recent WhatsApp chats; older ones appear when a message arrives
     # (creating every conversation from history overloads Synapse for many minutes).
+    # Chats archived on the phone get Unichat's archive tag (u.archived, see SyncProcessor.TAG_ARCHIVED), also
+    # when archived later: tags keep syncing instead of only at room creation. One-way: WhatsApp -> Unichat.
     if [ "$b" = whatsapp ]; then
-      expr="$expr"' | .network.history_sync.max_initial_conversations = 50'
+      expr="$expr"' | .network.history_sync.max_initial_conversations = 50
+        | .network.archive_tag = "u.archived"
+        | .bridge.only_bridge_tags = ["m.favourite", "m.lowpriority", "u.archived"] | .bridge.tag_only_on_create = false'
     fi
     if [ "$b" = telegram ]; then
       export TG_API_ID="$TELEGRAM_API_ID" TG_API_HASH="$TELEGRAM_API_HASH"
