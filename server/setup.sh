@@ -161,6 +161,11 @@ for b in $ACTIVE; do
     if [ "$b" = instagram ]; then
       expr="$expr"' | .network.mode = "instagram" | .appservice.bot.displayname = "Instagram bridge bot"'
     fi
+    # Create rooms only for the 50 most recent WhatsApp chats; older ones appear when a message arrives
+    # (creating every conversation from history overloads Synapse for many minutes).
+    if [ "$b" = whatsapp ]; then
+      expr="$expr"' | .network.history_sync.max_initial_conversations = 50'
+    fi
     if [ "$b" = telegram ]; then
       export TG_API_ID="$TELEGRAM_API_ID" TG_API_HASH="$TELEGRAM_API_HASH"
       expr="$expr"' | .network.api_id = env(TG_API_ID) | .network.api_hash = strenv(TG_API_HASH)'
@@ -199,6 +204,8 @@ docker run --rm --user root -v "$PWD/data:/data" --entrypoint sh "$YQ_IMAGE" -c 
 # Personal server: the default message/login rate limits are too tight when connecting several bridges
 # in a row (createRoom counts as a message). Failed-login limits stay at Synapse's defaults.
 export APPSERVICES
+# Presence (online/offline of every bridged contact) is the main background load on a small Synapse.
+yq_edit synapse/homeserver.yaml '.presence.enabled = false'
 yq_edit synapse/homeserver.yaml '.database = {"name": "psycopg2", "args": {"user": "unichat",
     "password": strenv(PG_PASS), "database": "synapse", "host": "postgres", "cp_min": 5, "cp_max": 10}}
   | .enable_registration = false

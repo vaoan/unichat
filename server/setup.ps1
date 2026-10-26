@@ -175,6 +175,10 @@ foreach ($b in $Active) {
         if ($b -eq "instagram") {
             $expr += ' | .network.mode = "instagram" | .appservice.bot.displayname = "Instagram bridge bot"'
         }
+        # Rooms only for the 50 most recent WhatsApp chats; older ones appear when a message arrives.
+        if ($b -eq "whatsapp") {
+            $expr += ' | .network.history_sync.max_initial_conversations = 50'
+        }
         if ($b -eq "telegram") {
             $vars.TG_API_ID = $TgId; $vars.TG_API_HASH = $TgHash
             $expr += ' | .network.api_id = env(TG_API_ID) | .network.api_hash = strenv(TG_API_HASH)'
@@ -210,6 +214,8 @@ if ($LASTEXITCODE -ne 0) { throw "No se pudieron copiar los registros de los bri
 
 # Personal server: the default message/login rate limits are too tight when connecting several bridges
 # in a row (createRoom counts as a message). Failed-login limits stay at Synapse's defaults.
+# Presence (online/offline of every bridged contact) is the main background load on a small Synapse.
+Invoke-YqEdit "synapse/homeserver.yaml" '.presence.enabled = false'
 Invoke-YqEdit "synapse/homeserver.yaml" ('.database = {"name": "psycopg2", "args": {"user": "unichat",' +
     ' "password": strenv(PG_PASS), "database": "synapse", "host": "postgres", "cp_min": 5, "cp_max": 10}}' +
     ' | .enable_registration = false | .rc_message = {"per_second": 10, "burst_count": 100}' +
