@@ -24,4 +24,12 @@ class ChatResyncTest {
         assertEquals("!telegram sync-chats", MatrixChatService.botCommand(Network.TELEGRAM, "sync-chats"));
         assertEquals(100, BridgeConfig.TELEGRAM_CREATE_LIMIT);
     }
+
+    @Test
+    void aBrokenBotRoomIsRecognised() {
+        assertTrue(MatrixChatService.brokenRoom(new MatrixException(500, "M_UNKNOWN",
+                "cannot create a non-create event in a room with no forward extremities in !x:localhost")));
+        assertFalse(MatrixChatService.brokenRoom(new MatrixException(403, "M_FORBIDDEN", "not in room")));
+        assertFalse(MatrixChatService.brokenRoom(new java.io.IOException("timeout")));
+    }
 }

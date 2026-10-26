@@ -1663,8 +1663,12 @@ public final class MatrixChatService implements ChatService {
     /** After the first sync: re-check networks with no cache, no logins, or a cache over 6 h old. */
     private void refreshStaleLogins() {
         for (Network n : Network.values()) {
-            if (!n.isBridged() || findBotRoom(n) == null) continue;
+            if (!n.isBridged()) continue;
             List<Login> known = logins.get(n);
+            // Cached logins skip refreshLoginsNow, which also checks this; logins made through the bridge API
+            // have no bot chat, so this comes before that check.
+            if (known != null && !known.isEmpty()) maybeResyncChats(n, known);
+            if (findBotRoom(n) == null) continue;
             long ts = loginsCachedAt.getOrDefault(n, 0L);
             // An empty cache ("not logged in") is always re-checked: a login may have happened since.
             if (known == null || known.isEmpty() || System.currentTimeMillis() - ts > LOGINS_MAX_AGE_MS) refreshLogins(n);
@@ -1731,6 +1735,33 @@ public final class MatrixChatService implements ChatService {
         return roomId;
     }
 
+    /** A room the homeserver can no longer write to ("no forward extremities"): only replacing it helps. */
+    static boolean brokenRoom(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t.getMessage() != null && t.getMessage().contains("no forward extremities")) return true;
+        }
+        return false;
+    }
+
+    private void abandonRoom(String roomId) {
+        for (String step : List.of("/leave", "/forget")) {
+            try {
+                client.post(CLIENT + "/rooms/" + enc(roomId) + step, null);
+            } catch (Exception ignored) {
+                // A broken room may refuse even this; dropping it locally is what matters.
+            }
+        }
+        synchronized (proc) {
+            proc.removeRoom(roomId);
+        }
+        // If the server still lists it as joined, never pick it as the bot chat again.
+        String known = Settings.get().getString("matrix.brokenRooms", "");
+        if (!java.util.Arrays.asList(known.split(",")).contains(roomId)) {
+            Settings.get().set("matrix.brokenRooms", known.isEmpty() ? roomId : known + "," + roomId);
+        }
+        fire(Listener::chatsChanged);
+    }
+
     /** Whether Telegram's chats should be listed again: never done, or done for a lower limit than now. */
     static boolean needsChatResync(String doneForLimit, int limit) {
         return !Integer.toString(limit).equals(doneForLimit);
@@ -1756,9 +1787,20 @@ public final class MatrixChatService implements ChatService {
         if (n != Network.TELEGRAM || parsed.isEmpty() || provisioner == null) return;
         if (!needsChatResync(Settings.get().getString("telegram.chatSyncLimit", null), app.unichat.server.BridgeConfig.TELEGRAM_CREATE_LIMIT)) return;
         if (!resyncStarted.add(n)) return;
-        syncChats(n).whenComplete((r, err) -> {
-            if (err != null) System.err.println("Telegram chat resync failed: " + err.getClass().getSimpleName());
-        });
+        resyncAttempt(n, 1);
+    }
+
+    /** Right after start the server and bridges are still settling: wait a bit, and retry a failed attempt. */
+    private void resyncAttempt(Network n, int attempt) {
+        CompletableFuture.delayedExecutor(attempt == 1 ? 20 : 45, java.util.concurrent.TimeUnit.SECONDS, io).execute(() ->
+                syncChats(n).whenComplete((r, err) -> {
+                    if (err == null) return;
+                    Throwable root = err;
+                    while (root.getCause() != null) root = root.getCause();
+                    System.err.println("Telegram chat resync attempt " + attempt + " failed: " + root.getClass().getSimpleName()
+                            + ": " + root.getMessage());
+                    if (attempt < 3) resyncAttempt(n, attempt + 1);
+                }));
     }
 
     private final Set<Network> resyncStarted = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -1771,7 +1813,16 @@ public final class MatrixChatService implements ChatService {
     private String botQuery(Network n, String command, int seconds) throws IOException, InterruptedException {
         String roomId = botRoom(n);
         int before = botMessageCount(roomId);
-        sendCommand(roomId, botCommand(n, command));
+        try {
+            sendCommand(roomId, botCommand(n, command));
+        } catch (RuntimeException | IOException e) {
+            if (!brokenRoom(e)) throw e;
+            // The homeserver lost this room's state (nothing can be sent there any more): start a fresh bot chat.
+            abandonRoom(roomId);
+            roomId = botRoom(n);
+            before = botMessageCount(roomId);
+            sendCommand(roomId, botCommand(n, command));
+        }
         for (int i = 0; i < seconds * 2; i++) {
             Thread.sleep(500);
             String reply = botReplyAfter(roomId, before);
@@ -1781,9 +1832,10 @@ public final class MatrixChatService implements ChatService {
     }
 
     private String findBotRoom(Network n) {
+        List<String> broken = java.util.Arrays.asList(Settings.get().getString("matrix.brokenRooms", "").split(","));
         synchronized (proc) {
             for (MatrixRoom r : proc.rooms()) {
-                if (r.chat.bridgeBot() && r.chat.network() == n && !r.invite) return r.id;
+                if (r.chat.bridgeBot() && r.chat.network() == n && !r.invite && !broken.contains(r.id)) return r.id;
             }
         }
         return null;
