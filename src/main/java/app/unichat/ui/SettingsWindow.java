@@ -69,7 +69,7 @@ public final class SettingsWindow {
         BorderPane content = new BorderPane();
         content.getStyleClass().add("settings-content");
         ListView<String> nav = new ListView<>();
-        nav.getItems().addAll("Cuentas", "Perfil", "Apariencia", "Accesibilidad", "Notificaciones", "Privacidad", "GIFs", "Atajos de teclado", "Acerca de");
+        nav.getItems().addAll("Cuentas", "Perfil", "Apariencia", "Accesibilidad", "Notificaciones", "Privacidad", "Redes", "GIFs", "Atajos de teclado", "Acerca de");
         nav.getStyleClass().add("settings-nav");
         nav.setPrefWidth(200);
         nav.getSelectionModel().selectedItemProperty().addListener((o, a, s) -> {
@@ -89,6 +89,7 @@ public final class SettingsWindow {
                 case "Accesibilidad" -> accessibilityPage(onAppearanceChanged);
                 case "Notificaciones" -> notificationsPage();
                 case "Privacidad" -> privacyPage();
+                case "Redes" -> networksPage();
                 case "GIFs" -> gifsPage();
                 case "Atajos de teclado" -> shortcutsPage();
                 case "Acerca de" -> aboutPage();
@@ -380,6 +381,45 @@ public final class SettingsWindow {
                 row("Borrar registros después de", "Sirven para diagnosticar errores. No guardan nombres, números, "
                         + "mensajes ni contraseñas.", days),
                 row("Borrar ahora", "De Unichat, del servidor y de los puentes.", clear));
+    }
+
+    /** Options that only make sense for one network; each network gets its own group. */
+    private static Node networksPage() {
+        Label intro = new Label("Opciones que solo existen en una red.");
+        intro.setWrapText(true);
+        intro.getStyleClass().add("settings-help");
+        return page("Redes", intro, group("WhatsApp",
+                row("Stickers animados", "WhatsApp no acepta los stickers animados de otras redes tal cual. Sticker: se "
+                        + "convierte en sticker animado. GIF: llega como un GIF que se repite. Video: llega como un video corto.",
+                        stickerModeChoice(app.unichat.model.Network.WHATSAPP))));
+    }
+
+    private static Node stickerModeChoice(app.unichat.model.Network n) {
+        Settings s = Settings.get();
+        String key = app.unichat.matrix.StickerConverter.modeKey(n);
+        app.unichat.matrix.StickerConverter.Mode current = app.unichat.matrix.StickerConverter.mode(n);
+        ToggleGroup tg = new ToggleGroup();
+        HBox box = new HBox(6);
+        box.setAccessibleText("Cómo enviar stickers animados a " + n.displayName());
+        for (var m : app.unichat.matrix.StickerConverter.Mode.values()) {
+            String label = switch (m) {
+                case STICKER -> "Sticker";
+                case GIF -> "GIF";
+                case VIDEO -> "Video";
+            };
+            ToggleButton b = new ToggleButton(label);
+            b.getStyleClass().add("chip");
+            b.setMinWidth(Region.USE_PREF_SIZE);
+            b.setToggleGroup(tg);
+            b.setSelected(m == current);
+            b.setAccessibleText("Enviar stickers animados de " + n.displayName() + " como " + label);
+            b.setOnAction(e -> {
+                if (!b.isSelected()) b.setSelected(true);
+                s.set(key, m.name());
+            });
+            box.getChildren().add(b);
+        }
+        return box;
     }
 
     /**

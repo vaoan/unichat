@@ -105,4 +105,30 @@ class SendStickerTest {
         assertTrue(sent.path("info").path("fi.mau.bridged_sticker").isMissingNode(), "it's no longer that network's sticker");
         assertTrue(sent.path("info").path("size").asLong() != 999, "size describes the new file");
     }
+
+    private JsonNode sendAs(StickerConverter.Mode mode) throws Exception {
+        MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
+        app.unichat.model.RoomFeatures wa = app.unichat.model.RoomFeatures.parse(MatrixClient.JSON.readTree(
+                "{\"id\":\"wa\",\"file\":{\"m.sticker\":{\"mime_types\":{\"image/webp\":2}},\"m.video\":{\"mime_types\":{\"video/mp4\":2}}}}"));
+        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/gif", "image/gif", 16, 16, null), wa, mode)
+                .get(30, TimeUnit.SECONDS);
+        assertTrue(path.contains("/send/m.room.message/"), path);
+        assertEquals("video/mp4", uploadedType);
+        return MatrixClient.JSON.readTree(body);
+    }
+
+    @Test
+    void chosenGifGoesAsALoopingWhatsappGif() throws Exception {
+        JsonNode sent = sendAs(StickerConverter.Mode.GIF);
+        assertEquals("m.video", sent.path("msgtype").asText());
+        assertEquals("video/mp4", sent.path("info").path("mimetype").asText());
+        assertTrue(sent.path("info").path("fi.mau.gif").asBoolean(), "WhatsApp plays it as a GIF");
+    }
+
+    @Test
+    void chosenVideoGoesAsAPlainVideo() throws Exception {
+        JsonNode sent = sendAs(StickerConverter.Mode.VIDEO);
+        assertEquals("m.video", sent.path("msgtype").asText());
+        assertTrue(sent.path("info").path("fi.mau.gif").isMissingNode());
+    }
 }

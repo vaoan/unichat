@@ -25,6 +25,8 @@ Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix
   AWT TrayIcon when it's missing or dies. run-dev.sh builds it; package.sh ships it as `Contents/app/native/UnichatBar`.
 - `native/fetch-gif2webp.sh` — pinned libwebp `gif2webp` shipped in `app/server/` (Windows: pinned in package.ps1);
   `matrix/StickerConverter` uses it when a chat's room_features refuse a sticker's MIME (GIF → WebP on WhatsApp).
+  Ajustes → Redes (`<network>.animatedStickers` = STICKER|GIF|VIDEO) can send them as mp4 instead (`GifFrames` +
+  JCodec, pure Java).
 - `package.sh` / `package.ps1` — jpackage; `.github/workflows/build.yml` builds Windows zip/msi + macOS dmg.
 
 ## Checking UI changes

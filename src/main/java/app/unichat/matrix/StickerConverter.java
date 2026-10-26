@@ -15,10 +15,60 @@ import java.util.concurrent.TimeUnit;
  * which format to send instead, and the conversion. GIF → animated WebP uses libwebp's {@code gif2webp}, shipped
  * inside the app; without it the first frame goes out as a still PNG.
  */
-final class StickerConverter {
+public final class StickerConverter {
     static final String WEBP = "image/webp", PNG = "image/png";
 
     record Result(Path file, String mime) {}
+
+    /** How a network gets animated (GIF) stickers: Ajustes → Redes. */
+    public enum Mode { STICKER, GIF, VIDEO }
+
+    public static String modeKey(app.unichat.model.Network n) {
+        return n.name().toLowerCase(Locale.ROOT) + ".animatedStickers";
+    }
+
+    public static Mode mode(app.unichat.model.Network n) {
+        String v = app.unichat.settings.Settings.get().getString(modeKey(n), Mode.STICKER.name());
+        try {
+            return Mode.valueOf(v);
+        } catch (IllegalArgumentException e) {
+            return Mode.STICKER;
+        }
+    }
+
+    private static final int FPS = 25;
+    /** Short stickers are looped up to this long, so a video isn't over before it's seen. */
+    private static final int MIN_VIDEO_MS = 3000;
+
+    /**
+     * An animated GIF as an H.264 mp4 (JCodec, pure Java: no ffmpeg on Windows). Transparent areas become white
+     * and odd sizes are padded to even, as H.264 needs. Written as {@code sticker.mp4} in a new folder under {@code dir}.
+     */
+    static Result toMp4(Path gif, Path dir) throws IOException {
+        java.util.List<GifFrames.Frame> frames = GifFrames.read(gif);
+        if (frames.isEmpty()) throw new IOException("El GIF no tiene cuadros");
+        int w = frames.get(0).image().getWidth(), h = frames.get(0).image().getHeight();
+        int ew = w + (w & 1), eh = h + (h & 1);
+        Files.createDirectories(dir);
+        Path out = Files.createTempDirectory(dir, "sticker").resolve("sticker.mp4");
+        org.jcodec.api.awt.AWTSequenceEncoder enc = org.jcodec.api.awt.AWTSequenceEncoder.createSequenceEncoder(out.toFile(), FPS);
+        int total = 0;
+        do {
+            for (GifFrames.Frame f : frames) {
+                BufferedImage flat = new BufferedImage(ew, eh, BufferedImage.TYPE_3BYTE_BGR);
+                java.awt.Graphics2D g = flat.createGraphics();
+                g.setColor(java.awt.Color.WHITE);
+                g.fillRect(0, 0, ew, eh);
+                g.drawImage(f.image(), 0, 0, null);
+                g.dispose();
+                int repeats = Math.max(1, Math.round(f.delayMs() * FPS / 1000f));
+                for (int i = 0; i < repeats; i++) enc.encodeImage(flat);
+                total += repeats * 1000 / FPS;
+            }
+        } while (total < MIN_VIDEO_MS);
+        enc.finish();
+        return new Result(out, "video/mp4");
+    }
 
     private StickerConverter() {}
 

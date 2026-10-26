@@ -644,7 +644,33 @@ public final class MatrixChatService implements ChatService {
     @Override
     public CompletableFuture<Void> sendSticker(String chatId, app.unichat.model.MediaLibrary.Item item) {
         Chat c = chat(chatId);
-        return sendSticker(chatId, item, c == null ? app.unichat.model.RoomFeatures.UNKNOWN : c.features());
+        return sendSticker(chatId, item, c == null ? app.unichat.model.RoomFeatures.UNKNOWN : c.features(),
+                c == null ? StickerConverter.Mode.STICKER : StickerConverter.mode(c.network()));
+    }
+
+    /**
+     * {@code mode} GIF/VIDEO (the network's choice in Ajustes → Redes): an animated GIF sticker goes out as an mp4,
+     * flagged as a GIF (it loops, like WhatsApp's GIFs) or as a plain video.
+     */
+    CompletableFuture<Void> sendSticker(String chatId, app.unichat.model.MediaLibrary.Item item,
+                                        app.unichat.model.RoomFeatures features, StickerConverter.Mode mode) {
+        String mime = item.info() != null && item.info().hasNonNull("mimetype") ? item.info().path("mimetype").asText() : item.mime();
+        if (mode == StickerConverter.Mode.STICKER || !"image/gif".equals(mime)) return sendSticker(chatId, item, features);
+        return media(item.url(), 0, 0).thenApplyAsync(src -> {
+            try {
+                return StickerConverter.toMp4(src, Settings.get().cacheDir().resolve("stickers"));
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            }
+        }, io).thenCompose(r -> sendMedia(chatId, r.file(), null, r.mime(), item.width(), item.height(),
+                mode == StickerConverter.Mode.GIF).whenComplete((v, err) -> {
+            try {
+                Files.deleteIfExists(r.file());
+                Files.deleteIfExists(r.file().getParent());
+            } catch (IOException ignored) {
+                // left in the cache folder
+            }
+        }));
     }
 
     /** Sends {@code item}; when the chat refuses its format (a GIF on WhatsApp) a converted copy is uploaded first. */
