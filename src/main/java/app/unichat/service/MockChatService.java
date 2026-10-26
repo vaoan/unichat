@@ -131,6 +131,43 @@ public final class MockChatService implements ChatService {
                 : CompletableFuture.failedFuture(new UnsupportedOperationException("syncChats"));
     }
 
+    /** A demo Discord server you're in that doesn't come into Unichat until you add it. */
+    public static final String OFFERED_GUILD_ID = "900000000000000001";
+
+    /** Demo/tests: no Discord server in Unichat yet, like right after logging in. */
+    public void dropDemoServer() {
+        for (String id : List.of("!servidor:demo", "!srv-general:demo", "!srv-memes:demo")) chats.remove(id);
+        fireChats();
+    }
+
+    private volatile boolean offerAdded;
+
+    @Override
+    public CompletableFuture<List<GroupOffer>> groupOffers(Network network) {
+        return later(() -> network == Network.DISCORD && !offerAdded
+                ? List.of(new GroupOffer(OFFERED_GUILD_ID, "Servidor de juegos")) : List.of());
+    }
+
+    @Override
+    public CompletableFuture<Void> addGroup(Network network, String offerId) {
+        if (network != Network.DISCORD || !OFFERED_GUILD_ID.equals(offerId)) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("unknown server"));
+        }
+        return later(() -> {
+            offerAdded = true;
+            Chat space = new Chat("!juegos:demo");
+            space.setNetwork(Network.DISCORD);
+            space.setTitle("Servidor de juegos");
+            space.setSpace(true);
+            space.setSpaceChildren(List.of("!juegos-general:demo"));
+            chats.put(space.id(), space);
+            ChatBuilder.group(this, "juegos-general", Network.DISCORD, "#general", "xNico")
+                    .in(-100, "xNico", "¿Quién juega hoy?").done();
+            fireChats();
+            return null;
+        });
+    }
+
     private volatile boolean failJoins;
 
     /** Demo/tests: every join is refused (a channel you lost access to). */

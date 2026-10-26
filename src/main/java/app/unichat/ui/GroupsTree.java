@@ -40,7 +40,14 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
     private Consumer<String> toast = t -> { };
     /** How long a joined channel may take to arrive before we stop waiting to open it (tests shorten it). */
     static long joinWaitMs = 30_000;
+    /** Tree ids of servers you're in that don't come into Unichat yet ({@link ChatService#groupOffers}). */
+    static final String OFFER_PREFIX = "offer:";
     private String selectedId;
+    /** Per network: servers you could add, asked once to the bridge. */
+    private final Map<Network, List<ChatService.GroupOffer>> offers = new ConcurrentHashMap<>();
+    private final Set<Network> offersAsked = new HashSet<>();
+    private final Set<String> adding = new HashSet<>();
+    private Runnable onOffersChanged = () -> { };
 
     GroupsTree(ChatService svc, Consumer<Chat> onOpen) {
         this.svc = svc;
@@ -50,6 +57,7 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
         setShowRoot(false);
         setRoot(new TreeItem<>());
         setCellFactory(v -> new Cell());
+        expanded.add(SpaceTree.OFFERS_ID);
         // Arrowing through the tree is remembered, so a redraw from incoming messages keeps your place.
         getSelectionModel().selectedItemProperty().addListener((o, a, b) -> {
             if (!rebuilding && b != null && b.getValue() != null) selectedId = b.getValue().id();
@@ -66,9 +74,27 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
         this.toast = toast;
     }
 
+    /** Called when the servers you could add arrive or change (they can make the Grupos choice appear). */
+    void setOnOffersChanged(Runnable r) {
+        this.onOffersChanged = r;
+    }
+
+    private List<ChatService.GroupOffer> offers(Network n) {
+        if (offersAsked.add(n)) {
+            svc.groupOffers(n).whenComplete((l, err) -> {
+                if (err != null || l.isEmpty()) return;
+                Platform.runLater(() -> {
+                    offers.put(n, l);
+                    onOffersChanged.run();
+                });
+            });
+        }
+        return offers.getOrDefault(n, List.of());
+    }
+
     /** Whether {@code n} has any server/group (so the Bandeja | Grupos choice makes sense). */
     boolean hasGroups(Network n, String account) {
-        return SpaceTree.build(svc.chats(), n, account, names).stream().anyMatch(x -> !x.loose());
+        return !offers(n).isEmpty() || SpaceTree.build(svc.chats(), n, account, names).stream().anyMatch(x -> !x.loose());
     }
 
     void refresh(Network n, String account) {
@@ -86,6 +112,12 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
         }
         List<SpaceTree.Node> roots = SpaceTree.build(chats, n, account, names);
         askNames(roots);
+        List<SpaceTree.Node> offered = offers(n).stream()
+                .map(o -> new SpaceTree.Node(OFFER_PREFIX + o.id(), null, o.name(), List.of())).toList();
+        if (!offered.isEmpty()) {
+            roots = new java.util.ArrayList<>(roots);
+            roots.add(new SpaceTree.Node(SpaceTree.OFFERS_ID, null, "Otros servidores", offered));
+        }
         TreeItem<SpaceTree.Node> selected = null;
         rebuilding = true;
         getRoot().getChildren().clear();
@@ -141,7 +173,9 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
     private void act(TreeItem<SpaceTree.Node> item) {
         if (item == null || item.getValue() == null) return;
         SpaceTree.Node n = item.getValue();
-        if (n.container()) {
+        if (n.id().startsWith(OFFER_PREFIX)) {
+            add(n);
+        } else if (n.container()) {
             item.setExpanded(!item.isExpanded());
         } else if (n.joined()) {
             selectedId = n.id();
@@ -169,6 +203,24 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
             });
             pendingTimeout.play();
         }
+    }
+
+    /** Brings a server into Unichat; a big one takes minutes (the bridge makes a room per channel). */
+    private void add(SpaceTree.Node n) {
+        String id = n.id().substring(OFFER_PREFIX.length()), name = n.name();
+        Network net = network;
+        if (!adding.add(id)) return;
+        toast.accept("Agregando " + name + "… si es grande puede tardar unos minutos");
+        svc.addGroup(net, id).whenComplete((v, err) -> Platform.runLater(() -> {
+            adding.remove(id);
+            if (err != null) {
+                toast.accept("No se pudo agregar " + name + ". Prueba de nuevo en un momento.");
+                return;
+            }
+            offers.computeIfPresent(net, (k, l) -> l.stream().filter(o -> !o.id().equals(id)).toList());
+            toast.accept(name + " ya está en Unichat");
+            onOffersChanged.run();
+        }));
     }
 
     private String childWord() {
@@ -211,13 +263,16 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
             }
             name.setText(n.name());
             boolean container = n.container();
-            avatar.setVisible(!n.loose());
-            avatar.setManaged(!n.loose());
-            if (!n.loose()) avatar.set(n.name(), n.id(), n.chat() == null ? null : n.chat().avatarUrl(), svc);
+            boolean plain = n.loose() || n.offers();
+            avatar.setVisible(!plain);
+            avatar.setManaged(!plain);
+            if (!plain) avatar.set(n.name(), n.id(), n.chat() == null ? null : n.chat().avatarUrl(), svc);
             int unread = SpaceTree.unread(n);
             badge.setText(unread > 99 ? "99+" : Integer.toString(unread));
             badge.setVisible(unread > 0);
             badge.setManaged(unread > 0);
+            boolean offer = n.id().startsWith(OFFER_PREFIX);
+            join.setText(offer ? (adding.contains(n.id().substring(OFFER_PREFIX.length())) ? "Agregando…" : "Agregar") : "Unirse");
             join.setVisible(!n.joined() && !container);
             join.setManaged(!n.joined() && !container);
             pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("container"), container);
@@ -226,10 +281,11 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
             setText(null);
             StringBuilder a = new StringBuilder(n.name());
             if (container) {
-                a.append(", ").append(n.children().size()).append(' ').append(n.loose() ? "chats" : childWord());
+                a.append(", ").append(n.children().size()).append(' ')
+                        .append(n.loose() ? "chats" : n.offers() ? "servidores" : childWord());
             }
             if (unread > 0) a.append(", ").append(unread).append(" sin leer");
-            if (!n.joined() && !container) a.append(", Unirse");
+            if (!n.joined() && !container) a.append(", ").append(join.getText());
             if (container) a.append(getTreeItem() != null && getTreeItem().isExpanded() ? ", desplegado" : ", contraído");
             setAccessibleText(a.toString());
         }

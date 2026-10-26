@@ -243,6 +243,38 @@ class GroupsUiTest {
         svc.stop();
     }
 
+    @Test
+    void discordWithNoServerInUnichatStillShowsYourServers() throws Exception {
+        Scene scene = open(Network.DISCORD);
+        svc.dropDemoServer(); // like a fresh Discord login: the bridge brings no server by itself
+        Thread.sleep(400);
+        assertTrue(fx(() -> toggle(scene) != null && toggle(scene).isVisible()), "Grupos offered for the servers you're in");
+        fx(() -> { button(scene, "Grupos").fire(); return null; });
+        Thread.sleep(300);
+        List<String> rows = fx(() -> rowTexts(scene));
+        assertTrue(rows.stream().anyMatch(r -> r.startsWith("Otros servidores") && r.contains("1 servidores")), rows.toString());
+        assertTrue(rows.stream().anyMatch(r -> r.startsWith("Servidor de juegos") && r.contains("Agregar")), rows.toString());
+        svc.stop();
+    }
+
+    @Test
+    void addingAServerBringsItWithItsChannels() throws Exception {
+        Scene scene = open(Network.DISCORD);
+        fx(() -> { button(scene, "Grupos").fire(); return null; });
+        Thread.sleep(300);
+        TreeView<SpaceTree.Node> tree = fx(() -> tree(scene));
+        int offer = fx(() -> indexOf(tree, GroupsTree.OFFER_PREFIX + MockChatService.OFFERED_GUILD_ID));
+        fx(() -> { tree.requestFocus(); tree.getSelectionModel().select(offer); return null; });
+        key(tree, KeyCode.ENTER);
+        Thread.sleep(500);
+        assertTrue(svc.chats().stream().anyMatch(c -> c.space() && "Servidor de juegos".equals(c.title())), "the server came in");
+        List<String> rows = fx(() -> rowTexts(scene));
+        assertTrue(rows.stream().anyMatch(r -> r.startsWith("Servidor de juegos") && r.contains("1 canales")), rows.toString());
+        assertTrue(rows.stream().noneMatch(r -> r.startsWith("Otros servidores")), "no longer offered: " + rows);
+        assertTrue(toastText(scene).contains("Servidor de juegos"), toastText(scene));
+        svc.stop();
+    }
+
     private static int indexOf(TreeView<SpaceTree.Node> tree, String id) {
         for (int i = 0; i < tree.getExpandedItemCount(); i++) {
             if (tree.getTreeItem(i) != null && id.equals(tree.getTreeItem(i).getValue().id())) return i;

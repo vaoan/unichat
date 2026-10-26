@@ -1719,6 +1719,36 @@ public final class MatrixChatService implements ChatService {
         }, io);
     }
 
+    /** Discord servers you're in that aren't bridged yet: the Grupos view offers them. */
+    @Override
+    public CompletableFuture<List<GroupOffer>> groupOffers(Network network) {
+        if (network != Network.DISCORD || accounts().stream().noneMatch(a -> a.network() == Network.DISCORD
+                && a.status() == app.unichat.model.AccountStatus.CONNECTED)) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return discordGuilds().thenApply(gs -> gs.stream().filter(g -> !g.bridged())
+                .map(g -> new GroupOffer(g.id(), g.name())).toList());
+    }
+
+    /**
+     * Bridges a whole Discord server ({@code --entire}: a room for every channel, so the Grupos tree shows them
+     * all). Big servers take a while: the bridge answers once every channel room exists.
+     */
+    @Override
+    public CompletableFuture<Void> addGroup(Network network, String offerId) {
+        if (network != Network.DISCORD) return ChatService.super.addGroup(network, offerId);
+        return CompletableFuture.runAsync(() -> {
+            try {
+                String reply = botQuery(Network.DISCORD, "guilds bridge " + offerId + " --entire", 600);
+                if (!reply.startsWith("Successfully")) throw new MatrixException(0, null, reply);
+            } catch (MatrixException e) {
+                throw new java.util.concurrent.CompletionException(e);
+            } catch (Exception e) {
+                throw new java.util.concurrent.CompletionException(new MatrixException(userMessage(e), e));
+            }
+        }, io);
+    }
+
     /** The chat with {@code n}'s bridge bot, created when there's none (logins through the bridge API don't make one). */
     private String botRoom(Network n) throws IOException, InterruptedException {
         String roomId = findBotRoom(n);

@@ -152,6 +152,19 @@ public interface ChatService {
         return CompletableFuture.failedFuture(new UnsupportedOperationException("joinChat"));
     }
 
+    /** A server/group you're in on {@code network} that doesn't come into Unichat yet (a Discord server). */
+    record GroupOffer(String id, String name) {}
+
+    /** Servers/groups of {@code network} you could add ({@link #addGroup}); empty when the network has none. */
+    default CompletableFuture<List<GroupOffer>> groupOffers(Network network) {
+        return CompletableFuture.completedFuture(List.of());
+    }
+
+    /** Brings one of {@link #groupOffers} into Unichat with all its channels. */
+    default CompletableFuture<Void> addGroup(Network network, String offerId) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("addGroup"));
+    }
+
     /** Names of a space's direct children, including ones you haven't joined (room id → name). */
     default CompletableFuture<java.util.Map<String, String>> spaceNames(String spaceId) {
         return CompletableFuture.completedFuture(java.util.Map.of());

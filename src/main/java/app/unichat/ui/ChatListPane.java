@@ -58,6 +58,7 @@ public final class ChatListPane extends VBox {
         this.svc = svc;
         this.onOpen = onOpen;
         this.groups = new GroupsTree(svc, c -> open(c));
+        groups.setOnOffersChanged(this::refresh);
         getStyleClass().add("chat-list-pane");
 
         title.getStyleClass().add("pane-title");
