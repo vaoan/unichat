@@ -339,7 +339,45 @@ public final class SettingsWindow {
                         toggle(s.sendReadReceipts(), s::setSendReadReceipts)),
                 row("Indicador de escritura", "Los demás ven cuando estás escribiendo.",
                         toggle(s.sendTypingNotifications(), s::setSendTypingNotifications))),
-                group("Datos locales", row("Carpeta de datos", s.dir().toString(), new Label())));
+                group("Datos locales", row("Carpeta de datos", s.dir().toString(), new Label())),
+                logsGroup(s));
+    }
+
+    /** Logs never hold personal data (Redactor) and are deleted after the chosen days (LogFiles). */
+    private static Node logsGroup(Settings s) {
+        ToggleGroup tg = new ToggleGroup();
+        HBox days = new HBox(6);
+        for (int d : new int[]{1, 7, 30}) {
+            ToggleButton b = new ToggleButton(d == 1 ? "1 día" : d + " días");
+            b.getStyleClass().add("chip");
+            b.setMinWidth(Region.USE_PREF_SIZE);
+            b.setToggleGroup(tg);
+            b.setSelected(s.logRetentionDays() == d);
+            b.setAccessibleText("Borrar registros después de " + b.getText());
+            b.setOnAction(e -> {
+                if (!b.isSelected()) b.setSelected(true);
+                s.setLogRetentionDays(d);
+                Thread.ofVirtual().start(() -> app.unichat.LogFiles.cleanOld(app.unichat.LogFiles.roots(),
+                        java.time.Duration.ofDays(d), java.time.Instant.now()));
+            });
+            days.getChildren().add(b);
+        }
+        Button clear = new Button("Borrar registros ahora");
+        clear.getStyleClass().add("secondary-button");
+        clear.setOnAction(e -> {
+            clear.setDisable(true);
+            Thread.ofVirtual().start(() -> {
+                app.unichat.LogFiles.clearAll(app.unichat.LogFiles.roots());
+                javafx.application.Platform.runLater(() -> {
+                    clear.setText("Registros borrados");
+                    clear.setDisable(false);
+                });
+            });
+        });
+        return group("Registros (logs)",
+                row("Borrar registros después de", "Sirven para diagnosticar errores. No guardan nombres, números, "
+                        + "mensajes ni contraseñas.", days),
+                row("Borrar ahora", "De Unichat, del servidor y de los puentes.", clear));
     }
 
     private static Node shortcutsPage() {

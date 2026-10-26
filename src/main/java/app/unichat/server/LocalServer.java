@@ -185,7 +185,7 @@ public final class LocalServer {
 
     private void startBridge(String b) throws IOException {
         Path bd = dir.resolve(b);
-        supervisor.start(b, bd, List.of(store.path(b).toString(), "-c", "config.yaml"), bd.resolve(b + ".out"));
+        supervisor.start(b, bd, List.of(store.path(b).toString(), "-c", "config.yaml"), bd.resolve("bridge.log"));
     }
 
     private static void awaitPort(int port, int seconds) throws IOException, InterruptedException {

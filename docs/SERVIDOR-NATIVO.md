@@ -42,7 +42,7 @@ server/
   CREDENCIALES.txt     usuario y contraseña de la cuenta (privado)
   tuwunel/             tuwunel.toml + base de datos (db/)
   appservices/         registro de cada puente (tuwunel los lee de aquí al arrancar)
-  <red>/               config.yaml, registration.yaml, <red>.db (SQLite) y bridge.log de cada puente
+  <red>/               config.yaml, registration.yaml, <red>.db (SQLite) y bridge.log (filtrado) de cada puente
   run/                 PID de cada proceso en marcha
   bridges.active       puentes activos
 ```
@@ -115,7 +115,17 @@ La app instalada no tiene consola; todo queda en archivos:
 |---|---|
 | Unichat | `~/Library/Application Support/Unichat/logs/unichat.log` (el anterior: `unichat.log.1`, al pasar 5 MB) |
 | Servidor | `~/Library/Application Support/Unichat/server/tuwunel/tuwunel.log` |
-| Cada puente | `~/Library/Application Support/Unichat/server/<red>/bridge.log` (JSON) y `<red>.out` (salida cruda) |
+| Cada puente | `~/Library/Application Support/Unichat/server/<red>/bridge.log` (JSON) |
+
+**Sin datos personales:** los puentes y el servidor escriben a su salida estándar y Unichat la filtra antes de
+guardarla (`Redactor`): quita IDs de Matrix, salas y eventos, enlaces de archivos, números de teléfono e IDs
+numéricos largos, correos, tokens y los valores de campos como nombre, texto, título o usuario. El log de Unichat
+pasa por el mismo filtro. Los puentes registran en nivel `info` (no `debug`).
+
+**Limpieza:** cada archivo rota al pasar de 5 MB (se guarda una copia `.1`). Al abrir Unichat y luego una vez al
+día se borran los registros que no se escribieron en los últimos N días (Ajustes → Privacidad → Registros: 1, 7 o
+30 días; por defecto 7). "Borrar registros ahora" vacía los que están en uso y borra el resto. Nunca se tocan bases
+de datos ni configuraciones.
 
 Seguir el log en vivo: `tail -f "$HOME/Library/Application Support/Unichat/logs/unichat.log"`.
 

@@ -70,7 +70,9 @@ class BridgeConfigTest {
         assertTrue(c.at("/backfill/enabled").asBoolean());
         assertEquals(50, c.at("/backfill/max_initial_messages").asInt());
         assertEquals(500, c.at("/backfill/max_catchup_messages").asInt());
-        assertEquals("/data/signal/bridge.log", c.at("/logging/writers/0/filename").asText());
+        assertEquals("stdout", c.at("/logging/writers/0/type").asText(), "logs go through Unichat's redactor");
+        assertEquals(1, c.at("/logging/writers").size());
+        assertEquals("info", c.at("/logging/min_level").asText());
         assertEquals(1, c.at("/network/some_network_key").asInt(), "network keys untouched");
     }
 

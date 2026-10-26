@@ -41,6 +41,18 @@ class SupervisorTest {
     }
 
     @Test
+    void personalDataNeverReachesTheLog() throws Exception {
+        Path log = dir.resolve("bridge.log");
+        String java = ProcessHandle.current().info().command().orElse("java");
+        sup.start("wa", dir, List.of(java, "-cp", System.getProperty("java.class.path"), FakeService.class.getName(),
+                "run", "{\"name\":\"Ana Perez\",\"message\":\"Connected\",\"jid\":\"573009998877@s.whatsapp.net\"}"), log);
+        await(() -> contains(log, "Connected"));
+        String text = Files.readString(log);
+        assertFalse(text.contains("Ana Perez"), text);
+        assertFalse(text.contains("573009998877"), text);
+    }
+
+    @Test
     void restartsAfterACrash() throws Exception {
         Path log = dir.resolve("crash.log");
         sup.start("crash", dir, fake("crash"), log);

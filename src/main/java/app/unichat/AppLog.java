@@ -14,7 +14,8 @@ import java.time.LocalDateTime;
 
 /**
  * Copies stdout/stderr to {@code <data dir>/logs/unichat.log}: a packaged app opened from Finder or the Start menu
- * has no console, so this is where its errors end up. The previous log (over 5 MB) is kept as unichat.log.1.
+ * has no console, so this is where its errors end up. Lines pass through {@link Redactor} (no personal data on
+ * disk). The previous log (over 5 MB) is kept as unichat.log.1; LogFiles deletes old ones.
  */
 final class AppLog {
     private static final long MAX = 5L * 1024 * 1024;
@@ -32,10 +33,37 @@ final class AppLog {
             OutputStream file = new FileOutputStream(log.toFile(), true);
             String header = "\n=== Unichat " + LocalDateTime.now() + " ===\n";
             file.write(header.getBytes(StandardCharsets.UTF_8));
-            System.setOut(new PrintStream(new Tee(System.out, file), true, StandardCharsets.UTF_8));
-            System.setErr(new PrintStream(new Tee(System.err, file), true, StandardCharsets.UTF_8));
+            OutputStream redacted = new RedactingLines(file);
+            System.setOut(new PrintStream(new Tee(System.out, redacted), true, StandardCharsets.UTF_8));
+            System.setErr(new PrintStream(new Tee(System.err, redacted), true, StandardCharsets.UTF_8));
         } catch (IOException e) {
             System.err.println("No log file: " + e);
+        }
+    }
+
+    /** Buffers bytes into lines and writes each one through {@link Redactor}. Shared by stdout and stderr. */
+    private static final class RedactingLines extends OutputStream {
+        private final OutputStream out;
+        private final java.io.ByteArrayOutputStream line = new java.io.ByteArrayOutputStream();
+
+        RedactingLines(OutputStream out) {
+            this.out = out;
+        }
+
+        @Override
+        public synchronized void write(int c) throws IOException {
+            if (c == '\n') {
+                out.write((Redactor.redact(line.toString(StandardCharsets.UTF_8)) + "\n").getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                line.reset();
+            } else {
+                line.write(c);
+            }
+        }
+
+        @Override
+        public synchronized void write(byte[] buf, int off, int len) throws IOException {
+            for (int i = off; i < off + len; i++) write(buf[i]);
         }
     }
 

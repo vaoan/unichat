@@ -155,7 +155,17 @@ public final class Settings {
     public void setNotificationPreview(boolean v) { setBool("notify.preview", v); }
     public boolean notificationSound() { return getBool("notify.sound", true); }
     public void setNotificationSound(boolean v) { setBool("notify.sound", v); }
-    /** The session is on the server Unichat runs on this computer (app.unichat.server.LocalServer). */
+    /** Logs older than this are deleted (Ajustes → Privacidad). */
+    public int logRetentionDays() {
+        try {
+            return Math.max(1, Integer.parseInt(getString("logs.retentionDays", "7")));
+        } catch (NumberFormatException e) {
+            return 7;
+        }
+    }
+    public void setLogRetentionDays(int days) { set("logs.retentionDays", Integer.toString(days)); }
+
+        /** The session is on the server Unichat runs on this computer (app.unichat.server.LocalServer). */
     public boolean localServer() { return getBool("server.local", false); }
     public void setLocalServer(boolean v) { setBool("server.local", v); }
         /** Off by default: archiving a chat means it shouldn't interrupt you. */

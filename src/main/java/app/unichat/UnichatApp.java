@@ -75,6 +75,7 @@ public final class UnichatApp extends Application {
             }
         });
 
+        LogFiles.scheduleCleanup();
         if (s.localServer()) startLocalServer();
         ChatService restored = switch (s.backend() == null ? "" : s.backend()) {
             case "demo" -> new MockChatService();

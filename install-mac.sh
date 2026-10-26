@@ -4,7 +4,8 @@
 # Logs of the installed app:
 #   ~/Library/Application Support/Unichat/logs/unichat.log            (the app)
 #   ~/Library/Application Support/Unichat/server/tuwunel/tuwunel.log  (homeserver)
-#   ~/Library/Application Support/Unichat/server/<network>/           (each bridge: bridge.log, <network>.out)
+#   ~/Library/Application Support/Unichat/server/<network>/bridge.log (each bridge)
+# None of them hold personal data (see Redactor); old ones are deleted (Ajustes > Privacidad > Registros).
 set -e
 cd "$(dirname "$0")"
 ./package.sh

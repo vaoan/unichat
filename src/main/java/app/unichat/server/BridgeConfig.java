@@ -59,9 +59,9 @@ public final class BridgeConfig {
         perms.put(s.domain(), "user");
         perms.put(s.adminUserId(), "admin");
         String db = "file:" + s.dir().resolve(b + ".db") + "?_txlock=immediate";
+        // Bridges log to stdout; Unichat's Supervisor strips personal data before it reaches the disk.
         ArrayNode writers = YAML.createArrayNode();
-        writers.addObject().put("type", "file").put("format", "json")
-                .put("filename", s.dir().resolve("bridge.log").toString()).put("max_size", 20).put("max_backups", 3);
+        writers.addObject().put("type", "stdout").put("format", "json");
 
         if (c.has("network")) {
             // bridgev2 ("megabridge") layout: every bridge except discord.
@@ -73,7 +73,7 @@ public final class BridgeConfig {
             obj(c, "/double_puppet").putObject("secrets").put(s.domain(), "as_token:" + s.doublePuppetToken());
             // History from the first room creation on: a room created without it is never filled later.
             obj(c, "/backfill").put("enabled", true).put("max_initial_messages", 50).put("max_catchup_messages", 500);
-            obj(c, "/logging").set("writers", writers);
+            obj(c, "/logging").put("min_level", "info").set("writers", writers);
             switch (b) {
                 case "instagram" -> {
                     set(c, "/network/mode", "instagram");
@@ -105,7 +105,7 @@ public final class BridgeConfig {
             obj(c, "/bridge").putObject("login_shared_secret_map").put(s.domain(), "as_token:" + s.doublePuppetToken());
             obj(c, "/bridge/backfill/forward_limits/initial").put("dm", 50).put("channel", 50);
             obj(c, "/bridge/backfill/forward_limits/missed").put("dm", 500).put("channel", 500);
-            obj(c, "/logging").set("writers", writers);
+            obj(c, "/logging").put("min_level", "info").set("writers", writers);
         }
         return c;
     }
