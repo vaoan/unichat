@@ -4,6 +4,7 @@ import app.unichat.matrix.MatrixChatService;
 import app.unichat.service.ChatService;
 import app.unichat.service.MockChatService;
 import app.unichat.settings.Settings;
+import app.unichat.ui.DockIcon;
 import app.unichat.ui.LoginView;
 import app.unichat.ui.MainView;
 import app.unichat.ui.Notifier;
@@ -62,9 +63,9 @@ public final class UnichatApp extends Application {
         stage.setScene(scene);
         stage.setOnCloseRequest(e -> {
             saveGeometry();
-            if (notifier.hasTray() && Settings.get().minimizeToTray()) {
+            if (toTray()) {
                 e.consume();
-                stage.hide();
+                hideToTray();
             } else {
                 quit();
             }
@@ -175,8 +176,18 @@ public final class UnichatApp extends Application {
         getHostServices().showDocument(url);
     }
 
+    private boolean toTray() {
+        return notifier.hasTray() && Settings.get().minimizeToTray();
+    }
+
+    private void hideToTray() {
+        stage.hide();
+        DockIcon.hide();
+    }
+
     private void showWindow() {
         Platform.runLater(() -> {
+            DockIcon.show();
             stage.show();
             stage.setIconified(false);
             stage.toFront();
