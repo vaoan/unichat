@@ -314,12 +314,46 @@ public final class MatrixChatService implements ChatService {
         }
     }
 
+    private static final Set<String> REDACTED_STATE_TYPES = Set.of("m.room.message", "m.sticker", "m.reaction");
+
+    /**
+     * Deep copy of a /sync response with bridge-bot room message content blanked, so login credentials
+     * (cookies, tokens, QR data) sent in those DMs never reach the on-disk cache. Input is not mutated.
+     */
+    static JsonNode redactForCache(JsonNode fullSync, Set<String> botRoomIds) {
+        JsonNode copy = fullSync.deepCopy();
+        for (String section : new String[]{"join", "invite", "leave"}) {
+            JsonNode sec = copy.path("rooms").path(section);
+            for (String id : botRoomIds) {
+                JsonNode room = sec.path(id);
+                if (!room.isObject()) continue;
+                blank(room.path("timeline").path("events"), false);
+                blank(room.path("state").path("events"), true);
+                blank(room.path("invite_state").path("events"), true);
+            }
+        }
+        return copy;
+    }
+
+    private static void blank(JsonNode events, boolean onlyMessageTypes) {
+        if (!events.isArray()) return;
+        for (JsonNode ev : events) {
+            if (!(ev instanceof ObjectNode o)) continue;
+            if (onlyMessageTypes && !REDACTED_STATE_TYPES.contains(o.path("type").asText())) continue;
+            o.set("content", MatrixClient.JSON.createObjectNode());
+        }
+    }
+
     private void saveSyncCache(JsonNode fullSync) {
         try {
             Path f = syncCacheFile();
             Files.createDirectories(f.getParent());
             Path tmp = f.resolveSibling(f.getFileName() + ".tmp");
-            MatrixClient.JSON.writeValue(tmp.toFile(), fullSync);
+            Set<String> botRoomIds = new java.util.HashSet<>();
+            synchronized (proc) {
+                for (MatrixRoom r : proc.rooms()) if (r.chat.bridgeBot()) botRoomIds.add(r.id);
+            }
+            MatrixClient.JSON.writeValue(tmp.toFile(), redactForCache(fullSync, botRoomIds));
             Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
         } catch (Exception e) {
             System.err.println("Could not save sync cache: " + e);
