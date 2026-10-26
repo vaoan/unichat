@@ -142,6 +142,11 @@ public interface ChatService {
                 : CompletableFuture.failedFuture(new UnsupportedOperationException("openDm"));
     }
 
+    /** Asks a bridge to list your chats again (Telegram: chats beyond the login-time limit); the bridge's answer. */
+    default CompletableFuture<String> syncChats(Network network) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("syncChats"));
+    }
+
     /** Joins a room (a channel or topic of a space you're not in yet). */
     default CompletableFuture<Void> joinChat(String roomId) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException("joinChat"));

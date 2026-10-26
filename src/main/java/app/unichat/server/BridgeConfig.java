@@ -17,6 +17,8 @@ import java.nio.file.Path;
  * with SQLite and 127.0.0.1 instead of Postgres and Docker host names. See docs/SERVIDOR-NATIVO.md.
  */
 public final class BridgeConfig {
+    /** Telegram chats created per chat sync (the bridge's default is 15); raising it triggers one resync. */
+    public static final int TELEGRAM_CREATE_LIMIT = 100;
     static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory()
             .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
             .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
@@ -96,8 +98,8 @@ public final class BridgeConfig {
                     net.put("api_hash", s.telegramApiHash());
                     obj(c, "/network/animated_sticker").put("target", "gif").put("convert_from_webm", true);
                     // 15 by default: most chats never showed up. The bridge paces itself on Telegram's flood waits.
-                    setExisting(c, "/network/sync/create_limit", 100);
-                    setExisting(c, "/network/sync/login_sync_limit", 100);
+                    setExisting(c, "/network/sync/create_limit", TELEGRAM_CREATE_LIMIT);
+                    setExisting(c, "/network/sync/login_sync_limit", TELEGRAM_CREATE_LIMIT);
                 }
                 default -> { }
             }

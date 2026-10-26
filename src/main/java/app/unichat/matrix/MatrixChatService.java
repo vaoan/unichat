@@ -1373,18 +1373,7 @@ public final class MatrixChatService implements ChatService {
                         throw new MatrixException(e.getMessage() != null ? e.getMessage() : e.toString(), e);
                     }
                 }
-                String bot = botId(network);
-                String roomId = findBotRoom(network);
-                if (roomId == null) {
-                    ObjectNode body = MatrixClient.JSON.createObjectNode();
-                    body.put("is_direct", true);
-                    body.put("preset", "trusted_private_chat");
-                    body.putArray("invite").add(bot);
-                    roomId = client.post(CLIENT + "/createRoom", body).path("room_id").asText(null);
-                    if (roomId == null) throw new MatrixException(0, null, "No se pudo crear el chat con el bot");
-                    addDirect(bot, roomId);
-                    waitForJoin(roomId, bot);
-                }
+                String roomId = botRoom(network);
                 if (startsLoginByItself(network)) sendCommand(roomId, botCommand(network, loginCommand(network)));
                 waitForRoom(roomId);
                 return roomId;
@@ -1631,6 +1620,7 @@ public final class MatrixChatService implements ChatService {
             parsed = n == Network.DISCORD ? parseDiscordPing(reply) : parseLogins(reply);
         }
         logins.put(n, parsed);
+        maybeResyncChats(n, parsed);
         StringBuilder sb = new StringBuilder();
         for (Login l : parsed) {
             sb.append(l.id()).append('\t').append(l.name() == null ? "" : l.name()).append('\t')
@@ -1725,13 +1715,64 @@ public final class MatrixChatService implements ChatService {
         }, io);
     }
 
+    /** The chat with {@code n}'s bridge bot, created when there's none (logins through the bridge API don't make one). */
+    private String botRoom(Network n) throws IOException, InterruptedException {
+        String roomId = findBotRoom(n);
+        if (roomId != null) return roomId;
+        String bot = botId(n);
+        ObjectNode body = MatrixClient.JSON.createObjectNode();
+        body.put("is_direct", true);
+        body.put("preset", "trusted_private_chat");
+        body.putArray("invite").add(bot);
+        roomId = client.post(CLIENT + "/createRoom", body).path("room_id").asText(null);
+        if (roomId == null) throw new MatrixException(0, null, "No se pudo crear el chat con el bot");
+        addDirect(bot, roomId);
+        waitForJoin(roomId, bot);
+        return roomId;
+    }
+
+    /** Whether Telegram's chats should be listed again: never done, or done for a lower limit than now. */
+    static boolean needsChatResync(String doneForLimit, int limit) {
+        return !Integer.toString(limit).equals(doneForLimit);
+    }
+
+    /**
+     * Asks the bridge to go through your chat list again ({@code sync-chats}): Telegram only does it once, at
+     * login, so chats beyond the old limit never arrive otherwise. Completes with the bridge's answer.
+     */
+    @Override
+    public CompletableFuture<String> syncChats(Network n) {
+        if (n != Network.TELEGRAM) return CompletableFuture.failedFuture(new UnsupportedOperationException("syncChats"));
+        return io(() -> {
+            String reply = botQuery(n, "sync-chats", 600);
+            if (!reply.startsWith("Successfully")) throw new MatrixException(0, null, reply);
+            Settings.get().set("telegram.chatSyncLimit", Integer.toString(app.unichat.server.BridgeConfig.TELEGRAM_CREATE_LIMIT));
+            return reply;
+        });
+    }
+
+    /** Once per limit raise, after Telegram's login is confirmed (in the background; failures retry next start). */
+    private void maybeResyncChats(Network n, List<Login> parsed) {
+        if (n != Network.TELEGRAM || parsed.isEmpty() || provisioner == null) return;
+        if (!needsChatResync(Settings.get().getString("telegram.chatSyncLimit", null), app.unichat.server.BridgeConfig.TELEGRAM_CREATE_LIMIT)) return;
+        if (!resyncStarted.add(n)) return;
+        syncChats(n).whenComplete((r, err) -> {
+            if (err != null) System.err.println("Telegram chat resync failed: " + err.getClass().getSimpleName());
+        });
+    }
+
+    private final Set<Network> resyncStarted = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     /** Sends a command to {@code n}'s bridge bot and returns its next reply (up to 20 s). */
     private String botQuery(Network n, String command) throws IOException, InterruptedException {
-        String roomId = findBotRoom(n);
-        if (roomId == null) throw new MatrixException(0, null, "No se encontró el chat con el puente de " + n.displayName());
+        return botQuery(n, command, 20);
+    }
+
+    private String botQuery(Network n, String command, int seconds) throws IOException, InterruptedException {
+        String roomId = botRoom(n);
         int before = botMessageCount(roomId);
         sendCommand(roomId, botCommand(n, command));
-        for (int i = 0; i < 40; i++) {
+        for (int i = 0; i < seconds * 2; i++) {
             Thread.sleep(500);
             String reply = botReplyAfter(roomId, before);
             if (reply != null) return reply;

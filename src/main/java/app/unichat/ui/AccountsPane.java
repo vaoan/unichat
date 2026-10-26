@@ -162,6 +162,22 @@ public final class AccountsPane extends VBox {
             servers.setOnAction(e -> showDiscordGuilds(m));
             row.getChildren().add(2, servers);
         }
+        if (a.network() == Network.TELEGRAM && a.status() == app.unichat.model.AccountStatus.CONNECTED) {
+            // Telegram lists your chats only once, at login: this goes through the list again.
+            Button sync = new Button("Sincronizar chats");
+            sync.getStyleClass().add("secondary-button");
+            sync.setMinWidth(Region.USE_PREF_SIZE);
+            sync.setAccessibleText("Volver a traer tus chats de Telegram");
+            sync.setOnAction(e -> {
+                sync.setDisable(true);
+                toast.accept("Sincronizando tus chats de Telegram… puede tardar unos minutos");
+                svc.syncChats(Network.TELEGRAM).whenComplete((r, err) -> Platform.runLater(() -> {
+                    sync.setDisable(false);
+                    toast.accept(err == null ? "Chats de Telegram sincronizados" : "No se pudieron sincronizar los chats de Telegram");
+                }));
+            });
+            row.getChildren().add(2, sync);
+        }
         row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("settings-row");
         row.setAccessibleText(Accounts.name(a) + ", " + a.network().displayName() + ", " + status.getText());

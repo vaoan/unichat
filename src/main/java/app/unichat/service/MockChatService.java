@@ -125,6 +125,12 @@ public final class MockChatService implements ChatService {
         return CompletableFuture.completedFuture(null);
     }
 
+    @Override
+    public CompletableFuture<String> syncChats(Network network) {
+        return network == Network.TELEGRAM ? later(() -> "Successfully synchronized chats")
+                : CompletableFuture.failedFuture(new UnsupportedOperationException("syncChats"));
+    }
+
     private volatile boolean failJoins;
 
     /** Demo/tests: every join is refused (a channel you lost access to). */
