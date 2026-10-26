@@ -314,8 +314,6 @@ public final class MatrixChatService implements ChatService {
         }
     }
 
-    private static final Set<String> REDACTED_STATE_TYPES = Set.of("m.room.message", "m.sticker", "m.reaction");
-
     /**
      * Deep copy of a /sync response with bridge-bot room message content blanked, so login credentials
      * (cookies, tokens, QR data) sent in those DMs never reach the on-disk cache. Input is not mutated.
@@ -327,19 +325,20 @@ public final class MatrixChatService implements ChatService {
             for (String id : botRoomIds) {
                 JsonNode room = sec.path(id);
                 if (!room.isObject()) continue;
-                blank(room.path("timeline").path("events"), false);
-                blank(room.path("state").path("events"), true);
-                blank(room.path("invite_state").path("events"), true);
+                blank(room.path("timeline").path("events"));
+                blank(room.path("state").path("events"));
+                blank(room.path("invite_state").path("events"));
             }
         }
         return copy;
     }
 
-    private static void blank(JsonNode events, boolean onlyMessageTypes) {
+    /** Blanks message-type events (no state_key); state events keep their content so the room still resolves. */
+    private static void blank(JsonNode events) {
         if (!events.isArray()) return;
         for (JsonNode ev : events) {
             if (!(ev instanceof ObjectNode o)) continue;
-            if (onlyMessageTypes && !REDACTED_STATE_TYPES.contains(o.path("type").asText())) continue;
+            if (o.has("state_key")) continue;
             o.set("content", MatrixClient.JSON.createObjectNode());
         }
     }

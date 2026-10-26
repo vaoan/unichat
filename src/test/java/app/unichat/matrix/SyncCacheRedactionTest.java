@@ -38,4 +38,19 @@ class SyncCacheRedactionTest {
         assertEquals(2, out.at("/rooms/join/!bot:s/unread_notifications/notification_count").asInt());
         assertTrue(MatrixClient.JSON.writeValueAsString(in).contains("SECRETVALUE"));
     }
+
+    @Test
+    void keepsStateEventsInTimelineButBlanksMessages() throws Exception {
+        String json = """
+                {"next_batch":"s1","rooms":{"join":{"!bot:s":{"timeline":{"events":[
+                  {"type":"m.room.member","state_key":"@b:s","content":{"membership":"join","displayname":"Bridge Bot"}},
+                  {"type":"m.room.name","state_key":"","content":{"name":"Instagram bridge"}},
+                  {"type":"m.room.message","content":{"body":"cookie sessionid=SECRETVALUE"}}]}}}}}
+                """;
+        JsonNode out = MatrixChatService.redactForCache(MatrixClient.JSON.readTree(json), Set.of("!bot:s"));
+        String s = MatrixClient.JSON.writeValueAsString(out);
+        assertTrue(s.contains("Bridge Bot"));
+        assertTrue(s.contains("Instagram bridge"));
+        assertFalse(s.contains("SECRETVALUE"));
+    }
 }
