@@ -28,7 +28,7 @@ Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix
 ## Checking UI changes
 `-Dunichat.snapshot=out.png` writes the window to a PNG and exits; combine with `-Dunichat.dataDir=<dir>` (put
 `session.backend=demo` and optionally `ui.theme=LIGHT` in `<dir>/settings.properties`),
-`-Dunichat.openChat=<id>` (demo ids like `!familia:demo`), `-Dunichat.info=true`,
+`-Dunichat.openChat=<id>` (demo ids like `!familia:demo`), `-Dunichat.info=true`, `-Dunichat.panel=EMOJIS|STICKERS|GIFS`,
 `-Dunichat.overlay=command|add|settings:<Página>` (settings snapshots the settings window).
 Run via `JAVA_OPTS=... ./run-dev.sh`, then read the PNG. Do this after every visual change.
 

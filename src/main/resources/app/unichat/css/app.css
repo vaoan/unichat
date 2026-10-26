@@ -725,3 +725,12 @@
 /* No height cap (unlike .sheet-scroll): a QR plus its steps needs the room. */
 .login-scroll { -fx-background-color: transparent; }
 .login-scroll > .viewport { -fx-background-color: transparent; }
+
+/* Side panel (SidePanel): Perfil · Emojis · Stickers · GIFs on the right of the chat. */
+.side-panel { -fx-background-color: -bg-list; -fx-border-color: -border; -fx-border-width: 0 0 0 1; -fx-pref-width: 320; -fx-min-width: 280; }
+.side-panel-tabs { -fx-padding: 10 10 6 10; }
+.side-panel-scroll { -fx-background-color: transparent; }
+.side-panel-scroll > .viewport { -fx-background-color: transparent; }
+.side-panel-placeholder { -fx-padding: 24; }
+.side-panel .info-pane { -fx-border-width: 0; }
+.gif-button { -fx-font-size: 0.78em; -fx-font-weight: bold; -fx-text-fill: -text-3; }

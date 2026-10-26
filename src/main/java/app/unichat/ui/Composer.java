@@ -74,13 +74,21 @@ public final class Composer extends VBox {
         HBox.setHgrow(input, Priority.ALWAYS);
 
         Button attach = iconButton(Icons.ATTACH, "Adjuntar archivo", this::chooseFile);
-        Button emoji = iconButton(Icons.EMOJI, "Emoji", null);
-        emoji.setOnAction(e -> EmojiPicker.show(emoji, this::insert));
+        Button emoji = iconButton(Icons.EMOJI, "Emojis", null);
+        emoji.setOnAction(e -> {
+            if (onPanel != null) onPanel.accept(SidePanel.Tab.EMOJIS);
+            else EmojiPicker.show(emoji, this::insert);
+        });
+        Button stickers = new Button("GIF");
+        stickers.getStyleClass().addAll("icon-button", "gif-button");
+        stickers.setAccessibleText("Stickers y GIFs");
+        stickers.setTooltip(new javafx.scene.control.Tooltip("Stickers y GIFs"));
+        stickers.setOnAction(e -> { if (onPanel != null) onPanel.accept(SidePanel.Tab.STICKERS); });
         Button send = iconButton(Icons.SEND, "Enviar", this::send);
         send.getStyleClass().add("send-button");
         send.disableProperty().bind(input.textProperty().map(t -> t.isBlank()));
 
-        HBox row = new HBox(4, attach, input, emoji, send);
+        HBox row = new HBox(4, attach, input, stickers, emoji, send);
         row.setAlignment(Pos.BOTTOM_CENTER);
         row.getStyleClass().add("composer-row");
         getChildren().addAll(banner, row);
@@ -136,6 +144,13 @@ public final class Composer extends VBox {
         input.positionCaret(input.getLength());
         updateBanner();
         focus();
+    }
+
+    private Consumer<SidePanel.Tab> onPanel;
+
+    /** The emoji and sticker/GIF buttons open the side panel on that tab. */
+    public void setOnPanel(Consumer<SidePanel.Tab> onPanel) {
+        this.onPanel = onPanel;
     }
 
     public void insert(String text) {

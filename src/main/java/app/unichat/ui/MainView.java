@@ -44,6 +44,7 @@ public final class MainView extends StackPane {
     private String pendingOpenId;
     private long pendingOpenUntil;
     private boolean infoVisible;
+    private SidePanel panel;
     private final java.util.Set<String> dirtyThreads = new java.util.HashSet<>();
 
     private final ChatService.Listener listener = new ChatService.Listener() {
@@ -76,6 +77,8 @@ public final class MainView extends StackPane {
         listPane = new ChatListPane(svc, this::openChat);
         thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast);
         info = new InfoPane(svc, this::toggleInfo, this::toast);
+        panel = new SidePanel(info, text -> thread.composer().insert(text));
+        thread.composer().setOnPanel(this::togglePanel);
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::showSettings);
 
         threadArea.setCenter(thread);
@@ -145,7 +148,7 @@ public final class MainView extends StackPane {
                 thread.rebuild(false);
                 thread.refreshHeader();
                 if (stage.isFocused() && open.isUnread()) svc.markRead(chatId);
-                if (infoVisible) info.refresh();
+                if (infoVisible) panel.refresh();
             }
         });
     }
@@ -185,7 +188,7 @@ public final class MainView extends StackPane {
                 setInfo(false);
             } else {
                 thread.refreshHeader();
-                if (infoVisible) info.refresh();
+                if (infoVisible) panel.refresh();
             }
         }
         long unread = svc.chats().stream().filter(ChatFilter::inboxUnread).count();
@@ -238,7 +241,7 @@ public final class MainView extends StackPane {
         }
         listPane.setSelected(c.id());
         thread.open(c);
-        info.show(c);
+        if (infoVisible) panel.show(c, panel.current());
         svc.markRead(c.id());
         listPane.refresh();
     }
@@ -257,15 +260,33 @@ public final class MainView extends StackPane {
         toast("Abriendo el chat…");
     }
 
+    /** ⓘ button / ⌘I: the side panel on its Perfil tab. */
     public void toggleInfo() {
-        setInfo(!infoVisible);
+        togglePanel(SidePanel.Tab.PROFILE);
+    }
+
+    /** Opens the side panel on {@code t}; if it's already showing {@code t}, closes it (same button toggles). */
+    public void togglePanel(SidePanel.Tab t) {
+        if (infoVisible && panel.current() == t) setInfo(false);
+        else showPanel(t);
+    }
+
+    public void showPanel(SidePanel.Tab t) {
+        if (thread.chat() == null) return;
+        infoVisible = true;
+        threadArea.setRight(panel);
+        thread.setInfoSelected(t == SidePanel.Tab.PROFILE);
+        panel.show(thread.chat(), t);
     }
 
     private void setInfo(boolean show) {
-        infoVisible = show && thread.chat() != null;
-        threadArea.setRight(infoVisible ? info : null);
-        thread.setInfoSelected(infoVisible);
-        if (infoVisible) info.show(thread.chat());
+        if (show) {
+            showPanel(panel.current());
+            return;
+        }
+        infoVisible = false;
+        threadArea.setRight(null);
+        thread.setInfoSelected(false);
     }
 
     public void toast(String text) {
@@ -350,7 +371,7 @@ public final class MainView extends StackPane {
         toast("Tamaño de texto: " + Math.round(s.fontScale() * 100) + " %");
     }
 
-    /** F6 / Shift+F6: rail → chat list → messages → message input. */
+    /** F6 / Shift+F6: rail → chat list → messages → message input (→ side panel when open). */
     private void cycleFocus(int dir) {
         Node owner = getScene() == null ? null : getScene().getFocusOwner();
         int current = -1;
@@ -359,14 +380,16 @@ public final class MainView extends StackPane {
             else if (n == listPane) current = 1;
             else if (n instanceof javafx.scene.control.ListView<?> lv && lv.getStyleClass().contains("timeline")) current = 2;
             else if (n == thread.composer()) current = 3;
+            else if (n == panel) current = 4;
             if (current >= 0) break;
         }
-        int zones = thread.chat() == null ? 2 : 4;
+        int zones = thread.chat() == null ? 2 : infoVisible ? 5 : 4;
         int next = Math.floorMod((current < 0 ? (dir > 0 ? -1 : 0) : current) + dir, zones);
         switch (next) {
             case 0 -> { Node b = rail.lookup(".rail-button"); if (b != null) b.requestFocus(); }
             case 1 -> listPane.focusList();
             case 2 -> thread.focusTimeline();
+            case 4 -> { Node b = panel.lookup(".chip"); if (b != null) b.requestFocus(); }
             default -> thread.composer().focus();
         }
     }

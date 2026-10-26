@@ -30,28 +30,35 @@ public final class EmojiPicker {
         CATEGORIES.put("Objetos", "📱 💻 ⌨️ 🖥️ 📷 📞 ⏰ 💡 💸 💰 💳 📎 📌 ✏️ 📝 📅 📦 ✉️ 🔒 🔑 🔔 🚗 ✈️ 🏠 ⏳ ✅ ❌ ❓ ❗ ⚠️ 🚀");
     }
 
-    /** Shows the picker anchored above {@code anchor}; {@code onPick} receives the emoji. */
-    public static void show(Node anchor, Consumer<String> onPick) {
-        Popup popup = new Popup();
-        popup.setAutoHide(true);
+    /** Every category as a grid of emoji buttons ({@code onPick} gets the emoji); used by the popup and the side panel. */
+    static VBox grid(Consumer<String> onPick, double wrap) {
         VBox content = new VBox(6);
         content.setPadding(new Insets(10));
         for (Map.Entry<String, String> cat : CATEGORIES.entrySet()) {
             Label title = new Label(cat.getKey());
             title.getStyleClass().add("emoji-category");
             FlowPane grid = new FlowPane(2, 2);
-            grid.setPrefWrapLength(300);
+            grid.setPrefWrapLength(wrap);
             for (String e : cat.getValue().split(" ")) {
                 Button b = new Button(e);
                 b.getStyleClass().add("emoji-button");
-                b.setOnAction(ev -> {
-                    onPick.accept(e);
-                    popup.hide();
-                });
+                b.setAccessibleText("Emoji " + e);
+                b.setOnAction(ev -> onPick.accept(e));
                 grid.getChildren().add(b);
             }
             content.getChildren().addAll(title, grid);
         }
+        return content;
+    }
+
+    /** Shows the picker anchored above {@code anchor}; {@code onPick} receives the emoji. */
+    public static void show(Node anchor, Consumer<String> onPick) {
+        Popup popup = new Popup();
+        popup.setAutoHide(true);
+        VBox content = grid(e -> {
+            onPick.accept(e);
+            popup.hide();
+        }, 300);
         ScrollPane scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
         scroll.setPrefSize(340, 320);

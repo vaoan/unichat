@@ -117,6 +117,8 @@ public final class UnichatApp extends Application {
         wait.setOnFinished(e -> {
             if (chatId != null && mainView != null) mainView.openChatId(chatId);
             if (Boolean.getBoolean("unichat.info") && mainView != null) mainView.toggleInfo();
+            String panelTab = System.getProperty("unichat.panel");
+            if (panelTab != null && mainView != null) mainView.showPanel(app.unichat.ui.SidePanel.Tab.valueOf(panelTab));
             String net = System.getProperty("unichat.network");
             if (net != null && mainView != null) mainView.showNetwork(app.unichat.model.Network.fromProtocolId(net));
             String overlay = System.getProperty("unichat.overlay", "");
