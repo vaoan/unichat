@@ -80,8 +80,8 @@ public final class BridgeConfig {
                     set(c, "/appservice/bot/displayname", "Instagram bridge bot");
                 }
                 case "whatsapp" -> {
-                    // Only the 50 most recent chats get rooms when connecting (all of them overloads the server).
-                    obj(c, "/network/history_sync").put("max_initial_conversations", 50);
+                    // The 200 most recent chats get rooms when connecting; the rest open from "Nuevo chat".
+                    obj(c, "/network/history_sync").put("max_initial_conversations", 200);
                     // Chats archived on the phone land in Unichat's archive, also later (one-way).
                     set(c, "/network/archive_tag", ARCHIVE_TAG);
                     obj(c, "/bridge").set("only_bridge_tags",
@@ -95,11 +95,15 @@ public final class BridgeConfig {
                     net.put("api_id", Integer.parseInt(s.telegramApiId()));
                     net.put("api_hash", s.telegramApiHash());
                     obj(c, "/network/animated_sticker").put("target", "gif").put("convert_from_webm", true);
+                    // 15 by default: most chats never showed up. The bridge paces itself on Telegram's flood waits.
+                    setExisting(c, "/network/sync/create_limit", 100);
+                    setExisting(c, "/network/sync/login_sync_limit", 100);
                 }
                 default -> { }
             }
         } else {
             // Legacy layout (mautrix-discord).
+            setExisting(c, "/bridge/startup_private_channel_create_limit", 50);
             set(c, "/bridge/username_template", b + "_{{.}}");
             set(c, "/appservice/database/type", "sqlite3-fk-wal");
             set(c, "/appservice/database/uri", db);
@@ -110,6 +114,22 @@ public final class BridgeConfig {
             obj(c, "/logging").put("min_level", "info").set("writers", writers);
         }
         return c;
+    }
+
+    /**
+     * Sets a number only where the bridge's own template already has that key: a mistyped path or a bridge version
+     * that renamed it is reported (false) instead of adding a key the bridge would silently ignore.
+     */
+    static boolean setExisting(ObjectNode root, String path, int value) {
+        int slash = path.lastIndexOf('/');
+        com.fasterxml.jackson.databind.JsonNode parent = root.at(path.substring(0, slash));
+        String key = path.substring(slash + 1);
+        if (!(parent instanceof ObjectNode o) || !o.has(key)) {
+            System.err.println("Bridge config key not found, left as is: " + path);
+            return false;
+        }
+        o.put(key, value);
+        return true;
     }
 
     /** The object at {@code path} ("/a/b"), creating missing levels. */

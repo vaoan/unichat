@@ -80,7 +80,7 @@ class BridgeConfigTest {
     void whatsappSyncsArchivedChats() throws Exception {
         ObjectNode c = BridgeConfig.apply(BridgeConfig.read(V2), settings("whatsapp"));
         assertEquals("u.archived", c.at("/network/archive_tag").asText());
-        assertEquals(50, c.at("/network/history_sync/max_initial_conversations").asInt());
+        assertEquals(200, c.at("/network/history_sync/max_initial_conversations").asInt());
         assertFalse(c.at("/bridge/tag_only_on_create").asBoolean(true));
         assertFalse(c.at("/network/enable_status_broadcast").asBoolean(true), "no Status stories chat");
         JsonNode tags = c.at("/bridge/only_bridge_tags");
@@ -122,5 +122,42 @@ class BridgeConfigTest {
         assertTrue(toml.contains("registration_token = \"tok\\\"en\""), toml);
         assertTrue(toml.contains("appservice_dir = \"/srv/u/appservices\""));
         assertTrue(toml.contains("database_path = \"/srv/u/tuwunel/db\""));
+    }
+
+    private static final String TELEGRAM = V2.replace("    some_network_key: 1\n", """
+                some_network_key: 1
+                sync:
+                    update_limit: 100
+                    create_limit: 15
+                    login_sync_limit: 15
+                    direct_chats: true
+            """);
+
+    @Test
+    void telegramCreatesMoreChats() throws Exception {
+        ObjectNode c = BridgeConfig.apply(BridgeConfig.read(TELEGRAM), settings("telegram"));
+        assertEquals(100, c.at("/network/sync/create_limit").asInt());
+        assertEquals(100, c.at("/network/sync/login_sync_limit").asInt());
+        assertEquals(100, c.at("/network/sync/update_limit").asInt(), "other keys untouched");
+    }
+
+    @Test
+    void discordCreatesMoreDms() throws Exception {
+        String legacy = LEGACY.replace("bridge:\n", "bridge:\n    startup_private_channel_create_limit: 5\n");
+        ObjectNode c = BridgeConfig.apply(BridgeConfig.read(legacy), settings("discord"));
+        assertEquals(50, c.at("/bridge/startup_private_channel_create_limit").asInt());
+    }
+
+    @Test
+    void whatsappSyncs200Conversations() throws Exception {
+        ObjectNode c = BridgeConfig.apply(BridgeConfig.read(V2), settings("whatsapp"));
+        assertEquals(200, c.at("/network/history_sync/max_initial_conversations").asInt());
+    }
+
+    @Test
+    void aMistypedKeyIsNotInvented() throws Exception {
+        ObjectNode c = BridgeConfig.read(V2);
+        assertFalse(BridgeConfig.setExisting(c, "/network/sync/create_limitt", 100));
+        assertTrue(c.at("/network/sync").isMissingNode(), "nothing created for a key the bridge doesn't have");
     }
 }
