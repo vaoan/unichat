@@ -33,7 +33,8 @@ Run via `JAVA_OPTS=... ./run-dev.sh`, then read the PNG. Do this after every vis
 Settings → Accesibilidad (`a11y.*` keys); `Theme` adds `contrast`, `strong-focus`, `wide-spacing` root classes and
 follows OS high contrast / reduced motion. Every new control needs an accessible text (icon buttons get it from
 `Composer.iconButton`), keyboard reachability, and must survive 160 % text + high contrast. `KeyboardUiTest`
-(`-Dunichat.uiTests=true`, needs a display) checks F6 zones, timeline keys, zoom and screen-reader texts.
+(`-Dunichat.uiTests=true`, needs a display) checks F6 zones, timeline keys, zoom and screen-reader texts;
+`FilterUiTest` (same flag) checks that the rail keeps the chosen chip when switching network.
 
 ## Rules
 - Run `./mvnw test` before committing. Never point tests at the real data dir (surefire sets `unichat.dataDir`).
