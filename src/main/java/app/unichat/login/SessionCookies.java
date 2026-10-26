@@ -21,6 +21,12 @@ public record SessionCookies(Network network, Map<String, String> values) {
                 .allMatch(n -> values.get(n) != null && !values.get(n).isBlank());
     }
 
+    /** Never prints cookie values: they are live session credentials. */
+    @Override
+    public String toString() {
+        return "SessionCookies[network=" + network + ", names=" + new java.util.TreeSet<>(values.keySet()) + "]";
+    }
+
     /** JSON object {@code {"name":"value",...}} as expected by the bridge login. */
     public String toBridgeJson() {
         try {

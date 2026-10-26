@@ -69,4 +69,16 @@ class CookieSpecTest {
                 CookieSpec.forNetwork(Network.GOOGLE_MESSAGES).optional());
         assertThrows(IllegalArgumentException.class, () -> CookieSpec.forNetwork(Network.WHATSAPP));
     }
+
+    @Test
+    void toStringShowsNamesButNeverValues() {
+        SessionCookies s = CookieSpec.forNetwork(Network.INSTAGRAM)
+                .select(Map.of("sessionid", "SECRET123", "csrftoken", "SECRET456"));
+        String str = s.toString();
+        assertTrue(str.contains("sessionid"));
+        assertTrue(str.contains("csrftoken"));
+        assertTrue(str.contains("INSTAGRAM"));
+        assertFalse(str.contains("SECRET123"));
+        assertFalse(str.contains("SECRET456"));
+    }
 }
