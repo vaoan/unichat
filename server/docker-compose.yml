@@ -1,0 +1,92 @@
+# Unichat self-hosted stack: Synapse + Postgres + mautrix bridges.
+# Run ./setup.sh (macOS/Linux) or .\setup.ps1 (Windows) once before `docker compose up -d`.
+# All state lives in ./data (git-ignored). Bridge bot / puppet names match app/unichat/model/Network.java.
+
+x-bridge: &bridge
+  restart: unless-stopped
+  depends_on: [postgres, synapse]
+  networks: [unichat]
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: unichat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run setup first}
+      POSTGRES_DB: unichat
+      # Synapse requires C collation.
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
+    networks: [unichat]
+
+  synapse:
+    image: matrixdotorg/synapse:latest
+    restart: unless-stopped
+    depends_on: [postgres]
+    ports:
+      - "8008:8008"
+    volumes:
+      # Bridge registrations are copied to ./data/synapse/appservices by setup.
+      - ./data/synapse:/data
+    networks: [unichat]
+
+  whatsapp:
+    <<: *bridge
+    image: dock.mau.dev/mautrix/whatsapp:latest
+    volumes: ["./data/whatsapp:/data"]
+
+  telegram:
+    <<: *bridge
+    # Needs api_id / api_hash from https://my.telegram.org (see docs/BRIDGES.md).
+    image: dock.mau.dev/mautrix/telegram:latest
+    volumes: ["./data/telegram:/data"]
+
+  signal:
+    <<: *bridge
+    image: dock.mau.dev/mautrix/signal:latest
+    volumes: ["./data/signal:/data"]
+
+  # mautrix-meta runs twice: one instance per mode.
+  instagram:
+    <<: *bridge
+    image: dock.mau.dev/mautrix/meta:latest
+    volumes: ["./data/instagram:/data"]
+
+  facebook:
+    <<: *bridge
+    image: dock.mau.dev/mautrix/meta:latest
+    volumes: ["./data/facebook:/data"]
+
+  discord:
+    <<: *bridge
+    image: dock.mau.dev/mautrix/discord:latest
+    volumes: ["./data/discord:/data"]
+
+  slack:
+    <<: *bridge
+    image: dock.mau.dev/mautrix/slack:latest
+    volumes: ["./data/slack:/data"]
+
+  gmessages:
+    <<: *bridge
+    image: dock.mau.dev/mautrix/gmessages:latest
+    volumes: ["./data/gmessages:/data"]
+
+  twitter:
+    <<: *bridge
+    image: dock.mau.dev/mautrix/twitter:latest
+    volumes: ["./data/twitter:/data"]
+
+  # Optional: newer bridge, image name not fully verified. Enable with
+  #   docker compose --profile linkedin up -d   (and BRIDGES="... linkedin" in setup)
+  linkedin:
+    <<: *bridge
+    image: dock.mau.dev/mautrix/linkedin:latest
+    profiles: [linkedin]
+    volumes: ["./data/linkedin:/data"]
+
+networks:
+  unichat: {}
