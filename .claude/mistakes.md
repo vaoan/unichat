@@ -24,3 +24,7 @@
   and a wrapping `FlowPane` row. Always check UI at max text size.
 - **Self-referencing looked-up color** (`-accent: derive(-accent, …)`) is a loop; compute derived colors in code
   (`Theme.accessibleAccent`).
+- **Networks only appeared after the first /sync** (WhatsApp, Telegram… all of them): cached `list-logins` were
+  loaded after the sync and `accounts()` skipped networks without known rooms; every start downloaded ~6 MB.
+  Now logins load at start, the last full sync is cached on disk and the network sync resumes from its token.
+  `StartupBeforeSyncTest` (fake homeserver with a 5 s /sync) guards it — it fails if either fix is removed.

@@ -239,6 +239,7 @@ public final class MatrixChatService implements ChatService {
     public synchronized void start() {
         if (running) return;
         running = true;
+        loadCachedLogins();
         syncThread = new Thread(this::syncLoop, "matrix-sync");
         syncThread.setDaemon(true);
         syncThread.start();
@@ -264,6 +265,11 @@ public final class MatrixChatService implements ChatService {
                 System.err.println("Matrix logout failed: " + e);
             }
             Settings.get().clearSession();
+            try {
+                Files.deleteIfExists(syncCacheFile());
+            } catch (IOException ignored) {
+                // best effort
+            }
             setState(ConnectionState.LOGGED_OUT);
         }, io);
     }
@@ -282,28 +288,99 @@ public final class MatrixChatService implements ChatService {
 
     // ---------------------------------------------------------------- sync loop
 
+    /** Last full /sync response for this account; shown instantly on the next start (like Element's cache). */
+    Path syncCacheFile() {
+        return Settings.get().cacheDir().resolve("sync-" + sha256(serverName + "|" + userId).substring(0, 16) + ".json");
+    }
+
+    /** Shows the cached snapshot right away; the network sync then only fetches what changed since. */
+    private boolean loadSyncCache() {
+        Path f = syncCacheFile();
+        if (!Files.exists(f)) return false;
+        try {
+            JsonNode resp = MatrixClient.JSON.readTree(f.toFile());
+            String token = resp.path("next_batch").asText(null);
+            if (token == null) return false;
+            SyncProcessor.Result r;
+            synchronized (proc) {
+                r = proc.process(resp, false);
+            }
+            nextBatch = token;
+            dispatch(r, false);
+            return true;
+        } catch (Exception e) {
+            System.err.println("Ignoring unreadable sync cache: " + e);
+            return false;
+        }
+    }
+
+    private void saveSyncCache(JsonNode fullSync) {
+        try {
+            Path f = syncCacheFile();
+            Files.createDirectories(f.getParent());
+            Path tmp = f.resolveSibling(f.getFileName() + ".tmp");
+            MatrixClient.JSON.writeValue(tmp.toFile(), fullSync);
+            Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (Exception e) {
+            System.err.println("Could not save sync cache: " + e);
+        }
+    }
+
+    /** Replaces the snapshot with a fresh full sync, in the background, so catch-ups stay small. */
+    private void refreshSyncCache() {
+        io.execute(() -> {
+            try {
+                Thread.sleep(30_000);
+                if (!running) return;
+                String path = CLIENT + "/sync?filter=" + enc(SYNC_FILTER) + "&timeout=0";
+                saveSyncCache(client.request("GET", path, null, Duration.ofSeconds(300)));
+            } catch (Exception e) {
+                System.err.println("Sync cache refresh failed: " + e);
+            }
+        });
+    }
+
     private void syncLoop() {
         int failures = 0;
         setState(ConnectionState.CONNECTING);
+        boolean catchUp = loadSyncCache();
         while (running) {
             try {
                 boolean initial = nextBatch == null;
                 if (initial) setState(ConnectionState.SYNCING);
-                String path = CLIENT + "/sync?filter=" + enc(SYNC_FILTER) + "&timeout=" + (initial ? 0 : 30000)
+                // A catch-up from the cached token must return at once, not long-poll for 30 s.
+                int timeout = initial || catchUp ? 0 : 30000;
+                String path = CLIENT + "/sync?filter=" + enc(SYNC_FILTER) + "&timeout=" + timeout
                         + (initial ? "" : "&since=" + enc(nextBatch));
-                JsonNode resp = client.request("GET", path, null, Duration.ofSeconds(initial ? 180 : 75));
+                JsonNode resp;
+                try {
+                    resp = client.request("GET", path, null, Duration.ofSeconds(initial || catchUp ? 180 : 75));
+                } catch (MatrixException e) {
+                    if (catchUp && !"M_UNKNOWN_TOKEN".equals(e.errcode())) {
+                        // The cached token was rejected (expired/purged): fall back to a full sync.
+                        catchUp = false;
+                        nextBatch = null;
+                        continue;
+                    }
+                    throw e;
+                }
                 if (!running) return;
-                boolean live = initialSyncDone;
+                // Missed messages during the catch-up don't notify, like the initial sync.
+                boolean live = initialSyncDone && !catchUp;
                 SyncProcessor.Result r;
                 synchronized (proc) {
                     r = proc.process(resp, live);
                 }
                 nextBatch = resp.path("next_batch").asText(null);
+                if (initial) saveSyncCache(resp);
+                else if (catchUp) refreshSyncCache();
+                boolean firstRound = !initialSyncDone;
+                catchUp = false;
                 initialSyncDone = true;
                 failures = 0;
                 setState(ConnectionState.ONLINE);
-                dispatch(r, live);
-                if (!live) checkReminders();
+                dispatch(r, live && !firstRound);
+                if (firstRound) checkReminders();
             } catch (MatrixException e) {
                 if ("M_UNKNOWN_TOKEN".equals(e.errcode())) {
                     running = false;
@@ -1082,6 +1159,15 @@ public final class MatrixChatService implements ChatService {
                     if (r.chat.network() != n || r.invite) continue;
                     if (r.chat.bridgeBot()) botRoom = r; else portals++;
                 }
+                List<Login> cachedLogins = logins.get(n);
+                if (cachedLogins != null && !cachedLogins.isEmpty()) {
+                    // Known logins don't depend on rooms: show them even before the first sync arrives.
+                    for (Login l : cachedLogins) {
+                        out.add(new Account(accountId(n, l.id()), n, l.name() == null || l.name().isBlank() ? l.id() : l.name(),
+                                loginStatus(l.state()), l.state()));
+                    }
+                    continue;
+                }
                 if (portals == 0 && botRoom == null) continue;
                 AccountStatus status = portals > 0 ? AccountStatus.CONNECTED : AccountStatus.NEEDS_LOGIN;
                 String label = n.displayName();
@@ -1279,34 +1365,46 @@ public final class MatrixChatService implements ChatService {
                     .append(l.state() == null ? "" : l.state()).append('\n');
         }
         Settings.get().set("matrix.logins." + n.protocolId(), System.currentTimeMillis() + "\n" + sb);
+        loginsCachedAt.put(n, System.currentTimeMillis());
         lastAccounts = accounts();
         fire(Listener::accountsChanged);
     }
 
     /** After the first sync: load cached logins; refresh networks with no cache, no logins, or a cache over 6 h old. */
+    /** Cached {@code list-logins} answers, read at start so accounts show before the first sync finishes. */
+    private final Map<Network, Long> loginsCachedAt = new ConcurrentHashMap<>();
+
+    private void loadCachedLogins() {
+        for (Network n : Network.values()) {
+            if (!n.isBridged()) continue;
+            String cached = Settings.get().getString("matrix.logins." + n.protocolId(), null);
+            if (cached == null) continue;
+            String[] lines = cached.split("\n");
+            long ts = 0;
+            try {
+                ts = Long.parseLong(lines[0]);
+            } catch (NumberFormatException ignored) {
+                // treated as stale
+            }
+            List<Login> list = new ArrayList<>();
+            for (int i = 1; i < lines.length; i++) {
+                String[] f = lines[i].split("\t", -1);
+                if (f.length >= 1 && !f[0].isBlank()) {
+                    list.add(new Login(f[0], f.length > 1 && !f[1].isEmpty() ? f[1] : null, f.length > 2 && !f[2].isEmpty() ? f[2] : null));
+                }
+            }
+            logins.put(n, list);
+            loginsCachedAt.put(n, ts);
+        }
+    }
+
+    /** After the first sync: re-check networks with no cache, no logins, or a cache over 6 h old. */
     private void refreshStaleLogins() {
         for (Network n : Network.values()) {
             if (!n.isBridged() || findBotRoom(n) == null) continue;
-            String cached = Settings.get().getString("matrix.logins." + n.protocolId(), null);
-            long ts = 0;
-            if (cached != null) {
-                String[] lines = cached.split("\n");
-                try {
-                    ts = Long.parseLong(lines[0]);
-                } catch (NumberFormatException ignored) {
-                    // refresh
-                }
-                List<Login> list = new ArrayList<>();
-                for (int i = 1; i < lines.length; i++) {
-                    String[] f = lines[i].split("\t", -1);
-                    if (f.length >= 1 && !f[0].isBlank()) {
-                        list.add(new Login(f[0], f.length > 1 && !f[1].isEmpty() ? f[1] : null, f.length > 2 && !f[2].isEmpty() ? f[2] : null));
-                    }
-                }
-                logins.put(n, list);
-            }
-            // An empty cache ("not logged in") is always re-checked: a login may have happened since.
             List<Login> known = logins.get(n);
+            long ts = loginsCachedAt.getOrDefault(n, 0L);
+            // An empty cache ("not logged in") is always re-checked: a login may have happened since.
             if (known == null || known.isEmpty() || System.currentTimeMillis() - ts > LOGINS_MAX_AGE_MS) refreshLogins(n);
         }
     }
