@@ -81,7 +81,7 @@ registro solo con token secreto, y lee los registros de los puentes de `appservi
 
 | | Mac Apple Silicon | Windows x64 | Mac Intel |
 |---|---|---|---|
-| Servidor tuwunel | ✅ compila (sin cambios) | ⏳ compilando sin `jemalloc`/`io_uring`/`systemd` (solo Linux) | ❌ fuera de alcance |
+| Servidor tuwunel | ✅ compila (sin cambios, 26 min en CI) | ✅ compila y arranca sin las funciones de Linux (`--no-default-features` sin `jemalloc`/`io_uring`/`systemd`; 82 min en CI, `tuwunel.exe` de 123 MB) | ❌ fuera de alcance |
 | Puentes Go (WhatsApp, Telegram, Meta, Slack, Google Messages, X, LinkedIn, Discord) | ✅ binarios oficiales | ✅ compilan con `go build -tags goolm` (no hay binarios oficiales; los compilaría nuestro CI) | ❌ |
 | Signal | ✅ binario oficial | ⚠️ la parte Rust compila; falla al enlazar con Go (pendiente) | ❌ |
 
