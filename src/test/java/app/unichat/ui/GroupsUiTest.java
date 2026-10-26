@@ -139,6 +139,18 @@ class GroupsUiTest {
     }
 
     @Test
+    void openingADiscordServerBringsAllItsChannels() throws Exception {
+        Scene scene = open(null);
+        enter(scene, fx(() -> chatList(scene)), "!servidor:demo");
+        Thread.sleep(200);
+        assertEquals(List.of("!servidor:demo"), svc.channelLoads(), "asked the bridge for every channel");
+        key(fx(() -> spaceList(scene)), KeyCode.ESCAPE);
+        enter(scene, fx(() -> chatList(scene)), "!servidor:demo");
+        assertEquals(1, svc.channelLoads().size(), "once");
+        svc.stop();
+    }
+
+    @Test
     void joiningAChannelOpensItWhenItArrives() throws Exception {
         Scene scene = open(Network.DISCORD);
         enter(scene, fx(() -> chatList(scene)), "!servidor:demo");

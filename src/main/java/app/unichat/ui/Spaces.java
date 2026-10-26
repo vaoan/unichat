@@ -28,7 +28,10 @@ final class Spaces {
     private final Map<String, String> names = new ConcurrentHashMap<>();
     private final Set<String> namesAsked = new HashSet<>();
     private final Map<Network, List<ChatService.GroupOffer>> offers = new ConcurrentHashMap<>();
-    private final Set<Network> offersAsked = new HashSet<>();
+    private final Map<Network, Long> offersAskedAt = new ConcurrentHashMap<>();
+    private final Set<Network> offersInFlight = ConcurrentHashMap.newKeySet();
+    /** Servers keep arriving (Discord brings them in one by one): the list to add is re-checked this often. */
+    static long offersRecheckMs = 15_000;
     private final Set<String> adding = new HashSet<>();
     private String pendingOpen;
     private javafx.animation.PauseTransition pendingTimeout;
@@ -62,13 +65,19 @@ final class Spaces {
         });
     }
 
-    /** Servers of {@code n} you could add; asked to the bridge the first time, empty until it answers. */
+    /** Servers of {@code n} you could add; re-checked now and then, empty until the bridge answers. */
     List<ChatService.GroupOffer> offers(Network n) {
-        if (offersAsked.add(n)) {
+        long now = System.currentTimeMillis();
+        if (now - offersAskedAt.getOrDefault(n, 0L) >= offersRecheckMs && offersInFlight.add(n)) {
+            offersAskedAt.put(n, now);
             svc.groupOffers(n).whenComplete((l, err) -> {
-                System.err.println("Group offers for " + n + ": " + (err != null ? "failed " + err.getClass().getSimpleName() : l.size()));
-                if (err != null || l.isEmpty()) return;
+                offersInFlight.remove(n);
+                if (err != null) {
+                    System.err.println("Group offers for " + n + " failed: " + err.getClass().getSimpleName());
+                    return;
+                }
                 Platform.runLater(() -> {
+                    if (l.equals(offers.getOrDefault(n, List.of()))) return;
                     offers.put(n, l);
                     onChanged.run();
                 });

@@ -61,6 +61,7 @@ public final class ChatListPane extends VBox {
     private final ObservableList<Chat> spaceItems = FXCollections.observableArrayList();
     private final ListView<Chat> spaceList = new ListView<>(spaceItems);
     private final Label spaceTitle = new Label();
+    private final java.util.Set<String> channelsAsked = new java.util.HashSet<>();
     private final VBox spaceView;
 
     public ChatListPane(ChatService svc, Consumer<Chat> onOpen) {
@@ -141,6 +142,9 @@ public final class ChatListPane extends VBox {
         spaceHeader.getStyleClass().add("space-header");
         spaceList.getStyleClass().addAll("chat-list", "space-list");
         spaceList.setCellFactory(v -> new ChatCell());
+        Label noChannels = new Label("Trayendo los canales…");
+        noChannels.getStyleClass().add("empty-label");
+        spaceList.setPlaceholder(noChannels);
         spaceList.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER) open(spaceList.getSelectionModel().getSelectedItem());
             if (e.getCode() == KeyCode.ESCAPE || e.getCode() == KeyCode.LEFT) {
@@ -432,6 +436,8 @@ public final class ChatListPane extends VBox {
 
     /** Shows a server's channels over the list. */
     private void openSpace(String id) {
+        // Discord brings a server's channels as people write in them: on opening, ask for all of them (once).
+        if (channelsAsked.add(id)) svc.loadAllChannels(id).exceptionally(e -> null);
         openSpace = id;
         arrowedRow = id;
         spaces.ensureNames(id);

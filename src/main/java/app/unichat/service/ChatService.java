@@ -165,6 +165,11 @@ public interface ChatService {
         return CompletableFuture.failedFuture(new UnsupportedOperationException("addGroup"));
     }
 
+    /** Asks the bridge for every channel of server {@code spaceId} (not only those with messages); no-op elsewhere. */
+    default CompletableFuture<Void> loadAllChannels(String spaceId) {
+        return CompletableFuture.completedFuture(null);
+    }
+
     /** Names of a space's direct children, including ones you haven't joined (room id → name). */
     default CompletableFuture<java.util.Map<String, String>> spaceNames(String spaceId) {
         return CompletableFuture.completedFuture(java.util.Map.of());

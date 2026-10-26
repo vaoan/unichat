@@ -168,6 +168,19 @@ public final class MockChatService implements ChatService {
         });
     }
 
+    private final List<String> channelLoads = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    @Override
+    public CompletableFuture<Void> loadAllChannels(String spaceId) {
+        if (!channelLoads.contains(spaceId)) channelLoads.add(spaceId);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    /** Demo/tests: the servers whose channels were all asked for. */
+    public List<String> channelLoads() {
+        return channelLoads;
+    }
+
     private volatile boolean failJoins;
 
     /** Demo/tests: every join is refused (a channel you lost access to). */
