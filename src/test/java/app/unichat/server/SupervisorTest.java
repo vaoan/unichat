@@ -53,6 +53,31 @@ class SupervisorTest {
     }
 
     @Test
+    void orphansFromAPreviousRunAreStopped() throws Exception {
+        Path run = dir.resolve("run");
+        Supervisor first = new Supervisor(Duration.ofMillis(50), Duration.ofMillis(200), run);
+        first.start("svc", dir, fake("run"), dir.resolve("svc.log"));
+        await(() -> first.isRunning("svc"));
+        long orphan = Long.parseLong(Files.readString(run.resolve("svc.pid")).strip().split(" ")[0]);
+        // Unichat dies without stopping its children (forced quit, crash): the next run cleans up.
+        Supervisor next = new Supervisor(Duration.ofMillis(50), Duration.ofMillis(200), run);
+        next.reapOrphans();
+        await(() -> ProcessHandle.of(orphan).map(h -> !h.isAlive()).orElse(true));
+        assertFalse(Files.exists(run.resolve("svc.pid")));
+    }
+
+    @Test
+    void unrelatedProcessesAreNeverKilled() throws Exception {
+        Path run = dir.resolve("run");
+        Files.createDirectories(run);
+        // A pid file pointing at this test's own JVM (not started by the supervisor): must survive.
+        Files.writeString(run.resolve("svc.pid"), Long.toString(ProcessHandle.current().pid()));
+        new Supervisor(Duration.ofMillis(50), Duration.ofMillis(200), run).reapOrphans();
+        assertTrue(ProcessHandle.current().isAlive());
+        assertFalse(Files.exists(run.resolve("svc.pid")));
+    }
+
+    @Test
     void restartsAfterACrash() throws Exception {
         Path log = dir.resolve("crash.log");
         sup.start("crash", dir, fake("crash"), log);

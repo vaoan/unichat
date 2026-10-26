@@ -27,13 +27,69 @@ public final class Supervisor {
     static final long MAX_LOG = 5L * 1024 * 1024;
     private final Map<String, Service> services = new ConcurrentHashMap<>();
 
-    public Supervisor() {
-        this(Duration.ofSeconds(1), Duration.ofSeconds(30));
+    /** Where each running process is noted as {@code <name>.pid} ("pid startMillis"), or null. */
+    private final Path runDir;
+
+    public Supervisor(Path runDir) {
+        this(Duration.ofSeconds(1), Duration.ofSeconds(30), runDir);
     }
 
     Supervisor(Duration firstBackoff, Duration maxBackoff) {
+        this(firstBackoff, maxBackoff, null);
+    }
+
+    Supervisor(Duration firstBackoff, Duration maxBackoff, Path runDir) {
         this.firstBackoff = firstBackoff;
         this.maxBackoff = maxBackoff;
+        this.runDir = runDir;
+    }
+
+    /**
+     * Stops processes a previous Unichat left running (it was killed or crashed before stopping them), so they
+     * don't hold the port or the database. Only a process whose pid AND start time match its note is touched.
+     */
+    public void reapOrphans() {
+        if (runDir == null || !Files.isDirectory(runDir)) return;
+        try (var files = Files.list(runDir)) {
+            for (Path f : files.filter(x -> x.getFileName().toString().endsWith(".pid")).toList()) {
+                String[] parts = Files.readString(f).strip().split("\\s+");
+                Files.deleteIfExists(f);
+                if (parts.length != 2) continue;
+                long pid = Long.parseLong(parts[0]), started = Long.parseLong(parts[1]);
+                ProcessHandle.of(pid).filter(ProcessHandle::isAlive)
+                        .filter(h -> h.info().startInstant().map(i -> i.toEpochMilli() == started).orElse(false))
+                        .ifPresent(h -> {
+                            h.destroy();
+                            try {
+                                h.onExit().get(5, TimeUnit.SECONDS);
+                            } catch (Exception e) {
+                                h.destroyForcibly();
+                            }
+                        });
+            }
+        } catch (IOException | NumberFormatException e) {
+            System.err.println("Could not check leftover processes: " + e);
+        }
+    }
+
+    private void notePid(String name, Process p) {
+        if (runDir == null) return;
+        try {
+            Files.createDirectories(runDir);
+            long started = p.info().startInstant().map(java.time.Instant::toEpochMilli).orElse(0L);
+            Files.writeString(runDir.resolve(name + ".pid"), p.pid() + " " + started);
+        } catch (IOException e) {
+            System.err.println("Could not note pid of " + name + ": " + e);
+        }
+    }
+
+    private void forgetPid(String name) {
+        if (runDir == null) return;
+        try {
+            Files.deleteIfExists(runDir.resolve(name + ".pid"));
+        } catch (IOException ignored) {
+            // Removed on the next start anyway.
+        }
     }
 
     private final class Service {
@@ -56,6 +112,7 @@ public final class Supervisor {
             Files.createDirectories(log.getParent());
             process = new ProcessBuilder(command).directory(workDir.toFile()).redirectErrorStream(true).start();
             Process p = process;
+            notePid(name, p);
             Thread pump = new Thread(() -> pump(p, log), "log-" + name);
             pump.setDaemon(true);
             pump.start();
@@ -131,6 +188,7 @@ public final class Supervisor {
         Service s = services.remove(name);
         if (s == null) return;
         s.wanted = false;
+        forgetPid(name);
         Process p = s.process;
         if (p == null || !p.isAlive()) return;
         p.destroy();

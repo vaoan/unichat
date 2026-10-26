@@ -49,7 +49,7 @@ public final class LocalServer {
     private final Path dir;
     private final Manifest manifest;
     private final BinaryStore store;
-    private final Supervisor supervisor = new Supervisor();
+    private final Supervisor supervisor;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private boolean running;
 
@@ -58,6 +58,9 @@ public final class LocalServer {
         this.dir = platform.dataDir();
         this.manifest = Manifest.bundled();
         this.store = new BinaryStore(dir.resolve("bin"), platform);
+        this.supervisor = new Supervisor(dir.resolve("run"));
+        // Whatever way Unichat ends (Salir, ⌘Q, logout of the Mac, kill), its server and bridges end with it.
+        Runtime.getRuntime().addShutdownHook(new Thread(supervisor::stopAll, "local-server-shutdown"));
     }
 
     /** Null on systems the native stack doesn't support (Intel Mac, Linux). */
@@ -83,6 +86,7 @@ public final class LocalServer {
      */
     public synchronized void ensureRunning(Consumer<String> progress) throws IOException, InterruptedException {
         Properties secrets = secrets();
+        if (!running) supervisor.reapOrphans();
         Files.createDirectories(dir.resolve("appservices"));
         progress.accept("Preparando el servidor…");
         store.installBundled("tuwunel", bundledHomeserver(), manifest.tuwunelVersion());
