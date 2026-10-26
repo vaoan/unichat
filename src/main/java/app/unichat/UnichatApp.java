@@ -77,6 +77,13 @@ public final class UnichatApp extends Application {
         };
         if (restored != null) showMain(restored); else showLogin();
         stage.show();
+        // -Dunichat.startLogin=<protocol id>: open Ajustes > Cuentas with that network's login wizard.
+        String startLogin = System.getProperty("unichat.startLogin");
+        if (startLogin != null && mainView != null) {
+            javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(3));
+            wait.setOnFinished(e -> mainView.addAccount(app.unichat.model.Network.fromProtocolId(startLogin)));
+            wait.play();
+        }
         snapshotIfRequested();
     }
 
