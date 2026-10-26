@@ -74,6 +74,11 @@ public final class LocalServer {
 
     public Path dir() { return dir; }
 
+    /** Whether this server can install {@code bridge} here (pinned in versions.env, with a known port). */
+    public boolean provides(String bridge) {
+        return BRIDGE_PORTS.containsKey(bridge) && manifest.bridge(bridge) != null;
+    }
+
     /** Login of the account on this server: {user, password}. Available after {@link #ensureRunning}. */
     public synchronized String[] credentials() throws IOException {
         Properties s = secrets();

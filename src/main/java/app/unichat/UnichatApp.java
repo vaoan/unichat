@@ -169,7 +169,7 @@ public final class UnichatApp extends Application {
     private void startLocalServer() {
         LocalServer local = LocalServer.get();
         if (local == null) return;
-        MatrixChatService.setBridgeProvisioner(n -> local.ensureBridge(n.protocolId(), msg -> { }));
+        MatrixChatService.setBridgeProvisioner(provisioner(local));
         Thread.ofVirtual().name("local-server").start(() -> {
             try {
                 local.ensureRunning(msg -> { });
@@ -179,10 +179,23 @@ public final class UnichatApp extends Application {
         });
     }
 
+    /** Adding a network on the local server installs and starts its bridge first. */
+    private static MatrixChatService.BridgeProvisioner provisioner(LocalServer local) {
+        return new MatrixChatService.BridgeProvisioner() {
+            @Override public void ensure(app.unichat.model.Network n) throws Exception {
+                local.ensureBridge(n.protocolId(), msg -> { });
+            }
+
+            @Override public boolean provides(app.unichat.model.Network n) {
+                return local.provides(n.protocolId());
+            }
+        };
+    }
+
     private void showMain(ChatService svc) {
         if (Settings.get().localServer()) {
             LocalServer local = LocalServer.get();
-            if (local != null) MatrixChatService.setBridgeProvisioner(n -> local.ensureBridge(n.protocolId(), msg -> { }));
+            if (local != null) MatrixChatService.setBridgeProvisioner(provisioner(local));
         }
         service = svc;
         mainView = new MainView(svc, stage, notifier, this::logout, this::openLink);

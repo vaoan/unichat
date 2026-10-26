@@ -1190,8 +1190,11 @@ public final class MatrixChatService implements ChatService {
         synchronized (proc) {
             for (MatrixRoom r : proc.rooms()) if (r.chat.network().isBridged()) seen.put(r.chat.network(), true);
         }
+        BridgeProvisioner p = provisioner;
         for (Network n : Network.values()) {
-            if (n.isBridged() && (Boolean.TRUE.equals(bridgeAvailable.get(n)) || seen.containsKey(n))) out.add(n);
+            if (!n.isBridged()) continue;
+            boolean installable = p != null && p.provides(n);
+            if (installable || Boolean.TRUE.equals(bridgeAvailable.get(n)) || seen.containsKey(n)) out.add(n);
         }
         return out;
     }
@@ -1259,6 +1262,9 @@ public final class MatrixChatService implements ChatService {
     @FunctionalInterface
     public interface BridgeProvisioner {
         void ensure(Network network) throws Exception;
+
+        /** Whether this provisioner can install {@code network}'s bridge (it's offered in Cuentas before it exists). */
+        default boolean provides(Network network) { return true; }
     }
 
     private static volatile BridgeProvisioner provisioner;
