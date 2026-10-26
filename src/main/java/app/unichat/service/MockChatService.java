@@ -325,8 +325,7 @@ public final class MockChatService implements ChatService {
         synchronized (accounts) {
             accounts.put(pendingId(network), new Account(pendingId(network), network, "Nueva cuenta", AccountStatus.NEEDS_LOGIN, null));
         }
-        incoming(chat, botMember(network), "Hola 👋 Soy el puente de " + network.displayName()
-                + ". Escribe **login** para conectar una cuenta.", false);
+        answerBridgeBot(chat, "login");
         listeners.forEach(Listener::accountsChanged);
         return CompletableFuture.completedFuture(chat.id());
     }
@@ -352,6 +351,17 @@ public final class MockChatService implements ChatService {
         chats.values().removeIf(c -> account.id().equals(c.accountId()) || (last && c.network() == account.network() && !c.bridgeBot()));
         listeners.forEach(Listener::accountsChanged);
         fireChats();
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> cancelLogin(Network network, String botChatId) {
+        synchronized (accounts) {
+            accounts.remove(pendingId(network));
+        }
+        Chat chat = chats.get(botChatId);
+        if (chat != null) incoming(chat, botMember(network), "Login cancelled.", false);
+        listeners.forEach(Listener::accountsChanged);
         return CompletableFuture.completedFuture(null);
     }
 
@@ -387,10 +397,10 @@ public final class MockChatService implements ChatService {
                 qr.setFileName("qr.png");
                 qr.setSize(640, 420);
                 append(chat, qr);
-                incoming(chat, bot, "Escanea el código desde la app de " + n.displayName()
-                        + " (en el demo, escribe **ok** para simular el escaneo).", false);
+                incoming(chat, bot, "Scan the QR code with the " + n.displayName() + " mobile app to log in.", false);
+                scheduler().schedule(() -> answerBridgeBot(chat, "ok"), 6, TimeUnit.SECONDS); // demo: simulated scan
             } else if (command.equalsIgnoreCase("ok")) {
-                incoming(chat, bot, "✅ Sesión iniciada correctamente. Sincronizando chats…", false);
+                incoming(chat, bot, "Successfully logged in as demo_" + n.protocolId(), false);
                 synchronized (accounts) {
                     accounts.remove(pendingId(n));
                     long k = accounts.values().stream().filter(a -> a.network() == n).count() + 1;

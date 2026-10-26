@@ -183,7 +183,7 @@
 .rail-button { -fx-padding: 9; -fx-background-radius: 12; -fx-min-width: 44; -fx-min-height: 44; }
 .rail-button.active { -fx-background-color: -selected; }
 .rail-button.active .icon { -fx-background-color: -text; }
-.rail-button.warning .rail-network { -fx-opacity: 0.55; }
+.rail-button.warning .rail-network { -fx-opacity: 0.8; -fx-border-color: -text-3; -fx-border-width: 1.5; -fx-border-radius: 8; -fx-border-style: segments(3, 2); }
 .rail-network {
     -fx-min-width: 26; -fx-min-height: 26; -fx-max-width: 26; -fx-max-height: 26;
     -fx-alignment: center;
@@ -652,3 +652,16 @@
 .account-row { -fx-padding: 0 4; }
 .settings-group .text-field { -fx-background-color: -surface; -fx-border-color: -border; -fx-border-radius: 10; }
 .settings-group .text-field:focused { -fx-border-color: -accent; }
+
+/* ================================================================ accounts sheet & login wizard */
+.accounts-sheet { -fx-pref-width: 600; }
+.sheet-scroll { -fx-background-color: transparent; -fx-max-height: 380; }
+.picker-row { -fx-padding: 10 12; -fx-background-radius: 10; -fx-alignment: center-left; }
+.picker-row:hover { -fx-background-color: -hover; }
+.picker-row .icon { -fx-background-color: -text-3; }
+.wizard-instructions { -fx-font-size: 1.04em; -fx-line-spacing: 3; }
+.wizard-bot { -fx-text-fill: -text-3; -fx-font-size: 0.88em; }
+.qr-box { -fx-background-color: white; -fx-background-radius: 14; -fx-padding: 12; -fx-border-color: -border; -fx-border-radius: 14; }
+.link-button { -fx-text-fill: -text-3; -fx-underline: true; -fx-font-size: 0.86em; -fx-padding: 2 4; }
+.accounts-sheet .text-area { -fx-background-color: -surface-2; }
+.primary-button .icon { -fx-background-color: white; }

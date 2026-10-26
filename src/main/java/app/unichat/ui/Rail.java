@@ -43,7 +43,7 @@ public final class Rail extends VBox {
                 listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(null).withView(ChatFilter.View.INBOX)));
         archive = railButton(Icons.icon(Icons.ARCHIVE, 20), "Archivados", () ->
                 listPane.filterProperty().set(listPane.filterProperty().get().withView(ChatFilter.View.ARCHIVE)));
-        Button add = railButton(Icons.icon(Icons.PLUS, 20), "Conectar una red", onConnect);
+        Button add = railButton(Icons.icon(Icons.PLUS, 20), "Cuentas: agregar o administrar", onConnect);
         add.getStyleClass().add("rail-add");
         Button settings = railButton(Icons.icon(Icons.SETTINGS, 20), "Ajustes", onSettings);
 
@@ -92,10 +92,17 @@ public final class Rail extends VBox {
             };
             List<Account> netAccounts = Accounts.of(svc, n);
             String count = netAccounts.size() > 1 ? " (" + netAccounts.size() + " cuentas)" : "";
-            Button b = railButton(letter, n.displayName() + count + status, () ->
-                    listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(n).withView(ChatFilter.View.INBOX)));
+            // A network with no working login opens its login chat (QR, cookies…) instead of an empty filter.
+            boolean connected = !netAccounts.isEmpty();
+            Button b = railButton(letter, connected ? n.displayName() + count + status : n.displayName() + " — conectar", () -> {
+                if (connected) {
+                    listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(n).withView(ChatFilter.View.INBOX));
+                } else {
+                    onAddAccount.accept(n);
+                }
+            });
             b.setOnContextMenuRequested(e -> networkMenu(n, netAccounts).show(b, e.getScreenX(), e.getScreenY()));
-            if (acc != null && acc.status() != AccountStatus.CONNECTED) b.getStyleClass().add("warning");
+            if (!connected) b.getStyleClass().add("warning");
             setActive(b, f.network() == n);
             setUnreadBadge(b, chats.stream().filter(c -> c.network() == n && !c.archived() && !c.bridgeBot() && !c.muted() && c.isUnread()).count());
             networks.getChildren().add(b);

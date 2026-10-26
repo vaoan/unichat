@@ -1177,6 +1177,11 @@ public final class MatrixChatService implements ChatService {
         return n.protocolId() + ":" + loginId;
     }
 
+    @Override
+    public CompletableFuture<Void> cancelLogin(Network network, String botChatId) {
+        return run(() -> sendCommand(botChatId, botCommand(network, "cancel")));
+    }
+
     static AccountStatus loginStatus(String state) {
         if (state == null) return AccountStatus.CONNECTED;
         return switch (state) {

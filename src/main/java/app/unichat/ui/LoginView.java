@@ -61,7 +61,7 @@ public final class LoginView extends StackPane {
                     .whenComplete((svc, err) -> Platform.runLater(() -> {
                         login.setDisable(false);
                         spin.setVisible(false);
-                        if (err != null) showError(error, AddAccountPane.rootMessage(err));
+                        if (err != null) showError(error, AccountsPane.rootMessage(err));
                         else onLoggedIn.accept(svc);
                     }));
         });

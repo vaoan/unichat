@@ -160,6 +160,8 @@ public final class ChatListPane extends VBox {
         empty.setText(f.searching() ? "Sin resultados para «" + f.query() + "»"
                 : f.view() == ChatFilter.View.ARCHIVE ? "No hay chats archivados"
                 : f.unreadOnly() ? "¡Todo al día! No tienes mensajes sin leer 🎉"
+                : svc.accounts().stream().noneMatch(a -> a.status() == app.unichat.model.AccountStatus.CONNECTED)
+                    ? "Aún no conectaste ninguna red.\nHaz clic en una red de la izquierda (o en +) para iniciar sesión."
                 : "No hay chats aquí todavía");
 
         boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly();

@@ -184,10 +184,17 @@ y vuelve a ejecutar el script para regenerarlo.
 ## Varias cuentas de la misma red
 
 Los bridges nuevos (WhatsApp, Signal, Instagram, Messenger, Google Messages, Slack, X, LinkedIn, Telegram)
-admiten varias sesiones. En Unichat: **Conectar una red → (red ya conectada) → Agregar otra cuenta**, o clic
-derecho sobre la red en la barra lateral. En **Ajustes → Redes conectadas** cada cuenta tiene su nombre
+admiten varias sesiones. En Unichat: botón **+ (Cuentas) → Agregar cuenta → elige la red**; se abre un asistente
+con el QR o el campo para pegar cookies/códigos (el chat técnico con el bot queda oculto, con un enlace
+para verlo). También con clic derecho sobre la red en la barra lateral. En **Ajustes → Redes conectadas** cada cuenta tiene su nombre
 (alias) y su botón **Desconectar**, que cierra solo esa sesión (`logout <id>`).
 
 Unichat lee la lista de sesiones con `list-logins` (al conectar o desconectar, y como mucho una vez al día al
 abrir la app). Limitación: los bridges no siempre indican a qué sesión pertenece cada chat; cuando no se
 sabe, los chats aparecen juntos bajo la red y el filtro por cuenta no se muestra (para no ocultar chats).
+
+## Historial (backfill)
+
+`setup` activa el backfill en todos los bridges (últimos 50 mensajes por chat al vincular y hasta 500 mensajes
+perdidos tras reinicios). WhatsApp manda el historial **una sola vez, al vincular**: si vinculaste una cuenta
+antes de activar el backfill, desconéctala en **Cuentas** y vuelve a vincularla para recibir tus chats.

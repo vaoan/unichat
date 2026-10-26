@@ -109,4 +109,14 @@ public interface ChatService {
     default CompletableFuture<Void> disconnectAccount(Account account) {
         return disconnectNetwork(account.network());
     }
+
+    /** Answers the bridge's current login step (pasted cookies, e-mail, verification code…). */
+    default CompletableFuture<Void> sendLoginInput(Network network, String botChatId, String text) {
+        return sendText(botChatId, text, null);
+    }
+
+    /** Aborts an unfinished login started with {@link #addAccount}/{@link #connectNetwork}. */
+    default CompletableFuture<Void> cancelLogin(Network network, String botChatId) {
+        return CompletableFuture.completedFuture(null);
+    }
 }

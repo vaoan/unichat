@@ -83,7 +83,7 @@ public final class UnichatApp extends Application {
     /**
      * Diagnostics for screenshots/CI: {@code -Dunichat.snapshot=out.png} writes the window to a PNG
      * and exits; {@code -Dunichat.openChat=<id>} opens a chat first, {@code -Dunichat.info=true} the info panel,
-     * {@code -Dunichat.overlay=command|add|settings[:Page]} the command bar, connect-network sheet or settings,
+     * {@code -Dunichat.overlay=command|add|picker|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
      * {@code -Dunichat.network=<protocol id>} filters the inbox to one network.
      */
     private void snapshotIfRequested() {
@@ -98,12 +98,16 @@ public final class UnichatApp extends Application {
             if (net != null && mainView != null) mainView.showNetwork(app.unichat.model.Network.fromProtocolId(net));
             String overlay = System.getProperty("unichat.overlay", "");
             if (mainView != null && overlay.equals("command")) mainView.showCommandBar();
-            if (mainView != null && overlay.equals("add")) mainView.showAddAccount();
+            if (mainView != null && overlay.equals("add")) mainView.showAccounts();
+            if (mainView != null && overlay.equals("picker")) mainView.showAccounts().showPicker();
+            if (mainView != null && overlay.startsWith("login:")) {
+                mainView.addAccount(app.unichat.model.Network.fromProtocolId(overlay.substring(6)));
+            }
             if (mainView != null && overlay.startsWith("settings")) {
                 mainView.showSettings();
                 if (overlay.contains(":")) app.unichat.ui.SettingsWindow.select(overlay.substring(overlay.indexOf(':') + 1));
             }
-            javafx.animation.PauseTransition shoot = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(1.5));
+            javafx.animation.PauseTransition shoot = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(Double.parseDouble(System.getProperty("unichat.snapshotDelay", "1.5"))));
             shoot.setOnFinished(ev -> {
                 try {
                     var settings = app.unichat.ui.SettingsWindow.current();

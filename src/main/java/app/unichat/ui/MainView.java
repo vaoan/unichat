@@ -41,6 +41,8 @@ public final class MainView extends StackPane {
     private final Runnable onLogout;
     private final Consumer<String> openLink;
     private boolean chatsDirty;
+    private String pendingOpenId;
+    private long pendingOpenUntil;
     private boolean infoVisible;
     private final java.util.Set<String> dirtyThreads = new java.util.HashSet<>();
 
@@ -50,10 +52,7 @@ public final class MainView extends StackPane {
         @Override public void accountsChanged() {
             scheduleChats();
             Platform.runLater(() -> {
-                // Rebuild an open "Conectar una red" sheet with fresh availability/accounts.
-                if (overlay.isVisible() && !overlay.getChildren().isEmpty() && overlay.getChildren().get(0) instanceof AddAccountPane) {
-                    showAddAccount();
-                }
+                if (openAccountsPane() instanceof AccountsPane ap) ap.refresh();
             });
         }
         @Override public void connectionChanged(ConnectionState s) { Platform.runLater(() -> showConnection(s)); }
@@ -77,7 +76,7 @@ public final class MainView extends StackPane {
         listPane = new ChatListPane(svc, this::openChat);
         thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast);
         info = new InfoPane(svc, this::toggleInfo, this::toast);
-        rail = new Rail(svc, listPane, this::showAddAccount, this::addAccount, this::showSettings);
+        rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::showSettings);
 
         threadArea.setCenter(thread);
         SplitPane split = new SplitPane(listPane, threadArea);
@@ -152,6 +151,16 @@ public final class MainView extends StackPane {
     }
 
     private void refreshAll() {
+        if (pendingOpenId != null) {
+            Chat pending = svc.chat(pendingOpenId);
+            if (pending != null) {
+                pendingOpenId = null;
+                openChat(pending);
+            } else if (System.currentTimeMillis() > pendingOpenUntil) {
+                pendingOpenId = null;
+                toast("El chat tarda en aparecer. Prueba de nuevo en unos segundos.");
+            }
+        }
         listPane.refresh();
         rail.refresh();
         Chat open = thread.chat();
@@ -218,7 +227,15 @@ public final class MainView extends StackPane {
     public void openChatId(String id) {
         if (id == null) return;
         Chat c = svc.chat(id);
-        if (c != null) openChat(c);
+        if (c != null) {
+            pendingOpenId = null;
+            openChat(c);
+            return;
+        }
+        // The room (e.g. a just-created bridge-bot chat) hasn't arrived through sync yet: open it when it does.
+        pendingOpenId = id;
+        pendingOpenUntil = System.currentTimeMillis() + 20_000;
+        toast("Abriendo el chat…");
     }
 
     public void toggleInfo() {
@@ -245,6 +262,7 @@ public final class MainView extends StackPane {
     }
 
     private void showOverlay(Node card) {
+        if (card instanceof javafx.scene.layout.Region r) r.maxHeightProperty().bind(overlay.heightProperty().subtract(130));
         overlay.getChildren().setAll(card);
         StackPane.setAlignment(card, Pos.TOP_CENTER);
         card.setTranslateY(90);
@@ -252,6 +270,7 @@ public final class MainView extends StackPane {
     }
 
     private void hideOverlay() {
+        if (openAccountsPane() instanceof AccountsPane ap) ap.dispose();
         overlay.setVisible(false);
         overlay.getChildren().clear();
         if (thread.chat() != null) thread.composer().focus();
@@ -265,7 +284,8 @@ public final class MainView extends StackPane {
                 new CommandBar.Command("Ver favoritos", m + "3", () -> setView(ChatFilter.View.FAVORITES, false)),
                 new CommandBar.Command("Ver prioridad baja", m + "4", () -> setView(ChatFilter.View.LOW_PRIORITY, false)),
                 new CommandBar.Command("Ver archivados", "", () -> setView(ChatFilter.View.ARCHIVE, false)),
-                new CommandBar.Command("Conectar una red", "", this::showAddAccount),
+                new CommandBar.Command("Cuentas", "", this::showAccounts),
+                new CommandBar.Command("Agregar cuenta", "", () -> showAccounts().showPicker()),
                 new CommandBar.Command("Ajustes", m + ",", this::showSettings),
                 new CommandBar.Command("Cerrar sesión", "", onLogout)
         ), this::openChat, this::hideOverlay);
@@ -277,8 +297,16 @@ public final class MainView extends StackPane {
         listPane.filterProperty().set(listPane.filterProperty().get().withView(v).withUnreadOnly(unread).withQuery(""));
     }
 
-    public void showAddAccount() {
-        showOverlay(new AddAccountPane(svc, this::openChatId, this::hideOverlay, this::toast, this::addAccount));
+    /** Opens the "Cuentas" sheet (list of accounts, add account, login wizard). */
+    public AccountsPane showAccounts() {
+        if (openAccountsPane() instanceof AccountsPane open) return open;
+        AccountsPane pane = new AccountsPane(svc, this::hideOverlay, this::toast, this::openChatId);
+        showOverlay(pane);
+        return pane;
+    }
+
+    private Object openAccountsPane() {
+        return overlay.isVisible() && !overlay.getChildren().isEmpty() ? overlay.getChildren().get(0) : null;
     }
 
     /** Filters the inbox to one network (all its accounts). */
@@ -288,10 +316,7 @@ public final class MainView extends StackPane {
 
     /** Starts the login of one more account on {@code n} and opens its bridge-bot chat. */
     public void addAccount(app.unichat.model.Network n) {
-        svc.addAccount(n).whenComplete((chatId, err) -> Platform.runLater(() -> {
-            if (err != null) toast("No se pudo agregar la cuenta: " + AddAccountPane.rootMessage(err));
-            else openChatId(chatId);
-        }));
+        showAccounts().startLogin(n);
     }
 
     public void showSettings() {
@@ -299,7 +324,7 @@ public final class MainView extends StackPane {
             Theme.applyAll();
             refreshAll();
             thread.rebuild(false);
-        }, onLogout, this::showAddAccount, this::addAccount, this::toast);
+        }, onLogout, this::showAccounts, this::addAccount, this::toast);
     }
 
     /** Text size: delta 0 resets to 100 %. */
