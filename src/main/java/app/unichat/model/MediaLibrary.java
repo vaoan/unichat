@@ -56,6 +56,12 @@ public final class MediaLibrary {
         save();
     }
 
+    /** A sticker/GIF shown in a chat: added to the recents if it's new, without moving existing ones. */
+    public synchronized void rememberSeen(Item item) {
+        if (recents.stream().anyMatch(i -> i.url().equals(item.url()))) return;
+        addRecent(item);
+    }
+
     /** Adds or removes a favourite; true when it's now a favourite. */
     public synchronized boolean toggleFavorite(Item item) {
         boolean removed = favorites.removeIf(i -> i.url().equals(item.url()));

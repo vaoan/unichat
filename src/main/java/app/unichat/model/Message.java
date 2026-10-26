@@ -54,6 +54,11 @@ public final class Message {
     public void setBody(String body) { this.body = body == null ? "" : body; }
     public String mediaUrl() { return mediaUrl; }
     public void setMediaUrl(String mediaUrl) { this.mediaUrl = mediaUrl; }
+    /** The event's original {@code info} (e.g. fi.mau.bridged_sticker), kept so a sticker can be sent again natively. */
+    private com.fasterxml.jackson.databind.JsonNode mediaInfo;
+    public com.fasterxml.jackson.databind.JsonNode mediaInfo() { return mediaInfo; }
+    public void setMediaInfo(com.fasterxml.jackson.databind.JsonNode info) { this.mediaInfo = info; }
+
     public String fileName() { return fileName; }
     public void setFileName(String fileName) { this.fileName = fileName; }
     /** MIME type of the media (e.g. {@code image/webp}), or null when unknown. */

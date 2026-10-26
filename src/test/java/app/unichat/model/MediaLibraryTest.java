@@ -53,4 +53,15 @@ class MediaLibraryTest {
         lib.addRecent(sticker("mxc://s/x"));
         assertEquals(1, new MediaLibrary(f).recents(MediaLibrary.Kind.STICKER).size(), "and it heals on the next save");
     }
+
+    @Test
+    void seenStickersAreRememberedWithoutReordering() {
+        MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
+        lib.addRecent(sticker("mxc://s/a"));
+        lib.addRecent(sticker("mxc://s/b"));
+        lib.rememberSeen(sticker("mxc://s/a"));
+        assertEquals("mxc://s/b", lib.recents(MediaLibrary.Kind.STICKER).get(0).url(), "scrolling past a sticker doesn't reorder");
+        lib.rememberSeen(sticker("mxc://s/c"));
+        assertEquals("mxc://s/c", lib.recents(MediaLibrary.Kind.STICKER).get(0).url(), "a new one is added");
+    }
 }

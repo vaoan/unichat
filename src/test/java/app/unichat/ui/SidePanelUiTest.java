@@ -13,7 +13,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -68,12 +67,72 @@ class SidePanelUiTest {
         assertFalse(fx(() -> panel(scene) != null), "same button closes it");
     }
 
+    @Test
+    void stickersTabShowsFavouritesAndSendsThem() throws Exception {
+        System.setProperty("java.awt.headless", "true");
+        try {
+            CountDownLatch started = new CountDownLatch(1);
+            Platform.startup(started::countDown);
+            started.await(10, TimeUnit.SECONDS);
+        } catch (IllegalStateException alreadyRunning) {
+            // another UI test started the toolkit
+        }
+        MockChatService svc = new MockChatService();
+        MainView[] view = new MainView[1];
+        Scene scene = fx(() -> {
+            Stage stage = new Stage();
+            stage.setOpacity(0);
+            stage.setX(-10000);
+            view[0] = new MainView(svc, stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            Scene sc = new Scene(view[0], 1200, 800);
+            Theme.register(sc);
+            stage.setScene(sc);
+            stage.show();
+            view[0].openChatId("!familia:demo");
+            // The library persists in the test data dir: make sure it's a favourite, whatever a previous run left.
+            if (!view[0].library().isFavorite("mxc://demo/fav")) view[0].library().toggleFavorite(new app.unichat.model.MediaLibrary.Item(
+                    app.unichat.model.MediaLibrary.Kind.STICKER, "mxc://demo/fav", "image/png", 160, 160, null));
+            return sc;
+        });
+        Thread.sleep(400);
+        fx(() -> { view[0].showPanel(SidePanel.Tab.STICKERS); return null; });
+        Thread.sleep(300);
+        int before = fx(() -> svc.chat("!familia:demo").lastPreview().length());
+        fx(() -> {
+            Node tile = panel(scene).lookup(".sticker-tile");
+            assertTrue(tile != null, "the favourite is listed");
+            assertEquals("Sticker favorito, enviar", tile.getAccessibleText());
+            tile.fireEvent(new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "",
+                    javafx.scene.input.KeyCode.ENTER, false, false, false, false));
+            return null;
+        });
+        Thread.sleep(300);
+        assertEquals("Sticker", fx(() -> svc.chat("!familia:demo").lastPreview()), "sent to the open chat");
+        assertTrue(before >= 0);
+
+        // A network that rejects stickers: shown dimmed, with the reason, and nothing is sent.
+        fx(() -> {
+            svc.chat("!familia:demo").setFeatures(app.unichat.model.RoomFeatures.parse(
+                    new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"id\":\"gm\",\"file\":{\"m.image\":{\"mime_types\":{\"image/*\":2}}}}")));
+            view[0].showPanel(SidePanel.Tab.STICKERS);
+            return null;
+        });
+        Thread.sleep(300);
+        String text = fx(() -> panel(scene).lookup(".sticker-tile").getAccessibleText());
+        assertTrue(text.contains("no acepta stickers"), text);
+    }
+
     private static SidePanel panel(Scene s) {
         for (Node n : s.getRoot().lookupAll("*")) if (n instanceof SidePanel p && p.getScene() != null) return p;
         return null;
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
+    @FunctionalInterface
+    private interface Fx<T> {
+        T get() throws Exception;
+    }
+
+    private static <T> T fx(Fx<T> s) throws Exception {
         CompletableFuture<T> f = new CompletableFuture<>();
         Platform.runLater(() -> {
             try {

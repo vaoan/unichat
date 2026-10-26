@@ -59,6 +59,7 @@ public final class ThreadPane extends BorderPane {
     private final Button jumpDown;
     private final Consumer<String> openLink;
     private final Consumer<String> toast;
+    private app.unichat.model.MediaLibrary library;
     private final Runnable toggleInfo;
     private final ToggleButton infoButton = new ToggleButton();
     private final Avatar headerAvatar = new Avatar(34);
@@ -175,6 +176,9 @@ public final class ThreadPane extends BorderPane {
 
     public Chat chat() { return chat; }
     public Composer composer() { return composer; }
+
+    /** Favourites and recents shared by every chat (MainView owns it). */
+    public void setLibrary(app.unichat.model.MediaLibrary library) { this.library = library; }
     public void setInfoSelected(boolean selected) { infoButton.setSelected(selected); }
 
     public void open(Chat c) {
@@ -583,6 +587,7 @@ public final class ThreadPane extends BorderPane {
         box.getChildren().add(view);
         if (m.mediaUrl() != null) {
             loadInto(view, m, (int) (dw * 2), (int) (dh * 2));
+            if (library != null && MessageActions.isStickerOrGif(m)) library.rememberSeen(MediaItems.of(m));
             // On release, not click: the first press selects the message and may scroll the list, and a press and
             // release over different spots is no "click" (it took a second click to open). Stickers open too: the
             // viewer plays animated WebP.
@@ -608,6 +613,11 @@ public final class ThreadPane extends BorderPane {
     }
 
     private void loadInto(ImageView view, Message m, int pxW, int pxH) {
+        loadMedia(svc, view, m, pxW, pxH);
+    }
+
+    /** Thumbnail first, then the (possibly animated) original; shared with the sticker and GIF grids. */
+    static void loadMedia(ChatService svc, ImageView view, Message m, int pxW, int pxH) {
         if (!mayBeAnimated(m)) {
             svc.media(m.mediaUrl(), pxW, pxH).thenAccept(p ->
                     Platform.runLater(() -> view.setImage(new Image(p.toUri().toString(), pxW, pxH, true, true, true))));
@@ -766,6 +776,13 @@ public final class ThreadPane extends BorderPane {
         if (a.contains(MessageActions.Action.SAVE_AS)) menu.getItems().add(ChatMenus.item("Guardar como…", () -> {
             if (getScene() != null) MediaSaver.save(getScene().getWindow(), svc, m, toast);
         }));
+        if (a.contains(MessageActions.Action.FAVORITE) && library != null) {
+            boolean fav = library.isFavorite(m.mediaUrl());
+            menu.getItems().add(ChatMenus.item(fav ? "Quitar de favoritos" : "Agregar a favoritos", () -> {
+                boolean now = library.toggleFavorite(MediaItems.of(m));
+                toast.accept(now ? "Agregado a favoritos" : "Quitado de favoritos");
+            }));
+        }
         if (a.contains(MessageActions.Action.EDIT)) menu.getItems().add(ChatMenus.item("Editar", () -> composer.edit(m)));
         java.util.List<String> reactions = chat.features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK));
         if (!reactions.isEmpty()) {

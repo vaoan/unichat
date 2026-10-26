@@ -145,6 +145,21 @@ public final class MockChatService implements ChatService {
     }
 
     @Override
+    public CompletableFuture<Void> sendSticker(String chatId, app.unichat.model.MediaLibrary.Item item) {
+        Chat chat = chats.get(chatId);
+        if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Chat no encontrado"));
+        Message m = outgoing(chatId);
+        m.setType(MessageType.STICKER);
+        m.setMediaUrl(item.url());
+        m.setMimeType(item.mime());
+        m.setSize(item.width(), item.height());
+        m.setMediaInfo(item.info());
+        append(chat, m);
+        deliver(chat, m);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
     public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId) {
         Chat chat = chats.get(chatId);
         if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Chat no encontrado"));

@@ -110,6 +110,11 @@ public interface ChatService {
         return disconnectNetwork(account.network());
     }
 
+    /** Sends a favourite/recent sticker; {@code item.info()} lets the bridge resend the native sticker. */
+    default CompletableFuture<Void> sendSticker(String chatId, app.unichat.model.MediaLibrary.Item item) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Stickers no disponibles"));
+    }
+
     /** Answers the bridge's current login step (pasted cookies, e-mail, verification code…). */
     default CompletableFuture<Void> sendLoginInput(Network network, String botChatId, String text) {
         return sendText(botChatId, text, null);

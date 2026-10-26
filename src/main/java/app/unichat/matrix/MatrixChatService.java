@@ -641,6 +641,30 @@ public final class MatrixChatService implements ChatService {
         return sendEvent(chatId, "m.room.message", txn, content);
     }
 
+    @Override
+    public CompletableFuture<Void> sendSticker(String chatId, app.unichat.model.MediaLibrary.Item item) {
+        String txn = newTxnId();
+        ObjectNode content = MatrixClient.JSON.createObjectNode();
+        content.put("body", "sticker");
+        content.put("url", item.url());
+        ObjectNode info = item.info() instanceof ObjectNode o ? o.deepCopy() : MatrixClient.JSON.createObjectNode();
+        if (!info.has("mimetype") && item.mime() != null) info.put("mimetype", item.mime());
+        if (!info.has("w") && item.width() > 0) info.put("w", item.width());
+        if (!info.has("h") && item.height() > 0) info.put("h", item.height());
+        content.set("info", info);
+        synchronized (proc) {
+            proc.addLocalEcho(chatId, txn, m -> {
+                m.setType(MessageType.STICKER);
+                m.setMediaUrl(item.url());
+                m.setMimeType(item.mime());
+                m.setSize(item.width(), item.height());
+                m.setMediaInfo(info);
+            });
+        }
+        fireLocal(chatId);
+        return sendEvent(chatId, "m.sticker", txn, content);
+    }
+
     /** Adds m.relates_to and the plain-text reply fallback. */
     private void addReply(String chatId, ObjectNode content, String replyToId) {
         if (replyToId == null || replyToId.startsWith(SyncProcessor.LOCAL_PREFIX)) return;

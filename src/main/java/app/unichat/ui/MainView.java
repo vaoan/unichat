@@ -45,6 +45,11 @@ public final class MainView extends StackPane {
     private long pendingOpenUntil;
     private boolean infoVisible;
     private SidePanel panel;
+    /** Favourite and recent stickers/GIFs, shared by every chat. */
+    private final app.unichat.model.MediaLibrary library =
+            new app.unichat.model.MediaLibrary(app.unichat.settings.Settings.dataDir().resolve("media-library.json"));
+
+    public app.unichat.model.MediaLibrary library() { return library; }
     private final java.util.Set<String> dirtyThreads = new java.util.HashSet<>();
 
     private final ChatService.Listener listener = new ChatService.Listener() {
@@ -78,6 +83,9 @@ public final class MainView extends StackPane {
         thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast);
         info = new InfoPane(svc, this::toggleInfo, this::toast);
         panel = new SidePanel(info, text -> thread.composer().insert(text));
+        thread.setLibrary(library);
+        StickerGrid stickers = new StickerGrid(svc, library, thread::chat, this::toast);
+        panel.setContent(SidePanel.Tab.STICKERS, stickers, stickers::refresh);
         thread.composer().setOnPanel(this::togglePanel);
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::showSettings);
 

@@ -70,9 +70,12 @@ public final class SidePanel extends VBox {
         }
     }
 
-    /** Replaces the content of a tab (Stickers and GIFs are filled once their palettes exist). */
-    public void setContent(Tab t, Node n) {
+    private final Map<Tab, Runnable> onShow = new EnumMap<>(Tab.class);
+
+    /** Replaces the content of a tab; {@code refresh} runs every time the tab is shown (may be null). */
+    public void setContent(Tab t, Node n, Runnable refresh) {
         content.put(t, n);
+        if (refresh != null) onShow.put(t, refresh);
         if (t == current) body.getChildren().setAll(n);
     }
 
@@ -81,6 +84,8 @@ public final class SidePanel extends VBox {
         current = t;
         buttons.get(t).setSelected(true);
         if (t == Tab.PROFILE && c != null) info.show(c);
+        Runnable r = onShow.get(t);
+        if (r != null) r.run();
         body.getChildren().setAll(content.get(t));
         Settings.get().set("panel.tab", t.name());
     }
