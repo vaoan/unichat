@@ -72,7 +72,7 @@ public final class Rail extends VBox {
         List<Chat> chats = svc.chats();
         setActive(inbox, f.network() == null && f.view() != ChatFilter.View.ARCHIVE);
         setActive(archive, f.view() == ChatFilter.View.ARCHIVE);
-        setUnreadBadge(inbox, chats.stream().filter(c -> !c.archived() && !c.bridgeBot() && !c.muted() && c.isUnread()).count());
+        setUnreadBadge(inbox, chats.stream().filter(ChatFilter::inboxUnread).count());
 
         networks.getChildren().clear();
         List<Account> accounts = svc.accounts();
@@ -99,7 +99,7 @@ public final class Rail extends VBox {
                     listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(n).withView(ChatFilter.View.INBOX)));
             if (n.isBridged()) b.setOnContextMenuRequested(e -> networkMenu(n, netAccounts).show(b, e.getScreenX(), e.getScreenY()));
             setActive(b, f.network() == n);
-            setUnreadBadge(b, chats.stream().filter(c -> c.network() == n && !c.archived() && !c.bridgeBot() && !c.muted() && c.isUnread()).count());
+            setUnreadBadge(b, chats.stream().filter(c -> c.network() == n && ChatFilter.inboxUnread(c)).count());
             networks.getChildren().add(b);
         }
     }

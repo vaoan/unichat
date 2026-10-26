@@ -29,13 +29,22 @@ public record ChatFilter(View view, Network network, String accountId, boolean u
 
     public boolean searching() { return query != null && !query.isBlank(); }
 
+    /**
+     * The one definition of "unread and demanding attention in the inbox": used by the inbox badge, the
+     * window title, notifications and the "No leídos" filter, so they can never disagree. Archived, muted,
+     * low-priority and bridge-bot chats don't count.
+     */
+    public static boolean inboxUnread(Chat c) {
+        return c.isUnread() && !c.archived() && !c.muted() && !c.lowPriority() && !c.bridgeBot();
+    }
+
     public boolean matches(Chat c) {
         if (network != null && c.network() != network) return false;
         if (accountId != null && !accountId.equals(c.accountId())) return false;
         if (searching()) return normalize(c.title()).contains(normalize(query))
                 || c.members().stream().anyMatch(m -> normalize(m.displayName()).contains(normalize(query)));
         if (c.bridgeBot()) return false;
-        if (unreadOnly && !c.isUnread()) return false;
+        if (unreadOnly && (!c.isUnread() || c.muted())) return false;
         return switch (view) {
             case INBOX -> !c.archived() && !c.lowPriority();
             case LOW_PRIORITY -> !c.archived() && c.lowPriority();

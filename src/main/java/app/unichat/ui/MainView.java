@@ -188,7 +188,7 @@ public final class MainView extends StackPane {
                 if (infoVisible) info.refresh();
             }
         }
-        long unread = svc.chats().stream().filter(c -> !c.archived() && !c.muted() && !c.bridgeBot() && c.isUnread()).count();
+        long unread = svc.chats().stream().filter(ChatFilter::inboxUnread).count();
         notifier.setUnread((int) unread);
         stage.setTitle(unread > 0 ? "Unichat (" + unread + ")" : "Unichat");
     }
