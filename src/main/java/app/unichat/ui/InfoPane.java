@@ -156,8 +156,9 @@ public final class InfoPane extends ScrollPane {
         v.getStyleClass().add("media-thumb");
         svc.media(m.mediaUrl(), 168, 168).thenAccept(p ->
                 Platform.runLater(() -> v.setImage(new Image(p.toUri().toString(), 168, 168, false, true, true))));
-        v.setOnMouseClicked(e -> svc.media(m.mediaUrl(), 0, 0).thenAccept(p ->
-                Platform.runLater(() -> MediaViewer.show(getScene().getWindow(), p, m.fileName()))));
+        v.setOnMouseClicked(e -> {
+            if (getScene() != null) MediaViewer.show(getScene().getWindow(), svc.media(m.mediaUrl(), 0, 0), m.fileName());
+        });
         v.setCursor(javafx.scene.Cursor.HAND);
         return v;
     }
