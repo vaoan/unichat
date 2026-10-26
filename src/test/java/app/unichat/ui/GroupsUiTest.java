@@ -200,23 +200,31 @@ class GroupsUiTest {
     }
 
     @Test
-    void discordServersNotInUnichatYetCanBeAddedFromTheList() throws Exception {
-        Scene scene = open(Network.DISCORD);
+    void discordServersNotInUnichatYetAreRowsLikeAnyChat() throws Exception {
+        Scene scene = open(null); // Todos, with every contact
         svc.dropDemoServer(); // like a fresh Discord login: the bridge brings no server by itself
         Thread.sleep(400);
-        List<String> rows = fx(() -> listTexts(scene));
-        assertTrue(rows.stream().anyMatch(t -> t.startsWith("Otros servidores de Discord, 1")), rows.toString());
-        enter(scene, fx(() -> chatList(scene)), ChatListPane.OFFERS_ROW + Network.DISCORD.name());
-        assertTrue(fx(() -> spaceTexts(scene)).stream().anyMatch(t -> t.startsWith("Servidor de juegos") && t.contains("Agregar")),
-                fx(() -> spaceTexts(scene)).toString());
-        enter(scene, fx(() -> spaceList(scene)), Spaces.OFFER_PREFIX + MockChatService.OFFERED_GUILD_ID);
+        String offer = Spaces.OFFER_PREFIX + MockChatService.OFFERED_GUILD_ID;
+        var list = fx(() -> chatList(scene));
+        assertTrue(fx(list::getItems).stream().anyMatch(c -> c.id().equals(offer)), "its own row, among the chats");
+        assertTrue(fx(list::getItems).stream().noneMatch(c -> c.title().startsWith("Otros servidores")), "no separate zone");
+        enter(scene, list, offer);
         Thread.sleep(500);
         assertTrue(svc.chats().stream().anyMatch(c -> c.space() && "Servidor de juegos".equals(c.title())), "the server came in");
         assertTrue(toastText(scene).contains("Servidor de juegos"), toastText(scene));
-        key(fx(() -> spaceList(scene)), KeyCode.ESCAPE);
-        assertTrue(fx(() -> listTexts(scene)).stream().anyMatch(t -> t.startsWith("Servidor de juegos, servidor de Discord")),
-                "it's a row of the Bandeja now");
-        assertTrue(fx(() -> listTexts(scene)).stream().noneMatch(t -> t.startsWith("Otros servidores")), "nothing left to add");
+        assertTrue(fx(list::getItems).stream().noneMatch(c -> c.id().equals(offer)), "now a real server row");
+        assertTrue(fx(list::getItems).stream().anyMatch(c -> c.space() && "Servidor de juegos".equals(c.title())));
+        svc.stop();
+    }
+
+    @Test
+    void searchFindsServersToAdd() throws Exception {
+        Scene scene = open(Network.DISCORD);
+        Thread.sleep(300);
+        fx(() -> { ((javafx.scene.control.TextField) scene.getRoot().lookup(".search-field")).setText("juegos"); return null; });
+        Thread.sleep(300);
+        assertTrue(fx(() -> chatList(scene).getItems()).stream()
+                .anyMatch(c -> c.id().equals(Spaces.OFFER_PREFIX + MockChatService.OFFERED_GUILD_ID)));
         svc.stop();
     }
 

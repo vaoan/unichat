@@ -45,8 +45,8 @@ public final class ChatListPane extends VBox {
     private final TextField search = new TextField();
     private final ToggleGroup chips = new ToggleGroup();
     private final Spaces spaces;
-    /** Id prefix of the "Otros servidores" row: the network's servers you could still add. */
-    static final String OFFERS_ROW = "offers:";
+    /** Network of each server-to-add row shown (they're not chats yet, so they carry no network of their own). */
+    private final java.util.Map<String, app.unichat.model.Network> offerNetworks = new java.util.HashMap<>();
     private FlowPane chipRow;
     private Runnable onNewChat;
     private final Consumer<Chat> onOpen;
@@ -219,28 +219,10 @@ public final class ChatListPane extends VBox {
         rows = InboxRows.build(all, f, spaces.names());
         List<Chat> visible = new java.util.ArrayList<>(rows.rows());
         spaces.checkPending();
-        // A network's servers not in Unichat yet (Discord): one row at the end, opening the list to add them.
-        app.unichat.model.Network net = f.network();
-        List<ChatService.GroupOffer> offers = net != null && f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly()
-                ? spaces.offers(net) : List.of();
-        if (!offers.isEmpty()) visible.add(offersRow(net, offers.size()));
-        boolean offersOpen = openSpace != null && openSpace.startsWith(OFFERS_ROW);
-        if (openSpace != null && (f.searching() || (offersOpen ? offers.isEmpty() : svc.chat(openSpace) == null))) openSpace = null;
+        visible.addAll(offerRows(f));
+        if (openSpace != null && (f.searching() || svc.chat(openSpace) == null)) openSpace = null;
         if (openSpace == null) {
             spaceRows = InboxRows.Rows.EMPTY;
-        } else if (offersOpen) {
-            spaceTitle.setText("Otros servidores de " + net.displayName());
-            spaceList.setAccessibleText(spaceTitle.getText());
-            List<Chat> offered = new java.util.ArrayList<>();
-            java.util.Set<String> ids = new java.util.HashSet<>();
-            for (ChatService.GroupOffer o : offers) {
-                Chat p = new Chat(Spaces.OFFER_PREFIX + o.id());
-                p.setTitle(o.name());
-                p.setNetwork(net);
-                offered.add(p);
-                ids.add(p.id());
-            }
-            spaceRows = new InboxRows.Rows(offered, ids, java.util.Map.of(), java.util.Map.of());
         } else {
             Chat s = svc.chat(openSpace);
             spaceTitle.setText(s.title());
@@ -282,16 +264,30 @@ public final class ChatListPane extends VBox {
         favorites.setManaged(!favs.isEmpty());
     }
 
-    /** The row standing for {@code n}'s servers you could still add. */
-    private static Chat offersRow(app.unichat.model.Network n, int count) {
-        Chat c = new Chat(OFFERS_ROW + n.name());
-        c.setTitle("Otros servidores de " + n.displayName());
-        c.setNetwork(n);
-        c.setLastPreview(count == 1 ? "1 servidor que aún no está en Unichat" : count + " servidores que aún no están en Unichat");
-        return c;
+    /**
+     * Servers you're in that aren't in Unichat yet (Discord), one row each among the chats. They have no messages, so
+     * they come last; a search finds them by name.
+     */
+    private List<Chat> offerRows(ChatFilter f) {
+        offerNetworks.clear();
+        if (f.view() != ChatFilter.View.INBOX || f.unreadOnly()) return List.of();
+        List<Chat> out = new java.util.ArrayList<>();
+        List<app.unichat.model.Network> nets = f.network() != null ? List.of(f.network())
+                : java.util.Arrays.stream(app.unichat.model.Network.values()).filter(app.unichat.model.Network::isBridged).toList();
+        for (app.unichat.model.Network n : nets) {
+            for (ChatService.GroupOffer o : spaces.offers(n)) {
+                if (f.searching() && !ChatFilter.normalize(o.name()).contains(ChatFilter.normalize(f.query()))) continue;
+                Chat p = new Chat(Spaces.OFFER_PREFIX + o.id());
+                p.setTitle(o.name());
+                p.setNetwork(n);
+                out.add(p);
+                offerNetworks.put(p.id(), n);
+            }
+        }
+        return out;
     }
 
-    /** A server's channels (or the servers to add) cover the list while open. */
+    /** A server's channels cover the list while open. */
     private void refreshView(ChatFilter f) {
         boolean space = openSpace != null;
         for (Node x : List.of(chipRow, list)) {
@@ -431,14 +427,14 @@ public final class ChatListPane extends VBox {
     }
 
     private boolean actsLikeChat(Chat c) {
-        return !c.space() && !c.id().startsWith(OFFERS_ROW) && !spaceRows.unjoined().contains(c.id());
+        return !c.space() && !c.id().startsWith(Spaces.OFFER_PREFIX) && !spaceRows.unjoined().contains(c.id());
     }
 
     /** Shows a server's channels over the list. */
     private void openSpace(String id) {
         openSpace = id;
         arrowedRow = id;
-        if (!id.startsWith(OFFERS_ROW)) spaces.ensureNames(id);
+        spaces.ensureNames(id);
         refresh();
         spaceList.requestFocus();
         if (spaceList.getSelectionModel().isEmpty() && !spaceItems.isEmpty()) {
@@ -481,16 +477,16 @@ public final class ChatListPane extends VBox {
 
     private void open(Chat c) {
         if (c == null) return;
-        if (c.space() || c.id().startsWith(OFFERS_ROW)) {
+        if (c.space()) {
             openSpace(c.id());
             return;
         }
+        if (offerNetworks.containsKey(c.id())) {
+            spaces.add(offerNetworks.get(c.id()), c.id().substring(Spaces.OFFER_PREFIX.length()), c.title());
+            return;
+        }
         if (spaceRows.unjoined().contains(c.id())) {
-            if (c.id().startsWith(Spaces.OFFER_PREFIX)) {
-                spaces.add(filter.get().network(), c.id().substring(Spaces.OFFER_PREFIX.length()), c.title());
-            } else {
-                spaces.join(c.id(), c.title());
-            }
+            spaces.join(c.id(), c.title());
             return;
         }
         selectedId = c.id();
@@ -563,7 +559,8 @@ public final class ChatListPane extends VBox {
                 if (e.getButton() == MouseButton.PRIMARY && getItem() != null) open(getItem());
             });
             setOnContextMenuRequested(e -> {
-                if (getItem() != null && !spaceRows.unjoined().contains(getItem().id())) menuFor(getItem()).show(this, e.getScreenX(), e.getScreenY());
+                Chat it = getItem();
+                if (it != null && (it.space() || actsLikeChat(it))) menuFor(it).show(this, e.getScreenX(), e.getScreenY());
             });
         }
 
@@ -611,25 +608,20 @@ public final class ChatListPane extends VBox {
             badge.setManaged(unread);
             toggle(badge, "muted", c.muted());
             toggle(badge, "dot", n == 0 && c.mentionCount() == 0);
-            boolean offersRow = c.id().startsWith(OFFERS_ROW), offer = c.id().startsWith(Spaces.OFFER_PREFIX);
-            boolean space = c.space() || offersRow, unjoined = spaceRows.unjoined().contains(c.id());
+            boolean offer = c.id().startsWith(Spaces.OFFER_PREFIX);
+            boolean space = c.space(), unjoined = spaceRows.unjoined().contains(c.id());
             disclosure.setGraphic(space ? Icons.icon(Icons.CHEVRON_RIGHT, 14) : null);
             disclosure.setVisible(space);
             disclosure.setManaged(space);
             toggle(name, "unjoined", unjoined);
             String a11y = describe(c, Accounts.forChat(svc, c));
-            if (offersRow) {
-                stamp.setText("");
-                badge.setVisible(false);
-                badge.setManaged(false);
-                a11y = c.title() + ", " + c.lastPreview() + ". Abre la lista para agregarlos";
-            } else if (offer) {
+            if (offer) {
                 boolean busy = spaces.adding(c.id().substring(Spaces.OFFER_PREFIX.length()));
                 stamp.setText("");
-                preview.setText(busy ? "Agregando…" : "Toca para agregarlo con todos sus canales");
+                preview.setText(busy ? "Agregando…" : "Servidor sin agregar · toca para traer sus canales");
                 badge.setVisible(false);
                 badge.setManaged(false);
-                a11y = c.title() + ", servidor por agregar, " + (busy ? "Agregando" : "Agregar");
+                a11y = c.title() + ", servidor de " + c.network().displayName() + " sin agregar, " + (busy ? "Agregando" : "Agregar");
             } else if (space) {
                 Chat latest = rows.latest().get(c.id());
                 int u = rows.unread().getOrDefault(c.id(), 0);
