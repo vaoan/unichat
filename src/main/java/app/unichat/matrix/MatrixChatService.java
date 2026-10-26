@@ -1449,14 +1449,43 @@ public final class MatrixChatService implements ChatService {
     }
 
     private void addDirect(String otherUser, String roomId) throws IOException {
-        ObjectNode direct;
+        ObjectNode cached;
         synchronized (proc) {
-            direct = proc.directContentCopy();
+            cached = proc.directContentCopy();
         }
-        JsonNode existing = direct.get(otherUser);
-        ArrayNode arr = existing instanceof ArrayNode a ? a : direct.putArray(otherUser);
-        arr.add(roomId);
-        client.put(CLIENT + "/user/" + enc(userId) + "/account_data/m.direct", direct);
+        String path = CLIENT + "/user/" + enc(userId) + "/account_data/m.direct";
+        JsonNode server = null;
+        try {
+            server = client.get(path);
+        } catch (Exception e) {
+            // no m.direct on the server yet (404) or transient failure: fall back to the cached copy
+        }
+        client.put(path, mergeDirect(server, cached, otherUser, roomId));
+    }
+
+    /**
+     * Merges m.direct content: union of the server's and the locally cached room lists per user, then
+     * appends {@code roomId} under {@code otherUser} if absent. Never drops existing entries.
+     */
+    static ObjectNode mergeDirect(JsonNode serverContent, JsonNode cachedContent, String otherUser, String roomId) {
+        ObjectNode out = MatrixClient.JSON.createObjectNode();
+        for (JsonNode src : new JsonNode[] {serverContent, cachedContent}) {
+            if (src == null || !src.isObject()) continue;
+            src.fields().forEachRemaining(e -> {
+                ArrayNode arr = out.has(e.getKey()) && out.get(e.getKey()) instanceof ArrayNode a
+                        ? a : out.putArray(e.getKey());
+                if (!e.getValue().isArray()) return;
+                for (JsonNode r : e.getValue()) if (!containsText(arr, r.asText())) arr.add(r.asText());
+            });
+        }
+        ArrayNode target = out.get(otherUser) instanceof ArrayNode a ? a : out.putArray(otherUser);
+        if (!containsText(target, roomId)) target.add(roomId);
+        return out;
+    }
+
+    private static boolean containsText(ArrayNode arr, String v) {
+        for (JsonNode n : arr) if (v.equals(n.asText())) return true;
+        return false;
     }
 
     private void waitForJoin(String roomId, String user) throws InterruptedException {
