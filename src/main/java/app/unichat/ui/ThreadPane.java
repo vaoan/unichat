@@ -579,21 +579,18 @@ public final class ThreadPane extends BorderPane {
         box.getChildren().add(view);
         if (m.mediaUrl() != null) {
             loadInto(view, m, (int) (dw * 2), (int) (dh * 2));
-            if (sticker) {
-                // Like on the phone: a sticker isn't opened full size.
-                box.setAccessibleText("Sticker" + (m.body() == null || m.body().isBlank() ? "" : " " + m.body()));
-            } else {
-                // On release, not click: the first press selects the message and may scroll the list, and a press
-                // and release over different spots is no "click" (it took a second click to open).
-                box.setOnMouseReleased(e -> {
-                    if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress() && getScene() != null) {
-                        MediaViewer.show(getScene().getWindow(), svc.media(m.mediaUrl(), 0, 0), m.fileName());
-                    }
-                });
-                box.setCursor(javafx.scene.Cursor.HAND);
-                box.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
-                box.setAccessibleText("Imagen" + (m.fileName() == null ? "" : " " + m.fileName()) + ", abrir en grande");
-            }
+            // On release, not click: the first press selects the message and may scroll the list, and a press and
+            // release over different spots is no "click" (it took a second click to open). Stickers open too: the
+            // viewer plays animated WebP.
+            box.setOnMouseReleased(e -> {
+                if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress() && getScene() != null) {
+                    MediaViewer.show(getScene().getWindow(), svc.media(m.mediaUrl(), 0, 0), sticker ? "Sticker" : m.fileName());
+                }
+            });
+            box.setCursor(javafx.scene.Cursor.HAND);
+            box.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
+            box.setAccessibleText((sticker ? "Sticker" : "Imagen") + (m.fileName() == null || sticker ? "" : " " + m.fileName())
+                    + ", abrir en grande");
         }
         return box;
     }
