@@ -1467,6 +1467,82 @@ public final class MatrixChatService implements ChatService {
         });
     }
 
+    /** The bridge login behind an account ("whatsapp:573…" → "573…"); null for a network-wide account. */
+    static String loginIdOf(Account a) {
+        String prefix = a.network().protocolId() + ":";
+        return a.id().startsWith(prefix) ? a.id().substring(prefix.length()) : null;
+    }
+
+    /** Accounts whose bridge answered that it has no user search. */
+    private final Set<String> noSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** The bridge's contacts API for {@code a}, or null when there's no bridge API (external server). */
+    private app.unichat.login.BridgeContacts bridgeContacts(Account a) {
+        BridgeProvisioner p = provisioner;
+        String url = p == null ? null : p.provisioningUrl(a.network());
+        return url == null ? null : new app.unichat.login.BridgeContacts(url, accessToken, userId, loginIdOf(a));
+    }
+
+    private <T> CompletableFuture<T> io(java.util.concurrent.Callable<T> call) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return call.call();
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            }
+        }, io);
+    }
+
+    @Override
+    public CompletableFuture<ContactSupport> contactSupport(Account a) {
+        return io(() -> {
+            app.unichat.login.BridgeContacts b = bridgeContacts(a);
+            if (b == null) return new ContactSupport(false, false);
+            // Search support is learnt from the user's own first search (never probed with a made-up query).
+            return new ContactSupport(b.list().isPresent(), !noSearch.contains(a.id()));
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<app.unichat.model.Contact>> contacts(Account a) {
+        return io(() -> {
+            app.unichat.login.BridgeContacts b = bridgeContacts(a);
+            return b == null ? List.of() : b.list().orElse(List.of());
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<app.unichat.model.Contact>> searchContacts(Account a, String query) {
+        return io(() -> {
+            app.unichat.login.BridgeContacts b = bridgeContacts(a);
+            if (b == null) throw new UnsupportedOperationException("search");
+            java.util.Optional<List<app.unichat.model.Contact>> r = b.search(query);
+            if (r.isEmpty()) {
+                noSearch.add(a.id());
+                throw new UnsupportedOperationException("search");
+            }
+            return r.get();
+        });
+    }
+
+    @Override
+    public CompletableFuture<app.unichat.model.Contact> resolveContact(Account a, String identifier) {
+        return io(() -> {
+            app.unichat.login.BridgeContacts b = bridgeContacts(a);
+            return b == null ? null : b.resolve(identifier);
+        });
+    }
+
+    @Override
+    public CompletableFuture<String> openDm(Account a, app.unichat.model.Contact contact) {
+        if (contact.dmRoomId() != null) return CompletableFuture.completedFuture(contact.dmRoomId());
+        return io(() -> {
+            app.unichat.login.BridgeContacts b = bridgeContacts(a);
+            if (b == null) throw new IllegalStateException("Esta red no permite abrir chats nuevos desde Unichat");
+            return b.createDm(contact.id());
+        });
+    }
+
     static String accountId(Network n, String loginId) {
         return n.protocolId() + ":" + loginId;
     }

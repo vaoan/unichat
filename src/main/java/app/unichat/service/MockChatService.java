@@ -124,6 +124,54 @@ public final class MockChatService implements ChatService {
         return CompletableFuture.completedFuture("!servidor:demo".equals(spaceId) ? Map.of(UNJOINED_CHANNEL_ID, "#anuncios") : Map.of());
     }
 
+    private static final List<app.unichat.model.Contact> DEMO_CONTACTS = List.of(
+            new app.unichat.model.Contact("c-mama", "Mamá", List.of("tel:+573001110001"), null, "!mama:demo"),
+            new app.unichat.model.Contact("c-ana", "Ana Restrepo", List.of("tel:+573001110002"), null, null),
+            new app.unichat.model.Contact("c-anamaria", "Ana María", List.of("tel:+573001110003"), null, null),
+            new app.unichat.model.Contact("c-carlos", "Carlos Peña", List.of("tel:+573001110004"), null, null),
+            new app.unichat.model.Contact("c-dentista", "Consultorio dental", List.of("tel:+573001110005"), null, null),
+            new app.unichat.model.Contact("c-pedro", "Pedro", List.of("tel:+573001110006"), null, null));
+
+    @Override
+    public CompletableFuture<ContactSupport> contactSupport(Account account) {
+        return CompletableFuture.completedFuture(switch (account.network()) {
+            case WHATSAPP, TELEGRAM -> new ContactSupport(true, true);
+            case INSTAGRAM, MESSENGER -> new ContactSupport(false, true);
+            default -> new ContactSupport(false, false);
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<app.unichat.model.Contact>> contacts(Account account) {
+        return CompletableFuture.completedFuture(account.network() == Network.WHATSAPP ? DEMO_CONTACTS : List.of());
+    }
+
+    @Override
+    public CompletableFuture<List<app.unichat.model.Contact>> searchContacts(Account account, String query) {
+        if (!contactSupport(account).join().search()) return CompletableFuture.failedFuture(new UnsupportedOperationException("search"));
+        String q = query.toLowerCase(java.util.Locale.ROOT);
+        return CompletableFuture.completedFuture(DEMO_CONTACTS.stream()
+                .filter(c -> c.name().toLowerCase(java.util.Locale.ROOT).contains(q)).toList());
+    }
+
+    @Override
+    public CompletableFuture<app.unichat.model.Contact> resolveContact(Account account, String identifier) {
+        String digits = identifier.replaceAll("[^0-9]", "");
+        return CompletableFuture.completedFuture(digits.length() >= 7
+                ? new app.unichat.model.Contact("c-" + digits, identifier.strip(), List.of("tel:+" + digits), null, null) : null);
+    }
+
+    @Override
+    public CompletableFuture<String> openDm(Account account, app.unichat.model.Contact contact) {
+        if (contact.dmRoomId() != null) return CompletableFuture.completedFuture(contact.dmRoomId());
+        String key = "dm-" + contact.id();
+        if (!chats.containsKey("!" + key + ":demo")) {
+            ChatBuilder.dm(this, key, account.network(), contact.name()).done();
+            fireChats();
+        }
+        return CompletableFuture.completedFuture("!" + key + ":demo");
+    }
+
     @Override public List<Chat> chats() { return new ArrayList<>(chats.values()); }
     @Override public Chat chat(String chatId) { return chats.get(chatId); }
 

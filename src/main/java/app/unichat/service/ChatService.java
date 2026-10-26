@@ -115,6 +115,33 @@ public interface ChatService {
         return CompletableFuture.failedFuture(new UnsupportedOperationException("Stickers no disponibles"));
     }
 
+    /** What "Nuevo chat" can do for an account: list its contacts, search the network. */
+    record ContactSupport(boolean list, boolean search) {}
+
+    default CompletableFuture<ContactSupport> contactSupport(app.unichat.model.Account account) {
+        return CompletableFuture.completedFuture(new ContactSupport(false, false));
+    }
+
+    default CompletableFuture<List<app.unichat.model.Contact>> contacts(app.unichat.model.Account account) {
+        return CompletableFuture.completedFuture(List.of());
+    }
+
+    /** Fails with UnsupportedOperationException when the network has no user search. */
+    default CompletableFuture<List<app.unichat.model.Contact>> searchContacts(app.unichat.model.Account account, String query) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("search"));
+    }
+
+    /** A phone number, @username…; completes with null when nobody matches. */
+    default CompletableFuture<app.unichat.model.Contact> resolveContact(app.unichat.model.Account account, String identifier) {
+        return CompletableFuture.completedFuture(null);
+    }
+
+    /** The room of the DM with {@code contact}, creating it when there's none yet. */
+    default CompletableFuture<String> openDm(app.unichat.model.Account account, app.unichat.model.Contact contact) {
+        return contact.dmRoomId() != null ? CompletableFuture.completedFuture(contact.dmRoomId())
+                : CompletableFuture.failedFuture(new UnsupportedOperationException("openDm"));
+    }
+
     /** Joins a room (a channel or topic of a space you're not in yet). */
     default CompletableFuture<Void> joinChat(String roomId) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException("joinChat"));
