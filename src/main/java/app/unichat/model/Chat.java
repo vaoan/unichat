@@ -34,6 +34,8 @@ public final class Chat {
     private String topic;
     /** True for the DM with a bridge bot (account management), hidden from the inbox. */
     private boolean bridgeBot;
+    /** What this chat's network supports (from its bridge); UNKNOWN offers everything. */
+    private RoomFeatures features = RoomFeatures.UNKNOWN;
     private final List<Member> members = new ArrayList<>();
     private final Set<String> typing = new LinkedHashSet<>();
 
@@ -93,4 +95,7 @@ public final class Chat {
         lastSenderName = m.senderName();
         lastOutgoing = m.outgoing();
     }
+
+    public RoomFeatures features() { return features; }
+    public void setFeatures(RoomFeatures f) { this.features = f == null ? RoomFeatures.UNKNOWN : f; }
 }

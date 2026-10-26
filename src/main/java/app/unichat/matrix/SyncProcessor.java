@@ -208,6 +208,7 @@ final class SyncProcessor {
                     room.directInvite = true;
                 }
             }
+            case "com.beeper.room_features" -> room.roomFeatures = c;
             case "m.bridge", "uk.half-shot.bridge" -> {
                 String proto = text(c.path("protocol"), "id");
                 if (proto != null) room.bridgeProtocol = proto;
@@ -617,6 +618,8 @@ final class SyncProcessor {
         boolean botRoom = isBridgeBotRoom(room);
         c.setBridgeBot(botRoom);
         c.setNetwork(detectNetwork(room, botRoom));
+        c.setFeatures(room.roomFeatures != null ? app.unichat.model.RoomFeatures.parse(room.roomFeatures)
+                : c.network() == Network.DISCORD ? app.unichat.model.RoomFeatures.discord() : app.unichat.model.RoomFeatures.UNKNOWN);
         boolean group = !botRoom && isGroup(room);
         c.setGroup(group);
         c.setTopic(room.topic);
