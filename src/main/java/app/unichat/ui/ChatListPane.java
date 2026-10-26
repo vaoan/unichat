@@ -44,12 +44,10 @@ public final class ChatListPane extends VBox {
     private final Label empty = new Label();
     private final TextField search = new TextField();
     private final ToggleGroup chips = new ToggleGroup();
-    /** Bandeja | Grupos, for a network that has servers/groups (spaces). */
-    private final HBox viewToggle = new HBox(2);
-    private final ToggleGroup viewChoice = new ToggleGroup();
-    private final GroupsTree groups;
+    private final Spaces spaces;
+    /** Id prefix of the "Otros servidores" row: the network's servers you could still add. */
+    static final String OFFERS_ROW = "offers:";
     private FlowPane chipRow;
-    private boolean showingGroups;
     private Runnable onNewChat;
     private final Consumer<Chat> onOpen;
     private String selectedId;
@@ -68,20 +66,11 @@ public final class ChatListPane extends VBox {
     public ChatListPane(ChatService svc, Consumer<Chat> onOpen) {
         this.svc = svc;
         this.onOpen = onOpen;
-        this.groups = new GroupsTree(svc, c -> open(c));
-        groups.setOnOffersChanged(this::refresh);
+        this.spaces = new Spaces(svc, c -> open(c));
+        spaces.setOnChanged(this::refresh);
         getStyleClass().add("chat-list-pane");
 
         title.getStyleClass().add("pane-title");
-        ToggleButton inbox = viewButton("Bandeja", false), grouped = viewButton("Grupos", true);
-        // Full-width tabs under the title, like Telegram's folders: a small label up there went unnoticed.
-        for (ToggleButton b : List.of(inbox, grouped)) {
-            b.setMaxWidth(Double.MAX_VALUE);
-            HBox.setHgrow(b, Priority.ALWAYS);
-        }
-        viewToggle.getChildren().addAll(inbox, grouped);
-        viewToggle.getStyleClass().add("list-view-toggle");
-        viewToggle.setAccessibleText("Vista de la lista");
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
         javafx.scene.control.Button newChat = Composer.iconButton(Icons.PLUS, "Nuevo chat", () -> { if (onNewChat != null) onNewChat.run(); });
@@ -143,7 +132,6 @@ public final class ChatListPane extends VBox {
 
         accountRow.getStyleClass().addAll("chip-row", "account-row");
         accountRow.setAccessibleText("Cuentas");
-        VBox.setVgrow(groups, Priority.ALWAYS);
         // A server's channels slide over the list, like a Telegram forum's topics.
         javafx.scene.control.Button back = Composer.iconButton(Icons.CHEVRON_LEFT, "Volver a la bandeja", this::closeSpace);
         spaceTitle.getStyleClass().add("space-title");
@@ -169,7 +157,7 @@ public final class ChatListPane extends VBox {
         VBox.setVgrow(spaceView, Priority.ALWAYS);
         spaceView.setVisible(false);
         spaceView.setManaged(false);
-        getChildren().addAll(header, viewToggle, searchBox, chipRow, accountRow, favorites, list, groups, spaceView);
+        getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list, spaceView);
         filter.addListener((o, a, b) -> {
             syncChips(b);
             refresh();
@@ -201,7 +189,7 @@ public final class ChatListPane extends VBox {
 
     public void setOnNewChat(Runnable r) { this.onNewChat = r; }
 
-    public void setToast(Consumer<String> toast) { groups.setToast(toast); }
+    public void setToast(Consumer<String> toast) { spaces.setToast(toast); }
 
     public void focusSearch() {
         search.requestFocus();
@@ -215,17 +203,11 @@ public final class ChatListPane extends VBox {
             if (spaceList.getSelectionModel().isEmpty() && !spaceItems.isEmpty()) spaceList.getSelectionModel().select(0);
             return;
         }
-        if (showingGroups) {
-            groups.requestFocus();
-            if (groups.getSelectionModel().isEmpty()) groups.getSelectionModel().select(0);
-            return;
-        }
         list.requestFocus();
         if (list.getSelectionModel().isEmpty() && !items.isEmpty()) list.getSelectionModel().select(0);
     }
 
     public void setSelected(String chatId) {
-        groups.setSelected(chatId);
         selectedId = chatId;
         selectInList();
     }
@@ -234,17 +216,36 @@ public final class ChatListPane extends VBox {
     public void refresh() {
         ChatFilter f = filter.get();
         List<Chat> all = svc.chats();
-        rows = InboxRows.build(all, f, groups.names());
-        List<Chat> visible = rows.rows();
-        groups.checkPending();
-        if (openSpace != null && (f.searching() || svc.chat(openSpace) == null)) openSpace = null;
-        if (openSpace != null) {
+        rows = InboxRows.build(all, f, spaces.names());
+        List<Chat> visible = new java.util.ArrayList<>(rows.rows());
+        spaces.checkPending();
+        // A network's servers not in Unichat yet (Discord): one row at the end, opening the list to add them.
+        app.unichat.model.Network net = f.network();
+        List<ChatService.GroupOffer> offers = net != null && f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly()
+                ? spaces.offers(net) : List.of();
+        if (!offers.isEmpty()) visible.add(offersRow(net, offers.size()));
+        boolean offersOpen = openSpace != null && openSpace.startsWith(OFFERS_ROW);
+        if (openSpace != null && (f.searching() || (offersOpen ? offers.isEmpty() : svc.chat(openSpace) == null))) openSpace = null;
+        if (openSpace == null) {
+            spaceRows = InboxRows.Rows.EMPTY;
+        } else if (offersOpen) {
+            spaceTitle.setText("Otros servidores de " + net.displayName());
+            spaceList.setAccessibleText(spaceTitle.getText());
+            List<Chat> offered = new java.util.ArrayList<>();
+            java.util.Set<String> ids = new java.util.HashSet<>();
+            for (ChatService.GroupOffer o : offers) {
+                Chat p = new Chat(Spaces.OFFER_PREFIX + o.id());
+                p.setTitle(o.name());
+                p.setNetwork(net);
+                offered.add(p);
+                ids.add(p.id());
+            }
+            spaceRows = new InboxRows.Rows(offered, ids, java.util.Map.of(), java.util.Map.of());
+        } else {
             Chat s = svc.chat(openSpace);
             spaceTitle.setText(s.title());
-            spaceRows = InboxRows.channels(all, openSpace, f.accountId(), groups.names());
+            spaceRows = InboxRows.channels(all, openSpace, f.accountId(), spaces.names());
             spaceList.setAccessibleText("Canales de " + s.title());
-        } else {
-            spaceRows = InboxRows.Rows.EMPTY;
         }
         updating = true;
         try {
@@ -273,7 +274,7 @@ public final class ChatListPane extends VBox {
                     ? "Aún no conectaste ninguna red.\nHaz clic en una red de la izquierda (o en +) para iniciar sesión."
                 : "No hay chats aquí todavía");
 
-        boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && !showingGroups && openSpace == null;
+        boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && openSpace == null;
         List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.personalSpace() && !c.archived() && !c.bridgeBot()
                 && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).limit(8).toList() : List.of();
         favorites.getChildren().setAll(favs.stream().map(this::favoriteTile).toList());
@@ -281,41 +282,25 @@ public final class ChatListPane extends VBox {
         favorites.setManaged(!favs.isEmpty());
     }
 
-    private ToggleButton viewButton(String text, boolean groupsView) {
-        ToggleButton b = new ToggleButton(text);
-        b.setToggleGroup(viewChoice);
-        b.setAccessibleText(groupsView ? "Ver por grupos y servidores" : "Ver la bandeja");
-        b.setOnAction(e -> {
-            app.unichat.model.Network n = filter.get().network();
-            if (n != null) Settings.get().set("list.view." + n.name(), groupsView ? "GROUPS" : "INBOX");
-            refresh();
-        });
-        return b;
+    /** The row standing for {@code n}'s servers you could still add. */
+    private static Chat offersRow(app.unichat.model.Network n, int count) {
+        Chat c = new Chat(OFFERS_ROW + n.name());
+        c.setTitle("Otros servidores de " + n.displayName());
+        c.setNetwork(n);
+        c.setLastPreview(count == 1 ? "1 servidor que aún no está en Unichat" : count + " servidores que aún no están en Unichat");
+        return c;
     }
 
-    /** Bandeja (the list) or Grupos (the tree), remembered per network; a search always shows the list. */
+    /** A server's channels (or the servers to add) cover the list while open. */
     private void refreshView(ChatFilter f) {
-        app.unichat.model.Network n = f.network();
-        boolean can = n != null && f.view() == ChatFilter.View.INBOX && groups.hasGroups(n, f.accountId());
-        viewToggle.setVisible(can);
-        viewToggle.setManaged(can);
-        showingGroups = can && !f.searching() && "GROUPS".equals(Settings.get().getString("list.view." + n.name(), "INBOX"));
-        viewChoice.getToggles().get(showingGroups ? 1 : 0).setSelected(true);
-        for (Node x : List.of(list, chipRow)) {
-            x.setVisible(!showingGroups);
-            x.setManaged(!showingGroups);
-        }
-        groups.setVisible(showingGroups);
-        groups.setManaged(showingGroups);
-        if (showingGroups) {
-            groups.refresh(n, f.accountId());
-        }
         boolean space = openSpace != null;
-        for (Node x : List.of(viewToggle, chipRow, accountRow, favorites, list, groups)) {
-            if (space) {
-                x.setVisible(false);
-                x.setManaged(false);
-            }
+        for (Node x : List.of(chipRow, list)) {
+            x.setVisible(!space);
+            x.setManaged(!space);
+        }
+        if (space) {
+            accountRow.setVisible(false);
+            accountRow.setManaged(false);
         }
         spaceView.setVisible(space);
         spaceView.setManaged(space);
@@ -446,14 +431,14 @@ public final class ChatListPane extends VBox {
     }
 
     private boolean actsLikeChat(Chat c) {
-        return !c.space() && !spaceRows.unjoined().contains(c.id());
+        return !c.space() && !c.id().startsWith(OFFERS_ROW) && !spaceRows.unjoined().contains(c.id());
     }
 
     /** Shows a server's channels over the list. */
     private void openSpace(String id) {
         openSpace = id;
         arrowedRow = id;
-        groups.ensureNames(id);
+        if (!id.startsWith(OFFERS_ROW)) spaces.ensureNames(id);
         refresh();
         spaceList.requestFocus();
         if (spaceList.getSelectionModel().isEmpty() && !spaceItems.isEmpty()) {
@@ -496,16 +481,19 @@ public final class ChatListPane extends VBox {
 
     private void open(Chat c) {
         if (c == null) return;
-        if (c.space()) {
+        if (c.space() || c.id().startsWith(OFFERS_ROW)) {
             openSpace(c.id());
             return;
         }
         if (spaceRows.unjoined().contains(c.id())) {
-            groups.join(c.id(), c.title());
+            if (c.id().startsWith(Spaces.OFFER_PREFIX)) {
+                spaces.add(filter.get().network(), c.id().substring(Spaces.OFFER_PREFIX.length()), c.title());
+            } else {
+                spaces.join(c.id(), c.title());
+            }
             return;
         }
         selectedId = c.id();
-        groups.setSelected(c.id());
         onOpen.accept(c);
     }
 
@@ -623,13 +611,26 @@ public final class ChatListPane extends VBox {
             badge.setManaged(unread);
             toggle(badge, "muted", c.muted());
             toggle(badge, "dot", n == 0 && c.mentionCount() == 0);
-            boolean space = c.space(), unjoined = spaceRows.unjoined().contains(c.id());
+            boolean offersRow = c.id().startsWith(OFFERS_ROW), offer = c.id().startsWith(Spaces.OFFER_PREFIX);
+            boolean space = c.space() || offersRow, unjoined = spaceRows.unjoined().contains(c.id());
             disclosure.setGraphic(space ? Icons.icon(Icons.CHEVRON_RIGHT, 14) : null);
             disclosure.setVisible(space);
             disclosure.setManaged(space);
             toggle(name, "unjoined", unjoined);
             String a11y = describe(c, Accounts.forChat(svc, c));
-            if (space) {
+            if (offersRow) {
+                stamp.setText("");
+                badge.setVisible(false);
+                badge.setManaged(false);
+                a11y = c.title() + ", " + c.lastPreview() + ". Abre la lista para agregarlos";
+            } else if (offer) {
+                boolean busy = spaces.adding(c.id().substring(Spaces.OFFER_PREFIX.length()));
+                stamp.setText("");
+                preview.setText(busy ? "Agregando…" : "Toca para agregarlo con todos sus canales");
+                badge.setVisible(false);
+                badge.setManaged(false);
+                a11y = c.title() + ", servidor por agregar, " + (busy ? "Agregando" : "Agregar");
+            } else if (space) {
                 Chat latest = rows.latest().get(c.id());
                 int u = rows.unread().getOrDefault(c.id(), 0);
                 stamp.setText(latest == null ? "" : Formats.listStamp(latest.lastActivity(), Instant.now(), ZoneId.systemDefault()));

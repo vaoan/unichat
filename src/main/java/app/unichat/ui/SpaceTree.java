@@ -13,15 +13,13 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The Grupos view of one network: its servers/groups (Matrix spaces) with their channels/topics, and the chats that
+ * The servers/groups of one network (Matrix spaces) with their channels/topics, and the chats that
  * hang from no group in "Chats directos y otros". The bridge's personal folder is not a group: it's every chat.
  * Pure (no JavaFX) so it's unit tested.
  */
 public final class SpaceTree {
     public static final String LOOSE = "Chats directos y otros";
     static final String LOOSE_ID = "loose";
-    /** "Otros servidores": servers you're in that don't come into Unichat yet (filled by {@code GroupsTree}). */
-    static final String OFFERS_ID = "offers";
 
     private SpaceTree() {}
 
@@ -29,8 +27,7 @@ public final class SpaceTree {
     public record Node(String id, Chat chat, String name, List<Node> children) {
         public boolean loose() { return LOOSE_ID.equals(id); }
         public boolean joined() { return chat != null; }
-        public boolean offers() { return OFFERS_ID.equals(id); }
-        public boolean container() { return loose() || offers() || (chat != null && chat.space()); }
+        public boolean container() { return loose() || (chat != null && chat.space()); }
     }
 
     public static List<Node> build(List<Chat> all, Network network, Map<String, String> names) {
