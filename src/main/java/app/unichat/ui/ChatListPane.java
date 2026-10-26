@@ -1,0 +1,318 @@
+package app.unichat.ui;
+
+import app.unichat.model.Chat;
+import app.unichat.service.ChatService;
+import app.unichat.settings.Settings;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Consumer;
+
+/** Left column: title, search, filter chips, favorites grid and the chat list. */
+public final class ChatListPane extends VBox {
+    private final ChatService svc;
+    private final ObjectProperty<ChatFilter> filter = new SimpleObjectProperty<>(ChatFilter.DEFAULT);
+    private final ObservableList<Chat> items = FXCollections.observableArrayList();
+    private final ListView<Chat> list = new ListView<>(items);
+    private final FlowPane favorites = new FlowPane();
+    private final Label title = new Label();
+    private final Label empty = new Label();
+    private final TextField search = new TextField();
+    private final ToggleGroup chips = new ToggleGroup();
+    private final Consumer<Chat> onOpen;
+    private String selectedId;
+    private boolean updating;
+
+    public ChatListPane(ChatService svc, Consumer<Chat> onOpen) {
+        this.svc = svc;
+        this.onOpen = onOpen;
+        getStyleClass().add("chat-list-pane");
+
+        title.getStyleClass().add("pane-title");
+        HBox header = new HBox(title);
+        header.getStyleClass().add("chat-list-header");
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        search.setPromptText("Buscar   " + (MainView.MAC ? "⌘K" : "Ctrl+K"));
+        search.getStyleClass().add("search-field");
+        search.textProperty().addListener((o, a, q) -> filter.set(filter.get().withQuery(q)));
+        search.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ESCAPE) search.clear();
+            if (e.getCode() == KeyCode.DOWN) { list.requestFocus(); list.getSelectionModel().selectFirst(); }
+            if (e.getCode() == KeyCode.ENTER && !items.isEmpty()) open(items.get(0));
+        });
+        Node searchIcon = Icons.icon(Icons.SEARCH, 14);
+        StackPane searchBox = new StackPane(search, searchIcon);
+        StackPane.setAlignment(searchIcon, Pos.CENTER_LEFT);
+        StackPane.setMargin(searchIcon, new Insets(0, 0, 0, 10));
+        searchIcon.setMouseTransparent(true);
+        searchBox.getStyleClass().add("search-box");
+
+        HBox chipRow = new HBox(6,
+                chip("Todos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.INBOX)),
+                chip("No leídos", f -> f.withUnreadOnly(true).withView(ChatFilter.View.INBOX)),
+                chip("Favoritos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.FAVORITES)),
+                chip("Prioridad baja", f -> f.withUnreadOnly(false).withView(ChatFilter.View.LOW_PRIORITY)));
+        chipRow.getStyleClass().add("chip-row");
+        chips.getToggles().get(0).setSelected(true);
+        chips.selectedToggleProperty().addListener((o, a, b) -> { if (b == null) a.setSelected(true); });
+
+        favorites.getStyleClass().add("favorites");
+        favorites.setHgap(4);
+        favorites.setVgap(4);
+
+        list.getStyleClass().add("chat-list");
+        list.setCellFactory(v -> new ChatCell());
+        list.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ENTER) open(list.getSelectionModel().getSelectedItem());
+        });
+        list.getSelectionModel().selectedItemProperty().addListener((o, a, c) -> {
+            if (!updating && c != null && list.isFocused()) open(c);
+        });
+        empty.getStyleClass().add("empty-label");
+        empty.setWrapText(true);
+        list.setPlaceholder(empty);
+        VBox.setVgrow(list, Priority.ALWAYS);
+
+        getChildren().addAll(header, searchBox, chipRow, favorites, list);
+        filter.addListener((o, a, b) -> refresh());
+        refresh();
+    }
+
+    private ToggleButton chip(String text, java.util.function.UnaryOperator<ChatFilter> change) {
+        ToggleButton b = new ToggleButton(text);
+        b.getStyleClass().add("chip");
+        b.setToggleGroup(chips);
+        b.setOnAction(e -> filter.set(change.apply(filter.get())));
+        return b;
+    }
+
+    public ObjectProperty<ChatFilter> filterProperty() { return filter; }
+
+    public void focusSearch() {
+        search.requestFocus();
+        search.selectAll();
+    }
+
+    public void setSelected(String chatId) {
+        selectedId = chatId;
+        selectInList();
+    }
+
+    /** Rebuilds the visible list from the service; call on the FX thread after chatsChanged. */
+    public void refresh() {
+        ChatFilter f = filter.get();
+        List<Chat> all = svc.chats();
+        List<Chat> visible = f.apply(all);
+        updating = true;
+        try {
+            items.setAll(visible);
+            selectInList();
+        } finally {
+            updating = false;
+        }
+        list.refresh();
+
+        String base = switch (f.view()) {
+            case INBOX -> f.unreadOnly() ? "No leídos" : "Bandeja";
+            case FAVORITES -> "Favoritos";
+            case LOW_PRIORITY -> "Prioridad baja";
+            case ARCHIVE -> "Archivados";
+        };
+        title.setText(f.network() == null ? base : f.network().displayName());
+        empty.setText(f.searching() ? "Sin resultados para «" + f.query() + "»"
+                : f.view() == ChatFilter.View.ARCHIVE ? "No hay chats archivados"
+                : f.unreadOnly() ? "¡Todo al día! No tienes mensajes sin leer 🎉"
+                : "No hay chats aquí todavía");
+
+        boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly();
+        List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.archived() && !c.bridgeBot()
+                && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).limit(8).toList() : List.of();
+        favorites.getChildren().setAll(favs.stream().map(this::favoriteTile).toList());
+        favorites.setVisible(!favs.isEmpty());
+        favorites.setManaged(!favs.isEmpty());
+    }
+
+    private void selectInList() {
+        if (selectedId == null) {
+            list.getSelectionModel().clearSelection();
+            return;
+        }
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).id().equals(selectedId)) {
+                list.getSelectionModel().select(i);
+                return;
+            }
+        }
+        list.getSelectionModel().clearSelection();
+    }
+
+    private Node favoriteTile(Chat c) {
+        Avatar a = new Avatar(44);
+        a.set(c.title(), c.id(), c.avatarUrl(), svc);
+        a.setNetwork(c.network(), Settings.get().showNetworkBadges());
+        Label name = new Label(firstWord(c.title()));
+        name.getStyleClass().add("favorite-name");
+        StackPane dot = new StackPane();
+        dot.getStyleClass().add("unread-dot");
+        dot.setVisible(c.isUnread());
+        StackPane.setAlignment(dot, Pos.TOP_RIGHT);
+        StackPane av = new StackPane(a, dot);
+        av.setMaxSize(44, 44);
+        VBox tile = new VBox(4, av, name);
+        tile.setAlignment(Pos.TOP_CENTER);
+        tile.getStyleClass().add("favorite-tile");
+        if (c.id().equals(selectedId)) tile.getStyleClass().add("selected");
+        tile.setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.PRIMARY) open(c);
+        });
+        tile.setOnContextMenuRequested(e -> ChatMenus.forChat(c, svc, null).show(tile, e.getScreenX(), e.getScreenY()));
+        return tile;
+    }
+
+    private static String firstWord(String s) {
+        String t = s.replaceAll("^[#@]", "").trim();
+        int sp = t.indexOf(' ');
+        return sp > 0 ? t.substring(0, sp) : t;
+    }
+
+    private void open(Chat c) {
+        if (c == null) return;
+        selectedId = c.id();
+        onOpen.accept(c);
+    }
+
+    /** Opens the next/previous visible chat (Alt+↓ / Alt+↑). */
+    public void move(int delta, boolean unreadOnly) {
+        if (items.isEmpty()) return;
+        int idx = -1;
+        for (int i = 0; i < items.size(); i++) if (items.get(i).id().equals(selectedId)) idx = i;
+        for (int step = 1; step <= items.size(); step++) {
+            int i = Math.floorMod(idx + delta * step, items.size());
+            if (idx < 0) i = delta > 0 ? step - 1 : items.size() - step;
+            Chat c = items.get(i);
+            if (!unreadOnly || c.isUnread()) {
+                open(c);
+                list.scrollTo(i);
+                return;
+            }
+        }
+    }
+
+    private final class ChatCell extends ListCell<Chat> {
+        private final Avatar avatar = new Avatar(44);
+        private final Label name = new Label();
+        private final Label stamp = new Label();
+        private final Label preview = new Label();
+        private final Label badge = new Label();
+        private final HBox flags = new HBox(4);
+        private final HBox root;
+
+        ChatCell() {
+            getStyleClass().add("chat-cell");
+            name.getStyleClass().add("chat-name");
+            stamp.getStyleClass().add("chat-stamp");
+            stamp.setMinWidth(Region.USE_PREF_SIZE);
+            preview.getStyleClass().add("chat-preview");
+            badge.getStyleClass().add("unread-badge");
+            badge.setMinWidth(Region.USE_PREF_SIZE);
+            flags.setMinWidth(Region.USE_PREF_SIZE);
+            flags.setAlignment(Pos.CENTER_RIGHT);
+            flags.getStyleClass().add("chat-flags");
+            Region grow = new Region();
+            HBox.setHgrow(grow, Priority.ALWAYS);
+            name.setMinWidth(0);
+            HBox top = new HBox(6, name, grow, stamp);
+            top.setAlignment(Pos.BASELINE_LEFT);
+            Region grow2 = new Region();
+            HBox.setHgrow(grow2, Priority.ALWAYS);
+            preview.setMinWidth(0);
+            HBox bottom = new HBox(6, preview, grow2, flags, badge);
+            bottom.setAlignment(Pos.CENTER_LEFT);
+            VBox text = new VBox(2, top, bottom);
+            text.setAlignment(Pos.CENTER_LEFT);
+            HBox.setHgrow(text, Priority.ALWAYS);
+            text.setMinWidth(0);
+            root = new HBox(12, avatar, text);
+            root.setAlignment(Pos.CENTER_LEFT);
+            root.setMinWidth(0);
+            // Size cells to the viewport instead of their content, so no horizontal scrollbar appears.
+            setPrefWidth(0);
+            setOnMouseClicked(e -> {
+                if (e.getButton() == MouseButton.PRIMARY && getItem() != null) open(getItem());
+            });
+            setOnContextMenuRequested(e -> {
+                if (getItem() != null) ChatMenus.forChat(getItem(), svc, null).show(this, e.getScreenX(), e.getScreenY());
+            });
+        }
+
+        @Override
+        protected void updateItem(Chat c, boolean isEmpty) {
+            super.updateItem(c, isEmpty);
+            if (isEmpty || c == null) {
+                setGraphic(null);
+                pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("current"), false);
+                return;
+            }
+            boolean compact = Settings.get().compactList();
+            pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("compact"), compact);
+            avatar.set(c.title(), c.id(), c.avatarUrl(), svc);
+            avatar.setNetwork(c.network(), Settings.get().showNetworkBadges());
+            name.setText(c.title());
+            stamp.setText(Formats.listStamp(c.lastActivity(), Instant.now(), ZoneId.systemDefault()));
+            boolean unread = c.isUnread();
+            toggle(name, "unread", unread);
+            toggle(stamp, "unread", unread && !c.muted());
+            toggle(preview, "typing", !c.typing().isEmpty());
+            if (!c.typing().isEmpty()) {
+                preview.setText(c.group() ? Formats.typing(c.typing()) : "escribiendo…");
+            } else {
+                String who = c.lastOutgoing() ? "Tú: " : c.group() && c.lastSenderName() != null
+                        ? c.lastSenderName().split(" ")[0] + ": " : "";
+                preview.setText(who + c.lastPreview());
+            }
+            toggle(preview, "unread", unread);
+            flags.getChildren().clear();
+            if (c.reminderAt() != null) flags.getChildren().add(Icons.icon(Icons.CLOCK, 13));
+            if (c.muted()) flags.getChildren().add(Icons.icon(Icons.BELL_OFF, 13));
+            if (c.pinned()) flags.getChildren().add(Icons.icon(Icons.PIN, 13));
+            int n = c.unreadCount();
+            badge.setText(c.mentionCount() > 0 ? "@" : n > 0 ? (n > 99 ? "99+" : Integer.toString(n)) : "");
+            badge.setVisible(unread);
+            badge.setManaged(unread);
+            toggle(badge, "muted", c.muted());
+            toggle(badge, "dot", n == 0 && c.mentionCount() == 0);
+            setGraphic(root);
+            setPadding(compact ? new Insets(4, 10, 4, 10) : new Insets(8, 10, 8, 10));
+            pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("current"), Objects.equals(c.id(), selectedId));
+        }
+
+        private static void toggle(Node n, String cls, boolean on) {
+            n.getStyleClass().remove(cls);
+            if (on) n.getStyleClass().add(cls);
+        }
+    }
+}

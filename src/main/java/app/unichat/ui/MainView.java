@@ -1,0 +1,303 @@
+package app.unichat.ui;
+
+import app.unichat.model.Chat;
+import app.unichat.model.ConnectionState;
+import app.unichat.model.Message;
+import app.unichat.service.ChatService;
+import javafx.animation.FadeTransition;
+import javafx.animation.PauseTransition;
+import javafx.animation.SequentialTransition;
+import javafx.application.Platform;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.Label;
+import javafx.scene.control.SplitPane;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.StackPane;
+import javafx.stage.Stage;
+import javafx.util.Duration;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.function.Consumer;
+
+/** Main window content: rail | chat list | thread (+ info panel), overlays and toasts. */
+public final class MainView extends StackPane {
+    public static final boolean MAC = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
+
+    private final ChatService svc;
+    private final Stage stage;
+    private final Notifier notifier;
+    private final ChatListPane listPane;
+    private final ThreadPane thread;
+    private final InfoPane info;
+    private final Rail rail;
+    private final BorderPane threadArea = new BorderPane();
+    private final StackPane overlay = new StackPane();
+    private final Label toast = new Label();
+    private final Label connection = new Label();
+    private final Runnable onLogout;
+    private final Consumer<String> openLink;
+    private boolean chatsDirty;
+    private boolean infoVisible;
+    private final java.util.Set<String> dirtyThreads = new java.util.HashSet<>();
+
+    private final ChatService.Listener listener = new ChatService.Listener() {
+        @Override public void chatsChanged() { scheduleChats(); }
+        @Override public void messagesChanged(String chatId) { scheduleThread(chatId); }
+        @Override public void accountsChanged() { Platform.runLater(rail::refresh); }
+        @Override public void connectionChanged(ConnectionState s) { Platform.runLater(() -> showConnection(s)); }
+        @Override public void incomingMessage(Chat chat, Message m) { Platform.runLater(() -> onIncoming(chat, m)); }
+        @Override public void reminderDue(Chat chat) { Platform.runLater(() -> notifier.reminder(chat)); }
+    };
+
+    public MainView(ChatService svc, Stage stage, Notifier notifier, Runnable onLogout, Consumer<String> openLink) {
+        this.svc = svc;
+        this.stage = stage;
+        this.notifier = notifier;
+        this.onLogout = onLogout;
+        this.openLink = openLink;
+        getStyleClass().add("main-root");
+
+        listPane = new ChatListPane(svc, this::openChat);
+        thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast);
+        info = new InfoPane(svc, this::toggleInfo, this::toast);
+        rail = new Rail(svc, listPane, this::showAddAccount, this::showSettings);
+
+        threadArea.setCenter(thread);
+        SplitPane split = new SplitPane(listPane, threadArea);
+        split.setDividerPositions(0.3);
+        SplitPane.setResizableWithParent(listPane, false);
+        listPane.setMinWidth(260);
+        listPane.setMaxWidth(480);
+        listPane.setPrefWidth(340);
+        split.getStyleClass().add("main-split");
+
+        connection.getStyleClass().add("connection-banner");
+        connection.setMaxWidth(Double.MAX_VALUE);
+        connection.setVisible(false);
+        connection.setManaged(false);
+
+        BorderPane main = new BorderPane(split);
+        main.setLeft(rail);
+        main.setTop(connection);
+
+        overlay.getStyleClass().add("overlay");
+        overlay.setVisible(false);
+        overlay.setOnMouseClicked(e -> { if (e.getTarget() == overlay) hideOverlay(); });
+
+        toast.getStyleClass().add("toast");
+        toast.setVisible(false);
+        toast.setMouseTransparent(true);
+        StackPane.setAlignment(toast, Pos.BOTTOM_CENTER);
+        toast.setTranslateY(-90);
+
+        getChildren().addAll(main, overlay, toast);
+        addEventFilter(KeyEvent.KEY_PRESSED, this::onKey);
+        stage.focusedProperty().addListener((o, a, focused) -> {
+            if (focused && thread.chat() != null) svc.markRead(thread.chat().id());
+        });
+
+        svc.addListener(listener);
+        showConnection(svc.connectionState());
+        refreshAll();
+    }
+
+    public void dispose() {
+        svc.removeListener(listener);
+    }
+
+    // ------------------------------------------------------------------ updates (coalesced)
+
+    private void scheduleChats() {
+        synchronized (dirtyThreads) {
+            if (chatsDirty) return;
+            chatsDirty = true;
+        }
+        Platform.runLater(() -> {
+            synchronized (dirtyThreads) { chatsDirty = false; }
+            refreshAll();
+        });
+    }
+
+    private void scheduleThread(String chatId) {
+        synchronized (dirtyThreads) {
+            if (!dirtyThreads.add(chatId)) return;
+        }
+        Platform.runLater(() -> {
+            synchronized (dirtyThreads) { dirtyThreads.remove(chatId); }
+            Chat open = thread.chat();
+            if (open != null && open.id().equals(chatId)) {
+                thread.rebuild(false);
+                thread.refreshHeader();
+                if (stage.isFocused() && open.isUnread()) svc.markRead(chatId);
+                if (infoVisible) info.refresh();
+            }
+        });
+    }
+
+    private void refreshAll() {
+        listPane.refresh();
+        rail.refresh();
+        Chat open = thread.chat();
+        if (open != null) {
+            Chat current = svc.chat(open.id());
+            if (current == null) {
+                thread.open(null);
+                listPane.setSelected(null);
+                setInfo(false);
+            } else {
+                thread.refreshHeader();
+                if (infoVisible) info.refresh();
+            }
+        }
+        long unread = svc.chats().stream().filter(c -> !c.archived() && !c.muted() && !c.bridgeBot() && c.isUnread()).count();
+        notifier.setUnread((int) unread);
+        stage.setTitle(unread > 0 ? "Unichat (" + unread + ")" : "Unichat");
+    }
+
+    private void onIncoming(Chat chat, Message m) {
+        boolean viewing = stage.isFocused() && stage.isShowing() && thread.chat() != null && thread.chat().id().equals(chat.id());
+        if (!viewing) notifier.notify(chat, m);
+    }
+
+    private void showConnection(ConnectionState s) {
+        String text = switch (s) {
+            case CONNECTING -> "Conectando…";
+            case SYNCING -> "Sincronizando chats…";
+            case OFFLINE -> "Sin conexión con el servidor. Reintentando…";
+            case LOGGED_OUT -> "La sesión expiró. Vuelve a iniciar sesión.";
+            case ONLINE -> null;
+        };
+        connection.setText(text);
+        connection.getStyleClass().removeAll("error");
+        if (s == ConnectionState.OFFLINE || s == ConnectionState.LOGGED_OUT) connection.getStyleClass().add("error");
+        connection.setVisible(text != null);
+        connection.setManaged(text != null);
+        if (s == ConnectionState.LOGGED_OUT) onLogout.run();
+    }
+
+    // ------------------------------------------------------------------ navigation
+
+    public void openChat(Chat c) {
+        if (c == null) return;
+        hideOverlay();
+        if (c.archived() && listPane.filterProperty().get().view() != ChatFilter.View.ARCHIVE && !listPane.filterProperty().get().searching()) {
+            listPane.filterProperty().set(listPane.filterProperty().get().withView(ChatFilter.View.ARCHIVE));
+        }
+        listPane.setSelected(c.id());
+        thread.open(c);
+        info.show(c);
+        svc.markRead(c.id());
+        listPane.refresh();
+    }
+
+    public void openChatId(String id) {
+        if (id == null) return;
+        Chat c = svc.chat(id);
+        if (c != null) openChat(c);
+    }
+
+    public void toggleInfo() {
+        setInfo(!infoVisible);
+    }
+
+    private void setInfo(boolean show) {
+        infoVisible = show && thread.chat() != null;
+        threadArea.setRight(infoVisible ? info : null);
+        thread.setInfoSelected(infoVisible);
+        if (infoVisible) info.show(thread.chat());
+    }
+
+    public void toast(String text) {
+        toast.setText(text);
+        toast.setVisible(true);
+        toast.setOpacity(1);
+        FadeTransition out = new FadeTransition(Duration.millis(400), toast);
+        out.setToValue(0);
+        SequentialTransition seq = new SequentialTransition(new PauseTransition(Duration.seconds(3)), out);
+        seq.setOnFinished(e -> toast.setVisible(false));
+        seq.play();
+    }
+
+    private void showOverlay(Node card) {
+        overlay.getChildren().setAll(card);
+        StackPane.setAlignment(card, Pos.TOP_CENTER);
+        card.setTranslateY(90);
+        overlay.setVisible(true);
+    }
+
+    private void hideOverlay() {
+        overlay.setVisible(false);
+        overlay.getChildren().clear();
+        if (thread.chat() != null) thread.composer().focus();
+    }
+
+    public void showCommandBar() {
+        String m = MAC ? "⌘" : "Ctrl+";
+        CommandBar bar = new CommandBar(svc, List.of(
+                new CommandBar.Command("Ir a la bandeja", "", () -> setView(ChatFilter.View.INBOX, false)),
+                new CommandBar.Command("Ver no leídos", m + "2", () -> setView(ChatFilter.View.INBOX, true)),
+                new CommandBar.Command("Ver favoritos", m + "3", () -> setView(ChatFilter.View.FAVORITES, false)),
+                new CommandBar.Command("Ver prioridad baja", m + "4", () -> setView(ChatFilter.View.LOW_PRIORITY, false)),
+                new CommandBar.Command("Ver archivados", "", () -> setView(ChatFilter.View.ARCHIVE, false)),
+                new CommandBar.Command("Conectar una red", "", this::showAddAccount),
+                new CommandBar.Command("Ajustes", m + ",", this::showSettings),
+                new CommandBar.Command("Cerrar sesión", "", onLogout)
+        ), this::openChat, this::hideOverlay);
+        showOverlay(bar);
+        Platform.runLater(bar::focus);
+    }
+
+    private void setView(ChatFilter.View v, boolean unread) {
+        listPane.filterProperty().set(listPane.filterProperty().get().withView(v).withUnreadOnly(unread).withQuery(""));
+    }
+
+    public void showAddAccount() {
+        showOverlay(new AddAccountPane(svc, this::openChatId, this::hideOverlay, this::toast));
+    }
+
+    public void showSettings() {
+        SettingsWindow.show(stage, svc, () -> {
+            Theme.applyAll();
+            listPane.refresh();
+            thread.rebuild(false);
+        }, onLogout, this::showAddAccount, this::toast);
+    }
+
+    private void onKey(KeyEvent e) {
+        boolean mod = e.isShortcutDown();
+        Chat c = thread.chat();
+        if (mod && e.getCode() == KeyCode.K) {
+            showCommandBar();
+        } else if (e.getCode() == KeyCode.ESCAPE && overlay.isVisible()) {
+            hideOverlay();
+        } else if (mod && e.getCode() == KeyCode.COMMA) {
+            showSettings();
+        } else if (mod && e.getCode() == KeyCode.F) {
+            listPane.focusSearch();
+        } else if (e.isAltDown() && (e.getCode() == KeyCode.UP || e.getCode() == KeyCode.DOWN)) {
+            listPane.move(e.getCode() == KeyCode.DOWN ? 1 : -1, e.isShiftDown());
+        } else if (mod && e.getCode() == KeyCode.E && c != null) {
+            svc.setArchived(c.id(), !c.archived());
+            toast(c.archived() ? "Chat desarchivado" : "Chat archivado");
+        } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.U && c != null) {
+            if (c.isUnread()) svc.markRead(c.id()); else svc.setMarkedUnread(c.id(), true);
+        } else if (mod && e.getCode() == KeyCode.I && c != null) {
+            toggleInfo();
+        } else if (mod && e.getCode().isDigitKey()) {
+            switch (e.getCode()) {
+                case DIGIT1 -> setView(ChatFilter.View.INBOX, false);
+                case DIGIT2 -> setView(ChatFilter.View.INBOX, true);
+                case DIGIT3 -> setView(ChatFilter.View.FAVORITES, false);
+                case DIGIT4 -> setView(ChatFilter.View.LOW_PRIORITY, false);
+                default -> { return; }
+            }
+        } else {
+            return;
+        }
+        e.consume();
+    }
+}
