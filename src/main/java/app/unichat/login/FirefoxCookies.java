@@ -104,11 +104,13 @@ public final class FirefoxCookies {
         Path wal = null;
         try {
             tmp = Files.createTempFile("unichat-cookies-", ".sqlite");
+            tmp.toFile().deleteOnExit(); // fallback if the delete in finally fails (e.g. locked on Windows)
             Files.copy(db, tmp, StandardCopyOption.REPLACE_EXISTING);
             // Recent cookies may still sit in the write-ahead log.
             Path srcWal = db.resolveSibling("cookies.sqlite-wal");
             if (Files.isRegularFile(srcWal)) {
                 wal = tmp.resolveSibling(tmp.getFileName() + "-wal");
+                wal.toFile().deleteOnExit();
                 Files.copy(srcWal, wal, StandardCopyOption.REPLACE_EXISTING);
             }
             return read(tmp, spec, Instant.now());

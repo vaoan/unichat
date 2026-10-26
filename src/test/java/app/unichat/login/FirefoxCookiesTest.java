@@ -78,4 +78,17 @@ class FirefoxCookiesTest {
         assertTrue(found.get(0).cookies().complete());
         assertTrue(Files.exists(profile.resolve("cookies.sqlite")));
     }
+
+    @Test
+    void findSessionsLeavesNoTempFilesBehind(@TempDir Path root) throws Exception {
+        Path profile = Files.createDirectories(root.resolve("p.default"));
+        makeDb(profile.resolve("cookies.sqlite"));
+        System.setProperty("unichat.browserRoots", root.toString());
+        FirefoxCookies.findSessions(spec);
+        try (var files = Files.list(Path.of(System.getProperty("java.io.tmpdir")))) {
+            List<String> left = files.map(p -> p.getFileName().toString())
+                    .filter(n -> n.startsWith("unichat-cookies-")).toList();
+            assertTrue(left.isEmpty(), "temp cookie copies left: " + left);
+        }
+    }
 }
