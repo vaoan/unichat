@@ -107,6 +107,23 @@ public final class MockChatService implements ChatService {
 
     // ---------------------------------------------------------------- reading
 
+    static final String UNJOINED_CHANNEL = "!srv-anuncios:demo";
+
+    @Override
+    public CompletableFuture<Void> joinChat(String roomId) {
+        if (UNJOINED_CHANNEL.equals(roomId) && !chats.containsKey(roomId)) {
+            ChatBuilder.group(this, "srv-anuncios", Network.DISCORD, "#anuncios", "Mafe")
+                    .in(-100, "Mafe", "Nuevo evento el sábado").done();
+            fireChats();
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Map<String, String>> spaceNames(String spaceId) {
+        return CompletableFuture.completedFuture("!servidor:demo".equals(spaceId) ? Map.of(UNJOINED_CHANNEL, "#anuncios") : Map.of());
+    }
+
     @Override public List<Chat> chats() { return new ArrayList<>(chats.values()); }
     @Override public Chat chat(String chatId) { return chats.get(chatId); }
 
@@ -612,6 +629,20 @@ public final class MockChatService implements ChatService {
                 .out(-19700, "Dale, yo creo la sala")
                 .in(-900, "xNico", "Ya estamos en el canal de voz")
                 .unread(4).muted().done();
+
+        // A Discord server (a Matrix space) with two joined channels and one not joined yet.
+        Chat server = new Chat("!servidor:demo");
+        server.setNetwork(Network.DISCORD);
+        server.setTitle("Servidor Unichat");
+        server.setSpace(true);
+        server.setSpaceChildren(List.of("!srv-general:demo", "!srv-memes:demo", UNJOINED_CHANNEL));
+        chats.put(server.id(), server);
+        ChatBuilder.group(this, "srv-general", Network.DISCORD, "#general", "xNico", "Mafe")
+                .in(-5000, "xNico", "Bienvenidos al servidor")
+                .unread(2).done();
+        ChatBuilder.group(this, "srv-memes", Network.DISCORD, "#memes", "Mafe")
+                .in(-7000, "Mafe", "😂")
+                .done();
 
         ChatBuilder.dm(this, "banco", Network.GOOGLE_MESSAGES, "Banco 85432")
                 .in(-30000, "Tu código de verificación es 482913. No lo compartas.")

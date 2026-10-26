@@ -115,6 +115,16 @@ public interface ChatService {
         return CompletableFuture.failedFuture(new UnsupportedOperationException("Stickers no disponibles"));
     }
 
+    /** Joins a room (a channel or topic of a space you're not in yet). */
+    default CompletableFuture<Void> joinChat(String roomId) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("joinChat"));
+    }
+
+    /** Names of a space's direct children, including ones you haven't joined (room id → name). */
+    default CompletableFuture<java.util.Map<String, String>> spaceNames(String spaceId) {
+        return CompletableFuture.completedFuture(java.util.Map.of());
+    }
+
     /** Sends a GIF (mp4 or gif file) from the GIF tab. */
     default CompletableFuture<Void> sendGif(String chatId, java.nio.file.Path file, String mime, int width, int height) {
         return sendFile(chatId, file, null);

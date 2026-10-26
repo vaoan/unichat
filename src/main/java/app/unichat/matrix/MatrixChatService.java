@@ -1010,6 +1010,30 @@ public final class MatrixChatService implements ChatService {
     }
 
     @Override
+    public CompletableFuture<Void> joinChat(String roomId) {
+        return run(() -> client.post(CLIENT + "/join/" + enc(roomId), null));
+    }
+
+    @Override
+    public CompletableFuture<Map<String, String>> spaceNames(String spaceId) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                JsonNode r = client.get("/_matrix/client/v1/rooms/" + enc(spaceId) + "/hierarchy?max_depth=1&limit=100");
+                Map<String, String> names = new java.util.LinkedHashMap<>();
+                for (JsonNode room : r.path("rooms")) {
+                    String id = room.path("room_id").asText("");
+                    String name = room.path("name").asText("");
+                    if (name.isBlank()) name = room.path("canonical_alias").asText("");
+                    if (!id.equals(spaceId) && !name.isBlank()) names.put(id, name);
+                }
+                return names;
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            }
+        }, io);
+    }
+
+    @Override
     public CompletableFuture<Void> leaveChat(String chatId) {
         return run(() -> {
             client.post(CLIENT + "/rooms/" + enc(chatId) + "/leave", null);
