@@ -324,7 +324,7 @@ public final class MainView extends StackPane {
 
     /** Filters the inbox to one network (all its accounts). */
     public void showNetwork(app.unichat.model.Network n) {
-        listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(n).withView(ChatFilter.View.INBOX));
+        listPane.filterProperty().set(listPane.filterProperty().get().switchTo(n, null));
     }
 
     /** Starts the login of one more account on {@code n} and opens its bridge-bot chat. */

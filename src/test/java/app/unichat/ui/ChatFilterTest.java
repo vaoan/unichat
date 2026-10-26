@@ -108,4 +108,22 @@ class ChatFilterTest {
         assertFalse(ChatFilter.inboxUnread(bot));
         assertTrue(ChatFilter.inboxUnread(ok));
     }
+
+    @Test
+    void switchingNetworkKeepsTheChosenChip() {
+        ChatFilter fav = ChatFilter.DEFAULT.withView(ChatFilter.View.FAVORITES).switchTo(Network.WHATSAPP, null);
+        assertEquals(ChatFilter.View.FAVORITES, fav.view());
+        assertEquals(Network.WHATSAPP, fav.network());
+        ChatFilter low = ChatFilter.DEFAULT.withView(ChatFilter.View.LOW_PRIORITY).switchTo(Network.TELEGRAM, "telegram:1");
+        assertEquals(ChatFilter.View.LOW_PRIORITY, low.view());
+        assertEquals("telegram:1", low.accountId());
+        ChatFilter unread = ChatFilter.DEFAULT.withUnreadOnly(true).switchTo(null, null);
+        assertTrue(unread.unreadOnly());
+    }
+
+    @Test
+    void leavingTheArchiveGoesBackToTheInbox() {
+        ChatFilter f = ChatFilter.DEFAULT.withView(ChatFilter.View.ARCHIVE).switchTo(Network.SIGNAL, null);
+        assertEquals(ChatFilter.View.INBOX, f.view());
+    }
 }

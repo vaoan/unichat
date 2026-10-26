@@ -104,7 +104,10 @@ public final class ChatListPane extends VBox {
         accountRow.getStyleClass().addAll("chip-row", "account-row");
         accountRow.setAccessibleText("Cuentas");
         getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list);
-        filter.addListener((o, a, b) -> refresh());
+        filter.addListener((o, a, b) -> {
+            syncChips(b);
+            refresh();
+        });
         refresh();
     }
 
@@ -115,6 +118,17 @@ public final class ChatListPane extends VBox {
         b.setToggleGroup(chips);
         b.setOnAction(e -> filter.set(change.apply(filter.get())));
         return b;
+    }
+
+    /** The chips follow the filter however it changed (rail, shortcuts, leaving the archive). */
+    private void syncChips(ChatFilter f) {
+        int i = switch (f.view()) {
+            case INBOX -> f.unreadOnly() ? 1 : 0;
+            case FAVORITES -> 2;
+            case LOW_PRIORITY -> 3;
+            case ARCHIVE -> -1;
+        };
+        if (i >= 0 && chips.getToggles().get(i) != chips.getSelectedToggle()) chips.getToggles().get(i).setSelected(true);
     }
 
     public ObjectProperty<ChatFilter> filterProperty() { return filter; }

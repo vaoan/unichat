@@ -24,6 +24,14 @@ public record ChatFilter(View view, Network network, String accountId, boolean u
     public ChatFilter withNetwork(Network n) { return new ChatFilter(view, n, null, unreadOnly, query); }
     /** Filters by one account of a network; null id = all accounts of that network. */
     public ChatFilter withAccount(Network n, String id) { return new ChatFilter(view, n, id, unreadOnly, query); }
+    /**
+     * The rail's network/inbox buttons: shows {@code n} (null = every network) and account {@code id} (null = all)
+     * keeping the chosen chip (Todos / No leídos / Favoritos / Prioridad baja). The archive is a place of its own,
+     * so leaving it goes back to the inbox.
+     */
+    public ChatFilter switchTo(Network n, String id) {
+        return new ChatFilter(view == View.ARCHIVE ? View.INBOX : view, n, id, unreadOnly, query);
+    }
     public ChatFilter withUnreadOnly(boolean u) { return new ChatFilter(view, network, accountId, u, query); }
     public ChatFilter withQuery(String q) { return new ChatFilter(view, network, accountId, unreadOnly, q == null ? "" : q); }
 
