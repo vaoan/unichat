@@ -49,6 +49,7 @@ public final class ChatListPane extends VBox {
     private final GroupsTree groups;
     private FlowPane chipRow;
     private boolean showingGroups;
+    private Runnable onNewChat;
     private final Consumer<Chat> onOpen;
     private String selectedId;
     private boolean updating;
@@ -66,7 +67,9 @@ public final class ChatListPane extends VBox {
         viewToggle.setAccessibleText("Vista de la lista");
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-        HBox header = new HBox(title, headerSpacer, viewToggle);
+        javafx.scene.control.Button newChat = Composer.iconButton(Icons.PLUS, "Nuevo chat", () -> { if (onNewChat != null) onNewChat.run(); });
+        newChat.setTooltip(new javafx.scene.control.Tooltip("Nuevo chat (" + (MainView.MAC ? "⌘N" : "Ctrl+N") + ")"));
+        HBox header = new HBox(6, title, headerSpacer, viewToggle, newChat);
         header.getStyleClass().add("chat-list-header");
         header.setAlignment(Pos.CENTER_LEFT);
 
@@ -146,6 +149,8 @@ public final class ChatListPane extends VBox {
     }
 
     public ObjectProperty<ChatFilter> filterProperty() { return filter; }
+
+    public void setOnNewChat(Runnable r) { this.onNewChat = r; }
 
     public void focusSearch() {
         search.requestFocus();

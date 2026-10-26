@@ -753,3 +753,11 @@
 .groups-tree .tree-cell:unjoined .group-name { -fx-opacity: 0.6; }
 .group-join { -fx-text-fill: -accent; -fx-font-size: 0.85em; }
 .root.contrast .groups-tree .tree-cell:focused { -fx-border-color: -text; -fx-border-radius: 8; }
+/* Nuevo chat */
+.new-chat-pane { -fx-padding: 18; -fx-spacing: 10; }
+.new-chat-list { -fx-background-color: transparent; }
+.new-chat-list .list-cell { -fx-background-color: transparent; -fx-padding: 6 8; }
+.new-chat-list .list-cell:selected, .new-chat-list .list-cell:hover { -fx-background-color: -hover; -fx-background-radius: 8; }
+.contact-name { -fx-text-fill: -text; }
+.contact-detail { -fx-text-fill: -text-2; -fx-font-size: 0.85em; }
+.root.contrast .new-chat-list .list-cell:focused { -fx-border-color: -text; -fx-border-radius: 8; }

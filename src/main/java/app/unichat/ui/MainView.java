@@ -80,6 +80,7 @@ public final class MainView extends StackPane {
         getStyleClass().add("main-root");
 
         listPane = new ChatListPane(svc, this::openChat);
+        listPane.setOnNewChat(this::showNewChat);
         thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast);
         info = new InfoPane(svc, this::toggleInfo, this::toast);
         panel = new SidePanel(info, text -> thread.composer().insert(text));
@@ -325,6 +326,13 @@ public final class MainView extends StackPane {
         if (thread.chat() != null) thread.composer().focus();
     }
 
+    /** Nuevo chat (⌘N / Ctrl+N): any contact of a network, starting with the one the list shows. */
+    public void showNewChat() {
+        NewChatPane pane = new NewChatPane(svc, listPane.filterProperty().get().network(), this::openChatId, this::hideOverlay, this::toast);
+        showOverlay(pane);
+        Platform.runLater(pane::focus);
+    }
+
     public void showCommandBar() {
         String m = MAC ? "⌘" : "Ctrl+";
         CommandBar bar = new CommandBar(svc, List.of(
@@ -333,6 +341,7 @@ public final class MainView extends StackPane {
                 new CommandBar.Command("Ver favoritos", m + "3", () -> setView(ChatFilter.View.FAVORITES, false)),
                 new CommandBar.Command("Ver prioridad baja", m + "4", () -> setView(ChatFilter.View.LOW_PRIORITY, false)),
                 new CommandBar.Command("Ver archivados", "", () -> setView(ChatFilter.View.ARCHIVE, false)),
+                new CommandBar.Command("Nuevo chat", m + "N", this::showNewChat),
                 new CommandBar.Command("Cuentas", "", this::showAccounts),
                 new CommandBar.Command("Agregar cuenta", "", () -> showAccounts().showPicker()),
                 new CommandBar.Command("Ajustes", m + ",", this::showSettings),
@@ -409,6 +418,8 @@ public final class MainView extends StackPane {
         Chat c = thread.chat();
         if (mod && e.getCode() == KeyCode.K) {
             showCommandBar();
+        } else if (mod && e.getCode() == KeyCode.N) {
+            showNewChat();
         } else if (e.getCode() == KeyCode.ESCAPE && overlay.isVisible()) {
             hideOverlay();
         } else if (mod && e.getCode() == KeyCode.COMMA) {
