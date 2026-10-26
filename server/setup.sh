@@ -154,7 +154,8 @@ for b in $ACTIVE; do
       | .bridge.permissions = {"*": "relay"} | .bridge.permissions[strenv(DOMAIN)] = "user"
       | .bridge.permissions[strenv(ADMIN_ID)] = "admin"
       | .encryption.allow = false | .encryption.default = false | .encryption.require = false
-      | .double_puppet.secrets = {} | .double_puppet.secrets[strenv(DOMAIN)] = "as_token:" + strenv(DP_TOKEN)'
+      | .double_puppet.secrets = {} | .double_puppet.secrets[strenv(DOMAIN)] = "as_token:" + strenv(DP_TOKEN)
+      | .backfill.enabled = true | .backfill.max_initial_messages = 50 | .backfill.max_catchup_messages = 500'
     # Instagram runs the pinned mautrix-meta v26.07 (last release with Instagram) in instagram mode.
     # Current mautrix-meta (facebook) has no mode key: its login flows (facebook, messenger, ...) pick it.
     if [ "$b" = instagram ]; then
@@ -172,7 +173,9 @@ for b in $ACTIVE; do
       | .bridge.permissions = {"*": "relay"} | .bridge.permissions[strenv(DOMAIN)] = "user"
       | .bridge.permissions[strenv(ADMIN_ID)] = "admin"
       | .bridge.encryption.allow = false | .bridge.encryption.default = false
-      | .bridge.login_shared_secret_map = {} | .bridge.login_shared_secret_map[strenv(DOMAIN)] = "as_token:" + strenv(DP_TOKEN)'
+      | .bridge.login_shared_secret_map = {} | .bridge.login_shared_secret_map[strenv(DOMAIN)] = "as_token:" + strenv(DP_TOKEN)
+      | .bridge.backfill.forward_limits.initial.dm = 50 | .bridge.backfill.forward_limits.initial.channel = 50
+      | .bridge.backfill.forward_limits.missed.dm = 500 | .bridge.backfill.forward_limits.missed.channel = 500'
   fi
   yq_edit "$b/config.yaml" "$expr"
   [ "$before" = "$(conf_sum "$b/config.yaml")" ] || CHANGED="$CHANGED $b"
