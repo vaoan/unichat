@@ -44,6 +44,12 @@
       <version>${jackson.version}</version>
     </dependency>
     <dependency>
+      <!-- Bridge config.yaml files of the native server (app.unichat.server). -->
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-yaml</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
       <!-- WebP decoding (WhatsApp stickers are animated WebP); JavaFX can't read WebP. -->
       <groupId>com.twelvemonkeys.imageio</groupId>
       <artifactId>imageio-webp</artifactId>

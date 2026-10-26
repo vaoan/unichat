@@ -42,7 +42,7 @@ bridge_port() {
     twitter) echo 29327 ;; linkedin) echo 29341 ;; *) echo "Bridge desconocido: $1" >&2; exit 1 ;;
   esac
 }
-manifest() { grep "^$1=" "$HERE/versions.env" | cut -d= -f2-; }
+manifest() { grep "^$1=" "$HERE/../src/main/resources/app/unichat/server/versions.env" | cut -d= -f2-; }
 
 # --- Homeserver binary -----------------------------------------------------------------------
 TUWUNEL_VERSION="$(manifest TUWUNEL_VERSION)"

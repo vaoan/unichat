@@ -1239,11 +1239,33 @@ public final class MatrixChatService implements ChatService {
         return out;
     }
 
+    /** Makes a network's bridge available before signing in to it (the local server downloads and starts it). */
+    @FunctionalInterface
+    public interface BridgeProvisioner {
+        void ensure(Network network) throws Exception;
+    }
+
+    private static volatile BridgeProvisioner provisioner;
+
+    public static void setBridgeProvisioner(BridgeProvisioner p) {
+        provisioner = p;
+    }
+
     @Override
     public CompletableFuture<String> connectNetwork(Network network) {
         if (!network.isBridged()) return CompletableFuture.failedFuture(new MatrixException(0, null, "Red no compatible"));
         return CompletableFuture.supplyAsync(() -> {
             try {
+                BridgeProvisioner p = provisioner;
+                if (p != null) {
+                    try {
+                        p.ensure(network);
+                    } catch (MatrixException e) {
+                        throw e;
+                    } catch (Exception e) {
+                        throw new MatrixException(e.getMessage() != null ? e.getMessage() : e.toString(), e);
+                    }
+                }
                 String bot = botId(network);
                 String roomId = findBotRoom(network);
                 if (roomId == null) {

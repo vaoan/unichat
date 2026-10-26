@@ -155,7 +155,10 @@ public final class Settings {
     public void setNotificationPreview(boolean v) { setBool("notify.preview", v); }
     public boolean notificationSound() { return getBool("notify.sound", true); }
     public void setNotificationSound(boolean v) { setBool("notify.sound", v); }
-    /** Off by default: archiving a chat means it shouldn't interrupt you. */
+    /** The session is on the server Unichat runs on this computer (app.unichat.server.LocalServer). */
+    public boolean localServer() { return getBool("server.local", false); }
+    public void setLocalServer(boolean v) { setBool("server.local", v); }
+        /** Off by default: archiving a chat means it shouldn't interrupt you. */
     public boolean notifyArchived() { return getBool("notify.archived", false); }
     public void setNotifyArchived(boolean v) { setBool("notify.archived", v); }
     public boolean sendReadReceipts() { return getBool("privacy.readReceipts", true); }

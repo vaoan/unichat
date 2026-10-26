@@ -1,6 +1,7 @@
 package app.unichat;
 
 import app.unichat.matrix.MatrixChatService;
+import app.unichat.server.LocalServer;
 import app.unichat.service.ChatService;
 import app.unichat.service.MockChatService;
 import app.unichat.settings.Settings;
@@ -74,6 +75,7 @@ public final class UnichatApp extends Application {
             }
         });
 
+        if (s.localServer()) startLocalServer();
         ChatService restored = switch (s.backend() == null ? "" : s.backend()) {
             case "demo" -> new MockChatService();
             case "matrix" -> MatrixChatService.fromSettings();
@@ -156,7 +158,28 @@ public final class UnichatApp extends Application {
         Theme.applyAll();
     }
 
+    /**
+     * Installs whatever is missing and starts the local server in the background; the chat list shows from cache
+     * meanwhile and the sync connects as soon as the server answers.
+     */
+    private void startLocalServer() {
+        LocalServer local = LocalServer.get();
+        if (local == null) return;
+        MatrixChatService.setBridgeProvisioner(n -> local.ensureBridge(n.protocolId(), msg -> { }));
+        Thread.ofVirtual().name("local-server").start(() -> {
+            try {
+                local.ensureRunning(msg -> { });
+            } catch (Exception e) {
+                System.err.println("Local server failed to start: " + e);
+            }
+        });
+    }
+
     private void showMain(ChatService svc) {
+        if (Settings.get().localServer()) {
+            LocalServer local = LocalServer.get();
+            if (local != null) MatrixChatService.setBridgeProvisioner(n -> local.ensureBridge(n.protocolId(), msg -> { }));
+        }
         service = svc;
         mainView = new MainView(svc, stage, notifier, this::logout, this::openLink);
         scene.setRoot(mainView);
@@ -171,6 +194,12 @@ public final class UnichatApp extends Application {
         svc.logout().whenComplete((v, err) -> Platform.runLater(() -> {
             svc.stop();
             Settings.get().clearSession();
+            if (Settings.get().localServer()) {
+                Settings.get().setLocalServer(false);
+                MatrixChatService.setBridgeProvisioner(null);
+                LocalServer local = LocalServer.get();
+                if (local != null) Thread.ofVirtual().start(local::stop);
+            }
             showLogin();
         }));
     }
@@ -211,6 +240,8 @@ public final class UnichatApp extends Application {
         Platform.runLater(() -> {
             if (stage.isShowing()) saveGeometry();
             if (service != null) service.stop();
+            LocalServer local = Settings.get().localServer() ? LocalServer.get() : null;
+            if (local != null) local.stop();
             notifier.dispose();
             Platform.exit();
             // Exit off the FX thread: System.exit on it can deadlock with AWT's shutdown on macOS.

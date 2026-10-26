@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.matrix.MatrixChatService;
+import app.unichat.server.LocalServer;
 import app.unichat.service.ChatService;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
@@ -66,6 +67,43 @@ public final class LoginView extends StackPane {
                     }));
         });
 
+        // Recommended path: Unichat installs and runs its own server on this computer (no Docker, no passwords).
+        LocalServer local = LocalServer.get();
+        Button useLocal = new Button("Usar este equipo (recomendado)");
+        useLocal.getStyleClass().add("primary-button");
+        useLocal.setMaxWidth(Double.MAX_VALUE);
+        Label localStatus = new Label("Unichat instala y mantiene su propio servidor. No necesitas Docker ni contraseñas.");
+        localStatus.getStyleClass().add("login-subtitle");
+        localStatus.setWrapText(true);
+        useLocal.setOnAction(e -> {
+            useLocal.setDisable(true);
+            login.setDisable(true);
+            error.setVisible(false);
+            error.setManaged(false);
+            Thread.ofVirtual().name("local-server-setup").start(() -> {
+                try {
+                    local.ensureRunning(msg -> Platform.runLater(() -> localStatus.setText(msg)));
+                    String[] cred = local.credentials();
+                    Platform.runLater(() -> localStatus.setText("Iniciando sesión…"));
+                    ChatService svc = MatrixChatService.login(LocalServer.URL, cred[0], cred[1]).join();
+                    app.unichat.settings.Settings.get().setLocalServer(true);
+                    Platform.runLater(() -> onLoggedIn.accept(svc));
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        useLocal.setDisable(false);
+                        login.setDisable(false);
+                        localStatus.setText("");
+                        showError(error, AccountsPane.rootMessage(ex));
+                    });
+                }
+            });
+        });
+        if (local != null) {
+            login.getStyleClass().setAll("button", "secondary-button");
+            login.setDefaultButton(false);
+            useLocal.setDefaultButton(true);
+        }
+
         Button demo = new Button("Probar el modo demo");
         demo.getStyleClass().add("secondary-button");
         demo.setMaxWidth(Double.MAX_VALUE);
@@ -77,7 +115,9 @@ public final class LoginView extends StackPane {
 
         StackPane loginRow = new StackPane(login, spin);
         StackPane.setAlignment(spin, Pos.CENTER_RIGHT);
-        VBox card = new VBox(12, logo, title, sub, server, user, pass, error, loginRow, new Label("o"), demo, help);
+        VBox card = new VBox(12, logo, title, sub);
+        if (local != null) card.getChildren().addAll(useLocal, localStatus, new Label("o con tu propio servidor"));
+        card.getChildren().addAll(server, user, pass, error, loginRow, new Label("o"), demo, help);
         card.setAlignment(Pos.CENTER);
         card.getStyleClass().addAll("login-card", "card");
         card.setMaxSize(420, VBox.USE_PREF_SIZE);
