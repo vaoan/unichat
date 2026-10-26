@@ -66,6 +66,17 @@ public final class Formats {
         return (first + last.substring(0, last.offsetByCodePoints(0, 1))).toUpperCase(ES);
     }
 
+    /**
+     * Two characters naming one of your accounts in a tiny avatar: the last two digits of a phone number
+     * ("+57 300 111 2233" → "33"), otherwise the initials ("Trabajo" → "T", "Ana Pérez" → "AP").
+     */
+    public static String accountShort(String label) {
+        if (label == null || label.isBlank()) return "?";
+        String digits = label.replaceAll("\\D", "");
+        if (label.trim().matches("[+\\d][\\d ()\\-]{5,}") && digits.length() >= 2) return digits.substring(digits.length() - 2);
+        return initials(label.startsWith("@") ? label.substring(1) : label);
+    }
+
     /** "Ana está escribiendo…", "Ana y Luis están escribiendo…", "3 personas están escribiendo…". */
     public static String typing(java.util.Collection<String> names) {
         java.util.List<String> list = java.util.List.copyOf(names);

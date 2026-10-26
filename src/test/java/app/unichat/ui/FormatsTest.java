@@ -35,4 +35,14 @@ class FormatsTest {
         assertEquals("1.5 MB", Formats.fileSize(1572864));
         assertEquals("Ana y Luis están escribiendo…", Formats.typing(List.of("Ana", "Luis")));
     }
+
+    @Test
+    void accountShortNames() {
+        assertEquals("33", Formats.accountShort("+57 300 111 2233"));
+        assertEquals("00", Formats.accountShort("16505550000"));
+        assertEquals("T", Formats.accountShort("Trabajo"));
+        assertEquals("AP", Formats.accountShort("Ana Pérez"));
+        assertEquals("H", Formats.accountShort("@ejemplo"));
+        assertEquals("?", Formats.accountShort(null));
+    }
 }

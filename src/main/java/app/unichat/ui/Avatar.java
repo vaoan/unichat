@@ -51,6 +51,11 @@ public final class Avatar extends StackPane {
         getChildren().addAll(initials, image, badge);
     }
 
+    /** The color used for {@code key}'s initials (also used for your accounts' tiny avatars). */
+    static String colorFor(String key) {
+        return COLORS[Math.floorMod(key.hashCode(), COLORS.length)];
+    }
+
     /** Shows {@code name}'s initials and loads {@code url} through the service (may be null). */
     public void set(String name, String key, String url, ChatService service) {
         initials.setText(Formats.initials(name));
@@ -87,7 +92,15 @@ public final class Avatar extends StackPane {
             badge.setVisible(false);
             return;
         }
-        badge.setText(network.badgeLetter());
+        double b = badge.getMinWidth();
+        if (NetworkIcons.path(network) != null) {
+            badge.setText("");
+            badge.setGraphic(NetworkIcons.glyph(network, b));
+        } else {
+            badge.setGraphic(null);
+            badge.setText(network.badgeLetter());
+        }
+        badge.setAccessibleText(network.displayName());
         badge.setStyle(badge.getStyle().replaceAll("-fx-background-color:[^;]*;", "")
                 + "-fx-background-color: " + network.color() + ";");
         badge.setVisible(true);

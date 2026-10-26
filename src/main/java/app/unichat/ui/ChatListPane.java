@@ -342,7 +342,7 @@ public final class ChatListPane extends VBox {
             accountTag.getStyleClass().add("account-tag");
             accountTag.setMinWidth(Region.USE_PREF_SIZE);
             HBox top = new HBox(6, name, grow, accountTag, stamp);
-            top.setAlignment(Pos.BASELINE_LEFT);
+            top.setAlignment(Pos.CENTER_LEFT);
             Region grow2 = new Region();
             HBox.setHgrow(grow2, Priority.ALWAYS);
             preview.setMinWidth(0);
@@ -380,7 +380,10 @@ public final class ChatListPane extends VBox {
             avatar.setNetwork(c.network(), Settings.get().showNetworkBadges());
             name.setText(c.title());
             String account = filter.get().accountId() == null ? Accounts.forChat(svc, c) : null;
-            accountTag.setText(account == null ? "" : account);
+            // Several accounts on this network: a tiny avatar says which one (full name on hover / screen reader).
+            accountTag.setText(account == null ? "" : Formats.accountShort(account));
+            accountTag.setStyle(account == null ? "" : "-fx-background-color: " + Avatar.colorFor(account) + ";");
+            accountTag.setTooltip(account == null ? null : new javafx.scene.control.Tooltip("Cuenta: " + account));
             accountTag.setVisible(account != null);
             accountTag.setManaged(account != null);
             stamp.setText(Formats.listStamp(c.lastActivity(), Instant.now(), ZoneId.systemDefault()));

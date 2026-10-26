@@ -821,11 +821,7 @@ public final class AccountsPane extends VBox {
     }
 
     static Label networkIcon(Network n, double size) {
-        Label l = new Label(n.badgeLetter());
-        l.getStyleClass().add("network-tile-icon");
-        l.setStyle("-fx-background-color: " + n.color() + "; -fx-min-width: " + size + "; -fx-min-height: " + size
-                + "; -fx-max-width: " + size + "; -fx-max-height: " + size + ";");
-        return l;
+        return NetworkIcons.tile(n, size, "network-tile-icon");
     }
 
     private static Label statusPill(AccountStatus s) {

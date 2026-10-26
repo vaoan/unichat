@@ -643,14 +643,18 @@
 .root.contrast .msg-link { -fx-underline: true; }
 
 /* ================================================================ multiple accounts */
+/* Your account on a network with several: tiny avatar (initials or last phone digits) in the account's color. */
 .account-tag {
-    -fx-font-size: 0.75em;
-    -fx-text-fill: -text-2;
+    -fx-font-size: 0.62em;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
     -fx-background-color: -surface-2;
-    -fx-background-radius: 6;
-    -fx-padding: 0 5;
+    -fx-background-radius: 999;
+    -fx-alignment: center;
+    -fx-min-width: 18; -fx-min-height: 18; -fx-max-width: 18; -fx-max-height: 18;
+    -fx-padding: 0;
 }
-.root.contrast .account-tag { -fx-border-color: -border; -fx-border-width: 1; -fx-border-radius: 6; }
+.root.contrast .account-tag { -fx-border-color: -text; -fx-border-width: 1; -fx-border-radius: 999; }
 .account-row { -fx-padding: 0 4; }
 .settings-group .text-field { -fx-background-color: -surface; -fx-border-color: -border; -fx-border-radius: 10; }
 .settings-group .text-field:focused { -fx-border-color: -accent; }

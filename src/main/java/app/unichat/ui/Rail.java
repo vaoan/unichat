@@ -85,9 +85,7 @@ public final class Rail extends VBox {
                     ? chats.stream().anyMatch(c -> c.network() == n && !c.bridgeBot())
                     : !Accounts.of(svc, n).isEmpty();
             if (!shown) continue;
-            Label letter = new Label(n.badgeLetter());
-            letter.getStyleClass().add("rail-network");
-            letter.setStyle("-fx-background-color: " + n.color() + ";");
+            Label letter = NetworkIcons.tile(n, 26, "rail-network");
             String status = acc == null ? "" : switch (acc.status()) {
                 case CONNECTED -> "";
                 case CONNECTING -> " (conectando…)";
