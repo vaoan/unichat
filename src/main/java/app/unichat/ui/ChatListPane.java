@@ -152,6 +152,8 @@ public final class ChatListPane extends VBox {
 
     public void setOnNewChat(Runnable r) { this.onNewChat = r; }
 
+    public void setToast(Consumer<String> toast) { groups.setToast(toast); }
+
     public void focusSearch() {
         search.requestFocus();
         search.selectAll();

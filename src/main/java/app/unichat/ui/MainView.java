@@ -81,6 +81,7 @@ public final class MainView extends StackPane {
 
         listPane = new ChatListPane(svc, this::openChat);
         listPane.setOnNewChat(this::showNewChat);
+        listPane.setToast(this::toast);
         thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast);
         info = new InfoPane(svc, this::toggleInfo, this::toast);
         panel = new SidePanel(info, text -> thread.composer().insert(text));

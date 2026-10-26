@@ -36,6 +36,10 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
     private String accountId;
     private boolean rebuilding;
     private String pendingOpen;
+    private javafx.animation.PauseTransition pendingTimeout;
+    private Consumer<String> toast = t -> { };
+    /** How long a joined channel may take to arrive before we stop waiting to open it (tests shorten it). */
+    static long joinWaitMs = 30_000;
     private String selectedId;
 
     GroupsTree(ChatService svc, Consumer<Chat> onOpen) {
@@ -58,6 +62,10 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
         });
     }
 
+    void setToast(Consumer<String> toast) {
+        this.toast = toast;
+    }
+
     /** Whether {@code n} has any server/group (so the Bandeja | Grupos choice makes sense). */
     boolean hasGroups(Network n, String account) {
         return SpaceTree.build(svc.chats(), n, account, names).stream().anyMatch(x -> !x.loose());
@@ -71,6 +79,7 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
             Chat joined = svc.chat(pendingOpen);
             if (joined != null && !joined.space()) {
                 pendingOpen = null;
+                if (pendingTimeout != null) pendingTimeout.stop();
                 selectedId = joined.id();
                 onOpen.accept(joined);
             }
@@ -137,13 +146,28 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
         } else if (n.joined()) {
             selectedId = n.id();
             onOpen.accept(n.chat());
-        } else {
-            pendingOpen = n.id();
-            selectedId = n.id();
-            svc.joinChat(n.id()).whenComplete((v, err) -> Platform.runLater(() -> {
-                if (err != null) pendingOpen = null;
+        } else if (pendingOpen == null) {
+            String id = n.id(), name = n.name();
+            pendingOpen = id;
+            selectedId = id;
+            toast.accept("Uniéndote a " + name + "…");
+            svc.joinChat(id).whenComplete((v, err) -> Platform.runLater(() -> {
+                if (err != null) {
+                    if (id.equals(pendingOpen)) pendingOpen = null;
+                    toast.accept("No se pudo unir a " + name + ". Puede que ya no tengas acceso.");
+                    return;
+                }
                 refresh(network, accountId);
             }));
+            // Don't open it by surprise minutes later: after the wait it just shows up in the list.
+            if (pendingTimeout != null) pendingTimeout.stop();
+            pendingTimeout = new javafx.animation.PauseTransition(javafx.util.Duration.millis(joinWaitMs));
+            pendingTimeout.setOnFinished(e -> {
+                if (!id.equals(pendingOpen)) return;
+                pendingOpen = null;
+                toast.accept("Te uniste a " + name + "; aparecerá en la lista en un momento");
+            });
+            pendingTimeout.play();
         }
     }
 

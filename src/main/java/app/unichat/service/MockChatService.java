@@ -111,12 +111,25 @@ public final class MockChatService implements ChatService {
 
     @Override
     public CompletableFuture<Void> joinChat(String roomId) {
-        if (UNJOINED_CHANNEL_ID.equals(roomId) && !chats.containsKey(roomId)) {
-            ChatBuilder.group(this, "srv-anuncios", Network.DISCORD, "#anuncios", "Mafe")
-                    .in(-100, "Mafe", "Nuevo evento el sábado").done();
-            fireChats();
-        }
+        if (failJoins) return CompletableFuture.failedFuture(new IllegalStateException("join refused"));
+        Runnable arrive = () -> {
+            if (UNJOINED_CHANNEL_ID.equals(roomId) && !chats.containsKey(roomId)) {
+                ChatBuilder.group(this, "srv-anuncios", Network.DISCORD, "#anuncios", "Mafe")
+                        .in(-100, "Mafe", "Nuevo evento el sábado").done();
+                fireChats();
+            }
+        };
+        // Like a real server: the join answers at once, the room reaches sync a bit later on a slow bridge.
+        if (bridgeDelayMs <= 0) arrive.run();
+        else CompletableFuture.delayedExecutor(bridgeDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS).execute(arrive);
         return CompletableFuture.completedFuture(null);
+    }
+
+    private volatile boolean failJoins;
+
+    /** Demo/tests: every join is refused (a channel you lost access to). */
+    public void failJoins(boolean fail) {
+        failJoins = fail;
     }
 
     @Override

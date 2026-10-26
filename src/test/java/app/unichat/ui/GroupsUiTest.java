@@ -184,6 +184,65 @@ class GroupsUiTest {
         svc.stop();
     }
 
+    private void enterOnAnuncios(Scene scene) throws Exception {
+        fx(() -> { button(scene, "Grupos").fire(); return null; });
+        Thread.sleep(300);
+        TreeView<SpaceTree.Node> tree = fx(() -> tree(scene));
+        fx(() -> { tree.requestFocus(); tree.getSelectionModel().select(0); return null; });
+        key(tree, KeyCode.RIGHT);
+        int anuncios = fx(() -> indexOf(tree, MockChatService.UNJOINED_CHANNEL_ID));
+        fx(() -> { tree.getSelectionModel().select(anuncios); return null; });
+        key(tree, KeyCode.ENTER);
+    }
+
+    private static String toastText(Scene s) throws Exception {
+        return fx(() -> {
+            javafx.scene.Node t = s.getRoot().lookup(".toast");
+            return t != null && t.isVisible() ? ((javafx.scene.control.Label) t).getText() : "";
+        });
+    }
+
+    @Test
+    void aFailedJoinSaysSo() throws Exception {
+        Scene scene = open(Network.DISCORD);
+        svc.failJoins(true);
+        enterOnAnuncios(scene);
+        Thread.sleep(300);
+        assertTrue(toastText(scene).startsWith("No se pudo unir"), toastText(scene));
+        svc.stop();
+    }
+
+    @Test
+    void aJoinThatArrivesTooLateDoesNotOpenByItself() throws Exception {
+        Scene scene = open(Network.DISCORD);
+        GroupsTree.joinWaitMs = 300;
+        try {
+            svc.simulateSlowBridge(900); // the joined room arrives after the wait is over
+            fx(() -> { view.openChatId("!familia:demo"); return null; });
+            enterOnAnuncios(scene);
+            Thread.sleep(1500);
+            assertEquals("!familia:demo", fx(() -> thread(scene).chat().id()), "no surprise jump minutes later");
+            assertTrue(toastText(scene).contains("aparecerá"), toastText(scene));
+        } finally {
+            GroupsTree.joinWaitMs = 30_000;
+        }
+        svc.stop();
+    }
+
+    @Test
+    void screenReaderHearsExpandedAndCollapsed() throws Exception {
+        Scene scene = open(Network.DISCORD);
+        fx(() -> { button(scene, "Grupos").fire(); return null; });
+        Thread.sleep(300);
+        TreeView<SpaceTree.Node> tree = fx(() -> tree(scene));
+        fx(() -> { tree.requestFocus(); tree.getSelectionModel().select(0); return null; });
+        assertTrue(fx(() -> rowTexts(scene)).stream().anyMatch(r -> r.startsWith("Servidor Unichat") && r.endsWith("contraído")));
+        key(tree, KeyCode.RIGHT);
+        assertTrue(fx(() -> rowTexts(scene)).stream().anyMatch(r -> r.startsWith("Servidor Unichat") && r.endsWith("desplegado")),
+                fx(() -> rowTexts(scene)).toString());
+        svc.stop();
+    }
+
     private static int indexOf(TreeView<SpaceTree.Node> tree, String id) {
         for (int i = 0; i < tree.getExpandedItemCount(); i++) {
             if (tree.getTreeItem(i) != null && id.equals(tree.getTreeItem(i).getValue().id())) return i;

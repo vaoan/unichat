@@ -157,6 +157,22 @@ class NewChatUiTest {
         svc.stop();
     }
 
+    @Test
+    void statusIsReadOutWithTheSearchField() throws Exception {
+        MockChatService svc = new MockChatService();
+        Scene scene = start(svc);
+        shortcutN(scene);
+        chooseNetwork(scene, "Discord");
+        Thread.sleep(300);
+        String help = fx(() -> search(scene).getAccessibleHelp());
+        assertTrue(help != null && help.contains("Grupos"), String.valueOf(help));
+        chooseNetwork(scene, "WhatsApp");
+        type(scene, "zzzz");
+        Thread.sleep(700);
+        assertEquals("Sin resultados", fx(() -> search(scene).getAccessibleHelp()));
+        svc.stop();
+    }
+
     private static boolean n(String t) {
         return t != null && !t.isBlank();
     }

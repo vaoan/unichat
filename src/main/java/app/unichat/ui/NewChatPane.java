@@ -137,7 +137,7 @@ final class NewChatPane extends VBox {
             if (first == null || n == preferred) first = b;
         }
         if (first == null) {
-            status.setText("Primero conecta una red en Ajustes → Cuentas.");
+            setStatus("Primero conecta una red en Ajustes → Cuentas.");
             search.setDisable(true);
         } else {
             first.fire();
@@ -186,7 +186,7 @@ final class NewChatPane extends VBox {
         list.getItems().clear();
         search.setAccessibleText("Buscar contacto en " + a.network().displayName());
         search.setDisable(false);
-        status.setText("Cargando…");
+        setStatus("Cargando…");
         ChatService.ContactSupport[] found = new ChatService.ContactSupport[1];
         svc.contactSupport(a).thenCompose(s -> {
             found[0] = s;
@@ -231,7 +231,7 @@ final class NewChatPane extends VBox {
             show(rows, rows.isEmpty() ? "Sin resultados" : null);
             return;
         }
-        status.setText("Buscando…");
+        setStatus("Buscando…");
         svc.searchContacts(account, q).whenComplete((found, err) -> Platform.runLater(() -> {
             if (gen != generation) return;
             if (err != null) {
@@ -256,9 +256,16 @@ final class NewChatPane extends VBox {
                 || c.identifiers().stream().anyMatch(i -> i.contains(q))).toList();
     }
 
+    /** The status line, also given to the search field so a screen reader hears it where the focus is. */
+    private void setStatus(String text) {
+        status.setText(text);
+        search.setAccessibleHelp(text == null || text.isEmpty() ? null : text);
+        search.notifyAccessibleAttributeChanged(javafx.scene.AccessibleAttribute.HELP);
+    }
+
     private void show(List<Row> rows, String message) {
         list.getItems().setAll(rows);
-        status.setText(message == null ? "" : message);
+        setStatus(message == null ? "" : message);
         status.setVisible(message != null);
         status.setManaged(message != null);
     }
@@ -278,7 +285,7 @@ final class NewChatPane extends VBox {
     private void choose(Row r) {
         Account a = account;
         if (a == null || pendingListener != null) return; // already opening one
-        status.setText("Abriendo…");
+        setStatus("Abriendo…");
         status.setVisible(true);
         status.setManaged(true);
         java.util.concurrent.CompletableFuture<Contact> contact = r.contact() != null
@@ -289,7 +296,7 @@ final class NewChatPane extends VBox {
         }).whenComplete((roomId, err) -> Platform.runLater(() -> {
             if (err != null) {
                 Throwable cause = err.getCause() != null ? err.getCause() : err;
-                status.setText(cause instanceof IllegalArgumentException
+                setStatus(cause instanceof IllegalArgumentException
                         ? "No se encontró a " + r.typed() + " en " + a.network().displayName() + "."
                         : "No se pudo abrir el chat. Intenta de nuevo.");
                 return;
@@ -306,7 +313,7 @@ final class NewChatPane extends VBox {
             return;
         }
         if (getScene() == null) return; // closed while the bridge answered
-        status.setText("Creando el chat…");
+        setStatus("Creando el chat…");
         ChatService.Listener l = new ChatService.Listener() {
             @Override
             public void chatsChanged() {
