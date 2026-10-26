@@ -185,3 +185,21 @@
 - [ ] **Step 3: Implement** fusionar sobre el `m.direct` más reciente del servidor (GET antes de PUT) en vez de solo el cacheado.
 - [ ] **Step 4: Run** → PASS.
 - [ ] **Step 5: Commit** `fix(matrix): merge m.direct so existing bot DMs aren't dropped`.
+
+## Task 9 (added during execution): keep credentials out of the on-disk sync cache
+
+**Why:** `MatrixChatService.saveSyncCache` writes the entire `/sync` response to disk (clear JSON),
+including bridge-bot DM timelines. Those now carry the cookie JSON we send (and QR data / tokens), so
+session credentials would sit on disk until logout. This contradicts the design's "nada se persiste en disco".
+
+**Files:**
+- Modify: `src/main/java/app/unichat/matrix/MatrixChatService.java` (`saveSyncCache`, maybe `SyncProcessor` to identify bridge-bot rooms)
+- Test: `src/test/java/app/unichat/matrix/` (pure redaction helper)
+
+**Interfaces:** no public API change.
+
+- [ ] **Step 1: Write the failing test** — extract a pure static helper, e.g. `static JsonNode redactForCache(JsonNode fullSync, Set<String> botRoomIds)` that returns a deep copy of the `/sync` with, for each room id in `botRoomIds`, the `timeline.events[].content` (and `state` message content) removed/blanked while keeping membership/state needed for the room to resolve. Test: a bridge-bot room's message bodies (e.g. a value "sessionid=SECRET") are absent from the output; a normal room's timeline is untouched; `next_batch` preserved.
+- [ ] **Step 2: Run** → FAIL.
+- [ ] **Step 3: Implement** the helper; in `saveSyncCache`, compute the bridge-bot room id set from the processor (rooms whose chat `bridgeBot()` is true) and write `redactForCache(fullSync, botRooms)` instead of the raw response. `loadSyncCache` still works (bot rooms load with empty timelines — fine; they're management chats).
+- [ ] **Step 4: Run** → PASS; full `./mvnw test` PASS.
+- [ ] **Step 5: Commit** `fix(matrix): keep bridge-bot credentials out of the on-disk sync cache`.
