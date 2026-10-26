@@ -9,32 +9,39 @@ public final class CookieSpec {
     private static final Map<Network, CookieSpec> SPECS = new EnumMap<>(Network.class);
 
     static {
-        SPECS.put(Network.INSTAGRAM, new CookieSpec(
+        SPECS.put(Network.INSTAGRAM, new CookieSpec(Network.INSTAGRAM,
                 Set.of("sessionid", "csrftoken"), Set.of("ds_user_id", "mid", "ig_did"),
                 Set.of("instagram.com")));
-        SPECS.put(Network.MESSENGER, new CookieSpec(
+        SPECS.put(Network.MESSENGER, new CookieSpec(Network.MESSENGER,
                 Set.of("c_user", "xs"), Set.of("datr", "fr"),
                 Set.of("facebook.com", "messenger.com")));
-        SPECS.put(Network.X, new CookieSpec(
+        SPECS.put(Network.X, new CookieSpec(Network.X,
                 Set.of("auth_token", "ct0"), Set.of(),
                 Set.of("x.com", "twitter.com")));
-        SPECS.put(Network.LINKEDIN, new CookieSpec(
+        SPECS.put(Network.LINKEDIN, new CookieSpec(Network.LINKEDIN,
                 Set.of("li_at", "JSESSIONID"), Set.of(),
                 Set.of("linkedin.com")));
-        SPECS.put(Network.GOOGLE_MESSAGES, new CookieSpec(
+        SPECS.put(Network.GOOGLE_MESSAGES, new CookieSpec(Network.GOOGLE_MESSAGES,
                 Set.of("SAPISID", "SID", "__Secure-1PSID"),
                 Set.of("HSID", "SSID", "APISID", "__Secure-3PSID"),
                 Set.of("google.com")));
     }
 
+    private final Network network;
     private final Set<String> required;
     private final Set<String> optional;
     private final Set<String> domains;
 
-    private CookieSpec(Set<String> required, Set<String> optional, Set<String> domains) {
+    private CookieSpec(Network network, Set<String> required, Set<String> optional, Set<String> domains) {
+        this.network = network;
         this.required = required;
         this.optional = optional;
         this.domains = domains;
+    }
+
+    /** A spec built from what a bridge asks for in its login step (see BridgeCookies). */
+    public static CookieSpec of(Network network, Set<String> required, Set<String> optional, Set<String> domains) {
+        return new CookieSpec(network, Set.copyOf(required), Set.copyOf(optional), Set.copyOf(domains));
     }
 
     /** @throws IllegalArgumentException if the network does not log in with cookies */
@@ -80,6 +87,7 @@ public final class CookieSpec {
     }
 
     private Network networkOf() {
+        if (network != null) return network;
         for (var e : SPECS.entrySet()) if (e.getValue() == this) return e.getKey();
         throw new IllegalStateException();
     }

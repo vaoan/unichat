@@ -36,10 +36,14 @@ public final class CookieLogin {
      * (the macOS keychain prompt can block). Never fails: errors yield an empty contribution.
      */
     public static CompletableFuture<List<BrowserSession>> findBrowserSessions(Network network) {
+        if (!isCookieNetwork(network)) return CompletableFuture.completedFuture(new ArrayList<>());
+        return findBrowserSessions(CookieSpec.forNetwork(network));
+    }
+
+    /** Same, for the cookies a bridge asks for. */
+    public static CompletableFuture<List<BrowserSession>> findBrowserSessions(CookieSpec spec) {
         return CompletableFuture.supplyAsync(() -> {
             List<BrowserSession> all = new ArrayList<>();
-            if (!isCookieNetwork(network)) return all;
-            CookieSpec spec = CookieSpec.forNetwork(network);
             try {
                 all.addAll(FirefoxCookies.findSessions(spec));
             } catch (RuntimeException | LinkageError e) {
@@ -80,14 +84,17 @@ public final class CookieLogin {
         if (!isCookieNetwork(network)) {
             return TxtResult.error("Esta red no usa inicio de sesión con cookies.");
         }
-        CookieSpec spec = CookieSpec.forNetwork(network);
+        return fromCookieTxt(file, CookieSpec.forNetwork(network));
+    }
+
+    /** Same, for the cookies a bridge asks for. */
+    public static TxtResult fromCookieTxt(Path file, CookieSpec spec) {
         SessionCookies cookies;
         try {
             cookies = CookieTxt.read(file, spec, Instant.now());
         } catch (IOException | RuntimeException e) {
             return TxtResult.error("No se pudo leer el archivo. Comprueba que sea un cookies.txt válido.");
         }
-        if (cookies.complete()) return TxtResult.ok(cookies);
         List<String> missing = spec.required().stream()
                 .filter(n -> {
                     String v = cookies.values().get(n);
@@ -95,6 +102,6 @@ public final class CookieLogin {
                 })
                 .sorted()
                 .toList();
-        return TxtResult.missing(missing);
+        return missing.isEmpty() ? TxtResult.ok(cookies) : TxtResult.missing(missing);
     }
 }
