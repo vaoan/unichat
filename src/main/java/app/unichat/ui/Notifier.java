@@ -6,6 +6,7 @@ import app.unichat.settings.Settings;
 
 import javax.imageio.ImageIO;
 import java.awt.EventQueue;
+import java.awt.GraphicsEnvironment;
 import java.awt.MenuItem;
 import java.awt.PopupMenu;
 import java.awt.SystemTray;
@@ -30,18 +31,72 @@ public final class Notifier {
     /** {@code onOpen} receives a chat id (or null) when the user clicks the tray icon or a notification. */
     public Notifier(Runnable onShow, Consumer<String> onOpen, Runnable onQuit) {
         toast = MAC ? new DesktopToast(onOpen) : null;
+        this.onOpen = onOpen;
+        PopupMenu menu = new PopupMenu();
+        MenuItem open = new MenuItem("Abrir Unichat");
+        open.addActionListener(e -> onShow.run());
+        MenuItem quit = new MenuItem("Salir");
+        quit.addActionListener(e -> onQuit.run());
+        menu.add(open);
+        menu.addSeparator();
+        menu.add(quit);
+        this.menu = menu;
+        // macOS: the native item (narrow, real menu, like Apple's own); the AWT TrayIcon if it's missing or dies.
+        if (MAC && !GraphicsEnvironment.isHeadless() && startNativeBar()) return;
+        addAwtTray();
+    }
+
+    private final PopupMenu menu;
+    private final Consumer<String> onOpen;
+    private volatile NativeBar bar;
+    private volatile String tooltip = "Unichat";
+    private volatile boolean disposed;
+
+    private boolean startNativeBar() {
+        NativeBar b = NativeBar.start(barHelper(), menu, () -> EventQueue.invokeLater(() -> {
+            bar = null;
+            if (tray == null && !disposed) addAwtTray(); // the helper died: keep a tray icon
+        }));
+        if (b == null) return false;
+        bar = b;
+        EventQueue.invokeLater(() -> {
+            b.setIcon(menuBarIcon());
+            b.setTooltip(tooltip);
+            b.syncMenu();
+        });
+        return true;
+    }
+
+    /** The app icon at 44 px: shown at 22 pt, sharp on Retina menu bars. */
+    private static BufferedImage menuBarIcon() {
+        try (InputStream in = Notifier.class.getResourceAsStream("/app/unichat/icons/app-128.png")) {
+            BufferedImage src = ImageIO.read(in);
+            BufferedImage out = new BufferedImage(44, 44, BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D g = out.createGraphics();
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING, java.awt.RenderingHints.VALUE_RENDER_QUALITY);
+            g.drawImage(src, 0, 0, 44, 44, null);
+            g.dispose();
+            return out;
+        } catch (Exception e) {
+            return new BufferedImage(44, 44, BufferedImage.TYPE_INT_ARGB);
+        }
+    }
+
+    /** native/UnichatBar: -Dunichat.barHelper (development) or Contents/app/native/UnichatBar in the packaged app. */
+    private static java.nio.file.Path barHelper() {
+        String o = System.getProperty("unichat.barHelper");
+        if (o != null) return java.nio.file.Path.of(o);
+        String launcher = System.getProperty("jpackage.app-path");
+        if (launcher == null) return null;
+        return java.nio.file.Path.of(launcher).getParent().resolveSibling("app").resolve("native").resolve("UnichatBar");
+    }
+
+    private void addAwtTray() {
         if (!SystemTray.isSupported()) return;
         try (InputStream in = Notifier.class.getResourceAsStream("/app/unichat/icons/tray.png")) {
             BufferedImage img = in == null ? new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB) : ImageIO.read(in);
-            PopupMenu menu = new PopupMenu();
-            MenuItem open = new MenuItem("Abrir Unichat");
-            open.addActionListener(e -> onShow.run());
-            MenuItem quit = new MenuItem("Salir");
-            quit.addActionListener(e -> onQuit.run());
-            menu.add(open);
-            menu.addSeparator();
-            menu.add(quit);
-            tray = new TrayIcon(img, "Unichat", menu);
+            tray = new TrayIcon(img, tooltip, menu);
             tray.setImageAutoSize(true);
             tray.addActionListener(e -> onOpen.accept(lastChatId));
             SystemTray.getSystemTray().add(tray);
@@ -51,7 +106,7 @@ public final class Notifier {
         }
     }
 
-    public boolean hasTray() { return tray != null; }
+    public boolean hasTray() { return tray != null || bar != null; }
 
     public void notify(Chat chat, Message m) {
         Settings s = Settings.get();
@@ -84,7 +139,10 @@ public final class Notifier {
     }
 
     private void setUnreadNow(int count) {
-        if (tray != null) tray.setToolTip(count > 0 ? "Unichat — " + count + " sin leer" : "Unichat");
+        tooltip = count > 0 ? "Unichat — " + count + " sin leer" : "Unichat";
+        if (tray != null) tray.setToolTip(tooltip);
+        NativeBar b = bar;
+        if (b != null) b.setTooltip(tooltip);
         try {
             if (Taskbar.isTaskbarSupported() && Taskbar.getTaskbar().isSupported(Taskbar.Feature.ICON_BADGE_NUMBER)) {
                 Taskbar.getTaskbar().setIconBadge(count > 0 ? Integer.toString(count) : null);
@@ -95,6 +153,10 @@ public final class Notifier {
     }
 
     public void dispose() {
+        disposed = true;
+        NativeBar b = bar;
+        bar = null;
+        if (b != null) b.close();
         TrayIcon t = tray;
         tray = null;
         if (t != null) awt(() -> SystemTray.getSystemTray().remove(t));

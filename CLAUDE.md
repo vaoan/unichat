@@ -20,6 +20,9 @@ Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix
 - `native/` — no-Docker stack (tuwunel + mautrix bridge binaries + SQLite): `versions.env` pins every component,
   `setup-mac.sh` / `run-mac.sh` are the reference for the installer Unichat will run at startup (install whatever
   is missing, start and supervise). Read `docs/SERVIDOR-NATIVO.md` before touching it.
+- `native/UnichatBar.swift` (`native/build-bar.sh`) — macOS menu-bar item drawn natively (narrower than Java's
+  TrayIcon, real NSMenu; same design as InstaTray), driven by `ui/NativeBar` over stdin; `Notifier` falls back to the
+  AWT TrayIcon when it's missing or dies. run-dev.sh builds it; package.sh ships it as `Contents/app/native/UnichatBar`.
 - `package.sh` / `package.ps1` — jpackage; `.github/workflows/build.yml` builds Windows zip/msi + macOS dmg.
 
 ## Checking UI changes
