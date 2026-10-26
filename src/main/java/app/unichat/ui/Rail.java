@@ -127,9 +127,13 @@ public final class Rail extends VBox {
         if (on) b.getStyleClass().add("active");
     }
 
-    private static void setUnreadBadge(Button b, long count) {
+    /**
+     * Shows {@code count} on the button. The inbox button lives for the whole session, so the second call must reuse
+     * the wrapper the first one made (it is the button's graphic): wrapping again kept the old number inside forever.
+     */
+    static void setUnreadBadge(Button b, long count) {
         Node g = b.getGraphic();
-        StackPane wrap = g.getParent() instanceof StackPane sp && sp.getStyleClass().contains("rail-graphic") ? sp : null;
+        StackPane wrap = g instanceof StackPane sp && sp.getStyleClass().contains("rail-graphic") ? sp : null;
         if (wrap == null) {
             wrap = new StackPane(g);
             wrap.getStyleClass().add("rail-graphic");
