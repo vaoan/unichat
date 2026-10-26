@@ -7,6 +7,7 @@ import app.unichat.service.MockChatService;
 import app.unichat.settings.Settings;
 import app.unichat.ui.DockIcon;
 import app.unichat.ui.LoginView;
+import app.unichat.ui.MacQuit;
 import app.unichat.ui.MainView;
 import app.unichat.ui.Notifier;
 import app.unichat.ui.Theme;
@@ -61,6 +62,8 @@ public final class UnichatApp extends Application {
             });
         }, this::quit);
         Platform.setImplicitExit(!notifier.hasTray());
+        // macOS "Salir" (⌘Q, app menu, Dock, logout) quits for real; closing the window only hides it in the tray.
+        MacQuit.install(this::quit);
 
         scene = new Scene(new javafx.scene.layout.StackPane(), stage.getWidth(), stage.getHeight());
         Theme.register(scene);

@@ -48,3 +48,7 @@
 - **macOS drops AWT tray notifications from a plain `java` process** (usernoted: "dropping msg … app not found");
   osascript ones show but clicking opens Script Editor. macOS uses Unichat's own card (`DesktopToast`); Windows
   keeps the native balloon. Tray/balloon callbacks run on the AWT thread: hop to FX with `Platform.runLater`.
+- **macOS ⌘Q / "Salir" never quit:** JavaFX turns the quit action into "close every window" and our close handler
+  hides to the tray. `Desktop.setQuitHandler` (AWT) is never called with JavaFX owning the app. Fix: `MacQuit`
+  wraps JavaFX's glass `Application.EventHandler.handleQuitAction`. Test by AXPress on the app menu's Quit item
+  (an `osascript 'quit app'` to a dev `java` process doesn't reach it).
