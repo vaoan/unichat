@@ -1,0 +1,99 @@
+package app.unichat.ui;
+
+import app.unichat.model.Chat;
+import app.unichat.model.Network;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * The Grupos view of one network: its servers/groups (Matrix spaces) with their channels/topics, and the chats that
+ * hang from no group in "Chats directos y otros". The bridge's personal folder is not a group: it's every chat.
+ * Pure (no JavaFX) so it's unit tested.
+ */
+public final class SpaceTree {
+    public static final String LOOSE = "Chats directos y otros";
+    static final String LOOSE_ID = "loose";
+
+    private SpaceTree() {}
+
+    /** {@code chat} null: a child you haven't joined yet (its name comes from the space hierarchy), or the loose group. */
+    public record Node(String id, Chat chat, String name, List<Node> children) {
+        public boolean loose() { return LOOSE_ID.equals(id); }
+        public boolean joined() { return chat != null; }
+        public boolean container() { return loose() || (chat != null && chat.space()); }
+    }
+
+    /** {@code names}: room id → name for children not joined yet (from {@code /hierarchy}). */
+    public static List<Node> build(List<Chat> all, Network network, Map<String, String> names) {
+        Map<String, Chat> byId = new HashMap<>();
+        Map<String, List<String>> declaredChildren = new HashMap<>();
+        for (Chat c : all) {
+            if (c.network() != network || c.bridgeBot()) continue;
+            byId.put(c.id(), c);
+        }
+        for (Chat c : byId.values()) {
+            for (String p : c.spaceParents()) declaredChildren.computeIfAbsent(p, k -> new ArrayList<>()).add(c.id());
+        }
+        List<Chat> spaces = byId.values().stream().filter(c -> c.space() && !c.personalSpace())
+                .sorted(Comparator.comparing(Chat::title, String.CASE_INSENSITIVE_ORDER)).toList();
+        Set<String> childOfGroup = new HashSet<>();
+        for (Chat s : spaces) childOfGroup.addAll(childIds(s, declaredChildren));
+
+        Set<String> placed = new HashSet<>();
+        List<Node> roots = new ArrayList<>();
+        for (Chat s : spaces) {
+            if (!childOfGroup.contains(s.id())) roots.add(node(s, byId, declaredChildren, names, new LinkedHashSet<>(), placed));
+        }
+        // Spaces that are only each other's children (a cycle) still need a way in.
+        for (Chat s : spaces) {
+            if (!placed.contains(s.id())) roots.add(node(s, byId, declaredChildren, names, new LinkedHashSet<>(), placed));
+        }
+        List<Node> loose = byId.values().stream()
+                .filter(c -> !c.space() && !c.archived() && !placed.contains(c.id()))
+                .sorted(ChatFilter.ORDER)
+                .map(c -> new Node(c.id(), c, c.title(), List.of())).toList();
+        if (!loose.isEmpty()) roots.add(new Node(LOOSE_ID, null, LOOSE, loose));
+        return roots;
+    }
+
+    private static List<String> childIds(Chat space, Map<String, List<String>> declaredChildren) {
+        Set<String> ids = new LinkedHashSet<>(space.spaceChildren());
+        ids.addAll(declaredChildren.getOrDefault(space.id(), List.of()));
+        return new ArrayList<>(ids);
+    }
+
+    private static Node node(Chat space, Map<String, Chat> byId, Map<String, List<String>> declared, Map<String, String> names,
+                             Set<String> path, Set<String> placed) {
+        path.add(space.id());
+        placed.add(space.id());
+        List<Node> children = new ArrayList<>();
+        for (String id : childIds(space, declared)) {
+            if (path.contains(id)) continue; // a cycle: don't walk back up
+            Chat c = byId.get(id);
+            if (c == null) {
+                children.add(new Node(id, null, names.getOrDefault(id, "Chat sin unirte"), List.of()));
+            } else if (c.space()) {
+                if (!c.personalSpace()) children.add(node(c, byId, declared, names, new LinkedHashSet<>(path), placed));
+            } else if (!c.archived()) {
+                placed.add(id);
+                children.add(new Node(id, c, c.title(), List.of()));
+            }
+        }
+        return new Node(space.id(), space, space.title(), children);
+    }
+
+    /** Unread messages in a node: the same "demands attention" rule as the inbox (no muted/archived/low priority). */
+    public static int unread(Node n) {
+        int sum = 0;
+        if (n.chat() != null && !n.chat().space() && ChatFilter.inboxUnread(n.chat())) sum += Math.max(1, n.chat().unreadCount());
+        for (Node c : n.children()) sum += unread(c);
+        return sum;
+    }
+}
