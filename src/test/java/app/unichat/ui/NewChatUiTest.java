@@ -186,6 +186,9 @@ class NewChatUiTest {
     }
 
     private static void chooseNetwork(Scene s, String name) throws Exception {
+        // The pane is built on the next pulse after ⌘N: wait for its network chips.
+        for (int i = 0; i < 30 && !fx(() -> s.getRoot().lookupAll(".new-chat-network").stream()
+                .anyMatch(n -> name.equals(((ToggleButton) n).getText()))); i++) Thread.sleep(100);
         fx(() -> {
             s.getRoot().lookupAll(".new-chat-network").stream().map(n -> (ToggleButton) n)
                     .filter(b -> name.equals(b.getText())).findFirst().orElseThrow().fire();

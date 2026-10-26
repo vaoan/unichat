@@ -73,8 +73,15 @@ public final class ThreadPane extends BorderPane {
     private boolean loadingOlder;
     private boolean reachedStart;
     private ScrollBar vbar;
-    /** True while the viewport should follow new messages (user is at the bottom). */
+    /**
+     * True while the viewport follows new messages. Only the person scrolling (wheel, keys, the scrollbar) unpins it:
+     * the scrollbar also moves when a photo or sticker finishes loading and a bubble grows, which isn't "scrolled up".
+     */
     private boolean pinnedBottom = true;
+    /** When the person last scrolled by hand (ms); scrollbar moves shortly after count as theirs. */
+    private long userScrollAt;
+    /** Newest message shown, to notice your own new message (always jumps to it). */
+    private String lastMessageId;
 
     public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast) {
         this.svc = svc;
@@ -113,6 +120,13 @@ public final class ThreadPane extends BorderPane {
         list.setAccessibleHelp("Flechas para recorrer mensajes. R responder, E editar, Enter o Espacio abre las acciones, "
                 + "1 a 6 reacciones rápidas, " + (MainView.MAC ? "⌘" : "Ctrl+") + "C copiar, Esc vuelve al campo de texto.");
         list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, this::onTimelineKey);
+        list.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> userScrolled());
+        list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, e -> {
+            switch (e.getCode()) {
+                case PAGE_UP, PAGE_DOWN, HOME, END, UP, DOWN -> userScrolled();
+                default -> { }
+            }
+        });
         list.focusedProperty().addListener((o, a, focused) -> {
             if (focused && list.getSelectionModel().isEmpty() && !rows.isEmpty()) {
                 list.getSelectionModel().select(rows.size() - 1);
@@ -155,15 +169,41 @@ public final class ThreadPane extends BorderPane {
         list.widthProperty().addListener((o, a, w) -> {
             if (pinnedBottom && chat != null) scrollToBottom();
         });
+        // After every layout: if we follow the bottom and something grew (media loaded, text wrapped), stay there.
+        sceneProperty().addListener((o, a, sc) -> {
+            if (a != null) a.removePostLayoutPulseListener(keepBottom);
+            if (sc != null) sc.addPostLayoutPulseListener(keepBottom);
+        });
+    }
+
+    private final Runnable keepBottom = () -> {
+        if (!pinnedBottom || chat == null || rows.isEmpty() || getCenter() != content) return;
+        if (!lastRowFullyVisible()) list.scrollTo(rows.size() - 1);
+    };
+
+    private void userScrolled() {
+        userScrollAt = System.currentTimeMillis();
+    }
+
+    private boolean lastRowFullyVisible() {
+        if (!(list.lookup(".virtual-flow") instanceof javafx.scene.control.skin.VirtualFlow<?> flow)) return true;
+        javafx.scene.control.IndexedCell<?> last = flow.getLastVisibleCell();
+        if (last == null) return true;
+        if (last.getIndex() != rows.size() - 1) return false;
+        double bottom = last.localToScene(last.getBoundsInLocal()).getMaxY();
+        return bottom <= flow.localToScene(flow.getBoundsInLocal()).getMaxY() + 1;
     }
 
     private void hookScrollBar() {
         for (Node n : list.lookupAll(".scroll-bar")) {
             if (n instanceof ScrollBar sb && sb.getOrientation() == javafx.geometry.Orientation.VERTICAL) {
                 vbar = sb;
+                sb.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> userScrolled());
+                sb.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, e -> userScrolled());
                 sb.valueProperty().addListener((o, a, v) -> {
-                    pinnedBottom = atBottom();
-                    jumpDown.setVisible(!pinnedBottom);
+                    // Only the person's own scrolling changes whether we follow the bottom.
+                    if (System.currentTimeMillis() - userScrollAt < 600) pinnedBottom = atBottom();
+                    jumpDown.setVisible(!pinnedBottom && !atBottom());
                     if (v.doubleValue() <= sb.getMin() + 0.0001 && chat != null) loadOlder();
                 });
             }
@@ -185,6 +225,8 @@ public final class ThreadPane extends BorderPane {
         chat = c;
         reachedStart = false;
         loadingOlder = false;
+        lastMessageId = null;
+        pinnedBottom = true;
         setCenter(c == null ? emptyState : content);
         composer.setChat(c == null ? null : c.id());
         if (c == null) return;
@@ -220,6 +262,14 @@ public final class ThreadPane extends BorderPane {
         boolean wasAtBottom = forceBottom || pinnedBottom;
         Message selected = selectedMessage();
         List<Message> msgs = svc.messages(chat.id());
+        Message newest = msgs.isEmpty() ? null : msgs.get(msgs.size() - 1);
+        // Your own new message always brings you down to it, wherever you were reading.
+        boolean ownNew = newest != null && newest.outgoing() && lastMessageId != null && !newest.id().equals(lastMessageId);
+        if (ownNew) {
+            wasAtBottom = true;
+            selected = null;
+        }
+        lastMessageId = newest == null ? null : newest.id();
         rows.setAll(ThreadRows.build(msgs, ZoneId.systemDefault()));
         if (selected != null && !forceBottom) select(selected);
         if (wasAtBottom && !(list.isFocused() && selected != null)) scrollToBottom();
@@ -227,6 +277,7 @@ public final class ThreadPane extends BorderPane {
 
     private void scrollToBottom() {
         pinnedBottom = true;
+        userScrollAt = 0; // our own scroll: don't let a recent wheel turn unpin it again
         jumpDown.setVisible(false);
         if (rows.isEmpty()) return;
         list.scrollTo(rows.size() - 1);
@@ -246,6 +297,8 @@ public final class ThreadPane extends BorderPane {
         if (loadingOlder || reachedStart || chat == null) return;
         loadingOlder = true;
         String id = chat.id();
+        // Loaded because the chat is short (not because you scrolled to the top): keep showing the newest.
+        boolean followBottom = pinnedBottom;
         Message firstBefore = rows.stream().filter(r -> r instanceof ThreadRows.MessageRow)
                 .map(r -> ((ThreadRows.MessageRow) r).message()).findFirst().orElse(null);
         svc.loadOlder(id).whenComplete((more, err) -> Platform.runLater(() -> {
@@ -253,7 +306,9 @@ public final class ThreadPane extends BorderPane {
             if (chat == null || !chat.id().equals(id)) return;
             if (err != null || Boolean.FALSE.equals(more)) reachedStart = true;
             rows.setAll(ThreadRows.build(svc.messages(id), ZoneId.systemDefault()));
-            if (firstBefore != null) {
+            if (followBottom && pinnedBottom) {
+                scrollToBottom();
+            } else if (firstBefore != null) {
                 for (int i = 0; i < rows.size(); i++) {
                     if (rows.get(i) instanceof ThreadRows.MessageRow mr && mr.message() == firstBefore) {
                         list.scrollTo(Math.max(0, i - 1));
