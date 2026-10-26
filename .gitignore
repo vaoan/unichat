@@ -11,3 +11,4 @@ out/
 server/data/
 target/
 server/CREDENCIALES.txt
+.worktrees/
