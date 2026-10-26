@@ -153,13 +153,38 @@ public final class AccountsPane extends VBox {
                 ChatMenus.item("Cambiar nombre…", () -> showRename(a)),
                 ChatMenus.item("Agregar otra cuenta de " + a.network().displayName(), () -> startLogin(a.network())),
                 new SeparatorMenuItem(),
-                ChatMenus.danger(ChatMenus.item("Desconectar", () -> svc.disconnectAccount(a).whenComplete((v, err) ->
-                        Platform.runLater(() -> {
-                            toast.accept(err == null ? Accounts.name(a) + " desconectada"
-                                    : "No se pudo desconectar: " + rootMessage(err));
-                            showList();
-                        })))));
+                ChatMenus.danger(ChatMenus.item("Desconectar…", () -> showDisconnect(a))));
         return m;
+    }
+
+    /** Disconnecting logs the account out on the bridge, so it always asks first. */
+    private void showDisconnect(Account a) {
+        Label icon = networkIcon(a.network(), 48);
+        Label q = new Label("¿Desconectar " + a.network().displayName() + " · " + Accounts.name(a) + "?");
+        q.getStyleClass().add("sheet-title");
+        q.setWrapText(true);
+        Label info = new Label("Se cierra la sesión en el puente y dejarás de recibir mensajes de esta cuenta. "
+                + "Tus chats ya sincronizados se quedan. Para volver a conectarla tendrás que iniciar sesión de nuevo"
+                + (qrNetwork(a.network()) ? " (escanear el QR)." : "."));
+        info.setWrapText(true);
+        info.getStyleClass().add("settings-help");
+        Button cancel = new Button("Cancelar");
+        cancel.getStyleClass().add("secondary-button");
+        cancel.setCancelButton(true);
+        cancel.setOnAction(e -> showList());
+        Button confirm = new Button("Desconectar");
+        confirm.getStyleClass().add("danger-button");
+        confirm.setOnAction(e -> {
+            confirm.setDisable(true);
+            svc.disconnectAccount(a).whenComplete((v, err) -> Platform.runLater(() -> {
+                toast.accept(err == null ? Accounts.name(a) + " desconectada" : "No se pudo desconectar: " + rootMessage(err));
+                showList();
+            }));
+        });
+        HBox buttons = new HBox(10, cancel, confirm);
+        VBox content = new VBox(14, icon, q, info, buttons);
+        setView("Desconectar cuenta", content, this::showList);
+        Platform.runLater(cancel::requestFocus);
     }
 
     private void showRename(Account a) {

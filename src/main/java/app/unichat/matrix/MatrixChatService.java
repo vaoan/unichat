@@ -69,6 +69,9 @@ public final class MatrixChatService implements ChatService {
     /** network -> known logins (empty list = bridge says not logged in); absent = unknown. */
     private final Map<Network, List<Login>> logins = new ConcurrentHashMap<>();
     private final Set<Network> refreshingLogins = ConcurrentHashMap.newKeySet();
+    /** Users whose profile was already requested (lazy-loaded members have no display name yet). */
+    private final Set<String> profileRequested = ConcurrentHashMap.newKeySet();
+    private final java.util.concurrent.Semaphore profileSlots = new java.util.concurrent.Semaphore(6);
     private static final Pattern LOGGED_IN_AS = Pattern.compile("(?i)logged in as ([^\\n.]+)");
 
     private final MatrixClient client;
@@ -349,10 +352,45 @@ public final class MatrixChatService implements ChatService {
         } else {
             refreshStaleLogins();
         }
+        fetchMissingProfiles();
         List<Account> acc = accounts();
         if (!acc.equals(lastAccounts)) {
             lastAccounts = acc;
             fire(Listener::accountsChanged);
+        }
+    }
+
+    /** Fetches display names/avatars of chat counterparts the sync didn't include (lazy-loaded members). */
+    private void fetchMissingProfiles() {
+        Set<String> users;
+        synchronized (proc) {
+            users = proc.unnamedUsers();
+        }
+        for (String u : users) {
+            if (!profileRequested.add(u)) continue;
+            io.execute(() -> {
+                try {
+                    profileSlots.acquire();
+                } catch (InterruptedException e) {
+                    profileRequested.remove(u);
+                    return;
+                }
+                try {
+                    JsonNode p = client.get(CLIENT + "/profile/" + enc(u));
+                    String name = p.path("displayname").asText(null);
+                    String avatar = p.path("avatar_url").asText(null);
+                    if (name == null && avatar == null) return;
+                    List<String> changed;
+                    synchronized (proc) {
+                        changed = proc.applyProfile(u, name, avatar);
+                    }
+                    if (!changed.isEmpty()) fire(Listener::chatsChanged);
+                } catch (Exception ignored) {
+                    // keep the fallback name
+                } finally {
+                    profileSlots.release();
+                }
+            });
         }
     }
 

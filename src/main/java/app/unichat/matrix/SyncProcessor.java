@@ -223,7 +223,44 @@ final class SyncProcessor {
         String avatar = text(content, "avatar_url");
         Member old = room.members.get(userId);
         if (old != null && name == null && avatar == null && !"join".equals(text(content, "membership"))) return;
-        room.members.put(userId, new Member(userId, name, avatar));
+        room.members.put(userId, new Member(userId, cleanName(name), avatar));
+    }
+
+    /** Bridges append the network to puppet names ("Ana (WA)"); the app shows a network badge instead. */
+    private static final java.util.regex.Pattern NETWORK_SUFFIX = java.util.regex.Pattern.compile(
+            "\\s*\\((WA|WhatsApp|Telegram|Signal|Instagram|Facebook|Messenger|Discord|Slack|Google Messages|GMessages|SMS|Twitter|X|LinkedIn)\\)$");
+
+    static String cleanName(String name) {
+        if (name == null) return null;
+        String n = NETWORK_SUFFIX.matcher(name).replaceFirst("");
+        return n.isBlank() ? name : n;
+    }
+
+    /** Fills in a profile fetched separately (lazy-loaded members); returns the rooms whose chat changed. */
+    List<String> applyProfile(String userId, String name, String avatar) {
+        List<String> changed = new ArrayList<>();
+        for (MatrixRoom room : rooms.values()) {
+            if (!room.membership.containsKey(userId) && !room.heroes.contains(userId)) continue;
+            Member old = room.members.get(userId);
+            if (old != null && old.name() != null && !old.name().isBlank()) continue;
+            room.members.put(userId, new Member(userId, cleanName(name), avatar != null ? avatar : old == null ? null : old.avatarUrl()));
+            refresh(room);
+            changed.add(room.id);
+        }
+        return changed;
+    }
+
+    /** Users shown in a chat title or avatar without a known display name (to fetch their profile). */
+    Set<String> unnamedUsers() {
+        Set<String> out = new LinkedHashSet<>();
+        for (MatrixRoom room : rooms.values()) {
+            if (room.invite) continue;
+            for (String u : otherUsers(room)) {
+                Member m = room.members.get(u);
+                if ((m == null || m.name() == null || m.name().isBlank()) && !isBot(u)) out.add(u);
+            }
+        }
+        return out;
     }
 
     /** Older member events only fill in unknown profiles; they never override current state. */
@@ -584,7 +621,7 @@ final class SyncProcessor {
         c.setTopic(room.topic);
 
         String counterpart = group ? null : counterpart(room);
-        String title = blankToNull(room.name);
+        String title = cleanName(blankToNull(room.name));
         if (title == null && counterpart != null) title = nameOf(room, counterpart);
         if (title == null) title = heroesTitle(room);
         if (title == null) title = blankToNull(room.canonicalAlias);
@@ -624,8 +661,12 @@ final class SyncProcessor {
             String inviter = room.inviter;
             c.setLastActivity(room.invitedAt);
             c.setLastPreview(inviter != null ? "Invitación de " + nameOf(room, inviter) : "Te invitaron a este chat");
-        } else if (room.created != null && c.lastActivity().equals(Instant.EPOCH)) {
-            c.setLastActivity(room.created);
+        } else {
+            // Joined but no messages loaded yet: no stale invite text, and don't jump to the top of the
+            // inbox just because the bridge created the room now (bridges create hundreds after a login).
+            c.setLastPreview("");
+            c.setLastSenderName(null);
+            c.setLastActivity(Instant.EPOCH);
         }
     }
 
@@ -848,7 +889,17 @@ final class SyncProcessor {
     String nameOf(MatrixRoom room, String userId) {
         Member m = room.members.get(userId);
         if (m != null && m.name() != null && !m.name().isBlank()) return m.name();
-        return localpart(userId);
+        return fallbackName(userId);
+    }
+
+    /** Name for a user whose profile isn't known yet: "+57300…" for phone puppets, else "Contacto de WhatsApp". */
+    static String fallbackName(String userId) {
+        String local = localpart(userId);
+        Network n = Network.fromUserId(userId);
+        if (n == null || n.puppetPrefix() == null || !local.startsWith(n.puppetPrefix())) return local;
+        String rest = local.substring(n.puppetPrefix().length());
+        if (rest.matches("\\d{6,15}")) return "+" + rest;
+        return "Contacto de " + n.displayName();
     }
 
     static String localpart(String userId) {
