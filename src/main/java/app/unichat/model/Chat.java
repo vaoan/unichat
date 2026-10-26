@@ -13,6 +13,8 @@ import java.util.Set;
 public final class Chat {
     private final String id;
     private Network network = Network.MATRIX;
+    /** {@link Account#id()} of the login this chat comes through; null when unknown. */
+    private String accountId;
     private String title = "";
     private String avatarUrl;
     private boolean group;
@@ -40,6 +42,8 @@ public final class Chat {
     public String id() { return id; }
     public Network network() { return network; }
     public void setNetwork(Network network) { this.network = network == null ? Network.MATRIX : network; }
+    public String accountId() { return accountId; }
+    public void setAccountId(String accountId) { this.accountId = accountId; }
     public String title() { return title; }
     public void setTitle(String title) { this.title = title == null ? "" : title; }
     public String avatarUrl() { return avatarUrl; }

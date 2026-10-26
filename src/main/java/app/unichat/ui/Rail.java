@@ -28,7 +28,11 @@ public final class Rail extends VBox {
     private final Button inbox;
     private final Button archive;
 
-    public Rail(ChatService svc, ChatListPane listPane, Runnable onAddAccount, Runnable onSettings) {
+    private final java.util.function.Consumer<Network> onAddAccount;
+
+    public Rail(ChatService svc, ChatListPane listPane, Runnable onConnect, java.util.function.Consumer<Network> onAddAccount,
+                Runnable onSettings) {
+        this.onAddAccount = onAddAccount;
         this.svc = svc;
         this.listPane = listPane;
         getStyleClass().add("rail");
@@ -39,7 +43,7 @@ public final class Rail extends VBox {
                 listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(null).withView(ChatFilter.View.INBOX)));
         archive = railButton(Icons.icon(Icons.ARCHIVE, 20), "Archivados", () ->
                 listPane.filterProperty().set(listPane.filterProperty().get().withView(ChatFilter.View.ARCHIVE)));
-        Button add = railButton(Icons.icon(Icons.PLUS, 20), "Conectar una red", onAddAccount);
+        Button add = railButton(Icons.icon(Icons.PLUS, 20), "Conectar una red", onConnect);
         add.getStyleClass().add("rail-add");
         Button settings = railButton(Icons.icon(Icons.SETTINGS, 20), "Ajustes", onSettings);
 
@@ -86,13 +90,32 @@ public final class Rail extends VBox {
                 case ERROR -> " (error)";
                 case NOT_AVAILABLE -> " (no disponible)";
             };
-            Button b = railButton(letter, n.displayName() + status, () ->
+            List<Account> netAccounts = Accounts.of(svc, n);
+            String count = netAccounts.size() > 1 ? " (" + netAccounts.size() + " cuentas)" : "";
+            Button b = railButton(letter, n.displayName() + count + status, () ->
                     listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(n).withView(ChatFilter.View.INBOX)));
+            b.setOnContextMenuRequested(e -> networkMenu(n, netAccounts).show(b, e.getScreenX(), e.getScreenY()));
             if (acc != null && acc.status() != AccountStatus.CONNECTED) b.getStyleClass().add("warning");
             setActive(b, f.network() == n);
             setUnreadBadge(b, chats.stream().filter(c -> c.network() == n && !c.archived() && !c.bridgeBot() && !c.muted() && c.isUnread()).count());
             networks.getChildren().add(b);
         }
+    }
+
+    /** Right-click on a network: pick one of its accounts or add another. */
+    private javafx.scene.control.ContextMenu networkMenu(Network n, List<Account> accounts) {
+        javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
+        menu.getItems().add(ChatMenus.item("Todas las cuentas de " + n.displayName(), () ->
+                listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(n).withView(ChatFilter.View.INBOX))));
+        if (accounts.size() > 1) {
+            for (Account a : accounts) {
+                menu.getItems().add(ChatMenus.item(Accounts.name(a), () ->
+                        listPane.filterProperty().set(listPane.filterProperty().get().withAccount(n, a.id()).withView(ChatFilter.View.INBOX))));
+            }
+        }
+        menu.getItems().add(new javafx.scene.control.SeparatorMenuItem());
+        menu.getItems().add(ChatMenus.item("Agregar otra cuenta de " + n.displayName(), () -> onAddAccount.accept(n)));
+        return menu;
     }
 
     private static void setActive(Button b, boolean on) {

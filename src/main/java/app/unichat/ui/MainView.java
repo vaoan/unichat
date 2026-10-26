@@ -47,7 +47,15 @@ public final class MainView extends StackPane {
     private final ChatService.Listener listener = new ChatService.Listener() {
         @Override public void chatsChanged() { scheduleChats(); }
         @Override public void messagesChanged(String chatId) { scheduleThread(chatId); }
-        @Override public void accountsChanged() { Platform.runLater(rail::refresh); }
+        @Override public void accountsChanged() {
+            scheduleChats();
+            Platform.runLater(() -> {
+                // Rebuild an open "Conectar una red" sheet with fresh availability/accounts.
+                if (overlay.isVisible() && !overlay.getChildren().isEmpty() && overlay.getChildren().get(0) instanceof AddAccountPane) {
+                    showAddAccount();
+                }
+            });
+        }
         @Override public void connectionChanged(ConnectionState s) { Platform.runLater(() -> showConnection(s)); }
         @Override public void incomingMessage(Chat chat, Message m) { Platform.runLater(() -> onIncoming(chat, m)); }
         @Override public void reminderDue(Chat chat) {
@@ -69,7 +77,7 @@ public final class MainView extends StackPane {
         listPane = new ChatListPane(svc, this::openChat);
         thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast);
         info = new InfoPane(svc, this::toggleInfo, this::toast);
-        rail = new Rail(svc, listPane, this::showAddAccount, this::showSettings);
+        rail = new Rail(svc, listPane, this::showAddAccount, this::addAccount, this::showSettings);
 
         threadArea.setCenter(thread);
         SplitPane split = new SplitPane(listPane, threadArea);
@@ -270,15 +278,28 @@ public final class MainView extends StackPane {
     }
 
     public void showAddAccount() {
-        showOverlay(new AddAccountPane(svc, this::openChatId, this::hideOverlay, this::toast));
+        showOverlay(new AddAccountPane(svc, this::openChatId, this::hideOverlay, this::toast, this::addAccount));
+    }
+
+    /** Filters the inbox to one network (all its accounts). */
+    public void showNetwork(app.unichat.model.Network n) {
+        listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(n).withView(ChatFilter.View.INBOX));
+    }
+
+    /** Starts the login of one more account on {@code n} and opens its bridge-bot chat. */
+    public void addAccount(app.unichat.model.Network n) {
+        svc.addAccount(n).whenComplete((chatId, err) -> Platform.runLater(() -> {
+            if (err != null) toast("No se pudo agregar la cuenta: " + AddAccountPane.rootMessage(err));
+            else openChatId(chatId);
+        }));
     }
 
     public void showSettings() {
         SettingsWindow.show(stage, svc, () -> {
             Theme.applyAll();
-            listPane.refresh();
+            refreshAll();
             thread.rebuild(false);
-        }, onLogout, this::showAddAccount, this::toast);
+        }, onLogout, this::showAddAccount, this::addAccount, this::toast);
     }
 
     /** Text size: delta 0 resets to 100 %. */

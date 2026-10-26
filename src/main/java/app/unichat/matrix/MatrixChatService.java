@@ -59,6 +59,16 @@ public final class MatrixChatService implements ChatService {
     private static final String HISTORY_FILTER = "{\"lazy_load_members\":true}";
     private static final String CLIENT = "/_matrix/client/v3";
     private static final Pattern LOGIN_ID = Pattern.compile("(?m)^\\s*[*-]\\s*`([^`\\s]+)`");
+    /** One line of bridgev2 {@code list-logins}: {@code * `id` (Remote name) - `STATE`}. */
+    private static final Pattern LOGIN_LINE = Pattern.compile("(?m)^\\s*[*-]\\s*`([^`\\s]+)`\\s*(?:\\(([^)\\n]*)\\))?\\s*(?:-\\s*`?([A-Z_]+)`?)?");
+    private static final long LOGINS_MAX_AGE_MS = 24L * 3600 * 1000;
+
+    /** A bridge login as reported by {@code list-logins}. */
+    record Login(String id, String name, String state) {}
+
+    /** network -> known logins (empty list = bridge says not logged in); absent = unknown. */
+    private final Map<Network, List<Login>> logins = new ConcurrentHashMap<>();
+    private final Set<Network> refreshingLogins = ConcurrentHashMap.newKeySet();
     private static final Pattern LOGGED_IN_AS = Pattern.compile("(?i)logged in as ([^\\n.]+)");
 
     private final MatrixClient client;
@@ -331,6 +341,14 @@ public final class MatrixChatService implements ChatService {
             }
         }
         for (String roomId : r.invites) autoJoin(roomId);
+        if (notify) {
+            for (Message m : r.newMessages) {
+                Chat c = chat(m.chatId());
+                if (c != null && c.bridgeBot() && loginChanged(m.body())) refreshLogins(c.network());
+            }
+        } else {
+            refreshStaleLogins();
+        }
         List<Account> acc = accounts();
         if (!acc.equals(lastAccounts)) {
             lastAccounts = acc;
@@ -980,18 +998,23 @@ public final class MatrixChatService implements ChatService {
 
     private String botId(Network n) { return "@" + n.botLocalpart() + ":" + serverName; }
 
+    /** Probes every bridge bot's profile in parallel; a bot that exists means its bridge is installed. */
     private void checkBridges() {
+        List<CompletableFuture<Void>> probes = new ArrayList<>();
         for (Network n : Network.values()) {
             if (!n.isBridged()) continue;
-            try {
-                client.get(CLIENT + "/profile/" + enc(botId(n)));
-                bridgeAvailable.put(n, true);
-            } catch (MatrixException e) {
-                bridgeAvailable.put(n, false);
-            } catch (Exception e) {
-                // unknown (offline); retried on next start
-            }
+            probes.add(CompletableFuture.runAsync(() -> {
+                try {
+                    client.get(CLIENT + "/profile/" + enc(botId(n)));
+                    bridgeAvailable.put(n, true);
+                } catch (MatrixException e) {
+                    bridgeAvailable.put(n, false);
+                } catch (Exception e) {
+                    // unknown (offline); retried on next start
+                }
+            }, io));
         }
+        CompletableFuture.allOf(probes.toArray(CompletableFuture[]::new)).join();
         lastAccounts = accounts();
         fire(Listener::accountsChanged);
     }
@@ -1044,6 +1067,15 @@ public final class MatrixChatService implements ChatService {
                 String detail = status == AccountStatus.CONNECTED
                         ? portals + (portals == 1 ? " chat" : " chats")
                         : "Inicia sesión desde el chat del bot";
+                List<Login> known = logins.get(n);
+                if (known != null && !known.isEmpty()) {
+                    for (Login l : known) {
+                        out.add(new Account(accountId(n, l.id()), n, l.name() == null || l.name().isBlank() ? l.id() : l.name(),
+                                loginStatus(l.state()), l.state()));
+                    }
+                    continue;
+                }
+                if (known != null && portals == 0) status = AccountStatus.NEEDS_LOGIN;
                 out.add(new Account(n, label, status, detail));
             }
         }
@@ -1067,11 +1099,7 @@ public final class MatrixChatService implements ChatService {
                     addDirect(bot, roomId);
                     waitForJoin(roomId, bot);
                 }
-                String cmd = switch (network) {
-                    case WHATSAPP, GOOGLE_MESSAGES -> "login qr";
-                    default -> "login";
-                };
-                sendCommand(roomId, cmd);
+                sendCommand(roomId, botCommand(network, loginCommand(network)));
                 waitForRoom(roomId);
                 return roomId;
             } catch (MatrixException e) {
@@ -1082,13 +1110,38 @@ public final class MatrixChatService implements ChatService {
         }, io);
     }
 
+    /**
+     * Prefixes a bot command with {@code !<protocol id>} (e.g. {@code !whatsapp login qr}); server/setup.* sets that
+     * prefix on every bridge. Without it a bridge ignores commands in any bot DM other than its management room.
+     */
+    static String botCommand(Network network, String command) {
+        return "!" + network.protocolId() + " " + command;
+    }
+
+    /**
+     * First command sent to a bridge bot to start logging in. Bridges with several login flows answer a bare
+     * {@code login} with a list of flow ids, so pick the one that suits a desktop user (checked against the
+     * bridge versions installed by server/setup.*; see docs/BRIDGES.md).
+     */
+    static String loginCommand(Network network) {
+        return switch (network) {
+            case WHATSAPP -> "login qr";              // flows: qr, phone
+            case MESSENGER -> "login facebook";       // flows: facebook, messenger, messenger-lite, ...
+            case SLACK -> "login email";              // flows: email, token, app
+            case X, LINKEDIN -> "login cookies";      // flows: cookies, password
+            case TELEGRAM -> "login qr";              // flows: qr, phone, bot
+            // Single flow (Signal QR, Google Messages "google", Instagram cookies) or legacy bridge (Discord QR).
+            default -> "login";
+        };
+    }
+
     @Override
     public CompletableFuture<Void> disconnectNetwork(Network network) {
         return run(() -> {
             String roomId = findBotRoom(network);
             if (roomId == null) return;
             int before = botMessageCount(roomId);
-            sendCommand(roomId, "list-logins");
+            sendCommand(roomId, botCommand(network, "list-logins"));
             String reply = null;
             for (int i = 0; i < 20 && reply == null; i++) {
                 Thread.sleep(500);
@@ -1099,9 +1152,118 @@ public final class MatrixChatService implements ChatService {
                 Matcher m = LOGIN_ID.matcher(reply);
                 while (m.find()) ids.add(m.group(1));
             }
-            if (ids.isEmpty()) sendCommand(roomId, "logout");
-            for (String id : ids) sendCommand(roomId, "logout " + id);
+            if (ids.isEmpty()) sendCommand(roomId, botCommand(network, "logout"));
+            for (String id : ids) sendCommand(roomId, botCommand(network, "logout " + id));
+            Thread.sleep(1500);
+            refreshLoginsNow(network);
         });
+    }
+
+    @Override
+    public CompletableFuture<Void> disconnectAccount(Account account) {
+        String prefix = account.network().protocolId() + ":";
+        if (!account.id().startsWith(prefix)) return disconnectNetwork(account.network());
+        String loginId = account.id().substring(prefix.length());
+        return run(() -> {
+            String roomId = findBotRoom(account.network());
+            if (roomId == null) return;
+            sendCommand(roomId, botCommand(account.network(), "logout " + loginId));
+            Thread.sleep(1500);
+            refreshLoginsNow(account.network());
+        });
+    }
+
+    static String accountId(Network n, String loginId) {
+        return n.protocolId() + ":" + loginId;
+    }
+
+    static AccountStatus loginStatus(String state) {
+        if (state == null) return AccountStatus.CONNECTED;
+        return switch (state) {
+            case "CONNECTED", "BACKFILLING" -> AccountStatus.CONNECTED;
+            case "CONNECTING", "TRANSIENT_DISCONNECT", "STARTING" -> AccountStatus.CONNECTING;
+            case "BAD_CREDENTIALS", "LOGGED_OUT" -> AccountStatus.NEEDS_LOGIN;
+            default -> state.startsWith("UNKNOWN") || state.contains("ERROR") ? AccountStatus.ERROR : AccountStatus.CONNECTED;
+        };
+    }
+
+    /** Parses a {@code list-logins} reply; empty when the bot says we're not logged in. */
+    static List<Login> parseLogins(String reply) {
+        List<Login> out = new ArrayList<>();
+        if (reply == null) return out;
+        Matcher m = LOGIN_LINE.matcher(reply);
+        while (m.find()) out.add(new Login(m.group(1), m.group(2) == null ? null : m.group(2).trim(), m.group(3)));
+        return out;
+    }
+
+    /** Bot messages after which the list of logins may have changed. */
+    static boolean loginChanged(String body) {
+        String b = body == null ? "" : body.toLowerCase(Locale.ROOT);
+        return b.contains("successfully logged in") || b.contains("logged out") || b.contains("logged in as");
+    }
+
+    private void refreshLogins(Network n) {
+        if (!refreshingLogins.add(n)) return;
+        io.execute(() -> {
+            try {
+                Thread.sleep(1000);
+                refreshLoginsNow(n);
+            } catch (Exception e) {
+                System.err.println("list-logins failed for " + n + ": " + e);
+            } finally {
+                refreshingLogins.remove(n);
+            }
+        });
+    }
+
+    /** Sends {@code list-logins} to the bridge bot and caches the answer (also in Settings, to skip it next start). */
+    private void refreshLoginsNow(Network n) throws IOException, InterruptedException {
+        String roomId = findBotRoom(n);
+        if (roomId == null) return;
+        int before = botMessageCount(roomId);
+        sendCommand(roomId, botCommand(n, "list-logins"));
+        String reply = null;
+        for (int i = 0; i < 20 && reply == null; i++) {
+            Thread.sleep(500);
+            reply = botReplyAfter(roomId, before);
+        }
+        if (reply == null) return;
+        List<Login> parsed = parseLogins(reply);
+        logins.put(n, parsed);
+        StringBuilder sb = new StringBuilder();
+        for (Login l : parsed) {
+            sb.append(l.id()).append('\t').append(l.name() == null ? "" : l.name()).append('\t')
+                    .append(l.state() == null ? "" : l.state()).append('\n');
+        }
+        Settings.get().set("matrix.logins." + n.protocolId(), System.currentTimeMillis() + "\n" + sb);
+        lastAccounts = accounts();
+        fire(Listener::accountsChanged);
+    }
+
+    /** After the first sync: load cached logins, refresh networks whose cache is missing or older than a day. */
+    private void refreshStaleLogins() {
+        for (Network n : Network.values()) {
+            if (!n.isBridged() || findBotRoom(n) == null) continue;
+            String cached = Settings.get().getString("matrix.logins." + n.protocolId(), null);
+            long ts = 0;
+            if (cached != null) {
+                String[] lines = cached.split("\n");
+                try {
+                    ts = Long.parseLong(lines[0]);
+                } catch (NumberFormatException ignored) {
+                    // refresh
+                }
+                List<Login> list = new ArrayList<>();
+                for (int i = 1; i < lines.length; i++) {
+                    String[] f = lines[i].split("\t", -1);
+                    if (f.length >= 1 && !f[0].isBlank()) {
+                        list.add(new Login(f[0], f.length > 1 && !f[1].isEmpty() ? f[1] : null, f.length > 2 && !f[2].isEmpty() ? f[2] : null));
+                    }
+                }
+                logins.put(n, list);
+            }
+            if (System.currentTimeMillis() - ts > LOGINS_MAX_AGE_MS) refreshLogins(n);
+        }
     }
 
     private String findBotRoom(Network n) {

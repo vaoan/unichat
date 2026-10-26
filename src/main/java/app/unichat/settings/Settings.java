@@ -159,6 +159,13 @@ public final class Settings {
     public void setSendReadReceipts(boolean v) { setBool("privacy.readReceipts", v); }
     public boolean sendTypingNotifications() { return getBool("privacy.typing", true); }
     public void setSendTypingNotifications(boolean v) { setBool("privacy.typing", v); }
+    // --- Accounts ---
+    /** User-chosen name for an account ("Trabajo"), or null. */
+    public String accountAlias(String accountId) { return getString("account.alias." + accountId, null); }
+    public void setAccountAlias(String accountId, String alias) {
+        set("account.alias." + accountId, alias == null || alias.isBlank() ? null : alias.strip());
+    }
+
     // --- Accessibility ---
     private Mode mode(String key) {
         try {

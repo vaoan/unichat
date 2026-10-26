@@ -38,6 +38,7 @@ public final class ChatListPane extends VBox {
     private final ObservableList<Chat> items = FXCollections.observableArrayList();
     private final ListView<Chat> list = new ListView<>(items);
     private final FlowPane favorites = new FlowPane();
+    private final FlowPane accountRow = new FlowPane(6, 6);
     private final Label title = new Label();
     private final Label empty = new Label();
     private final TextField search = new TextField();
@@ -100,7 +101,9 @@ public final class ChatListPane extends VBox {
         list.setPlaceholder(empty);
         VBox.setVgrow(list, Priority.ALWAYS);
 
-        getChildren().addAll(header, searchBox, chipRow, favorites, list);
+        accountRow.getStyleClass().addAll("chip-row", "account-row");
+        accountRow.setAccessibleText("Cuentas");
+        getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list);
         filter.addListener((o, a, b) -> refresh());
         refresh();
     }
@@ -153,6 +156,7 @@ public final class ChatListPane extends VBox {
             case ARCHIVE -> "Archivados";
         };
         title.setText(f.network() == null ? base : f.network().displayName());
+        refreshAccountRow(f);
         empty.setText(f.searching() ? "Sin resultados para «" + f.query() + "»"
                 : f.view() == ChatFilter.View.ARCHIVE ? "No hay chats archivados"
                 : f.unreadOnly() ? "¡Todo al día! No tienes mensajes sin leer 🎉"
@@ -164,6 +168,40 @@ public final class ChatListPane extends VBox {
         favorites.getChildren().setAll(favs.stream().map(this::favoriteTile).toList());
         favorites.setVisible(!favs.isEmpty());
         favorites.setManaged(!favs.isEmpty());
+    }
+
+    /** "Todas · Personal · Trabajo" chips, shown only for a network with several accounts. */
+    private void refreshAccountRow(ChatFilter f) {
+        List<app.unichat.model.Account> accounts = f.network() == null ? List.of() : Accounts.of(svc, f.network());
+        // Only offer per-account filters when every chat of the network knows its account; otherwise a filter
+        // would silently hide chats (Matrix bridges don't always say which login a portal belongs to).
+        boolean attributed = f.network() != null && svc.chats().stream()
+                .filter(c -> c.network() == f.network() && !c.bridgeBot()).allMatch(c -> c.accountId() != null);
+        boolean show = accounts.size() > 1 && !f.searching() && attributed;
+        accountRow.setVisible(show);
+        accountRow.setManaged(show);
+        accountRow.getChildren().clear();
+        if (!show) return;
+        ToggleGroup group = new ToggleGroup();
+        accountRow.getChildren().add(accountChip("Todas las cuentas", f.accountId() == null, group,
+                () -> filter.set(filter.get().withAccount(f.network(), null))));
+        for (app.unichat.model.Account a : accounts) {
+            accountRow.getChildren().add(accountChip(Accounts.name(a), a.id().equals(f.accountId()), group,
+                    () -> filter.set(filter.get().withAccount(f.network(), a.id()))));
+        }
+    }
+
+    private ToggleButton accountChip(String text, boolean selected, ToggleGroup group, Runnable action) {
+        ToggleButton b = new ToggleButton(text);
+        b.getStyleClass().addAll("chip", "account-chip");
+        b.setMinWidth(Region.USE_PREF_SIZE);
+        b.setToggleGroup(group);
+        b.setSelected(selected);
+        b.setOnAction(e -> {
+            if (!b.isSelected()) b.setSelected(true);
+            action.run();
+        });
+        return b;
     }
 
     private void selectInList() {
@@ -201,7 +239,7 @@ public final class ChatListPane extends VBox {
         });
         tile.setFocusTraversable(true);
         tile.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
-        tile.setAccessibleText("Favorito: " + describe(c));
+        tile.setAccessibleText("Favorito: " + describe(c, Accounts.forChat(svc, c)));
         tile.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) open(c);
         });
@@ -209,9 +247,14 @@ public final class ChatListPane extends VBox {
         return tile;
     }
 
-    /** What a screen reader says for a chat. */
     static String describe(Chat c) {
+        return describe(c, null);
+    }
+
+    /** What a screen reader says for a chat; {@code account} names the login when the network has several. */
+    static String describe(Chat c, String account) {
         StringBuilder sb = new StringBuilder(c.title()).append(", ").append(c.network().displayName());
+        if (account != null) sb.append(" (").append(account).append(')');
         if (c.group()) sb.append(", grupo");
         if (c.mentionCount() > 0) sb.append(", te mencionaron");
         if (c.unreadCount() > 0) sb.append(", ").append(c.unreadCount()).append(c.unreadCount() == 1 ? " mensaje sin leer" : " mensajes sin leer");
@@ -260,6 +303,7 @@ public final class ChatListPane extends VBox {
         private final Avatar avatar = new Avatar(44);
         private final Label name = new Label();
         private final Label stamp = new Label();
+        private final Label accountTag = new Label();
         private final Label preview = new Label();
         private final Label badge = new Label();
         private final HBox flags = new HBox(4);
@@ -279,7 +323,9 @@ public final class ChatListPane extends VBox {
             Region grow = new Region();
             HBox.setHgrow(grow, Priority.ALWAYS);
             name.setMinWidth(0);
-            HBox top = new HBox(6, name, grow, stamp);
+            accountTag.getStyleClass().add("account-tag");
+            accountTag.setMinWidth(Region.USE_PREF_SIZE);
+            HBox top = new HBox(6, name, grow, accountTag, stamp);
             top.setAlignment(Pos.BASELINE_LEFT);
             Region grow2 = new Region();
             HBox.setHgrow(grow2, Priority.ALWAYS);
@@ -317,6 +363,10 @@ public final class ChatListPane extends VBox {
             avatar.set(c.title(), c.id(), c.avatarUrl(), svc);
             avatar.setNetwork(c.network(), Settings.get().showNetworkBadges());
             name.setText(c.title());
+            String account = filter.get().accountId() == null ? Accounts.forChat(svc, c) : null;
+            accountTag.setText(account == null ? "" : account);
+            accountTag.setVisible(account != null);
+            accountTag.setManaged(account != null);
             stamp.setText(Formats.listStamp(c.lastActivity(), Instant.now(), ZoneId.systemDefault()));
             boolean unread = c.isUnread();
             toggle(name, "unread", unread);
@@ -341,7 +391,7 @@ public final class ChatListPane extends VBox {
             toggle(badge, "muted", c.muted());
             toggle(badge, "dot", n == 0 && c.mentionCount() == 0);
             setGraphic(root);
-            setAccessibleText(describe(c));
+            setAccessibleText(describe(c, Accounts.forChat(svc, c)));
             setPadding(compact ? new Insets(4, 10, 4, 10) : new Insets(8, 10, 8, 10));
             pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("current"), Objects.equals(c.id(), selectedId));
         }

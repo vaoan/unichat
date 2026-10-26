@@ -40,4 +40,25 @@ class MockChatServiceTest {
         assertTrue(mama.archived());
         svc.stop();
     }
+
+    @Test
+    void severalAccountsPerNetwork() {
+        MockChatService svc = new MockChatService();
+        List<app.unichat.model.Account> wa = svc.accounts().stream()
+                .filter(a -> a.network() == app.unichat.model.Network.WHATSAPP).toList();
+        assertEquals(2, wa.size(), "demo starts with two WhatsApp accounts");
+        assertEquals("whatsapp:trabajo", svc.chat("!andrea:demo").accountId());
+        assertEquals("whatsapp:personal", svc.chat("!mama:demo").accountId());
+
+        String bot = svc.addAccount(app.unichat.model.Network.WHATSAPP).join();
+        assertTrue(svc.chat(bot).bridgeBot());
+        assertEquals(3, svc.accounts().stream().filter(a -> a.network() == app.unichat.model.Network.WHATSAPP).count(),
+                "a pending login is listed until it finishes");
+
+        app.unichat.model.Account work = wa.stream().filter(a -> a.id().equals("whatsapp:trabajo")).findFirst().orElseThrow();
+        svc.disconnectAccount(work).join();
+        assertEquals(null, svc.chat("!andrea:demo"), "chats of the disconnected account go away");
+        assertTrue(svc.chat("!mama:demo") != null, "the other account keeps its chats");
+        svc.stop();
+    }
 }

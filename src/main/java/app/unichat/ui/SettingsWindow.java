@@ -37,18 +37,22 @@ public final class SettingsWindow {
     /** The open settings window, if any (used by the snapshot diagnostics). */
     public static Stage current() { return open; }
 
-    /** Selects a page by its title, e.g. "Accesibilidad". */
+    /** Selects the first page whose title starts with {@code page}, e.g. "Accesibilidad" or "Redes". */
     @SuppressWarnings("unchecked")
     public static void select(String page) {
         if (open == null) return;
         Node nav = open.getScene().getRoot().lookup(".settings-nav");
-        if (nav instanceof ListView<?> lv) ((ListView<String>) lv).getSelectionModel().select(page);
+        if (nav instanceof ListView<?> lv) {
+            ListView<String> l = (ListView<String>) lv;
+            l.getItems().stream().filter(t -> t.startsWith(page)).findFirst().ifPresent(t -> l.getSelectionModel().select(t));
+        }
     }
 
     private static final String[] ACCENTS = {"#5B5BD6", "#0090FF", "#12A594", "#46A758", "#F76B15", "#E5484D", "#D6409F", "#8E4EC6", "#1C2024"};
 
     public static void show(Window owner, ChatService svc, Runnable onAppearanceChanged, Runnable onLogout,
-                            Runnable onAddAccount, Consumer<String> toast) {
+                            Runnable onAddAccount, Consumer<app.unichat.model.Network> onAddNetworkAccount,
+                            Consumer<String> toast) {
         if (open != null) {
             open.toFront();
             return;
@@ -65,7 +69,8 @@ public final class SettingsWindow {
         nav.setPrefWidth(200);
         nav.getSelectionModel().selectedItemProperty().addListener((o, a, s) -> {
             Node page = switch (s == null ? "Cuenta" : s) {
-                case "Redes conectadas" -> networksPage(svc, () -> { stage.close(); onAddAccount.run(); });
+                case "Redes conectadas" -> networksPage(svc, () -> { stage.close(); onAddAccount.run(); },
+                        n -> { stage.close(); onAddNetworkAccount.accept(n); }, onAppearanceChanged);
                 case "Apariencia" -> appearancePage(onAppearanceChanged);
                 case "Accesibilidad" -> accessibilityPage(onAppearanceChanged);
                 case "Notificaciones" -> notificationsPage();
@@ -162,43 +167,79 @@ public final class SettingsWindow {
                 "Se borra el token guardado. Tus redes siguen conectadas en el servidor.", out)));
     }
 
-    private static Node networksPage(ChatService svc, Runnable add) {
-        VBox list = new VBox(0);
-        list.getStyleClass().add("settings-group");
+    private static Node networksPage(ChatService svc, Runnable add, Consumer<app.unichat.model.Network> addAnother,
+                                     Runnable changed) {
+        VBox groups = new VBox(16);
         List<Account> accounts = svc.accounts();
         if (accounts.isEmpty()) {
             Label l = new Label("Todavía no conectaste ninguna red.");
             l.getStyleClass().add("settings-help");
-            list.getChildren().add(new HBox(l));
+            groups.getChildren().add(l);
         }
-        for (Account acc : accounts) {
-            Label letter = new Label(acc.network().badgeLetter());
-            letter.getStyleClass().add("network-tile-icon");
-            letter.setStyle("-fx-background-color: " + acc.network().color() + "; -fx-min-width: 28; -fx-min-height: 28;");
-            Label status = new Label(switch (acc.status()) {
-                case CONNECTED -> "Conectado";
-                case CONNECTING -> "Conectando…";
-                case NEEDS_LOGIN -> "Inicia sesión";
-                case ERROR -> "Error";
-                case NOT_AVAILABLE -> "No disponible";
-            });
-            status.getStyleClass().addAll("status-pill", acc.status() == AccountStatus.CONNECTED ? "ok" : "warn");
-            Button disconnect = new Button("Desconectar");
-            disconnect.getStyleClass().add("secondary-button");
-            disconnect.setOnAction(e -> {
-                disconnect.setDisable(true);
-                svc.disconnectNetwork(acc.network());
-            });
-            HBox control = new HBox(10, status, disconnect);
-            control.setAlignment(Pos.CENTER_RIGHT);
-            HBox row = (HBox) row(acc.network().displayName(), acc.label(), control);
-            row.getChildren().add(0, letter);
-            list.getChildren().add(row);
+        for (app.unichat.model.Network n : app.unichat.model.Network.values()) {
+            List<Account> mine = accounts.stream().filter(a -> a.network() == n).toList();
+            if (mine.isEmpty()) continue;
+            VBox list = new VBox(0);
+            list.getStyleClass().add("settings-group");
+            for (Account acc : mine) list.getChildren().add(accountRow(svc, acc, changed));
+            Button another = new Button("Agregar otra cuenta de " + n.displayName());
+            another.getStyleClass().add("secondary-button");
+            another.setOnAction(e -> addAnother.accept(n));
+            HBox foot = new HBox(another);
+            foot.getStyleClass().add("settings-row");
+            list.getChildren().add(foot);
+            Label title = new Label(n.displayName() + (mine.size() > 1 ? " · " + mine.size() + " cuentas" : ""));
+            title.getStyleClass().add("settings-group-title");
+            groups.getChildren().add(new VBox(6, title, list));
         }
-        Button addBtn = new Button("Conectar una red");
+        Button addBtn = new Button("Conectar otra red");
         addBtn.getStyleClass().add("primary-button");
         addBtn.setOnAction(e -> add.run());
-        return page("Redes conectadas", list, addBtn);
+        return page("Redes conectadas", groups, addBtn);
+    }
+
+    /** One login: alias field, bridge label, status and disconnect. */
+    private static Node accountRow(ChatService svc, Account acc, Runnable changed) {
+        Label letter = new Label(acc.network().badgeLetter());
+        letter.getStyleClass().add("network-tile-icon");
+        letter.setStyle("-fx-background-color: " + acc.network().color() + "; -fx-min-width: 28; -fx-min-height: 28;");
+        letter.setMinWidth(Region.USE_PREF_SIZE);
+        javafx.scene.control.TextField alias = new javafx.scene.control.TextField(
+                Settings.get().accountAlias(acc.id()) == null ? "" : Settings.get().accountAlias(acc.id()));
+        alias.setPromptText("Nombre (ej. Trabajo)");
+        alias.setPrefColumnCount(12);
+        alias.setAccessibleText("Nombre para la cuenta " + acc.label() + " de " + acc.network().displayName());
+        Runnable save = () -> {
+            Settings.get().setAccountAlias(acc.id(), alias.getText());
+            changed.run();
+        };
+        alias.setOnAction(e -> save.run());
+        alias.focusedProperty().addListener((o, was, now) -> { if (!now) save.run(); });
+        Label label = new Label(acc.label());
+        label.getStyleClass().add("settings-help");
+        VBox text = new VBox(4, alias, label);
+        HBox.setHgrow(text, Priority.ALWAYS);
+        Label status = new Label(switch (acc.status()) {
+            case CONNECTED -> "Conectada";
+            case CONNECTING -> "Conectando…";
+            case NEEDS_LOGIN -> "Inicia sesión";
+            case ERROR -> "Error";
+            case NOT_AVAILABLE -> "No disponible";
+        });
+        status.getStyleClass().addAll("status-pill", acc.status() == AccountStatus.CONNECTED ? "ok" : "warn");
+        status.setMinWidth(Region.USE_PREF_SIZE);
+        Button disconnect = new Button("Desconectar");
+        disconnect.getStyleClass().add("secondary-button");
+        disconnect.setMinWidth(Region.USE_PREF_SIZE);
+        disconnect.setAccessibleText("Desconectar " + acc.network().displayName() + " " + acc.label());
+        disconnect.setOnAction(e -> {
+            disconnect.setDisable(true);
+            svc.disconnectAccount(acc);
+        });
+        HBox row = new HBox(12, letter, text, status, disconnect);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.getStyleClass().add("settings-row");
+        return row;
     }
 
     private static Node appearancePage(Runnable changed) {

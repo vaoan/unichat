@@ -639,3 +639,16 @@
 .root.contrast .split-pane > .split-pane-divider { -fx-background-color: -border; -fx-padding: 0 1 0 1; }
 .root.contrast .thread-header { -fx-border-color: transparent transparent -border transparent; -fx-border-width: 0 0 1.5 0; }
 .root.contrast .msg-link { -fx-underline: true; }
+
+/* ================================================================ multiple accounts */
+.account-tag {
+    -fx-font-size: 0.75em;
+    -fx-text-fill: -text-2;
+    -fx-background-color: -surface-2;
+    -fx-background-radius: 6;
+    -fx-padding: 0 5;
+}
+.root.contrast .account-tag { -fx-border-color: -border; -fx-border-width: 1; -fx-border-radius: 6; }
+.account-row { -fx-padding: 0 4; }
+.settings-group .text-field { -fx-background-color: -surface; -fx-border-color: -border; -fx-border-radius: 10; }
+.settings-group .text-field:focused { -fx-border-color: -accent; }

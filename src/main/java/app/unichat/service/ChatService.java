@@ -96,4 +96,17 @@ public interface ChatService {
      */
     CompletableFuture<String> connectNetwork(Network network);
     CompletableFuture<Void> disconnectNetwork(Network network);
+
+    /**
+     * Starts the login flow for one more account on a network that may already have one; completes
+     * with the bridge-bot chat id. Bridges that support several logins add a new one.
+     */
+    default CompletableFuture<String> addAccount(Network network) {
+        return connectNetwork(network);
+    }
+
+    /** Logs out one specific account; the default logs out the whole network. */
+    default CompletableFuture<Void> disconnectAccount(Account account) {
+        return disconnectNetwork(account.network());
+    }
 }

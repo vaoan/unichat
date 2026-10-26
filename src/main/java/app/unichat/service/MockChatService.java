@@ -24,7 +24,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -42,6 +42,8 @@ import java.util.concurrent.TimeUnit;
  */
 public final class MockChatService implements ChatService {
     private static final String ME = "@yo:demo.unichat";
+    private static final String WA_PERSONAL = "whatsapp:personal";
+    private static final String WA_WORK = "whatsapp:trabajo";
     private static final List<Network> AVAILABLE = List.of(Network.WHATSAPP, Network.TELEGRAM, Network.SIGNAL,
             Network.INSTAGRAM, Network.MESSENGER, Network.DISCORD, Network.SLACK, Network.GOOGLE_MESSAGES,
             Network.X, Network.LINKEDIN);
@@ -53,7 +55,8 @@ public final class MockChatService implements ChatService {
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
     private final Map<String, Chat> chats = new ConcurrentHashMap<>();
     private final Map<String, List<Message>> messages = new ConcurrentHashMap<>();
-    private final Map<Network, Account> accounts = new EnumMap<>(Network.class);
+    /** Account id -> account, in connection order. */
+    private final Map<String, Account> accounts = new LinkedHashMap<>();
     private final Random random = new Random(7);
     private ScheduledExecutorService scheduler;
     private volatile ConnectionState state = ConnectionState.CONNECTING;
@@ -309,36 +312,64 @@ public final class MockChatService implements ChatService {
 
     @Override
     public CompletableFuture<String> connectNetwork(Network network) {
-        String id = "!bot-" + network.name().toLowerCase() + ":demo";
-        Chat bot = chats.get(id);
-        if (bot == null) {
-            bot = new Chat(id);
-            bot.setNetwork(network);
-            bot.setTitle(network.displayName() + " bridge bot");
-            bot.setBridgeBot(true);
-            bot.members().add(new Member("@" + network.botLocalpart() + ":demo.unichat", network.displayName() + " bridge bot", null));
-            chats.put(id, bot);
-            messages.put(id, new ArrayList<>());
-        }
-        Chat chat = bot;
-        incoming(chat, botMember(network), "Hola 👋 Soy el puente de " + network.displayName()
-                + ". Escribe **login** para conectar tu cuenta.", false);
+        boolean hasAccount;
         synchronized (accounts) {
-            accounts.putIfAbsent(network, new Account(network, "Sin conectar", AccountStatus.NEEDS_LOGIN, null));
+            hasAccount = accounts.values().stream().anyMatch(a -> a.network() == network);
         }
+        return hasAccount ? CompletableFuture.completedFuture(botChat(network).id()) : addAccount(network);
+    }
+
+    @Override
+    public CompletableFuture<String> addAccount(Network network) {
+        Chat chat = botChat(network);
+        synchronized (accounts) {
+            accounts.put(pendingId(network), new Account(pendingId(network), network, "Nueva cuenta", AccountStatus.NEEDS_LOGIN, null));
+        }
+        incoming(chat, botMember(network), "Hola 👋 Soy el puente de " + network.displayName()
+                + ". Escribe **login** para conectar una cuenta.", false);
         listeners.forEach(Listener::accountsChanged);
-        return CompletableFuture.completedFuture(id);
+        return CompletableFuture.completedFuture(chat.id());
     }
 
     @Override
     public CompletableFuture<Void> disconnectNetwork(Network network) {
         synchronized (accounts) {
-            accounts.remove(network);
+            accounts.values().removeIf(a -> a.network() == network);
         }
         chats.values().removeIf(c -> c.network() == network);
         listeners.forEach(Listener::accountsChanged);
         fireChats();
         return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> disconnectAccount(Account account) {
+        boolean last;
+        synchronized (accounts) {
+            accounts.remove(account.id());
+            last = accounts.values().stream().noneMatch(a -> a.network() == account.network());
+        }
+        chats.values().removeIf(c -> account.id().equals(c.accountId()) || (last && c.network() == account.network() && !c.bridgeBot()));
+        listeners.forEach(Listener::accountsChanged);
+        fireChats();
+        return CompletableFuture.completedFuture(null);
+    }
+
+    private static String pendingId(Network n) {
+        return n.protocolId() + ":pending";
+    }
+
+    private Chat botChat(Network network) {
+        String id = "!bot-" + network.name().toLowerCase() + ":demo";
+        return chats.computeIfAbsent(id, k -> {
+            Chat bot = new Chat(k);
+            bot.setNetwork(network);
+            bot.setTitle(network.displayName() + " bridge bot");
+            bot.setBridgeBot(true);
+            bot.members().add(botMember(network));
+            messages.put(k, new ArrayList<>());
+            return bot;
+        });
     }
 
     private Member botMember(Network n) {
@@ -361,13 +392,16 @@ public final class MockChatService implements ChatService {
             } else if (command.equalsIgnoreCase("ok")) {
                 incoming(chat, bot, "✅ Sesión iniciada correctamente. Sincronizando chats…", false);
                 synchronized (accounts) {
-                    accounts.put(n, new Account(n, "demo_" + n.protocolId(), AccountStatus.CONNECTED, null));
+                    accounts.remove(pendingId(n));
+                    long k = accounts.values().stream().filter(a -> a.network() == n).count() + 1;
+                    String id = n.protocolId() + ":demo" + k;
+                    accounts.put(id, new Account(id, n, "demo_" + n.protocolId() + "_" + k, AccountStatus.CONNECTED, null));
                 }
                 listeners.forEach(Listener::accountsChanged);
             } else if (command.equalsIgnoreCase("logout")) {
                 incoming(chat, bot, "Sesión cerrada.", false);
                 synchronized (accounts) {
-                    accounts.put(n, new Account(n, "Sin conectar", AccountStatus.NEEDS_LOGIN, null));
+                    accounts.values().removeIf(a -> a.network() == n);
                 }
                 listeners.forEach(Listener::accountsChanged);
             } else {
@@ -485,8 +519,17 @@ public final class MockChatService implements ChatService {
         Instant now = Instant.now();
         for (Network n : List.of(Network.WHATSAPP, Network.TELEGRAM, Network.INSTAGRAM, Network.SIGNAL,
                 Network.DISCORD, Network.SLACK, Network.MESSENGER, Network.GOOGLE_MESSAGES)) {
-            accounts.put(n, new Account(n, "demo_" + n.protocolId(), AccountStatus.CONNECTED, null));
+            if (n != Network.WHATSAPP) accounts.put(n.protocolId(), new Account(n, "demo_" + n.protocolId(), AccountStatus.CONNECTED, null));
         }
+
+        accounts.put(WA_PERSONAL, new Account(WA_PERSONAL, Network.WHATSAPP, "+57 300 111 2233", AccountStatus.CONNECTED, null));
+        accounts.put(WA_WORK, new Account(WA_WORK, Network.WHATSAPP, "+57 310 555 0000", AccountStatus.CONNECTED, null));
+
+        ChatBuilder.dm(this, "andrea", Network.WHATSAPP, "Andrea (cliente)")
+                .in(-1500, "Buenas tardes, ¿me confirma la cotización?")
+                .out(-1400, "Hola Andrea, se la envío hoy antes de las 5")
+                .in(-240, "Perfecto, quedo atenta 🙌")
+                .account(WA_WORK).unread(1).done();
 
         ChatBuilder.dm(this, "mama", Network.WHATSAPP, "Mamá")
                 .in(-2900, "Hola mijo, ¿cómo estás?")
@@ -644,8 +687,12 @@ public final class MockChatService implements ChatService {
         ChatBuilder archived() { chat.setArchived(true); return this; }
         ChatBuilder muted() { chat.setMuted(true); return this; }
         ChatBuilder pinned() { chat.setPinned(true); return this; }
+        ChatBuilder account(String id) { chat.setAccountId(id); return this; }
 
         void done() {
+            if (chat.accountId() == null) {
+                chat.setAccountId(chat.network() == Network.WHATSAPP ? WA_PERSONAL : chat.network().protocolId());
+            }
             list.sort(Comparator.comparing(Message::timestamp));
             if (!list.isEmpty()) chat.applyLastMessage(list.get(list.size() - 1));
             svc.chats.put(chat.id(), chat);

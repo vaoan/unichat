@@ -31,6 +31,8 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
 - Acciones por chat: marcar leído/no leído, favorito, fijar, silenciar, prioridad baja, archivar,
   **recordatorios** (1 h, 3 h, mañana, el lunes), salir.
 - Panel de información: participantes, multimedia compartida, descripción.
+- **Varias cuentas por red** (p. ej. WhatsApp personal y de trabajo): cada una con su alias, etiqueta en
+  cada chat, filtro por cuenta, «Agregar otra cuenta» y desconexión individual.
 - **⌘K / Ctrl+K**: saltar a cualquier chat o ejecutar comandos.
 - Notificaciones de escritorio y contador en la bandeja del sistema / dock; se queda en segundo plano al cerrar.
 - Ajustes: tema claro/oscuro/sistema, color de acento, tamaño de letra, lista compacta,

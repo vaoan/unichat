@@ -14,20 +14,24 @@ import java.util.Locale;
  * <p>Views: INBOX hides archived and low-priority chats (low priority has its own section at the end),
  * ARCHIVE shows only archived ones. Bridge-bot management chats only appear when searching.
  */
-public record ChatFilter(View view, Network network, boolean unreadOnly, String query) {
+public record ChatFilter(View view, Network network, String accountId, boolean unreadOnly, String query) {
     public enum View { INBOX, LOW_PRIORITY, ARCHIVE, FAVORITES }
 
-    public static final ChatFilter DEFAULT = new ChatFilter(View.INBOX, null, false, "");
+    public static final ChatFilter DEFAULT = new ChatFilter(View.INBOX, null, null, false, "");
 
-    public ChatFilter withView(View v) { return new ChatFilter(v, network, unreadOnly, query); }
-    public ChatFilter withNetwork(Network n) { return new ChatFilter(view, n, unreadOnly, query); }
-    public ChatFilter withUnreadOnly(boolean u) { return new ChatFilter(view, network, u, query); }
-    public ChatFilter withQuery(String q) { return new ChatFilter(view, network, unreadOnly, q == null ? "" : q); }
+    public ChatFilter withView(View v) { return new ChatFilter(v, network, accountId, unreadOnly, query); }
+    /** Filters by network (all its accounts). */
+    public ChatFilter withNetwork(Network n) { return new ChatFilter(view, n, null, unreadOnly, query); }
+    /** Filters by one account of a network; null id = all accounts of that network. */
+    public ChatFilter withAccount(Network n, String id) { return new ChatFilter(view, n, id, unreadOnly, query); }
+    public ChatFilter withUnreadOnly(boolean u) { return new ChatFilter(view, network, accountId, u, query); }
+    public ChatFilter withQuery(String q) { return new ChatFilter(view, network, accountId, unreadOnly, q == null ? "" : q); }
 
     public boolean searching() { return query != null && !query.isBlank(); }
 
     public boolean matches(Chat c) {
         if (network != null && c.network() != network) return false;
+        if (accountId != null && !accountId.equals(c.accountId())) return false;
         if (searching()) return normalize(c.title()).contains(normalize(query))
                 || c.members().stream().anyMatch(m -> normalize(m.displayName()).contains(normalize(query)));
         if (c.bridgeBot()) return false;

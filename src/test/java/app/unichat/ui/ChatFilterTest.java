@@ -55,6 +55,19 @@ class ChatFilterTest {
     }
 
     @Test
+    void accountFilterKeepsOnlyThatLogin() {
+        Chat personal = chat("p", Network.WHATSAPP, 10);
+        personal.setAccountId("whatsapp:1");
+        Chat work = chat("w", Network.WHATSAPP, 20);
+        work.setAccountId("whatsapp:2");
+        Chat tg = chat("t", Network.TELEGRAM, 30);
+        List<Chat> all = List.of(personal, work, tg);
+        assertEquals(List.of("w"), ids(ChatFilter.DEFAULT.withAccount(Network.WHATSAPP, "whatsapp:2").apply(all)));
+        assertEquals(List.of("w", "p"), ids(ChatFilter.DEFAULT.withAccount(Network.WHATSAPP, "whatsapp:2")
+                .withNetwork(Network.WHATSAPP).apply(all)), "choosing the network again shows every account");
+    }
+
+    @Test
     void searchIsAccentInsensitiveIncludesArchivedAndMembers() {
         Chat mama = chat("Mamá", Network.WHATSAPP, 10);
         mama.setArchived(true);

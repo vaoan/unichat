@@ -83,7 +83,8 @@ public final class UnichatApp extends Application {
     /**
      * Diagnostics for screenshots/CI: {@code -Dunichat.snapshot=out.png} writes the window to a PNG
      * and exits; {@code -Dunichat.openChat=<id>} opens a chat first, {@code -Dunichat.info=true} the info panel,
-     * {@code -Dunichat.overlay=command|add|settings[:Page]} the command bar, connect-network sheet or settings.
+     * {@code -Dunichat.overlay=command|add|settings[:Page]} the command bar, connect-network sheet or settings,
+     * {@code -Dunichat.network=<protocol id>} filters the inbox to one network.
      */
     private void snapshotIfRequested() {
         String out = System.getProperty("unichat.snapshot");
@@ -93,6 +94,8 @@ public final class UnichatApp extends Application {
         wait.setOnFinished(e -> {
             if (chatId != null && mainView != null) mainView.openChatId(chatId);
             if (Boolean.getBoolean("unichat.info") && mainView != null) mainView.toggleInfo();
+            String net = System.getProperty("unichat.network");
+            if (net != null && mainView != null) mainView.showNetwork(app.unichat.model.Network.fromProtocolId(net));
             String overlay = System.getProperty("unichat.overlay", "");
             if (mainView != null && overlay.equals("command")) mainView.showCommandBar();
             if (mainView != null && overlay.equals("add")) mainView.showAddAccount();

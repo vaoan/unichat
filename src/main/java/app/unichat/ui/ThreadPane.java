@@ -193,6 +193,8 @@ public final class ThreadPane extends BorderPane {
         headerAvatar.setNetwork(chat.network(), Settings.get().showNetworkBadges());
         headerTitle.setText(chat.title());
         String sub = chat.network().displayName();
+        String account = Accounts.forChat(svc, chat);
+        if (account != null) sub += " · " + account;
         if (chat.group()) sub += " · " + chat.members().size() + " participantes";
         if (chat.muted()) sub += " · Silenciado";
         headerSubtitle.setText(sub);
