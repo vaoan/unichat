@@ -389,7 +389,7 @@ public final class AccountsPane extends VBox {
         other.getStyleClass().add("secondary-button");
         other.setMaxWidth(Double.MAX_VALUE);
         other.setOnAction(e -> {
-            if (LoginWebView.isOpen()) return;
+            if (LoginWebView.isOpen() || getScene() == null) return;
             LoginWebView.open(getScene().getWindow(), n, CookieSpec.forNetwork(n), sendSession, () -> { });
         });
         other.setDisable(LoginWebView.isOpen());
@@ -398,6 +398,7 @@ public final class AccountsPane extends VBox {
         file.getStyleClass().add("secondary-button");
         file.setMaxWidth(Double.MAX_VALUE);
         file.setOnAction(e -> {
+            if (getScene() == null) return;
             FileChooser fc = new FileChooser();
             fc.setTitle("Elige tu archivo cookies.txt");
             fc.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("cookies.txt", "*.txt"),
@@ -414,13 +415,18 @@ public final class AccountsPane extends VBox {
 
         Button paste = new Button("Pegar cookies manualmente");
         paste.getStyleClass().add("link-button");
-        paste.setOnAction(e -> setView("Conectar " + net, w.root, cancel));
+        paste.setOnAction(e -> {
+            w.chooserActive = false;
+            setView("Conectar " + net, w.root, cancel);
+            w.update();
+        });
 
         VBox content = new VBox(12, heading, top, found, other, file, status, paste);
         ScrollPane scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("sheet-scroll");
         chooser[0] = scroll;
+        w.chooserActive = true;
         setView("Conectar " + net, scroll, cancel);
 
         CookieLogin.findBrowserSessions(n).whenComplete((sessions, err) -> Platform.runLater(() -> {
@@ -491,6 +497,9 @@ public final class AccountsPane extends VBox {
         String shownQr;
         boolean finished;
         boolean sent;
+        Instant sentAt = Instant.EPOCH;
+        /** True while the cookie-source chooser is on screen: bot messages must not replace it. */
+        boolean chooserActive;
 
         Wizard(Network network, String botChatId, Instant since) {
             this.network = network;
@@ -552,6 +561,8 @@ public final class AccountsPane extends VBox {
         /** A session was sent to the bridge: hide the manual-paste UI and wait for its answer. */
         void sessionSent() {
             sent = true;
+            chooserActive = false;
+            sentAt = Instant.now();
             instructions.setText("Enviamos tu sesión al puente. Esperando su confirmación…");
             inputRow.setVisible(false);
             inputRow.setManaged(false);
@@ -560,6 +571,7 @@ public final class AccountsPane extends VBox {
         /** Sending the session failed: back to the manual state. */
         void sessionFailed() {
             sent = false;
+            chooserActive = true;
             instructions.setText(instructions(network));
             inputRow.setVisible(true);
             inputRow.setManaged(true);
@@ -591,7 +603,7 @@ public final class AccountsPane extends VBox {
 
         /** Renders the newest bot state: QR image, last instruction text, success or failure. */
         void update() {
-            if (finished) return;
+            if (finished || chooserActive) return;
             List<Message> msgs = svc.messages(botChatId).stream()
                     .filter(m -> !m.outgoing() && !m.timestamp().isBefore(since)).toList();
             Message lastImage = null;
@@ -615,7 +627,8 @@ public final class AccountsPane extends VBox {
                 botText.setText("Puente: " + lastText.body());
                 boolean asksInput = !qrNetwork(network) || b.contains("password") || b.contains("contraseña")
                         || ((b.contains("code") || b.contains("código")) && !b.contains("qr"));
-                boolean showInput = asksInput && !sent;
+                // after a session was sent, only a prompt newer than that send re-opens the input
+                boolean showInput = asksInput && (!sent || lastText.timestamp().isAfter(sentAt));
                 inputRow.setVisible(showInput);
                 inputRow.setManaged(showInput);
             }

@@ -140,6 +140,7 @@ public final class LoginWebView {
             engine.load(LoginUrls.startUrl(network));
         } catch (RuntimeException ex) {
             poll.stop();
+            stage.close(); // no orphan modal window
             if (CookieHandler.getDefault() == manager) CookieHandler.setDefault(previous);
             openStage = null;
             throw ex;
