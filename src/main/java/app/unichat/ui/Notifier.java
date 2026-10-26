@@ -32,6 +32,10 @@ public final class Notifier {
     public Notifier(Runnable onShow, Consumer<String> onOpen, Runnable onQuit) {
         toast = MAC ? new DesktopToast(onOpen) : null;
         this.onOpen = onOpen;
+        if (GraphicsEnvironment.isHeadless()) { // tests, snapshot runs: no tray, and AWT menus can't be built
+            this.menu = null;
+            return;
+        }
         PopupMenu menu = new PopupMenu();
         MenuItem open = new MenuItem("Abrir Unichat");
         open.addActionListener(e -> onShow.run());
@@ -42,7 +46,7 @@ public final class Notifier {
         menu.add(quit);
         this.menu = menu;
         // macOS: the native item (narrow, real menu, like Apple's own); the AWT TrayIcon if it's missing or dies.
-        if (MAC && !GraphicsEnvironment.isHeadless() && startNativeBar()) return;
+        if (MAC && startNativeBar()) return;
         addAwtTray();
     }
 
