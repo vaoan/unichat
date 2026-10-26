@@ -74,6 +74,22 @@ public final class BridgeLogin {
         this.userId = userId;
     }
 
+    /** An account signed in on this bridge; {@code state} like CONNECTED, CONNECTING, BAD_CREDENTIALS. */
+    public record Account(String id, String name, String state) {}
+
+    /** The accounts signed in on this bridge (whoami): the source of truth, no bot chat needed. */
+    public List<Account> accounts() throws IOException, InterruptedException {
+        List<Account> out = new ArrayList<>();
+        for (JsonNode l : call("GET", "/v3/whoami", null, Duration.ofSeconds(30)).path("logins")) {
+            JsonNode st = l.path("state");
+            String state = text(st, "state_event");
+            String name = text(l, "name");
+            if (name == null) name = text(l.path("profile"), "name");
+            out.add(new Account(l.path("id").asText(), name, state));
+        }
+        return out;
+    }
+
     public List<Flow> flows() throws IOException, InterruptedException {
         List<Flow> out = new ArrayList<>();
         for (JsonNode f : call("GET", "/v3/login/flows", null, Duration.ofSeconds(30)).path("flows")) {

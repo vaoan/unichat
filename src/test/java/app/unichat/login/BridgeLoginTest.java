@@ -54,6 +54,11 @@ class BridgeLoginTest {
                 out = """
                         {"login_id":"L1","type":"complete","step_id":"fi.mau.whatsapp.complete",
                          "instructions":"Logged in as +57 300","complete":{"user_login_id":"573001112233"}}""";
+            } else if (path.endsWith("/v3/whoami")) {
+                out = """
+                        {"network":{"displayname":"WhatsApp"},"login_flows":[],"logins":[
+                         {"id":"573001112233","name":"+57 300 111 2233","state":{"state_event":"CONNECTED"},"profile":{"name":"Yo"}},
+                         {"id":"16505550000","state":{"state_event":"BAD_CREDENTIALS"},"profile":{"name":"Trabajo"}}]}""";
             } else if (path.endsWith("/v3/login/start/broken")) {
                 status = 403;
                 out = "{\"errcode\":\"M_FORBIDDEN\",\"error\":\"You don't have permission to log in\"}";
@@ -131,5 +136,14 @@ class BridgeLoginTest {
         BridgeLogin.BridgeLoginException e = assertThrows(BridgeLogin.BridgeLoginException.class, () -> api().start("broken"));
         assertEquals("M_FORBIDDEN", e.errcode());
         assertEquals("You don't have permission to log in", e.getMessage());
+    }
+
+    @Test
+    void accountsComeFromWhoami() throws Exception {
+        List<BridgeLogin.Account> a = api().accounts();
+        assertEquals(2, a.size());
+        assertEquals(new BridgeLogin.Account("573001112233", "+57 300 111 2233", "CONNECTED"), a.get(0));
+        assertEquals("Trabajo", a.get(1).name(), "falls back to the profile name");
+        assertEquals("BAD_CREDENTIALS", a.get(1).state());
     }
 }

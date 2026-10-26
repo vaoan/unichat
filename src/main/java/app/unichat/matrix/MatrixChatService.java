@@ -1450,17 +1450,25 @@ public final class MatrixChatService implements ChatService {
 
     /** Sends {@code list-logins} to the bridge bot and caches the answer (also in Settings, to skip it next start). */
     private void refreshLoginsNow(Network n) throws IOException, InterruptedException {
-        String roomId = findBotRoom(n);
-        if (roomId == null) return;
-        int before = botMessageCount(roomId);
-        sendCommand(roomId, botCommand(n, "list-logins"));
-        String reply = null;
-        for (int i = 0; i < 20 && reply == null; i++) {
-            Thread.sleep(500);
-            reply = botReplyAfter(roomId, before);
+        List<Login> parsed;
+        app.unichat.login.BridgeLogin api = bridgeLogin(n);
+        if (api != null) {
+            // The bridge's own API (local server): no bot chat needed, and it carries each account's state.
+            parsed = new ArrayList<>();
+            for (app.unichat.login.BridgeLogin.Account a : api.accounts()) parsed.add(new Login(a.id(), a.name(), a.state()));
+        } else {
+            String roomId = findBotRoom(n);
+            if (roomId == null) return;
+            int before = botMessageCount(roomId);
+            sendCommand(roomId, botCommand(n, "list-logins"));
+            String reply = null;
+            for (int i = 0; i < 20 && reply == null; i++) {
+                Thread.sleep(500);
+                reply = botReplyAfter(roomId, before);
+            }
+            if (reply == null) return;
+            parsed = parseLogins(reply);
         }
-        if (reply == null) return;
-        List<Login> parsed = parseLogins(reply);
         logins.put(n, parsed);
         StringBuilder sb = new StringBuilder();
         for (Login l : parsed) {
