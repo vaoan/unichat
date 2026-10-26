@@ -364,11 +364,19 @@ public final class AccountsPane extends VBox {
         status.setVisible(false);
         status.setManaged(false);
 
+        ScrollPane[] chooser = new ScrollPane[1];
         Consumer<SessionCookies> sendSession = cookies -> {
             setView("Conectar " + net, w.root, cancel);
             w.sessionSent();
             svc.sendLoginInput(n, botChatId, cookies.toBridgeJson()).exceptionally(err -> {
-                Platform.runLater(() -> toast.accept("No se pudo enviar: " + rootMessage(err)));
+                Platform.runLater(() -> {
+                    toast.accept("No se pudo enviar: " + rootMessage(err));
+                    // undo the waiting state so the user can retry from the chooser
+                    if (wizard == w && !w.finished) {
+                        w.sessionFailed();
+                        setView("Conectar " + net, chooser[0], cancel);
+                    }
+                });
                 return null;
             });
         };
@@ -412,6 +420,7 @@ public final class AccountsPane extends VBox {
         ScrollPane scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("sheet-scroll");
+        chooser[0] = scroll;
         setView("Conectar " + net, scroll, cancel);
 
         CookieLogin.findBrowserSessions(n).whenComplete((sessions, err) -> Platform.runLater(() -> {
@@ -546,6 +555,14 @@ public final class AccountsPane extends VBox {
             instructions.setText("Enviamos tu sesión al puente. Esperando su confirmación…");
             inputRow.setVisible(false);
             inputRow.setManaged(false);
+        }
+
+        /** Sending the session failed: back to the manual state. */
+        void sessionFailed() {
+            sent = false;
+            instructions.setText(instructions(network));
+            inputRow.setVisible(true);
+            inputRow.setManaged(true);
         }
 
         void dispose() {
