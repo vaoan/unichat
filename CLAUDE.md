@@ -22,8 +22,15 @@ Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix
 ## Checking UI changes
 `-Dunichat.snapshot=out.png` writes the window to a PNG and exits; combine with `-Dunichat.dataDir=<dir>` (put
 `session.backend=demo` and optionally `ui.theme=LIGHT` in `<dir>/settings.properties`),
-`-Dunichat.openChat=<id>` (demo ids like `!familia:demo`), `-Dunichat.info=true`, `-Dunichat.overlay=command|add`.
+`-Dunichat.openChat=<id>` (demo ids like `!familia:demo`), `-Dunichat.info=true`,
+`-Dunichat.overlay=command|add|settings:<Página>` (settings snapshots the settings window).
 Run via `JAVA_OPTS=... ./run-dev.sh`, then read the PNG. Do this after every visual change.
+
+## Accessibility (user requirement — keep it working)
+Settings → Accesibilidad (`a11y.*` keys); `Theme` adds `contrast`, `strong-focus`, `wide-spacing` root classes and
+follows OS high contrast / reduced motion. Every new control needs an accessible text (icon buttons get it from
+`Composer.iconButton`), keyboard reachability, and must survive 160 % text + high contrast. `KeyboardUiTest`
+(`-Dunichat.uiTests=true`, needs a display) checks F6 zones, timeline keys, zoom and screen-reader texts.
 
 ## Rules
 - Run `./mvnw test` before committing. Never point tests at the real data dir (surefire sets `unichat.dataDir`).

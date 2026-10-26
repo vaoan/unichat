@@ -36,6 +36,25 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
 - Ajustes: tema claro/oscuro/sistema, color de acento, tamaño de letra, lista compacta,
   notificaciones, privacidad (confirmaciones de lectura, "escribiendo"), atajos.
 
+## Accesibilidad
+
+En **Ajustes → Accesibilidad**:
+
+- **Tamaño de texto** de 85 % a 160 % (también con Ctrl/⌘ + / − / 0).
+- **Alto contraste** (sigue el modo de alto contraste de Windows o «Aumentar contraste» de macOS, o se fuerza):
+  colores sólidos, bordes marcados, burbujas delimitadas y color de acento oscurecido hasta cumplir WCAG AA (4.5:1).
+- **Reducir movimiento** (sigue «Mostrar animaciones» de Windows / «Reducir movimiento» de macOS).
+- **Fuente más legible** (Verdana), **más interlineado**, **indicador de foco reforzado**.
+- **Acciones de mensaje siempre visibles** (sin depender del ratón).
+- **Leer mensajes nuevos en voz alta** con la voz del sistema.
+
+Lectores de pantalla (Narrador, VoiceOver, Orca): chats, mensajes, botones de solo ícono, imágenes,
+reacciones e interruptores tienen descripción hablada.
+
+Todo se puede usar **solo con teclado**: F6 / Shift+F6 salta entre barra lateral, lista, mensajes y campo de
+texto; en los mensajes, ↑/↓ recorre, **R** responde, **E** edita, **Enter** abre las acciones, **1–6** reacciona,
+**Esc** vuelve al campo de texto. El foco se ve al navegar con Tab.
+
 ## Descargar para Windows
 
 Cada push a `main` compila la app en GitHub Actions. En la pestaña **Actions** → último run →
@@ -59,6 +78,12 @@ Requisito: **JDK 21+** (Maven no hace falta, se usa el wrapper).
 .\package.ps1           # Windows: release\Unichat\Unichat.exe + zip (+ .msi con WiX 3)
 ```
 
+Prueba de teclado y lector de pantalla con la UI real (necesita pantalla):
+
+```bash
+./mvnw test -Dtest=KeyboardUiTest -Dunichat.uiTests=true
+```
+
 Prueba de integración contra un servidor real (usuarios `alice` y `bob`, contraseña `pass1234`):
 
 ```bash
@@ -70,6 +95,8 @@ UNICHAT_IT_HOMESERVER=http://localhost:8008 ./mvnw test -Dtest=MatrixLiveIT
 | Atajo | Acción |
 |---|---|
 | ⌘K / Ctrl+K | Buscar chats y comandos |
+| F6 / Shift+F6 | Siguiente / anterior zona (barra, lista, mensajes, texto) |
+| ⌘+ ⌘− ⌘0 / Ctrl+ Ctrl− Ctrl+0 | Tamaño de texto |
 | Alt+↑ / Alt+↓ | Chat anterior / siguiente (con Shift: solo no leídos) |
 | ⌘E / Ctrl+E | Archivar / desarchivar |
 | ⌘⇧U / Ctrl+Shift+U | Marcar leído / no leído |

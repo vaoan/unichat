@@ -18,3 +18,9 @@
 - **Appending to a generated YAML without a trailing newline** glued `rc_message:` to a comment line (Synapse
   test config). Use `printf '\n...'` when appending.
 - Matrix media messages keep the name in `fileName`, not `body` (body = caption) — match on both in tests.
+- **`-fx-background-radius: 999` on a thin Slider track** made the slider report ~2000 px bounds and draw across the
+  whole settings row. Use small fixed radii on thin shapes.
+- **Fixed-width chips truncated to "Tod…"** at 125 % text / contrast borders: chips need `setMinWidth(USE_PREF_SIZE)`
+  and a wrapping `FlowPane` row. Always check UI at max text size.
+- **Self-referencing looked-up color** (`-accent: derive(-accent, …)`) is a loop; compute derived colors in code
+  (`Theme.accessibleAccent`).
