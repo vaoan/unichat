@@ -82,6 +82,7 @@ class BridgeConfigTest {
         assertEquals("u.archived", c.at("/network/archive_tag").asText());
         assertEquals(50, c.at("/network/history_sync/max_initial_conversations").asInt());
         assertFalse(c.at("/bridge/tag_only_on_create").asBoolean(true));
+        assertFalse(c.at("/network/enable_status_broadcast").asBoolean(true), "no Status stories chat");
         JsonNode tags = c.at("/bridge/only_bridge_tags");
         assertEquals("[\"m.favourite\",\"m.lowpriority\",\"u.archived\"]", tags.toString());
     }

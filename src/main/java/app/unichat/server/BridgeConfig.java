@@ -87,6 +87,8 @@ public final class BridgeConfig {
                     obj(c, "/bridge").set("only_bridge_tags",
                             YAML.createArrayNode().add("m.favourite").add("m.lowpriority").add(ARCHIVE_TAG));
                     obj(c, "/bridge").put("tag_only_on_create", false);
+                    // WhatsApp Status (24 h stories) would arrive as a "WhatsApp Status Broadcast" chat: not a chat.
+                    obj(c, "/network").put("enable_status_broadcast", false);
                 }
                 case "telegram" -> {
                     ObjectNode net = obj(c, "/network");
