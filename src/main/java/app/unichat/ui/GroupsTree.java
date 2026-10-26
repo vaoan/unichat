@@ -98,19 +98,40 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
         return !offers(n).isEmpty() || SpaceTree.build(svc.chats(), n, account, names).stream().anyMatch(x -> !x.loose());
     }
 
+    /** Names of channels not joined yet (room id → name), as far as they've been asked. */
+    Map<String, String> names() {
+        return names;
+    }
+
+    /** Asks {@code spaceId}'s hierarchy for its channels' names once (the Bandeja opens servers too). */
+    void ensureNames(String spaceId) {
+        if (!namesAsked.add(spaceId)) return;
+        svc.spaceNames(spaceId).thenAccept(m -> {
+            names.putAll(m);
+            if (!m.isEmpty()) Platform.runLater(() -> {
+                if (network != null) refresh(network, accountId);
+                onOffersChanged.run();
+            });
+        });
+    }
+
+    /** Opens a channel you just joined once the bridge has it ready (also from the Bandeja). */
+    void checkPending() {
+        if (pendingOpen == null) return;
+        Chat joined = svc.chat(pendingOpen);
+        if (joined != null && !joined.space()) {
+            pendingOpen = null;
+            if (pendingTimeout != null) pendingTimeout.stop();
+            selectedId = joined.id();
+            onOpen.accept(joined);
+        }
+    }
+
     void refresh(Network n, String account) {
         this.network = n;
         this.accountId = account;
         List<Chat> chats = svc.chats();
-        if (pendingOpen != null) {
-            Chat joined = svc.chat(pendingOpen);
-            if (joined != null && !joined.space()) {
-                pendingOpen = null;
-                if (pendingTimeout != null) pendingTimeout.stop();
-                selectedId = joined.id();
-                onOpen.accept(joined);
-            }
-        }
+        checkPending();
         List<SpaceTree.Node> roots = SpaceTree.build(chats, n, account, names);
         askNames(roots);
         List<SpaceTree.Node> offered = offers(n).stream()
@@ -164,7 +185,10 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
                     && n.children().stream().anyMatch(c -> !c.joined())) {
                 svc.spaceNames(n.id()).thenAccept(m -> {
                     names.putAll(m);
-                    if (!m.isEmpty()) Platform.runLater(() -> refresh(network, accountId));
+                    if (!m.isEmpty()) Platform.runLater(() -> {
+                        refresh(network, accountId);
+                        onOffersChanged.run();
+                    });
                 });
             }
             askNames(n.children());
@@ -181,8 +205,14 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
         } else if (n.joined()) {
             selectedId = n.id();
             onOpen.accept(n.chat());
-        } else if (pendingOpen == null) {
-            String id = n.id(), name = n.name();
+        } else {
+            join(n.id(), n.name());
+        }
+    }
+
+    /** Joins a channel you aren't in, with feedback; it opens when the bridge has it (or just shows up later). */
+    void join(String id, String name) {
+        if (pendingOpen == null) {
             pendingOpen = id;
             selectedId = id;
             toast.accept("Uniéndote a " + name + "…");
@@ -192,7 +222,8 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
                     toast.accept("No se pudo unir a " + name + ". Puede que ya no tengas acceso.");
                     return;
                 }
-                refresh(network, accountId);
+                if (network != null) refresh(network, accountId);
+                onOffersChanged.run();
             }));
             // Don't open it by surprise minutes later: after the wait it just shows up in the list.
             if (pendingTimeout != null) pendingTimeout.stop();

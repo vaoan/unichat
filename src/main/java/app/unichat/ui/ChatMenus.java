@@ -40,6 +40,19 @@ public final class ChatMenus {
         return menu;
     }
 
+    /** A server/group in the Bandeja: what makes sense for a container of chats. */
+    public static ContextMenu forSpace(Chat c, ChatService svc) {
+        String id = c.id();
+        ContextMenu menu = new ContextMenu();
+        menu.getItems().addAll(
+                item(c.favorite() ? "Quitar de favoritos" : "Añadir a favoritos", () -> svc.setFavorite(id, !c.favorite())),
+                item(c.pinned() ? "Desfijar" : "Fijar arriba", () -> svc.setPinned(id, !c.pinned())),
+                item(c.muted() ? "Activar notificaciones" : "Silenciar", () -> svc.setMuted(id, !c.muted())),
+                new SeparatorMenuItem(),
+                item(c.archived() ? "Desarchivar" : "Archivar", () -> svc.setArchived(id, !c.archived())));
+        return menu;
+    }
+
     static Menu reminderMenu(Chat c, ChatService svc) {
         Menu m = new Menu("Recordarme");
         ZoneId zone = ZoneId.systemDefault();

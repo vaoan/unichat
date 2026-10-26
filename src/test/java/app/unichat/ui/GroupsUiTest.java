@@ -55,7 +55,7 @@ class GroupsUiTest {
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();
-            view.showNetwork(n);
+            if (n != null) view.showNetwork(n);
             return sc;
         });
         Thread.sleep(500);
@@ -181,16 +181,48 @@ class GroupsUiTest {
         svc.stop();
     }
 
+    private static List<String> listTexts(Scene s) {
+        return s.getRoot().lookupAll(".chat-list .list-cell").stream()
+                .map(n -> (String) n.queryAccessibleAttribute(javafx.scene.AccessibleAttribute.TEXT))
+                .filter(t -> t != null && !t.isEmpty()).toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static javafx.scene.control.ListView<app.unichat.model.Chat> chatList(Scene s) {
+        return (javafx.scene.control.ListView<app.unichat.model.Chat>) s.getRoot().lookup(".chat-list");
+    }
+
     @Test
-    void aFavouriteServerIsNotAFavouriteChat() throws Exception {
-        Scene scene = open(Network.DISCORD);
+    void serversAreRowsOfTheBandejaThatOpenInPlace() throws Exception {
+        Scene scene = open(null); // Todos: every network
+        assertTrue(fx(() -> listTexts(scene)).stream().anyMatch(t -> t.startsWith("Servidor Unichat, servidor de Discord")
+                && t.contains("2 sin leer") && t.contains("contraído")), fx(() -> listTexts(scene)).toString());
+        var list = fx(() -> chatList(scene));
+        int server = fx(() -> list.getItems().indexOf(svc.chat("!servidor:demo")));
+        fx(() -> { list.requestFocus(); list.getSelectionModel().select(server); return null; });
+        key(list, KeyCode.ENTER);
+        fx(() -> { list.scrollTo(server); return null; });
+        Thread.sleep(200);
+        List<String> rows = fx(() -> listTexts(scene));
+        assertTrue(rows.stream().anyMatch(t -> t.startsWith("Servidor Unichat") && t.contains("desplegado")), rows.toString());
+        assertTrue(rows.stream().anyMatch(t -> t.startsWith("#anuncios, canal sin unirte")), rows.toString());
+        assertEquals(server + 1, (int) fx(() -> list.getItems().indexOf(svc.chat("!srv-general:demo"))), "channels under their server");
+        key(list, KeyCode.LEFT);
+        assertTrue(fx(() -> listTexts(scene)).stream().noneMatch(t -> t.startsWith("#anuncios")), "closed again");
+        svc.stop();
+    }
+
+    @Test
+    void aFavouriteServerShowsInFavoritesAndOpensInTheList() throws Exception {
+        Scene scene = open(null);
         svc.setFavorite("!servidor:demo", true);
         Thread.sleep(400);
-        assertTrue(fx(() -> scene.getRoot().lookupAll(".favorites *").stream()
-                .noneMatch(n -> n instanceof javafx.scene.control.Label l && "Servidor".equals(l.getText()))));
-        assertTrue(fx(() -> scene.getRoot().lookupAll(".favorites > *").stream()
-                .map(n -> (String) n.queryAccessibleAttribute(javafx.scene.AccessibleAttribute.TEXT))
-                .noneMatch(t -> t != null && t.contains("Servidor Unichat"))));
+        javafx.scene.Node tile = fx(() -> scene.getRoot().lookupAll(".favorites > *").stream()
+                .filter(n -> String.valueOf(n.queryAccessibleAttribute(javafx.scene.AccessibleAttribute.TEXT)).contains("Servidor Unichat"))
+                .findFirst().orElseThrow());
+        key(tile, KeyCode.ENTER);
+        Thread.sleep(200);
+        assertTrue(fx(() -> listTexts(scene)).stream().anyMatch(t -> t.startsWith("#anuncios")), "the server opened in the list, scrolled to it");
         svc.stop();
     }
 
