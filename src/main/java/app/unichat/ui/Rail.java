@@ -43,7 +43,7 @@ public final class Rail extends VBox {
                 listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(null).withView(ChatFilter.View.INBOX)));
         archive = railButton(Icons.icon(Icons.ARCHIVE, 20), "Archivados", () ->
                 listPane.filterProperty().set(listPane.filterProperty().get().withView(ChatFilter.View.ARCHIVE)));
-        Button add = railButton(Icons.icon(Icons.PLUS, 20), "Cuentas: agregar o administrar", onConnect);
+        Button add = railButton(Icons.icon(Icons.PLUS, 20), "Agregar o administrar cuentas (Ajustes)", onConnect);
         add.getStyleClass().add("rail-add");
         Button settings = railButton(Icons.icon(Icons.SETTINGS, 20), "Ajustes", onSettings);
 
@@ -78,8 +78,11 @@ public final class Rail extends VBox {
         List<Account> accounts = svc.accounts();
         for (Network n : Network.values()) {
             Account acc = accounts.stream().filter(a -> a.network() == n).findFirst().orElse(null);
-            boolean hasChats = chats.stream().anyMatch(c -> c.network() == n && !c.bridgeBot());
-            if (acc == null && !hasChats) continue;
+            // Only networks you actually use: a working account, or native Matrix chats.
+            boolean shown = n == Network.MATRIX
+                    ? chats.stream().anyMatch(c -> c.network() == n && !c.bridgeBot())
+                    : !Accounts.of(svc, n).isEmpty();
+            if (!shown) continue;
             Label letter = new Label(n.badgeLetter());
             letter.getStyleClass().add("rail-network");
             letter.setStyle("-fx-background-color: " + n.color() + ";");
@@ -92,17 +95,9 @@ public final class Rail extends VBox {
             };
             List<Account> netAccounts = Accounts.of(svc, n);
             String count = netAccounts.size() > 1 ? " (" + netAccounts.size() + " cuentas)" : "";
-            // A network with no working login opens its login chat (QR, cookies…) instead of an empty filter.
-            boolean connected = !netAccounts.isEmpty();
-            Button b = railButton(letter, connected ? n.displayName() + count + status : n.displayName() + " — conectar", () -> {
-                if (connected) {
-                    listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(n).withView(ChatFilter.View.INBOX));
-                } else {
-                    onAddAccount.accept(n);
-                }
-            });
-            b.setOnContextMenuRequested(e -> networkMenu(n, netAccounts).show(b, e.getScreenX(), e.getScreenY()));
-            if (!connected) b.getStyleClass().add("warning");
+            Button b = railButton(letter, n.displayName() + count + status, () ->
+                    listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(n).withView(ChatFilter.View.INBOX)));
+            if (n.isBridged()) b.setOnContextMenuRequested(e -> networkMenu(n, netAccounts).show(b, e.getScreenX(), e.getScreenY()));
             setActive(b, f.network() == n);
             setUnreadBadge(b, chats.stream().filter(c -> c.network() == n && !c.archived() && !c.bridgeBot() && !c.muted() && c.isUnread()).count());
             networks.getChildren().add(b);

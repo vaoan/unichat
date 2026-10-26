@@ -22,7 +22,8 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
 ## Funciones
 
 - **Bandeja unificada** con insignia de red en cada avatar, fijados arriba, favoritos en cuadrícula.
-- Filtros: Todos · No leídos · Favoritos · Prioridad baja · Archivados · por red (barra lateral).
+- Filtros: Todos · No leídos · Favoritos · Prioridad baja · Archivados · por red (la barra lateral muestra
+  solo las redes que tienes conectadas).
 - **Hilos** con burbujas agrupadas, separadores de día, respuestas, reacciones, edición, borrado,
   emojis grandes, enlaces, **negrita**/*cursiva*/`código`, imágenes, archivos, video y audio.
 - Estados de entrega (enviando → enviado → entregado → leído) e indicador de "escribiendo…".
@@ -31,7 +32,7 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
 - Acciones por chat: marcar leído/no leído, favorito, fijar, silenciar, prioridad baja, archivar,
   **recordatorios** (1 h, 3 h, mañana, el lunes), salir.
 - Panel de información: participantes, multimedia compartida, descripción.
-- **Menú «Cuentas»** (botón + de la barra): todas tus cuentas, una por fila; **Agregar cuenta** → eliges la red
+- **Ajustes → Cuentas** (también con el botón + de la barra): todas tus cuentas, una por fila; **Agregar cuenta** → eliges la red
   → un asistente con instrucciones, el código QR grande o el campo para pegar cookies/códigos. Puedes conectar
   varias cuentas de cada red (p. ej. WhatsApp personal y de trabajo), con alias, etiqueta en cada chat, filtro
   por cuenta y desconexión individual.

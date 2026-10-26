@@ -52,7 +52,7 @@ public final class MainView extends StackPane {
         @Override public void accountsChanged() {
             scheduleChats();
             Platform.runLater(() -> {
-                if (openAccountsPane() instanceof AccountsPane ap) ap.refresh();
+                if (SettingsWindow.accountsPage() != null) SettingsWindow.accountsPage().refresh();
             });
         }
         @Override public void connectionChanged(ConnectionState s) { Platform.runLater(() -> showConnection(s)); }
@@ -270,7 +270,6 @@ public final class MainView extends StackPane {
     }
 
     private void hideOverlay() {
-        if (openAccountsPane() instanceof AccountsPane ap) ap.dispose();
         overlay.setVisible(false);
         overlay.getChildren().clear();
         if (thread.chat() != null) thread.composer().focus();
@@ -297,16 +296,11 @@ public final class MainView extends StackPane {
         listPane.filterProperty().set(listPane.filterProperty().get().withView(v).withUnreadOnly(unread).withQuery(""));
     }
 
-    /** Opens the "Cuentas" sheet (list of accounts, add account, login wizard). */
+    /** Opens Ajustes → Cuentas (list of accounts, add account, login wizard). */
     public AccountsPane showAccounts() {
-        if (openAccountsPane() instanceof AccountsPane open) return open;
-        AccountsPane pane = new AccountsPane(svc, this::hideOverlay, this::toast, this::openChatId);
-        showOverlay(pane);
-        return pane;
-    }
-
-    private Object openAccountsPane() {
-        return overlay.isVisible() && !overlay.getChildren().isEmpty() ? overlay.getChildren().get(0) : null;
+        showSettings();
+        SettingsWindow.select("Cuentas");
+        return SettingsWindow.accountsPage();
     }
 
     /** Filters the inbox to one network (all its accounts). */
@@ -324,7 +318,7 @@ public final class MainView extends StackPane {
             Theme.applyAll();
             refreshAll();
             thread.rebuild(false);
-        }, onLogout, this::showAccounts, this::addAccount, this::toast);
+        }, onLogout, this::openChatId, this::toast);
     }
 
     /** Text size: delta 0 resets to 100 %. */

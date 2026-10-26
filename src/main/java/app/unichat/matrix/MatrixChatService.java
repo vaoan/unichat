@@ -61,7 +61,7 @@ public final class MatrixChatService implements ChatService {
     private static final Pattern LOGIN_ID = Pattern.compile("(?m)^\\s*[*-]\\s*`([^`\\s]+)`");
     /** One line of bridgev2 {@code list-logins}: {@code * `id` (Remote name) - `STATE`}. */
     private static final Pattern LOGIN_LINE = Pattern.compile("(?m)^\\s*[*-]\\s*`([^`\\s]+)`\\s*(?:\\(([^)\\n]*)\\))?\\s*(?:-\\s*`?([A-Z_]+)`?)?");
-    private static final long LOGINS_MAX_AGE_MS = 24L * 3600 * 1000;
+    private static final long LOGINS_MAX_AGE_MS = 6L * 3600 * 1000;
 
     /** A bridge login as reported by {@code list-logins}. */
     record Login(String id, String name, String state) {}
@@ -1245,7 +1245,7 @@ public final class MatrixChatService implements ChatService {
         fire(Listener::accountsChanged);
     }
 
-    /** After the first sync: load cached logins, refresh networks whose cache is missing or older than a day. */
+    /** After the first sync: load cached logins; refresh networks with no cache, no logins, or a cache over 6 h old. */
     private void refreshStaleLogins() {
         for (Network n : Network.values()) {
             if (!n.isBridged() || findBotRoom(n) == null) continue;
@@ -1267,7 +1267,9 @@ public final class MatrixChatService implements ChatService {
                 }
                 logins.put(n, list);
             }
-            if (System.currentTimeMillis() - ts > LOGINS_MAX_AGE_MS) refreshLogins(n);
+            // An empty cache ("not logged in") is always re-checked: a login may have happened since.
+            List<Login> known = logins.get(n);
+            if (known == null || known.isEmpty() || System.currentTimeMillis() - ts > LOGINS_MAX_AGE_MS) refreshLogins(n);
         }
     }
 

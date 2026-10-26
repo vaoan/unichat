@@ -183,7 +183,6 @@
 .rail-button { -fx-padding: 9; -fx-background-radius: 12; -fx-min-width: 44; -fx-min-height: 44; }
 .rail-button.active { -fx-background-color: -selected; }
 .rail-button.active .icon { -fx-background-color: -text; }
-.rail-button.warning .rail-network { -fx-opacity: 0.8; -fx-border-color: -text-3; -fx-border-width: 1.5; -fx-border-radius: 8; -fx-border-style: segments(3, 2); }
 .rail-network {
     -fx-min-width: 26; -fx-min-height: 26; -fx-max-width: 26; -fx-max-height: 26;
     -fx-alignment: center;

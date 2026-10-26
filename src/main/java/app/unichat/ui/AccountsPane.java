@@ -48,20 +48,25 @@ public final class AccountsPane extends VBox {
     private Runnable onBack;
     private Wizard wizard;
 
+    /** {@code close} null = embedded in the settings window (no close button, no card frame). */
     public AccountsPane(ChatService svc, Runnable close, Consumer<String> toast, Consumer<String> openChatId) {
         this.svc = svc;
         this.close = close;
         this.toast = toast;
         this.openChatId = openChatId;
-        getStyleClass().addAll("accounts-sheet", "card");
-        setMaxSize(640, 640);
+        getStyleClass().add("accounts-sheet");
+        if (close != null) {
+            getStyleClass().add("card");
+            setMaxSize(640, 640);
+        }
         setSpacing(14);
 
         title.getStyleClass().add("sheet-title");
         back = Composer.iconButton(Icons.BACK, "Volver", () -> { if (onBack != null) onBack.run(); });
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.ALWAYS);
-        HBox head = new HBox(6, back, title, grow, Composer.iconButton(Icons.CLOSE, "Cerrar", this::closeSheet));
+        HBox head = new HBox(6, back, title, grow);
+        if (close != null) head.getChildren().add(Composer.iconButton(Icons.CLOSE, "Cerrar", this::closeSheet));
         head.setAlignment(Pos.CENTER_LEFT);
         VBox.setVgrow(body, Priority.ALWAYS);
         getChildren().addAll(head, body);
@@ -76,7 +81,7 @@ public final class AccountsPane extends VBox {
 
     private void closeSheet() {
         dispose();
-        close.run();
+        if (close != null) close.run();
     }
 
     /** Re-reads accounts if the list is showing (accountsChanged). The wizard updates itself. */
