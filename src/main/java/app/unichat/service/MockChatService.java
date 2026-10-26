@@ -384,8 +384,20 @@ public final class MockChatService implements ChatService {
     @Override public CompletableFuture<Void> setMarkedUnread(String id, boolean v) { return update(id, c -> c.setMarkedUnread(v)); }
     @Override public CompletableFuture<Void> setFavorite(String id, boolean v) { return update(id, c -> c.setFavorite(v)); }
     @Override public CompletableFuture<Void> setLowPriority(String id, boolean v) { return update(id, c -> c.setLowPriority(v)); }
-    @Override public CompletableFuture<Void> setArchived(String id, boolean v) { return update(id, c -> c.setArchived(v)); }
-    @Override public CompletableFuture<Void> setMuted(String id, boolean v) { return update(id, c -> c.setMuted(v)); }
+    @Override public CompletableFuture<Void> setArchived(String id, boolean v) { return quiet(id, v); }
+    @Override public CompletableFuture<Void> setMuted(String id, boolean v) { return quiet(id, v); }
+
+    /** Muted = archived ({@link QuietRule}). */
+    private CompletableFuture<Void> quiet(String id, boolean v) {
+        for (String t : QuietRule.targets(this, id)) {
+            Chat c = chats.get(t);
+            if (c == null) continue;
+            c.setArchived(v);
+            c.setMuted(v);
+        }
+        fireChats();
+        return CompletableFuture.completedFuture(null);
+    }
     @Override public CompletableFuture<Void> setPinned(String id, boolean v) { return update(id, c -> c.setPinned(v)); }
     @Override public CompletableFuture<Void> setReminder(String id, Instant at) { return update(id, c -> c.setReminderAt(at)); }
 

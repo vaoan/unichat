@@ -419,9 +419,16 @@ public final class MatrixChatService implements ChatService {
                 // Missed messages during the catch-up don't notify, like the initial sync.
                 boolean live = initialSyncDone && !catchUp;
                 SyncProcessor.Result r;
+                List<String> mutedElsewhere;
                 synchronized (proc) {
                     r = proc.process(resp, live);
+                    List<Chat> now = proc.rooms().stream().map(x -> x.chat).toList();
+                    mutedElsewhere = app.unichat.service.QuietRule.toArchive(mutedSeen, now);
+                    mutedSeen.clear();
+                    for (Chat c : now) if (c.muted()) mutedSeen.add(c.id());
                 }
+                // Muted on the phone (or anywhere): archived too, like a mute made here.
+                for (String id : mutedElsewhere) archiveOnly(id, true).exceptionally(e -> null);
                 nextBatch = resp.path("next_batch").asText(null);
                 if (initial) saveSyncCache(resp);
                 else if (catchUp) refreshSyncCache();
@@ -1010,6 +1017,20 @@ public final class MatrixChatService implements ChatService {
 
     @Override
     public CompletableFuture<Void> setArchived(String chatId, boolean archived) {
+        return quiet(chatId, archived);
+    }
+
+    /** Muted = archived ({@link app.unichat.service.QuietRule}): both, for the chat and a server's channels. */
+    private CompletableFuture<Void> quiet(String chatId, boolean on) {
+        List<CompletableFuture<Void>> all = new ArrayList<>();
+        for (String id : app.unichat.service.QuietRule.targets(this, chatId)) {
+            all.add(archiveOnly(id, on));
+            all.add(muteOnly(id, on));
+        }
+        return CompletableFuture.allOf(all.toArray(new CompletableFuture[0]));
+    }
+
+    private CompletableFuture<Void> archiveOnly(String chatId, boolean archived) {
         return optimistic(chatId, Chat::archived, Chat::setArchived, archived,
                 () -> setTag(chatId, SyncProcessor.TAG_ARCHIVED, archived));
     }
@@ -1021,6 +1042,10 @@ public final class MatrixChatService implements ChatService {
 
     @Override
     public CompletableFuture<Void> setMuted(String chatId, boolean muted) {
+        return quiet(chatId, muted);
+    }
+
+    private CompletableFuture<Void> muteOnly(String chatId, boolean muted) {
         boolean old;
         synchronized (proc) {
             Chat c = chat(chatId);
@@ -1888,6 +1913,9 @@ public final class MatrixChatService implements ChatService {
                     if (attempt < 3) resyncAttempt(n, attempt + 1);
                 }));
     }
+
+    /** Chats muted at the last sync ({@link app.unichat.service.QuietRule#toArchive}). */
+    private final Set<String> mutedSeen = new java.util.HashSet<>();
 
     private final Set<Network> resyncStarted = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
