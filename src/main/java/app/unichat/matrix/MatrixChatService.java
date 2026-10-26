@@ -1546,6 +1546,64 @@ public final class MatrixChatService implements ChatService {
         }
     }
 
+    // ---------------------------------------------------------------- Discord servers
+
+    /** A Discord server ("guild") the account is in; {@code bridged}: its messages come into Unichat. */
+    public record DiscordGuild(String id, String name, boolean bridged) {}
+
+    private static final Pattern GUILD_LINE = Pattern.compile("(?m)^\\s*[*-]\\s*(.+?)\\s*\\(`?(\\d{5,})`?\\)\\s*-\\s*(.+)$");
+
+    /** Parses the bridge's {@code guilds status} answer ("* Name (`id`) - never bridge messages"). */
+    static List<DiscordGuild> parseGuilds(String reply) {
+        List<DiscordGuild> out = new ArrayList<>();
+        if (reply == null) return out;
+        Matcher m = GUILD_LINE.matcher(reply);
+        while (m.find()) out.add(new DiscordGuild(m.group(2), m.group(1).trim(), !m.group(3).trim().startsWith("never")));
+        return out;
+    }
+
+    /** The Discord servers of the signed-in account, asked to the bridge bot. */
+    public CompletableFuture<List<DiscordGuild>> discordGuilds() {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return parseGuilds(botQuery(Network.DISCORD, "guilds status"));
+            } catch (Exception e) {
+                throw new java.util.concurrent.CompletionException(e);
+            }
+        }, io);
+    }
+
+    /**
+     * Bridges a Discord server (its channels appear as people write in them) or stops bridging it. Not {@code
+     * --entire}: that would create a room for every channel of the server at once.
+     */
+    public CompletableFuture<Void> setDiscordGuildBridged(String guildId, boolean bridged) {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                String reply = botQuery(Network.DISCORD, (bridged ? "guilds bridge " : "guilds unbridge ") + guildId);
+                if (!reply.startsWith("Successfully")) throw new MatrixException(0, null, reply);
+            } catch (MatrixException e) {
+                throw new java.util.concurrent.CompletionException(e);
+            } catch (Exception e) {
+                throw new java.util.concurrent.CompletionException(new MatrixException(userMessage(e), e));
+            }
+        }, io);
+    }
+
+    /** Sends a command to {@code n}'s bridge bot and returns its next reply (up to 20 s). */
+    private String botQuery(Network n, String command) throws IOException, InterruptedException {
+        String roomId = findBotRoom(n);
+        if (roomId == null) throw new MatrixException(0, null, "No se encontró el chat con el puente de " + n.displayName());
+        int before = botMessageCount(roomId);
+        sendCommand(roomId, botCommand(n, command));
+        for (int i = 0; i < 40; i++) {
+            Thread.sleep(500);
+            String reply = botReplyAfter(roomId, before);
+            if (reply != null) return reply;
+        }
+        throw new MatrixException(0, null, "El puente de " + n.displayName() + " no respondió");
+    }
+
     private String findBotRoom(Network n) {
         synchronized (proc) {
             for (MatrixRoom r : proc.rooms()) {

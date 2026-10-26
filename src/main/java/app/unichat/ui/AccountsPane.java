@@ -153,10 +153,109 @@ public final class AccountsPane extends VBox {
         Button more = Composer.iconButton(Icons.MORE, "Opciones de " + Accounts.name(a), null);
         more.setOnAction(e -> accountMenu(a).show(more, Side.BOTTOM, 0, 4));
         HBox row = new HBox(12, icon, text, status, more);
+        if (a.network() == Network.DISCORD && svc instanceof app.unichat.matrix.MatrixChatService m) {
+            // Discord bridges no server by default: choosing them is part of connecting Discord.
+            Button servers = new Button("Servidores");
+            servers.getStyleClass().add("secondary-button");
+            servers.setMinWidth(Region.USE_PREF_SIZE);
+            servers.setAccessibleText("Elegir qué servidores de Discord ver en Unichat");
+            servers.setOnAction(e -> showDiscordGuilds(m));
+            row.getChildren().add(2, servers);
+        }
         row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("settings-row");
         row.setAccessibleText(Accounts.name(a) + ", " + a.network().displayName() + ", " + status.getText());
         return row;
+    }
+
+    /**
+     * Which Discord servers come into Unichat: search, one switch per server, bridged ones first. A server's
+     * channels appear as people write in them (no room is created for every channel at once).
+     */
+    private void showDiscordGuilds(app.unichat.matrix.MatrixChatService m) {
+        dispose();
+        ProgressIndicator spin = new ProgressIndicator();
+        spin.setMaxSize(36, 36);
+        Label wait = new Label("Buscando tus servidores de Discord…");
+        wait.getStyleClass().add("settings-help");
+        VBox loading = new VBox(14, spin, wait);
+        loading.setAlignment(Pos.CENTER);
+        setView("Servidores de Discord", loading, this::showList);
+        m.discordGuilds().whenComplete((guilds, err) -> Platform.runLater(() -> {
+            if (err != null) {
+                spin.setVisible(false);
+                wait.setText("No se pudo leer la lista: " + rootMessage(err));
+                return;
+            }
+            Label help = new Label("Elige los servidores que quieres ver. Sus canales aparecen en Unichat a medida que alguien escribe en ellos. Los mensajes directos y grupos privados llegan siempre.");
+            help.setWrapText(true);
+            help.getStyleClass().add("settings-help");
+            TextField search = new TextField();
+            search.setPromptText("Buscar servidor");
+            search.setAccessibleText("Buscar servidor de Discord");
+            Label count = new Label();
+            count.getStyleClass().add("settings-help");
+            VBox rows = new VBox(0);
+            rows.getStyleClass().add("settings-group");
+            java.util.Set<String> on = new java.util.HashSet<>();
+            for (var g : guilds) if (g.bridged()) on.add(g.id());
+            List<app.unichat.matrix.MatrixChatService.DiscordGuild> sorted = guilds.stream()
+                    .sorted(java.util.Comparator.comparing((app.unichat.matrix.MatrixChatService.DiscordGuild g) -> !g.bridged())
+                            .thenComparing(g -> g.name().toLowerCase(java.util.Locale.ROOT)))
+                    .toList();
+            Runnable render = () -> {
+                String q = ChatFilter.normalize(search.getText());
+                rows.getChildren().clear();
+                for (var g : sorted) {
+                    if (!q.isEmpty() && !ChatFilter.normalize(g.name()).contains(q)) continue;
+                    Label name = new Label(g.name());
+                    name.getStyleClass().add("settings-label");
+                    name.setWrapText(true);
+                    HBox.setHgrow(name, Priority.ALWAYS);
+                    name.setMaxWidth(Double.MAX_VALUE);
+                    javafx.scene.control.CheckBox sw = new javafx.scene.control.CheckBox();
+                    sw.getStyleClass().add("switch");
+                    sw.setSelected(on.contains(g.id()));
+                    sw.setAccessibleText("Ver " + g.name() + " en Unichat");
+                    sw.setOnAction(e -> {
+                        boolean want = sw.isSelected();
+                        sw.setDisable(true);
+                        m.setDiscordGuildBridged(g.id(), want).whenComplete((v, ex) -> Platform.runLater(() -> {
+                            sw.setDisable(false);
+                            if (ex != null) {
+                                sw.setSelected(!want);
+                                toast.accept("No se pudo cambiar " + g.name() + ": " + rootMessage(ex));
+                            } else {
+                                if (want) on.add(g.id()); else on.remove(g.id());
+                                count.setText(on.size() + " de " + sorted.size() + " servidores en Unichat");
+                                toast.accept(want ? g.name() + ": sus canales irán apareciendo" : g.name() + " ya no se traerá");
+                            }
+                        }));
+                    });
+                    HBox row = new HBox(12, name, sw);
+                    row.setAlignment(Pos.CENTER_LEFT);
+                    row.getStyleClass().add("settings-row");
+                    rows.getChildren().add(row);
+                }
+                if (rows.getChildren().isEmpty()) {
+                    Label none = new Label(sorted.isEmpty() ? "Tu cuenta no está en ningún servidor." : "Ningún servidor coincide.");
+                    none.getStyleClass().add("settings-help");
+                    HBox row = new HBox(none);
+                    row.getStyleClass().add("settings-row");
+                    rows.getChildren().add(row);
+                }
+            };
+            count.setText(on.size() + " de " + sorted.size() + " servidores en Unichat");
+            search.textProperty().addListener((o, a, b) -> render.run());
+            render.run();
+            ScrollPane scroll = new ScrollPane(rows);
+            scroll.setFitToWidth(true);
+            scroll.getStyleClass().add("login-scroll");
+            VBox.setVgrow(scroll, Priority.ALWAYS);
+            VBox content = new VBox(10, help, search, count, scroll);
+            setView("Servidores de Discord", content, this::showList);
+            Platform.runLater(search::requestFocus);
+        }));
     }
 
     private ContextMenu accountMenu(Account a) {
