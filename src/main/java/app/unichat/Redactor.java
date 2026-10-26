@@ -19,8 +19,9 @@ public final class Redactor {
     private static final Pattern MXC = Pattern.compile("mxc://([^/\\s\"]+)/[A-Za-z0-9_\\-]+");
     private static final Pattern MATRIX_ID = Pattern.compile("([@!$#+])[A-Za-z0-9._=/+\\-]+:([A-Za-z0-9.\\-]+(?::\\d+)?)");
     private static final Pattern EMAIL = Pattern.compile("[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}");
-    /** Phone numbers ("+57 300 111 2233") and long numeric IDs (WhatsApp JIDs, Telegram IDs): 7+ digits. */
-    private static final Pattern PHONE = Pattern.compile("\\+?\\d[\\d ()\\-]{5,}\\d");
+    /** Phone numbers ("+57 300 111 2233") and long numeric IDs (WhatsApp JIDs, Telegram IDs): 7+ digits. Not the
+     * fraction of a time ("09:51:20.1234567-05:00"): never right after a digit, '.' or ':'. */
+    private static final Pattern PHONE = Pattern.compile("(?<![\\d.:])\\+?\\d[\\d ()\\-]{5,}\\d");
     /** Dates like 2026-10-26 look like phone numbers to PHONE. */
     private static final Pattern DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     private static final Pattern LONG_NUMBER = Pattern.compile("(?<![\\d.:\\-T])\\d{7,}(?![\\d.:])");

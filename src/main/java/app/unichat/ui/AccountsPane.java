@@ -379,10 +379,75 @@ public final class AccountsPane extends VBox {
             };
             if (CookieLogin.isCookieNetwork(n)) {
                 showCookieSources(n, botChatId, cancel);
+            } else if (n == Network.DISCORD) {
+                showDiscordChoice(n, botChatId, cancel);
             } else {
                 setView("Conectar " + n.displayName(), wizard.root, cancel);
             }
         }));
+    }
+
+    // ------------------------------------------------------------------ 3a. Discord
+
+    /**
+     * Discord's QR login often ends in a captcha the bridge can't show. Logging in on discord.com inside Unichat
+     * lets the user solve it; the account token is then handed to the bridge (which deletes that message).
+     */
+    private void showDiscordChoice(Network n, String botChatId, Runnable cancel) {
+        Wizard w = wizard;
+        Label heading = new Label("Elige cómo conectar Discord");
+        heading.getStyleClass().add("wizard-instructions");
+        heading.setWrapText(true);
+
+        Button web = new Button("Iniciar sesión en Discord");
+        web.getStyleClass().add("primary-button");
+        web.setMaxWidth(Double.MAX_VALUE);
+        web.setAccessibleText("Iniciar sesión en Discord en una ventana de Unichat (recomendado)");
+        Label webHelp = new Label("Recomendado. Se abre Discord aquí mismo; si te pide resolver un captcha, lo haces ahí.");
+        webHelp.setWrapText(true);
+        webHelp.getStyleClass().add("settings-help");
+
+        Button qr = new Button("Escanear un código QR");
+        qr.getStyleClass().add("secondary-button");
+        qr.setMaxWidth(Double.MAX_VALUE);
+        Label qrHelp = new Label("Con la app de Discord en tu teléfono. A veces Discord lo bloquea con un captcha.");
+        qrHelp.setWrapText(true);
+        qrHelp.getStyleClass().add("settings-help");
+
+        Label status = new Label();
+        status.setWrapText(true);
+        status.getStyleClass().add("settings-help");
+
+        VBox content = new VBox(12, heading, web, webHelp, qr, qrHelp, status);
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.setFitToWidth(true);
+        scroll.getStyleClass().add("sheet-scroll");
+
+        Consumer<String> send = command -> {
+            setView("Conectar " + n.displayName(), w.root, cancel);
+            w.sessionSent();
+            svc.sendLoginInput(n, botChatId, command).exceptionally(err -> {
+                Platform.runLater(() -> {
+                    if (wizard != w || w.finished) return;
+                    w.sessionFailed();
+                    setView("Conectar " + n.displayName(), scroll, cancel);
+                    status.setText("No se pudo enviar: " + rootMessage(err));
+                });
+                return null;
+            });
+        };
+        web.setOnAction(e -> {
+            if (LoginWebView.isOpen() || getScene() == null) return;
+            LoginWebView.openForToken(getScene().getWindow(), n, app.unichat.login.DiscordToken.LOGIN_URL,
+                    app.unichat.login.DiscordToken.EXTRACT_JS, app.unichat.login.DiscordToken::isToken,
+                    token -> send.accept("!" + n.protocolId() + " login-token user " + token), () -> { });
+        });
+        qr.setOnAction(e -> {
+            w.chooserActive = false;
+            send.accept("!" + n.protocolId() + " login");
+        });
+        w.chooserActive = true;
+        setView("Conectar " + n.displayName(), scroll, cancel);
     }
 
     // ------------------------------------------------------------------ 3b. cookie-source chooser

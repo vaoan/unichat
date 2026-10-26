@@ -49,5 +49,7 @@ class RedactorTest {
         assertEquals(line, Redactor.redact(line));
         String ts = "2026-10-26 12:36:08.319 UTC [357] LOG:  syncing data directory";
         assertEquals(ts, Redactor.redact(ts));
+        String iso = "{\"time\":\"2026-10-26T09:51:20.1234567-05:00\",\"message\":\"Bridge started!\"}";
+        assertEquals(iso, Redactor.redact(iso), "fractions of a second are not phone numbers");
     }
 }

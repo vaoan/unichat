@@ -1326,7 +1326,7 @@ public final class MatrixChatService implements ChatService {
                     addDirect(bot, roomId);
                     waitForJoin(roomId, bot);
                 }
-                sendCommand(roomId, botCommand(network, loginCommand(network)));
+                if (startsLoginByItself(network)) sendCommand(roomId, botCommand(network, loginCommand(network)));
                 waitForRoom(roomId);
                 return roomId;
             } catch (MatrixException e) {
@@ -1350,6 +1350,14 @@ public final class MatrixChatService implements ChatService {
      * {@code login} with a list of flow ids, so pick the one that suits a desktop user (checked against the
      * bridge versions installed by server/setup.*; see docs/BRIDGES.md).
      */
+    /**
+     * Whether adding an account sends the login command right away. Discord waits for the user's choice: its QR
+     * login often ends in a captcha the bridge can't show, so Unichat offers logging in on discord.com first.
+     */
+    static boolean startsLoginByItself(Network network) {
+        return network != Network.DISCORD;
+    }
+
     static String loginCommand(Network network) {
         return switch (network) {
             case WHATSAPP -> "login qr";              // flows: qr, phone

@@ -28,14 +28,20 @@ import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.HttpCookie;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Modal window showing a network's real login page. The user signs in as on the website
- * (password, 2FA, checkpoints); once every required session cookie exists the window closes
- * itself and hands the cookies back. Cookie values are never logged.
+ * (password, 2FA, checkpoints, captchas); once the session exists (every required cookie, or a token the page
+ * holds) the window closes itself and hands it back. Values are never logged.
  */
 public final class LoginWebView {
     private LoginWebView() {}
@@ -48,6 +54,41 @@ public final class LoginWebView {
 
     public static void open(Window owner, Network network, CookieSpec spec,
                             Consumer<SessionCookies> onDone, Runnable onCancel) {
+        openWindow(owner, network, LoginUrls.startUrl(network), (engine, manager) -> {
+            Map<String, String> byName = new HashMap<>();
+            for (HttpCookie c : manager.getCookieStore().getCookies()) {
+                if (c.hasExpired() || !spec.isForNetwork(c.getDomain())) continue;
+                byName.put(c.getName(), c.getValue());
+            }
+            SessionCookies s = spec.select(byName);
+            return s.complete() ? () -> onDone.accept(s) : null;
+        }, onCancel);
+    }
+
+    /**
+     * Same window, finishing when {@code extractJs} (run in the page every second and after each load) returns a
+     * string {@code valid} accepts, e.g. Discord's account token, which lives in the page and not in a cookie.
+     * The value is never logged.
+     */
+    public static void openForToken(Window owner, Network network, String url, String extractJs,
+                                    Predicate<String> valid, Consumer<String> onToken, Runnable onCancel) {
+        openWindow(owner, network, url, (engine, manager) -> {
+            Object r;
+            try {
+                r = engine.executeScript(extractJs);
+            } catch (RuntimeException e) {
+                return null; // page not ready yet
+            }
+            return r instanceof String t && valid.test(t) ? () -> onToken.accept(t) : null;
+        }, onCancel);
+    }
+
+    /**
+     * The window: shows {@code url}; every 1.5 s and after each page load asks {@code finish} whether the login
+     * is done; a non-null answer closes the window and then runs it.
+     */
+    private static void openWindow(Window owner, Network network, String url,
+                                   BiFunction<WebEngine, CookieManager, Runnable> finish, Runnable onCancel) {
         if (openStage != null) { // never swap the global handler twice
             openStage.toFront();
             openStage.requestFocus();
@@ -60,6 +101,15 @@ public final class LoginWebView {
         web.setContextMenuEnabled(false);
         WebEngine engine = web.getEngine();
         engine.setUserAgent(LoginUrls.userAgent());
+        // Fresh local storage per window (another account can log in; nothing stays behind).
+        Path storage = null;
+        try {
+            storage = Files.createTempDirectory("unichat-login");
+            engine.setUserDataDirectory(storage.toFile());
+        } catch (IOException | RuntimeException ignored) {
+            // Default storage: login still works.
+        }
+        Path storageDir = storage;
         web.setAccessibleText("Página de inicio de sesión de " + network.displayName());
 
         Stage stage = new Stage();
@@ -68,7 +118,7 @@ public final class LoginWebView {
         stage.setTitle("Iniciar sesión en " + network.displayName());
 
         Label hint = new Label("Inicia sesión como en la web de " + network.displayName()
-                + ". La ventana se cerrará sola al terminar.");
+                + ". Puede tardar unos segundos en cargar; la ventana se cerrará sola al terminar.");
         hint.getStyleClass().add("settings-help");
         hint.setWrapText(true);
         Button cancel = new Button("Cancelar");
@@ -92,16 +142,11 @@ public final class LoginWebView {
 
         Runnable check = () -> {
             if (finished[0]) return;
-            Map<String, String> byName = new HashMap<>();
-            for (HttpCookie c : manager.getCookieStore().getCookies()) {
-                if (c.hasExpired() || !spec.isForNetwork(c.getDomain())) continue;
-                byName.put(c.getName(), c.getValue());
-            }
-            SessionCookies s = spec.select(byName);
-            if (s.complete()) {
+            Runnable done = finish.apply(engine, manager);
+            if (done != null) {
                 finished[0] = true;
                 stage.close();
-                onDone.accept(s);
+                done.run();
             }
         };
 
@@ -124,6 +169,7 @@ public final class LoginWebView {
             // Restore the JVM-wide handler only if nobody replaced ours meanwhile.
             if (CookieHandler.getDefault() == manager) CookieHandler.setDefault(previous);
             openStage = null;
+            deleteQuietly(storageDir);
             if (!finished[0]) {
                 finished[0] = true; // closed with the window button
                 Platform.runLater(onCancel);
@@ -137,13 +183,22 @@ public final class LoginWebView {
         try {
             stage.show();
             poll.play();
-            engine.load(LoginUrls.startUrl(network));
+            engine.load(url);
         } catch (RuntimeException ex) {
             poll.stop();
             stage.close(); // no orphan modal window
             if (CookieHandler.getDefault() == manager) CookieHandler.setDefault(previous);
             openStage = null;
             throw ex;
+        }
+    }
+
+    private static void deleteQuietly(Path dir) {
+        if (dir == null) return;
+        try (var walk = Files.walk(dir)) {
+            for (Path f : walk.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(f);
+        } catch (IOException ignored) {
+            // Temp folder: the OS cleans it eventually.
         }
     }
 }

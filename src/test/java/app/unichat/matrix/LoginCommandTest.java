@@ -43,4 +43,10 @@ class LoginCommandTest {
             if (n.isBridged()) assertTrue(MatrixChatService.loginCommand(n).startsWith("login"), n.name());
         }
     }
+
+    @Test
+    void discordWaitsForTheUsersChoice() {
+        assertEquals(false, MatrixChatService.startsLoginByItself(Network.DISCORD));
+        assertEquals(true, MatrixChatService.startsLoginByItself(Network.WHATSAPP));
+    }
 }
