@@ -40,12 +40,21 @@ import java.util.function.Consumer;
 public final class LoginWebView {
     private LoginWebView() {}
 
+    /** The single open login window; only one may swap the JVM-wide cookie handler at a time. */
+    private static Stage openStage;
+
+    /** True while a login window is open. */
+    public static boolean isOpen() { return openStage != null; }
+
     public static void open(Window owner, Network network, CookieSpec spec,
                             Consumer<SessionCookies> onDone, Runnable onCancel) {
-        // WebView reads the JVM-wide default handler: give it a fresh, empty store while open.
+        if (openStage != null) { // never swap the global handler twice
+            openStage.toFront();
+            openStage.requestFocus();
+            return;
+        }
         CookieHandler previous = CookieHandler.getDefault();
         CookieManager manager = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
-        CookieHandler.setDefault(manager);
 
         WebView web = new WebView();
         web.setContextMenuEnabled(false);
@@ -114,14 +123,26 @@ public final class LoginWebView {
             engine.load("about:blank");
             // Restore the JVM-wide handler only if nobody replaced ours meanwhile.
             if (CookieHandler.getDefault() == manager) CookieHandler.setDefault(previous);
+            openStage = null;
             if (!finished[0]) {
                 finished[0] = true; // closed with the window button
                 Platform.runLater(onCancel);
             }
         });
 
-        stage.show();
-        poll.play();
-        engine.load(LoginUrls.startUrl(network));
+        // Install the global handler only after all risky setup succeeded; undo on failure.
+        // WebView reads the JVM-wide default handler: give it a fresh, empty store while open.
+        CookieHandler.setDefault(manager);
+        openStage = stage;
+        try {
+            stage.show();
+            poll.play();
+            engine.load(LoginUrls.startUrl(network));
+        } catch (RuntimeException ex) {
+            poll.stop();
+            if (CookieHandler.getDefault() == manager) CookieHandler.setDefault(previous);
+            openStage = null;
+            throw ex;
+        }
     }
 }
