@@ -34,6 +34,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Window;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.TextFlow;
 import javafx.stage.Popup;
@@ -57,6 +58,7 @@ public final class ThreadPane extends BorderPane {
     private final Label typing = new Label();
     private final Button jumpDown;
     private final Consumer<String> openLink;
+    private final Consumer<String> toast;
     private final Runnable toggleInfo;
     private final ToggleButton infoButton = new ToggleButton();
     private final Avatar headerAvatar = new Avatar(34);
@@ -77,6 +79,7 @@ public final class ThreadPane extends BorderPane {
         this.svc = svc;
         this.openLink = openLink;
         this.toggleInfo = toggleInfo;
+        this.toast = toast;
         getStyleClass().add("thread-pane");
         composer = new Composer(svc, toast);
 
@@ -585,7 +588,9 @@ public final class ThreadPane extends BorderPane {
             // viewer plays animated WebP.
             box.setOnMouseReleased(e -> {
                 if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress() && getScene() != null) {
-                    MediaViewer.show(getScene().getWindow(), svc.media(m.mediaUrl(), 0, 0), sticker ? "Sticker" : m.fileName());
+                    Window owner = getScene().getWindow();
+                    MediaViewer.show(owner, svc.media(m.mediaUrl(), 0, 0), sticker ? "Sticker" : m.fileName(),
+                            () -> MediaSaver.save(owner, svc, m, toast));
                 }
             });
             box.setCursor(javafx.scene.Cursor.HAND);
@@ -758,6 +763,9 @@ public final class ThreadPane extends BorderPane {
             Clipboard.getSystemClipboard().setContent(cc);
         }));
         if (a.contains(MessageActions.Action.OPEN_FILE)) menu.getItems().add(ChatMenus.item("Abrir archivo", () -> openFile(m)));
+        if (a.contains(MessageActions.Action.SAVE_AS)) menu.getItems().add(ChatMenus.item("Guardar como…", () -> {
+            if (getScene() != null) MediaSaver.save(getScene().getWindow(), svc, m, toast);
+        }));
         if (a.contains(MessageActions.Action.EDIT)) menu.getItems().add(ChatMenus.item("Editar", () -> composer.edit(m)));
         java.util.List<String> reactions = chat.features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK));
         if (!reactions.isEmpty()) {

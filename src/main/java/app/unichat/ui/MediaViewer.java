@@ -22,9 +22,23 @@ public final class MediaViewer {
     private MediaViewer() {}
 
     public static void show(Window owner, CompletableFuture<Path> file, String title) {
+        show(owner, file, title, null);
+    }
+
+    /** {@code onSave}: "Guardar como…" button in the corner (null: none). */
+    public static void show(Window owner, CompletableFuture<Path> file, String title, Runnable onSave) {
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(40, 40);
         StackPane root = new StackPane(spin);
+        javafx.scene.control.Button save = null;
+        if (onSave != null) {
+            save = new javafx.scene.control.Button("Guardar como…");
+            save.getStyleClass().add("secondary-button");
+            save.setOnAction(e -> onSave.run());
+            StackPane.setAlignment(save, javafx.geometry.Pos.TOP_RIGHT);
+            StackPane.setMargin(save, new javafx.geometry.Insets(10));
+        }
+        javafx.scene.control.Button saveButton = save;
         root.getStyleClass().add("media-viewer");
         Stage stage = new Stage();
         stage.initOwner(owner);
@@ -55,6 +69,7 @@ public final class MediaViewer {
                     AnimatedImage.Frames frames = AnimatedImage.decodeWebp(p, 1600, 1600);
                     Platform.runLater(() -> {
                         root.getChildren().setAll(view);
+                        if (saveButton != null) root.getChildren().add(saveButton);
                         AnimatedImage.play(view, frames);
                     });
                 } else {
@@ -62,6 +77,7 @@ public final class MediaViewer {
                     Platform.runLater(() -> {
                         view.setImage(img);
                         root.getChildren().setAll(view);
+                        if (saveButton != null) root.getChildren().add(saveButton);
                     });
                 }
             } catch (Exception e) {
