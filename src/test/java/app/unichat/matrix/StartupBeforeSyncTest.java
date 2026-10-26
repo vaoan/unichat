@@ -146,6 +146,21 @@ class StartupBeforeSyncTest {
         assertNotEquals(ConnectionState.ONLINE, svc.connectionState());
     }
 
+    @Test
+    void networkWithoutCachedLoginStillShowsFromTheSyncCache() throws Exception {
+        // Telegram after a logout: the bridge reported no logins, but its chats are in the cached sync.
+        svc = new MatrixChatService(url(), ME, "token");
+        previousRun(svc);
+        Settings.get().set("matrix.logins.telegram", System.currentTimeMillis() + "\n");
+        long t0 = System.currentTimeMillis();
+        svc.start();
+        await("telegram chat", () -> svc.chat("!tg:localhost") != null);
+        await("telegram listed", () -> svc.accounts().stream().anyMatch(a -> a.network() == Network.TELEGRAM));
+        long elapsed = System.currentTimeMillis() - t0;
+        assertTrue(elapsed < 2000, "took " + elapsed + " ms");
+        assertNotEquals(ConnectionState.ONLINE, svc.connectionState(), "the server hasn't answered yet");
+    }
+
     private static void await(String what, BooleanSupplier cond) throws InterruptedException {
         long end = System.currentTimeMillis() + 2000;
         while (System.currentTimeMillis() < end) {
