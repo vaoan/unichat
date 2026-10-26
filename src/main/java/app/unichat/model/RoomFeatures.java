@@ -54,6 +54,7 @@ public final class RoomFeatures {
     }
 
     public static RoomFeatures parse(JsonNode c) {
+        if (c == null || c.isEmpty()) return UNKNOWN; // redacted or emptied: don't strip every option
         Map<String, Long> files = new HashMap<>();
         JsonNode file = c.path("file");
         file.fieldNames().forEachRemaining(type -> {
@@ -109,6 +110,9 @@ public final class RoomFeatures {
         for (String r : allowedReactions) allowed.add(stripVs(r));
         return quick.stream().filter(q -> allowed.contains(stripVs(q))).toList();
     }
+
+    /** Any emoji can be a reaction (the "Más emojis" picker makes sense). */
+    public boolean anyReaction() { return reaction >= 1 && allowedReactions == null; }
 
     public boolean isUnknown() { return unrestricted; }
 

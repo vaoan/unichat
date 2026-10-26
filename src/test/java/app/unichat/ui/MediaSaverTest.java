@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MediaSaverTest {
     private static Message media(MessageType type, String fileName, String mime) {
@@ -42,5 +43,16 @@ class MediaSaverTest {
     @Test
     void addsTheExtensionWhenTheNameHasNone() {
         assertEquals("foto.png", MediaSaver.suggestedName(media(MessageType.IMAGE, "foto", "image/png"), BOGOTA));
+    }
+
+    @Test
+    void namesWindowsWouldMisreadAreCleaned() {
+        assertEquals("C_evil.exe", MediaSaver.suggestedName(media(MessageType.FILE, "C:evil.exe", null), BOGOTA));
+        assertEquals("foo.txt_ads", MediaSaver.suggestedName(media(MessageType.FILE, "foo.txt:ads", null), BOGOTA));
+        assertEquals("a_b_.pdf", MediaSaver.suggestedName(media(MessageType.FILE, "a<b>.pdf", null), BOGOTA));
+        assertEquals("_CON.txt", MediaSaver.suggestedName(media(MessageType.FILE, "CON.txt", null), BOGOTA));
+        assertEquals("nota", MediaSaver.suggestedName(media(MessageType.FILE, "nota. . ", null), BOGOTA));
+        assertTrue(MediaSaver.suggestedName(media(MessageType.FILE, "x".repeat(400) + ".pdf", null), BOGOTA).length() <= 200);
+        assertTrue(MediaSaver.suggestedName(media(MessageType.FILE, "x".repeat(400) + ".pdf", null), BOGOTA).endsWith(".pdf"));
     }
 }

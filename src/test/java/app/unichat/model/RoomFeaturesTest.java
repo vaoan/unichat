@@ -80,4 +80,17 @@ class RoomFeaturesTest {
         assertTrue(d.accepts("m.sticker"));
         assertFalse(d.accepts("org.matrix.msc3245.voice"));
     }
+
+    @Test
+    void anyEmojiOnlyWhenTheNetworkDoesNotRestrictReactions() throws Exception {
+        assertTrue(RoomFeatures.UNKNOWN.anyReaction());
+        assertTrue(RoomFeatures.parse(json("{\"reaction\":2}")).anyReaction());
+        assertFalse(RoomFeatures.parse(json("{\"reaction\":2,\"allowed_reactions\":[\"👍\"]}")).anyReaction());
+        assertFalse(RoomFeatures.parse(json("{\"reaction\":0}")).anyReaction());
+    }
+
+    @Test
+    void anEmptyEventMeansUnknownNotNothing() throws Exception {
+        assertTrue(RoomFeatures.parse(json("{}")).isUnknown(), "a redacted/empty room_features must not strip every option");
+    }
 }

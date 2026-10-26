@@ -31,7 +31,7 @@ final class MediaSaver {
      */
     static String suggestedName(Message m, ZoneId zone) {
         String name = m.fileName() == null ? "" : m.fileName().replace('\\', '/');
-        name = name.substring(name.lastIndexOf('/') + 1).strip();
+        name = windowsSafe(name.substring(name.lastIndexOf('/') + 1).strip());
         String ext = m.mimeType() == null ? "" : EXT.getOrDefault(m.mimeType().toLowerCase(), "");
         if (name.isEmpty() || name.equals(".") || name.equals("..") || m.type() == MessageType.STICKER) {
             String kind = switch (m.type()) {
@@ -44,6 +44,24 @@ final class MediaSaver {
             return kind + "-" + STAMP.format(m.timestamp().atZone(zone)) + ext;
         }
         return name.contains(".") || ext.isEmpty() ? name : name + ext;
+    }
+
+    private static final java.util.regex.Pattern RESERVED =
+            java.util.regex.Pattern.compile("(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\\..*)?");
+
+    /**
+     * Windows reads "C:x" as relative to drive C and "a:b" as a hidden stream, rejects {@code <>"|?*}, control
+     * characters, trailing dots/spaces and DOS device names: clean all of those, and keep it under 200 characters.
+     */
+    private static String windowsSafe(String name) {
+        String n = name.replaceAll("[<>:\"|?*\\x00-\\x1F]", "_").replaceAll("[. ]+$", "");
+        if (RESERVED.matcher(n).matches()) n = "_" + n;
+        if (n.length() > 200) {
+            int dot = n.lastIndexOf('.');
+            String ext = dot > 0 && n.length() - dot <= 10 ? n.substring(dot) : "";
+            n = n.substring(0, 200 - ext.length()) + ext;
+        }
+        return n;
     }
 
     /** Asks where to save, then copies the downloaded file there. */

@@ -370,9 +370,9 @@ public final class ThreadPane extends BorderPane {
             composer.focus();
         } else if (m == null || m.type() == MessageType.SYSTEM) {
             return;
-        } else if (code == javafx.scene.input.KeyCode.R && !e.isShortcutDown()) {
+        } else if (code == javafx.scene.input.KeyCode.R && !e.isShortcutDown() && allows(m, MessageActions.Action.REPLY)) {
             composer.reply(m);
-        } else if (code == javafx.scene.input.KeyCode.E && !e.isShortcutDown() && m.outgoing() && !m.isMedia() && !m.deleted()) {
+        } else if (code == javafx.scene.input.KeyCode.E && !e.isShortcutDown() && allows(m, MessageActions.Action.EDIT)) {
             composer.edit(m);
         } else if (code == javafx.scene.input.KeyCode.C && e.isShortcutDown() && !m.isMedia()) {
             ClipboardContent cc = new ClipboardContent();
@@ -539,7 +539,8 @@ public final class ThreadPane extends BorderPane {
 
         bubble.setOnContextMenuRequested(e -> messageMenu(m).show(bubble, e.getScreenX(), e.getScreenY()));
         bubble.setOnMouseClicked(e -> {
-            if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2 && !m.deleted()) {
+            if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2 && !m.deleted()
+                    && !chat.features().reactionsOffered(java.util.List.of("❤️")).isEmpty()) {
                 svc.toggleReaction(chat.id(), m.id(), "❤️");
             }
         });
@@ -723,12 +724,15 @@ public final class ThreadPane extends BorderPane {
         box.getStyleClass().add("hover-actions");
         box.setAlignment(Pos.CENTER);
         if (m.deleted()) return box;
-        Button react = Composer.iconButton(Icons.EMOJI, "Reaccionar", null);
-        react.setOnAction(e -> reactionPopup(m, react));
-        Button reply = Composer.iconButton(Icons.REPLY, "Responder", () -> composer.reply(m));
+        if (!chat.features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK)).isEmpty() || chat.features().anyReaction()) {
+            Button react = Composer.iconButton(Icons.EMOJI, "Reaccionar", null);
+            react.setOnAction(e -> reactionPopup(m, react));
+            box.getChildren().add(react);
+        }
+        if (allows(m, MessageActions.Action.REPLY)) box.getChildren().add(Composer.iconButton(Icons.REPLY, "Responder", () -> composer.reply(m)));
         Button more = Composer.iconButton(Icons.MORE, "Más", null);
         more.setOnAction(e -> messageMenu(m).show(more, Side.BOTTOM, 0, 0));
-        box.getChildren().addAll(react, reply, more);
+        box.getChildren().add(more);
         // Reachable with the timeline keys instead; tabbing through every message would be unusable.
         box.getChildren().forEach(n -> n.setFocusTraversable(false));
         return box;
@@ -742,7 +746,7 @@ public final class ThreadPane extends BorderPane {
         row.getStylesheets().addAll(getScene().getStylesheets());
         row.getStyleClass().addAll(getScene().getRoot().getStyleClass());
         row.setStyle(getScene().getRoot().getStyle());
-        for (String e : EmojiPicker.QUICK) {
+        for (String e : chat.features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK))) {
             Button b = new Button(e);
             b.getStyleClass().add("emoji-button");
             b.setOnAction(ev -> {
@@ -751,15 +755,22 @@ public final class ThreadPane extends BorderPane {
             });
             row.getChildren().add(b);
         }
-        Button plus = Composer.iconButton(Icons.PLUS, "Más emojis", null);
-        plus.setOnAction(ev -> {
-            p.hide();
-            EmojiPicker.show(anchor, e -> svc.toggleReaction(chat.id(), m.id(), e));
-        });
-        row.getChildren().add(plus);
+        if (chat.features().anyReaction()) {
+            Button plus = Composer.iconButton(Icons.PLUS, "Más emojis", null);
+            plus.setOnAction(ev -> {
+                p.hide();
+                EmojiPicker.show(anchor, e -> svc.toggleReaction(chat.id(), m.id(), e));
+            });
+            row.getChildren().add(plus);
+        }
         p.getContent().add(row);
         var b = anchor.localToScreen(anchor.getBoundsInLocal());
         p.show(anchor, b.getMinX() - 120, b.getMinY() - 52);
+    }
+
+    /** Same rules as the message menu, for the shortcuts and hover buttons. */
+    private boolean allows(Message m, MessageActions.Action a) {
+        return MessageActions.of(m, chat.features(), java.time.Instant.now()).contains(a);
     }
 
     private ContextMenu messageMenu(Message m) {

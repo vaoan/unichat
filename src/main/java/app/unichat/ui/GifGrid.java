@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.gif.Gif;
+import app.unichat.gif.GifFiles;
 import app.unichat.gif.GifProviders;
 import app.unichat.gif.GifSearch;
 import app.unichat.model.Chat;
@@ -23,14 +24,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
-import java.io.InputStream;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -42,7 +36,6 @@ import java.util.function.Supplier;
  */
 final class GifGrid extends VBox {
     private static final int TILE_W = 132, TILE_H = 100, LIMIT = 24;
-    private static final HttpClient HTTP = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
 
     private final ChatService svc;
     private final MediaLibrary library;
@@ -109,7 +102,9 @@ final class GifGrid extends VBox {
         FlowPane grid = new FlowPane(6, 6);
         for (MediaLibrary.Item i : items) {
             ImageView probe = new ImageView();
-            ThreadPane.loadMedia(svc, probe, MediaItems.message(i), TILE_W * 2, TILE_H * 2);
+            String preview = GifFiles.preview(i);
+            if (preview != null && !preview.startsWith("mxc://")) probe.setImage(new Image(preview, TILE_W * 2, 0, true, true, true));
+            else ThreadPane.loadMedia(svc, probe, MediaItems.message(i), TILE_W * 2, TILE_H * 2);
             grid.getChildren().add(tile(probe, title.equals("Favoritos") ? "GIF favorito" : "GIF reciente", accepted, () -> sendFromLibrary(i)));
         }
         content.getChildren().addAll(section(title), grid);
@@ -148,10 +143,8 @@ final class GifGrid extends VBox {
 
     /** Downloads the provider's file (mp4 when available, smaller and accepted by every bridge) and sends it. */
     private void sendFromProvider(Gif g) {
-        boolean mp4 = g.mp4Url() != null;
-        MediaLibrary.Item item = new MediaLibrary.Item(MediaLibrary.Kind.GIF, mp4 ? g.mp4Url() : g.gifUrl(),
-                mp4 ? "video/mp4" : "image/gif", g.width(), g.height(), null);
-        send(item, CompletableFuture.supplyAsync(() -> download(item.url(), mp4 ? ".mp4" : ".gif")));
+        MediaLibrary.Item item = GifFiles.item(g);
+        send(item, CompletableFuture.supplyAsync(() -> download(item.url(), "video/mp4".equals(item.mime()) ? ".mp4" : ".gif")));
     }
 
     private void sendFromLibrary(MediaLibrary.Item i) {
@@ -176,14 +169,7 @@ final class GifGrid extends VBox {
 
     private static Path download(String url, String ext) {
         try {
-            HttpResponse<InputStream> r = HTTP.send(HttpRequest.newBuilder(URI.create(url)).build(), HttpResponse.BodyHandlers.ofInputStream());
-            if (r.statusCode() != 200) throw new java.io.IOException("HTTP " + r.statusCode());
-            Path f = Files.createTempFile("unichat-gif", ext);
-            f.toFile().deleteOnExit();
-            try (InputStream in = r.body()) {
-                Files.copy(in, f, StandardCopyOption.REPLACE_EXISTING);
-            }
-            return f;
+            return GifFiles.download(url, ext, GifFiles.TIMEOUT);
         } catch (Exception e) {
             throw new java.util.concurrent.CompletionException(e);
         }

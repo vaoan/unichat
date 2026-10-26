@@ -96,6 +96,40 @@ class KeyboardUiTest {
         svc.stop();
     }
 
+    @Test
+    void shortcutsFollowWhatTheNetworkAllows() throws Exception {
+        System.setProperty("java.awt.headless", "true");
+        try {
+            CountDownLatch started = new CountDownLatch(1);
+            Platform.startup(started::countDown);
+            started.await(10, TimeUnit.SECONDS);
+        } catch (IllegalStateException alreadyRunning) {
+            // another UI test started the toolkit
+        }
+        MockChatService svc = new MockChatService();
+        svc.chat("!familia:demo").setFeatures(app.unichat.model.RoomFeatures.parse(
+                new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"reply\":0,\"edit\":0,\"reaction\":0}")));
+        Scene scene = fx(() -> {
+            Stage stage = new Stage();
+            MainView view = new MainView(svc, stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            Scene sc = new Scene(view, 1100, 700);
+            Theme.register(sc);
+            stage.setScene(sc);
+            stage.show();
+            view.openChatId("!familia:demo");
+            return sc;
+        });
+        Thread.sleep(500);
+        for (int i = 0; i < 3; i++) press(scene, KeyCode.F6, false, false);
+        assertEquals("timeline", fx(() -> zone(scene)));
+        press(scene, KeyCode.R, false, false);
+        assertEquals("timeline", fx(() -> zone(scene)), "R does nothing where the network has no replies");
+        assertTrue(fx(() -> scene.getRoot().lookupAll(".hover-actions .button").stream()
+                .noneMatch(n -> "Responder".equals(n.getAccessibleText()) || "Reaccionar".equals(n.getAccessibleText()))),
+                "no reply/react buttons on hover either");
+        svc.stop();
+    }
+
     /** Which F6 zone holds the keyboard focus. */
     private static String zone(Scene scene) {
         for (Node n = scene.getFocusOwner(); n != null; n = n.getParent()) {
