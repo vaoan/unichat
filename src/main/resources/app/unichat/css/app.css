@@ -202,6 +202,9 @@
 }
 .rail-separator { -fx-background-color: -border; -fx-min-height: 1; -fx-max-height: 1; -fx-pref-width: 28; -fx-max-width: 28; }
 .rail-add .icon { -fx-background-color: -text-3; }
+.rail-archive { -fx-opacity: 0.45; }
+.rail-archive .icon { -fx-background-color: -text-3; }
+.rail-archive:hover, .rail-archive:focused, .rail-archive.active { -fx-opacity: 1; }
 
 /* ---------------------------------------------------------------- chat list */
 
@@ -704,3 +707,5 @@
 .desktop-toast-body {
     -fx-text-fill: -text-2;
 }
+/* High contrast: the archive button keeps full strength. */
+.root.contrast .rail-archive { -fx-opacity: 1; }

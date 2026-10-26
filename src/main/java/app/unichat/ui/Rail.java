@@ -19,7 +19,7 @@ import java.util.List;
 
 /**
  * Narrow far-left column: unified inbox, one button per connected network (filters the list),
- * then archive, connect-network and settings at the bottom.
+ * then archive (dimmed) and connect-network, and settings at the bottom.
  */
 public final class Rail extends VBox {
     private final ChatService svc;
@@ -41,8 +41,10 @@ public final class Rail extends VBox {
 
         inbox = railButton(Icons.icon(Icons.INBOX, 20), "Bandeja unificada", () ->
                 listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(null).withView(ChatFilter.View.INBOX)));
-        archive = railButton(Icons.icon(Icons.ARCHIVE, 20), "Archivados", () ->
-                listPane.filterProperty().set(listPane.filterProperty().get().withView(ChatFilter.View.ARCHIVE)));
+        // Every network's archived chats; dimmed so it doesn't compete with the networks. Search still finds them.
+        archive = railButton(Icons.icon(Icons.ARCHIVE, 18), "Archivados", () ->
+                listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(null).withView(ChatFilter.View.ARCHIVE)));
+        archive.getStyleClass().add("rail-archive");
         Button add = railButton(Icons.icon(Icons.PLUS, 20), "Agregar o administrar cuentas (Ajustes)", onConnect);
         add.getStyleClass().add("rail-add");
         Button settings = railButton(Icons.icon(Icons.SETTINGS, 20), "Ajustes", onSettings);
@@ -52,7 +54,7 @@ public final class Rail extends VBox {
         networks.setAlignment(Pos.TOP_CENTER);
         Region sep = new Region();
         sep.getStyleClass().add("rail-separator");
-        getChildren().addAll(new StackPane(inbox), sep, networks, add, grow, archive, settings);
+        getChildren().addAll(new StackPane(inbox), sep, networks, archive, add, grow, settings);
         listPane.filterProperty().addListener((o, a, b) -> refresh());
         refresh();
     }

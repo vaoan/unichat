@@ -195,8 +195,9 @@ public final class MainView extends StackPane {
 
     private void onIncoming(Chat chat, Message m) {
         boolean viewing = stage.isFocused() && stage.isShowing() && thread.chat() != null && thread.chat().id().equals(chat.id());
-        if (!viewing) notifier.notify(chat, m);
-        if (app.unichat.settings.Settings.get().speakMessages()) Speaker.say(spoken(chat, m));
+        var settings = app.unichat.settings.Settings.get();
+        if (NotificationPolicy.shouldNotify(chat.archived(), settings.notifyArchived(), viewing)) notifier.notify(chat, m);
+        if (settings.speakMessages() && (!chat.archived() || settings.notifyArchived())) Speaker.say(spoken(chat, m));
     }
 
     /** "Mensaje de Laura en Familia, WhatsApp: hola" (only the sender when previews are hidden). */

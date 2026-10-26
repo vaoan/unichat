@@ -326,6 +326,8 @@ public final class SettingsWindow {
                         toggle(s.notificationsEnabled(), s::setNotificationsEnabled)),
                 row("Mostrar contenido", "Si lo desactivas, solo se ve quién escribió.", toggle(s.notificationPreview(), s::setNotificationPreview)),
                 row("Sonido", null, toggle(s.notificationSound(), s::setNotificationSound)),
+                row("Chats archivados", "Avisar también de los mensajes nuevos en chats archivados.",
+                        toggle(s.notifyArchived(), s::setNotifyArchived)),
                 row("Seguir en la bandeja al cerrar", "Cerrar la ventana la oculta en el área de notificaciones.",
                         toggle(s.minimizeToTray(), s::setMinimizeToTray))));
     }
