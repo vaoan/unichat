@@ -67,4 +67,18 @@ class LoginCopyTest {
         assertEquals("Número de teléfono", LoginCopy.fieldLabel(new BridgeLogin.Field("phone_number", "p", "Phone number", "", null, false, null, List.of())));
         assertEquals("Workspace", LoginCopy.fieldLabel(new BridgeLogin.Field("select", "ws", "Workspace", "", null, false, null, List.of("a"))));
     }
+
+    @Test
+    void xChatPinIsExplained() {
+        BridgeLogin.Step create = new BridgeLogin.Step("L", "user_input", "fi.mau.twitter.login.juicebox_pin",
+                "No PIN code is registered yet. Create your X Chat PIN below.",
+                List.of(new BridgeLogin.Field("2fa_code", "pin", "PIN", "", null, false, "^[0-9]{4}$", List.of())), null, null, null);
+        LoginCopy.StepText t = LoginCopy.step(Network.X, create);
+        assertEquals("Crea tu PIN de X Chat", t.title());
+        assertTrue(t.steps().get(1).contains("Inventa uno"));
+        assertEquals("PIN de 4 dígitos", LoginCopy.fieldLabel(create.fields().get(0)));
+        BridgeLogin.Step enter = new BridgeLogin.Step("L", "user_input", "fi.mau.twitter.login.juicebox_pin", "Enter your X Chat PIN.",
+                List.of(), null, null, null);
+        assertEquals("Escribe tu PIN de X Chat", LoginCopy.step(Network.X, enter).title());
+    }
 }

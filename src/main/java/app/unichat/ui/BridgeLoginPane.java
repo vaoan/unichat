@@ -254,7 +254,7 @@ final class BridgeLoginPane extends StackPane {
                 if (f.defaultValue() != null) t.setText(f.defaultValue());
                 t.setPromptText(switch (f.type()) {
                     case "phone_number" -> "+57 300 123 4567";
-                    case "2fa_code" -> "123456";
+                    case "2fa_code" -> sampleDigits(f.pattern());
                     case "email" -> "tu@correo.com";
                     default -> "";
                 });
@@ -302,6 +302,13 @@ final class BridgeLoginPane extends StackPane {
         box.getChildren().addAll(problem, next);
         inputs.values().stream().findFirst().ifPresent(n -> Platform.runLater(((Node) n)::requestFocus));
         return box;
+    }
+
+    /** "1234" for a pattern like ^[0-9]{4}$, else "123456" (the usual code length). */
+    static String sampleDigits(String pattern) {
+        java.util.regex.Matcher m = pattern == null ? null : Pattern.compile("\\{(\\d{1,2})}").matcher(pattern);
+        int n = m != null && m.find() ? Integer.parseInt(m.group(1)) : 6;
+        return "1234567890".repeat(2).substring(0, Math.max(1, Math.min(n, 12)));
     }
 
     /** Spanish reason a value isn't accepted, or null. */

@@ -44,4 +44,10 @@ class BridgeLoginPaneTest {
         LuminanceSource src = new RGBLuminanceSource(w, h, px);
         assertEquals(data, new QRCodeReader().decode(new BinaryBitmap(new HybridBinarizer(src))).getText());
     }
+
+    @Test
+    void codeHintMatchesTheExpectedLength() {
+        assertEquals("1234", BridgeLoginPane.sampleDigits("^[0-9]{4}$"));
+        assertEquals("123456", BridgeLoginPane.sampleDigits(null));
+    }
 }

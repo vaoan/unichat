@@ -95,6 +95,15 @@ public final class LoginCopy {
         if (s.display() != null && "emoji".equals(s.display().type())) {
             return new StepText("Toca este emoji en tu teléfono", List.of("Abre " + net + " en tu teléfono", "Toca el emoji que coincide con este"));
         }
+        if (id.endsWith(".juicebox_pin")) {
+            // X's encrypted chats ("X Chat") are protected with a 4-digit PIN the user chooses.
+            boolean create = s.instructions().contains("No PIN code is registered");
+            return create
+                    ? new StepText("Crea tu PIN de X Chat", List.of(
+                    "X protege tus chats cifrados con un PIN de 4 dígitos.",
+                    "Inventa uno que vayas a recordar: X te lo pedirá cuando abras tus chats en otro dispositivo."))
+                    : new StepText("Escribe tu PIN de X Chat", List.of("Es el PIN de 4 dígitos que creaste para tus chats cifrados de X."));
+        }
         if (id.endsWith(".phone") || id.endsWith(".phone_number")) {
             return new StepText("¿Cuál es tu número de " + net + "?", List.of("Incluye el código de país, por ejemplo +57 para Colombia."));
         }
@@ -115,6 +124,7 @@ public final class LoginCopy {
 
     /** Spanish label for an input field, by its type (the bridge's name when we don't know it). */
     public static String fieldLabel(BridgeLogin.Field f) {
+        if ("pin".equals(f.id())) return "PIN de 4 dígitos";
         return switch (f.type()) {
             case "phone_number" -> "Número de teléfono";
             case "2fa_code" -> "Código";
