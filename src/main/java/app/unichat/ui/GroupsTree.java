@@ -82,6 +82,7 @@ final class GroupsTree extends TreeView<SpaceTree.Node> {
     private List<ChatService.GroupOffer> offers(Network n) {
         if (offersAsked.add(n)) {
             svc.groupOffers(n).whenComplete((l, err) -> {
+                System.err.println("Group offers for " + n + ": " + (err != null ? "failed " + err.getClass().getSimpleName() : l.size()));
                 if (err != null || l.isEmpty()) return;
                 Platform.runLater(() -> {
                     offers.put(n, l);

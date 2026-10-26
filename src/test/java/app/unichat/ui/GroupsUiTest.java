@@ -124,6 +124,16 @@ class GroupsUiTest {
     }
 
     @Test
+    void theBandejaGruposChoiceIsHardToMiss() throws Exception {
+        Scene scene = open(Network.DISCORD);
+        double toggleWidth = fx(() -> toggle(scene).getBoundsInParent().getWidth());
+        double paneWidth = fx(() -> toggle(scene).getParent().getLayoutBounds().getWidth());
+        assertTrue(toggleWidth > paneWidth * 0.8, "full-width tabs, not a small label: " + toggleWidth + " of " + paneWidth);
+        assertTrue(fx(() -> button(scene, "Grupos").getHeight()) >= 26, "a real target to click");
+        svc.stop();
+    }
+
+    @Test
     void toggleHiddenWhenNetworkHasNoSpaces() throws Exception {
         Scene scene = open(Network.WHATSAPP);
         assertFalse(fx(() -> toggle(scene) != null && toggle(scene).isVisible()));

@@ -63,6 +63,11 @@ public final class ChatListPane extends VBox {
 
         title.getStyleClass().add("pane-title");
         ToggleButton inbox = viewButton("Bandeja", false), grouped = viewButton("Grupos", true);
+        // Full-width tabs under the title, like Telegram's folders: a small label up there went unnoticed.
+        for (ToggleButton b : List.of(inbox, grouped)) {
+            b.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(b, Priority.ALWAYS);
+        }
         viewToggle.getChildren().addAll(inbox, grouped);
         viewToggle.getStyleClass().add("list-view-toggle");
         viewToggle.setAccessibleText("Vista de la lista");
@@ -70,7 +75,7 @@ public final class ChatListPane extends VBox {
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
         javafx.scene.control.Button newChat = Composer.iconButton(Icons.PLUS, "Nuevo chat", () -> { if (onNewChat != null) onNewChat.run(); });
         newChat.setTooltip(new javafx.scene.control.Tooltip("Nuevo chat (" + (MainView.MAC ? "⌘N" : "Ctrl+N") + ")"));
-        HBox header = new HBox(6, title, headerSpacer, viewToggle, newChat);
+        HBox header = new HBox(6, title, headerSpacer, newChat);
         header.getStyleClass().add("chat-list-header");
         header.setAlignment(Pos.CENTER_LEFT);
 
@@ -121,7 +126,7 @@ public final class ChatListPane extends VBox {
         accountRow.getStyleClass().addAll("chip-row", "account-row");
         accountRow.setAccessibleText("Cuentas");
         VBox.setVgrow(groups, Priority.ALWAYS);
-        getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list, groups);
+        getChildren().addAll(header, viewToggle, searchBox, chipRow, accountRow, favorites, list, groups);
         filter.addListener((o, a, b) -> {
             syncChips(b);
             refresh();
