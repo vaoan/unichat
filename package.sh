@@ -14,6 +14,15 @@ if [ -n "${TUWUNEL_BIN:-}" ]; then
 else
   echo "Aviso: sin TUWUNEL_BIN la app no trae el servidor local (solo servidores externos)." >&2
 fi
+# macOS bridges link libolm (Homebrew dropped it): ship ours (native/build-libolm.sh).
+if [ "$(uname -s)" = Darwin ]; then
+  LIBOLM="${LIBOLM:-$HOME/Library/Caches/unichat-build/olm/libolm.3.dylib}"
+  if [ -f "$LIBOLM" ]; then
+    mkdir -p target/pkg/server && cp "$LIBOLM" target/pkg/server/libolm.3.dylib
+  else
+    echo "Aviso: falta libolm (native/build-libolm.sh); los puentes no arrancarán." >&2
+  fi
+fi
 
 COMMON="--name Unichat --app-version $VERSION --vendor Unichat --input target/pkg --main-jar unichat.jar
   --main-class app.unichat.Launcher --dest release --java-options -Xmx512m"

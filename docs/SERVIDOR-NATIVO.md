@@ -8,6 +8,11 @@ Docker (`server/`). El servidor nativo hace lo mismo con programas normales del 
 | **tuwunel** | Servidor Matrix (un solo ejecutable, en Rust) | Se compila en GitHub Actions y **viaja dentro del instalador de Unichat** |
 | **Puentes mautrix** | Un ejecutable por red | **Se descargan** de los releases oficiales de mautrix, verificados con `sha256sums.txt` |
 | **SQLite** | Base de datos (un archivo por componente) | Incluida en los ejecutables; no hay que instalar nada |
+| **libolm** (solo Mac) | Librería que los puentes oficiales de Mac necesitan para arrancar | Se compila con `native/build-libolm.sh` y **viaja dentro de Unichat**; se copia junto a los puentes |
+
+> Los puentes oficiales de mautrix para Mac enlazan `libolm.3.dylib`, que Homebrew ya no ofrece. Sin ella no arrancan
+> (`Library not loaded: @rpath/libolm.3.dylib`). Unichat la lleva consigo; el cifrado del puente está apagado, así que
+> solo se carga. A futuro: compilar los puentes con `-tags goolm` (Go puro, sin libolm), como en Windows.
 
 ## Objetivo: que se instale solo
 

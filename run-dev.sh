@@ -7,4 +7,7 @@ cd "$(dirname "$0")"
 # Local server: use the tuwunel built from source (packaged apps carry their own; see docs/SERVIDOR-NATIVO.md).
 TUWUNEL_BIN="${TUWUNEL_BIN:-$HOME/Library/Caches/unichat-build/tuwunel/target/release/tuwunel}"
 [ -x "$TUWUNEL_BIN" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.tuwunelBin=$TUWUNEL_BIN"
+# macOS bridges need libolm next to them (native/build-libolm.sh).
+LIBOLM="${LIBOLM:-$HOME/Library/Caches/unichat-build/olm/libolm.3.dylib}"
+[ -f "$LIBOLM" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.libolm=$LIBOLM"
 exec java $JAVA_OPTS -cp "target/classes:$(cat target/classpath.txt)" app.unichat.Launcher "$@"

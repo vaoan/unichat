@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -101,6 +102,7 @@ public final class LocalServer {
         Files.createDirectories(dir.resolve("appservices"));
         progress.accept("Preparando el servidor…");
         store.installBundled("tuwunel", bundledHomeserver(), manifest.tuwunelVersion());
+        installLibolm();
         writeDoublePuppet(secrets);
         for (String b : activeBridges()) prepareBridge(b, secrets, progress);
         writeHomeserverConfig(secrets);
@@ -284,18 +286,36 @@ public final class LocalServer {
 
     /** Folder of the app's own files: the homeserver shipped with it. -Dunichat.tuwunelBin wins (development). */
     private Path bundledHomeserver() throws IOException {
-        String override = System.getProperty("unichat.tuwunelBin");
-        if (override != null) return Path.of(override);
+        return bundled("tuwunel" + platform.exeSuffix(), "unichat.tuwunelBin");
+    }
+
+    /**
+     * A file shipped inside the app under {@code app/server/} (Unichat.app/Contents/app/server on macOS,
+     * Unichat\app\server on Windows); {@code -D<override>} wins during development.
+     */
+    private Path bundled(String file, String override) throws IOException {
+        String o = System.getProperty(override);
+        if (o != null) return Path.of(o);
         String launcher = System.getProperty("jpackage.app-path");
         if (launcher != null) {
             Path l = Path.of(launcher);
-            // macOS: Unichat.app/Contents/MacOS/Unichat → Contents/app; Windows: Unichat\Unichat.exe → Unichat\app
             Path app = platform == Platform.MAC_ARM64 ? l.getParent().resolveSibling("app") : l.getParent().resolve("app");
-            Path bin = app.resolve("server").resolve("tuwunel" + platform.exeSuffix());
-            if (Files.exists(bin)) return bin;
+            Path f = app.resolve("server").resolve(file);
+            if (Files.exists(f)) return f;
         }
-        throw new IOException("Esta copia de Unichat no trae el servidor (tuwunel)");
+        throw new IOException("Esta copia de Unichat no trae " + file);
     }
+
+    /**
+     * macOS: the official bridge binaries link @rpath/libolm.3.dylib and look next to themselves (Homebrew no
+     * longer has it). Unichat ships one (native/build-libolm.sh); bridge encryption is off, it's only loaded.
+     */
+    private void installLibolm() throws IOException {
+        if (platform != Platform.MAC_ARM64) return;
+        store.installBundled("libolm.3.dylib", bundled("libolm.3.dylib", "unichat.libolm"), LIBOLM_VERSION);
+    }
+
+    static final String LIBOLM_VERSION = "3.2.16";
 
     // ---------------------------------------------------------------- secrets
 
@@ -337,12 +357,26 @@ public final class LocalServer {
         return sb.toString();
     }
 
+    /** Runs a bridge setup command; on failure its (redacted) output goes to the log and the error message. */
     private static void run(Path workDir, String... cmd) throws IOException, InterruptedException {
         Process p = new ProcessBuilder(new ArrayList<>(List.of(cmd))).directory(workDir.toFile())
-                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+                .redirectErrorStream(true).start();
+        CompletableFuture<String> out = CompletableFuture.supplyAsync(() -> {
+            try {
+                return new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                return "";
+            }
+        });
         if (!p.waitFor(60, TimeUnit.SECONDS)) {
             p.destroyForcibly();
-            throw new IOException("Tiempo agotado: " + String.join(" ", cmd));
+            throw new IOException("Tiempo agotado: " + Path.of(cmd[0]).getFileName());
+        }
+        if (p.exitValue() != 0) {
+            String text = app.unichat.Redactor.redact(out.getNow("").strip());
+            System.err.println("Bridge setup failed (" + Path.of(cmd[0]).getFileName() + ", exit " + p.exitValue() + "): " + text);
+            String last = text.lines().reduce((a, b) -> b).orElse("sin detalles");
+            throw new IOException(Path.of(cmd[0]).getFileName() + " no pudo prepararse: " + last);
         }
     }
 }
