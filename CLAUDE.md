@@ -17,6 +17,9 @@ Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix
 - `css/app.css` — single stylesheet; light palette on `.root`, dark on `.root.dark`; `-accent` and font size
   set inline by `Theme`.
 - `server/` — Synapse + Postgres + bridges docker-compose, `setup.sh` / `setup.ps1`. `docs/BRIDGES.md`.
+- `native/` — no-Docker stack (tuwunel + mautrix bridge binaries + SQLite): `versions.env` pins every component,
+  `setup-mac.sh` / `run-mac.sh` are the reference for the installer Unichat will run at startup (install whatever
+  is missing, start and supervise). Read `docs/SERVIDOR-NATIVO.md` before touching it.
 - `package.sh` / `package.ps1` — jpackage; `.github/workflows/build.yml` builds Windows zip/msi + macOS dmg.
 
 ## Checking UI changes

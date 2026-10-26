@@ -1,0 +1,108 @@
+# Servidor nativo (sin Docker)
+
+Unichat necesita un servidor Matrix y un "puente" por cada red (WhatsApp, Telegram, …). Antes eso corría en
+Docker (`server/`). El servidor nativo hace lo mismo con programas normales del sistema, sin Docker:
+
+| Pieza | Qué es | De dónde sale |
+|---|---|---|
+| **tuwunel** | Servidor Matrix (un solo ejecutable, en Rust) | Se compila en GitHub Actions y **viaja dentro del instalador de Unichat** |
+| **Puentes mautrix** | Un ejecutable por red | **Se descargan** de los releases oficiales de mautrix, verificados con `sha256sums.txt` |
+| **SQLite** | Base de datos (un archivo por componente) | Incluida en los ejecutables; no hay que instalar nada |
+
+## Objetivo: que se instale solo
+
+Al iniciar Unichat se revisa qué falta y se instala sin preguntar:
+
+1. **Servidor:** si `bin/tuwunel` no existe o es de otra versión, se copia el que trae la app.
+2. **Puentes:** solo los de las redes que el usuario agregó. Al agregar una red nueva, su puente se descarga en
+   ese momento (con barra de progreso). Si un puente fijado en `versions.env` cambió de versión, se descarga el
+   nuevo y se reinicia.
+3. **Configuración:** se genera la primera vez y en cada arranque se vuelven a aplicar solo las claves de
+   Unichat (las contraseñas y tokens se conservan).
+4. **Cuenta:** la primera vez se crea el usuario y Unichat inicia sesión solo; el usuario nunca ve una
+   contraseña ni una URL de servidor.
+5. **Arranque y vigilancia:** Unichat arranca el servidor, espera a que responda, arranca los puentes y los
+   reinicia si se caen. Al salir de Unichat (menú de la bandeja → Salir) se detienen.
+
+Con eso, **actualizar Unichat = recibir todo**: nuevas versiones de puentes, del servidor y cambios de
+configuración vienen con la app.
+
+> Estado (26-oct-2026): la lógica existe como scripts de referencia para Mac (`native/setup-mac.sh` y
+> `native/run-mac.sh`). El siguiente paso es pasarla a Java dentro de Unichat para que corra al arrancar.
+
+## Dónde queda cada cosa
+
+- macOS: `~/Library/Application Support/Unichat/server/`
+- Windows: `%LOCALAPPDATA%\Unichat\server\`
+
+```
+server/
+  bin/                 tuwunel y un ejecutable por puente (+ archivo .version con la versión instalada)
+  secrets.env          token de registro y token de doble puppeting (privado)
+  CREDENCIALES.txt     usuario y contraseña de la cuenta (privado)
+  tuwunel/             tuwunel.toml + base de datos (db/)
+  appservices/         registro de cada puente (tuwunel los lee de aquí al arrancar)
+  <red>/               config.yaml, registration.yaml, <red>.db (SQLite) y bridge.log de cada puente
+  run/                 PID de cada proceso en marcha
+  bridges.active       puentes activos
+```
+
+## Versiones fijadas: `native/versions.env`
+
+Una línea por componente: `<red>=<repo>@<release>:<prefijo del ejecutable>`. El archivo que se baja es
+`<prefijo>-<sistema>-<arquitectura>` (por ejemplo `mautrix-whatsapp-darwin-arm64`) y se compara con el
+`sha256sums.txt` del mismo release; si no coincide, no se instala.
+
+**Actualizar un puente = cambiar su versión aquí** (y, si su changelog cambió el formato de configuración,
+ajustar las claves que aplica el instalador). La skill de mantenimiento de puentes hará ese trabajo:
+leer changelogs oficiales, subir versiones, migrar configuración, probar y publicar.
+
+## Configuración que aplica Unichat a cada puente
+
+La misma que el stack Docker (`server/setup.sh`), cambiando Postgres por SQLite y nombres de contenedor por
+`127.0.0.1`:
+
+- Prefijo de comandos `!<red>` (Unichat lo usa para hablar con cada bot; ver `Network.protocolId()`).
+- Permisos: el dominio propio es `user`, `@yo:localhost` es `admin`.
+- Cifrado de puente desactivado (todo es local).
+- **Doble puppeting** con el appservice `doublepuppet`: lo que envías desde el teléfono aparece como tuyo.
+- **Historial ("backfill") activado desde el principio**: 50 mensajes al crear un chat, hasta 500 al
+  ponerse al día. Importante: un chat creado con el backfill apagado no se rellena después (pasó con Telegram
+  en Docker); por eso va activado antes del primer inicio de sesión.
+- WhatsApp: solo los 50 chats más recientes al conectar; los archivados en el teléfono llegan a "Archivados"
+  (etiqueta `u.archived`, en un solo sentido).
+- Telegram: usa tu `api_id`/`api_hash` de my.telegram.org; sin ellas, Telegram queda desactivado.
+- Instagram: mautrix-meta v0.2607.0 en modo instagram (la última versión que funciona para Instagram).
+
+El servidor (`tuwunel.toml`): solo escucha en `127.0.0.1:8008`, sin federación, sin presencia ("en línea"),
+registro solo con token secreto, y lee los registros de los puentes de `appservices/`.
+
+## Plataformas
+
+| | Mac Apple Silicon | Windows x64 | Mac Intel |
+|---|---|---|---|
+| Servidor tuwunel | ✅ compila (sin cambios) | ⏳ compilando sin `jemalloc`/`io_uring`/`systemd` (solo Linux) | ❌ fuera de alcance |
+| Puentes Go (WhatsApp, Telegram, Meta, Slack, Google Messages, X, LinkedIn, Discord) | ✅ binarios oficiales | ✅ compilan con `go build -tags goolm` (no hay binarios oficiales; los compilaría nuestro CI) | ❌ |
+| Signal | ✅ binario oficial | ⚠️ la parte Rust compila; falla al enlazar con Go (pendiente) | ❌ |
+
+- **Mac Intel queda fuera**: GitHub retiró sus máquinas `macos-13` (dic-2025) y quitará las Intel restantes en
+  2027; Apple ya no da soporte a Intel.
+- Detalles de las pruebas de compilación: rama `spike/native-builds`, archivo `spike/NOTES.md`.
+
+## Pasar de Docker al servidor nativo
+
+Los chats no se migran desde Synapse. Al cambiar hay que volver a iniciar sesión en cada red una vez; los chats
+se crean de nuevo ya con historial. Lo marcado solo en Unichat (favoritos, archivados, prioridad baja) se
+pierde; los mensajes no, porque están en cada red.
+
+## Uso manual (desarrollo, Mac)
+
+```sh
+# Una vez: compilar tuwunel (o usar el que trae la app)
+cargo build --release --locked          # en un clon de tuwunel en la versión de versions.env
+TUWUNEL_BIN=<ruta>/target/release/tuwunel native/setup-mac.sh     # descarga puentes y genera configs
+native/run-mac.sh start                 # arranca todo; crea la cuenta la primera vez
+native/run-mac.sh status
+native/run-mac.sh stop
+```
+Requiere `yq` (`brew install yq`). Telegram toma las claves de `server/.env` si existen.
