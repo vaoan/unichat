@@ -46,7 +46,21 @@ class AvatarFlashUiTest {
             return photo.isVisible() && photo.getImage() != null;
         });
         assertTrue(visibleRightAway, "known photo must show in the same frame (no initials flash)");
+
+        // Opening the chat: header (34 px) and info panel (84 px) avatars are new nodes of other sizes.
+        boolean headerRightAway = fx(() -> {
+            Avatar header = new Avatar(34);
+            Avatar info = new Avatar(84);
+            header.set("Mamá", "!mama", "demo://Avatar-Mama", svc);
+            info.set("Mamá", "!mama", "demo://Avatar-Mama", svc);
+            return visiblePhoto(header) && visiblePhoto(info);
+        });
+        assertTrue(headerRightAway, "a photo seen in the list must show at once in the header and info panel too");
         svc.stop();
+    }
+
+    private static boolean visiblePhoto(Avatar a) {
+        return a.getChildren().stream().anyMatch(n -> n instanceof ImageView v && v.isVisible() && v.getImage() != null);
     }
 
     private static <T> T fx(Supplier<T> s) throws Exception {

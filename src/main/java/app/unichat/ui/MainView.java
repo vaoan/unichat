@@ -150,7 +150,20 @@ public final class MainView extends StackPane {
         });
     }
 
+    private boolean avatarsPreloaded;
+
+    /** Warms the photo cache with the most recent chats, so even the first open of a chat shows no initials. */
+    private void preloadAvatars() {
+        if (avatarsPreloaded) return;
+        java.util.List<Chat> recent = svc.chats().stream().filter(c -> !c.bridgeBot() && c.avatarUrl() != null)
+                .sorted(ChatFilter.ORDER).limit(150).toList();
+        if (recent.isEmpty()) return;
+        avatarsPreloaded = true;
+        for (Chat c : recent) ImageCache.load(c.avatarUrl(), svc);
+    }
+
     private void refreshAll() {
+        preloadAvatars();
         if (pendingOpenId != null) {
             Chat pending = svc.chat(pendingOpenId);
             if (pending != null) {

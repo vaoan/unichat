@@ -39,3 +39,9 @@
   user's app was open). Select explicitly in `focusTimeline()`.
 - **Snapshot runs stole the user's keyboard** (typed text landed in the test window): snapshot mode now shows an
   invisible, off-screen window sent to the back.
+- **Avatar flash, second round**: the first fix cached decoded images *per size*, but one contact shows at 44 px
+  (list), 34 (header), 28 (messages) and 84 (info) — every click on a chat missed the cache for header/info and
+  showed the initials. Measured with a click simulation (0 visible→hidden events, 38 misses) instead of guessing.
+  Now one decoded 168 px image per URL serves every size, loads are de-duplicated, failed URLs (bridge-bot
+  avatars on maunium.net, unreachable from a "localhost" Synapse) aren't retried per click, and the 150 most
+  recent chats' photos are preloaded. Result: 0 flashes for already-seen photos.

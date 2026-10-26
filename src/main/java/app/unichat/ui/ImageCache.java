@@ -1,37 +1,64 @@
 package app.unichat.ui;
 
+import app.unichat.service.ChatService;
 import javafx.scene.image.Image;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Fully decoded avatars/thumbnails by URL and pixel size. List cells are recycled on every refresh, so without
- * this each refresh hid the photo, showed the initials and reloaded it: the avatars flashed.
+ * Avatar photos, decoded once per URL and shared by every size (list 44 px, header 34, messages 28, info 84).
+ * Before, each size was its own download: opening a chat showed the initials in the header/info/messages and
+ * then the photo — the "flash" on every click. Concurrent requests for one URL share a single load.
  */
 final class ImageCache {
     private ImageCache() {}
 
-    private static final int MAX = 800;
+    /** Decode size: enough for the largest avatar (84 px) on a 2x screen; smaller views scale it down. */
+    static final int PX = 168;
+    private static final int MAX = 500;
+
     private static final Map<String, Image> CACHE = Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, Image> e) {
             return size() > MAX;
         }
     });
+    private static final Map<String, CompletableFuture<Image>> LOADING = new ConcurrentHashMap<>();
+    /** URLs that failed (e.g. bridge-bot avatars on remote servers a "localhost" Synapse can't fetch). */
+    private static final Map<String, Long> FAILED = new ConcurrentHashMap<>();
+    private static final long RETRY_AFTER_MS = 10 * 60 * 1000;
 
-    static String key(String url, int px) {
-        return px + "|" + url;
+    static Image get(String url) {
+        return CACHE.get(url);
     }
 
-    static Image get(String url, int px) {
-        return CACHE.get(key(url, px));
-    }
-
-    /** Only complete, error-free images are cached (decoded synchronously off the FX thread). */
-    static void put(String url, int px, Image img) {
-        if (img != null && !img.isError() && img.getProgress() >= 1.0) CACHE.put(key(url, px), img);
+    /**
+     * The photo for {@code url}: cached, already loading, or a new (single) download + decode off the FX thread.
+     * Completes with null when it can't be loaded (then the initials stay; retried after a while, not per click).
+     */
+    static CompletableFuture<Image> load(String url, ChatService svc) {
+        Image cached = CACHE.get(url);
+        if (cached != null) return CompletableFuture.completedFuture(cached);
+        Long failedAt = FAILED.get(url);
+        if (failedAt != null && System.currentTimeMillis() - failedAt < RETRY_AFTER_MS) return CompletableFuture.completedFuture(null);
+        return LOADING.computeIfAbsent(url, u -> svc.media(u, PX, PX).thenApplyAsync(path -> {
+            // Decoded completely here, so a view never shows a half-loaded (blank) image.
+            Image img = new Image(path.toUri().toString(), PX, PX, true, true, false);
+            if (img.isError()) {
+                FAILED.put(u, System.currentTimeMillis());
+                return (Image) null;
+            }
+            CACHE.put(u, img);
+            FAILED.remove(u);
+            return img;
+        }, AnimatedImage.DECODER).exceptionally(err -> {
+            FAILED.put(u, System.currentTimeMillis());
+            return null;
+        }).whenComplete((img, err) -> LOADING.remove(u)));
     }
 
     static int size() {
@@ -40,5 +67,6 @@ final class ImageCache {
 
     static void clear() {
         CACHE.clear();
+        FAILED.clear();
     }
 }
