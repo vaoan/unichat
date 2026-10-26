@@ -12,13 +12,14 @@ entregarle a otra app la sesión de otro sitio. Por eso la sesión se obtiene en
 - Si el usuario ya tiene la sesión abierta en su navegador, usarla con un clic (A).
 - Si no se puede, una ventana de inicio de sesión dentro de Unichat (B), con usuario, contraseña y
   verificación en dos pasos como en la web.
+- Alternativa: elegir un archivo **cookies.txt** (C) y, si trae lo necesario, conectar solo.
 - Funcionar en Windows (destino principal) y macOS. Varias cuentas por red.
 
 ## No objetivos
 - Safari (requiere "Acceso total al disco").
 - Chrome/Edge en Windows con el cifrado nuevo (cookies "v20", app-bound encryption, Chrome 127+): se
   detecta y se pasa directo a B, sin pedir privilegios de administrador.
-- Extensión de navegador (opción C, descartada por ahora).
+- Extensión de navegador propia (descartada por ahora).
 
 ## Anti-objetivos
 - Guardar la sesión del navegador en Unichat: solo se lee en el momento y se envía al bridge del propio
@@ -31,9 +32,12 @@ entregarle a otra app la sesión de otro sitio. Por eso la sesión se obtiene en
   Sin escribir nada, pero no sirve con Chrome/Edge en Windows.
 - **B. Ventana de login integrada** (WebView de JavaFX con la página real). Siempre funciona; hay que
   escribir la contraseña una vez.
-- **C. Extensión de navegador**. La más parecida a Spotify, pero exige instalar una extensión
+- **Extensión de navegador propia**. La más parecida a Spotify, pero exige instalar una extensión
   (y "modo desarrollador" hasta publicarla). Descartada.
-- **Elegido por el usuario: A + B.** A primero; si no encuentra sesión, B.
+- **C. Archivo cookies.txt** (formato Netscape, el que exportan extensiones como "Get cookies.txt LOCALLY"
+  y que el usuario ya usa en otros proyectos). Útil cuando A no ve el navegador (p. ej. Chrome en Windows)
+  y no se quiere escribir la contraseña.
+- **Elegido por el usuario: A + B + C.** A primero; si no encuentra sesión, B, con C siempre disponible.
 
 ## Cómo funciona (decidido)
 1. En el asistente, al elegir una red de cookies: "Buscando tu sesión de Instagram en tus navegadores…".
@@ -54,11 +58,18 @@ entregarle a otra app la sesión de otro sitio. Por eso la sesión se obtiene en
    cookies) por el mismo flujo del asistente; el asistente sigue mostrando éxito o error.
 6. Si el bridge pide un paso extra (Google Messages: confirmar emoji en el teléfono), el asistente lo
    muestra como hoy.
-7. Siempre queda un enlace discreto "Pegar cookies manualmente" para casos raros.
+7. C — botón **Elegir archivo cookies.txt…** (en la tarjeta de A y en la pantalla de B). Se leen las líneas
+   Netscape (`dominio  flag  ruta  secure  expira  nombre  valor`, incluidas las `#HttpOnly_`), se
+   filtran los dominios de la red y, si están las imprescindibles, se conecta directamente; si faltan,
+   se dice cuáles ("Al archivo le falta `sessionid`: exporta las cookies con la sesión de Instagram
+   abierta"). Cookies vencidas se ignoran.
+8. Siempre queda un enlace discreto "Pegar cookies manualmente" para casos raros.
 
 ## Pruebas
 - Descifrado de Chrome (macOS v10, Windows v10) con datos sintéticos; detección de v20.
 - Lectura de Firefox con una base `cookies.sqlite` sintética.
+- Lectura de cookies.txt: líneas `#HttpOnly_`, comentarios, cookies vencidas, dominios de otras redes, y
+  el mensaje de cookies faltantes.
 - Selección de cookies por red y armado del JSON.
 - Comprobación manual con los navegadores reales del usuario (Chrome con 3 perfiles en este Mac).
 
