@@ -106,6 +106,7 @@ public final class UnichatApp extends Application {
     /**
      * Diagnostics for screenshots/CI: {@code -Dunichat.snapshot=out.png} writes the window to a PNG
      * and exits; {@code -Dunichat.openChat=<id>} opens a chat first, {@code -Dunichat.info=true} the info panel,
+     * {@code -Dunichat.openSpace=<id>} a server's channels,
      * {@code -Dunichat.overlay=command|newchat|add|picker|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
      * {@code -Dunichat.network=<protocol id>} filters the inbox to one network.
      */
@@ -121,6 +122,8 @@ public final class UnichatApp extends Application {
             if (panelTab != null && mainView != null) mainView.showPanel(app.unichat.ui.SidePanel.Tab.valueOf(panelTab));
             String net = System.getProperty("unichat.network");
             if (net != null && mainView != null) mainView.showNetwork(app.unichat.model.Network.fromProtocolId(net));
+            String space = System.getProperty("unichat.openSpace");
+            if (space != null && mainView != null) mainView.showSpace(space);
             String overlay = System.getProperty("unichat.overlay", "");
             if (mainView != null && overlay.equals("command")) mainView.showCommandBar();
             if (mainView != null && overlay.equals("newchat")) mainView.showNewChat();

@@ -14,21 +14,22 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The rows of the inbox list: chats plus servers/groups (Matrix spaces), each server where its newest channel
- * would be. An opened server lists its channels under it (they leave their own place meanwhile, so nothing shows
- * twice); channels not joined yet come as placeholder chats. Pure (no JavaFX) so it's unit tested.
+ * The rows of the inbox list, Telegram-forum style: a server/group (Matrix space) is one row, placed at its newest
+ * channel's time with their unread total, and its channels live inside it ({@link #channels}) instead of in the
+ * list. A search lists channels too, and archived channels go to the archive on their own. Pure (no JavaFX).
  */
 public final class InboxRows {
     /**
-     * {@code depth}: indentation of rows inside an opened server (absent = 0). {@code unjoined}: placeholder rows for
-     * channels you aren't in. {@code unread}/{@code latest}: per server, unread messages and its newest channel.
+     * {@code unjoined}: placeholder rows for channels you aren't in. {@code unread}/{@code latest}: per server, its
+     * unread messages and its newest channel.
      */
-    public record Rows(List<Chat> rows, Map<String, Integer> depth, Set<String> unjoined, Map<String, Integer> unread,
-                       Map<String, Chat> latest) {}
+    public record Rows(List<Chat> rows, Set<String> unjoined, Map<String, Integer> unread, Map<String, Chat> latest) {
+        public static final Rows EMPTY = new Rows(List.of(), Set.of(), Map.of(), Map.of());
+    }
 
     private InboxRows() {}
 
-    public static Rows build(List<Chat> all, ChatFilter f, Set<String> expanded, Map<String, String> names) {
+    public static Rows build(List<Chat> all, ChatFilter f, Map<String, String> names) {
         Set<Network> networks = new LinkedHashSet<>();
         if (f.network() != null) networks.add(f.network());
         else for (Chat c : all) if (c.space() && !c.personalSpace()) networks.add(c.network());
@@ -36,40 +37,68 @@ public final class InboxRows {
         Map<String, Integer> unread = new HashMap<>();
         Map<String, Chat> latest = new HashMap<>();
         Map<String, Instant> activity = new HashMap<>();
-        List<SpaceTree.Node> servers = new ArrayList<>();
+        Set<String> inServer = new HashSet<>();
+        List<Chat> top = new ArrayList<>();
         for (Network n : networks) {
             for (SpaceTree.Node node : SpaceTree.build(all, n, f.accountId(), names)) {
                 if (node.loose() || node.chat() == null) continue;
                 describe(node, unread, latest, activity);
-                if (matches(f, node, unread.get(node.id()))) servers.add(node);
+                collect(node, inServer);
+                if (matches(f, node, unread.get(node.id()))) top.add(node.chat());
             }
         }
-
-        // Channels of an opened server are listed under it, not in their own place.
-        Set<String> underServer = new HashSet<>();
-        for (SpaceTree.Node s : servers) if (expanded.contains(s.id())) collectShown(s, expanded, underServer);
-
-        List<Chat> top = new ArrayList<>();
-        for (Chat c : f.apply(all)) if (!underServer.contains(c.id())) top.add(c);
-        Map<String, SpaceTree.Node> serverById = new HashMap<>();
-        for (SpaceTree.Node s : servers) {
-            top.add(s.chat());
-            serverById.put(s.id(), s);
-        }
+        // A channel lives in its server, except in a search and in the archive (where archived channels go).
+        boolean flat = f.searching() || f.view() == ChatFilter.View.ARCHIVE;
+        for (Chat c : f.apply(all)) if (flat || !inServer.contains(c.id())) top.add(c);
         top.sort(Comparator.comparing(Chat::pinned).reversed()
                 .thenComparing((Chat c) -> activity.getOrDefault(c.id(), c.lastActivity()), Comparator.reverseOrder())
                 .thenComparing((Chat c) -> !c.space())
                 .thenComparing(Chat::title));
+        return new Rows(top, Set.of(), unread, latest);
+    }
 
-        List<Chat> rows = new ArrayList<>();
-        Map<String, Integer> depth = new HashMap<>();
+    /** The channels of server {@code spaceId}, newest first, then the ones you could join (and sub-groups' channels). */
+    public static Rows channels(List<Chat> all, String spaceId, String accountId, Map<String, String> names) {
+        Chat space = all.stream().filter(c -> c.id().equals(spaceId)).findFirst().orElse(null);
+        if (space == null) return Rows.EMPTY;
+        SpaceTree.Node node = find(SpaceTree.build(all, space.network(), accountId, names), spaceId);
+        if (node == null) return Rows.EMPTY;
+        List<Chat> joined = new ArrayList<>();
+        List<Chat> toJoin = new ArrayList<>();
         Set<String> unjoined = new HashSet<>();
-        for (Chat c : top) {
-            rows.add(c);
-            SpaceTree.Node s = serverById.get(c.id());
-            if (s != null && expanded.contains(s.id())) addChildren(s, 1, expanded, rows, depth, unjoined);
+        leaves(node, space.network(), joined, toJoin, unjoined);
+        joined.sort(ChatFilter.ORDER);
+        List<Chat> rows = new ArrayList<>(joined);
+        rows.addAll(toJoin);
+        Map<String, Integer> unread = new HashMap<>();
+        Map<String, Chat> latest = new HashMap<>();
+        describe(node, unread, latest, new HashMap<>());
+        return new Rows(rows, unjoined, unread, latest);
+    }
+
+    private static SpaceTree.Node find(List<SpaceTree.Node> nodes, String id) {
+        for (SpaceTree.Node n : nodes) {
+            if (n.id().equals(id)) return n;
+            SpaceTree.Node f = find(n.children(), id);
+            if (f != null) return f;
         }
-        return new Rows(rows, depth, unjoined, unread, latest);
+        return null;
+    }
+
+    private static void leaves(SpaceTree.Node node, Network network, List<Chat> joined, List<Chat> toJoin, Set<String> unjoined) {
+        for (SpaceTree.Node c : node.children()) {
+            if (c.container()) {
+                leaves(c, network, joined, toJoin, unjoined);
+            } else if (c.chat() != null) {
+                joined.add(c.chat());
+            } else {
+                Chat p = new Chat(c.id());
+                p.setTitle(c.name());
+                p.setNetwork(network);
+                toJoin.add(p);
+                unjoined.add(c.id());
+            }
+        }
     }
 
     private static boolean matches(ChatFilter f, SpaceTree.Node node, int unread) {
@@ -82,6 +111,13 @@ public final class InboxRows {
             case ARCHIVE -> s.archived();
             case FAVORITES -> s.favorite() && !s.archived();
         };
+    }
+
+    private static void collect(SpaceTree.Node node, Set<String> out) {
+        for (SpaceTree.Node c : node.children()) {
+            out.add(c.id());
+            if (c.container()) collect(c, out);
+        }
     }
 
     /** Unread count, newest channel and its time for a server and every server inside it. */
@@ -98,28 +134,5 @@ public final class InboxRows {
             activity.put(node.id(), newest.lastActivity());
         }
         return newest;
-    }
-
-    private static void collectShown(SpaceTree.Node s, Set<String> expanded, Set<String> out) {
-        for (SpaceTree.Node c : s.children()) {
-            out.add(c.id());
-            if (c.container() && expanded.contains(c.id())) collectShown(c, expanded, out);
-        }
-    }
-
-    private static void addChildren(SpaceTree.Node s, int level, Set<String> expanded, List<Chat> rows,
-                                    Map<String, Integer> depth, Set<String> unjoined) {
-        for (SpaceTree.Node c : s.children()) {
-            Chat row = c.chat();
-            if (row == null) {
-                row = new Chat(c.id());
-                row.setTitle(c.name());
-                row.setNetwork(s.chat().network());
-                unjoined.add(c.id());
-            }
-            rows.add(row);
-            depth.put(c.id(), level);
-            if (c.container() && expanded.contains(c.id())) addChildren(c, level + 1, expanded, rows, depth, unjoined);
-        }
     }
 }

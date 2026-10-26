@@ -54,11 +54,16 @@ public final class ChatListPane extends VBox {
     private final Consumer<Chat> onOpen;
     private String selectedId;
     private boolean updating;
-    /** Servers opened in the Bandeja (their channels listed under them). */
-    private final java.util.Set<String> openServers = new java.util.HashSet<>();
-    /** The server/channel-to-join row the keyboard is on, if any. */
+    /** The server row the keyboard is on, if any (it opens on Enter, not on arrowing). */
     private String arrowedRow;
-    private InboxRows.Rows rows = new InboxRows.Rows(List.of(), java.util.Map.of(), java.util.Set.of(), java.util.Map.of(), java.util.Map.of());
+    private InboxRows.Rows rows = InboxRows.Rows.EMPTY;
+    /** The server whose channels cover the list (Telegram-forum style), or null. */
+    private String openSpace;
+    private InboxRows.Rows spaceRows = InboxRows.Rows.EMPTY;
+    private final ObservableList<Chat> spaceItems = FXCollections.observableArrayList();
+    private final ListView<Chat> spaceList = new ListView<>(spaceItems);
+    private final Label spaceTitle = new Label();
+    private final VBox spaceView;
 
     public ChatListPane(ChatService svc, Consumer<Chat> onOpen) {
         this.svc = svc;
@@ -120,10 +125,8 @@ public final class ChatListPane extends VBox {
         list.setCellFactory(v -> new ChatCell());
         list.setOnKeyPressed(e -> {
             Chat sel = list.getSelectionModel().getSelectedItem();
-            if (e.getCode() == KeyCode.ENTER) open(sel);
-            if (sel != null && sel.space() && (e.getCode() == KeyCode.RIGHT) != openServers.contains(sel.id())
-                    && (e.getCode() == KeyCode.RIGHT || e.getCode() == KeyCode.LEFT)) {
-                toggleServer(sel.id());
+            if (e.getCode() == KeyCode.ENTER || (e.getCode() == KeyCode.RIGHT && sel != null && sel.space())) {
+                open(sel);
                 e.consume();
             }
         });
@@ -141,7 +144,32 @@ public final class ChatListPane extends VBox {
         accountRow.getStyleClass().addAll("chip-row", "account-row");
         accountRow.setAccessibleText("Cuentas");
         VBox.setVgrow(groups, Priority.ALWAYS);
-        getChildren().addAll(header, viewToggle, searchBox, chipRow, accountRow, favorites, list, groups);
+        // A server's channels slide over the list, like a Telegram forum's topics.
+        javafx.scene.control.Button back = Composer.iconButton(Icons.CHEVRON_LEFT, "Volver a la bandeja", this::closeSpace);
+        spaceTitle.getStyleClass().add("space-title");
+        spaceTitle.setMinWidth(0);
+        HBox spaceHeader = new HBox(8, back, spaceTitle);
+        spaceHeader.setAlignment(Pos.CENTER_LEFT);
+        spaceHeader.getStyleClass().add("space-header");
+        spaceList.getStyleClass().addAll("chat-list", "space-list");
+        spaceList.setCellFactory(v -> new ChatCell());
+        spaceList.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ENTER) open(spaceList.getSelectionModel().getSelectedItem());
+            if (e.getCode() == KeyCode.ESCAPE || e.getCode() == KeyCode.LEFT) {
+                closeSpace();
+                e.consume();
+            }
+        });
+        spaceList.getSelectionModel().selectedItemProperty().addListener((o, a, c) -> {
+            if (!updating && c != null && spaceList.isFocused() && actsLikeChat(c)) open(c);
+        });
+        VBox.setVgrow(spaceList, Priority.ALWAYS);
+        spaceView = new VBox(6, spaceHeader, spaceList);
+        spaceView.getStyleClass().add("space-view");
+        VBox.setVgrow(spaceView, Priority.ALWAYS);
+        spaceView.setVisible(false);
+        spaceView.setManaged(false);
+        getChildren().addAll(header, viewToggle, searchBox, chipRow, accountRow, favorites, list, groups, spaceView);
         filter.addListener((o, a, b) -> {
             syncChips(b);
             refresh();
@@ -182,6 +210,11 @@ public final class ChatListPane extends VBox {
 
     /** Focuses the chat list (F6 cycle), keeping the open chat selected. */
     public void focusList() {
+        if (openSpace != null) {
+            spaceList.requestFocus();
+            if (spaceList.getSelectionModel().isEmpty() && !spaceItems.isEmpty()) spaceList.getSelectionModel().select(0);
+            return;
+        }
         if (showingGroups) {
             groups.requestFocus();
             if (groups.getSelectionModel().isEmpty()) groups.getSelectionModel().select(0);
@@ -201,18 +234,28 @@ public final class ChatListPane extends VBox {
     public void refresh() {
         ChatFilter f = filter.get();
         List<Chat> all = svc.chats();
-        rows = InboxRows.build(all, f, openServers, groups.names());
+        rows = InboxRows.build(all, f, groups.names());
         List<Chat> visible = rows.rows();
         groups.checkPending();
-        openServers.forEach(groups::ensureNames);
+        if (openSpace != null && (f.searching() || svc.chat(openSpace) == null)) openSpace = null;
+        if (openSpace != null) {
+            Chat s = svc.chat(openSpace);
+            spaceTitle.setText(s.title());
+            spaceRows = InboxRows.channels(all, openSpace, f.accountId(), groups.names());
+            spaceList.setAccessibleText("Canales de " + s.title());
+        } else {
+            spaceRows = InboxRows.Rows.EMPTY;
+        }
         updating = true;
         try {
             items.setAll(visible);
+            spaceItems.setAll(spaceRows.rows());
             selectInList();
         } finally {
             updating = false;
         }
         list.refresh();
+        spaceList.refresh();
 
         String base = switch (f.view()) {
             case INBOX -> f.unreadOnly() ? "No leídos" : "Bandeja";
@@ -230,7 +273,7 @@ public final class ChatListPane extends VBox {
                     ? "Aún no conectaste ninguna red.\nHaz clic en una red de la izquierda (o en +) para iniciar sesión."
                 : "No hay chats aquí todavía");
 
-        boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && !showingGroups;
+        boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && !showingGroups && openSpace == null;
         List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.personalSpace() && !c.archived() && !c.bridgeBot()
                 && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).limit(8).toList() : List.of();
         favorites.getChildren().setAll(favs.stream().map(this::favoriteTile).toList());
@@ -267,6 +310,15 @@ public final class ChatListPane extends VBox {
         if (showingGroups) {
             groups.refresh(n, f.accountId());
         }
+        boolean space = openSpace != null;
+        for (Node x : List.of(viewToggle, chipRow, accountRow, favorites, list, groups)) {
+            if (space) {
+                x.setVisible(false);
+                x.setManaged(false);
+            }
+        }
+        spaceView.setVisible(space);
+        spaceView.setManaged(space);
     }
 
     /** "Todas · Personal · Trabajo" chips, shown only for a network with several accounts. */
@@ -314,6 +366,10 @@ public final class ChatListPane extends VBox {
                 }
             }
         }
+        int si = -1;
+        for (int i = 0; i < spaceItems.size(); i++) if (spaceItems.get(i).id().equals(selectedId)) si = i;
+        if (si >= 0) spaceList.getSelectionModel().select(si);
+        else spaceList.getSelectionModel().clearSelection();
         if (selectedId == null) {
             list.getSelectionModel().clearSelection();
             return;
@@ -385,39 +441,53 @@ public final class ChatListPane extends VBox {
         return sp > 0 ? t.substring(0, sp) : t;
     }
 
-    /** A favourite server opens in the list (with its channels) instead of toggling. */
     private void openFavorite(Chat c) {
-        if (!c.space()) {
-            open(c);
-            return;
-        }
-        if (!openServers.contains(c.id())) toggleServer(c.id());
-        int i = items.indexOf(c);
-        if (i >= 0) {
-            list.scrollTo(i);
-            list.getSelectionModel().select(i);
-        }
+        open(c);
     }
 
     private boolean actsLikeChat(Chat c) {
-        return !c.space() && !rows.unjoined().contains(c.id());
+        return !c.space() && !spaceRows.unjoined().contains(c.id());
     }
 
-    private void toggleServer(String id) {
-        if (!openServers.remove(id)) {
-            openServers.add(id);
-            groups.ensureNames(id);
-        }
+    /** Shows a server's channels over the list. */
+    private void openSpace(String id) {
+        openSpace = id;
+        arrowedRow = id;
+        groups.ensureNames(id);
         refresh();
+        spaceList.requestFocus();
+        if (spaceList.getSelectionModel().isEmpty() && !spaceItems.isEmpty()) {
+            updating = true;
+            spaceList.getSelectionModel().select(0);
+            updating = false;
+        }
+    }
+
+    /** Back to the list, on the server you came from. */
+    private void closeSpace() {
+        String was = openSpace;
+        openSpace = null;
+        refresh();
+        list.requestFocus();
         for (int i = 0; i < items.size(); i++) {
-            if (items.get(i).id().equals(id)) {
-                arrowedRow = id;
+            if (items.get(i).id().equals(was)) {
+                arrowedRow = was;
                 updating = true;
                 list.getSelectionModel().select(i);
+                list.scrollTo(i);
                 updating = false;
                 break;
             }
         }
+    }
+
+    public void showSpace(String id) {
+        if (svc.chat(id) != null) openSpace(id);
+    }
+
+    /** Whether a server's channels are covering the list (Esc goes back). */
+    public boolean spaceOpen() {
+        return openSpace != null;
     }
 
     private ContextMenu menuFor(Chat c) {
@@ -427,10 +497,10 @@ public final class ChatListPane extends VBox {
     private void open(Chat c) {
         if (c == null) return;
         if (c.space()) {
-            toggleServer(c.id());
+            openSpace(c.id());
             return;
         }
-        if (rows.unjoined().contains(c.id())) {
+        if (spaceRows.unjoined().contains(c.id())) {
             groups.join(c.id(), c.title());
             return;
         }
@@ -496,7 +566,7 @@ public final class ChatListPane extends VBox {
             text.setMinWidth(0);
             disclosure.getStyleClass().add("disclosure");
             disclosure.setMinWidth(Region.USE_PREF_SIZE);
-            root = new HBox(12, disclosure, avatar, text);
+            root = new HBox(12, avatar, text, disclosure);
             root.setAlignment(Pos.CENTER_LEFT);
             root.setMinWidth(0);
             // Size cells to the viewport instead of their content, so no horizontal scrollbar appears.
@@ -505,7 +575,7 @@ public final class ChatListPane extends VBox {
                 if (e.getButton() == MouseButton.PRIMARY && getItem() != null) open(getItem());
             });
             setOnContextMenuRequested(e -> {
-                if (getItem() != null && !rows.unjoined().contains(getItem().id())) menuFor(getItem()).show(this, e.getScreenX(), e.getScreenY());
+                if (getItem() != null && !spaceRows.unjoined().contains(getItem().id())) menuFor(getItem()).show(this, e.getScreenX(), e.getScreenY());
             });
         }
 
@@ -553,8 +623,8 @@ public final class ChatListPane extends VBox {
             badge.setManaged(unread);
             toggle(badge, "muted", c.muted());
             toggle(badge, "dot", n == 0 && c.mentionCount() == 0);
-            boolean space = c.space(), unjoined = rows.unjoined().contains(c.id());
-            disclosure.setGraphic(space ? Icons.icon(openServers.contains(c.id()) ? Icons.CHEVRON_DOWN : Icons.CHEVRON_RIGHT, 14) : null);
+            boolean space = c.space(), unjoined = spaceRows.unjoined().contains(c.id());
+            disclosure.setGraphic(space ? Icons.icon(Icons.CHEVRON_RIGHT, 14) : null);
             disclosure.setVisible(space);
             disclosure.setManaged(space);
             toggle(name, "unjoined", unjoined);
@@ -572,10 +642,9 @@ public final class ChatListPane extends VBox {
                 badge.setVisible(un);
                 badge.setManaged(un);
                 toggle(badge, "dot", false);
-                boolean open = openServers.contains(c.id());
                 a11y = c.title() + ", " + (c.network() == app.unichat.model.Network.DISCORD ? "servidor" : "grupo") + " de "
                         + c.network().displayName() + (un ? ", " + u + " sin leer" : "") + (c.muted() ? ", silenciado" : "")
-                        + (open ? ", desplegado" : ", contraído") + (latest == null ? "" : ". " + latest.title() + ": " + latest.lastPreview());
+                        + (latest == null ? "" : ". " + latest.title() + ": " + latest.lastPreview()) + ". Abre sus canales";
             } else if (unjoined) {
                 stamp.setText("");
                 preview.setText("Toca para unirte");
@@ -583,10 +652,9 @@ public final class ChatListPane extends VBox {
                 badge.setManaged(false);
                 a11y = c.title() + ", canal sin unirte, Unirse";
             }
-            int depth = rows.depth().getOrDefault(c.id(), 0);
             setGraphic(root);
             setAccessibleText(a11y);
-            setPadding(compact ? new Insets(4, 10, 4, 10 + depth * 22) : new Insets(8, 10, 8, 10 + depth * 22));
+            setPadding(compact ? new Insets(4, 10, 4, 10) : new Insets(8, 10, 8, 10));
             pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("current"), Objects.equals(c.id(), selectedId));
         }
 

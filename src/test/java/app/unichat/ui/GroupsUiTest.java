@@ -192,28 +192,45 @@ class GroupsUiTest {
         return (javafx.scene.control.ListView<app.unichat.model.Chat>) s.getRoot().lookup(".chat-list");
     }
 
+    private static List<String> spaceTexts(Scene s) {
+        return s.getRoot().lookupAll(".space-list .list-cell").stream()
+                .map(n -> (String) n.queryAccessibleAttribute(javafx.scene.AccessibleAttribute.TEXT))
+                .filter(t -> t != null && !t.isEmpty()).toList();
+    }
+
     @Test
-    void serversAreRowsOfTheBandejaThatOpenInPlace() throws Exception {
+    void aServerIsOneRowWhoseChannelsCoverTheList() throws Exception {
         Scene scene = open(null); // Todos: every network
-        assertTrue(fx(() -> listTexts(scene)).stream().anyMatch(t -> t.startsWith("Servidor Unichat, servidor de Discord")
-                && t.contains("2 sin leer") && t.contains("contraído")), fx(() -> listTexts(scene)).toString());
+        List<String> rows = fx(() -> listTexts(scene));
+        assertTrue(rows.stream().anyMatch(t -> t.startsWith("Servidor Unichat, servidor de Discord") && t.contains("2 sin leer")), rows.toString());
+        assertTrue(fx(() -> chatList(scene).getItems()).stream().noneMatch(c -> c.id().equals("!srv-general:demo")),
+                "its channels live inside it, like a Telegram forum");
         var list = fx(() -> chatList(scene));
         int server = fx(() -> list.getItems().indexOf(svc.chat("!servidor:demo")));
         fx(() -> { list.requestFocus(); list.getSelectionModel().select(server); return null; });
         key(list, KeyCode.ENTER);
-        fx(() -> { list.scrollTo(server); return null; });
         Thread.sleep(200);
-        List<String> rows = fx(() -> listTexts(scene));
-        assertTrue(rows.stream().anyMatch(t -> t.startsWith("Servidor Unichat") && t.contains("desplegado")), rows.toString());
-        assertTrue(rows.stream().anyMatch(t -> t.startsWith("#anuncios, canal sin unirte")), rows.toString());
-        assertEquals(server + 1, (int) fx(() -> list.getItems().indexOf(svc.chat("!srv-general:demo"))), "channels under their server");
-        key(list, KeyCode.LEFT);
-        assertTrue(fx(() -> listTexts(scene)).stream().noneMatch(t -> t.startsWith("#anuncios")), "closed again");
+        assertTrue(fx(() -> scene.getRoot().lookup(".space-view").isVisible()));
+        assertFalse(fx(() -> list.isVisible()), "the channels cover the list");
+        List<String> channels = fx(() -> spaceTexts(scene));
+        assertTrue(channels.stream().anyMatch(t -> t.startsWith("#general")), channels.toString());
+        assertTrue(channels.stream().anyMatch(t -> t.startsWith("#anuncios, canal sin unirte")), channels.toString());
+
+        var spaceList = fx(() -> (javafx.scene.control.ListView<?>) scene.getRoot().lookup(".space-list"));
+        int general = fx(() -> spaceList.getItems().indexOf(svc.chat("!srv-general:demo")));
+        fx(() -> { spaceList.getSelectionModel().select(general); return null; });
+        key(spaceList, KeyCode.ENTER);
+        assertEquals("!srv-general:demo", fx(() -> thread(scene).chat().id()), "a channel opens like a chat");
+        assertTrue(fx(() -> scene.getRoot().lookup(".space-view").isVisible()), "and the server stays open");
+
+        key(spaceList, KeyCode.ESCAPE);
+        assertFalse(fx(() -> scene.getRoot().lookup(".space-view").isVisible()), "Esc goes back");
+        assertTrue(fx(() -> list.isVisible()));
         svc.stop();
     }
 
     @Test
-    void aFavouriteServerShowsInFavoritesAndOpensInTheList() throws Exception {
+    void aFavouriteServerOpensItsChannels() throws Exception {
         Scene scene = open(null);
         svc.setFavorite("!servidor:demo", true);
         Thread.sleep(400);
@@ -222,7 +239,7 @@ class GroupsUiTest {
                 .findFirst().orElseThrow());
         key(tile, KeyCode.ENTER);
         Thread.sleep(200);
-        assertTrue(fx(() -> listTexts(scene)).stream().anyMatch(t -> t.startsWith("#anuncios")), "the server opened in the list, scrolled to it");
+        assertTrue(fx(() -> spaceTexts(scene)).stream().anyMatch(t -> t.startsWith("#anuncios")), fx(() -> spaceTexts(scene)).toString());
         svc.stop();
     }
 

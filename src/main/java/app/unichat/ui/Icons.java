@@ -28,6 +28,7 @@ public final class Icons {
     public static final String EDIT = "M4 17.3V20h2.7l9.9-9.9-2.7-2.7L4 17.3Zm16.7-10.1a1 1 0 0 0 0-1.4l-2.5-2.5a1 1 0 0 0-1.4 0l-1.6 1.6 3.9 3.9 1.6-1.6Z";
     public static final String TRASH = "M9 3h6l1 1h4v2H4V4h4l1-1ZM5 7h14l-1 14H6L5 7Zm4 3v8h2v-8H9Zm4 0v8h2v-8h-2Z";
     public static final String CHEVRON_RIGHT = "M9 6l6 6-6 6-1.4-1.4 4.6-4.6-4.6-4.6L9 6Z";
+    public static final String CHEVRON_LEFT = "M15 6l-6 6 6 6 1.4-1.4-4.6-4.6 4.6-4.6L15 6Z";
     public static final String CHEVRON_DOWN = "M6 9l6 6 6-6-1.4-1.4-4.6 4.6-4.6-4.6L6 9Z";
     public static final String PLUS = "M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z";
     public static final String CHAT = "M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2Zm0 2v11.2L7.2 16H20V6H4Z";

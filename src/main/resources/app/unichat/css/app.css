@@ -749,6 +749,8 @@
 .list-view-toggle .toggle-button:selected { -fx-background-color: -accent; -fx-text-fill: white; -fx-font-weight: bold; }
 .list-view-toggle .toggle-button:focused { -fx-border-color: -text; -fx-border-radius: 8; }
 .root.contrast .list-view-toggle { -fx-border-color: -text; -fx-border-radius: 10; }
+.space-header { -fx-padding: 0 4; }
+.space-title { -fx-font-weight: bold; -fx-font-size: 1.1em; -fx-text-fill: -text; }
 .chat-cell .disclosure { -fx-text-fill: -text-2; -fx-font-size: 0.85em; }
 .chat-cell .chat-name.unjoined { -fx-opacity: 0.6; }
 .groups-tree { -fx-background-color: transparent; -fx-padding: 4 0; }

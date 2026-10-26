@@ -258,6 +258,11 @@ public final class MainView extends StackPane {
         listPane.refresh();
     }
 
+    /** Shows a server's channels over the chat list (snapshot diagnostics). */
+    public void showSpace(String id) {
+        listPane.showSpace(id);
+    }
+
     public void openChatId(String id) {
         if (id == null) return;
         Chat c = svc.chat(id);
