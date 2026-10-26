@@ -28,3 +28,14 @@
   loaded after the sync and `accounts()` skipped networks without known rooms; every start downloaded ~6 MB.
   Now logins load at start, the last full sync is cached on disk and the network sync resumes from its token.
   `StartupBeforeSyncTest` (fake homeserver with a 5 s /sync) guards it — it fails if either fix is removed.
+- **Stickers never animated**: images loaded the server *thumbnail* (a static PNG of frame 1), and JavaFX can't
+  read WebP at all. Stickers/GIF/WebP now load the original; animated WebP is composited from its ANMF chunks
+  (TwelveMonkeys only returns raw patches without durations) — `AnimatedImageTest` uses a synthetic fixture.
+  Decoding long stickers takes seconds: show the thumbnail first. Reduce-motion shows frame 1 only.
+- **Avatars flashed** on every inbox refresh: recycled cells hid the photo and reloaded it (background-loaded
+  `Image` is blank until decoded). `ImageCache` keeps fully decoded images; `AvatarFlashUiTest` guards it.
+- **Node.isFocused() needs the window to have OS focus**: F6 into the timeline only selected a message via the
+  focused listener, so it silently failed when the window wasn't frontmost (and KeyboardUiTest failed while the
+  user's app was open). Select explicitly in `focusTimeline()`.
+- **Snapshot runs stole the user's keyboard** (typed text landed in the test window): snapshot mode now shows an
+  invisible, off-screen window sent to the back.

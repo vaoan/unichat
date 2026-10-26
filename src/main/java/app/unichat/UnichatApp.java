@@ -76,7 +76,13 @@ public final class UnichatApp extends Application {
             default -> null;
         };
         if (restored != null) showMain(restored); else showLogin();
+        if (System.getProperty("unichat.snapshot") != null) {
+            // Diagnostics run: invisible and behind other windows so it never takes the user's keyboard.
+            stage.setOpacity(0);
+            stage.setX(-10000);
+        }
         stage.show();
+        if (System.getProperty("unichat.snapshot") != null) stage.toBack();
         // -Dunichat.startLogin=<protocol id>: open Ajustes > Cuentas with that network's login wizard.
         String startLogin = System.getProperty("unichat.startLogin");
         if (startLogin != null && mainView != null) {

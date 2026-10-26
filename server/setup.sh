@@ -168,7 +168,8 @@ for b in $ACTIVE; do
     fi
     if [ "$b" = telegram ]; then
       export TG_API_ID="$TELEGRAM_API_ID" TG_API_HASH="$TELEGRAM_API_HASH"
-      expr="$expr"' | .network.api_id = env(TG_API_ID) | .network.api_hash = strenv(TG_API_HASH)'
+      expr="$expr"' | .network.api_id = env(TG_API_ID) | .network.api_hash = strenv(TG_API_HASH)
+        | .network.animated_sticker.target = "gif" | .network.animated_sticker.convert_from_webm = true'
     fi
   else
     # Legacy Go bridge layout (mautrix-discord)
@@ -263,5 +264,5 @@ cat <<EOF
 Listo. En Unichat inicia sesión con:
   Servidor: http://localhost:8008   (o el dominio público si lo publicaste)
   Usuario:  $ADMIN_USER   (contraseña en server/CREDENCIALES.txt)
-Luego usa "Conectar una red" para cada red. Más detalles en docs/BRIDGES.md.
+Luego agrega tus cuentas en Ajustes → Cuentas. Más detalles en docs/BRIDGES.md.
 EOF

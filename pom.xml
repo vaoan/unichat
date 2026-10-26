@@ -34,6 +34,12 @@
       <version>${jackson.version}</version>
     </dependency>
     <dependency>
+      <!-- WebP decoding (WhatsApp stickers are animated WebP); JavaFX can't read WebP. -->
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-webp</artifactId>
+      <version>3.12.0</version>
+    </dependency>
+    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <version>5.10.3</version>
@@ -87,6 +93,8 @@
                 </filter>
               </filters>
               <transformers>
+                <!-- Keeps ImageIO plugin registrations (META-INF/services) of all jars in the fat jar. -->
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <mainClass>${main.class}</mainClass>
                 </transformer>

@@ -33,9 +33,13 @@ class KeyboardUiTest {
     @Test
     void keyboardOnlyNavigationReplyReactAndZoom() throws Exception {
         System.setProperty("java.awt.headless", "true"); // no tray icon in tests
-        CountDownLatch started = new CountDownLatch(1);
-        Platform.startup(started::countDown);
-        started.await(10, TimeUnit.SECONDS);
+        try {
+            CountDownLatch started = new CountDownLatch(1);
+            Platform.startup(started::countDown);
+            started.await(10, TimeUnit.SECONDS);
+        } catch (IllegalStateException alreadyRunning) {
+            // another UI test started the toolkit
+        }
 
         MockChatService svc = new MockChatService();
         Scene scene = fx(() -> {

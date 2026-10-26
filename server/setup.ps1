@@ -181,7 +181,8 @@ foreach ($b in $Active) {
         }
         if ($b -eq "telegram") {
             $vars.TG_API_ID = $TgId; $vars.TG_API_HASH = $TgHash
-            $expr += ' | .network.api_id = env(TG_API_ID) | .network.api_hash = strenv(TG_API_HASH)'
+            $expr += ' | .network.api_id = env(TG_API_ID) | .network.api_hash = strenv(TG_API_HASH)' +
+                ' | .network.animated_sticker.target = "gif" | .network.animated_sticker.convert_from_webm = true'
         }
     } else {
         # Legacy Go layout (mautrix-discord)
@@ -262,5 +263,5 @@ Write-Host @"
 Listo. En Unichat inicia sesión con:
   Servidor: http://localhost:8008   (o el dominio público si lo publicaste)
   Usuario:  $AdminUser   (contraseña en server\CREDENCIALES.txt)
-Luego usa "Conectar una red" para cada red. Más detalles en docs\BRIDGES.md.
+Luego agrega tus cuentas en Ajustes -> Cuentas. Más detalles en docs\BRIDGES.md.
 "@

@@ -405,6 +405,7 @@ final class SyncProcessor {
             m.setBody("");
         }
         JsonNode info = content.path("info");
+        m.setMimeType(text(info, "mimetype"));
         m.setSize(info.path("w").asInt(0), info.path("h").asInt(0));
         m.setFileSize(info.path("size").asLong(0));
     }

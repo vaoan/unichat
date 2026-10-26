@@ -64,16 +64,26 @@ public final class Avatar extends StackPane {
         }
         if (url.equals(loadedUrl)) return;
         loadedUrl = url;
-        image.setVisible(false);
         int px = (int) Math.ceil(size * 2);
-        service.media(url, px, px).thenAccept(path -> {
-            Image img = new Image(path.toUri().toString(), px, px, true, true, true);
+        Image cached = ImageCache.get(url, px);
+        if (cached != null) {
+            // Recycled cell or rebuilt tile: show the known photo at once instead of flashing the initials.
+            image.setImage(cached);
+            image.setVisible(true);
+            return;
+        }
+        image.setVisible(false);
+        service.media(url, px, px).thenAcceptAsync(path -> {
+            // Decoded completely here, so the view never shows a half-loaded (blank) image.
+            Image img = new Image(path.toUri().toString(), px, px, true, true, false);
+            if (img.isError()) return;
+            ImageCache.put(url, px, img);
             Platform.runLater(() -> {
                 if (!url.equals(loadedUrl)) return;
                 image.setImage(img);
                 image.setVisible(true);
             });
-        });
+        }, AnimatedImage.DECODER);
     }
 
     public void setNetwork(Network network, boolean visible) {

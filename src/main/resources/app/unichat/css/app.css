@@ -664,3 +664,13 @@
 .link-button { -fx-text-fill: -text-3; -fx-underline: true; -fx-font-size: 0.86em; -fx-padding: 2 4; }
 .accounts-sheet .text-area { -fx-background-color: -surface-2; }
 .primary-button .icon { -fx-background-color: white; }
+
+/* ================================================================ stickers */
+.bubble.sticker, .bubble.out.sticker, .root.contrast .bubble.sticker {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+.sticker-box { -fx-background-color: transparent; }
+.bubble.sticker .bubble-meta .label, .bubble.out.sticker .bubble-meta .label { -fx-text-fill: -text-3; }
+.bubble.sticker .bubble-meta .icon, .bubble.out.sticker .bubble-meta .icon { -fx-background-color: -text-3; }

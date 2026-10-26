@@ -388,7 +388,11 @@ public final class ThreadPane extends BorderPane {
 
     /** Moves keyboard focus into the message list (F6 cycle). */
     public void focusTimeline() {
-        if (chat != null) list.requestFocus();
+        if (chat == null) return;
+        list.requestFocus();
+        // Explicit, not only via the focused listener: a node only counts as focused while its window has the
+        // OS focus, so F6 must not depend on that.
+        if (list.getSelectionModel().isEmpty() && !rows.isEmpty()) list.getSelectionModel().select(rows.size() - 1);
     }
 
     private Node messageNode(ThreadRows.MessageRow row, double width) {
@@ -490,7 +494,7 @@ public final class ThreadPane extends BorderPane {
             l.getStyleClass().add("deleted-text");
             bubble.getChildren().add(l);
         } else if (m.type() == MessageType.IMAGE || m.type() == MessageType.STICKER) {
-            bubble.getStyleClass().add("media");
+            bubble.getStyleClass().add(m.type() == MessageType.STICKER ? "sticker" : "media");
             bubble.getChildren().add(imageNode(m));
         } else if (m.isMedia()) {
             bubble.getChildren().add(fileNode(m));
@@ -550,23 +554,31 @@ public final class ThreadPane extends BorderPane {
         double h = m.height() > 0 ? m.height() : 180;
         double scale = Math.min(1, Math.min(MAX_MEDIA / w, MAX_MEDIA / h));
         double dw = Math.max(80, w * scale), dh = Math.max(60, h * scale);
+        boolean sticker = m.type() == MessageType.STICKER;
+        if (sticker) {
+            // Stickers are small and shown without a bubble, like on the phone.
+            double s = Math.min(1, Math.min(180 / w, 180 / h));
+            dw = Math.max(60, w * s);
+            dh = Math.max(60, h * s);
+        }
         StackPane box = new StackPane();
-        box.getStyleClass().add("media-box");
+        box.getStyleClass().add(sticker ? "sticker-box" : "media-box");
         box.setPrefSize(dw, dh);
         box.setMinSize(dw, dh);
         box.setMaxSize(dw, dh);
-        Rectangle clip = new Rectangle(dw, dh);
-        clip.setArcWidth(24);
-        clip.setArcHeight(24);
-        box.setClip(clip);
+        if (!sticker) {
+            Rectangle clip = new Rectangle(dw, dh);
+            clip.setArcWidth(24);
+            clip.setArcHeight(24);
+            box.setClip(clip);
+        }
         ImageView view = new ImageView();
         view.setFitWidth(dw);
         view.setFitHeight(dh);
-        view.setPreserveRatio(false);
+        view.setPreserveRatio(sticker);
         box.getChildren().add(view);
         if (m.mediaUrl() != null) {
-            svc.media(m.mediaUrl(), (int) (dw * 2), (int) (dh * 2)).thenAccept(p ->
-                    Platform.runLater(() -> view.setImage(new Image(p.toUri().toString(), dw * 2, dh * 2, true, true, true))));
+            loadInto(view, m, (int) (dw * 2), (int) (dh * 2));
             box.setOnMouseClicked(e -> {
                 if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 1) {
                     svc.media(m.mediaUrl(), 0, 0).thenAccept(p -> Platform.runLater(() ->
@@ -578,6 +590,45 @@ public final class ThreadPane extends BorderPane {
             box.setAccessibleText("Imagen" + (m.fileName() == null ? "" : " " + m.fileName()) + ", abrir en grande");
         }
         return box;
+    }
+
+    /** Stickers, GIFs and WebP may be animated: those load the original file, never a (static) thumbnail. */
+    static boolean mayBeAnimated(Message m) {
+        String mime = m.mimeType() == null ? "" : m.mimeType();
+        return m.type() == MessageType.STICKER || mime.equals("image/gif") || mime.equals("image/webp");
+    }
+
+    private void loadInto(ImageView view, Message m, int pxW, int pxH) {
+        if (!mayBeAnimated(m)) {
+            svc.media(m.mediaUrl(), pxW, pxH).thenAccept(p ->
+                    Platform.runLater(() -> view.setImage(new Image(p.toUri().toString(), pxW, pxH, true, true, true))));
+            return;
+        }
+        // Placeholder: the server's static thumbnail shows at once; decoding a long animation takes seconds.
+        svc.media(m.mediaUrl(), pxW, pxH).thenAccept(p -> Platform.runLater(() -> {
+            if (view.getImage() == null) view.setImage(new Image(p.toUri().toString(), pxW, pxH, true, true, true));
+        }));
+        svc.media(m.mediaUrl(), 0, 0).thenAcceptAsync(p -> {
+            try {
+                if (AnimatedImage.isWebp(p)) {
+                    AnimatedImage.Frames frames = AnimatedImage.decodeWebp(p, pxW, pxH);
+                    Platform.runLater(() -> AnimatedImage.play(view, frames));
+                } else if (Theme.reduceMotion()) {
+                    // First frame only: JavaFX would animate a GIF on its own.
+                    java.awt.image.BufferedImage first = javax.imageio.ImageIO.read(p.toFile());
+                    if (first != null) {
+                        Image img = javafx.embed.swing.SwingFXUtils.toFXImage(AnimatedImage.scale(first, pxW, pxH), null);
+                        Platform.runLater(() -> view.setImage(img));
+                    }
+                } else {
+                    // JavaFX animates GIFs natively; no background loading so the first frame isn't blank.
+                    Image img = new Image(p.toUri().toString(), pxW, pxH, true, true, false);
+                    Platform.runLater(() -> view.setImage(img));
+                }
+            } catch (Exception e) {
+                System.err.println("Could not decode " + m.mediaUrl() + ": " + e);
+            }
+        }, AnimatedImage.DECODER);
     }
 
     private Node fileNode(Message m) {

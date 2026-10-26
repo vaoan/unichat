@@ -21,6 +21,7 @@ public final class Message {
     private String body = "";
     private String mediaUrl;
     private String fileName;
+    private String mimeType;
     private long fileSize;
     private int width;
     private int height;
@@ -55,6 +56,9 @@ public final class Message {
     public void setMediaUrl(String mediaUrl) { this.mediaUrl = mediaUrl; }
     public String fileName() { return fileName; }
     public void setFileName(String fileName) { this.fileName = fileName; }
+    /** MIME type of the media (e.g. {@code image/webp}), or null when unknown. */
+    public String mimeType() { return mimeType; }
+    public void setMimeType(String mimeType) { this.mimeType = mimeType; }
     public long fileSize() { return fileSize; }
     public void setFileSize(long fileSize) { this.fileSize = fileSize; }
     public int width() { return width; }
