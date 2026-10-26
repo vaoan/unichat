@@ -115,6 +115,11 @@ public interface ChatService {
         return CompletableFuture.failedFuture(new UnsupportedOperationException("Stickers no disponibles"));
     }
 
+    /** Sends a GIF (mp4 or gif file) from the GIF tab. */
+    default CompletableFuture<Void> sendGif(String chatId, java.nio.file.Path file, String mime, int width, int height) {
+        return sendFile(chatId, file, null);
+    }
+
     /** Answers the bridge's current login step (pasted cookies, e-mail, verification code…). */
     default CompletableFuture<Void> sendLoginInput(Network network, String botChatId, String text) {
         return sendText(botChatId, text, null);

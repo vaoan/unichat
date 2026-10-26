@@ -10,6 +10,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
@@ -68,7 +69,7 @@ public final class SettingsWindow {
         BorderPane content = new BorderPane();
         content.getStyleClass().add("settings-content");
         ListView<String> nav = new ListView<>();
-        nav.getItems().addAll("Cuentas", "Perfil", "Apariencia", "Accesibilidad", "Notificaciones", "Privacidad", "Atajos de teclado", "Acerca de");
+        nav.getItems().addAll("Cuentas", "Perfil", "Apariencia", "Accesibilidad", "Notificaciones", "Privacidad", "GIFs", "Atajos de teclado", "Acerca de");
         nav.getStyleClass().add("settings-nav");
         nav.setPrefWidth(200);
         nav.getSelectionModel().selectedItemProperty().addListener((o, a, s) -> {
@@ -88,6 +89,7 @@ public final class SettingsWindow {
                 case "Accesibilidad" -> accessibilityPage(onAppearanceChanged);
                 case "Notificaciones" -> notificationsPage();
                 case "Privacidad" -> privacyPage();
+                case "GIFs" -> gifsPage();
                 case "Atajos de teclado" -> shortcutsPage();
                 case "Acerca de" -> aboutPage();
                 default -> accountPage(svc, () -> { stage.close(); onLogout.run(); });
@@ -378,6 +380,43 @@ public final class SettingsWindow {
                 row("Borrar registros después de", "Sirven para diagnosticar errores. No guardan nombres, números, "
                         + "mensajes ni contraseñas.", days),
                 row("Borrar ahora", "De Unichat, del servidor y de los puentes.", clear));
+    }
+
+    /**
+     * GIF search providers: each one on/off with the user's own free key. Only the search text goes to them.
+     * Adding a provider = an adapter + a line in GifProviders.
+     */
+    private static Node gifsPage() {
+        Settings s = Settings.get();
+        java.util.List<Node> groups = new java.util.ArrayList<>();
+        Label intro = new Label("Activa uno o más proveedores para buscar GIFs en el panel lateral. Cada uno necesita su propia "
+                + "clave gratuita. Solo se les envía el texto que buscas.");
+        intro.setWrapText(true);
+        intro.getStyleClass().add("settings-help");
+        groups.add(intro);
+        for (app.unichat.gif.GifProviders.Known k : app.unichat.gif.GifProviders.known()) {
+            String enabledKey = "gif." + k.id() + ".enabled", keyKey = "gif." + k.id() + ".key";
+            PasswordField key = new PasswordField();
+            key.setText(s.getString(keyKey, ""));
+            key.setPromptText("Pega aquí tu clave");
+            key.setAccessibleText("Clave de " + k.name());
+            key.textProperty().addListener((o, a, b) -> s.set(keyKey, b.strip()));
+            javafx.scene.control.Hyperlink get = new javafx.scene.control.Hyperlink("Conseguir una clave gratis");
+            get.setAccessibleText("Conseguir una clave gratis de " + k.name());
+            get.setOnAction(e -> java.awt.EventQueue.invokeLater(() -> {
+                try {
+                    java.awt.Desktop.getDesktop().browse(java.net.URI.create(k.keyUrl()));
+                } catch (Exception ignored) {
+                    // No browser: the address is in the tooltip.
+                }
+            }));
+            get.setTooltip(new javafx.scene.control.Tooltip(k.keyUrl()));
+            groups.add(group(k.name(),
+                    row("Usar " + k.name(), null, toggle("true".equals(s.getString(enabledKey, "false")), v -> s.set(enabledKey, v.toString()))),
+                    row("Clave", null, key),
+                    row("¿No tienes clave?", k.keyUrl(), get)));
+        }
+        return page("GIFs", groups.toArray(new Node[0]));
     }
 
     private static Node shortcutsPage() {

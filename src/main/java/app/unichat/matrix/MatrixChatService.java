@@ -712,9 +712,19 @@ public final class MatrixChatService implements ChatService {
 
     @Override
     public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId) {
+        return sendMedia(chatId, file, replyToId, probeMime(file), 0, 0, false);
+    }
+
+    /** A GIF from the GIF tab: m.video (mp4) or m.image (gif) flagged {@code fi.mau.gif}, so bridges send a GIF. */
+    @Override
+    public CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height) {
+        return sendMedia(chatId, file, null, mime, width, height, true);
+    }
+
+    private CompletableFuture<Void> sendMedia(String chatId, Path file, String replyToId, String mime, int width, int height,
+                                              boolean gif) {
         String txn = newTxnId();
         String name = file.getFileName().toString();
-        String mime = probeMime(file);
         MessageType type = mime.startsWith("image/") ? MessageType.IMAGE
                 : mime.startsWith("video/") ? MessageType.VIDEO
                 : mime.startsWith("audio/") ? MessageType.AUDIO : MessageType.FILE;
@@ -724,7 +734,7 @@ public final class MatrixChatService implements ChatService {
         } catch (IOException e) {
             return CompletableFuture.failedFuture(new MatrixException(0, null, "No se pudo leer el archivo"));
         }
-        int[] wh = type == MessageType.IMAGE ? imageSize(file) : new int[]{0, 0};
+        int[] wh = width > 0 ? new int[]{width, height} : type == MessageType.IMAGE ? imageSize(file) : new int[]{0, 0};
         synchronized (proc) {
             proc.addLocalEcho(chatId, txn, m -> {
                 m.setType(type);
@@ -764,6 +774,7 @@ public final class MatrixChatService implements ChatService {
                 info.put("w", wh[0]);
                 info.put("h", wh[1]);
             }
+            if (gif) info.put("fi.mau.gif", true);
             addReply(chatId, content, replyToId);
             return sendEvent(chatId, "m.room.message", txn, content);
         });

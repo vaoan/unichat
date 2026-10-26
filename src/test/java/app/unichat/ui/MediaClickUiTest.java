@@ -48,8 +48,10 @@ class MediaClickUiTest {
             view.openChatId("!familia:demo");
             return sc;
         });
-        Thread.sleep(800);
-        int before = fx(() -> Window.getWindows().size());
+        // Wait for the photo to render (a fixed sleep was flaky under load).
+        for (int i = 0; i < 100 && !fx(() -> scene.getRoot().lookup(".media-box") != null); i++) Thread.sleep(100);
+        // Count only viewer windows: the demo's simulated incoming messages open notification cards too.
+        int before = fx(MediaClickUiTest::viewers);
         fx(() -> {
             Node media = scene.getRoot().lookup(".media-box");
             assertTrue(media != null, "the demo chat has a photo");
@@ -58,7 +60,7 @@ class MediaClickUiTest {
             return null;
         });
         Thread.sleep(300);
-        assertEquals(before + 1, (int) fx(() -> Window.getWindows().size()), "viewer opened on the first click");
+        assertEquals(before + 1, (int) fx(MediaClickUiTest::viewers), "viewer opened on the first click");
         boolean viewer = fx(() -> Window.getWindows().stream().anyMatch(w -> w.getScene() != null
                 && w.getScene().getRoot().getStyleClass().contains("media-viewer")));
         assertTrue(viewer);
@@ -67,6 +69,11 @@ class MediaClickUiTest {
                     .toList().forEach(Window::hide);
             return null;
         });
+    }
+
+    private static int viewers() {
+        return (int) Window.getWindows().stream()
+                .filter(w -> w.getScene() != null && w.getScene().getRoot().getStyleClass().contains("media-viewer")).count();
     }
 
     private static MouseEvent mouse(javafx.event.EventType<MouseEvent> type, Node n, boolean still) {

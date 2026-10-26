@@ -738,3 +738,7 @@
 .sticker-tile { -fx-background-radius: 10; -fx-padding: 2; }
 .sticker-tile:hover, .sticker-tile:focused { -fx-background-color: -hover; }
 .root.contrast .sticker-tile:focused { -fx-border-color: -text; -fx-border-radius: 10; }
+.gif-grid { -fx-padding: 10; }
+.gif-tile { -fx-background-color: -surface-2; -fx-background-radius: 10; }
+.gif-tile:hover, .gif-tile:focused { -fx-background-color: -hover; }
+.root.contrast .gif-tile:focused { -fx-border-color: -text; -fx-border-radius: 10; }

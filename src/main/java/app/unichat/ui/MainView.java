@@ -86,6 +86,8 @@ public final class MainView extends StackPane {
         thread.setLibrary(library);
         StickerGrid stickers = new StickerGrid(svc, library, thread::chat, this::toast);
         panel.setContent(SidePanel.Tab.STICKERS, stickers, stickers::refresh);
+        GifGrid gifs = new GifGrid(svc, library, thread::chat, this::toast);
+        panel.setContent(SidePanel.Tab.GIFS, gifs, gifs::refresh);
         thread.composer().setOnPanel(this::togglePanel);
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::showSettings);
 

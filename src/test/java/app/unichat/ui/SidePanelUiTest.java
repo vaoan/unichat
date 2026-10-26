@@ -122,6 +122,40 @@ class SidePanelUiTest {
         assertTrue(text.contains("no acepta stickers"), text);
     }
 
+    @Test
+    void gifsTabExplainsHowToTurnOnAProvider() throws Exception {
+        System.setProperty("java.awt.headless", "true");
+        try {
+            CountDownLatch started = new CountDownLatch(1);
+            Platform.startup(started::countDown);
+            started.await(10, TimeUnit.SECONDS);
+        } catch (IllegalStateException alreadyRunning) {
+            // another UI test started the toolkit
+        }
+        app.unichat.settings.Settings.get().set("gif.giphy.enabled", null);
+        app.unichat.settings.Settings.get().set("gif.klipy.enabled", null);
+        MainView[] view = new MainView[1];
+        Scene scene = fx(() -> {
+            Stage stage = new Stage();
+            stage.setOpacity(0);
+            stage.setX(-10000);
+            view[0] = new MainView(new MockChatService(), stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            Scene sc = new Scene(view[0], 1200, 800);
+            Theme.register(sc);
+            stage.setScene(sc);
+            stage.show();
+            view[0].openChatId("!familia:demo");
+            return sc;
+        });
+        Thread.sleep(400);
+        fx(() -> { view[0].showPanel(SidePanel.Tab.GIFS); return null; });
+        Thread.sleep(300);
+        String text = fx(() -> panel(scene).lookupAll(".label").stream()
+                .map(n -> ((javafx.scene.control.Label) n).getText()).reduce("", (a, b) -> a + "\n" + b));
+        assertTrue(text.contains("Ajustes → GIFs"), text);
+        assertTrue(fx(() -> panel(scene).lookup(".gif-search") != null), "search box is there");
+    }
+
     private static SidePanel panel(Scene s) {
         for (Node n : s.getRoot().lookupAll("*")) if (n instanceof SidePanel p && p.getScene() != null) return p;
         return null;

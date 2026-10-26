@@ -117,4 +117,16 @@ class GifSearchTest {
         assertEquals(1, g.size(), "Klipy's result still comes back");
         assertTrue(System.currentTimeMillis() - t0 < 7000, "a slow provider is cut off");
     }
+
+    @Test
+    void onlyEnabledProvidersWithAKeyAreUsed() {
+        java.util.Map<String, String> settings = new java.util.HashMap<>();
+        assertTrue(GifProviders.active(settings::get).isEmpty(), "none by default");
+        settings.put("gif.giphy.key", "abc");
+        assertTrue(GifProviders.active(settings::get).isEmpty(), "a key alone doesn't turn it on");
+        settings.put("gif.giphy.enabled", "true");
+        settings.put("gif.klipy.enabled", "true"); // no key: skipped
+        assertEquals(List.of("giphy"), GifProviders.active(settings::get).stream().map(GifProvider::id).toList());
+        assertEquals(List.of("giphy", "klipy"), GifProviders.known().stream().map(GifProviders.Known::id).toList());
+    }
 }
