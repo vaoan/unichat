@@ -346,8 +346,10 @@
     -fx-padding: 1 8;
     -fx-font-size: 0.9em;
 }
+.reaction-count { -fx-font-size: 0.85em; -fx-font-weight: bold; -fx-text-fill: -text-2; }
 .reaction-pill.mine { -fx-border-color: -accent; -fx-background-color: derive(-accent, 85%); }
-.root.dark .reaction-pill.mine { -fx-background-color: derive(-accent, -60%); }
+.root.dark .reaction-count { -fx-font-size: 0.85em; -fx-font-weight: bold; -fx-text-fill: -text-2; }
+.reaction-pill.mine { -fx-background-color: derive(-accent, -60%); }
 
 .hover-actions {
     -fx-background-color: -surface;
@@ -454,7 +456,7 @@
 }
 .emoji-picker { -fx-background-color: transparent; }
 .emoji-category { -fx-text-fill: -text-3; -fx-font-size: 0.82em; -fx-font-weight: bold; }
-.emoji-button, .reaction-pill, .jumbo-emoji, .quick-reactions .emoji-button {
+.emoji-button, .reaction-emoji, .jumbo-emoji, .quick-reactions .emoji-button {
     -fx-font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI", sans-serif;
 }
 .emoji-button { -fx-font-size: 1.45em; -fx-padding: 2 4; -fx-background-radius: 8; }
@@ -524,25 +526,116 @@
 .status-pill.ok { -fx-background-color: rgba(48, 164, 108, 0.15); -fx-text-fill: -success; }
 .status-pill.warn { -fx-background-color: rgba(245, 165, 36, 0.18); -fx-text-fill: -warning; }
 
-/* iOS-like switch on CheckBox.switch */
+/* Switch drawn on CheckBox.switch: grey track + white knob, knob moves via padding. */
+.switch { -fx-padding: 0; -fx-label-padding: 0; -fx-graphic-text-gap: 0; }
 .switch .box {
-    -fx-background-color: -selected;
+    -fx-background-color: -text-3;
     -fx-background-radius: 999;
-    -fx-pref-width: 38; -fx-pref-height: 22;
-    -fx-padding: 0;
     -fx-border-width: 0;
+    -fx-padding: 3 21 3 3;
 }
-.switch:selected .box { -fx-background-color: -accent; }
-.switch .mark {
-    -fx-shape: "M0 0h1v1H0Z";
+.switch:selected .box { -fx-background-color: -accent; -fx-padding: 3 3 3 21; }
+.switch .mark, .switch:selected .mark {
+    -fx-shape: "M10 0a10 10 0 1 1 0 20a10 10 0 1 1 0-20Z";
+    -fx-scale-shape: true;
     -fx-background-color: white;
-    -fx-background-radius: 999;
-    -fx-shape: null;
+    -fx-background-insets: 0;
     -fx-padding: 8;
-    -fx-translate-x: -8;
-    -fx-scale-x: 1;
 }
-.switch:selected .mark { -fx-translate-x: 8; -fx-background-color: white; }
-.switch .text { -fx-fill: transparent; }
+.root.contrast .switch .box { -fx-border-color: -border; -fx-border-width: 1.5; -fx-border-radius: 999; }
+.root.contrast .switch .box { -fx-background-color: -text-2; }
+.root.contrast .switch .mark { -fx-background-color: -bg; }
+.root.contrast .switch:selected .mark { -fx-background-color: white; }
 .slider .thumb { -fx-background-color: white; -fx-effect: dropshadow(gaussian, -shadow, 4, 0, 0, 1); }
-.slider .track { -fx-background-color: -selected; -fx-background-radius: 999; }
+.slider .track { -fx-background-color: -text-3; -fx-background-radius: 3; -fx-pref-height: 5; }
+
+/* ================================================================ accessibility */
+
+/* Keyboard focus: visible only when navigating with the keyboard (:focus-visible). */
+.button:focus-visible, .toggle-button:focus-visible, .hyperlink:focus-visible,
+.favorite-tile:focus-visible, .media-box:focus-visible, .file-chip:focus-visible {
+    -fx-border-color: -accent;
+    -fx-border-width: 2;
+    -fx-border-radius: 10;
+}
+.check-box:focus-visible .box, .slider:focus-visible .thumb {
+    -fx-border-color: -accent;
+    -fx-border-width: 2;
+    -fx-border-radius: 999;
+}
+.list-view:focus-visible .list-cell:selected { -fx-border-color: -accent; -fx-border-width: 2; -fx-border-radius: 12; }
+.text-field:focused, .password-field:focused, .composer-row:focus-within { -fx-border-color: -accent; }
+.composer-row { -fx-border-color: transparent; -fx-border-radius: 16; -fx-border-width: 1.5; }
+
+.root.strong-focus .button:focus-visible, .root.strong-focus .toggle-button:focus-visible,
+.root.strong-focus .hyperlink:focus-visible, .root.strong-focus .favorite-tile:focus-visible,
+.root.strong-focus .text-field:focused, .root.strong-focus .password-field:focused,
+.root.strong-focus .composer-row:focus-within, .root.strong-focus .list-view:focus-visible .list-cell:selected {
+    -fx-border-color: -text;
+    -fx-border-width: 3;
+}
+.root.strong-focus .check-box:focus-visible .box, .root.strong-focus .slider:focus-visible .thumb {
+    -fx-border-color: -text;
+    -fx-border-width: 3;
+}
+
+/* Selected message (keyboard navigation in the timeline). */
+.timeline .list-cell:selected { -fx-background-color: transparent; -fx-border-width: 0; }
+.timeline:focused .list-cell:selected { -fx-background-color: -hover; -fx-background-radius: 12; }
+.root.strong-focus .timeline:focused .list-cell:selected { -fx-border-color: -text; -fx-border-width: 2; -fx-border-radius: 12; }
+
+.root.wide-spacing .label { -fx-line-spacing: 3; }
+
+/* High contrast — light */
+.root.contrast {
+    -bg: #FFFFFF;
+    -bg-list: #FFFFFF;
+    -bg-rail: #FFFFFF;
+    -surface: #FFFFFF;
+    -surface-2: #FFFFFF;
+    -hover: rgba(0, 0, 0, 0.12);
+    -selected: rgba(0, 0, 0, 0.2);
+    -text: #000000;
+    -text-2: #111111;
+    -text-3: #2B2B2B;
+    -border: #000000;
+    -bubble-in: #FFFFFF;
+    -bubble-in-text: #000000;
+}
+/* High contrast — dark */
+.root.dark.contrast {
+    -bg: #000000;
+    -bg-list: #000000;
+    -bg-rail: #000000;
+    -surface: #000000;
+    -surface-2: #000000;
+    -hover: rgba(255, 255, 255, 0.18);
+    -selected: rgba(255, 255, 255, 0.3);
+    -text: #FFFFFF;
+    -text-2: #F2F2F2;
+    -text-3: #DDDDDD;
+    -border: #FFFFFF;
+    -bubble-in: #000000;
+    -bubble-in-text: #FFFFFF;
+}
+.root.contrast .bubble, .root.contrast .text-field, .root.contrast .password-field, .root.contrast .composer-row,
+.root.contrast .chip, .root.contrast .day-separator, .root.contrast .settings-group, .root.contrast .network-tile,
+.root.contrast .info-action, .root.contrast .secondary-button, .root.contrast .reaction-pill,
+.root.contrast .composer-banner, .root.contrast .hover-actions, .root.contrast .file-icon {
+    -fx-border-color: -border;
+    -fx-border-width: 1.5;
+}
+.root.contrast .bubble { -fx-background-radius: 14; -fx-border-radius: 14; }
+.root.contrast .chip, .root.contrast .day-separator, .root.contrast .reaction-pill { -fx-border-radius: 999; }
+.root.contrast .text-field, .root.contrast .password-field, .root.contrast .settings-group,
+.root.contrast .network-tile, .root.contrast .info-action, .root.contrast .secondary-button,
+.root.contrast .composer-banner, .root.contrast .hover-actions, .root.contrast .file-icon { -fx-border-radius: 12; }
+.root.contrast .composer-row { -fx-border-radius: 16; }
+.root.contrast .chip:selected { -fx-background-color: -text; -fx-text-fill: -bg; }
+.root.contrast .bubble.out .bubble-meta .label, .root.contrast .bubble.out .reply-text { -fx-text-fill: white; }
+.root.contrast .bubble.out .bubble-meta .icon { -fx-background-color: white; }
+.root.contrast .icon { -fx-background-color: -text; }
+.root.contrast .chat-preview, .root.contrast .chat-stamp, .root.contrast .thread-subtitle { -fx-text-fill: -text-2; }
+.root.contrast .split-pane > .split-pane-divider { -fx-background-color: -border; -fx-padding: 0 1 0 1; }
+.root.contrast .thread-header { -fx-border-color: transparent transparent -border transparent; -fx-border-width: 0 0 1.5 0; }
+.root.contrast .msg-link { -fx-underline: true; }

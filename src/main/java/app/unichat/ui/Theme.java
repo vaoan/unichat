@@ -20,6 +20,8 @@ public final class Theme {
     private static final List<Scene> SCENES = new ArrayList<>();
     private static final String CSS = Objects.requireNonNull(Theme.class.getResource("/app/unichat/css/app.css")).toExternalForm();
     private static Boolean systemDark;
+    private static Boolean systemContrast;
+    private static Boolean systemReducedMotion;
 
     public static void register(Scene scene) {
         SCENES.add(scene);
@@ -32,6 +34,8 @@ public final class Theme {
 
     public static void applyAll() {
         systemDark = null;
+        systemContrast = null;
+        systemReducedMotion = null;
         SCENES.forEach(Theme::apply);
     }
 
@@ -43,13 +47,115 @@ public final class Theme {
         };
     }
 
+    public static boolean highContrast() {
+        return switch (Settings.get().highContrast()) {
+            case ON -> true;
+            case OFF -> false;
+            case SYSTEM -> systemHighContrast();
+        };
+    }
+
+    public static boolean reduceMotion() {
+        return switch (Settings.get().reduceMotion()) {
+            case ON -> true;
+            case OFF -> false;
+            case SYSTEM -> systemReducedMotion();
+        };
+    }
+
+    /** Extra line spacing for message text, in px, when "más interlineado" is on. */
+    public static double lineSpacing() {
+        return Settings.get().wideSpacing() ? Math.round(5 * Settings.get().fontScale()) : 0;
+    }
+
     private static void apply(Scene scene) {
         Parent root = scene.getRoot();
         if (root == null) return;
-        root.getStyleClass().remove("dark");
-        if (isDark()) root.getStyleClass().add("dark");
         Settings s = Settings.get();
-        root.setStyle("-accent: " + s.accent() + "; -fx-font-size: " + Math.round(13 * s.fontScale() * 10) / 10.0 + "px;");
+        toggle(root, "dark", isDark());
+        toggle(root, "contrast", highContrast());
+        toggle(root, "strong-focus", s.strongFocus());
+        toggle(root, "wide-spacing", s.wideSpacing());
+        String accent = highContrast() ? accessibleAccent(s.accent()) : s.accent();
+        String style = "-accent: " + accent + "; -fx-font-size: " + Math.round(13 * s.fontScale() * 10) / 10.0 + "px;";
+        if (s.readableFont()) style += " -fx-font-family: \"Verdana\", \"Tahoma\", sans-serif;";
+        root.setStyle(style);
+    }
+
+    /** WCAG contrast ratio between two #RRGGBB colors. */
+    static double contrast(String a, String b) {
+        double la = luminance(a), lb = luminance(b);
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    }
+
+    private static double luminance(String hex) {
+        int rgb = Integer.parseInt(hex.substring(1), 16);
+        double[] c = {(rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255};
+        for (int i = 0; i < 3; i++) {
+            double v = c[i] / 255.0;
+            c[i] = v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+        }
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    }
+
+    /** Darkens {@code hex} until white text on it reaches 4.5:1 (WCAG AA). */
+    static String accessibleAccent(String hex) {
+        int rgb = Integer.parseInt(hex.substring(1), 16);
+        int r = (rgb >> 16) & 255, g = (rgb >> 8) & 255, b = rgb & 255;
+        String cur = hex;
+        for (int i = 0; i < 40 && contrast(cur, "#FFFFFF") < 4.5; i++) {
+            r = (int) (r * 0.93);
+            g = (int) (g * 0.93);
+            b = (int) (b * 0.93);
+            cur = String.format("#%02X%02X%02X", r, g, b);
+        }
+        return cur;
+    }
+
+    private static void toggle(Parent root, String cls, boolean on) {
+        root.getStyleClass().remove(cls);
+        if (on) root.getStyleClass().add(cls);
+    }
+
+    private static String os() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+    }
+
+    /** Windows high-contrast theme / macOS "Aumentar contraste". */
+    static boolean systemHighContrast() {
+        if (systemContrast != null) return systemContrast;
+        try {
+            if (os().contains("win")) {
+                String out = run("reg", "query", "HKCU\\Control Panel\\Accessibility\\HighContrast", "/v", "Flags");
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("REG_SZ\\s+(\\d+)").matcher(out);
+                systemContrast = m.find() && (Integer.parseInt(m.group(1)) & 1) == 1;
+            } else if (os().contains("mac")) {
+                systemContrast = run("defaults", "read", "com.apple.universalaccess", "increaseContrast").trim().equals("1");
+            } else {
+                systemContrast = run("gsettings", "get", "org.gnome.desktop.a11y.interface", "high-contrast").contains("true");
+            }
+        } catch (Exception e) {
+            systemContrast = false;
+        }
+        return systemContrast;
+    }
+
+    /** Windows "Mostrar animaciones" off / macOS "Reducir movimiento". */
+    static boolean systemReducedMotion() {
+        if (systemReducedMotion != null) return systemReducedMotion;
+        try {
+            if (os().contains("win")) {
+                String out = run("reg", "query", "HKCU\\Control Panel\\Desktop\\WindowMetrics", "/v", "MinAnimate");
+                systemReducedMotion = out.matches("(?s).*REG_SZ\\s+0\\b.*");
+            } else if (os().contains("mac")) {
+                systemReducedMotion = run("defaults", "read", "com.apple.universalaccess", "reduceMotion").trim().equals("1");
+            } else {
+                systemReducedMotion = run("gsettings", "get", "org.gnome.desktop.interface", "enable-animations").contains("false");
+            }
+        } catch (Exception e) {
+            systemReducedMotion = false;
+        }
+        return systemReducedMotion;
     }
 
     /** Reads the OS appearance once per {@link #applyAll()}: Windows registry / macOS defaults / GTK theme. */

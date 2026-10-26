@@ -94,7 +94,7 @@ public final class ThreadPane extends BorderPane {
         infoButton.getStyleClass().add("icon-button");
         infoButton.setTooltip(new javafx.scene.control.Tooltip("Información del chat"));
         infoButton.setOnAction(e -> toggleInfo.run());
-        infoButton.setFocusTraversable(false);
+        infoButton.setAccessibleText("Información del chat");
         Button more = Composer.iconButton(Icons.MORE, "Más opciones", null);
         more.setOnAction(e -> ChatMenus.forChat(chat, svc, null).show(more, Side.BOTTOM, 0, 4));
         HBox header = new HBox(10, headerAvatar, titles, favButton, archiveButton, infoButton, more);
@@ -104,8 +104,16 @@ public final class ThreadPane extends BorderPane {
 
         // Timeline
         list.getStyleClass().add("timeline");
-        list.setFocusTraversable(false);
         list.setCellFactory(v -> new RowCell());
+        list.setAccessibleText("Mensajes");
+        list.setAccessibleHelp("Flechas para recorrer mensajes. R responder, E editar, Enter o Espacio abre las acciones, "
+                + "1 a 6 reacciones rápidas, " + (MainView.MAC ? "⌘" : "Ctrl+") + "C copiar, Esc vuelve al campo de texto.");
+        list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, this::onTimelineKey);
+        list.focusedProperty().addListener((o, a, focused) -> {
+            if (focused && list.getSelectionModel().isEmpty() && !rows.isEmpty()) {
+                list.getSelectionModel().select(rows.size() - 1);
+            }
+        });
         jumpDown = Composer.iconButton(Icons.LOW, "Ir al final", this::scrollToBottom);
         jumpDown.getStyleClass().add("jump-down");
         jumpDown.setVisible(false);
@@ -201,9 +209,11 @@ public final class ThreadPane extends BorderPane {
     public void rebuild(boolean forceBottom) {
         if (chat == null) return;
         boolean wasAtBottom = forceBottom || pinnedBottom;
+        Message selected = selectedMessage();
         List<Message> msgs = svc.messages(chat.id());
         rows.setAll(ThreadRows.build(msgs, ZoneId.systemDefault()));
-        if (wasAtBottom) scrollToBottom();
+        if (selected != null && !forceBottom) select(selected);
+        if (wasAtBottom && !(list.isFocused() && selected != null)) scrollToBottom();
     }
 
     private void scrollToBottom() {
@@ -270,6 +280,7 @@ public final class ThreadPane extends BorderPane {
             setText(null);
             if (empty || row == null) {
                 setGraphic(null);
+                setAccessibleText(null);
                 return;
             }
             if (row instanceof ThreadRows.DayRow d) {
@@ -279,10 +290,103 @@ public final class ThreadPane extends BorderPane {
                 box.setAlignment(Pos.CENTER);
                 box.getStyleClass().add("day-row");
                 setGraphic(box);
+                setAccessibleText(l.getText());
             } else if (row instanceof ThreadRows.MessageRow mr) {
                 setGraphic(messageNode(mr, getListView().getWidth()));
+                setAccessibleText(describe(mr.message()));
+                showActions(isSelected());
             }
         }
+
+        @Override
+        public void updateSelected(boolean selected) {
+            super.updateSelected(selected);
+            showActions(selected);
+        }
+
+        private void showActions(boolean selected) {
+            if (getGraphic() != null && getGraphic().getProperties().get("actions") instanceof Node actions) {
+                actions.setVisible(selected || Settings.get().alwaysShowMessageActions()
+                        || Boolean.TRUE.equals(getGraphic().getProperties().get("hover")));
+            }
+        }
+    }
+
+    /** What a screen reader says for a message row. */
+    private String describe(Message m) {
+        StringBuilder sb = new StringBuilder(m.outgoing() ? "Tú" : m.senderName());
+        sb.append(", ").append(Formats.time(m.timestamp(), ZoneId.systemDefault())).append(": ");
+        if (m.type() == MessageType.SYSTEM) return m.body();
+        Message replied = findLoaded(m.replyToId());
+        if (replied != null) sb.append("respondiendo a ").append(replied.outgoing() ? "ti" : replied.senderName()).append(". ");
+        sb.append(switch (m.type()) {
+            case IMAGE -> "Imagen" + (m.fileName() == null ? "" : " " + m.fileName());
+            case STICKER -> "Sticker";
+            default -> m.preview();
+        });
+        if (m.edited() && !m.deleted()) sb.append(", editado");
+        if (!m.reactions().isEmpty()) {
+            sb.append(". Reacciones: ");
+            m.reactions().forEach((emoji, users) -> sb.append(emoji).append(' ').append(users.size()).append(", "));
+            sb.setLength(sb.length() - 2);
+        }
+        if (m.outgoing()) sb.append(switch (m.status()) {
+            case SENDING -> ". Enviando";
+            case SENT -> ". Enviado";
+            case DELIVERED -> ". Entregado";
+            case READ -> ". Leído";
+            case FAILED -> ". No se pudo enviar";
+        });
+        return sb.toString();
+    }
+
+    private Message selectedMessage() {
+        return list.getSelectionModel().getSelectedItem() instanceof ThreadRows.MessageRow mr ? mr.message() : null;
+    }
+
+    private void select(Message target) {
+        for (int i = 0; i < rows.size(); i++) {
+            if (rows.get(i) instanceof ThreadRows.MessageRow mr && mr.message().id().equals(target.id())) {
+                list.getSelectionModel().select(i);
+                return;
+            }
+        }
+    }
+
+    /** Keyboard control of the focused timeline. Arrow keys move the selection (ListView default). */
+    private void onTimelineKey(javafx.scene.input.KeyEvent e) {
+        Message m = selectedMessage();
+        javafx.scene.input.KeyCode code = e.getCode();
+        if (code == javafx.scene.input.KeyCode.ESCAPE) {
+            composer.focus();
+        } else if (m == null || m.type() == MessageType.SYSTEM) {
+            return;
+        } else if (code == javafx.scene.input.KeyCode.R && !e.isShortcutDown()) {
+            composer.reply(m);
+        } else if (code == javafx.scene.input.KeyCode.E && !e.isShortcutDown() && m.outgoing() && !m.isMedia() && !m.deleted()) {
+            composer.edit(m);
+        } else if (code == javafx.scene.input.KeyCode.C && e.isShortcutDown() && !m.isMedia()) {
+            ClipboardContent cc = new ClipboardContent();
+            cc.putString(m.body());
+            Clipboard.getSystemClipboard().setContent(cc);
+        } else if ((code == javafx.scene.input.KeyCode.ENTER || code == javafx.scene.input.KeyCode.SPACE
+                || code == javafx.scene.input.KeyCode.CONTEXT_MENU) && !m.deleted()) {
+            var cell = list.lookupAll(".row-cell").stream()
+                    .filter(n -> n instanceof RowCell rc && rc.isSelected()).findFirst().orElse(list);
+            messageMenu(m).show(cell, Side.BOTTOM, 40, -10);
+        } else if (code.isDigitKey() && !e.isShortcutDown() && !m.deleted()) {
+            int n = code.getCode() - javafx.scene.input.KeyCode.DIGIT1.getCode();
+            if (n < 0 || n >= EmojiPicker.QUICK.length) return;
+            svc.toggleReaction(chat.id(), m.id(), EmojiPicker.QUICK[n]);
+        } else {
+            return;
+        }
+        e.consume();
+    }
+
+    /** Moves keyboard focus into the message list (F6 cycle). */
+    public void focusTimeline() {
+        if (chat != null) list.requestFocus();
     }
 
     private Node messageNode(ThreadRows.MessageRow row, double width) {
@@ -313,7 +417,7 @@ public final class ThreadPane extends BorderPane {
         if (!m.reactions().isEmpty()) column.getChildren().add(reactions(m));
 
         HBox actions = hoverActions(m, bubble);
-        actions.setVisible(false);
+        actions.setVisible(Settings.get().alwaysShowMessageActions());
         HBox line = new HBox(6);
         line.setAlignment(Pos.CENTER_LEFT);
         if (out) {
@@ -341,8 +445,16 @@ public final class ThreadPane extends BorderPane {
         line.setAlignment(Pos.BOTTOM_LEFT);
         line.getStyleClass().add("message-line");
         if (row.last()) line.getStyleClass().add("group-last");
-        line.setOnMouseEntered(e -> actions.setVisible(true));
-        line.setOnMouseExited(e -> actions.setVisible(false));
+        line.getProperties().put("actions", actions);
+        line.setOnMouseEntered(e -> {
+            line.getProperties().put("hover", true);
+            actions.setVisible(true);
+        });
+        line.setOnMouseExited(e -> {
+            line.getProperties().put("hover", false);
+            boolean selected = line.getParent() instanceof RowCell rc && rc.isSelected();
+            actions.setVisible(selected || Settings.get().alwaysShowMessageActions());
+        });
         return line;
     }
 
@@ -350,8 +462,10 @@ public final class ThreadPane extends BorderPane {
         boolean out = m.outgoing();
         VBox bubble = new VBox(4);
         bubble.getStyleClass().addAll("bubble", out ? "out" : "in");
-        if (!row.first()) bubble.getStyleClass().add("cont-top");
-        if (!row.last()) bubble.getStyleClass().add("cont-bottom");
+        if (!Theme.highContrast()) {
+            if (!row.first()) bubble.getStyleClass().add("cont-top");
+            if (!row.last()) bubble.getStyleClass().add("cont-bottom");
+        }
         bubble.setMaxWidth(maxWidth);
         bubble.setFillWidth(false);
 
@@ -388,6 +502,7 @@ public final class ThreadPane extends BorderPane {
             TextFlow flow = new TextFlow();
             flow.getChildren().addAll(RichText.nodes(body, openLink));
             flow.getStyleClass().add("message-text");
+            flow.setLineSpacing(Theme.lineSpacing());
             if (m.type() == MessageType.NOTICE) flow.getStyleClass().add("notice");
             flow.setMaxWidth(maxWidth - 24);
             bubble.getChildren().add(flow);
@@ -457,6 +572,8 @@ public final class ThreadPane extends BorderPane {
                 }
             });
             box.setCursor(javafx.scene.Cursor.HAND);
+            box.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
+            box.setAccessibleText("Imagen" + (m.fileName() == null ? "" : " " + m.fileName()) + ", abrir en grande");
         }
         return box;
     }
@@ -479,6 +596,8 @@ public final class ThreadPane extends BorderPane {
         box.getStyleClass().add("file-chip");
         box.setCursor(javafx.scene.Cursor.HAND);
         box.setOnMouseClicked(e -> openFile(m));
+        box.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
+        box.setAccessibleText(size.getText() + " " + name.getText() + ", abrir");
         return box;
     }
 
@@ -497,12 +616,25 @@ public final class ThreadPane extends BorderPane {
         HBox box = new HBox(4);
         box.getStyleClass().add("reactions");
         for (Map.Entry<String, Set<String>> r : m.reactions().entrySet()) {
-            Button b = new Button(r.getKey() + (r.getValue().size() > 1 ? " " + r.getValue().size() : ""));
+            Label emoji = new Label(r.getKey());
+            emoji.getStyleClass().add("reaction-emoji");
+            HBox content = new HBox(4, emoji);
+            content.setAlignment(Pos.CENTER);
+            if (r.getValue().size() > 1) {
+                Label count = new Label(Integer.toString(r.getValue().size()));
+                count.getStyleClass().add("reaction-count");
+                content.getChildren().add(count);
+            }
+            Button b = new Button();
+            b.setGraphic(content);
             b.getStyleClass().add("reaction-pill");
             if (r.getValue().contains(svc.myUserId())) b.getStyleClass().add("mine");
             b.setTooltip(new javafx.scene.control.Tooltip(String.join(", ", r.getValue().stream().map(this::nameOf).toList())));
             b.setOnAction(e -> svc.toggleReaction(chat.id(), m.id(), r.getKey()));
             b.setFocusTraversable(false);
+            boolean mine = r.getValue().contains(svc.myUserId());
+            b.setAccessibleText("Reacción " + r.getKey() + ", " + r.getValue().size()
+                    + (mine ? ", incluida la tuya. Pulsa para quitarla" : ". Pulsa para reaccionar igual"));
             box.getChildren().add(b);
         }
         return box;
@@ -525,6 +657,8 @@ public final class ThreadPane extends BorderPane {
         Button more = Composer.iconButton(Icons.MORE, "Más", null);
         more.setOnAction(e -> messageMenu(m).show(more, Side.BOTTOM, 0, 0));
         box.getChildren().addAll(react, reply, more);
+        // Reachable with the timeline keys instead; tabbing through every message would be unusable.
+        box.getChildren().forEach(n -> n.setFocusTraversable(false));
         return box;
     }
 

@@ -58,6 +58,8 @@ public final class ChatListPane extends VBox {
 
         search.setPromptText("Buscar   " + (MainView.MAC ? "⌘K" : "Ctrl+K"));
         search.getStyleClass().add("search-field");
+        search.setAccessibleText("Buscar chats");
+        search.setAccessibleHelp("Flecha abajo para ir a los resultados, Enter abre el primero");
         search.textProperty().addListener((o, a, q) -> filter.set(filter.get().withQuery(q)));
         search.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ESCAPE) search.clear();
@@ -71,7 +73,7 @@ public final class ChatListPane extends VBox {
         searchIcon.setMouseTransparent(true);
         searchBox.getStyleClass().add("search-box");
 
-        HBox chipRow = new HBox(6,
+        FlowPane chipRow = new FlowPane(6, 6,
                 chip("Todos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.INBOX)),
                 chip("No leídos", f -> f.withUnreadOnly(true).withView(ChatFilter.View.INBOX)),
                 chip("Favoritos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.FAVORITES)),
@@ -85,6 +87,7 @@ public final class ChatListPane extends VBox {
         favorites.setVgap(4);
 
         list.getStyleClass().add("chat-list");
+        list.setAccessibleText("Chats");
         list.setCellFactory(v -> new ChatCell());
         list.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER) open(list.getSelectionModel().getSelectedItem());
@@ -105,6 +108,7 @@ public final class ChatListPane extends VBox {
     private ToggleButton chip(String text, java.util.function.UnaryOperator<ChatFilter> change) {
         ToggleButton b = new ToggleButton(text);
         b.getStyleClass().add("chip");
+        b.setMinWidth(Region.USE_PREF_SIZE);
         b.setToggleGroup(chips);
         b.setOnAction(e -> filter.set(change.apply(filter.get())));
         return b;
@@ -115,6 +119,12 @@ public final class ChatListPane extends VBox {
     public void focusSearch() {
         search.requestFocus();
         search.selectAll();
+    }
+
+    /** Focuses the chat list (F6 cycle), keeping the open chat selected. */
+    public void focusList() {
+        list.requestFocus();
+        if (list.getSelectionModel().isEmpty() && !items.isEmpty()) list.getSelectionModel().select(0);
     }
 
     public void setSelected(String chatId) {
@@ -189,8 +199,32 @@ public final class ChatListPane extends VBox {
         tile.setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY) open(c);
         });
+        tile.setFocusTraversable(true);
+        tile.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
+        tile.setAccessibleText("Favorito: " + describe(c));
+        tile.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) open(c);
+        });
         tile.setOnContextMenuRequested(e -> ChatMenus.forChat(c, svc, null).show(tile, e.getScreenX(), e.getScreenY()));
         return tile;
+    }
+
+    /** What a screen reader says for a chat. */
+    static String describe(Chat c) {
+        StringBuilder sb = new StringBuilder(c.title()).append(", ").append(c.network().displayName());
+        if (c.group()) sb.append(", grupo");
+        if (c.mentionCount() > 0) sb.append(", te mencionaron");
+        if (c.unreadCount() > 0) sb.append(", ").append(c.unreadCount()).append(c.unreadCount() == 1 ? " mensaje sin leer" : " mensajes sin leer");
+        else if (c.markedUnread()) sb.append(", marcado como no leído");
+        if (c.pinned()) sb.append(", fijado");
+        if (c.muted()) sb.append(", silenciado");
+        if (c.reminderAt() != null) sb.append(", con recordatorio");
+        if (!c.typing().isEmpty()) sb.append(". ").append(Formats.typing(c.typing()));
+        else if (!c.lastPreview().isEmpty()) sb.append(". ").append(c.lastOutgoing() ? "Tú: " : c.group() && c.lastSenderName() != null
+                ? c.lastSenderName() + ": " : "").append(c.lastPreview());
+        String stamp = Formats.listStamp(c.lastActivity(), Instant.now(), ZoneId.systemDefault());
+        if (!stamp.isEmpty()) sb.append(". ").append(stamp);
+        return sb.toString();
     }
 
     private static String firstWord(String s) {
@@ -274,6 +308,7 @@ public final class ChatListPane extends VBox {
             super.updateItem(c, isEmpty);
             if (isEmpty || c == null) {
                 setGraphic(null);
+                setAccessibleText(null);
                 pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("current"), false);
                 return;
             }
@@ -306,6 +341,7 @@ public final class ChatListPane extends VBox {
             toggle(badge, "muted", c.muted());
             toggle(badge, "dot", n == 0 && c.mentionCount() == 0);
             setGraphic(root);
+            setAccessibleText(describe(c));
             setPadding(compact ? new Insets(4, 10, 4, 10) : new Insets(8, 10, 8, 10));
             pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("current"), Objects.equals(c.id(), selectedId));
         }

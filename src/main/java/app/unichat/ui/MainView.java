@@ -50,7 +50,12 @@ public final class MainView extends StackPane {
         @Override public void accountsChanged() { Platform.runLater(rail::refresh); }
         @Override public void connectionChanged(ConnectionState s) { Platform.runLater(() -> showConnection(s)); }
         @Override public void incomingMessage(Chat chat, Message m) { Platform.runLater(() -> onIncoming(chat, m)); }
-        @Override public void reminderDue(Chat chat) { Platform.runLater(() -> notifier.reminder(chat)); }
+        @Override public void reminderDue(Chat chat) {
+            Platform.runLater(() -> {
+                notifier.reminder(chat);
+                if (app.unichat.settings.Settings.get().speakMessages()) Speaker.say("Recordatorio: " + chat.title());
+            });
+        }
     };
 
     public MainView(ChatService svc, Stage stage, Notifier notifier, Runnable onLogout, Consumer<String> openLink) {
@@ -161,6 +166,14 @@ public final class MainView extends StackPane {
     private void onIncoming(Chat chat, Message m) {
         boolean viewing = stage.isFocused() && stage.isShowing() && thread.chat() != null && thread.chat().id().equals(chat.id());
         if (!viewing) notifier.notify(chat, m);
+        if (app.unichat.settings.Settings.get().speakMessages()) Speaker.say(spoken(chat, m));
+    }
+
+    /** "Mensaje de Laura en Familia, WhatsApp: hola" (only the sender when previews are hidden). */
+    static String spoken(Chat chat, Message m) {
+        String who = chat.group() ? m.senderName() + " en " + chat.title() : chat.title();
+        String head = "Mensaje de " + who + ", " + chat.network().displayName();
+        return app.unichat.settings.Settings.get().notificationPreview() ? head + ": " + m.preview() : head;
     }
 
     private void showConnection(ConnectionState s) {
@@ -213,11 +226,12 @@ public final class MainView extends StackPane {
 
     public void toast(String text) {
         toast.setText(text);
+        toast.setAccessibleText(text);
         toast.setVisible(true);
         toast.setOpacity(1);
-        FadeTransition out = new FadeTransition(Duration.millis(400), toast);
+        FadeTransition out = new FadeTransition(Duration.millis(Theme.reduceMotion() ? 1 : 400), toast);
         out.setToValue(0);
-        SequentialTransition seq = new SequentialTransition(new PauseTransition(Duration.seconds(3)), out);
+        SequentialTransition seq = new SequentialTransition(new PauseTransition(Duration.seconds(Theme.reduceMotion() ? 5 : 3)), out);
         seq.setOnFinished(e -> toast.setVisible(false));
         seq.play();
     }
@@ -267,6 +281,37 @@ public final class MainView extends StackPane {
         }, onLogout, this::showAddAccount, this::toast);
     }
 
+    /** Text size: delta 0 resets to 100 %. */
+    private void zoom(double delta) {
+        var s = app.unichat.settings.Settings.get();
+        s.setFontScale(delta == 0 ? 1.0 : s.fontScale() + delta);
+        Theme.applyAll();
+        listPane.refresh();
+        thread.rebuild(false);
+        toast("Tamaño de texto: " + Math.round(s.fontScale() * 100) + " %");
+    }
+
+    /** F6 / Shift+F6: rail → chat list → messages → message input. */
+    private void cycleFocus(int dir) {
+        Node owner = getScene() == null ? null : getScene().getFocusOwner();
+        int current = -1;
+        for (Node n = owner; n != null; n = n.getParent()) {
+            if (n == rail) current = 0;
+            else if (n == listPane) current = 1;
+            else if (n instanceof javafx.scene.control.ListView<?> lv && lv.getStyleClass().contains("timeline")) current = 2;
+            else if (n == thread.composer()) current = 3;
+            if (current >= 0) break;
+        }
+        int zones = thread.chat() == null ? 2 : 4;
+        int next = Math.floorMod((current < 0 ? (dir > 0 ? -1 : 0) : current) + dir, zones);
+        switch (next) {
+            case 0 -> { Node b = rail.lookup(".rail-button"); if (b != null) b.requestFocus(); }
+            case 1 -> listPane.focusList();
+            case 2 -> thread.focusTimeline();
+            default -> thread.composer().focus();
+        }
+    }
+
     private void onKey(KeyEvent e) {
         boolean mod = e.isShortcutDown();
         Chat c = thread.chat();
@@ -287,6 +332,14 @@ public final class MainView extends StackPane {
             if (c.isUnread()) svc.markRead(c.id()); else svc.setMarkedUnread(c.id(), true);
         } else if (mod && e.getCode() == KeyCode.I && c != null) {
             toggleInfo();
+        } else if (e.getCode() == KeyCode.F6) {
+            cycleFocus(e.isShiftDown() ? -1 : 1);
+        } else if (mod && (e.getCode() == KeyCode.EQUALS || e.getCode() == KeyCode.PLUS || e.getCode() == KeyCode.ADD)) {
+            zoom(0.1);
+        } else if (mod && (e.getCode() == KeyCode.MINUS || e.getCode() == KeyCode.SUBTRACT)) {
+            zoom(-0.1);
+        } else if (mod && (e.getCode() == KeyCode.DIGIT0 || e.getCode() == KeyCode.NUMPAD0)) {
+            zoom(0);
         } else if (mod && e.getCode().isDigitKey()) {
             switch (e.getCode()) {
                 case DIGIT1 -> setView(ChatFilter.View.INBOX, false);

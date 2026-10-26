@@ -58,7 +58,7 @@ public final class Rail extends VBox {
         b.setGraphic(graphic);
         b.getStyleClass().add("rail-button");
         b.setTooltip(new Tooltip(tip));
-        b.setFocusTraversable(false);
+        b.setAccessibleText(tip);
         b.setOnAction(e -> action.run());
         return b;
     }
@@ -109,6 +109,8 @@ public final class Rail extends VBox {
             b.setGraphic(wrap);
         }
         wrap.getChildren().removeIf(n -> n.getStyleClass().contains("rail-badge"));
+        String tip = b.getTooltip() == null ? "" : b.getTooltip().getText();
+        b.setAccessibleText(count > 0 ? tip + ", " + count + (count == 1 ? " chat sin leer" : " chats sin leer") : tip);
         if (count > 0) {
             Label badge = new Label(count > 99 ? "99+" : Long.toString(count));
             badge.getStyleClass().add("rail-badge");

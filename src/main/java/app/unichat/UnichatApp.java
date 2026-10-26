@@ -83,7 +83,7 @@ public final class UnichatApp extends Application {
     /**
      * Diagnostics for screenshots/CI: {@code -Dunichat.snapshot=out.png} writes the window to a PNG
      * and exits; {@code -Dunichat.openChat=<id>} opens a chat first, {@code -Dunichat.info=true} the info panel,
-     * {@code -Dunichat.overlay=command|add} the command bar or the connect-network sheet.
+     * {@code -Dunichat.overlay=command|add|settings[:Page]} the command bar, connect-network sheet or settings.
      */
     private void snapshotIfRequested() {
         String out = System.getProperty("unichat.snapshot");
@@ -96,10 +96,15 @@ public final class UnichatApp extends Application {
             String overlay = System.getProperty("unichat.overlay", "");
             if (mainView != null && overlay.equals("command")) mainView.showCommandBar();
             if (mainView != null && overlay.equals("add")) mainView.showAddAccount();
+            if (mainView != null && overlay.startsWith("settings")) {
+                mainView.showSettings();
+                if (overlay.contains(":")) app.unichat.ui.SettingsWindow.select(overlay.substring(overlay.indexOf(':') + 1));
+            }
             javafx.animation.PauseTransition shoot = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(1.5));
             shoot.setOnFinished(ev -> {
                 try {
-                    var img = scene.snapshot(null);
+                    var settings = app.unichat.ui.SettingsWindow.current();
+                    var img = (settings != null ? settings.getScene() : scene).snapshot(null);
                     javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(img, null), "png", new java.io.File(out));
                 } catch (Exception ex) {
                     ex.printStackTrace();

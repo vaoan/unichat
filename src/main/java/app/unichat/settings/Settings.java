@@ -17,6 +17,12 @@ import java.util.Properties;
 public final class Settings {
     public enum Theme { SYSTEM, LIGHT, DARK }
 
+    /** Tri-state accessibility switch: follow the OS, or force on/off. */
+    public enum Mode { SYSTEM, ON, OFF }
+
+    public static final double MIN_FONT_SCALE = 0.85;
+    public static final double MAX_FONT_SCALE = 1.6;
+
     private static final Settings INSTANCE = new Settings(dataDir());
 
     private final Path dir;
@@ -130,9 +136,13 @@ public final class Settings {
     /** Accent color as CSS hex. */
     public String accent() { return getString("ui.accent", "#5B5BD6"); }
     public void setAccent(String hex) { set("ui.accent", hex); }
-    /** 0.85 .. 1.3 */
-    public double fontScale() { return getDouble("ui.fontScale", 1.0); }
-    public void setFontScale(double scale) { set("ui.fontScale", Double.toString(scale)); }
+    /** {@link #MIN_FONT_SCALE} .. {@link #MAX_FONT_SCALE} */
+    public double fontScale() { return clampScale(getDouble("ui.fontScale", 1.0)); }
+    public void setFontScale(double scale) { set("ui.fontScale", Double.toString(clampScale(scale))); }
+
+    static double clampScale(double s) {
+        return Math.max(MIN_FONT_SCALE, Math.min(MAX_FONT_SCALE, Math.round(s * 100) / 100.0));
+    }
     public boolean compactList() { return getBool("ui.compact", false); }
     public void setCompactList(boolean v) { setBool("ui.compact", v); }
     public boolean showNetworkBadges() { return getBool("ui.networkBadges", true); }
@@ -149,6 +159,29 @@ public final class Settings {
     public void setSendReadReceipts(boolean v) { setBool("privacy.readReceipts", v); }
     public boolean sendTypingNotifications() { return getBool("privacy.typing", true); }
     public void setSendTypingNotifications(boolean v) { setBool("privacy.typing", v); }
+    // --- Accessibility ---
+    private Mode mode(String key) {
+        try {
+            return Mode.valueOf(getString(key, "SYSTEM"));
+        } catch (IllegalArgumentException e) {
+            return Mode.SYSTEM;
+        }
+    }
+    public Mode highContrast() { return mode("a11y.highContrast"); }
+    public void setHighContrast(Mode m) { set("a11y.highContrast", m.name()); }
+    public Mode reduceMotion() { return mode("a11y.reduceMotion"); }
+    public void setReduceMotion(Mode m) { set("a11y.reduceMotion", m.name()); }
+    public boolean strongFocus() { return getBool("a11y.strongFocus", false); }
+    public void setStrongFocus(boolean v) { setBool("a11y.strongFocus", v); }
+    public boolean readableFont() { return getBool("a11y.readableFont", false); }
+    public void setReadableFont(boolean v) { setBool("a11y.readableFont", v); }
+    public boolean wideSpacing() { return getBool("a11y.wideSpacing", false); }
+    public void setWideSpacing(boolean v) { setBool("a11y.wideSpacing", v); }
+    public boolean alwaysShowMessageActions() { return getBool("a11y.messageActions", false); }
+    public void setAlwaysShowMessageActions(boolean v) { setBool("a11y.messageActions", v); }
+    public boolean speakMessages() { return getBool("a11y.speak", false); }
+    public void setSpeakMessages(boolean v) { setBool("a11y.speak", v); }
+
     public boolean minimizeToTray() { return getBool("app.minimizeToTray", true); }
     public void setMinimizeToTray(boolean v) { setBool("app.minimizeToTray", v); }
 }

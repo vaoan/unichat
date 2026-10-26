@@ -61,6 +61,8 @@ public final class Composer extends VBox {
         banner.setManaged(false);
 
         input.setPromptText("Escribe un mensaje");
+        input.setAccessibleText("Escribe un mensaje");
+        input.setAccessibleHelp("Enter envía, Shift+Enter nueva línea, flecha arriba edita tu último mensaje, Esc cancela");
         input.setWrapText(true);
         input.setPrefRowCount(1);
         input.getStyleClass().add("composer-input");
@@ -100,7 +102,7 @@ public final class Composer extends VBox {
         b.setGraphic(Icons.icon(icon, 18));
         b.getStyleClass().add("icon-button");
         b.setTooltip(new javafx.scene.control.Tooltip(tooltip));
-        b.setFocusTraversable(false);
+        b.setAccessibleText(tooltip);
         if (action != null) b.setOnAction(e -> action.run());
         return b;
     }

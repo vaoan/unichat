@@ -145,7 +145,7 @@ public final class InfoPane extends ScrollPane {
         b.getStyleClass().add("info-action");
         if (active) b.getStyleClass().add("active");
         b.setOnAction(e -> run.run());
-        b.setFocusTraversable(false);
+        b.setAccessibleText(text + (active ? ", activado" : ""));
         return b;
     }
 

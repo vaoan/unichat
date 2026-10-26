@@ -34,6 +34,17 @@ public final class SettingsWindow {
 
     private SettingsWindow() {}
 
+    /** The open settings window, if any (used by the snapshot diagnostics). */
+    public static Stage current() { return open; }
+
+    /** Selects a page by its title, e.g. "Accesibilidad". */
+    @SuppressWarnings("unchecked")
+    public static void select(String page) {
+        if (open == null) return;
+        Node nav = open.getScene().getRoot().lookup(".settings-nav");
+        if (nav instanceof ListView<?> lv) ((ListView<String>) lv).getSelectionModel().select(page);
+    }
+
     private static final String[] ACCENTS = {"#5B5BD6", "#0090FF", "#12A594", "#46A758", "#F76B15", "#E5484D", "#D6409F", "#8E4EC6", "#1C2024"};
 
     public static void show(Window owner, ChatService svc, Runnable onAppearanceChanged, Runnable onLogout,
@@ -49,13 +60,14 @@ public final class SettingsWindow {
         BorderPane content = new BorderPane();
         content.getStyleClass().add("settings-content");
         ListView<String> nav = new ListView<>();
-        nav.getItems().addAll("Cuenta", "Redes conectadas", "Apariencia", "Notificaciones", "Privacidad", "Atajos de teclado", "Acerca de");
+        nav.getItems().addAll("Cuenta", "Redes conectadas", "Apariencia", "Accesibilidad", "Notificaciones", "Privacidad", "Atajos de teclado", "Acerca de");
         nav.getStyleClass().add("settings-nav");
         nav.setPrefWidth(200);
         nav.getSelectionModel().selectedItemProperty().addListener((o, a, s) -> {
             Node page = switch (s == null ? "Cuenta" : s) {
                 case "Redes conectadas" -> networksPage(svc, () -> { stage.close(); onAddAccount.run(); });
                 case "Apariencia" -> appearancePage(onAppearanceChanged);
+                case "Accesibilidad" -> accessibilityPage(onAppearanceChanged);
                 case "Notificaciones" -> notificationsPage();
                 case "Privacidad" -> privacyPage();
                 case "Atajos de teclado" -> shortcutsPage();
@@ -108,6 +120,9 @@ public final class SettingsWindow {
             text.getChildren().add(h);
         }
         HBox.setHgrow(text, Priority.ALWAYS);
+        if (control.getAccessibleText() == null) control.setAccessibleText(label);
+        if (control instanceof Region r && !(control instanceof Slider)) r.setMinWidth(Region.USE_PREF_SIZE);
+        if (help != null && control.getAccessibleHelp() == null) control.setAccessibleHelp(help);
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.SOMETIMES);
         HBox row = new HBox(12, text, grow, control);
@@ -197,6 +212,7 @@ public final class SettingsWindow {
                 case DARK -> "Oscuro";
             });
             b.getStyleClass().add("chip");
+            b.setMinWidth(Region.USE_PREF_SIZE);
             b.setToggleGroup(tg);
             b.setSelected(s.theme() == t);
             b.setOnAction(e -> {
@@ -212,6 +228,7 @@ public final class SettingsWindow {
             sw.getStyleClass().add("accent-swatch");
             if (hex.equalsIgnoreCase(s.accent())) sw.getStyleClass().add("selected");
             sw.setStyle("-fx-background-color: " + hex + ";");
+            sw.setAccessibleText("Color de acento " + hex);
             sw.setOnAction(e -> {
                 s.setAccent(hex);
                 accents.getChildren().forEach(n -> n.getStyleClass().remove("selected"));
@@ -220,10 +237,27 @@ public final class SettingsWindow {
             });
             accents.getChildren().add(sw);
         }
-        Slider font = new Slider(0.85, 1.3, s.fontScale());
+        Slider font = fontSlider(changed);
+        return page("Apariencia",
+                group("Tema", row("Modo", "Sigue al sistema o fuerza claro/oscuro.", themes),
+                        row("Color de acento", null, accents)),
+                group("Lista de chats",
+                        row("Tamaño de texto", "También con " + (MainView.MAC ? "⌘" : "Ctrl") + " + / − / 0.", font),
+                        row("Lista compacta", "Filas más bajas para ver más chats.", toggle(s.compactList(), v -> { s.setCompactList(v); changed.run(); })),
+                        row("Insignias de red", "Muestra la red de cada chat sobre su avatar.", toggle(s.showNetworkBadges(), v -> { s.setShowNetworkBadges(v); changed.run(); }))),
+                group("Escritura",
+                        row("Enter envía el mensaje", "Desactívalo para que Enter cree una línea nueva y "
+                                + (MainView.MAC ? "⌘" : "Ctrl") + "+Enter envíe.", toggle(s.sendOnEnter(), s::setSendOnEnter))));
+    }
+
+    private static Slider fontSlider(Runnable changed) {
+        Settings s = Settings.get();
+        Slider font = new Slider(Settings.MIN_FONT_SCALE, Settings.MAX_FONT_SCALE, s.fontScale());
         font.setMajorTickUnit(0.15);
         font.setSnapToTicks(false);
         font.setPrefWidth(200);
+        font.setMinWidth(160);
+        font.setMaxWidth(220);
         font.valueChangingProperty().addListener((o, a, changing) -> {
             if (!changing) {
                 s.setFontScale(font.getValue());
@@ -234,16 +268,72 @@ public final class SettingsWindow {
             s.setFontScale(font.getValue());
             changed.run();
         });
-        return page("Apariencia",
-                group("Tema", row("Modo", "Sigue al sistema o fuerza claro/oscuro.", themes),
-                        row("Color de acento", null, accents)),
-                group("Lista de chats",
-                        row("Tamaño de texto", null, font),
-                        row("Lista compacta", "Filas más bajas para ver más chats.", toggle(s.compactList(), v -> { s.setCompactList(v); changed.run(); })),
-                        row("Insignias de red", "Muestra la red de cada chat sobre su avatar.", toggle(s.showNetworkBadges(), v -> { s.setShowNetworkBadges(v); changed.run(); }))),
-                group("Escritura",
-                        row("Enter envía el mensaje", "Desactívalo para que Enter cree una línea nueva y "
-                                + (MainView.MAC ? "⌘" : "Ctrl") + "+Enter envíe.", toggle(s.sendOnEnter(), s::setSendOnEnter))));
+        // Keyboard users change the slider with arrows: apply on every step.
+        font.setOnKeyReleased(e -> {
+            s.setFontScale(font.getValue());
+            changed.run();
+        });
+        font.setBlockIncrement(0.05);
+        font.setAccessibleRoleDescription("control deslizante");
+        return font;
+    }
+
+    /** Three chips: Sistema / Activado / Desactivado. */
+    private static HBox modeChips(Settings.Mode current, Consumer<Settings.Mode> save) {
+        ToggleGroup tg = new ToggleGroup();
+        HBox box = new HBox(6);
+        for (Settings.Mode m : Settings.Mode.values()) {
+            ToggleButton b = new ToggleButton(switch (m) {
+                case SYSTEM -> "Sistema";
+                case ON -> "Activado";
+                case OFF -> "Desactivado";
+            });
+            b.getStyleClass().add("chip");
+            b.setMinWidth(Region.USE_PREF_SIZE);
+            b.setToggleGroup(tg);
+            b.setSelected(current == m);
+            b.setOnAction(e -> {
+                if (!b.isSelected()) b.setSelected(true);
+                save.accept(m);
+            });
+            box.getChildren().add(b);
+        }
+        return box;
+    }
+
+    private static Node accessibilityPage(Runnable changed) {
+        Settings s = Settings.get();
+        String sys = " Ahora el sistema dice: ";
+        Button test = new Button("Probar voz");
+        test.getStyleClass().add("secondary-button");
+        test.setOnAction(e -> Speaker.say("Mensaje de Mamá, WhatsApp: ¿Vienes el domingo a almorzar?"));
+        HBox speak = new HBox(10, test, toggle(s.speakMessages(), s::setSpeakMessages));
+        speak.setAlignment(Pos.CENTER_RIGHT);
+        speak.getChildren().get(1).setAccessibleText("Leer en voz alta los mensajes nuevos");
+        return page("Accesibilidad",
+                group("Visión",
+                        row("Tamaño de texto", "De 85 % a 160 %. Atajo: " + (MainView.MAC ? "⌘" : "Ctrl") + " + / − / 0.", fontSlider(changed)),
+                        row("Alto contraste", "Colores sólidos, bordes marcados y burbujas delimitadas." + sys
+                                + (Theme.systemHighContrast() ? "activado." : "desactivado."),
+                                modeChips(s.highContrast(), m -> { s.setHighContrast(m); changed.run(); })),
+                        row("Fuente más legible", "Usa Verdana, con letras más abiertas y diferenciadas.",
+                                toggle(s.readableFont(), v -> { s.setReadableFont(v); changed.run(); })),
+                        row("Más interlineado", "Separa más las líneas de los mensajes.",
+                                toggle(s.wideSpacing(), v -> { s.setWideSpacing(v); changed.run(); }))),
+                group("Movimiento y foco",
+                        row("Reducir movimiento", "Quita animaciones y deja los avisos más tiempo en pantalla." + sys
+                                + (Theme.systemReducedMotion() ? "activado." : "desactivado."),
+                                modeChips(s.reduceMotion(), m -> { s.setReduceMotion(m); changed.run(); })),
+                        row("Indicador de foco reforzado", "Un borde grueso muestra dónde está el teclado.",
+                                toggle(s.strongFocus(), v -> { s.setStrongFocus(v); changed.run(); })),
+                        row("Acciones de mensaje siempre visibles", "Reaccionar, responder y más, sin pasar el ratón por encima.",
+                                toggle(s.alwaysShowMessageActions(), v -> { s.setAlwaysShowMessageActions(v); changed.run(); }))),
+                group("Audio",
+                        row("Leer mensajes nuevos en voz alta", "Usa la voz del sistema. Respeta «Mostrar contenido» de Notificaciones y los chats silenciados.", speak)),
+                group("Lectores de pantalla",
+                        row("Narrador, VoiceOver y Orca", "Chats, mensajes, botones y reacciones tienen descripción hablada. "
+                                + "F6 salta entre barra lateral, lista, mensajes y campo de texto; en los mensajes usa las flechas y R, E, Enter, 1–6.",
+                                new Label())));
     }
 
     private static Node notificationsPage() {
@@ -271,6 +361,11 @@ public final class SettingsWindow {
         String m = MainView.MAC ? "⌘" : "Ctrl+";
         String[][] keys = {
                 {m + "K", "Buscar chats y comandos"},
+                {"F6 / Shift+F6", "Saltar entre barra lateral, lista, mensajes y campo de texto"},
+                {"↑ / ↓ (en mensajes)", "Recorrer mensajes"},
+                {"R · E · Enter (en mensajes)", "Responder · Editar · Más acciones"},
+                {"1 … 6 (en mensajes)", "Reacciones rápidas ❤️ 👍 😂 😮 😢 🙏"},
+                {m + "+ / " + m + "− / " + m + "0", "Agrandar · Achicar · Restablecer texto"},
                 {"Alt+↑ / Alt+↓", "Chat anterior / siguiente"},
                 {"Alt+Shift+↑ / ↓", "Anterior / siguiente sin leer"},
                 {m + "E", "Archivar o desarchivar el chat"},
