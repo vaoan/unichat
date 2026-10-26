@@ -100,8 +100,12 @@ public final class MatrixChatService implements ChatService {
     private volatile List<Account> lastAccounts = List.of();
     private Thread syncThread;
 
+    /** Distinguishes this sign-in's cache from earlier sessions of the same user (see syncCacheFile). */
+    private final String sessionKey;
+
     public MatrixChatService(String homeserver, String userId, String accessToken) {
         this.client = new MatrixClient(homeserver, accessToken);
+        this.sessionKey = sha256(accessToken).substring(0, 8);
         this.userId = userId;
         this.serverName = userId.substring(userId.indexOf(':') + 1);
         this.proc = new SyncProcessor(userId);
@@ -189,6 +193,7 @@ public final class MatrixChatService implements ChatService {
         if (token == null || uid == null) throw new MatrixException(0, null, "Respuesta de inicio de sesión no válida");
         String wkBase = resp.path("well_known").path("m.homeserver").path("base_url").asText(null);
         if (wkBase != null && !wkBase.isBlank()) base = MatrixClient.stripSlash(wkBase);
+        dropSyncCaches();
         Settings.get().setMatrixSession(base, uid, token, resp.path("device_id").asText(null));
         return new MatrixChatService(base, uid, token);
     }
@@ -290,7 +295,18 @@ public final class MatrixChatService implements ChatService {
 
     /** Last full /sync response for this account; shown instantly on the next start (like Element's cache). */
     Path syncCacheFile() {
-        return Settings.get().cacheDir().resolve("sync-" + sha256(serverName + "|" + userId).substring(0, 16) + ".json");
+        // Per session, not only per user: two servers can share the name and user (Docker and the local server are
+        // both "localhost" / @yo:localhost), and a new session must never show another one's chats.
+        return Settings.get().cacheDir().resolve("sync-" + sha256(serverName + "|" + userId).substring(0, 16) + "-" + sessionKey + ".json");
+    }
+
+    /** Removes every session's cached sync (called on sign-in: the new session builds its own). */
+    static void dropSyncCaches() {
+        try (var files = Files.list(Settings.get().cacheDir())) {
+            for (Path f : files.filter(x -> x.getFileName().toString().matches("sync-.*\\.json")).toList()) Files.deleteIfExists(f);
+        } catch (IOException ignored) {
+            // No cache dir yet.
+        }
     }
 
     /** Shows the cached snapshot right away; the network sync then only fetches what changed since. */
