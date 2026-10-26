@@ -41,6 +41,13 @@ final class MatrixRoom {
     com.fasterxml.jackson.databind.JsonNode roomFeatures;
     /** {@code com.beeper.room_type} from bridgev2 bridge info: dm, group or space. */
     String bridgeRoomType;
+    /** {@code m.room.create} type m.space. */
+    boolean space;
+    /** {@code channel.id} of m.bridge ("__personal…" marks the bridge's folder space). */
+    String bridgeChannelId;
+    /** m.space.child state: child room id → its order ("" when none), in arrival order. */
+    final Map<String, String> spaceChildOrder = new LinkedHashMap<>();
+    final java.util.Set<String> spaceParents = new java.util.LinkedHashSet<>();
     List<String> heroes = List.of();
     int joinedCount = -1;
     int invitedCount = -1;

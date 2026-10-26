@@ -36,6 +36,12 @@ public final class Chat {
     private boolean bridgeBot;
     /** What this chat's network supports (from its bridge); UNKNOWN offers everything. */
     private RoomFeatures features = RoomFeatures.UNKNOWN;
+    /** A Matrix space: a container (bridge folder, Discord server, Telegram forum), never a chat itself. */
+    private boolean space;
+    /** The bridge's per-network folder of every chat (not a group of its own). */
+    private boolean personalSpace;
+    private List<String> spaceChildren = List.of();
+    private Set<String> spaceParents = Set.of();
     private final List<Member> members = new ArrayList<>();
     private final Set<String> typing = new LinkedHashSet<>();
 
@@ -98,4 +104,13 @@ public final class Chat {
 
     public RoomFeatures features() { return features; }
     public void setFeatures(RoomFeatures f) { this.features = f == null ? RoomFeatures.UNKNOWN : f; }
+
+    public boolean space() { return space; }
+    public void setSpace(boolean space) { this.space = space; }
+    public boolean personalSpace() { return personalSpace; }
+    public void setPersonalSpace(boolean personalSpace) { this.personalSpace = personalSpace; }
+    public List<String> spaceChildren() { return spaceChildren; }
+    public void setSpaceChildren(List<String> children) { this.spaceChildren = List.copyOf(children); }
+    public Set<String> spaceParents() { return spaceParents; }
+    public void setSpaceParents(Set<String> parents) { this.spaceParents = Set.copyOf(parents); }
 }

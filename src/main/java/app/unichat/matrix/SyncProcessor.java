@@ -197,6 +197,19 @@ final class SyncProcessor {
             case "m.room.create" -> {
                 long ts = ev.path("origin_server_ts").asLong(0);
                 if (ts > 0) room.created = Instant.ofEpochMilli(ts);
+                room.space = "m.space".equals(text(c, "type"));
+            }
+            case "m.space.child" -> {
+                String child = text(ev, "state_key");
+                if (child == null) break;
+                if (c.isEmpty() || !c.has("via")) room.spaceChildOrder.remove(child);
+                else room.spaceChildOrder.putIfAbsent(child, c.path("order").asText(""));
+            }
+            case "m.space.parent" -> {
+                String parent = text(ev, "state_key");
+                if (parent == null) break;
+                if (c.isEmpty() || !c.has("via")) room.spaceParents.remove(parent);
+                else room.spaceParents.add(parent);
             }
             case "m.room.member" -> {
                 String membership = text(c, "membership");
@@ -214,6 +227,8 @@ final class SyncProcessor {
                 if (proto != null) room.bridgeProtocol = proto;
                 String rt = text(c, "com.beeper.room_type");
                 if (rt != null) room.bridgeRoomType = rt;
+                String channel = text(c.path("channel"), "id");
+                if (channel != null) room.bridgeChannelId = channel;
             }
             default -> { }
         }
@@ -621,7 +636,11 @@ final class SyncProcessor {
         c.setNetwork(detectNetwork(room, botRoom));
         c.setFeatures(room.roomFeatures != null ? app.unichat.model.RoomFeatures.parse(room.roomFeatures)
                 : c.network() == Network.DISCORD ? app.unichat.model.RoomFeatures.discord() : app.unichat.model.RoomFeatures.UNKNOWN);
-        boolean group = !botRoom && isGroup(room);
+        c.setSpace(room.space);
+        c.setPersonalSpace(room.space && room.bridgeChannelId != null && room.bridgeChannelId.startsWith("__"));
+        c.setSpaceChildren(orderedChildren(room));
+        c.setSpaceParents(room.spaceParents);
+        boolean group = !botRoom && !room.space && isGroup(room);
         c.setGroup(group);
         c.setTopic(room.topic);
 
@@ -675,7 +694,17 @@ final class SyncProcessor {
         }
     }
 
+    /** Children with an {@code order} first (lexicographic, as the spec says), then the rest in arrival order. */
+    private static List<String> orderedChildren(MatrixRoom room) {
+        List<String> ordered = new ArrayList<>(), rest = new ArrayList<>();
+        room.spaceChildOrder.forEach((id, order) -> (order.isEmpty() ? rest : ordered).add(id));
+        ordered.sort(java.util.Comparator.comparing(room.spaceChildOrder::get));
+        ordered.addAll(rest);
+        return ordered;
+    }
+
     private boolean isBridgeBotRoom(MatrixRoom room) {
+        if (room.space) return false;
         if (room.bridgeProtocol != null) return false;
         List<String> others = otherUsers(room);
         if (others.isEmpty()) return false;
