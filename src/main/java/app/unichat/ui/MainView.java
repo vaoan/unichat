@@ -225,9 +225,14 @@ public final class MainView extends StackPane {
     // ------------------------------------------------------------------ navigation
 
     public void openChat(Chat c) {
+        openChat(c, false);
+    }
+
+    /** {@code keepFilters}: open the chat even if the current filters hide it in the list (notification clicks). */
+    private void openChat(Chat c, boolean keepFilters) {
         if (c == null) return;
         hideOverlay();
-        if (c.archived() && listPane.filterProperty().get().view() != ChatFilter.View.ARCHIVE && !listPane.filterProperty().get().searching()) {
+        if (!keepFilters && c.archived() && listPane.filterProperty().get().view() != ChatFilter.View.ARCHIVE && !listPane.filterProperty().get().searching()) {
             listPane.filterProperty().set(listPane.filterProperty().get().withView(ChatFilter.View.ARCHIVE));
         }
         listPane.setSelected(c.id());
@@ -242,7 +247,7 @@ public final class MainView extends StackPane {
         Chat c = svc.chat(id);
         if (c != null) {
             pendingOpenId = null;
-            openChat(c);
+            openChat(c, true);
             return;
         }
         // The room (e.g. a just-created bridge-bot chat) hasn't arrived through sync yet: open it when it does.

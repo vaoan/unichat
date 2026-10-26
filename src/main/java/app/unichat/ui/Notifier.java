@@ -21,11 +21,15 @@ import java.util.function.Consumer;
  * macOS menu bar) with balloon messages, plus the dock/taskbar badge where supported.
  */
 public final class Notifier {
+    private static final boolean MAC = System.getProperty("os.name", "").toLowerCase().contains("mac");
+
     private volatile TrayIcon tray;
     private volatile String lastChatId;
+    private final DesktopToast toast;
 
     /** {@code onOpen} receives a chat id (or null) when the user clicks the tray icon or a notification. */
     public Notifier(Runnable onShow, Consumer<String> onOpen, Runnable onQuit) {
+        toast = MAC ? new DesktopToast(onOpen) : null;
         if (!SystemTray.isSupported()) return;
         try (InputStream in = Notifier.class.getResourceAsStream("/app/unichat/icons/tray.png")) {
             BufferedImage img = in == null ? new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB) : ImageIO.read(in);
@@ -55,16 +59,23 @@ public final class Notifier {
         lastChatId = chat.id();
         String title = chat.group() ? m.senderName() + " · " + chat.title() : chat.title();
         String body = s.notificationPreview() ? m.preview() : "Mensaje nuevo · " + chat.network().displayName();
-        awt(() -> {
-            if (tray != null) tray.displayMessage(title, body, TrayIcon.MessageType.NONE);
-            if (s.notificationSound()) Toolkit.getDefaultToolkit().beep();
-        });
+        show(title, body, chat.id(), TrayIcon.MessageType.NONE);
+        if (s.notificationSound()) awt(() -> Toolkit.getDefaultToolkit().beep());
     }
 
     public void reminder(Chat chat) {
         lastChatId = chat.id();
+        show("Recordatorio", chat.title(), chat.id(), TrayIcon.MessageType.INFO);
+    }
+
+    /** Call on the FX thread. Windows: native balloon (clicking it fires the tray action). macOS: own card. */
+    private void show(String title, String body, String chatId, TrayIcon.MessageType type) {
+        if (toast != null) {
+            toast.show(title, body, chatId);
+            return;
+        }
         awt(() -> {
-            if (tray != null) tray.displayMessage("Recordatorio", chat.title(), TrayIcon.MessageType.INFO);
+            if (tray != null) tray.displayMessage(title, body, type);
         });
     }
 

@@ -52,9 +52,12 @@ public final class UnichatApp extends Application {
             stage.setY(y);
         }
 
+        // Tray/balloon clicks arrive on the AWT thread; the macOS card on the FX thread.
         notifier = new Notifier(this::showWindow, id -> {
             showWindow();
-            if (mainView != null) mainView.openChatId(id);
+            Platform.runLater(() -> {
+                if (mainView != null) mainView.openChatId(id);
+            });
         }, this::quit);
         Platform.setImplicitExit(!notifier.hasTray());
 

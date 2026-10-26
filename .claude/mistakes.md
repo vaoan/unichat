@@ -45,3 +45,6 @@
   Now one decoded 168 px image per URL serves every size, loads are de-duplicated, failed URLs (bridge-bot
   avatars on maunium.net, unreachable from a "localhost" Synapse) aren't retried per click, and the 150 most
   recent chats' photos are preloaded. Result: 0 flashes for already-seen photos.
+- **macOS drops AWT tray notifications from a plain `java` process** (usernoted: "dropping msg … app not found");
+  osascript ones show but clicking opens Script Editor. macOS uses Unichat's own card (`DesktopToast`); Windows
+  keeps the native balloon. Tray/balloon callbacks run on the AWT thread: hop to FX with `Platform.runLater`.
