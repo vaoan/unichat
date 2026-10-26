@@ -378,7 +378,8 @@ public final class ThreadPane extends BorderPane {
             messageMenu(m).show(cell, Side.BOTTOM, 40, -10);
         } else if (code.isDigitKey() && !e.isShortcutDown() && !m.deleted()) {
             int n = code.getCode() - javafx.scene.input.KeyCode.DIGIT1.getCode();
-            if (n < 0 || n >= EmojiPicker.QUICK.length) return;
+            java.util.List<String> offered = chat.features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK));
+            if (n < 0 || n >= EmojiPicker.QUICK.length || !offered.contains(EmojiPicker.QUICK[n])) return;
             svc.toggleReaction(chat.id(), m.id(), EmojiPicker.QUICK[n]);
         } else {
             return;
@@ -748,25 +749,24 @@ public final class ThreadPane extends BorderPane {
 
     private ContextMenu messageMenu(Message m) {
         ContextMenu menu = new ContextMenu();
-        if (!m.deleted()) {
-            menu.getItems().add(ChatMenus.item("Responder", () -> composer.reply(m)));
-            if (!m.isMedia()) menu.getItems().add(ChatMenus.item("Copiar texto", () -> {
-                ClipboardContent cc = new ClipboardContent();
-                cc.putString(m.body());
-                Clipboard.getSystemClipboard().setContent(cc);
-            }));
-            if (m.mediaUrl() != null) menu.getItems().add(ChatMenus.item("Abrir archivo", () -> openFile(m)));
-            if (m.outgoing() && !m.isMedia()) menu.getItems().add(ChatMenus.item("Editar", () -> composer.edit(m)));
+        java.util.Set<MessageActions.Action> a = MessageActions.of(m, chat.features(), Instant.now());
+        if (a.isEmpty()) return menu;
+        if (a.contains(MessageActions.Action.REPLY)) menu.getItems().add(ChatMenus.item("Responder", () -> composer.reply(m)));
+        if (a.contains(MessageActions.Action.COPY)) menu.getItems().add(ChatMenus.item("Copiar texto", () -> {
+            ClipboardContent cc = new ClipboardContent();
+            cc.putString(m.body());
+            Clipboard.getSystemClipboard().setContent(cc);
+        }));
+        if (a.contains(MessageActions.Action.OPEN_FILE)) menu.getItems().add(ChatMenus.item("Abrir archivo", () -> openFile(m)));
+        if (a.contains(MessageActions.Action.EDIT)) menu.getItems().add(ChatMenus.item("Editar", () -> composer.edit(m)));
+        java.util.List<String> reactions = chat.features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK));
+        if (!reactions.isEmpty()) {
             menu.getItems().add(new SeparatorMenuItem());
-            for (String e : EmojiPicker.QUICK) {
-                MenuItem i = ChatMenus.item("Reaccionar " + e, () -> svc.toggleReaction(chat.id(), m.id(), e));
-                menu.getItems().add(i);
-            }
-            if (m.outgoing()) {
-                menu.getItems().add(new SeparatorMenuItem());
-                menu.getItems().add(ChatMenus.danger(ChatMenus.item("Eliminar para todos",
-                        () -> svc.deleteMessage(chat.id(), m.id()))));
-            }
+            for (String e : reactions) menu.getItems().add(ChatMenus.item("Reaccionar " + e, () -> svc.toggleReaction(chat.id(), m.id(), e)));
+        }
+        if (a.contains(MessageActions.Action.DELETE_FOR_EVERYONE)) {
+            menu.getItems().add(new SeparatorMenuItem());
+            menu.getItems().add(ChatMenus.danger(ChatMenus.item("Eliminar para todos", () -> svc.deleteMessage(chat.id(), m.id()))));
         }
         return menu;
     }

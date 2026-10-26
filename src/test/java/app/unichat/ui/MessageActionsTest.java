@@ -1,0 +1,83 @@
+package app.unichat.ui;
+
+import app.unichat.model.Message;
+import app.unichat.model.MessageType;
+import app.unichat.model.RoomFeatures;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.Set;
+
+import static app.unichat.ui.MessageActions.Action.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class MessageActionsTest {
+    private static final Instant SENT = Instant.parse("2026-10-26T10:00:00Z");
+
+    private static RoomFeatures f(String json) throws Exception {
+        return RoomFeatures.parse(new ObjectMapper().readTree(json));
+    }
+
+    private static final String WHATSAPP = "{\"id\":\"wa\",\"edit\":2,\"edit_max_age\":900,\"delete\":2,\"delete_max_age\":172800,\"reply\":2}";
+
+    private static Message msg(boolean outgoing, MessageType type, String mime) {
+        Message m = new Message("$1", "!c", outgoing ? "@me" : "@ana", "Ana", outgoing, SENT);
+        m.setType(type);
+        if (type != MessageType.TEXT) {
+            m.setMediaUrl("mxc://s/abc");
+            m.setMimeType(mime);
+        } else {
+            m.setBody("hola");
+        }
+        return m;
+    }
+
+    @Test
+    void whatsappTextEditableFor15Minutes() throws Exception {
+        Set<MessageActions.Action> fresh = MessageActions.of(msg(true, MessageType.TEXT, null), f(WHATSAPP), SENT.plusSeconds(600));
+        assertTrue(fresh.containsAll(Set.of(REPLY, COPY, EDIT, DELETE_FOR_EVERYONE)));
+        Set<MessageActions.Action> old = MessageActions.of(msg(true, MessageType.TEXT, null), f(WHATSAPP), SENT.plusSeconds(1200));
+        assertFalse(old.contains(EDIT));
+        assertTrue(old.contains(DELETE_FOR_EVERYONE));
+    }
+
+    @Test
+    void receivedPhotoCanBeSavedNotEdited() throws Exception {
+        Set<MessageActions.Action> a = MessageActions.of(msg(false, MessageType.IMAGE, "image/jpeg"), f(WHATSAPP), SENT);
+        assertTrue(a.containsAll(Set.of(SAVE_AS, OPEN_FILE, REPLY)));
+        assertFalse(a.contains(EDIT));
+        assertFalse(a.contains(DELETE_FOR_EVERYONE), "only your own messages");
+        assertFalse(a.contains(COPY));
+    }
+
+    @Test
+    void stickersAndGifsCanBeFavourites() throws Exception {
+        assertTrue(MessageActions.of(msg(false, MessageType.STICKER, "image/webp"), f(WHATSAPP), SENT).contains(FAVORITE));
+        assertTrue(MessageActions.of(msg(false, MessageType.IMAGE, "image/gif"), f(WHATSAPP), SENT).contains(FAVORITE));
+        assertFalse(MessageActions.of(msg(false, MessageType.IMAGE, "image/jpeg"), f(WHATSAPP), SENT).contains(FAVORITE));
+    }
+
+    @Test
+    void googleMessagesDeletesOnlyForMe() throws Exception {
+        Set<MessageActions.Action> a = MessageActions.of(msg(true, MessageType.TEXT, null), f("{\"id\":\"gm\",\"delete_for_me\":true,\"reply\":2}"), SENT);
+        assertTrue(a.contains(DELETE_FOR_ME));
+        assertFalse(a.contains(DELETE_FOR_EVERYONE));
+        assertFalse(a.contains(EDIT));
+    }
+
+    @Test
+    void deletedMessagesHaveNoActions() throws Exception {
+        Message m = msg(true, MessageType.TEXT, null);
+        m.setDeleted(true);
+        assertEquals(Set.of(), MessageActions.of(m, f(WHATSAPP), SENT));
+    }
+
+    @Test
+    void unknownNetworksKeepTodaysActions() {
+        Set<MessageActions.Action> a = MessageActions.of(msg(true, MessageType.TEXT, null), RoomFeatures.UNKNOWN, SENT.plusSeconds(99999));
+        assertTrue(a.containsAll(Set.of(REPLY, COPY, EDIT, DELETE_FOR_EVERYONE)));
+    }
+}
