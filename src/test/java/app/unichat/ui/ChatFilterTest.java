@@ -126,4 +126,25 @@ class ChatFilterTest {
         ChatFilter f = ChatFilter.DEFAULT.withView(ChatFilter.View.ARCHIVE).switchTo(Network.SIGNAL, null);
         assertEquals(ChatFilter.View.INBOX, f.view());
     }
+
+    @Test
+    void spacesNeverShowInAnyView() {
+        Chat s = chat("!s", Network.DISCORD, 100);
+        s.setTitle("Servidor Unichat");
+        s.setSpace(true);
+        s.setUnreadCount(3);
+        s.setFavorite(true);
+        for (ChatFilter f : List.of(ChatFilter.DEFAULT, ChatFilter.DEFAULT.withView(ChatFilter.View.FAVORITES),
+                ChatFilter.DEFAULT.withView(ChatFilter.View.ARCHIVE), ChatFilter.DEFAULT.withQuery("servidor"))) {
+            assertFalse(f.matches(s), f.toString());
+        }
+    }
+
+    @Test
+    void spacesNeverCountAsUnread() {
+        Chat s = chat("!s", Network.DISCORD, 100);
+        s.setSpace(true);
+        s.setUnreadCount(3);
+        assertFalse(ChatFilter.inboxUnread(s));
+    }
 }

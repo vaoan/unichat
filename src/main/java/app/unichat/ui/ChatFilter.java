@@ -43,10 +43,11 @@ public record ChatFilter(View view, Network network, String accountId, boolean u
      * low-priority and bridge-bot chats don't count.
      */
     public static boolean inboxUnread(Chat c) {
-        return c.isUnread() && !c.archived() && !c.muted() && !c.lowPriority() && !c.bridgeBot();
+        return c.isUnread() && !c.space() && !c.archived() && !c.muted() && !c.lowPriority() && !c.bridgeBot();
     }
 
     public boolean matches(Chat c) {
+        if (c.space()) return false; // a container (server, forum, bridge folder): its chats are listed instead
         if (network != null && c.network() != network) return false;
         if (accountId != null && !accountId.equals(c.accountId())) return false;
         if (searching()) return normalize(c.title()).contains(normalize(query))
