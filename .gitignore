@@ -10,3 +10,4 @@ out/
 *.log
 server/data/
 target/
+server/CREDENCIALES.txt

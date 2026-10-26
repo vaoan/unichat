@@ -4,7 +4,10 @@
 
 x-bridge: &bridge
   restart: unless-stopped
-  depends_on: [postgres, synapse]
+  # Bridges crash if Postgres or Synapse are not reachable yet, so wait for both health checks.
+  depends_on:
+    postgres: {condition: service_healthy}
+    synapse: {condition: service_healthy}
   networks: [unichat]
 
 services:
@@ -20,12 +23,19 @@ services:
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U unichat -d unichat"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
     networks: [unichat]
 
   synapse:
     image: matrixdotorg/synapse:latest
     restart: unless-stopped
-    depends_on: [postgres]
+    depends_on:
+      postgres: {condition: service_healthy}
     ports:
       - "8008:8008"
     volumes:
@@ -40,8 +50,10 @@ services:
 
   telegram:
     <<: *bridge
-    # Needs api_id / api_hash from https://my.telegram.org (see docs/BRIDGES.md).
+    # Needs api_id / api_hash from https://my.telegram.org (see docs/BRIDGES.md), so it only runs with the
+    # "telegram" profile; setup adds COMPOSE_PROFILES=telegram to .env once TELEGRAM_API_ID/HASH are set.
     image: dock.mau.dev/mautrix/telegram:latest
+    profiles: [telegram]
     volumes: ["./data/telegram:/data"]
 
   signal:
@@ -49,10 +61,11 @@ services:
     image: dock.mau.dev/mautrix/signal:latest
     volumes: ["./data/signal:/data"]
 
-  # mautrix-meta runs twice: one instance per mode.
+  # mautrix-meta runs twice. Instagram support was removed from mautrix-meta after v26.07, so the
+  # instagram instance is pinned to that release (network.mode: instagram); facebook tracks latest.
   instagram:
     <<: *bridge
-    image: dock.mau.dev/mautrix/meta:latest
+    image: dock.mau.dev/mautrix/meta:v26.07
     volumes: ["./data/instagram:/data"]
 
   facebook:
@@ -80,12 +93,9 @@ services:
     image: dock.mau.dev/mautrix/twitter:latest
     volumes: ["./data/twitter:/data"]
 
-  # Optional: newer bridge, image name not fully verified. Enable with
-  #   docker compose --profile linkedin up -d   (and BRIDGES="... linkedin" in setup)
   linkedin:
     <<: *bridge
     image: dock.mau.dev/mautrix/linkedin:latest
-    profiles: [linkedin]
     volumes: ["./data/linkedin:/data"]
 
 networks:
