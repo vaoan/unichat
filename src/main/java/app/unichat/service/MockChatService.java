@@ -107,11 +107,11 @@ public final class MockChatService implements ChatService {
 
     // ---------------------------------------------------------------- reading
 
-    static final String UNJOINED_CHANNEL = "!srv-anuncios:demo";
+    public static final String UNJOINED_CHANNEL_ID = "!srv-anuncios:demo";
 
     @Override
     public CompletableFuture<Void> joinChat(String roomId) {
-        if (UNJOINED_CHANNEL.equals(roomId) && !chats.containsKey(roomId)) {
+        if (UNJOINED_CHANNEL_ID.equals(roomId) && !chats.containsKey(roomId)) {
             ChatBuilder.group(this, "srv-anuncios", Network.DISCORD, "#anuncios", "Mafe")
                     .in(-100, "Mafe", "Nuevo evento el sábado").done();
             fireChats();
@@ -121,7 +121,7 @@ public final class MockChatService implements ChatService {
 
     @Override
     public CompletableFuture<Map<String, String>> spaceNames(String spaceId) {
-        return CompletableFuture.completedFuture("!servidor:demo".equals(spaceId) ? Map.of(UNJOINED_CHANNEL, "#anuncios") : Map.of());
+        return CompletableFuture.completedFuture("!servidor:demo".equals(spaceId) ? Map.of(UNJOINED_CHANNEL_ID, "#anuncios") : Map.of());
     }
 
     @Override public List<Chat> chats() { return new ArrayList<>(chats.values()); }
@@ -635,7 +635,7 @@ public final class MockChatService implements ChatService {
         server.setNetwork(Network.DISCORD);
         server.setTitle("Servidor Unichat");
         server.setSpace(true);
-        server.setSpaceChildren(List.of("!srv-general:demo", "!srv-memes:demo", UNJOINED_CHANNEL));
+        server.setSpaceChildren(List.of("!srv-general:demo", "!srv-memes:demo", UNJOINED_CHANNEL_ID));
         chats.put(server.id(), server);
         ChatBuilder.group(this, "srv-general", Network.DISCORD, "#general", "xNico", "Mafe")
                 .in(-5000, "xNico", "Bienvenidos al servidor")

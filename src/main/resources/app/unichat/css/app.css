@@ -742,3 +742,14 @@
 .gif-tile { -fx-background-color: -surface-2; -fx-background-radius: 10; }
 .gif-tile:hover, .gif-tile:focused { -fx-background-color: -hover; }
 .root.contrast .gif-tile:focused { -fx-border-color: -text; -fx-border-radius: 10; }
+/* Bandeja | Grupos */
+.list-view-toggle .toggle-button { -fx-background-color: transparent; -fx-background-radius: 8; -fx-padding: 3 8; -fx-text-fill: -text-2; -fx-font-size: 0.85em; }
+.list-view-toggle .toggle-button:selected { -fx-background-color: -surface-2; -fx-text-fill: -text; }
+.list-view-toggle .toggle-button:focused { -fx-border-color: -accent; -fx-border-radius: 8; }
+.groups-tree { -fx-background-color: transparent; -fx-padding: 4 0; }
+.groups-tree .tree-cell { -fx-background-color: transparent; -fx-padding: 5 8; -fx-text-fill: -text; }
+.groups-tree .tree-cell:selected, .groups-tree .tree-cell:hover { -fx-background-color: -hover; -fx-background-radius: 8; }
+.groups-tree .tree-cell:container .group-name { -fx-font-weight: bold; }
+.groups-tree .tree-cell:unjoined .group-name { -fx-opacity: 0.6; }
+.group-join { -fx-text-fill: -accent; -fx-font-size: 0.85em; }
+.root.contrast .groups-tree .tree-cell:focused { -fx-border-color: -text; -fx-border-radius: 8; }

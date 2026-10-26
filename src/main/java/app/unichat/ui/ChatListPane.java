@@ -43,6 +43,12 @@ public final class ChatListPane extends VBox {
     private final Label empty = new Label();
     private final TextField search = new TextField();
     private final ToggleGroup chips = new ToggleGroup();
+    /** Bandeja | Grupos, for a network that has servers/groups (spaces). */
+    private final HBox viewToggle = new HBox(2);
+    private final ToggleGroup viewChoice = new ToggleGroup();
+    private final GroupsTree groups;
+    private FlowPane chipRow;
+    private boolean showingGroups;
     private final Consumer<Chat> onOpen;
     private String selectedId;
     private boolean updating;
@@ -50,10 +56,17 @@ public final class ChatListPane extends VBox {
     public ChatListPane(ChatService svc, Consumer<Chat> onOpen) {
         this.svc = svc;
         this.onOpen = onOpen;
+        this.groups = new GroupsTree(svc, c -> open(c));
         getStyleClass().add("chat-list-pane");
 
         title.getStyleClass().add("pane-title");
-        HBox header = new HBox(title);
+        ToggleButton inbox = viewButton("Bandeja", false), grouped = viewButton("Grupos", true);
+        viewToggle.getChildren().addAll(inbox, grouped);
+        viewToggle.getStyleClass().add("list-view-toggle");
+        viewToggle.setAccessibleText("Vista de la lista");
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        HBox header = new HBox(title, headerSpacer, viewToggle);
         header.getStyleClass().add("chat-list-header");
         header.setAlignment(Pos.CENTER_LEFT);
 
@@ -74,7 +87,7 @@ public final class ChatListPane extends VBox {
         searchIcon.setMouseTransparent(true);
         searchBox.getStyleClass().add("search-box");
 
-        FlowPane chipRow = new FlowPane(6, 6,
+        chipRow = new FlowPane(6, 6,
                 chip("Todos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.INBOX)),
                 chip("No leídos", f -> f.withUnreadOnly(true).withView(ChatFilter.View.INBOX)),
                 chip("Favoritos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.FAVORITES)),
@@ -103,7 +116,8 @@ public final class ChatListPane extends VBox {
 
         accountRow.getStyleClass().addAll("chip-row", "account-row");
         accountRow.setAccessibleText("Cuentas");
-        getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list);
+        VBox.setVgrow(groups, Priority.ALWAYS);
+        getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list, groups);
         filter.addListener((o, a, b) -> {
             syncChips(b);
             refresh();
@@ -140,6 +154,11 @@ public final class ChatListPane extends VBox {
 
     /** Focuses the chat list (F6 cycle), keeping the open chat selected. */
     public void focusList() {
+        if (showingGroups) {
+            groups.requestFocus();
+            if (groups.getSelectionModel().isEmpty()) groups.getSelectionModel().select(0);
+            return;
+        }
         list.requestFocus();
         if (list.getSelectionModel().isEmpty() && !items.isEmpty()) list.getSelectionModel().select(0);
     }
@@ -171,6 +190,7 @@ public final class ChatListPane extends VBox {
         };
         title.setText(f.network() == null ? base : f.network().displayName());
         refreshAccountRow(f);
+        refreshView(f);
         empty.setText(f.searching() ? "Sin resultados para «" + f.query() + "»"
                 : f.view() == ChatFilter.View.ARCHIVE ? "No hay chats archivados"
                 : f.unreadOnly() ? "¡Todo al día! No tienes mensajes sin leer 🎉"
@@ -178,12 +198,44 @@ public final class ChatListPane extends VBox {
                     ? "Aún no conectaste ninguna red.\nHaz clic en una red de la izquierda (o en +) para iniciar sesión."
                 : "No hay chats aquí todavía");
 
-        boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly();
+        boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && !showingGroups;
         List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.archived() && !c.bridgeBot()
                 && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).limit(8).toList() : List.of();
         favorites.getChildren().setAll(favs.stream().map(this::favoriteTile).toList());
         favorites.setVisible(!favs.isEmpty());
         favorites.setManaged(!favs.isEmpty());
+    }
+
+    private ToggleButton viewButton(String text, boolean groupsView) {
+        ToggleButton b = new ToggleButton(text);
+        b.setToggleGroup(viewChoice);
+        b.setAccessibleText(groupsView ? "Ver por grupos y servidores" : "Ver la bandeja");
+        b.setOnAction(e -> {
+            app.unichat.model.Network n = filter.get().network();
+            if (n != null) Settings.get().set("list.view." + n.name(), groupsView ? "GROUPS" : "INBOX");
+            refresh();
+        });
+        return b;
+    }
+
+    /** Bandeja (the list) or Grupos (the tree), remembered per network; a search always shows the list. */
+    private void refreshView(ChatFilter f) {
+        app.unichat.model.Network n = f.network();
+        boolean can = n != null && f.view() == ChatFilter.View.INBOX && groups.hasGroups(n);
+        viewToggle.setVisible(can);
+        viewToggle.setManaged(can);
+        showingGroups = can && !f.searching() && "GROUPS".equals(Settings.get().getString("list.view." + n.name(), "INBOX"));
+        viewChoice.getToggles().get(showingGroups ? 1 : 0).setSelected(true);
+        for (Node x : List.of(list, chipRow)) {
+            x.setVisible(!showingGroups);
+            x.setManaged(!showingGroups);
+        }
+        groups.setVisible(showingGroups);
+        groups.setManaged(showingGroups);
+        if (showingGroups) {
+            groups.setSelected(selectedId);
+            groups.refresh(n);
+        }
     }
 
     /** "Todas · Personal · Trabajo" chips, shown only for a network with several accounts. */
