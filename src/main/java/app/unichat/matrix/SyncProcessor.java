@@ -198,6 +198,7 @@ final class SyncProcessor {
                 long ts = ev.path("origin_server_ts").asLong(0);
                 if (ts > 0) room.created = Instant.ofEpochMilli(ts);
                 room.space = "m.space".equals(text(c, "type"));
+                room.createdByBridge = isBot(text(ev, "sender"));
             }
             case "m.space.child" -> {
                 String child = text(ev, "state_key");
@@ -637,7 +638,9 @@ final class SyncProcessor {
         c.setFeatures(room.roomFeatures != null ? app.unichat.model.RoomFeatures.parse(room.roomFeatures)
                 : c.network() == Network.DISCORD ? app.unichat.model.RoomFeatures.discord() : app.unichat.model.RoomFeatures.UNKNOWN);
         c.setSpace(room.space);
-        c.setPersonalSpace(room.space && room.bridgeChannelId != null && room.bridgeChannelId.startsWith("__"));
+        // The bridge's own folder: bridgev2 marks it with a "__" channel; mautrix-discord's folders ("Your Discord
+        // bridged chats", "direct messages") are made by its bot with no channel at all.
+        c.setPersonalSpace(room.space && (room.bridgeChannelId != null ? room.bridgeChannelId.startsWith("__") : room.createdByBridge));
         c.setSpaceChildren(orderedChildren(room));
         c.setSpaceParents(room.spaceParents);
         boolean group = !botRoom && !room.space && isGroup(room);

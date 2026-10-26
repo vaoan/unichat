@@ -45,6 +45,8 @@ final class MatrixRoom {
     boolean space;
     /** {@code channel.id} of m.bridge ("__personal…" marks the bridge's folder space). */
     String bridgeChannelId;
+    /** m.room.create was sent by a bridge bot. */
+    boolean createdByBridge;
     /** m.space.child state: child room id → its order ("" when none), in arrival order. */
     final Map<String, String> spaceChildOrder = new LinkedHashMap<>();
     final java.util.Set<String> spaceParents = new java.util.LinkedHashSet<>();

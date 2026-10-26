@@ -69,6 +69,18 @@ class SpaceSyncTest {
     }
 
     @Test
+    void aFolderTheBridgeBotMadeWithoutBridgeInfoIsTheBridgeFolder() {
+        // mautrix-discord's "Your Discord bridged chats" / "direct messages": made by the bot, no m.bridge.
+        sync("!f:x", me() + ",{\"type\":\"m.room.create\",\"state_key\":\"\",\"sender\":\"@discordbot:x\",\"content\":{\"type\":\"m.space\"}}");
+        assertTrue(chat("!f:x").personalSpace());
+        sync("!u:x", me() + "," + ev("m.room.create", "", "{\"type\":\"m.space\"}"));
+        assertFalse(chat("!u:x").personalSpace(), "a space you made yourself is a real group");
+        sync("!g:x", me() + ",{\"type\":\"m.room.create\",\"state_key\":\"\",\"sender\":\"@discordbot:x\",\"content\":{\"type\":\"m.space\"}}"
+                + "," + ev("m.bridge", "fi.mau.discord://discord/555", "{\"protocol\":{\"id\":\"discord\"},\"channel\":{\"id\":\"555\"}}"));
+        assertFalse(chat("!g:x").personalSpace(), "a server: the bot made it, with its guild id");
+    }
+
+    @Test
     void personalSpaceIsTheBridgeFolder() {
         sync("!p:x", me() + "," + ev("m.room.create", "", "{\"type\":\"m.space\"}")
                 + "," + ev("m.bridge", "fi.mau.telegram://telegram/__personal_space", "{\"protocol\":{\"id\":\"telegram\"},\"channel\":{\"id\":\"__personal_space\"}}"));
