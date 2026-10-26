@@ -75,10 +75,16 @@ public final class LocalServer {
 
     public Path dir() { return dir; }
 
-    /** The bridge's login API; mautrix bridges serve it on their appservice port. */
+    /**
+     * Bridges on the older mautrix framework (not bridgev2): no {@code -e} to write an example config and no login
+     * API, so they log in through the bot chat.
+     */
+    static final Set<String> LEGACY_BRIDGES = Set.of("discord");
+
+    /** The bridge's login API (bridgev2 bridges serve it on their appservice port); null for legacy bridges. */
     public String provisioningUrl(String bridge) {
         Integer port = BRIDGE_PORTS.get(bridge);
-        return port == null ? null : "http://127.0.0.1:" + port + "/_matrix/provision";
+        return port == null || LEGACY_BRIDGES.contains(bridge) ? null : "http://127.0.0.1:" + port + "/_matrix/provision";
     }
 
     /** Whether this server can install {@code bridge} here (pinned in versions.env, with a known port). */
@@ -154,7 +160,19 @@ public final class LocalServer {
         Path bd = dir.resolve(b);
         Files.createDirectories(bd);
         Path config = bd.resolve("config.yaml");
-        if (!Files.exists(config)) run(bd, store.path(b).toString(), "-e", "-c", "config.yaml");
+        if (!Files.exists(config)) {
+            if (LEGACY_BRIDGES.contains(b)) {
+                // Legacy bridges have no -e: given an empty config they fill in every default, then stop asking for
+                // the homeserver (expected: the non-zero exit is ignored, the filled file is what we want).
+                Files.writeString(config, "{}\n");
+                runIgnoringExit(bd, store.path(b).toString(), "-c", "config.yaml");
+                if (Files.size(config) < 100) throw new IOException(b + " no generó su configuración");
+                // That run logged to its default file (unfiltered); from now on it logs to stdout (Redactor).
+                deleteTree(bd.resolve("logs"));
+            } else {
+                run(bd, store.path(b).toString(), "-e", "-c", "config.yaml");
+            }
+        }
         String[] tg = telegramKeys(b);
         BridgeConfig.rewrite(config, new BridgeConfig.Settings(b, BRIDGE_PORTS.get(b), DOMAIN, "@" + USER + ":" + DOMAIN,
                 URL, bd, secrets.getProperty("double_puppet_token"), tg[0], tg[1]));
@@ -355,6 +373,22 @@ public final class LocalServer {
         StringBuilder sb = new StringBuilder(n);
         for (int i = 0; i < n; i++) sb.append(chars.charAt(r.nextInt(chars.length())));
         return sb.toString();
+    }
+
+    private static void deleteTree(Path p) throws IOException {
+        if (!Files.exists(p)) return;
+        try (var walk = Files.walk(p)) {
+            for (Path f : walk.sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(f);
+        }
+    }
+
+    private static void runIgnoringExit(Path workDir, String... cmd) throws IOException, InterruptedException {
+        Process p = new ProcessBuilder(new ArrayList<>(List.of(cmd))).directory(workDir.toFile())
+                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        if (!p.waitFor(60, TimeUnit.SECONDS)) {
+            p.destroyForcibly();
+            throw new IOException("Tiempo agotado: " + Path.of(cmd[0]).getFileName());
+        }
     }
 
     /** Runs a bridge setup command; on failure its (redacted) output goes to the log and the error message. */
