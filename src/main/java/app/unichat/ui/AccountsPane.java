@@ -83,7 +83,12 @@ public final class AccountsPane extends VBox {
     public void dispose() {
         if (wizard != null) wizard.dispose();
         wizard = null;
+        if (bridgeLogin != null) bridgeLogin.dispose();
+        bridgeLogin = null;
     }
+
+    /** The dynamic login on screen (local server), if any. */
+    private BridgeLoginPane bridgeLogin;
 
     private void closeSheet() {
         dispose();
@@ -305,6 +310,54 @@ public final class AccountsPane extends VBox {
     /** Opens the wizard for {@code n} directly (rail click on an unconnected network). */
     public void startLogin(Network n) {
         dispose();
+        // Local server: the bridge itself says how to log in (always up to date). Otherwise: the bot chat.
+        if (svc instanceof app.unichat.matrix.MatrixChatService m && m.bridgeLogin(n) != null) {
+            startBridgeLogin(m, n);
+            return;
+        }
+        startBotLogin(n);
+    }
+
+    private void startBridgeLogin(app.unichat.matrix.MatrixChatService m, Network n) {
+        ProgressIndicator spin = new ProgressIndicator();
+        spin.setMaxSize(36, 36);
+        Label wait = new Label("Preparando " + n.displayName() + "… La primera vez se descarga su conector; tarda unos segundos.");
+        wait.setWrapText(true);
+        wait.getStyleClass().add("settings-help");
+        VBox loading = new VBox(14, spin, wait);
+        loading.setAlignment(Pos.CENTER);
+        setView("Conectar " + n.displayName(), loading, this::showPicker);
+        Thread.ofVirtual().name("prepare-bridge").start(() -> {
+            try {
+                m.prepareBridge(n);
+                Platform.runLater(() -> {
+                    if (getScene() == null) return;
+                    bridgeLogin = new BridgeLoginPane(n, m.bridgeLogin(n), () -> getScene() == null ? null : getScene().getWindow(),
+                            () -> {
+                                m.loginFinished(n);
+                                dispose();
+                                showList();
+                                toast.accept(n.displayName() + " conectado");
+                            },
+                            () -> {
+                                dispose();
+                                startBotLogin(n);
+                            });
+                    setView("Conectar " + n.displayName(), bridgeLogin, () -> {
+                        dispose();
+                        showPicker();
+                    });
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    spin.setVisible(false);
+                    wait.setText("No se pudo preparar " + n.displayName() + ": " + rootMessage(e));
+                });
+            }
+        });
+    }
+
+    private void startBotLogin(Network n) {
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(36, 36);
         Label wait = new Label("Preparando el inicio de sesión de " + n.displayName() + "…");

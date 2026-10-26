@@ -100,11 +100,13 @@ public final class MatrixChatService implements ChatService {
     private volatile List<Account> lastAccounts = List.of();
     private Thread syncThread;
 
+    private final String accessToken;
     /** Distinguishes this sign-in's cache from earlier sessions of the same user (see syncCacheFile). */
     private final String sessionKey;
 
     public MatrixChatService(String homeserver, String userId, String accessToken) {
         this.client = new MatrixClient(homeserver, accessToken);
+        this.accessToken = accessToken;
         this.sessionKey = sha256(accessToken).substring(0, 8);
         this.userId = userId;
         this.serverName = userId.substring(userId.indexOf(':') + 1);
@@ -1265,6 +1267,30 @@ public final class MatrixChatService implements ChatService {
 
         /** Whether this provisioner can install {@code network}'s bridge (it's offered in Cuentas before it exists). */
         default boolean provides(Network network) { return true; }
+
+        /** Base URL of the bridge's own login API ({@code .../_matrix/provision}), or null when unreachable. */
+        default String provisioningUrl(Network network) { return null; }
+    }
+
+    /**
+     * The bridge's own login API for {@code n} (dynamic login: the bridge says which methods and steps it has),
+     * or null when only the bot chat can be used (external servers). Call {@link #prepareBridge} first.
+     */
+    public app.unichat.login.BridgeLogin bridgeLogin(Network n) {
+        BridgeProvisioner p = provisioner;
+        String url = p == null ? null : p.provisioningUrl(n);
+        return url == null ? null : new app.unichat.login.BridgeLogin(url, accessToken, userId);
+    }
+
+    /** Installs and starts {@code n}'s bridge when the local server provides it. Blocking. */
+    public void prepareBridge(Network n) throws Exception {
+        BridgeProvisioner p = provisioner;
+        if (p != null) p.ensure(n);
+    }
+
+    /** After a login through the bridge's API: refresh that network's accounts. */
+    public void loginFinished(Network n) {
+        refreshLogins(n);
     }
 
     private static volatile BridgeProvisioner provisioner;

@@ -44,6 +44,12 @@
       <version>${jackson.version}</version>
     </dependency>
     <dependency>
+      <!-- QR codes of the bridges' login steps (WhatsApp, Signal, Telegram, Google Messages). -->
+      <groupId>com.google.zxing</groupId>
+      <artifactId>core</artifactId>
+      <version>3.5.3</version>
+    </dependency>
+    <dependency>
       <!-- Bridge config.yaml files of the native server (app.unichat.server). -->
       <groupId>com.fasterxml.jackson.dataformat</groupId>
       <artifactId>jackson-dataformat-yaml</artifactId>

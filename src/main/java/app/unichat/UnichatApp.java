@@ -189,6 +189,10 @@ public final class UnichatApp extends Application {
             @Override public boolean provides(app.unichat.model.Network n) {
                 return local.provides(n.protocolId());
             }
+
+            @Override public String provisioningUrl(app.unichat.model.Network n) {
+                return local.provisioningUrl(n.protocolId());
+            }
         };
     }
 

@@ -74,6 +74,12 @@ public final class LocalServer {
 
     public Path dir() { return dir; }
 
+    /** The bridge's login API; mautrix bridges serve it on their appservice port. */
+    public String provisioningUrl(String bridge) {
+        Integer port = BRIDGE_PORTS.get(bridge);
+        return port == null ? null : "http://127.0.0.1:" + port + "/_matrix/provision";
+    }
+
     /** Whether this server can install {@code bridge} here (pinned in versions.env, with a known port). */
     public boolean provides(String bridge) {
         return BRIDGE_PORTS.containsKey(bridge) && manifest.bridge(bridge) != null;
