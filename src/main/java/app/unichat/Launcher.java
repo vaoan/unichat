@@ -8,6 +8,8 @@ public final class Launcher {
     private Launcher() {}
 
     public static void main(String[] args) {
+        // Tests and snapshot runs keep their output on the console only.
+        if (System.getProperty("unichat.snapshot") == null) AppLog.install();
         UnichatApp.main(args);
     }
 }

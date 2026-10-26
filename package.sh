@@ -7,6 +7,13 @@ VERSION=1.0.0
 ./mvnw -q -DskipTests package
 rm -rf target/pkg release && mkdir -p target/pkg release
 cp target/unichat.jar target/pkg/
+# The local server's homeserver ships inside the app (Contents/app/server/tuwunel; see LocalServer).
+# CI builds it from source; locally pass TUWUNEL_BIN=<path to a tuwunel built at the versions.env tag>.
+if [ -n "${TUWUNEL_BIN:-}" ]; then
+  mkdir -p target/pkg/server && cp "$TUWUNEL_BIN" target/pkg/server/tuwunel && chmod 755 target/pkg/server/tuwunel
+else
+  echo "Aviso: sin TUWUNEL_BIN la app no trae el servidor local (solo servidores externos)." >&2
+fi
 
 COMMON="--name Unichat --app-version $VERSION --vendor Unichat --input target/pkg --main-jar unichat.jar
   --main-class app.unichat.Launcher --dest release --java-options -Xmx512m"

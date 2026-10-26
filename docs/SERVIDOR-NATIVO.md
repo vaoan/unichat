@@ -106,3 +106,18 @@ native/run-mac.sh status
 native/run-mac.sh stop
 ```
 Requiere `yq` (`brew install yq`). Telegram toma las claves de `server/.env` si existen.
+
+## Logs y reinstalación (Mac)
+
+La app instalada no tiene consola; todo queda en archivos:
+
+| Qué | Archivo |
+|---|---|
+| Unichat | `~/Library/Application Support/Unichat/logs/unichat.log` (el anterior: `unichat.log.1`, al pasar 5 MB) |
+| Servidor | `~/Library/Application Support/Unichat/server/tuwunel/tuwunel.log` |
+| Cada puente | `~/Library/Application Support/Unichat/server/<red>/bridge.log` (JSON) y `<red>.out` (salida cruda) |
+
+Seguir el log en vivo: `tail -f "$HOME/Library/Application Support/Unichat/logs/unichat.log"`.
+
+Arreglar y reinstalar: `TUWUNEL_BIN=<ruta a tuwunel> ./install-mac.sh` empaqueta, cierra Unichat si está
+abierto y reemplaza `/Applications/Unichat.app`. Los datos (sesión, servidor, chats) no se tocan.
