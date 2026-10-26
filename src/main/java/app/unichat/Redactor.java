@@ -18,6 +18,8 @@ public final class Redactor {
             "(?i)(access_token=|bearer\\s+|\"(?:access_token|as_token|hs_token|token|password)\"\\s*:\\s*\")[^&\\s\"]+");
     private static final Pattern MXC = Pattern.compile("mxc://([^/\\s\"]+)/[A-Za-z0-9_\\-]+");
     private static final Pattern MATRIX_ID = Pattern.compile("([@!$#+])[A-Za-z0-9._=/+\\-]+:([A-Za-z0-9.\\-]+(?::\\d+)?)");
+    /** Room ids from room version 12 and event ids (v3+) have no ":server" part: an opaque 20+ char hash. */
+    private static final Pattern BARE_ID = Pattern.compile("(?<![A-Za-z0-9])([!$])[A-Za-z0-9_\\-+/]{20,}");
     private static final Pattern EMAIL = Pattern.compile("[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}");
     /** Phone numbers ("+57 300 111 2233") and long numeric IDs (WhatsApp JIDs, Telegram IDs): 7+ digits. Not the
      * fraction of a time ("09:51:20.1234567-05:00"): never right after a digit, '.' or ':'. */
@@ -34,6 +36,7 @@ public final class Redactor {
         s = TOKEN.matcher(s).replaceAll(m -> Matcher.quoteReplacement(m.group(1) + "…"));
         s = MXC.matcher(s).replaceAll(m -> Matcher.quoteReplacement("mxc://" + m.group(1) + "/…"));
         s = MATRIX_ID.matcher(s).replaceAll(m -> Matcher.quoteReplacement(m.group(1) + "…:" + m.group(2)));
+        s = BARE_ID.matcher(s).replaceAll(m -> Matcher.quoteReplacement(m.group(1) + "…"));
         s = EMAIL.matcher(s).replaceAll("<correo>");
         s = PHONE.matcher(s).replaceAll(m -> digits(m.group()) >= 7 && !DATE.matcher(m.group()).lookingAt()
                 ? "<número>" : Matcher.quoteReplacement(m.group()));

@@ -52,4 +52,14 @@ class RedactorTest {
         String iso = "{\"time\":\"2026-10-26T09:51:20.1234567-05:00\",\"message\":\"Bridge started!\"}";
         assertEquals(iso, Redactor.redact(iso), "fractions of a second are not phone numbers");
     }
+
+    @Test
+    void roomAndEventIdsWithoutAServerPartAreHidden() {
+        // Room version 12 ids (tuwunel) have no ":server" part; event ids never have one since v3.
+        String out = Redactor.redact("Could not join !QFT9dKh0_TUOmwxwp_6Gh4vgn-abzhHhRCiualC9di8: java.net.ConnectException "
+                + "event $Ab3dEfGhIjKlMnOpQrStUvWxYz0123456789_-abcd sent");
+        org.junit.jupiter.api.Assertions.assertFalse(out.contains("QFT9dKh0"), out);
+        org.junit.jupiter.api.Assertions.assertFalse(out.contains("Ab3dEfGh"), out);
+        org.junit.jupiter.api.Assertions.assertTrue(out.contains("java.net.ConnectException"), out);
+    }
 }
