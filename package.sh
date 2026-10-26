@@ -27,6 +27,11 @@ if [ "$(uname -s)" = Darwin ]; then
     echo "Aviso: falta libolm (native/build-libolm.sh); los puentes no arrancarán." >&2
   fi
 fi
+# Animated stickers for chats that only take WebP (WhatsApp): libwebp's gif2webp (see StickerConverter).
+if [ "$(uname -s)" = Darwin ]; then
+  mkdir -p target/pkg/server
+  native/fetch-gif2webp.sh "$PWD/target/pkg/server/gif2webp" || echo "Aviso: sin gif2webp los stickers animados se envían fijos a WhatsApp." >&2
+fi
 
 COMMON="--name Unichat --app-version $VERSION --vendor Unichat --input target/pkg --main-jar unichat.jar
   --main-class app.unichat.Launcher --dest release --java-options -Xmx512m"

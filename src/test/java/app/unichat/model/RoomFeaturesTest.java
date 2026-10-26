@@ -93,4 +93,18 @@ class RoomFeaturesTest {
     void anEmptyEventMeansUnknownNotNothing() throws Exception {
         assertTrue(RoomFeatures.parse(json("{}")).isUnknown(), "a redacted/empty room_features must not strip every option");
     }
+
+    @Test
+    void stickerFormatsFollowTheNetworksMimeTypes() throws Exception {
+        RoomFeatures wa = RoomFeatures.parse(json("""
+                {"id":"wa","file":{"m.sticker":{"mime_types":{"image/webp":2,"image/png":1,"image/jpeg":1}},
+                 "m.image":{"mime_types":{"image/*":1}}}}"""));
+        assertTrue(wa.acceptsMime(RoomFeatures.STICKER, "image/webp"));
+        assertTrue(wa.acceptsMime(RoomFeatures.STICKER, "image/png"));
+        assertFalse(wa.acceptsMime(RoomFeatures.STICKER, "image/gif"), "WhatsApp refuses GIF stickers");
+        assertTrue(wa.acceptsMime("m.image", "image/gif"), "wildcards count");
+        assertFalse(wa.acceptsMime("m.video", "video/mp4"));
+        assertTrue(RoomFeatures.UNKNOWN.acceptsMime(RoomFeatures.STICKER, "image/gif"));
+        assertTrue(RoomFeatures.discord().acceptsMime(RoomFeatures.STICKER, "image/gif"), "no list: anything goes");
+    }
 }

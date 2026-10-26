@@ -20,10 +20,30 @@ class SendStickerTest {
     private HttpServer server;
     private volatile String path;
     private volatile String body;
+    private volatile String uploadedType;
 
     @BeforeEach
     void fakeHomeserver() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/_matrix/client/v1/media/download/", ex -> {
+            java.io.ByteArrayOutputStream gif = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_RGB), "gif", gif);
+            ex.getResponseHeaders().add("Content-Type", "image/gif");
+            ex.sendResponseHeaders(200, gif.size());
+            try (OutputStream o = ex.getResponseBody()) {
+                o.write(gif.toByteArray());
+            }
+        });
+        server.createContext("/_matrix/media/v3/upload", ex -> {
+            uploadedType = ex.getRequestHeaders().getFirst("Content-Type");
+            ex.getRequestBody().readAllBytes();
+            byte[] b = "{\"content_uri\":\"mxc://s/converted\"}".getBytes(StandardCharsets.UTF_8);
+            ex.getResponseHeaders().add("Content-Type", "application/json");
+            ex.sendResponseHeaders(200, b.length);
+            try (OutputStream o = ex.getResponseBody()) {
+                o.write(b);
+            }
+        });
         server.createContext("/", ex -> {
             if ("PUT".equals(ex.getRequestMethod())) {
                 path = ex.getRequestURI().getPath();
@@ -66,5 +86,23 @@ class SendStickerTest {
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("image/png", sent.path("info").path("mimetype").asText());
         assertEquals(160, sent.path("info").path("w").asInt());
+    }
+
+    @Test
+    void aGifStickerGoesToWhatsappConvertedToAFormatItTakes() throws Exception {
+        MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
+        app.unichat.model.RoomFeatures wa = app.unichat.model.RoomFeatures.parse(MatrixClient.JSON.readTree(
+                "{\"id\":\"wa\",\"file\":{\"m.sticker\":{\"mime_types\":{\"image/webp\":2,\"image/png\":1}}}}"));
+        JsonNode info = MatrixClient.JSON.readTree("""
+                {"mimetype":"image/gif","w":256,"h":256,"size":999,"fi.mau.bridged_sticker":{"network":"telegram","id":"1"}}""");
+        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/gif", "image/gif", 256, 256, info), wa)
+                .get(30, TimeUnit.SECONDS);
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("mxc://s/converted", sent.path("url").asText());
+        String mime = sent.path("info").path("mimetype").asText();
+        assertEquals(StickerConverter.gif2webp() != null ? "image/webp" : "image/png", mime);
+        assertEquals(mime, uploadedType);
+        assertTrue(sent.path("info").path("fi.mau.bridged_sticker").isMissingNode(), "it's no longer that network's sticker");
+        assertTrue(sent.path("info").path("size").asLong() != 999, "size describes the new file");
     }
 }

@@ -9,6 +9,7 @@ Docker (`server/`). El servidor nativo hace lo mismo con programas normales del 
 | **Puentes mautrix** | Un ejecutable por red | **Se descargan** de los releases oficiales de mautrix, verificados con `sha256sums.txt` |
 | **SQLite** | Base de datos (un archivo por componente) | Incluida en los ejecutables; no hay que instalar nada |
 | **libolm** (solo Mac) | Librería que los puentes oficiales de Mac necesitan para arrancar | Se compila con `native/build-libolm.sh` y **viaja dentro de Unichat**; se copia junto a los puentes |
+| **gif2webp** (libwebp 1.6.0, licencia BSD) | Convierte stickers animados GIF a WebP animado para chats que solo aceptan WebP (WhatsApp) | `package.sh` (`native/fetch-gif2webp.sh`) y `package.ps1` descargan el binario oficial de Google con su SHA-256 fijado y **viaja dentro de Unichat**; sin él, el sticker se envía fijo (PNG) |
 
 > Los puentes oficiales de mautrix para Mac enlazan `libolm.3.dylib`, que Homebrew ya no ofrece. Sin ella no arrancan
 > (`Library not loaded: @rpath/libolm.3.dylib`). Unichat la lleva consigo; el cifrado del puente está apagado, así que

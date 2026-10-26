@@ -643,6 +643,12 @@ public final class MatrixChatService implements ChatService {
 
     @Override
     public CompletableFuture<Void> sendSticker(String chatId, app.unichat.model.MediaLibrary.Item item) {
+        Chat c = chat(chatId);
+        return sendSticker(chatId, item, c == null ? app.unichat.model.RoomFeatures.UNKNOWN : c.features());
+    }
+
+    /** Sends {@code item}; when the chat refuses its format (a GIF on WhatsApp) a converted copy is uploaded first. */
+    CompletableFuture<Void> sendSticker(String chatId, app.unichat.model.MediaLibrary.Item item, app.unichat.model.RoomFeatures features) {
         String txn = newTxnId();
         ObjectNode content = MatrixClient.JSON.createObjectNode();
         content.put("body", "sticker");
@@ -658,11 +664,35 @@ public final class MatrixChatService implements ChatService {
                 m.setMediaUrl(item.url());
                 m.setMimeType(item.mime());
                 m.setSize(item.width(), item.height());
-                m.setMediaInfo(info);
+                m.setMediaInfo(info.deepCopy());
             });
         }
         fireLocal(chatId);
-        return sendEvent(chatId, "m.sticker", txn, content);
+        String target = StickerConverter.target(info.path("mimetype").asText(null), features);
+        if (target == null) return sendEvent(chatId, "m.sticker", txn, content);
+        return media(item.url(), 0, 0).thenApplyAsync(src -> {
+            try {
+                StickerConverter.Result r = StickerConverter.convert(src, target, Settings.get().cacheDir().resolve("stickers"));
+                String ext = r.mime().equals(StickerConverter.WEBP) ? ".webp" : ".png";
+                content.put("url", client.upload(r.file(), r.mime(), "sticker" + ext));
+                info.put("mimetype", r.mime());
+                info.put("size", Files.size(r.file()));
+                info.remove("fi.mau.bridged_sticker"); // no longer that network's own sticker
+                Files.deleteIfExists(r.file());
+                return content;
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            }
+        }, io).handle((c, err) -> {
+            if (err == null) return sendEvent(chatId, "m.sticker", txn, c);
+            Throwable root = err instanceof CompletionException && err.getCause() != null ? err.getCause() : err;
+            System.err.println("Sticker conversion failed: " + root.getClass().getSimpleName());
+            synchronized (proc) {
+                proc.failLocalEcho(chatId, txn);
+            }
+            fireLocal(chatId);
+            return CompletableFuture.<Void>failedFuture(root);
+        }).thenCompose(f -> f);
     }
 
     /** Adds m.relates_to and the plain-text reply fallback. */

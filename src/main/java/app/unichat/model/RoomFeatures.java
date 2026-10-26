@@ -20,7 +20,7 @@ public final class RoomFeatures {
     /** Pseudo message types used in the {@code file} map besides m.image/m.video/m.audio/m.file. */
     public static final String STICKER = "m.sticker", GIF = "fi.mau.gif", VOICE = "org.matrix.msc3245.voice";
 
-    public static final RoomFeatures UNKNOWN = new RoomFeatures(true, 2, 0, 2, 0, false, 2, 2, 0, null, null, true);
+    public static final RoomFeatures UNKNOWN = new RoomFeatures(true, 2, 0, 2, 0, false, 2, 2, 0, null, null, true, null);
 
     private final boolean unrestricted;
     private final int edit;
@@ -35,10 +35,12 @@ public final class RoomFeatures {
     /** msgtype → max size in bytes (0 = not stated); only types with some MIME offered. */
     private final Map<String, Long> files;
     private final boolean anyFile;
+    /** msgtype → MIME types offered (may hold wildcards like image/*); a type missing here takes any. */
+    private final Map<String, java.util.Set<String>> mimes;
 
     private RoomFeatures(boolean unrestricted, int edit, long editMaxAgeSec, int delete, long deleteMaxAgeSec, boolean deleteForMe,
                          int reply, int reaction, int reactionCount, List<String> allowedReactions, Map<String, Long> files,
-                         boolean anyFile) {
+                         boolean anyFile, Map<String, java.util.Set<String>> mimes) {
         this.unrestricted = unrestricted;
         this.edit = edit;
         this.editMaxAgeSec = editMaxAgeSec;
@@ -51,17 +53,24 @@ public final class RoomFeatures {
         this.allowedReactions = allowedReactions;
         this.files = files == null ? Map.of() : Map.copyOf(files);
         this.anyFile = anyFile;
+        this.mimes = mimes == null ? Map.of() : Map.copyOf(mimes);
     }
 
     public static RoomFeatures parse(JsonNode c) {
         if (c == null || c.isEmpty()) return UNKNOWN; // redacted or emptied: don't strip every option
         Map<String, Long> files = new HashMap<>();
+        Map<String, java.util.Set<String>> mimes = new HashMap<>();
         JsonNode file = c.path("file");
         file.fieldNames().forEachRemaining(type -> {
             JsonNode rule = file.path(type);
-            boolean offered = false;
-            for (JsonNode level : rule.path("mime_types")) if (level.asInt() >= 1) offered = true;
-            if (offered) files.put(type, rule.path("max_size").asLong(0));
+            java.util.Set<String> offered = new java.util.HashSet<>();
+            rule.path("mime_types").fields().forEachRemaining(m -> {
+                if (m.getValue().asInt() >= 1) offered.add(m.getKey().toLowerCase(java.util.Locale.ROOT));
+            });
+            if (!offered.isEmpty()) {
+                files.put(type, rule.path("max_size").asLong(0));
+                mimes.put(type, offered);
+            }
         });
         List<String> allowed = null;
         if (c.has("allowed_reactions")) {
@@ -70,18 +79,29 @@ public final class RoomFeatures {
         }
         return new RoomFeatures(false, c.path("edit").asInt(0), c.path("edit_max_age").asLong(0),
                 c.path("delete").asInt(0), c.path("delete_max_age").asLong(0), c.path("delete_for_me").asBoolean(false),
-                c.path("reply").asInt(0), c.path("reaction").asInt(0), c.path("reaction_count").asInt(0), allowed, files, false);
+                c.path("reply").asInt(0), c.path("reaction").asInt(0), c.path("reaction_count").asInt(0), allowed, files, false, mimes);
     }
 
     /** mautrix-discord predates room features: what its code supports (edits/deletes without limit, no voice). */
     public static RoomFeatures discord() {
         Map<String, Long> files = new HashMap<>();
         for (String t : List.of("m.image", "m.video", "m.audio", "m.file", STICKER, GIF)) files.put(t, 0L);
-        return new RoomFeatures(false, 2, 0, 2, 0, false, 2, 2, 0, null, files, false);
+        return new RoomFeatures(false, 2, 0, 2, 0, false, 2, 2, 0, null, files, false, null);
     }
 
     public boolean accepts(String type) {
         return anyFile || files.containsKey(type);
+    }
+
+    /** Whether {@code type} messages may carry a {@code mime} file (exact, {@code image/*} or {@code *}{@code /*}). */
+    public boolean acceptsMime(String type, String mime) {
+        if (anyFile) return true;
+        if (!accepts(type)) return false;
+        java.util.Set<String> m = mimes.get(type);
+        if (m == null || m.isEmpty()) return true;
+        String x = mime == null ? "" : mime.split(";")[0].trim().toLowerCase(java.util.Locale.ROOT);
+        int slash = x.indexOf('/');
+        return m.contains(x) || m.contains("*/*") || (slash > 0 && m.contains(x.substring(0, slash) + "/*"));
     }
 
     /** Largest file the network takes for {@code type}, in bytes; 0 when not stated. */
@@ -130,7 +150,8 @@ public final class RoomFeatures {
         return o instanceof RoomFeatures f && unrestricted == f.unrestricted && edit == f.edit && editMaxAgeSec == f.editMaxAgeSec
                 && delete == f.delete && deleteMaxAgeSec == f.deleteMaxAgeSec && deleteForMe == f.deleteForMe && reply == f.reply
                 && reaction == f.reaction && reactionCount == f.reactionCount
-                && java.util.Objects.equals(allowedReactions, f.allowedReactions) && files.equals(f.files) && anyFile == f.anyFile;
+                && java.util.Objects.equals(allowedReactions, f.allowedReactions) && files.equals(f.files) && anyFile == f.anyFile
+                && mimes.equals(f.mimes);
     }
 
     @Override

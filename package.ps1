@@ -12,6 +12,22 @@ Remove-Item -Recurse -Force target\pkg, release -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force target\pkg, release | Out-Null
 Copy-Item target\unichat.jar target\pkg\
 
+# Animated stickers for chats that only take WebP (WhatsApp): libwebp's gif2webp, pinned (see StickerConverter
+# and native/fetch-gif2webp.sh for the macOS build of the same release).
+$WebpVersion = "1.6.0"
+$WebpAsset = "libwebp-$WebpVersion-windows-x64.zip"
+$WebpSha256 = "48886f506b21f62e4661f0f4cbfca19800897c385128e8902542d29a950c93f1"
+try {
+    $zip = "target\$WebpAsset"
+    Invoke-WebRequest "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/$WebpAsset" -OutFile $zip
+    if ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLower() -ne $WebpSha256) { throw "libwebp checksum mismatch" }
+    Expand-Archive $zip -DestinationPath target\libwebp -Force
+    New-Item -ItemType Directory -Force target\pkg\server | Out-Null
+    Copy-Item "target\libwebp\libwebp-$WebpVersion-windows-x64\bin\gif2webp.exe" target\pkg\server\
+} catch {
+    Write-Warning "Sin gif2webp los stickers animados se envían fijos a WhatsApp: $_"
+}
+
 $common = @("--name", "Unichat", "--app-version", $Version, "--vendor", "Unichat",
             "--input", "target\pkg", "--main-jar", "unichat.jar", "--main-class", "app.unichat.Launcher",
             "--dest", "release", "--icon", "packaging\unichat.ico", "--java-options", "-Xmx512m")

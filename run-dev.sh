@@ -10,6 +10,12 @@ TUWUNEL_BIN="${TUWUNEL_BIN:-$HOME/Library/Caches/unichat-build/tuwunel/target/re
 # macOS bridges need libolm next to them (native/build-libolm.sh).
 LIBOLM="${LIBOLM:-$HOME/Library/Caches/unichat-build/olm/libolm.3.dylib}"
 [ -f "$LIBOLM" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.libolm=$LIBOLM"
+# Animated stickers to WhatsApp: libwebp's gif2webp (native/fetch-gif2webp.sh), fetched once.
+if [ "$(uname -s)" = Darwin ]; then
+  GIF2WEBP="$HOME/Library/Caches/unichat-build/gif2webp"
+  [ -x "$GIF2WEBP" ] || native/fetch-gif2webp.sh "$GIF2WEBP" || true
+  [ -x "$GIF2WEBP" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.gif2webp=$GIF2WEBP"
+fi
 # macOS menu-bar item (native/build-bar.sh); rebuilt when the Swift source changes.
 if [ "$(uname -s)" = Darwin ] && command -v swiftc >/dev/null; then
   BAR="$HOME/Library/Caches/unichat-build/UnichatBar"

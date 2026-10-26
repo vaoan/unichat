@@ -23,6 +23,8 @@ Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix
 - `native/UnichatBar.swift` (`native/build-bar.sh`) — macOS menu-bar item drawn natively (narrower than Java's
   TrayIcon, real NSMenu; same design as InstaTray), driven by `ui/NativeBar` over stdin; `Notifier` falls back to the
   AWT TrayIcon when it's missing or dies. run-dev.sh builds it; package.sh ships it as `Contents/app/native/UnichatBar`.
+- `native/fetch-gif2webp.sh` — pinned libwebp `gif2webp` shipped in `app/server/` (Windows: pinned in package.ps1);
+  `matrix/StickerConverter` uses it when a chat's room_features refuse a sticker's MIME (GIF → WebP on WhatsApp).
 - `package.sh` / `package.ps1` — jpackage; `.github/workflows/build.yml` builds Windows zip/msi + macOS dmg.
 
 ## Checking UI changes
