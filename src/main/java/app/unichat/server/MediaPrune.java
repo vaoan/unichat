@@ -20,8 +20,6 @@ import java.util.List;
  * they're uploaded once and never again.
  */
 final class MediaPrune {
-    /** Attachments older than this are deleted. */
-    static final Duration KEEP = Duration.ofDays(14);
     /** Smaller files (stickers, small images) aren't worth it. */
     static final long MIN_SIZE = 100_000;
     /** At most this many per start, so the command line stays reasonable; the rest go next time. */
@@ -36,13 +34,14 @@ final class MediaPrune {
     private MediaPrune() {}
 
     /**
-     * Takes the old attachments out of the Discord bridge's cache ({@code discord.db}; the bridge must not be running)
-     * and returns their mxc:// URIs for {@link #command}. Empty when there's no bridge database or nothing old.
+     * Takes the attachments older than {@code keep} out of the Discord bridge's cache ({@code discord.db}; the bridge
+     * must not be running) and returns their mxc:// URIs for {@link #command}. Empty when there's no bridge database,
+     * nothing old, or {@code keep} is null (keep them forever).
      */
-    static List<String> takeOldDiscordAttachments(Path discordDb, Instant now) {
+    static List<String> takeOldDiscordAttachments(Path discordDb, Duration keep, Instant now) {
         List<String> out = new ArrayList<>();
-        if (!Files.isRegularFile(discordDb)) return out;
-        long cutoff = now.minus(KEEP).toEpochMilli();
+        if (keep == null || !Files.isRegularFile(discordDb)) return out;
+        long cutoff = now.minus(keep).toEpochMilli();
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + discordDb.toAbsolutePath())) {
             c.setAutoCommit(false);
             try (PreparedStatement q = c.prepareStatement("SELECT DISTINCT mxc " + OLD_ATTACHMENTS + " LIMIT " + MAX_PER_RUN)) {

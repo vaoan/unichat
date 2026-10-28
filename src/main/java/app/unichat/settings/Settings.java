@@ -164,6 +164,15 @@ public final class Settings {
         }
     }
     public void setLogRetentionDays(int days) { set("logs.retentionDays", Integer.toString(days)); }
+    /** Photos and videos of Discord channels older than this are deleted; 0 = never (Ajustes → Redes). */
+    public int discordMediaDays() {
+        try {
+            return Math.max(0, Integer.parseInt(getString("discord.mediaDays", "30")));
+        } catch (NumberFormatException e) {
+            return 30;
+        }
+    }
+    public void setDiscordMediaDays(int days) { set("discord.mediaDays", Integer.toString(days)); }
 
         /** The session is on the server Unichat runs on this computer (app.unichat.server.LocalServer). */
     public boolean localServer() { return getBool("server.local", false); }

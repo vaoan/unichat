@@ -198,7 +198,9 @@ public final class LocalServer {
         List<String> command = new ArrayList<>(List.of(store.path("tuwunel").toString(), "-c", hs.resolve("tuwunel.toml").toString()));
         // Old Discord attachments go before the bridge starts (it must not be using its database meanwhile).
         if (!supervisor.isRunning("discord")) {
-            List<String> old = MediaPrune.takeOldDiscordAttachments(dir.resolve("discord").resolve("discord.db"), java.time.Instant.now());
+            int days = app.unichat.settings.Settings.get().discordMediaDays();
+            List<String> old = MediaPrune.takeOldDiscordAttachments(dir.resolve("discord").resolve("discord.db"),
+                    days == 0 ? null : Duration.ofDays(days), java.time.Instant.now());
             if (!old.isEmpty()) {
                 System.err.println("Discord: deleting " + old.size() + " old attachments");
                 command.addAll(List.of("--execute", MediaPrune.command(old)));

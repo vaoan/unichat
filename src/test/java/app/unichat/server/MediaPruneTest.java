@@ -52,15 +52,22 @@ class MediaPruneTest {
     @Test
     void onlyOldBigAttachmentsGoAndLeaveTheBridgeCache() throws Exception {
         Path db = bridgeDb();
-        assertEquals(List.of("mxc://localhost/oldBig"), MediaPrune.takeOldDiscordAttachments(db, now));
+        assertEquals(List.of("mxc://localhost/oldBig"), MediaPrune.takeOldDiscordAttachments(db, Duration.ofDays(14), now));
         assertEquals(List.of("mxc://localhost/avatar", "mxc://localhost/emoji", "mxc://localhost/newBig",
                 "mxc://localhost/oldSmall"), cached(db), "avatars, emoji, recent and small files stay");
-        assertTrue(MediaPrune.takeOldDiscordAttachments(db, now).isEmpty(), "nothing twice");
+        assertTrue(MediaPrune.takeOldDiscordAttachments(db, Duration.ofDays(14), now).isEmpty(), "nothing twice");
+    }
+
+    @Test
+    void neverMeansNothingIsDeleted() throws Exception {
+        Path db = bridgeDb();
+        assertTrue(MediaPrune.takeOldDiscordAttachments(db, null, now).isEmpty());
+        assertEquals(5, cached(db).size());
     }
 
     @Test
     void noBridgeDatabaseMeansNothingToDo() {
-        assertTrue(MediaPrune.takeOldDiscordAttachments(dir.resolve("missing.db"), now).isEmpty());
+        assertTrue(MediaPrune.takeOldDiscordAttachments(dir.resolve("missing.db"), Duration.ofDays(14), now).isEmpty());
     }
 
     @Test

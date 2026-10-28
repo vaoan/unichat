@@ -391,7 +391,33 @@ public final class SettingsWindow {
         return page("Redes", intro, group("WhatsApp",
                 row("Stickers animados", "WhatsApp no acepta los stickers animados de otras redes tal cual. Sticker: se "
                         + "convierte en sticker animado. GIF: llega como un GIF que se repite. Video: llega como un video corto.",
-                        stickerModeChoice(app.unichat.model.Network.WHATSAPP))));
+                        stickerModeChoice(app.unichat.model.Network.WHATSAPP))),
+                group("Discord",
+                        row("Borrar fotos y videos de canales después de", "Discord guarda en tu disco una copia de cada "
+                                + "imagen y video de los canales de servidores. Los avatares, emojis y los demás chats no "
+                                + "se borran nunca.", discordMediaChoice())));
+    }
+
+    private static Node discordMediaChoice() {
+        Settings s = Settings.get();
+        ToggleGroup tg = new ToggleGroup();
+        HBox box = new HBox(6);
+        box.setAccessibleText("Cuándo borrar las fotos y videos de canales de Discord");
+        for (int d : new int[]{7, 30, 90, 0}) {
+            ToggleButton b = new ToggleButton(d == 0 ? "Nunca" : d + " días");
+            b.getStyleClass().add("chip");
+            b.setMinWidth(Region.USE_PREF_SIZE);
+            b.setToggleGroup(tg);
+            b.setSelected(s.discordMediaDays() == d);
+            b.setAccessibleText(d == 0 ? "No borrar nunca las fotos y videos de Discord"
+                    : "Borrar fotos y videos de Discord después de " + b.getText());
+            b.setOnAction(e -> {
+                if (!b.isSelected()) b.setSelected(true);
+                s.setDiscordMediaDays(d);
+            });
+            box.getChildren().add(b);
+        }
+        return box;
     }
 
     private static Node stickerModeChoice(app.unichat.model.Network n) {
