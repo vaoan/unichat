@@ -473,7 +473,10 @@ public final class MatrixChatService implements ChatService {
         if (r.chatsChanged) fire(Listener::chatsChanged);
         for (String id : r.messagesChanged) fire(l -> l.messagesChanged(id));
         if (notify) {
+            java.time.Instant now = java.time.Instant.now();
             for (Message m : r.newMessages) {
+                // Backfilled history (a bridge catching up on old messages) arrives as new events: don't announce it.
+                if (!SyncProcessor.fresh(m, now)) continue;
                 Chat c = chat(m.chatId());
                 if (c != null && !c.muted() && !c.bridgeBot()) fire(l -> l.incomingMessage(c, m));
             }

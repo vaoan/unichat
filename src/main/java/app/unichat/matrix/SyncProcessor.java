@@ -376,6 +376,14 @@ final class SyncProcessor {
         if (live && older == null && !m.outgoing() && m.type() != MessageType.SYSTEM) r.newMessages.add(m);
     }
 
+    /** How old a message may be and still notify: older ones are history a bridge is backfilling right now. */
+    static final java.time.Duration NOTIFY_WINDOW = java.time.Duration.ofMinutes(5);
+
+    /** True when {@code m} was sent recently enough to be news (not backfill arriving late). */
+    static boolean fresh(Message m, Instant now) {
+        return m.timestamp().isAfter(now.minus(NOTIFY_WINDOW));
+    }
+
     private void applyPending(MatrixRoom room, String targetId, Result r) {
         List<JsonNode> list = room.pending.remove(targetId);
         if (list == null) return;
