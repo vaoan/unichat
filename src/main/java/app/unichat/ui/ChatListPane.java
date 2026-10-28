@@ -57,6 +57,8 @@ public final class ChatListPane extends VBox {
     private InboxRows.Rows rows = InboxRows.Rows.EMPTY;
     /** The server whose channels cover the list (Telegram-forum style), or null. */
     private String openSpace;
+    /** The accounts as of the last refresh: list cells need them, and computing them walks every room. */
+    private List<app.unichat.model.Account> accounts = List.of();
     private InboxRows.Rows spaceRows = InboxRows.Rows.EMPTY;
     private final ObservableList<Chat> spaceItems = FXCollections.observableArrayList();
     private final ListView<Chat> spaceList = new ListView<>(spaceItems);
@@ -224,6 +226,7 @@ public final class ChatListPane extends VBox {
     public void refresh() {
         ChatFilter f = filter.get();
         List<Chat> all = svc.chats();
+        accounts = svc.accounts();
         rows = InboxRows.build(all, f, spaces.names());
         List<Chat> visible = new java.util.ArrayList<>(rows.rows());
         spaces.checkPending();
@@ -313,7 +316,7 @@ public final class ChatListPane extends VBox {
 
     /** "Todas · Personal · Trabajo" chips, shown only for a network with several accounts. */
     private void refreshAccountRow(ChatFilter f) {
-        List<app.unichat.model.Account> accounts = f.network() == null ? List.of() : Accounts.of(svc, f.network());
+        List<app.unichat.model.Account> accounts = f.network() == null ? List.of() : Accounts.of(this.accounts, f.network());
         // Only offer per-account filters when every chat of the network knows its account; otherwise a filter
         // would silently hide chats (Matrix bridges don't always say which login a portal belongs to).
         boolean attributed = f.network() != null && svc.chats().stream()
@@ -394,7 +397,7 @@ public final class ChatListPane extends VBox {
         });
         tile.setFocusTraversable(true);
         tile.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
-        tile.setAccessibleText("Favorito: " + describe(c, Accounts.forChat(svc, c)));
+        tile.setAccessibleText("Favorito: " + describe(c, Accounts.forChat(accounts, c)));
         tile.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) openFavorite(c);
         });
@@ -595,7 +598,7 @@ public final class ChatListPane extends VBox {
             avatar.set(c.title(), c.id(), c.avatarUrl(), svc);
             avatar.setNetwork(c.network(), Settings.get().showNetworkBadges());
             name.setText(c.title());
-            String account = filter.get().accountId() == null ? Accounts.forChat(svc, c) : null;
+            String account = filter.get().accountId() == null ? Accounts.forChat(accounts, c) : null;
             // Several accounts on this network: a tiny avatar says which one (full name on hover / screen reader).
             accountTag.setText(account == null ? "" : Formats.accountShort(account));
             accountTag.setStyle(account == null ? "" : "-fx-background-color: " + Avatar.colorFor(account) + ";");
@@ -631,7 +634,7 @@ public final class ChatListPane extends VBox {
             disclosure.setVisible(space);
             disclosure.setManaged(space);
             toggle(name, "unjoined", unjoined);
-            String a11y = describe(c, Accounts.forChat(svc, c));
+            String a11y = describe(c, Accounts.forChat(accounts, c));
             if (offer) {
                 boolean busy = spaces.adding(c.id().substring(Spaces.OFFER_PREFIX.length()));
                 stamp.setText("");

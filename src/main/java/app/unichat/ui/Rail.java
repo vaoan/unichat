@@ -83,7 +83,7 @@ public final class Rail extends VBox {
             // Only networks you actually use: a working account, or native Matrix chats.
             boolean shown = n == Network.MATRIX
                     ? chats.stream().anyMatch(c -> c.network() == n && !c.bridgeBot() && !c.space())
-                    : !Accounts.of(svc, n).isEmpty();
+                    : !Accounts.of(accounts, n).isEmpty();
             if (!shown) continue;
             Label letter = NetworkIcons.tile(n, 26, "rail-network");
             String status = acc == null ? "" : switch (acc.status()) {
@@ -93,7 +93,7 @@ public final class Rail extends VBox {
                 case ERROR -> " (error)";
                 case NOT_AVAILABLE -> " (no disponible)";
             };
-            List<Account> netAccounts = Accounts.of(svc, n);
+            List<Account> netAccounts = Accounts.of(accounts, n);
             String count = netAccounts.size() > 1 ? " (" + netAccounts.size() + " cuentas)" : "";
             Button b = railButton(letter, n.displayName() + count + status, () ->
                     listPane.filterProperty().set(listPane.filterProperty().get().switchTo(n, null)));

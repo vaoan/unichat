@@ -144,9 +144,26 @@ public final class MainView extends StackPane {
             chatsDirty = true;
         }
         Platform.runLater(() -> {
-            synchronized (dirtyThreads) { chatsDirty = false; }
-            refreshAll();
+            // A busy account (big Discord servers) changes chats many times a second: rebuild at most every
+            // REFRESH_GAP_MS, so the UI thread isn't redrawing the whole inbox nonstop.
+            long wait = REFRESH_GAP_MS - (System.currentTimeMillis() - lastRefreshAt);
+            if (wait <= 0) {
+                runChatsRefresh();
+            } else {
+                javafx.animation.PauseTransition later = new javafx.animation.PauseTransition(javafx.util.Duration.millis(wait));
+                later.setOnFinished(e -> runChatsRefresh());
+                later.play();
+            }
         });
+    }
+
+    private static final long REFRESH_GAP_MS = 250;
+    private long lastRefreshAt;
+
+    private void runChatsRefresh() {
+        synchronized (dirtyThreads) { chatsDirty = false; }
+        lastRefreshAt = System.currentTimeMillis();
+        refreshAll();
     }
 
     private void scheduleThread(String chatId) {

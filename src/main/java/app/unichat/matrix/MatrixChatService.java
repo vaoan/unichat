@@ -1364,14 +1364,18 @@ public final class MatrixChatService implements ChatService {
     public List<Account> accounts() {
         List<Account> out = new ArrayList<>();
         synchronized (proc) {
+            // One pass over the rooms (thousands with big Discord servers), not one per network.
+            Map<Network, Integer> portalCount = new EnumMap<>(Network.class);
+            Map<Network, MatrixRoom> botRooms = new EnumMap<>(Network.class);
+            for (MatrixRoom r : proc.rooms()) {
+                if (r.invite) continue;
+                if (r.chat.bridgeBot()) botRooms.put(r.chat.network(), r);
+                else portalCount.merge(r.chat.network(), 1, Integer::sum);
+            }
             for (Network n : Network.values()) {
                 if (!n.isBridged()) continue;
-                int portals = 0;
-                MatrixRoom botRoom = null;
-                for (MatrixRoom r : proc.rooms()) {
-                    if (r.chat.network() != n || r.invite) continue;
-                    if (r.chat.bridgeBot()) botRoom = r; else portals++;
-                }
+                int portals = portalCount.getOrDefault(n, 0);
+                MatrixRoom botRoom = botRooms.get(n);
                 List<Login> cachedLogins = logins.get(n);
                 if (cachedLogins != null && !cachedLogins.isEmpty()) {
                     // Known logins don't depend on rooms: show them even before the first sync arrives.
