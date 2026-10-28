@@ -78,6 +78,7 @@ public final class MatrixChatService implements ChatService {
     private final String userId;
     private final String serverName;
     private final SyncProcessor proc;
+    private final NotifyGate notifyGate = new NotifyGate();
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
     private final ExecutorService io = Executors.newVirtualThreadPerTaskExecutor();
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -472,11 +473,17 @@ public final class MatrixChatService implements ChatService {
     private void dispatch(SyncProcessor.Result r, boolean notify) {
         if (r.chatsChanged) fire(Listener::chatsChanged);
         for (String id : r.messagesChanged) fire(l -> l.messagesChanged(id));
+        if (!notify) {
+            // Initial sync or catch-up: everything there is counts as seen, so it can't be announced later.
+            synchronized (proc) {
+                for (MatrixRoom room : proc.rooms()) notifyGate.seen(room.id, room.chat.lastActivity());
+            }
+        }
         if (notify) {
             java.time.Instant now = java.time.Instant.now();
             for (Message m : r.newMessages) {
-                // Backfilled history (a bridge catching up on old messages) arrives as new events: don't announce it.
-                if (!SyncProcessor.fresh(m, now)) continue;
+                // History a bridge backfills or resends arrives as new events: only what's really new is announced.
+                if (!notifyGate.isNew(m, now)) continue;
                 Chat c = chat(m.chatId());
                 if (c != null && !c.muted() && !c.bridgeBot()) fire(l -> l.incomingMessage(c, m));
             }

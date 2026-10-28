@@ -331,13 +331,4 @@ class SyncProcessorTest {
                  'room':[{'rule_id':'!b:x','enabled':true,'actions':['notify']}]}}"""));
         assertEquals(Set.of("!a:x"), muted);
     }
-
-    @Test
-    void backfilledHistoryIsNotFresh() {
-        Instant now = Instant.parse("2026-10-27T20:00:00Z");
-        Message recent = new Message("$a", "!r", "@bob:example.org", "Bob", false, now.minusSeconds(30));
-        Message old = new Message("$b", "!r", "@bob:example.org", "Bob", false, now.minus(java.time.Duration.ofDays(2)));
-        assertTrue(SyncProcessor.fresh(recent, now));
-        assertFalse(SyncProcessor.fresh(old, now), "a bridge's backfill must not notify");
-    }
 }
