@@ -44,12 +44,14 @@ class LogFilesTest {
         Path oldBridge = file("server/whatsapp/bridge-2026-10-10T00-00-00.000.log", 16);
         Path recent = file("logs/unichat.log", 0);
         Path db = file("server/whatsapp/whatsapp.db", 400);
+        Path wal = file("server/db/000123.log", 400);
         int n = LogFiles.cleanOld(List.of(root), Duration.ofDays(7), now);
         assertEquals(2, n);
         assertFalse(Files.exists(old));
         assertFalse(Files.exists(oldBridge));
         assertTrue(Files.exists(recent));
         assertTrue(Files.exists(db), "databases are never touched");
+        assertTrue(Files.exists(wal), "tuwunel's write-ahead logs are part of its database");
     }
 
     @Test

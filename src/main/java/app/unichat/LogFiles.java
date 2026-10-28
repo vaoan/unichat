@@ -6,14 +6,17 @@ import app.unichat.settings.Settings;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * Log housekeeping so logs never fill the disk: Unichat's own log plus the local server's and its bridges'.
@@ -22,6 +25,8 @@ import java.util.stream.Stream;
 public final class LogFiles {
     /** unichat.log, tuwunel.log, bridge.log, whatsapp.out, their ".1" copies and the bridges' dated backups. */
     private static final Pattern LOG = Pattern.compile("(?i).+\\.(log|out)(\\.\\d+)?");
+    /** Folders holding a database (tuwunel's RocksDB): never searched for logs. */
+    private static final Set<String> DATABASE_DIRS = Set.of("db");
     /** Files a running process is writing to: emptied by {@link #clearAll}, not deleted. */
     private static final Pattern ACTIVE = Pattern.compile("(?i)(unichat|tuwunel|bridge)\\.log|[a-z]+\\.out");
 
@@ -93,9 +98,28 @@ public final class LogFiles {
         List<Path> out = new ArrayList<>();
         for (Path root : roots) {
             if (!Files.isDirectory(root)) continue;
-            // Logs sit at most two levels down (server/<network>/bridge.log); the homeserver db is deeper.
-            try (Stream<Path> s = Files.walk(root, 3)) {
-                s.filter(Files::isRegularFile).filter(LogFiles::isLog).forEach(out::add);
+            // Logs sit at most two levels down (server/<network>/bridge.log). The homeserver's database folder is
+            // never entered: its write-ahead files are named 000123.log and deleting them corrupts it.
+            try {
+                Files.walkFileTree(root, Set.of(), 3, new SimpleFileVisitor<>() {
+                    @Override
+                    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes a) {
+                        return DATABASE_DIRS.contains(dir.getFileName().toString())
+                                ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFile(Path f, BasicFileAttributes a) {
+                        if (a.isRegularFile() && isLog(f)) out.add(f);
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFileFailed(Path f, IOException e) {
+                        // Gone meanwhile (the database compacts all the time) or unreadable: skip it.
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
             } catch (IOException ignored) {
                 // Unreadable folder: skip.
             }
