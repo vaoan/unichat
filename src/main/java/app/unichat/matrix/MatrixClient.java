@@ -22,7 +22,7 @@ final class MatrixClient {
     static final ObjectMapper JSON = new ObjectMapper();
     static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
-    private final HttpClient http;
+    private volatile HttpClient http;
     private final String baseUrl;
     private final String accessToken;
 
@@ -115,8 +115,18 @@ final class MatrixClient {
     }
 
     private <T> HttpResponse<T> send(HttpRequest req, HttpResponse.BodyHandler<T> handler) throws IOException {
+        HttpClient c = http;
         try {
-            return http.send(req, handler);
+            return c.send(req, handler);
+        } catch (IOException e) {
+            // A client whose selector died ("selector manager closed") fails every request from then on: replace it
+            // so the next attempt (the sync loop retries) gets a working one.
+            if (c.isTerminated()) {
+                synchronized (this) {
+                    if (http == c) http = newHttpClient();
+                }
+            }
+            throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new InterruptedIOException("interrupted");

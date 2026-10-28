@@ -170,6 +170,8 @@ allow_federation = false
 allow_local_presence = false
 allow_incoming_presence = false
 allow_outgoing_presence = false
+# Fixed resolvers: tuwunel won't start if /etc/resolv.conf has a scoped IPv6 nameserver (fe80::1%en0).
+dns_servers = ["1.1.1.1", "9.9.9.9"]
 # Only someone with the token can create accounts; the first account becomes server admin.
 allow_registration = true
 registration_token = "$REGISTRATION_TOKEN"

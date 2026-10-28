@@ -19,6 +19,9 @@ final class HomeserverConfig {
                 allow_local_presence = false
                 allow_incoming_presence = false
                 allow_outgoing_presence = false
+                # Fixed resolvers: tuwunel won't start when /etc/resolv.conf lists a scoped IPv6 nameserver (macOS
+                # adds fe80::1 on en0 on some networks); without federation it barely resolves anything anyway.
+                dns_servers = ["1.1.1.1", "9.9.9.9"]
                 # Only Unichat (which knows the token) creates accounts; the first one becomes server admin.
                 allow_registration = true
                 registration_token = %s

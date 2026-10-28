@@ -119,6 +119,7 @@ class BridgeConfigTest {
         assertTrue(toml.contains("server_name = \"localhost\""));
         assertTrue(toml.contains("address = [\"127.0.0.1\"]"));
         assertTrue(toml.contains("allow_federation = false"));
+        assertTrue(toml.contains("dns_servers = [\"1.1.1.1\", \"9.9.9.9\"]"), "never reads /etc/resolv.conf");
         assertTrue(toml.contains("registration_token = \"tok\\\"en\""), toml);
         assertTrue(toml.contains("appservice_dir = \"/srv/u/appservices\""));
         assertTrue(toml.contains("database_path = \"/srv/u/tuwunel/db\""));

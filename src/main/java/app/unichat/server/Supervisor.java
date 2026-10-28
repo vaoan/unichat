@@ -25,6 +25,7 @@ public final class Supervisor {
     private final Duration firstBackoff;
     private final Duration maxBackoff;
     static final long MAX_LOG = 5L * 1024 * 1024;
+    private static final long STABLE_MS = 60_000;
     private final Map<String, Service> services = new ConcurrentHashMap<>();
 
     /** Where each running process is noted as {@code <name>.pid} ("pid startMillis"), or null. */
@@ -100,6 +101,9 @@ public final class Supervisor {
         volatile Process process;
         volatile boolean wanted = true;
         volatile int restarts;
+        /** Crashes in a row without a stable run in between; sets the wait before the next restart. */
+        volatile int streak;
+        volatile long launchedAt;
 
         Service(String name, Path workDir, List<String> command, Path log) {
             this.name = name;
@@ -111,6 +115,7 @@ public final class Supervisor {
         void launch() throws IOException {
             Files.createDirectories(log.getParent());
             process = new ProcessBuilder(command).directory(workDir.toFile()).redirectErrorStream(true).start();
+            launchedAt = System.currentTimeMillis();
             Process p = process;
             notePid(name, p);
             Thread pump = new Thread(() -> pump(p, log), "log-" + name);
@@ -156,17 +161,26 @@ public final class Supervisor {
 
     private void onExit(Service s, Process p) {
         if (!s.wanted || s.process != p || services.get(s.name) != s) return;
-        long delay = Math.min(maxBackoff.toMillis(), firstBackoff.toMillis() << Math.min(s.restarts, 10));
+        // A process that ran fine for a while starts over with short waits (days-old crashes don't count).
+        if (System.currentTimeMillis() - s.launchedAt > STABLE_MS) s.streak = 0;
+        scheduleRestart(s);
+    }
+
+    private void scheduleRestart(Service s) {
+        long delay = Math.min(maxBackoff.toMillis(), firstBackoff.toMillis() << Math.min(s.streak, 10));
         Thread t = new Thread(() -> {
             try {
                 Thread.sleep(delay);
                 if (!s.wanted || services.get(s.name) != s) return;
                 s.restarts++;
+                s.streak++;
                 s.launch();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (IOException e) {
+                // Not launched, so no exit will come to retry it (full disk, binary being replaced): try again later.
                 System.err.println("Could not restart " + s.name + ": " + e);
+                scheduleRestart(s);
             }
         }, "restart-" + s.name);
         t.setDaemon(true);
