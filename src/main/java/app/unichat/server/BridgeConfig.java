@@ -111,10 +111,10 @@ public final class BridgeConfig {
             set(c, "/appservice/database/uri", db);
             obj(c, "/bridge/encryption").put("allow", false).put("default", false);
             obj(c, "/bridge").putObject("login_shared_secret_map").put(s.domain(), "as_token:" + s.doublePuppetToken());
-            // Server channels get little history: missed messages are fetched for every channel on each start, with
-            // their attachments copied at full size (even 20 per channel over ~2000 channels added GBs per start).
-            // Channels get only what arrives live; DMs keep their history.
-            obj(c, "/bridge/backfill/forward_limits/initial").put("dm", 50).put("channel", 10);
+            // History comes with its attachments copied at full size, for every channel created (hundreds at a
+            // time) and every missed message on each start: GBs per start. A new channel brings only its last
+            // message (preview and activity); no catch-up on start. DMs keep their history.
+            obj(c, "/bridge/backfill/forward_limits/initial").put("dm", 50).put("channel", 1);
             obj(c, "/bridge/backfill/forward_limits/missed").put("dm", 500).put("channel", 0);
             // Big public servers: no missed-message backfill at all (only new messages come in).
             setExisting(c, "/bridge/backfill/max_guild_members", 1000);
