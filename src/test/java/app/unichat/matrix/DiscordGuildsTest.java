@@ -33,25 +33,8 @@ class DiscordGuildsTest {
             new MatrixChatService.DiscordGuild("3", "Tres", false));
 
     @Test
-    void everyServerComesInLikeTelegramGroupsExceptTheOnesTurnedOff() {
-        assertEquals(List.of("1", "3"), MatrixChatService.guildsToBridge(GUILDS, java.util.Set.of()));
-        assertEquals(List.of("3"), MatrixChatService.guildsToBridge(GUILDS, java.util.Set.of("1")),
-                "a server switched off in Cuentas stays off");
-    }
-
-    @Test
     void aServerWhoseSpaceAlreadyArrivedIsNoLongerToAdd() {
         assertEquals(List.of("3"), MatrixChatService.offers(GUILDS, java.util.Set.of("1")).stream()
                 .map(app.unichat.service.ChatService.GroupOffer::id).toList());
-    }
-
-    @Test
-    void switchingAServerOffIsRemembered() {
-        app.unichat.settings.Settings.get().set(MatrixChatService.UNWANTED_GUILDS_KEY, null);
-        MatrixChatService.rememberGuildChoice("7", false);
-        MatrixChatService.rememberGuildChoice("8", false);
-        MatrixChatService.rememberGuildChoice("7", true);
-        assertEquals(java.util.Set.of("8"), MatrixChatService.unwantedGuilds());
-        app.unichat.settings.Settings.get().set(MatrixChatService.UNWANTED_GUILDS_KEY, null);
     }
 }

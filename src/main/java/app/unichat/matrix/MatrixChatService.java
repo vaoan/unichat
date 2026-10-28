@@ -1705,7 +1705,6 @@ public final class MatrixChatService implements ChatService {
         }
         logins.put(n, parsed);
         maybeResyncChats(n, parsed);
-        maybeBridgeDiscordGuilds(n, parsed);
         StringBuilder sb = new StringBuilder();
         for (Login l : parsed) {
             sb.append(l.id()).append('\t').append(l.name() == null ? "" : l.name()).append('\t')
@@ -1752,10 +1751,7 @@ public final class MatrixChatService implements ChatService {
             List<Login> known = logins.get(n);
             // Cached logins skip refreshLoginsNow, which also checks this; logins made through the bridge API
             // have no bot chat, so this comes before that check.
-            if (known != null && !known.isEmpty()) {
-                maybeResyncChats(n, known);
-                maybeBridgeDiscordGuilds(n, known);
-            }
+            if (known != null && !known.isEmpty()) maybeResyncChats(n, known);
             if (findBotRoom(n) == null) continue;
             long ts = loginsCachedAt.getOrDefault(n, 0L);
             // An empty cache ("not logged in") is always re-checked: a login may have happened since.
@@ -1770,39 +1766,16 @@ public final class MatrixChatService implements ChatService {
 
     private static final Pattern GUILD_LINE = Pattern.compile("(?m)^\\s*[*-]\\s*(.+?)\\s*\\(`?(\\d{5,})`?\\)\\s*-\\s*(.+)$");
 
-    static final String UNWANTED_GUILDS_KEY = "discord.guilds.off";
-
-    /** Servers to bring in by themselves, like Telegram brings every group: all but the ones switched off. */
-    static List<String> guildsToBridge(List<DiscordGuild> guilds, Set<String> unwanted) {
-        return guilds.stream().filter(g -> !g.bridged() && !unwanted.contains(g.id())).map(DiscordGuild::id).toList();
-    }
-
     /** Servers still to add: not bridged and whose space hasn't arrived ({@code inUnichat}: guild ids with a space). */
     static List<GroupOffer> offers(List<DiscordGuild> guilds, Set<String> inUnichat) {
         return guilds.stream().filter(g -> !g.bridged() && !inUnichat.contains(g.id()))
                 .map(g -> new GroupOffer(g.id(), g.name())).toList();
     }
 
-    /** A server switched off in Cuentas → Servidores isn't brought back by itself. */
-    static void rememberGuildChoice(String guildId, boolean bridged) {
-        Set<String> off = new java.util.LinkedHashSet<>(unwantedGuilds());
-        if (bridged) off.remove(guildId);
-        else off.add(guildId);
-        Settings.get().set(UNWANTED_GUILDS_KEY, off.isEmpty() ? null : String.join(",", off));
-    }
-
-    static Set<String> unwantedGuilds() {
-        String v = Settings.get().getString(UNWANTED_GUILDS_KEY, "");
-        Set<String> out = new java.util.LinkedHashSet<>();
-        for (String id : v.split(",")) if (!id.isBlank()) out.add(id.strip());
-        return out;
-    }
-
     /** The bridge's guild list, asked at most every few minutes (each ask is a message in the bot chat). */
     private volatile List<DiscordGuild> guildCache;
     private volatile long guildCacheAt;
     private static final long GUILD_CACHE_MS = 10 * 60_000;
-    private final java.util.concurrent.atomic.AtomicBoolean guildAutoBridge = new java.util.concurrent.atomic.AtomicBoolean();
 
     /** Discord guild ids whose space is already in Unichat. */
     private Set<String> localGuildIds() {
@@ -1813,43 +1786,6 @@ public final class MatrixChatService implements ChatService {
             }
         }
         return out;
-    }
-
-    /**
-     * Brings every Discord server in once per run, like Telegram brings every group: each server's space arrives at
-     * once and its channels as people write (not {@code --entire}). One at a time, a few seconds apart.
-     */
-    private void maybeBridgeDiscordGuilds(Network n, List<Login> known) {
-        if (n != Network.DISCORD || known.stream().noneMatch(l -> "CONNECTED".equals(l.state()))) return;
-        if (!guildAutoBridge.compareAndSet(false, true)) return;
-        Thread.ofVirtual().name("discord-servers").start(() -> {
-            try {
-                Thread.sleep(30_000); // the server and bridges are still settling right after start
-                List<DiscordGuild> guilds = parseGuilds(botQuery(Network.DISCORD, "guilds status", 60));
-                guildCache = guilds;
-                guildCacheAt = System.currentTimeMillis();
-                List<String> ids = guildsToBridge(guilds, unwantedGuilds());
-                if (ids.isEmpty()) return;
-                System.err.println("Discord: bringing in " + ids.size() + " servers");
-                int done = 0;
-                for (String id : ids) {
-                    if (!running) return;
-                    try {
-                        if (botQuery(Network.DISCORD, "guilds bridge " + id, 120).startsWith("Successfully")) done++;
-                    } catch (Exception e) {
-                        System.err.println("Discord server bridge failed: " + e.getClass().getSimpleName());
-                    }
-                    Thread.sleep(3000);
-                }
-                guildCache = null;
-                System.err.println("Discord: " + done + " of " + ids.size() + " servers brought in");
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            } catch (Exception e) {
-                System.err.println("Discord servers not brought in: " + e.getClass().getSimpleName());
-                guildAutoBridge.set(false);
-            }
-        });
     }
 
     /** Every channel of a Discord server, asked once per server ({@code --entire}); other networks: nothing. */
@@ -1911,7 +1847,6 @@ public final class MatrixChatService implements ChatService {
             try {
                 String reply = botQuery(Network.DISCORD, (bridged ? "guilds bridge " : "guilds unbridge ") + guildId);
                 if (!reply.startsWith("Successfully")) throw new MatrixException(0, null, reply);
-                rememberGuildChoice(guildId, bridged);
                 guildCache = null;
             } catch (MatrixException e) {
                 throw new java.util.concurrent.CompletionException(e);
@@ -1950,7 +1885,6 @@ public final class MatrixChatService implements ChatService {
             try {
                 String reply = botQuery(Network.DISCORD, "guilds bridge " + offerId + " --entire", 600);
                 if (!reply.startsWith("Successfully")) throw new MatrixException(0, null, reply);
-                rememberGuildChoice(offerId, true);
                 guildCache = null;
             } catch (MatrixException e) {
                 throw new java.util.concurrent.CompletionException(e);
