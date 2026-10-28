@@ -473,6 +473,8 @@ public final class MatrixChatService implements ChatService {
     private void dispatch(SyncProcessor.Result r, boolean notify) {
         if (r.chatsChanged) fire(Listener::chatsChanged);
         for (String id : r.messagesChanged) fire(l -> l.messagesChanged(id));
+        // Read elsewhere (the phone, another client): nothing up to there is news any more.
+        r.readByMe.forEach(notifyGate::seen);
         if (!notify) {
             // Initial sync or catch-up: everything there is counts as seen, so it can't be announced later.
             synchronized (proc) {

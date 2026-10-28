@@ -40,6 +40,8 @@ final class SyncProcessor {
         final Set<String> messagesChanged = new LinkedHashSet<>();
         /** New incoming live messages (not outgoing, not system), candidates for notifications. */
         final List<Message> newMessages = new ArrayList<>();
+        /** Per room, the time up to which I've read (my own receipts, e.g. read on the phone). */
+        final Map<String, Instant> readByMe = new HashMap<>();
         /** Rooms we were newly invited to. */
         final List<String> invites = new ArrayList<>();
         /** Back-pagination only: false when the start of the room was reached. */
@@ -535,6 +537,14 @@ final class SyncProcessor {
                 boolean byOther = false;
                 for (Iterator<String> users = e.getValue().path("m.read").fieldNames(); users.hasNext(); ) {
                     if (!users.next().equals(me)) byOther = true;
+                }
+                for (String kind : new String[]{"m.read", "m.read.private"}) {
+                    JsonNode mine = e.getValue().path(kind).path(me);
+                    if (mine.isMissingNode()) continue;
+                    // Read up to that message (its time); a message not loaded here: when the receipt was sent.
+                    Message read = room.byId.get(e.getKey());
+                    Instant t = read != null ? read.timestamp() : Instant.ofEpochMilli(mine.path("ts").asLong(0));
+                    r.readByMe.merge(room.id, t, (a, b) -> a.isAfter(b) ? a : b);
                 }
                 if (byOther && markReadUpTo(room, e.getKey())) r.messagesChanged.add(room.id);
             }

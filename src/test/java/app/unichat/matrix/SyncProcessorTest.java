@@ -331,4 +331,22 @@ class SyncProcessorTest {
                  'room':[{'rule_id':'!b:x','enabled':true,'actions':['notify']}]}}"""));
         assertEquals(Set.of("!a:x"), muted);
     }
+
+    @Test
+    void myOwnReceiptsTellUpToWhereIRead() {
+        String room = "!p:example.org";
+        // A bridge delivers a message together with my receipt from the phone (read there already).
+        SyncProcessor.Result r = sync(room, """
+                {'timeline':{'events':[%s]},
+                 'ephemeral':{'events':[{'type':'m.receipt','content':{'$1':{'m.read':{'@me:example.org':{'ts':900}}}}}]}}"""
+                .formatted(text("$1", "@bob:example.org", 500, "a")), true);
+        assertEquals(Instant.ofEpochMilli(500), r.readByMe.get(room), "the read message's own time");
+        r = sync(room, """
+                {'ephemeral':{'events':[{'type':'m.receipt','content':{'$unknown':{'m.read.private':{'@me:example.org':{'ts':700}}}}}]}}""",
+                true);
+        assertEquals(Instant.ofEpochMilli(700), r.readByMe.get(room), "an event not loaded: when it was read");
+        r = sync(room, """
+                {'ephemeral':{'events':[{'type':'m.receipt','content':{'$1':{'m.read':{'@bob:example.org':{'ts':950}}}}}]}}""", true);
+        assertTrue(r.readByMe.isEmpty(), "others' receipts don't count");
+    }
 }
