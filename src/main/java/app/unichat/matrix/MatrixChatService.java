@@ -82,7 +82,17 @@ public final class MatrixChatService implements ChatService {
     /** Chats already seen in an earlier sync of this run (see QuietRule.toInherit). */
     private final Set<String> knownChats = new java.util.HashSet<>();
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
-    private final ExecutorService io = Executors.newVirtualThreadPerTaskExecutor();
+    /**
+     * Background work (sends, downloads, bot commands). Platform threads, not virtual ones: almost everything here
+     * takes {@code synchronized (proc)} or a bot lock, and on Java 21 a virtual thread blocked on a monitor pins its
+     * carrier. With as many waiters as CPU cores, nothing else could run: a bot command waiting for its own send
+     * froze all background work.
+     */
+    private final ExecutorService io = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "matrix-io");
+        t.setDaemon(true);
+        return t;
+    });
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "matrix-timer");
         t.setDaemon(true);
@@ -1083,19 +1093,21 @@ public final class MatrixChatService implements ChatService {
      * archive; brought back, it brings messages again, creating channels as people write.
      */
     private void setGuildPaused(String guildId, boolean paused) {
-        io.execute(() -> {
-            try {
-                String reply = botQuery(Network.DISCORD, "guilds bridging-mode " + guildId + " " + (paused ? "nothing" : "create-on-message"));
-                if (!reply.startsWith("Set guild bridging mode")) throw new MatrixException(0, null, reply);
-                synchronized (PAUSED_GUILDS_KEY) {
-                    Set<String> now = pausedGuilds();
-                    if (paused) now.add(guildId); else now.remove(guildId);
-                    Settings.get().set(PAUSED_GUILDS_KEY, now.isEmpty() ? null : String.join(",", now));
-                }
-            } catch (Exception e) {
-                System.err.println("Discord server " + (paused ? "pause" : "resume") + " failed: " + e.getClass().getSimpleName());
+        io.execute(() -> setGuildPausedNow(guildId, paused));
+    }
+
+    private void setGuildPausedNow(String guildId, boolean paused) {
+        try {
+            String reply = botQuery(Network.DISCORD, "guilds bridging-mode " + guildId + " " + (paused ? "nothing" : "create-on-message"));
+            if (!reply.startsWith("Set guild bridging mode")) throw new MatrixException(0, null, reply);
+            synchronized (PAUSED_GUILDS_KEY) {
+                Set<String> now = pausedGuilds();
+                if (paused) now.add(guildId); else now.remove(guildId);
+                Settings.get().set(PAUSED_GUILDS_KEY, now.isEmpty() ? null : String.join(",", now));
             }
-        });
+        } catch (Exception e) {
+            System.err.println("Discord server " + (paused ? "pause" : "resume") + " failed: " + e.getClass().getSimpleName());
+        }
     }
 
     private final java.util.concurrent.atomic.AtomicBoolean pausedArchivedGuilds = new java.util.concurrent.atomic.AtomicBoolean();
@@ -1112,8 +1124,15 @@ public final class MatrixChatService implements ChatService {
                 if (g != null && !done.contains(g)) todo.add(g);
             }
         }
-        if (!todo.isEmpty()) System.err.println("Discord: pausing " + todo.size() + " archived servers");
-        for (String g : todo) setGuildPaused(g, true);
+        if (todo.isEmpty()) return;
+        System.err.println("Discord: pausing " + todo.size() + " archived servers");
+        // One after another in a single task: the bridge takes one command at a time anyway.
+        io.execute(() -> {
+            for (String g : todo) {
+                if (!running) return;
+                setGuildPausedNow(g, true);
+            }
+        });
     }
 
     private CompletableFuture<Void> archiveOnly(String chatId, boolean archived) {

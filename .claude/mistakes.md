@@ -52,3 +52,7 @@
   hides to the tray. `Desktop.setQuitHandler` (AWT) is never called with JavaFX owning the app. Fix: `MacQuit`
   wraps JavaFX's glass `Application.EventHandler.handleQuitAction`. Test by AXPress on the app menu's Quit item
   (an `osascript 'quit app'` to a dev `java` process doesn't reach it).
+- **Virtual threads + `synchronized` (Java 21)**: a virtual thread blocked on a monitor pins its carrier; 8 bot
+  commands waiting on `synchronized (botLock)` used all 8 carriers and the command holding the lock could never run its
+  send → every background task froze. `MatrixChatService.io` is a platform pool for this reason; don't fan out work
+  that takes `synchronized (proc)` onto virtual threads.
