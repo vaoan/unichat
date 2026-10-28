@@ -79,6 +79,8 @@ public final class MatrixChatService implements ChatService {
     private final String serverName;
     private final SyncProcessor proc;
     private final NotifyGate notifyGate = new NotifyGate();
+    /** Chats already seen in an earlier sync of this run (see QuietRule.toInherit). */
+    private final Set<String> knownChats = new java.util.HashSet<>();
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
     private final ExecutorService io = Executors.newVirtualThreadPerTaskExecutor();
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -421,15 +423,20 @@ public final class MatrixChatService implements ChatService {
                 boolean live = initialSyncDone && !catchUp;
                 SyncProcessor.Result r;
                 List<String> mutedElsewhere;
+                List<String> inArchivedServer;
                 synchronized (proc) {
                     r = proc.process(resp, live);
                     List<Chat> now = proc.rooms().stream().map(x -> x.chat).toList();
                     mutedElsewhere = app.unichat.service.QuietRule.toArchive(mutedSeen, now);
                     mutedSeen.clear();
                     for (Chat c : now) if (c.muted()) mutedSeen.add(c.id());
+                    inArchivedServer = app.unichat.service.QuietRule.toInherit(knownChats, now);
+                    for (Chat c : now) knownChats.add(c.id());
                 }
                 // Muted on the phone (or anywhere): archived too, like a mute made here.
                 for (String id : mutedElsewhere) archiveOnly(id, true).exceptionally(e -> null);
+                // A channel that arrived in an archived server goes quiet like its siblings.
+                for (String id : inArchivedServer) quiet(id, true).exceptionally(e -> null);
                 nextBatch = resp.path("next_batch").asText(null);
                 if (initial) saveSyncCache(resp);
                 else if (catchUp) refreshSyncCache();

@@ -51,4 +51,23 @@ class QuietRuleTest {
         assertEquals(List.of("!a"), QuietRule.toArchive(Set.of(), List.of(a, b, c)), "first sync: what's muted gets archived");
         assertEquals(List.of(), QuietRule.toArchive(Set.of("!a"), List.of(a, b, c)), "already muted before: the user may have just unarchived");
     }
+
+    @Test
+    void aChannelArrivingInAnArchivedServerGoesQuietToo() {
+        Chat server = new Chat("!srv"), category = new Chat("!cat"), old = new Chat("!old"), fresh = new Chat("!new"),
+                elsewhere = new Chat("!dm");
+        server.setSpace(true);
+        server.setArchived(true);
+        server.setSpaceChildren(List.of("!cat"));
+        category.setSpace(true);
+        category.setArchived(true);
+        category.setSpaceChildren(List.of("!old"));
+        old.setArchived(true);
+        old.setSpaceParents(Set.of("!cat"));
+        fresh.setSpaceParents(Set.of("!cat"));
+        List<Chat> now = List.of(server, category, old, fresh, elsewhere);
+        assertEquals(List.of("!new"), QuietRule.toInherit(Set.of(), now), "first sync: whatever is out of line");
+        assertEquals(List.of(), QuietRule.toInherit(Set.of("!srv", "!cat", "!old", "!new", "!dm"), now),
+                "chats already known are left alone (the user may be bringing the server back)");
+    }
 }

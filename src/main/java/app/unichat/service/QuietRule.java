@@ -3,8 +3,11 @@ package app.unichat.service;
 import app.unichat.model.Chat;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -38,5 +41,36 @@ public final class QuietRule {
         List<String> out = new ArrayList<>();
         for (Chat c : now) if (c.muted() && !c.archived() && !mutedBefore.contains(c.id())) out.add(c.id());
         return out;
+    }
+
+    /**
+     * Chats that arrived inside an archived server/group (a channel the bridge created after the server was archived):
+     * they go quiet too, or they'd count as unread while hidden inside their server. Only chats not in
+     * {@code knownBefore} (empty on the first sync: all), so a server the user is bringing back isn't fought over.
+     */
+    public static List<String> toInherit(Set<String> knownBefore, List<Chat> now) {
+        Map<String, Chat> byId = new HashMap<>();
+        Map<String, Set<String>> parents = new HashMap<>();
+        for (Chat c : now) {
+            byId.put(c.id(), c);
+            parents.computeIfAbsent(c.id(), k -> new HashSet<>()).addAll(c.spaceParents());
+            if (c.space()) for (String child : c.spaceChildren()) parents.computeIfAbsent(child, k -> new HashSet<>()).add(c.id());
+        }
+        List<String> out = new ArrayList<>();
+        for (Chat c : now) {
+            if (c.archived() || knownBefore.contains(c.id())) continue;
+            if (archivedAncestor(c.id(), byId, parents, new HashSet<>())) out.add(c.id());
+        }
+        return out;
+    }
+
+    private static boolean archivedAncestor(String id, Map<String, Chat> byId, Map<String, Set<String>> parents, Set<String> seen) {
+        for (String p : parents.getOrDefault(id, Set.of())) {
+            if (!seen.add(p)) continue;
+            Chat pc = byId.get(p);
+            if (pc != null && pc.archived()) return true;
+            if (archivedAncestor(p, byId, parents, seen)) return true;
+        }
+        return false;
     }
 }
