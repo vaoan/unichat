@@ -111,8 +111,12 @@ public final class BridgeConfig {
             set(c, "/appservice/database/uri", db);
             obj(c, "/bridge/encryption").put("allow", false).put("default", false);
             obj(c, "/bridge").putObject("login_shared_secret_map").put(s.domain(), "as_token:" + s.doublePuppetToken());
-            obj(c, "/bridge/backfill/forward_limits/initial").put("dm", 50).put("channel", 50);
-            obj(c, "/bridge/backfill/forward_limits/missed").put("dm", 500).put("channel", 500);
+            // Server channels get little history: with every server brought in, 500 missed messages per channel on
+            // each start (attachments and avatars reuploaded) filled the disk and swamped the server. DMs keep more.
+            obj(c, "/bridge/backfill/forward_limits/initial").put("dm", 50).put("channel", 10);
+            obj(c, "/bridge/backfill/forward_limits/missed").put("dm", 500).put("channel", 20);
+            // Big public servers: no missed-message backfill at all (only new messages come in).
+            setExisting(c, "/bridge/backfill/max_guild_members", 1000);
             obj(c, "/logging").put("min_level", "info").set("writers", writers);
         }
         return c;

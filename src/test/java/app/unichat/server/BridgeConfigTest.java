@@ -109,7 +109,9 @@ class BridgeConfigTest {
         assertEquals("discord_{{.}}", c.at("/bridge/username_template").asText());
         assertEquals("as_token:dp-token", c.at("/bridge/login_shared_secret_map/localhost").asText());
         assertEquals(50, c.at("/bridge/backfill/forward_limits/initial/dm").asInt());
-        assertEquals(500, c.at("/bridge/backfill/forward_limits/missed/channel").asInt());
+        assertEquals(10, c.at("/bridge/backfill/forward_limits/initial/channel").asInt());
+        assertEquals(20, c.at("/bridge/backfill/forward_limits/missed/channel").asInt());
+        assertEquals(500, c.at("/bridge/backfill/forward_limits/missed/dm").asInt());
         assertFalse(c.has("database"), "no bridgev2 keys on the legacy layout");
     }
 
