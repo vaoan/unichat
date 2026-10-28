@@ -1046,7 +1046,74 @@ public final class MatrixChatService implements ChatService {
             all.add(archiveOnly(id, on));
             all.add(muteOnly(id, on));
         }
+        String guild;
+        synchronized (proc) {
+            guild = guildOf(chatId);
+        }
+        if (guild != null) setGuildPaused(guild, on);
         return CompletableFuture.allOf(all.toArray(new CompletableFuture[0]));
+    }
+
+    // ---------------------------------------------------------------- archived Discord servers load nothing
+
+    /** Discord servers set to bring nothing (archived), so each is asked of the bridge once. */
+    static final String PAUSED_GUILDS_KEY = "discord.guilds.paused";
+
+    /** The Discord server id behind a server's space (not a category inside it, not the bridge's own folder), or null. */
+    private String guildOf(String chatId) {
+        MatrixRoom r = proc.room(chatId);
+        if (r == null || !r.space || r.chat.network() != Network.DISCORD || r.bridgeChannelId == null || r.chat.personalSpace()) {
+            return null;
+        }
+        for (String p : r.chat.spaceParents()) {
+            MatrixRoom pr = proc.room(p);
+            if (pr != null && pr.space && pr.chat.network() == Network.DISCORD && !pr.chat.personalSpace()) return null;
+        }
+        return r.bridgeChannelId;
+    }
+
+    static Set<String> pausedGuilds() {
+        Set<String> out = new java.util.LinkedHashSet<>();
+        for (String id : Settings.get().getString(PAUSED_GUILDS_KEY, "").split(",")) if (!id.isBlank()) out.add(id.strip());
+        return out;
+    }
+
+    /**
+     * An archived server brings nothing (no messages, no attachments filling the disk) while its rooms stay in the
+     * archive; brought back, it brings messages again, creating channels as people write.
+     */
+    private void setGuildPaused(String guildId, boolean paused) {
+        io.execute(() -> {
+            try {
+                String reply = botQuery(Network.DISCORD, "guilds bridging-mode " + guildId + " " + (paused ? "nothing" : "create-on-message"));
+                if (!reply.startsWith("Set guild bridging mode")) throw new MatrixException(0, null, reply);
+                synchronized (PAUSED_GUILDS_KEY) {
+                    Set<String> now = pausedGuilds();
+                    if (paused) now.add(guildId); else now.remove(guildId);
+                    Settings.get().set(PAUSED_GUILDS_KEY, now.isEmpty() ? null : String.join(",", now));
+                }
+            } catch (Exception e) {
+                System.err.println("Discord server " + (paused ? "pause" : "resume") + " failed: " + e.getClass().getSimpleName());
+            }
+        });
+    }
+
+    private final java.util.concurrent.atomic.AtomicBoolean pausedArchivedGuilds = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /** Once per run, with Discord connected: servers archived earlier (or elsewhere) stop bringing anything too. */
+    private void maybePauseArchivedGuilds(Network n, List<Login> known) {
+        if (n != Network.DISCORD || known.stream().noneMatch(l -> "CONNECTED".equals(l.state()))) return;
+        if (!initialSyncDone || !pausedArchivedGuilds.compareAndSet(false, true)) return;
+        Set<String> done = pausedGuilds();
+        List<String> todo = new ArrayList<>();
+        synchronized (proc) {
+            for (MatrixRoom r : proc.rooms()) {
+                String g = r.chat.archived() ? guildOf(r.id) : null;
+                if (g != null && !done.contains(g)) todo.add(g);
+            }
+        }
+        if (!todo.isEmpty()) System.err.println("Discord: pausing " + todo.size() + " archived servers");
+        for (String g : todo) setGuildPaused(g, true);
     }
 
     private CompletableFuture<Void> archiveOnly(String chatId, boolean archived) {
@@ -1725,6 +1792,7 @@ public final class MatrixChatService implements ChatService {
         }
         logins.put(n, parsed);
         maybeResyncChats(n, parsed);
+        maybePauseArchivedGuilds(n, parsed);
         StringBuilder sb = new StringBuilder();
         for (Login l : parsed) {
             sb.append(l.id()).append('\t').append(l.name() == null ? "" : l.name()).append('\t')
@@ -1771,7 +1839,10 @@ public final class MatrixChatService implements ChatService {
             List<Login> known = logins.get(n);
             // Cached logins skip refreshLoginsNow, which also checks this; logins made through the bridge API
             // have no bot chat, so this comes before that check.
-            if (known != null && !known.isEmpty()) maybeResyncChats(n, known);
+            if (known != null && !known.isEmpty()) {
+                maybeResyncChats(n, known);
+                maybePauseArchivedGuilds(n, known);
+            }
             if (findBotRoom(n) == null) continue;
             long ts = loginsCachedAt.getOrDefault(n, 0L);
             // An empty cache ("not logged in") is always re-checked: a login may have happened since.
