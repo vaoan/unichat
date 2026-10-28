@@ -61,6 +61,8 @@ public final class ChatListPane extends VBox {
     private final ObservableList<Chat> spaceItems = FXCollections.observableArrayList();
     private final ListView<Chat> spaceList = new ListView<>(spaceItems);
     private final Label spaceTitle = new Label();
+    private final javafx.scene.control.Button markSpaceRead =
+            Composer.iconButton(Icons.CHECK_DOUBLE, "Marcar todo como leído", this::markSpaceRead);
     private final java.util.Set<String> channelsAsked = new java.util.HashSet<>();
     private final VBox spaceView;
 
@@ -137,7 +139,9 @@ public final class ChatListPane extends VBox {
         javafx.scene.control.Button back = Composer.iconButton(Icons.CHEVRON_LEFT, "Volver a la bandeja", this::closeSpace);
         spaceTitle.getStyleClass().add("space-title");
         spaceTitle.setMinWidth(0);
-        HBox spaceHeader = new HBox(8, back, spaceTitle);
+        spaceTitle.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(spaceTitle, Priority.ALWAYS);
+        HBox spaceHeader = new HBox(8, back, spaceTitle, markSpaceRead);
         spaceHeader.setAlignment(Pos.CENTER_LEFT);
         spaceHeader.getStyleClass().add("space-header");
         spaceList.getStyleClass().addAll("chat-list", "space-list");
@@ -243,6 +247,7 @@ public final class ChatListPane extends VBox {
         }
         list.refresh();
         spaceList.refresh();
+        markSpaceRead.setDisable(spaceItems.stream().noneMatch(c -> actsLikeChat(c) && c.isUnread()));
 
         String base = switch (f.view()) {
             case INBOX -> f.unreadOnly() ? "No leídos" : "Bandeja";
@@ -428,6 +433,12 @@ public final class ChatListPane extends VBox {
 
     private void openFavorite(Chat c) {
         open(c);
+    }
+
+    /** Clears the unread state of every channel of the open server. */
+    private void markSpaceRead() {
+        for (Chat c : List.copyOf(spaceItems)) if (actsLikeChat(c) && c.isUnread()) svc.markRead(c.id());
+        spaceList.requestFocus();
     }
 
     private boolean actsLikeChat(Chat c) {
