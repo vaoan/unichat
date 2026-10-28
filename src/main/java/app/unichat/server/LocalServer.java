@@ -195,8 +195,16 @@ public final class LocalServer {
     private void startHomeserver(Consumer<String> progress) throws IOException, InterruptedException {
         progress.accept("Iniciando el servidor…");
         Path hs = dir.resolve("tuwunel");
-        supervisor.start("tuwunel", hs, List.of(store.path("tuwunel").toString(), "-c", hs.resolve("tuwunel.toml").toString()),
-                hs.resolve("tuwunel.log"));
+        List<String> command = new ArrayList<>(List.of(store.path("tuwunel").toString(), "-c", hs.resolve("tuwunel.toml").toString()));
+        // Old Discord attachments go before the bridge starts (it must not be using its database meanwhile).
+        if (!supervisor.isRunning("discord")) {
+            List<String> old = MediaPrune.takeOldDiscordAttachments(dir.resolve("discord").resolve("discord.db"), java.time.Instant.now());
+            if (!old.isEmpty()) {
+                System.err.println("Discord: deleting " + old.size() + " old attachments");
+                command.addAll(List.of("--execute", MediaPrune.command(old)));
+            }
+        }
+        supervisor.start("tuwunel", hs, command, hs.resolve("tuwunel.log"));
         long end = System.currentTimeMillis() + 90_000;
         while (System.currentTimeMillis() < end) {
             if (answers()) return;

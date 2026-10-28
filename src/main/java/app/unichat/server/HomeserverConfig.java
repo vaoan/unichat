@@ -28,6 +28,8 @@ final class HomeserverConfig {
                 new_user_displayname_suffix = ""
                 appservice_dir = %s
                 max_request_size = 104857600
+                # Console commands passed at start (old Discord media cleanup) never stop the server if they fail.
+                admin_execute_errors_ignore = true
                 log = "info"
                 """.formatted(str(domain), str(dataDir.resolve("tuwunel").resolve("db").toString()), port,
                 str(registrationToken), str(dataDir.resolve("appservices").toString()));
