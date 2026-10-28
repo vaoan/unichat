@@ -40,10 +40,10 @@ public final class Rail extends VBox {
         setSpacing(6);
 
         inbox = railButton(Icons.icon(Icons.INBOX, 20), "Bandeja unificada", () ->
-                listPane.filterProperty().set(listPane.filterProperty().get().switchTo(null, null)));
+                listPane.goTo(listPane.filterProperty().get().switchTo(null, null)));
         // Every network's archived chats; dimmed so it doesn't compete with the networks. Search still finds them.
         archive = railButton(Icons.icon(Icons.ARCHIVE, 18), "Archivados", () ->
-                listPane.filterProperty().set(listPane.filterProperty().get().withNetwork(null).withView(ChatFilter.View.ARCHIVE)));
+                listPane.goTo(listPane.filterProperty().get().withNetwork(null).withView(ChatFilter.View.ARCHIVE)));
         archive.getStyleClass().add("rail-archive");
         Button add = railButton(Icons.icon(Icons.PLUS, 20), "Agregar o administrar cuentas (Ajustes)", onConnect);
         add.getStyleClass().add("rail-add");
@@ -96,7 +96,7 @@ public final class Rail extends VBox {
             List<Account> netAccounts = Accounts.of(accounts, n);
             String count = netAccounts.size() > 1 ? " (" + netAccounts.size() + " cuentas)" : "";
             Button b = railButton(letter, n.displayName() + count + status, () ->
-                    listPane.filterProperty().set(listPane.filterProperty().get().switchTo(n, null)));
+                    listPane.goTo(listPane.filterProperty().get().switchTo(n, null)));
             if (n.isBridged()) b.setOnContextMenuRequested(e -> networkMenu(n, netAccounts).show(b, e.getScreenX(), e.getScreenY()));
             setActive(b, f.network() == n);
             setUnreadBadge(b, chats.stream().filter(c -> c.network() == n && ChatFilter.inboxUnread(c)).count());
@@ -108,11 +108,11 @@ public final class Rail extends VBox {
     private javafx.scene.control.ContextMenu networkMenu(Network n, List<Account> accounts) {
         javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
         menu.getItems().add(ChatMenus.item("Todas las cuentas de " + n.displayName(), () ->
-                listPane.filterProperty().set(listPane.filterProperty().get().switchTo(n, null))));
+                listPane.goTo(listPane.filterProperty().get().switchTo(n, null))));
         if (accounts.size() > 1) {
             for (Account a : accounts) {
                 menu.getItems().add(ChatMenus.item(Accounts.name(a), () ->
-                        listPane.filterProperty().set(listPane.filterProperty().get().switchTo(n, a.id()))));
+                        listPane.goTo(listPane.filterProperty().get().switchTo(n, a.id()))));
             }
         }
         menu.getItems().add(new javafx.scene.control.SeparatorMenuItem());

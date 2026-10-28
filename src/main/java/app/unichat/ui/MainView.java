@@ -375,7 +375,7 @@ public final class MainView extends StackPane {
     }
 
     private void setView(ChatFilter.View v, boolean unread) {
-        listPane.filterProperty().set(listPane.filterProperty().get().withView(v).withUnreadOnly(unread).withQuery(""));
+        listPane.goTo(listPane.filterProperty().get().withView(v).withUnreadOnly(unread).withQuery(""));
     }
 
     /** Opens Ajustes → Cuentas (list of accounts, add account, login wizard). */
@@ -387,7 +387,7 @@ public final class MainView extends StackPane {
 
     /** Filters the inbox to one network (all its accounts). */
     public void showNetwork(app.unichat.model.Network n) {
-        listPane.filterProperty().set(listPane.filterProperty().get().switchTo(n, null));
+        listPane.goTo(listPane.filterProperty().get().switchTo(n, null));
     }
 
     /** Starts the login of one more account on {@code n} and opens its bridge-bot chat. */

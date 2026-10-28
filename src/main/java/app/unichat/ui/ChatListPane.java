@@ -197,6 +197,16 @@ public final class ChatListPane extends VBox {
 
     public ObjectProperty<ChatFilter> filterProperty() { return filter; }
 
+    /**
+     * Navigation (rail, shortcuts, menus): leaves whatever server is open and shows {@code f}, even when it's the
+     * filter already in place (clicking Bandeja from inside a server must take you to the inbox).
+     */
+    public void goTo(ChatFilter f) {
+        openSpace = null;
+        if (f.equals(filter.get())) refresh();
+        else filter.set(f);
+    }
+
     public void setOnNewChat(Runnable r) { this.onNewChat = r; }
 
     public void setToast(Consumer<String> toast) { spaces.setToast(toast); }

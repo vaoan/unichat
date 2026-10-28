@@ -255,4 +255,37 @@ class GroupsUiTest {
         });
         return f.get(10, TimeUnit.SECONDS);
     }
+
+    private static void clickRail(Scene s, String accessibleText) throws Exception {
+        fx(() -> {
+            for (Node n : s.getRoot().lookupAll(".rail-button")) {
+                String t = n.getAccessibleText();
+                // "Bandeja unificada, 5 chats sin leer", "WhatsApp (2 cuentas)"
+                if (t != null && (t.equals(accessibleText) || t.startsWith(accessibleText + ",") || t.startsWith(accessibleText + " "))) {
+                    ((javafx.scene.control.Button) n).fire();
+                    return null;
+                }
+            }
+            throw new AssertionError("no rail button " + accessibleText);
+        });
+        Thread.sleep(300);
+    }
+
+    @Test
+    void theRailAlwaysTakesYouOutOfAServer() throws Exception {
+        Scene scene = open(null);
+        var list = fx(() -> chatList(scene));
+        enter(scene, list, "!servidor:demo");
+        assertTrue(fx(() -> spaceOpen(scene)));
+        clickRail(scene, "Bandeja unificada");
+        assertFalse(fx(() -> spaceOpen(scene)), "Bandeja from inside a server, already on Bandeja: back to the inbox");
+        assertTrue(fx(list::isVisible));
+
+        enter(scene, list, "!servidor:demo");
+        clickRail(scene, "WhatsApp");
+        assertFalse(fx(() -> spaceOpen(scene)), "another network: its chats, not the server");
+        assertTrue(fx(list::getItems).stream().allMatch(c -> c.network() == Network.WHATSAPP || c.id().startsWith("offer")),
+                fx(list::getItems).stream().map(app.unichat.model.Chat::id).toList().toString());
+        svc.stop();
+    }
 }
