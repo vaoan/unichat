@@ -4,17 +4,14 @@ import app.unichat.model.Chat;
 import app.unichat.settings.Settings;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 import java.util.EnumMap;
 import java.util.Map;
-import java.util.function.Consumer;
 
 /**
  * The panel on the right of every chat, like Telegram's: one place for the person's profile and the emoji, sticker
@@ -22,7 +19,7 @@ import java.util.function.Consumer;
  */
 public final class SidePanel extends VBox {
     public enum Tab {
-        PROFILE("Perfil"), EMOJIS("Emojis"), STICKERS("Stickers"), GIFS("GIFs");
+        PROFILE("Perfil"), FAVORITES("Favoritos"), EMOJIS("Emojis"), STICKERS("Stickers"), GIFS("GIFs");
 
         final String label;
 
@@ -36,15 +33,17 @@ public final class SidePanel extends VBox {
     private Tab current = Tab.PROFILE;
     private Chat chat;
 
-    public SidePanel(InfoPane info, Consumer<String> insertText) {
+    public SidePanel(InfoPane info) {
         this.info = info;
         getStyleClass().add("side-panel");
         ToggleGroup group = new ToggleGroup();
-        HBox tabs = new HBox(4);
+        // Wraps at large text sizes instead of cutting the last tabs off.
+        javafx.scene.layout.FlowPane tabs = new javafx.scene.layout.FlowPane(4, 4);
         tabs.getStyleClass().add("side-panel-tabs");
         for (Tab t : Tab.values()) {
             ToggleButton b = new ToggleButton(t.label);
             b.getStyleClass().add("chip");
+            b.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
             b.setToggleGroup(group);
             b.setAccessibleText("Pestaña " + t.label);
             b.setOnAction(e -> {
@@ -55,12 +54,9 @@ public final class SidePanel extends VBox {
             tabs.getChildren().add(b);
         }
         content.put(Tab.PROFILE, info);
-        ScrollPane emojis = new ScrollPane(EmojiPicker.grid(insertText, 280));
-        emojis.setFitToWidth(true);
-        emojis.getStyleClass().addAll("emoji-picker", "side-panel-scroll");
-        content.put(Tab.EMOJIS, emojis);
         content.put(Tab.STICKERS, placeholder("Tus stickers favoritos y recientes aparecerán aquí."));
         content.put(Tab.GIFS, placeholder("Busca GIFs y guarda tus favoritos aquí."));
+        content.put(Tab.FAVORITES, placeholder("Tus emojis, stickers y GIFs favoritos aparecerán aquí."));
         VBox.setVgrow(body, Priority.ALWAYS);
         getChildren().addAll(tabs, body);
         try {

@@ -749,8 +749,8 @@ public final class MockChatService implements ChatService {
                 .in(-6900, "Tío Jorge", "Así quedó el paseo del sábado")
                 .out(-6800, "Qué bonito, ¡la próxima voy!")
                 .react(-7000, "❤️", "Papá", "Laura")
+                .voice(-6700, "Papá")
                 .in(-600, "Laura", "¿Quién trae qué el domingo?")
-                .voice(-540, "Papá")
                 .unread(1).done();
 
         ChatBuilder.dm(this, "andres", Network.TELEGRAM, "Andrés Mejía")

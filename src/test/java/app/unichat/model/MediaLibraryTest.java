@@ -64,4 +64,37 @@ class MediaLibraryTest {
         lib.rememberSeen(sticker("mxc://s/c"));
         assertEquals("mxc://s/c", lib.recents(MediaLibrary.Kind.STICKER).get(0).url(), "a new one is added");
     }
+
+    @Test
+    void emojisAreFavouritesTooAndKeptApart() {
+        Path f = dir.resolve("lib.json");
+        MediaLibrary lib = new MediaLibrary(f);
+        assertTrue(lib.toggleFavorite(MediaLibrary.emoji("🔥")));
+        lib.toggleFavorite(sticker("mxc://s/a"));
+        MediaLibrary again = new MediaLibrary(f);
+        assertEquals("🔥", again.favorites(MediaLibrary.Kind.EMOJI).get(0).url());
+        assertEquals(1, again.favorites(MediaLibrary.Kind.STICKER).size());
+        assertTrue(again.favorites(MediaLibrary.Kind.GIF).isEmpty());
+    }
+
+    @Test
+    void aRecentCanBeRemovedAndChangesAreAnnounced() {
+        MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
+        int[] changes = {0};
+        lib.addListener(() -> changes[0]++);
+        lib.addRecent(sticker("mxc://s/a"));
+        assertTrue(lib.isRecent("mxc://s/a"));
+        lib.removeRecent("mxc://s/a");
+        assertTrue(lib.recents(MediaLibrary.Kind.STICKER).isEmpty());
+        lib.removeRecent("mxc://s/a");
+        assertEquals(2, changes[0], "removing what isn't there changes nothing");
+    }
+
+    @Test
+    void aKindFromANewerVersionDoesNotWipeTheLibrary() throws Exception {
+        Path f = dir.resolve("lib.json");
+        Files.writeString(f, "{\"favorites\":[{\"kind\":\"HOLOGRAM\",\"url\":\"x\"},"
+                + "{\"kind\":\"STICKER\",\"url\":\"mxc://s/a\"}],\"recents\":[]}");
+        assertEquals(1, new MediaLibrary(f).favorites(MediaLibrary.Kind.STICKER).size());
+    }
 }

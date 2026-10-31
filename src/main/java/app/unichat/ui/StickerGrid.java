@@ -41,6 +41,10 @@ final class StickerGrid extends ScrollPane {
         setContent(content);
         setFitToWidth(true);
         getStyleClass().add("side-panel-scroll");
+        // A favourite added or removed anywhere (chat, Favoritos tab) shows here at once.
+        library.addListener(() -> Platform.runLater(() -> {
+            if (getScene() != null) refresh();
+        }));
     }
 
     /** Rebuilds the grid (opening the tab, after sending, after a favourite changes). */
@@ -52,8 +56,8 @@ final class StickerGrid extends ScrollPane {
         section("Favoritos", library.favorites(MediaLibrary.Kind.STICKER), "Sticker favorito", accepted);
         section("Recientes", library.recents(MediaLibrary.Kind.STICKER), "Sticker reciente", accepted);
         if (library.favorites(MediaLibrary.Kind.STICKER).isEmpty() && library.recents(MediaLibrary.Kind.STICKER).isEmpty()) {
-            content.getChildren().add(help("Aún no tienes stickers. Los que te manden aparecerán aquí, y puedes guardarlos con "
-                    + "clic derecho → Agregar a favoritos."));
+            content.getChildren().add(help("Aún no tienes stickers. Los que te manden aparecerán aquí; guárdalos con clic "
+                    + "derecho → Agregar a favoritos, aquí o en el chat."));
         }
     }
 
@@ -64,6 +68,12 @@ final class StickerGrid extends ScrollPane {
         FlowPane grid = new FlowPane(6, 6);
         for (MediaLibrary.Item i : items) grid.getChildren().add(tile(i, what, accepted));
         content.getChildren().addAll(t, grid);
+    }
+
+    /** A sticker tile for the open chat (also used by the Favoritos tab). */
+    Node tile(MediaLibrary.Item item, String what) {
+        Chat c = chat.get();
+        return tile(item, what, c == null || c.features().accepts(RoomFeatures.STICKER));
     }
 
     private Node tile(MediaLibrary.Item item, String what, boolean accepted) {
@@ -82,7 +92,10 @@ final class StickerGrid extends ScrollPane {
         tile.setOpacity(accepted ? 1 : 0.4);
         tile.setCursor(accepted ? Cursor.HAND : Cursor.DEFAULT);
         Runnable send = () -> send(item, accepted);
-        tile.setOnMouseClicked(e -> send.run());
+        tile.setOnMouseClicked(e -> {
+            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) send.run();
+        });
+        LibraryMenu.attach(tile, library, item, accepted ? send : null, toast);
         tile.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
                 e.consume();
@@ -105,7 +118,6 @@ final class StickerGrid extends ScrollPane {
                 return;
             }
             library.addRecent(item);
-            refresh();
         }));
     }
 

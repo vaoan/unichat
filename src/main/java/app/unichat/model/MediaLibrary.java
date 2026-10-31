@@ -12,11 +12,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Your favourite and recent stickers and GIFs, kept in Unichat (not on the server) so they work in every chat of
- * every network that accepts them. Stored as JSON in the data folder; a damaged file starts an empty library.
+ * Your favourite and recent emojis, stickers and GIFs, kept in Unichat (not on the server) so they work in every chat
+ * of every network that accepts them. Stored as JSON in the data folder; a damaged file starts an empty library.
  */
 public final class MediaLibrary {
-    public enum Kind { STICKER, GIF }
+    /** EMOJI items keep the emoji itself in {@code url}. */
+    public enum Kind { STICKER, GIF, EMOJI }
 
     /** {@code info}: the original event's info (keeps e.g. fi.mau.bridged_sticker so bridges resend the native sticker). */
     public record Item(Kind kind, String url, String mime, int width, int height, JsonNode info) {}
@@ -27,11 +28,19 @@ public final class MediaLibrary {
     private final Path file;
     private final List<Item> favorites = new ArrayList<>();
     private final List<Item> recents = new ArrayList<>();
+    private final List<Runnable> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public MediaLibrary(Path file) {
         this.file = file;
         load();
     }
+
+    public static Item emoji(String emoji) {
+        return new Item(Kind.EMOJI, emoji, null, 0, 0, null);
+    }
+
+    /** Runs after every change, on the thread that made it. */
+    public void addListener(Runnable r) { listeners.add(r); }
 
     public synchronized List<Item> favorites(Kind k) {
         return favorites.stream().filter(i -> i.kind() == k).toList();
@@ -53,7 +62,16 @@ public final class MediaLibrary {
         for (var it = recents.iterator(); it.hasNext(); ) {
             if (it.next().kind() == item.kind() && ++seen > MAX_RECENTS) it.remove();
         }
-        save();
+        changed();
+    }
+
+    public synchronized boolean isRecent(String url) {
+        return recents.stream().anyMatch(i -> i.url().equals(url));
+    }
+
+    /** Takes it out of the recents (it comes back the next time it's used or received). */
+    public synchronized void removeRecent(String url) {
+        if (recents.removeIf(i -> i.url().equals(url))) changed();
     }
 
     /** A sticker/GIF shown in a chat: added to the recents if it's new, without moving existing ones. */
@@ -66,7 +84,7 @@ public final class MediaLibrary {
     public synchronized boolean toggleFavorite(Item item) {
         boolean removed = favorites.removeIf(i -> i.url().equals(item.url()));
         if (!removed) favorites.add(0, item);
-        save();
+        changed();
         return !removed;
     }
 
@@ -74,12 +92,22 @@ public final class MediaLibrary {
         if (!Files.exists(file)) return;
         try {
             JsonNode root = JSON.readTree(file.toFile());
-            for (JsonNode n : root.path("favorites")) favorites.add(item(n));
-            for (JsonNode n : root.path("recents")) recents.add(item(n));
+            for (JsonNode n : root.path("favorites")) if (known(n)) favorites.add(item(n));
+            for (JsonNode n : root.path("recents")) if (known(n)) recents.add(item(n));
         } catch (IOException | RuntimeException e) {
             favorites.clear();
             recents.clear();
         }
+    }
+
+    /** An item of a kind this version doesn't know (written by a newer Unichat) is skipped, not the whole file. */
+    private static boolean known(JsonNode n) {
+        return java.util.Arrays.stream(Kind.values()).anyMatch(k -> k.name().equals(n.path("kind").asText()));
+    }
+
+    private void changed() {
+        save();
+        for (Runnable r : listeners) r.run();
     }
 
     private void save() {

@@ -32,6 +32,11 @@ public final class EmojiPicker {
 
     /** Every category as a grid of emoji buttons ({@code onPick} gets the emoji); used by the popup and the side panel. */
     static VBox grid(Consumer<String> onPick, double wrap) {
+        return grid(onPick, wrap, null, null);
+    }
+
+    /** With a library: right-click adds to or removes from the favourites, and a pick counts as recent. */
+    static VBox grid(Consumer<String> onPick, double wrap, app.unichat.model.MediaLibrary library, Consumer<String> toast) {
         VBox content = new VBox(6);
         content.setPadding(new Insets(10));
         for (Map.Entry<String, String> cat : CATEGORIES.entrySet()) {
@@ -39,16 +44,24 @@ public final class EmojiPicker {
             title.getStyleClass().add("emoji-category");
             FlowPane grid = new FlowPane(2, 2);
             grid.setPrefWrapLength(wrap);
-            for (String e : cat.getValue().split(" ")) {
-                Button b = new Button(e);
-                b.getStyleClass().add("emoji-button");
-                b.setAccessibleText("Emoji " + e);
-                b.setOnAction(ev -> onPick.accept(e));
-                grid.getChildren().add(b);
-            }
+            for (String e : cat.getValue().split(" ")) grid.getChildren().add(button(e, onPick, library, toast));
             content.getChildren().addAll(title, grid);
         }
         return content;
+    }
+
+    /** One emoji; {@code library} may be null (no menu, no recents). */
+    static Button button(String e, Consumer<String> onPick, app.unichat.model.MediaLibrary library, Consumer<String> toast) {
+        Button b = new Button(e);
+        b.getStyleClass().add("emoji-button");
+        b.setAccessibleText("Emoji " + e);
+        Runnable use = () -> {
+            onPick.accept(e);
+            if (library != null) library.addRecent(app.unichat.model.MediaLibrary.emoji(e));
+        };
+        b.setOnAction(ev -> use.run());
+        if (library != null) LibraryMenu.attach(b, library, app.unichat.model.MediaLibrary.emoji(e), use, toast);
+        return b;
     }
 
     /** Shows the picker anchored above {@code anchor}; {@code onPick} receives the emoji. */
