@@ -175,6 +175,16 @@ public final class Settings {
     public void setDiscordMediaDays(int days) { set("discord.mediaDays", Integer.toString(days)); }
 
         /** The session is on the server Unichat runs on this computer (app.unichat.server.LocalServer). */
+    /** Size limit of the downloaded media (photos, videos, files) in MB; the least recently seen go first. */
+    public int mediaCacheMb() {
+        try {
+            return Math.max(100, Integer.parseInt(getString("cache.mediaMb", "1024").strip()));
+        } catch (NumberFormatException e) {
+            return 1024;
+        }
+    }
+    public void setMediaCacheMb(int mb) { set("cache.mediaMb", Integer.toString(mb)); }
+
     public boolean localServer() { return getBool("server.local", false); }
     public void setLocalServer(boolean v) { setBool("server.local", v); }
         /** Off by default: archiving a chat means it shouldn't interrupt you. */

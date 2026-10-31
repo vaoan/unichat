@@ -1310,13 +1310,17 @@ public final class MatrixChatService implements ChatService {
         Path dir = Settings.get().cacheDir().resolve("media");
         String hash = sha256(key);
         Path cached = findCached(dir, hash);
-        if (cached != null) return CompletableFuture.completedFuture(cached);
+        if (cached != null) {
+            MediaCache.touch(cached);
+            return CompletableFuture.completedFuture(cached);
+        }
         CompletableFuture<Path> f = new CompletableFuture<>();
         CompletableFuture<Path> prev = mediaInFlight.putIfAbsent(key, f);
         if (prev != null) return prev;
         io.execute(() -> {
             try {
                 f.complete(download(url, width, height, dir, hash));
+                trimMediaCache(dir);
             } catch (Throwable t) {
                 f.completeExceptionally(t);
             } finally {
@@ -1324,6 +1328,15 @@ public final class MatrixChatService implements ChatService {
             }
         });
         return f;
+    }
+
+    private final java.util.concurrent.atomic.AtomicLong lastCacheTrim = new java.util.concurrent.atomic.AtomicLong();
+
+    /** At most once a minute: listing thousands of files after every thumbnail would cost more than it saves. */
+    private void trimMediaCache(Path dir) {
+        long now = System.currentTimeMillis(), last = lastCacheTrim.get();
+        if (now - last < 60_000 || !lastCacheTrim.compareAndSet(last, now)) return;
+        MediaCache.trim(dir, Settings.get().mediaCacheMb() * 1024L * 1024L);
     }
 
     private Path download(String url, int w, int h, Path dir, String hash) throws IOException {
@@ -1336,7 +1349,11 @@ public final class MatrixChatService implements ChatService {
             if (slash <= 0) throw new MatrixException(0, null, "URL de medio no válida");
             String sm = enc(rest.substring(0, slash)) + "/" + enc(rest.substring(slash + 1));
             contentType = null;
-            if (w > 0 && h > 0) {
+            String bridge = app.unichat.server.LocalServer.directMediaBase(rest.substring(0, slash));
+            if (bridge != null) {
+                // Direct media: the bridge fetches it from the network now (nothing was copied to the server).
+                contentType = client.download(bridge + "/_matrix/client/v1/media/download/" + sm, false, tmp);
+            } else if (w > 0 && h > 0) {
                 String q = "?width=" + w + "&height=" + h + "&method=scale";
                 try {
                     contentType = fetchMedia("/thumbnail/" + sm + q, tmp);

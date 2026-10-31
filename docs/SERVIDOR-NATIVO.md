@@ -79,6 +79,15 @@ La misma que el stack Docker (`server/setup.sh`), cambiando Postgres por SQLite 
   (etiqueta `u.archived`, en un solo sentido).
 - Telegram: usa tu `api_id`/`api_hash` de my.telegram.org; sin ellas, Telegram queda desactivado.
 - Instagram: mautrix-meta v0.2607.0 en modo instagram (la última versión que funciona para Instagram).
+- **Medios bajo demanda (`direct_media`)**: los puentes ya no copian fotos, videos ni archivos al servidor. Cada
+  mensaje lleva un `mxc://media-<red>.localhost/…` y Unichat lo pide al propio puente
+  (`127.0.0.1:<puerto>/_matrix/client/v1/media/download/…`, ver `LocalServer.directMediaBase`) solo al abrirlo;
+  el puente lo trae de la red en ese momento. No hace falta federación. Antes, cada adjunto de cada canal y cada
+  resincronización de Telegram se guardaba entero (11 GB en 4 días). Los mensajes anteriores al cambio siguen
+  apuntando a su copia local. Inconveniente: un archivo que la red ya borró (WhatsApp los borra tras un tiempo)
+  solo vuelve si el teléfono lo conserva (`direct_media_auto_request`).
+- Lo descargado por Unichat (`cache/media`) tiene un límite (Ajustes → Privacidad, 1 GB por defecto): se borra
+  primero lo que hace más tiempo no se ve (`MediaCache`).
 
 El servidor (`tuwunel.toml`): solo escucha en `127.0.0.1:8008`, sin federación, sin presencia ("en línea"),
 registro solo con token secreto, y lee los registros de los puentes de `appservices/`.

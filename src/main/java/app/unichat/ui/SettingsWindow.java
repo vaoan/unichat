@@ -342,8 +342,32 @@ public final class SettingsWindow {
                         toggle(s.sendReadReceipts(), s::setSendReadReceipts)),
                 row("Indicador de escritura", "Los demás ven cuando estás escribiendo.",
                         toggle(s.sendTypingNotifications(), s::setSendTypingNotifications))),
-                group("Datos locales", row("Carpeta de datos", s.dir().toString(), new Label())),
+                group("Datos locales", row("Carpeta de datos", s.dir().toString(), new Label()),
+                        row("Espacio para fotos y videos", "Los medios se descargan solo cuando los abres. Al llenarse "
+                                + "este espacio se borran los que hace más tiempo no ves; se vuelven a descargar si los abres.",
+                                mediaCacheChoice())),
                 logsGroup(s));
+    }
+
+    private static Node mediaCacheChoice() {
+        Settings s = Settings.get();
+        ToggleGroup tg = new ToggleGroup();
+        HBox box = new HBox(6);
+        box.setAccessibleText("Espacio en disco para fotos y videos descargados");
+        for (int mb : new int[]{500, 1024, 5120}) {
+            ToggleButton b = new ToggleButton(mb < 1024 ? mb + " MB" : mb / 1024 + " GB");
+            b.getStyleClass().add("chip");
+            b.setMinWidth(Region.USE_PREF_SIZE);
+            b.setToggleGroup(tg);
+            b.setSelected(s.mediaCacheMb() == mb);
+            b.setAccessibleText("Usar hasta " + b.getText() + " para fotos y videos descargados");
+            b.setOnAction(e -> {
+                if (!b.isSelected()) b.setSelected(true);
+                s.setMediaCacheMb(mb);
+            });
+            box.getChildren().add(b);
+        }
+        return box;
     }
 
     /** Logs never hold personal data (Redactor) and are deleted after the chosen days (LogFiles). */

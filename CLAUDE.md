@@ -20,7 +20,9 @@ Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix
 - `native/` — no-Docker stack (tuwunel + mautrix bridge binaries + SQLite): `versions.env` pins every component,
   `setup-mac.sh` / `run-mac.sh` are the reference for the installer Unichat will run at startup (install whatever
   is missing, start and supervise). Read `docs/SERVIDOR-NATIVO.md` before touching it.
-  `server/MediaPrune` deletes Discord attachments older than `discord.mediaDays` (default 30, 0 = never; Ajustes →
+  Bridges run with `direct_media` (`mxc://media-<bridge>.localhost/…`, nothing copied to the server); Unichat
+  downloads those from the bridge's port (`LocalServer.directMediaBase`), and `matrix/MediaCache` caps `cache/media`
+  (`cache.mediaMb`, LRU). `server/MediaPrune` deletes Discord attachments older than `discord.mediaDays` (default 30, 0 = never; Ajustes →
   Redes) on each server start; avatars/emoji kept.
 - `native/UnichatBar.swift` (`native/build-bar.sh`) — macOS menu-bar item drawn natively (narrower than Java's
   TrayIcon, real NSMenu; same design as InstaTray), driven by `ui/NativeBar` over stdin; `Notifier` falls back to the

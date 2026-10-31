@@ -158,6 +158,24 @@ class BridgeConfigTest {
     }
 
     @Test
+    void mediaStaysOnTheNetworkUntilOpened() throws Exception {
+        ObjectNode v2 = BridgeConfig.read(V2 + """
+                direct_media:
+                    enabled: false
+                    server_name: discord-media.example.com
+                    server_key: ed25519 AAAA generated
+                """);
+        BridgeConfig.apply(v2, settings("telegram"));
+        assertTrue(v2.at("/direct_media/enabled").asBoolean());
+        assertEquals("media-telegram.localhost", v2.at("/direct_media/server_name").asText());
+        assertEquals("ed25519 AAAA generated", v2.at("/direct_media/server_key").asText(), "the bridge's own key is kept");
+
+        ObjectNode legacy = BridgeConfig.apply(BridgeConfig.read(LEGACY), settings("discord"));
+        assertTrue(legacy.at("/bridge/direct_media/enabled").asBoolean());
+        assertEquals("media-discord.localhost", legacy.at("/bridge/direct_media/server_name").asText());
+    }
+
+    @Test
     void aMistypedKeyIsNotInvented() throws Exception {
         ObjectNode c = BridgeConfig.read(V2);
         assertFalse(BridgeConfig.setExisting(c, "/network/sync/create_limitt", 100));

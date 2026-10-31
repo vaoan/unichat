@@ -87,6 +87,18 @@ public final class LocalServer {
         return port == null || LEGACY_BRIDGES.contains(bridge) ? null : "http://127.0.0.1:" + port + "/_matrix/provision";
     }
 
+    /**
+     * Where to download {@code mxc://<serverName>/...} when it's a bridge's direct media
+     * ({@link BridgeConfig#mediaServerName}): the bridge serves the client media API on its appservice port and
+     * fetches the file from the network then. Null for any other server name. Static: needs no running server.
+     */
+    public static String directMediaBase(String serverName) {
+        for (Map.Entry<String, Integer> e : BRIDGE_PORTS.entrySet()) {
+            if (BridgeConfig.mediaServerName(e.getKey()).equals(serverName)) return "http://127.0.0.1:" + e.getValue();
+        }
+        return null;
+    }
+
     /** Whether this server can install {@code bridge} here (pinned in versions.env, with a known port). */
     public boolean provides(String bridge) {
         return BRIDGE_PORTS.containsKey(bridge) && manifest.bridge(bridge) != null;
