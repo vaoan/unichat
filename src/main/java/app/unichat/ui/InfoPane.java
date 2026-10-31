@@ -154,8 +154,14 @@ public final class InfoPane extends ScrollPane {
         v.setFitWidth(84);
         v.setFitHeight(84);
         v.getStyleClass().add("media-thumb");
-        svc.media(m.mediaUrl(), 168, 168).thenAccept(p ->
-                Platform.runLater(() -> v.setImage(new Image(p.toUri().toString(), 168, 168, false, true, true))));
+        svc.media(m.mediaUrl(), 168, 168).thenAcceptAsync(p -> {
+            try {
+                Image img = AnimatedImage.still(p, 168, 168);
+                Platform.runLater(() -> v.setImage(img));
+            } catch (java.io.IOException e) {
+                System.err.println("Could not decode a shared photo: " + e);
+            }
+        }, AnimatedImage.DECODER);
         v.setOnMouseClicked(e -> {
             if (getScene() != null) MediaViewer.show(getScene().getWindow(), svc.media(m.mediaUrl(), 0, 0), m.fileName());
         });

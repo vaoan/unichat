@@ -62,3 +62,9 @@
   zero crossings over the whole fixture, not just its length.
 - **Tests with a fixed "now" next to code that reads the real clock** (`FirefoxCookiesTest`: cookies valid one day
   after 2026-10-26) start failing days later. Give fixtures a margin of years.
+- **Never hand a GIF to `new Image(...)`**: JavaFX animates it with a Timeline that never stops and holds every
+  decoded frame, so each GIF ever shown stayed in the heap (Unichat hit OutOfMemoryError in a day with Discord).
+  Animations go through `AnimatedImage.decodeGif/decodeWebp` + `play`; thumbnails/avatars through
+  `AnimatedImage.still` (with direct media a "thumbnail" can be the original animated GIF).
+- **A thread reading a child process's output must never stop reading**: when `Supervisor.pump` died (OOM) the
+  pipe stayed open and full, and the Discord bridge sat in write() for a day, alive but deaf.

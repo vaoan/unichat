@@ -4,6 +4,7 @@ import app.unichat.Redactor;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -128,27 +129,65 @@ public final class Supervisor {
     /**
      * Copies a process's output to its log with personal data removed ({@link Redactor}); past
      * {@link #MAX_LOG} the log is moved to {@code <log>.1} (one copy kept).
+     * <p>
+     * Whatever fails here (log not writable, disk full, out of memory), the output keeps being read: with nobody
+     * reading, the pipe fills and the process blocks on its next log line, alive but deaf (the Discord bridge sat
+     * a day in write() after an OutOfMemoryError killed this thread). A line that can't be written is lost and the
+     * next one tries again.
      */
     static void pump(Process p, Path log) {
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
-            OutputStream out = Files.newOutputStream(log, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            try {
-                String line;
-                while ((line = in.readLine()) != null) {
+        InputStream raw = p.getInputStream();
+        BufferedReader in = new BufferedReader(new InputStreamReader(raw, StandardCharsets.UTF_8));
+        OutputStream out = null;
+        boolean reported = false;
+        try {
+            String line;
+            while ((line = in.readLine()) != null) {
+                try {
+                    if (out == null) out = Files.newOutputStream(log, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                     out.write((Redactor.redact(line) + "\n").getBytes(StandardCharsets.UTF_8));
                     out.flush();
                     if (Files.size(log) > MAX_LOG) {
                         out.close();
+                        out = null;
                         Files.move(log, log.resolveSibling(log.getFileName() + ".1"), StandardCopyOption.REPLACE_EXISTING);
-                        out = Files.newOutputStream(log, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                     }
+                    reported = false;
+                } catch (Throwable t) {
+                    out = closeQuietly(out);
+                    if (!reported) System.err.println("Log copy failing (" + log.getFileName() + "): " + t);
+                    reported = true;
                 }
-            } finally {
-                out.close();
             }
-        } catch (IOException ignored) {
-            // Process gone or log not writable: nothing else to copy.
+        } catch (IOException e) {
+            // Output closed: the process is gone.
+        } catch (Throwable t) {
+            // Reading itself failed (out of memory on a huge line): from here on only drain, into a fixed buffer.
+            System.err.println("Log copy stopped (" + log.getFileName() + "): " + t);
+            byte[] buf = new byte[8192];
+            while (true) {
+                try {
+                    if (raw.read(buf) < 0) break;
+                } catch (IOException e) {
+                    break;
+                } catch (Throwable again) {
+                    // keep draining
+                }
+            }
+        } finally {
+            closeQuietly(out);
         }
+    }
+
+    private static OutputStream closeQuietly(OutputStream out) {
+        if (out != null) {
+            try {
+                out.close();
+            } catch (Throwable ignored) {
+                // nothing to save
+            }
+        }
+        return null;
     }
 
     /** Starts {@code name} (replacing a previous one with that name). */

@@ -8,6 +8,7 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -63,5 +64,46 @@ class AnimatedImageTest {
             }
         }
         return true;
+    }
+
+    @Test
+    void longOrBigAnimationsKeepFewerFramesButTheSameDuration() {
+        assertEquals(1, AnimatedImage.step(40, 240, 240), "a short sticker keeps every frame");
+        assertEquals(3, AnimatedImage.step(300, 64, 64), "at most 120 frames");
+        // 480x480 frames are 900 KB: 24 MB holds 27 of them.
+        assertEquals(4, AnimatedImage.step(100, 480, 480));
+        assertEquals(List.of(30, 70, 50), AnimatedImage.sample(List.of(10, 20, 30, 40, 50), 2));
+        assertEquals(List.of(10, 20), AnimatedImage.sample(List.of(10, 20), 1));
+    }
+
+    @Test
+    void gifFramesAreHandedOutOneByOne(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
+        Path gif = dir.resolve("a.gif");
+        writeGif(gif, 5);
+        assertEquals(5, app.unichat.matrix.GifFrames.count(gif));
+        int[] seen = {0};
+        app.unichat.matrix.GifFrames.read(gif, f -> {
+            seen[0]++;
+            assertEquals(20, f.image().getWidth());
+        });
+        assertEquals(5, seen[0]);
+        assertTrue(AnimatedImage.isGif(gif));
+        assertFalse(AnimatedImage.isGif(fixture()));
+    }
+
+    /** A {@code frames}-frame 20x20 GIF. */
+    private static void writeGif(Path out, int frames) throws Exception {
+        javax.imageio.ImageWriter w = javax.imageio.ImageIO.getImageWritersByFormatName("gif").next();
+        try (var ios = javax.imageio.ImageIO.createImageOutputStream(out.toFile())) {
+            w.setOutput(ios);
+            w.prepareWriteSequence(null);
+            for (int i = 0; i < frames; i++) {
+                BufferedImage img = new BufferedImage(20, 20, BufferedImage.TYPE_INT_RGB);
+                img.setRGB(i, i, 0xFFFFFF);
+                w.writeToSequence(new javax.imageio.IIOImage(img, null, null), null);
+            }
+            w.endWriteSequence();
+        }
+        w.dispose();
     }
 }

@@ -47,8 +47,14 @@ final class ImageCache {
         if (failedAt != null && System.currentTimeMillis() - failedAt < RETRY_AFTER_MS) return CompletableFuture.completedFuture(null);
         return LOADING.computeIfAbsent(url, u -> svc.media(u, PX, PX).thenApplyAsync(path -> {
             // Decoded completely here, so a view never shows a half-loaded (blank) image.
-            Image img = new Image(path.toUri().toString(), PX, PX, true, true, false);
-            if (img.isError()) {
+            // Animated avatars (Discord) stay still: JavaFX's own GIF animation never lets the image go.
+            Image img;
+            try {
+                img = AnimatedImage.still(path, PX, PX);
+            } catch (java.io.IOException e) {
+                img = null;
+            }
+            if (img == null || img.isError()) {
                 FAILED.put(u, System.currentTimeMillis());
                 return (Image) null;
             }

@@ -64,9 +64,10 @@ public final class MediaViewer {
                 view.setPreserveRatio(true);
                 view.fitWidthProperty().bind(root.widthProperty().subtract(40));
                 view.fitHeightProperty().bind(root.heightProperty().subtract(40));
-                if (AnimatedImage.isWebp(p)) {
-                    // JavaFX can't read WebP at all: decode (and animate) it ourselves.
-                    AnimatedImage.Frames frames = AnimatedImage.decodeWebp(p, 1600, 1600);
+                if (AnimatedImage.isWebp(p) || AnimatedImage.isGif(p)) {
+                    // WebP JavaFX can't read; GIFs it animates forever, leaking every frame (AnimatedImage).
+                    AnimatedImage.Frames frames = AnimatedImage.isGif(p) ? AnimatedImage.decodeGif(p, 1600, 1600)
+                            : AnimatedImage.decodeWebp(p, 1600, 1600);
                     Platform.runLater(() -> {
                         root.getChildren().setAll(view);
                         if (saveButton != null) root.getChildren().add(saveButton);

@@ -41,6 +41,21 @@ class SupervisorTest {
     }
 
     @Test
+    void aLogThatCantBeWrittenNeitherBlocksTheProcessNorEndsTheCopy() throws Exception {
+        // The log path is a folder at first: every line fails, yet the output must keep being read (1 MB, far more
+        // than a pipe holds) and, once the log can be written again, lines reach it.
+        Path log = Files.createDirectory(dir.resolve("bridge.log"));
+        String java = ProcessHandle.current().info().command().orElse("java");
+        sup.start("chatty", dir, List.of(java, "-cp", System.getProperty("java.class.path"), FakeService.class.getName(),
+                "chatty", dir.toString()), log);
+        await(() -> Files.exists(dir.resolve("done")));
+        Files.delete(log);
+        Files.writeString(dir.resolve("go"), "");
+        await(() -> contains(log, "after"));
+        assertEquals(0, sup.restarts("chatty"), "the same process: its output was never closed under it");
+    }
+
+    @Test
     void personalDataNeverReachesTheLog() throws Exception {
         Path log = dir.resolve("bridge.log");
         String java = ProcessHandle.current().info().command().orElse("java");

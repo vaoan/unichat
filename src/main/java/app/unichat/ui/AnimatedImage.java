@@ -21,15 +21,16 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Animated stickers/GIFs. JavaFX animates GIF by itself but can't read WebP at all, and WhatsApp stickers are
- * animated WebP: their frames are patches placed on a canvas (ANMF chunks: offset, duration, blend, dispose),
- * so they're composited here and scaled down to the display size.
+ * Animated stickers/GIFs, decoded here and played by {@link #play}, which stops when the view leaves the screen.
+ * GIFs don't use JavaFX's own animation: it keeps every frame of every GIF ever shown alive until the app quits
+ * (its timeline never stops and holds the Image), which filled the heap. WebP (WhatsApp stickers) JavaFX can't read
+ * at all: its frames are patches placed on a canvas (ANMF chunks: offset, duration, blend, dispose), composited here.
+ * Frames are scaled to the display size, capped per animation, and the cache is capped in bytes.
  */
 public final class AnimatedImage {
     private AnimatedImage() {}
@@ -44,7 +45,23 @@ public final class AnimatedImage {
     /** Decoded animation: equal-size frames and how long each one stays, in ms. */
     public record Frames(List<Image> images, List<Integer> durationsMs) {
         public boolean animated() { return images.size() > 1; }
+
+        /** Pixel memory (4 bytes per pixel). */
+        long bytes() {
+            long b = 0;
+            for (Image i : images) b += (long) i.getWidth() * (long) i.getHeight() * 4;
+            return b;
+        }
     }
+
+    private static final String TIMELINE = "unichat.animation";
+
+    /** Most frames kept of one animation; longer ones keep every n-th frame (same total duration). */
+    static final int MAX_FRAMES = 120;
+    /** Most pixel memory for one animation: big or long ones drop frames until they fit. */
+    static final long MAX_ANIMATION_BYTES = 24L << 20;
+    /** Every decoded animation together; the least recently used go first. */
+    static final long CACHE_BYTES = 64L << 20;
 
     /** One ANMF chunk of an animated WebP. */
     record AnimFrame(int x, int y, int width, int height, int durationMs, boolean noBlend, boolean disposeToBackground) {}
@@ -52,12 +69,90 @@ public final class AnimatedImage {
     /** Parsed RIFF container: canvas size and frame layout (empty list for a still WebP). */
     record WebpLayout(int canvasWidth, int canvasHeight, List<AnimFrame> frames) {}
 
-    private static final Map<String, Frames> CACHE = Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Frames> e) {
-            return size() > 40;
+    private static final LinkedHashMap<String, Frames> CACHE = new LinkedHashMap<>(16, 0.75f, true);
+    private static long cachedBytes;
+
+    private static Frames cached(String key) {
+        synchronized (CACHE) {
+            return CACHE.get(key);
         }
-    });
+    }
+
+    private static Frames remember(String key, Frames f) {
+        synchronized (CACHE) {
+            Frames old = CACHE.put(key, f);
+            if (old != null) cachedBytes -= old.bytes();
+            cachedBytes += f.bytes();
+            for (var it = CACHE.entrySet().iterator(); cachedBytes > CACHE_BYTES && it.hasNext(); ) {
+                var e = it.next();
+                if (e.getValue() == f) continue;
+                cachedBytes -= e.getValue().bytes();
+                it.remove();
+            }
+        }
+        return f;
+    }
+
+    /** Keep 1 of every {@code step} frames so an animation of {@code count} frames of {@code w}x{@code h} fits the caps. */
+    static int step(int count, int w, int h) {
+        long perFrame = Math.max(1L, (long) w * h * 4);
+        int byBytes = (int) Math.max(1, MAX_ANIMATION_BYTES / perFrame);
+        int keep = Math.max(1, Math.min(MAX_FRAMES, byBytes));
+        return Math.max(1, (count + keep - 1) / keep);
+    }
+
+    /**
+     * Durations of the frames kept when only every {@code step}-th one is shown: each kept frame also stays for the
+     * ones dropped after it, so the animation lasts as long as before.
+     */
+    static List<Integer> sample(List<Integer> delays, int step) {
+        List<Integer> out = new ArrayList<>();
+        for (int i = 0; i < delays.size(); i++) {
+            if (i % step == 0) out.add(delays.get(i));
+            else out.set(out.size() - 1, out.get(out.size() - 1) + delays.get(i));
+        }
+        return List.copyOf(out);
+    }
+
+    /** Decodes an animated (or still) GIF scaled to fit {@code maxW}x{@code maxH}. Blocking: call off the FX thread. */
+    public static Frames decodeGif(Path file, int maxW, int maxH) throws IOException {
+        String key = file + "|" + maxW + "x" + maxH;
+        Frames hit = cached(key);
+        if (hit != null) return hit;
+        int count = app.unichat.matrix.GifFrames.count(file);
+        List<Image> images = new ArrayList<>();
+        List<Integer> delays = new ArrayList<>();
+        int[] step = {1};
+        app.unichat.matrix.GifFrames.read(file, f -> {
+            int i = delays.size();
+            delays.add(f.delayMs());
+            BufferedImage scaled = i % step[0] == 0 ? scale(f.image(), maxW, maxH) : null;
+            if (i == 0) step[0] = step(count, scaled.getWidth(), scaled.getHeight());
+            if (scaled != null) images.add(toFx(scaled));
+        });
+        if (images.isEmpty()) throw new IOException("GIF sin imágenes");
+        return remember(key, new Frames(List.copyOf(images), sample(delays, step[0])));
+    }
+
+    /**
+     * A still picture of {@code file} fitting {@code maxW}x{@code maxH}: a GIF shows its first frame (never JavaFX's
+     * own animation, which leaks). For thumbnails and avatars; blocking, call off the FX thread.
+     */
+    public static Image still(Path file, int maxW, int maxH) throws IOException {
+        if (isGif(file)) {
+            BufferedImage first = ImageIO.read(file.toFile());
+            if (first == null) throw new IOException("GIF sin imágenes");
+            return toFx(scale(first, maxW, maxH));
+        }
+        return new Image(file.toUri().toString(), maxW, maxH, true, true, false);
+    }
+
+    public static boolean isGif(Path file) throws IOException {
+        try (var in = Files.newInputStream(file)) {
+            byte[] h = in.readNBytes(4);
+            return h.length == 4 && h[0] == 'G' && h[1] == 'I' && h[2] == 'F' && h[3] == '8';
+        }
+    }
 
     public static boolean isWebp(Path file) throws IOException {
         byte[] head = new byte[12];
@@ -101,14 +196,14 @@ public final class AnimatedImage {
     /** Decodes a WebP (still or animated) scaled to fit {@code maxW}x{@code maxH}. Blocking: call off the FX thread. */
     public static Frames decodeWebp(Path file, int maxW, int maxH) throws IOException {
         String key = file + "|" + maxW + "x" + maxH;
-        Frames cached = CACHE.get(key);
-        if (cached != null) return cached;
+        Frames hit = cached(key);
+        if (hit != null) return hit;
         RawFrames raw = composeWebp(file, maxW, maxH);
         List<Image> images = new ArrayList<>();
-        for (BufferedImage b : raw.images()) images.add(toFx(b));
-        Frames out = new Frames(List.copyOf(images), raw.durationsMs());
-        CACHE.put(key, out);
-        return out;
+        int step = raw.images().isEmpty() ? 1
+                : step(raw.images().size(), raw.images().get(0).getWidth(), raw.images().get(0).getHeight());
+        for (int i = 0; i < raw.images().size(); i += step) images.add(toFx(raw.images().get(i)));
+        return remember(key, new Frames(List.copyOf(images), sample(raw.durationsMs(), step)));
     }
 
     static RawFrames composeWebp(Path file, int maxW, int maxH) throws IOException {
@@ -172,9 +267,12 @@ public final class AnimatedImage {
      * The timeline stops by itself when the view leaves the scene.
      */
     public static void play(ImageView view, Frames frames) {
+        // A view that gets a new animation (cell reused, thumbnail then original) stops the previous one.
+        if (view.getProperties().remove(TIMELINE) instanceof Timeline old) old.stop();
         view.setImage(frames.images().get(0));
         if (!frames.animated() || Theme.reduceMotion()) return;
         Timeline t = new Timeline();
+        view.getProperties().put(TIMELINE, t);
         double at = 0;
         for (int i = 0; i < frames.images().size(); i++) {
             Image img = frames.images().get(i);
@@ -184,6 +282,7 @@ public final class AnimatedImage {
         t.getKeyFrames().add(new KeyFrame(Duration.millis(at)));
         t.setCycleCount(Timeline.INDEFINITE);
         view.sceneProperty().addListener((o, a, scene) -> {
+            if (view.getProperties().get(TIMELINE) != t) return;
             if (scene == null) t.stop(); else t.play();
         });
         if (view.getScene() != null) t.play();

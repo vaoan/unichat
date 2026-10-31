@@ -18,9 +18,9 @@ import java.util.List;
  * The frames of an animated GIF as whole pictures: GIF frames are patches drawn over the previous one (with a
  * position and a "disposal" rule), so each is composited onto the canvas before it's handed out.
  */
-final class GifFrames {
+public final class GifFrames {
     /** {@code delayMs}: how long the frame stays on screen. */
-    record Frame(BufferedImage image, int delayMs) {}
+    public record Frame(BufferedImage image, int delayMs) {}
 
     /** Browsers show frames that ask for 0–10 ms for 100 ms; so do we. */
     private static final int DEFAULT_DELAY_MS = 100;
@@ -28,6 +28,30 @@ final class GifFrames {
     private GifFrames() {}
 
     static List<Frame> read(Path gif) throws IOException {
+        List<Frame> out = new ArrayList<>();
+        read(gif, out::add);
+        return out;
+    }
+
+    /** Frame count without decoding any frame. */
+    public static int count(Path gif) throws IOException {
+        try (ImageInputStream in = ImageIO.createImageInputStream(gif.toFile())) {
+            if (in == null) throw new IOException("No se pudo leer el GIF");
+            ImageReader r = ImageIO.getImageReadersByFormatName("gif").next();
+            try {
+                r.setInput(in, false);
+                return r.getNumImages(true);
+            } finally {
+                r.dispose();
+            }
+        }
+    }
+
+    /**
+     * Hands each composited frame to {@code each} as soon as it's ready (a private copy), so a caller that scales
+     * them down never holds every full-size frame at once.
+     */
+    public static void read(Path gif, java.util.function.Consumer<Frame> each) throws IOException {
         try (ImageInputStream in = ImageIO.createImageInputStream(gif.toFile())) {
             if (in == null) throw new IOException("No se pudo leer el GIF");
             Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("gif");
@@ -48,7 +72,6 @@ final class GifFrames {
                     h = first.getHeight();
                 }
                 BufferedImage canvas = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-                List<Frame> out = new ArrayList<>();
                 for (int i = 0; i < count; i++) {
                     BufferedImage patch = i == 0 ? first : r.read(i);
                     Node meta = tree(r.getImageMetadata(i));
@@ -62,7 +85,7 @@ final class GifFrames {
                     Graphics2D g = canvas.createGraphics();
                     g.drawImage(patch, x, y, null);
                     g.dispose();
-                    out.add(new Frame(copy(canvas), delay <= 10 ? DEFAULT_DELAY_MS : delay));
+                    each.accept(new Frame(copy(canvas), delay <= 10 ? DEFAULT_DELAY_MS : delay));
 
                     if ("restoreToBackgroundColor".equals(disposal)) {
                         Graphics2D c = canvas.createGraphics();
@@ -73,7 +96,6 @@ final class GifFrames {
                         canvas = before;
                     }
                 }
-                return out;
             } finally {
                 r.dispose();
             }

@@ -700,35 +700,40 @@ public final class ThreadPane extends BorderPane {
     /** Thumbnail first, then the (possibly animated) original; shared with the sticker and GIF grids. */
     static void loadMedia(ChatService svc, ImageView view, Message m, int pxW, int pxH) {
         if (!mayBeAnimated(m)) {
-            svc.media(m.mediaUrl(), pxW, pxH).thenAccept(p ->
-                    Platform.runLater(() -> view.setImage(new Image(p.toUri().toString(), pxW, pxH, true, true, true))));
+            svc.media(m.mediaUrl(), pxW, pxH).thenAcceptAsync(p -> showStill(view, p, pxW, pxH, false), AnimatedImage.DECODER);
             return;
         }
-        // Placeholder: the server's static thumbnail shows at once; decoding a long animation takes seconds.
-        svc.media(m.mediaUrl(), pxW, pxH).thenAccept(p -> Platform.runLater(() -> {
-            if (view.getImage() == null) view.setImage(new Image(p.toUri().toString(), pxW, pxH, true, true, true));
-        }));
+        // Placeholder: a still picture shows at once; decoding a long animation takes seconds. (With direct media
+        // the "thumbnail" is the original file, maybe an animated GIF: only its first frame is used.)
+        svc.media(m.mediaUrl(), pxW, pxH).thenAcceptAsync(p -> showStill(view, p, pxW, pxH, true), AnimatedImage.DECODER);
         svc.media(m.mediaUrl(), 0, 0).thenAcceptAsync(p -> {
             try {
-                if (AnimatedImage.isWebp(p)) {
-                    AnimatedImage.Frames frames = AnimatedImage.decodeWebp(p, pxW, pxH);
-                    Platform.runLater(() -> AnimatedImage.play(view, frames));
-                } else if (Theme.reduceMotion()) {
-                    // First frame only: JavaFX would animate a GIF on its own.
-                    java.awt.image.BufferedImage first = javax.imageio.ImageIO.read(p.toFile());
-                    if (first != null) {
-                        Image img = javafx.embed.swing.SwingFXUtils.toFXImage(AnimatedImage.scale(first, pxW, pxH), null);
-                        Platform.runLater(() -> view.setImage(img));
-                    }
-                } else {
-                    // JavaFX animates GIFs natively; no background loading so the first frame isn't blank.
+                AnimatedImage.Frames frames;
+                if (AnimatedImage.isWebp(p)) frames = AnimatedImage.decodeWebp(p, pxW, pxH);
+                else if (AnimatedImage.isGif(p)) frames = AnimatedImage.decodeGif(p, pxW, pxH);
+                else {
+                    // Labelled as a sticker but a plain PNG/JPEG: never handed to JavaFX's own GIF animation.
                     Image img = new Image(p.toUri().toString(), pxW, pxH, true, true, false);
                     Platform.runLater(() -> view.setImage(img));
+                    return;
                 }
+                Platform.runLater(() -> AnimatedImage.play(view, frames));
             } catch (Exception e) {
                 System.err.println("Could not decode " + m.mediaUrl() + ": " + e);
             }
         }, AnimatedImage.DECODER);
+    }
+
+    /** Decodes {@code p} as a still picture (off the FX thread) and shows it; {@code ifEmpty}: only if nothing's shown. */
+    private static void showStill(ImageView view, java.nio.file.Path p, int pxW, int pxH, boolean ifEmpty) {
+        try {
+            Image img = AnimatedImage.still(p, pxW, pxH);
+            Platform.runLater(() -> {
+                if (!ifEmpty || view.getImage() == null) view.setImage(img);
+            });
+        } catch (Exception e) {
+            System.err.println("Could not decode " + p.getFileName() + ": " + e);
+        }
     }
 
     private Node fileNode(Message m) {
