@@ -440,13 +440,27 @@ public final class MockChatService implements ChatService {
         if (url.startsWith("demo://")) {
             return CompletableFuture.supplyAsync(() -> {
                 try {
-                    return demoImage(url.substring("demo://".length()));
+                    String name = url.substring("demo://".length());
+                    return name.endsWith(".ogg") ? demoAudio(name) : demoImage(name);
                 } catch (IOException e) {
                     throw new java.io.UncheckedIOException(e);
                 }
             });
         }
         return CompletableFuture.failedFuture(new IllegalArgumentException("URL no soportada en demo: " + url));
+    }
+
+    /** The demo voice note (a 2 s tone, no speech), copied out of the app's resources. */
+    private Path demoAudio(String name) throws IOException {
+        Path dir = Settings.get().cacheDir().resolve("demo");
+        Files.createDirectories(dir);
+        Path file = dir.resolve(name);
+        if (Files.exists(file)) return file;
+        try (var in = MockChatService.class.getResourceAsStream("/app/unichat/demo/" + name)) {
+            if (in == null) throw new IOException("Falta el audio de demostración " + name);
+            Files.copy(in, file);
+        }
+        return file;
     }
 
     /** Renders a placeholder "photo" (gradient + caption) once and caches it. */
@@ -736,6 +750,7 @@ public final class MockChatService implements ChatService {
                 .out(-6800, "Qué bonito, ¡la próxima voy!")
                 .react(-7000, "❤️", "Papá", "Laura")
                 .in(-600, "Laura", "¿Quién trae qué el domingo?")
+                .voice(-540, "Papá")
                 .unread(1).done();
 
         ChatBuilder.dm(this, "andres", Network.TELEGRAM, "Andrés Mejía")
@@ -862,6 +877,17 @@ public final class MockChatService implements ChatService {
             msg.setMediaUrl("demo://" + name);
             msg.setFileName(name + ".png");
             msg.setSize(640, 420);
+            return this;
+        }
+
+        ChatBuilder voice(long secs, String who) {
+            in(secs, who, "");
+            Message msg = list.get(list.size() - 1);
+            msg.setType(MessageType.AUDIO);
+            msg.setMediaUrl("demo://nota-de-voz.ogg");
+            msg.setFileName("Nota de voz.ogg");
+            msg.setMimeType("audio/ogg");
+            msg.setFileSize(18_400);
             return this;
         }
 

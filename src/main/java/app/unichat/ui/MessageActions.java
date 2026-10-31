@@ -12,7 +12,7 @@ import java.util.Set;
 final class MessageActions {
     private MessageActions() {}
 
-    enum Action { REPLY, COPY, OPEN_FILE, SAVE_AS, EDIT, DELETE_FOR_EVERYONE, DELETE_FOR_ME, FAVORITE }
+    enum Action { REPLY, COPY, OPEN_FILE, SAVE_AS, TRANSCRIBE, EDIT, DELETE_FOR_EVERYONE, DELETE_FOR_ME, FAVORITE }
 
     static Set<Action> of(Message m, RoomFeatures f, Instant now) {
         Set<Action> out = EnumSet.noneOf(Action.class);
@@ -22,6 +22,7 @@ final class MessageActions {
         if (m.mediaUrl() != null) {
             out.add(Action.OPEN_FILE);
             out.add(Action.SAVE_AS);
+            if (m.type() == MessageType.AUDIO) out.add(Action.TRANSCRIBE);
         }
         if (isStickerOrGif(m)) out.add(Action.FAVORITE);
         if (m.outgoing()) {

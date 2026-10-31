@@ -7,6 +7,7 @@ import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
+import app.unichat.stt.Transcripts;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -15,6 +16,7 @@ import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -118,7 +120,8 @@ public final class ThreadPane extends BorderPane {
         list.setCellFactory(v -> new RowCell());
         list.setAccessibleText("Mensajes");
         list.setAccessibleHelp("Flechas para recorrer mensajes. R responder, E editar, Enter o Espacio abre las acciones, "
-                + "1 a 6 reacciones rápidas, " + (MainView.MAC ? "⌘" : "Ctrl+") + "C copiar, Esc vuelve al campo de texto.");
+                + "1 a 6 reacciones rápidas, T transcribir una nota de voz, " + (MainView.MAC ? "⌘" : "Ctrl+") + "C copiar, "
+                + "Esc vuelve al campo de texto.");
         list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, this::onTimelineKey);
         list.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> userScrolled());
         list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, e -> {
@@ -133,6 +136,14 @@ public final class ThreadPane extends BorderPane {
             }
         });
         jumpDown = Composer.iconButton(Icons.LOW, "Ir al final", this::scrollToBottom);
+        // Transcript progress redraws the visible rows; coalesced so a model download doesn't flood the FX thread.
+        java.util.concurrent.atomic.AtomicBoolean refreshQueued = new java.util.concurrent.atomic.AtomicBoolean();
+        Transcripts.get().addListener(() -> {
+            if (refreshQueued.compareAndSet(false, true)) Platform.runLater(() -> {
+                refreshQueued.set(false);
+                list.refresh();
+            });
+        });
         jumpDown.getStyleClass().add("jump-down");
         jumpDown.setVisible(false);
         StackPane.setAlignment(jumpDown, Pos.BOTTOM_RIGHT);
@@ -389,6 +400,9 @@ public final class ThreadPane extends BorderPane {
             default -> m.preview();
         });
         if (m.edited() && !m.deleted()) sb.append(", editado");
+        if (m.type() == MessageType.AUDIO && Transcripts.get().state(m.mediaUrl()) instanceof Transcripts.Done d) {
+            sb.append(". Transcripción: ").append(d.text().isEmpty() ? "sin voz" : d.text());
+        }
         if (!m.reactions().isEmpty()) {
             sb.append(". Reacciones: ");
             m.reactions().forEach((emoji, users) -> sb.append(emoji).append(' ').append(users.size()).append(", "));
@@ -427,6 +441,8 @@ public final class ThreadPane extends BorderPane {
             return;
         } else if (code == javafx.scene.input.KeyCode.R && !e.isShortcutDown() && allows(m, MessageActions.Action.REPLY)) {
             composer.reply(m);
+        } else if (code == javafx.scene.input.KeyCode.T && !e.isShortcutDown() && allows(m, MessageActions.Action.TRANSCRIBE)) {
+            transcribe(m);
         } else if (code == javafx.scene.input.KeyCode.E && !e.isShortcutDown() && allows(m, MessageActions.Action.EDIT)) {
             composer.edit(m);
         } else if (code == javafx.scene.input.KeyCode.C && e.isShortcutDown() && !m.isMedia()) {
@@ -561,6 +577,7 @@ public final class ThreadPane extends BorderPane {
             bubble.getChildren().add(imageNode(m));
         } else if (m.isMedia()) {
             bubble.getChildren().add(fileNode(m));
+            if (m.type() == MessageType.AUDIO && m.mediaUrl() != null) bubble.getChildren().add(transcriptNode(m, maxWidth));
         } else if ((m.type() == MessageType.TEXT) && RichText.isJumboEmoji(m.body()) && m.replyToId() == null) {
             bubble.getStyleClass().add("jumbo");
             Label l = new Label(m.body().strip());
@@ -729,6 +746,42 @@ public final class ThreadPane extends BorderPane {
         return box;
     }
 
+    private void transcribe(Message m) {
+        Transcripts.get().request(m.mediaUrl(), () -> svc.media(m.mediaUrl(), 0, 0));
+    }
+
+    /** Under a voice note: "Transcribir", the progress, the text, or the error with "Reintentar". */
+    private Node transcriptNode(Message m, double maxWidth) {
+        Transcripts.State st = Transcripts.get().state(m.mediaUrl());
+        if (st instanceof Transcripts.Done d) {
+            Label text = new Label(d.text().isEmpty() ? "Sin voz" : d.text());
+            text.getStyleClass().add("transcript");
+            if (d.text().isEmpty()) text.getStyleClass().add("empty");
+            text.setWrapText(true);
+            text.setMaxWidth(maxWidth - 24);
+            return text;
+        }
+        if (st instanceof Transcripts.Working w) {
+            Label l = new Label(w.what());
+            l.getStyleClass().add("transcript-status");
+            return l;
+        }
+        Hyperlink action = new Hyperlink(st instanceof Transcripts.Failed ? "Reintentar" : "Transcribir");
+        action.getStyleClass().add("transcript-action");
+        // Keyboard: T or the message's menu (rows are navigated as a whole, like reactions).
+        action.setFocusTraversable(false);
+        action.setAccessibleText("Transcribir la nota de voz");
+        action.setOnAction(e -> transcribe(m));
+        if (st instanceof Transcripts.Failed f) {
+            Label err = new Label("No se pudo transcribir: " + f.error());
+            err.getStyleClass().add("transcript-status");
+            err.setWrapText(true);
+            err.setMaxWidth(maxWidth - 24);
+            return new VBox(2, err, action);
+        }
+        return action;
+    }
+
     private void openFile(Message m) {
         if (m.mediaUrl() == null) return;
         svc.media(m.mediaUrl(), 0, 0).thenAccept(p -> {
@@ -842,6 +895,17 @@ public final class ThreadPane extends BorderPane {
         if (a.contains(MessageActions.Action.SAVE_AS)) menu.getItems().add(ChatMenus.item("Guardar como…", () -> {
             if (getScene() != null) MediaSaver.save(getScene().getWindow(), svc, m, toast);
         }));
+        if (a.contains(MessageActions.Action.TRANSCRIBE)) {
+            if (Transcripts.get().state(m.mediaUrl()) instanceof Transcripts.Done d) {
+                if (!d.text().isEmpty()) menu.getItems().add(ChatMenus.item("Copiar transcripción", () -> {
+                    ClipboardContent cc = new ClipboardContent();
+                    cc.putString(d.text());
+                    Clipboard.getSystemClipboard().setContent(cc);
+                }));
+            } else {
+                menu.getItems().add(ChatMenus.item("Transcribir", () -> transcribe(m)));
+            }
+        }
         if (a.contains(MessageActions.Action.FAVORITE) && library != null) {
             boolean fav = library.isFavorite(m.mediaUrl());
             menu.getItems().add(ChatMenus.item(fav ? "Quitar de favoritos" : "Agregar a favoritos", () -> {

@@ -185,6 +185,22 @@ public final class Settings {
     }
     public void setMediaCacheMb(int mb) { set("cache.mediaMb", Integer.toString(mb)); }
 
+    // Voice notes to text (stt/Transcriber).
+    public app.unichat.stt.Transcriber.Engine sttEngine() {
+        return "CUSTOM".equals(getString("stt.engine", "WHISPER")) ? app.unichat.stt.Transcriber.Engine.CUSTOM
+                : app.unichat.stt.Transcriber.Engine.WHISPER;
+    }
+    public void setSttEngine(app.unichat.stt.Transcriber.Engine e) { set("stt.engine", e.name()); }
+    public app.unichat.stt.WhisperModel sttModel() {
+        return "BASE".equals(getString("stt.model", "SMALL")) ? app.unichat.stt.WhisperModel.BASE : app.unichat.stt.WhisperModel.SMALL;
+    }
+    public void setSttModel(app.unichat.stt.WhisperModel m) { set("stt.model", m.name()); }
+    /** Whisper language code ("es", "en"…) or "auto". */
+    public String sttLanguage() { return getString("stt.language", "auto"); }
+    public void setSttLanguage(String lang) { set("stt.language", lang); }
+    public String sttCommand() { return getString("stt.command", ""); }
+    public void setSttCommand(String cmd) { set("stt.command", cmd); }
+
     public boolean localServer() { return getBool("server.local", false); }
     public void setLocalServer(boolean v) { setBool("server.local", v); }
         /** Off by default: archiving a chat means it shouldn't interrupt you. */

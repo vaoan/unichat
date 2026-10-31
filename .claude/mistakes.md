@@ -56,3 +56,8 @@
   commands waiting on `synchronized (botLock)` used all 8 carriers and the command holding the lock could never run its
   send → every background task froze. `MatrixChatService.io` is a platform pool for this reason; don't fan out work
   that takes `synchronized (proc)` onto virtual threads.
+- **Concentus decoding Opus straight at 16 kHz returned silence for the first CELT frames** (~0.3 s of every voice
+  note lost before Whisper). Decode at 48 kHz and low-pass/decimate (`stt/OggOpus`); `OggOpusTest` checks RMS and
+  zero crossings over the whole fixture, not just its length.
+- **Tests with a fixed "now" next to code that reads the real clock** (`FirefoxCookiesTest`: cookies valid one day
+  after 2026-10-26) start failing days later. Give fixtures a margin of years.

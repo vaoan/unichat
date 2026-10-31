@@ -14,6 +14,7 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
+import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.BorderPane;
@@ -69,7 +70,7 @@ public final class SettingsWindow {
         BorderPane content = new BorderPane();
         content.getStyleClass().add("settings-content");
         ListView<String> nav = new ListView<>();
-        nav.getItems().addAll("Cuentas", "Perfil", "Apariencia", "Accesibilidad", "Notificaciones", "Privacidad", "Redes", "GIFs", "Atajos de teclado", "Acerca de");
+        nav.getItems().addAll("Cuentas", "Perfil", "Apariencia", "Accesibilidad", "Notificaciones", "Privacidad", "Redes", "Voz a texto", "GIFs", "Atajos de teclado", "Acerca de");
         nav.getStyleClass().add("settings-nav");
         nav.setPrefWidth(200);
         nav.getSelectionModel().selectedItemProperty().addListener((o, a, s) -> {
@@ -90,6 +91,7 @@ public final class SettingsWindow {
                 case "Notificaciones" -> notificationsPage();
                 case "Privacidad" -> privacyPage();
                 case "Redes" -> networksPage();
+                case "Voz a texto" -> speechPage();
                 case "GIFs" -> gifsPage();
                 case "Atajos de teclado" -> shortcutsPage();
                 case "Acerca de" -> aboutPage();
@@ -466,6 +468,81 @@ public final class SettingsWindow {
             b.setOnAction(e -> {
                 if (!b.isSelected()) b.setSelected(true);
                 s.set(key, m.name());
+            });
+            box.getChildren().add(b);
+        }
+        return box;
+    }
+
+    /** Voice notes to text with what's on this computer: the bundled Whisper or the user's own command. */
+    private static Node speechPage() {
+        Settings s = Settings.get();
+        Label intro = new Label("Transcribe las notas de voz que recibes (menú del mensaje, \"Transcribir\" o la tecla T). "
+                + "Todo ocurre en este computador: el audio no se envía a ningún servicio y no cuesta nada.");
+        intro.setWrapText(true);
+        intro.getStyleClass().add("settings-help");
+
+        Label modelState = new Label();
+        modelState.getStyleClass().add("settings-help");
+        modelState.setWrapText(true);
+        modelState.setMaxWidth(240);
+        Runnable refreshModel = () -> modelState.setText(s.sttModel().isInstalled(app.unichat.stt.Transcriber.modelsDir())
+                ? "Descargado." : "Se descarga la primera vez que transcribes.");
+        refreshModel.run();
+        Node models = chips("Modelo de Whisper", java.util.List.of(app.unichat.stt.WhisperModel.values()),
+                m -> m == app.unichat.stt.WhisperModel.BASE ? "Rápido · 60 MB" : "Preciso · 190 MB",
+                s.sttModel(), m -> {
+                    s.setSttModel(m);
+                    refreshModel.run();
+                });
+        Node languages = chips("Idioma de las notas de voz", java.util.List.of("auto", "es", "en", "pt"),
+                l -> switch (l) {
+                    case "es" -> "Español";
+                    case "en" -> "English";
+                    case "pt" -> "Português";
+                    default -> "Detectar";
+                }, s.sttLanguage(), s::setSttLanguage);
+
+        TextField command = new TextField(s.sttCommand());
+        command.setPromptText(app.unichat.stt.Transcriber.EXAMPLE_COMMAND);
+        command.setPrefColumnCount(16);
+        command.setAccessibleText("Comando propio para transcribir");
+        command.textProperty().addListener((o, a, b) -> s.setSttCommand(b.strip()));
+        Node engines = chips("Cómo transcribir", java.util.List.of(app.unichat.stt.Transcriber.Engine.values()),
+                e -> e == app.unichat.stt.Transcriber.Engine.WHISPER ? "Whisper (incluido)" : "Comando propio",
+                s.sttEngine(), s::setSttEngine);
+        boolean bundled = app.unichat.stt.Transcriber.whisperBinary() != null;
+        return page("Voz a texto", intro,
+                group("Motor", row("Cómo transcribir", bundled ? "Whisper viene con Unichat y funciona sin internet una vez "
+                        + "descargado el modelo." : "Esta instalación no trae Whisper: usa un comando propio.", engines)),
+                group("Whisper",
+                        row("Modelo", "El preciso entiende bastante mejor el español y tarda más o menos el doble. "
+                                + "El rápido sirve en computadores lentos.", new VBox(4, models, modelState)),
+                        row("Idioma", "Fijarlo evita errores en notas cortas; \"Detectar\" sirve si recibes varios.", languages)),
+                group("Comando propio",
+                        row("Comando", "Cualquier programa que reciba el audio y escriba el texto en su salida. {archivo}: "
+                                + "el audio (WAV, MP3 o FLAC). {idioma}: es, en… o auto. Claude Code y Codex no "
+                                + "transcriben audio; sirven, por ejemplo, whisper, mlx_whisper o faster-whisper.", command)));
+    }
+
+    /** One choice out of {@code values} as a row of chips. */
+    private static <T> Node chips(String accessible, java.util.List<T> values, java.util.function.Function<T, String> label,
+                                  T current, Consumer<T> save) {
+        ToggleGroup tg = new ToggleGroup();
+        javafx.scene.layout.FlowPane box = new javafx.scene.layout.FlowPane(6, 6);
+        // Wraps instead of widening the page (row() pins controls to their preferred width).
+        box.setPrefWrapLength(240);
+        box.setAccessibleText(accessible);
+        for (T v : values) {
+            ToggleButton b = new ToggleButton(label.apply(v));
+            b.getStyleClass().add("chip");
+            b.setMinWidth(Region.USE_PREF_SIZE);
+            b.setToggleGroup(tg);
+            b.setSelected(v.equals(current));
+            b.setAccessibleText(accessible + ": " + b.getText());
+            b.setOnAction(e -> {
+                if (!b.isSelected()) b.setSelected(true);
+                save.accept(v);
             });
             box.getChildren().add(b);
         }

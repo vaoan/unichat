@@ -27,6 +27,11 @@ Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix
 - `native/UnichatBar.swift` (`native/build-bar.sh`) — macOS menu-bar item drawn natively (narrower than Java's
   TrayIcon, real NSMenu; same design as InstaTray), driven by `ui/NativeBar` over stdin; `Notifier` falls back to the
   AWT TrayIcon when it's missing or dies. run-dev.sh builds it; package.sh ships it as `Contents/app/native/UnichatBar`.
+- `stt/` — voice notes to text: `Transcriber` runs whisper.cpp's `whisper-cli` (`native/build-whisper.sh` on Mac,
+  pinned official zip in package.ps1; shipped in `app/server/whisper/`) or the user's own command (`CommandLine`);
+  `OggOpus` decodes Opus at 48 kHz then low-passes to 16 kHz (Concentus returns silence for the first CELT frames
+  at 16 kHz); `WhisperModel` downloads the pinned model on first use; `Transcripts` caches per media URL.
+  Claude Code / Codex CLIs can't take audio (tested), so they aren't engines.
 - `native/fetch-gif2webp.sh` — pinned libwebp `gif2webp` shipped in `app/server/` (Windows: pinned in package.ps1);
   `matrix/StickerConverter` uses it when a chat's room_features refuse a sticker's MIME (GIF → WebP on WhatsApp).
   Ajustes → Redes (`<network>.animatedStickers` = STICKER|GIF|VIDEO) can send them as mp4 instead (`GifFrames` +

@@ -54,6 +54,13 @@ class MessageActionsTest {
     }
 
     @Test
+    void onlyVoiceNotesAndAudioCanBeTranscribed() throws Exception {
+        assertTrue(MessageActions.of(msg(false, MessageType.AUDIO, "audio/ogg"), f(WHATSAPP), SENT).contains(TRANSCRIBE));
+        assertFalse(MessageActions.of(msg(false, MessageType.VIDEO, "video/mp4"), f(WHATSAPP), SENT).contains(TRANSCRIBE));
+        assertFalse(MessageActions.of(msg(false, MessageType.TEXT, null), f(WHATSAPP), SENT).contains(TRANSCRIBE));
+    }
+
+    @Test
     void stickersAndGifsCanBeFavourites() throws Exception {
         assertTrue(MessageActions.of(msg(false, MessageType.STICKER, "image/webp"), f(WHATSAPP), SENT).contains(FAVORITE));
         assertTrue(MessageActions.of(msg(false, MessageType.IMAGE, "image/gif"), f(WHATSAPP), SENT).contains(FAVORITE));

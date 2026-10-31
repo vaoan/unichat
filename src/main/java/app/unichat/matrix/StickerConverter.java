@@ -85,23 +85,7 @@ public final class StickerConverter {
      * the PATH; null when there's none.
      */
     static Path gif2webp() {
-        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
-        String exe = windows ? "gif2webp.exe" : "gif2webp";
-        String o = System.getProperty("unichat.gif2webp");
-        if (o != null) return Files.isExecutable(Path.of(o)) ? Path.of(o) : null;
-        String launcher = System.getProperty("jpackage.app-path");
-        if (launcher != null) {
-            Path l = Path.of(launcher);
-            Path app = windows ? l.getParent().resolve("app") : l.getParent().resolveSibling("app");
-            Path f = app.resolve("server").resolve(exe);
-            if (Files.isExecutable(f)) return f;
-        }
-        for (String d : System.getenv().getOrDefault("PATH", "").split(java.io.File.pathSeparator)) {
-            if (d.isBlank()) continue;
-            Path f = Path.of(d, exe);
-            if (Files.isExecutable(f)) return f;
-        }
-        return null;
+        return app.unichat.BundledTools.find("unichat.gif2webp", null, "gif2webp");
     }
 
     static Result convert(Path in, String target, Path dir) throws IOException {

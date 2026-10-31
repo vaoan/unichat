@@ -15,6 +15,10 @@ if [ "$(uname -s)" = Darwin ]; then
   GIF2WEBP="$HOME/Library/Caches/unichat-build/gif2webp"
   [ -x "$GIF2WEBP" ] || native/fetch-gif2webp.sh "$GIF2WEBP" || true
   [ -x "$GIF2WEBP" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.gif2webp=$GIF2WEBP"
+  # Voice notes to text: whisper.cpp built once (native/build-whisper.sh, a few minutes).
+  WHISPER="$HOME/Library/Caches/unichat-build/whisper-cli"
+  [ -x "$WHISPER" ] || native/build-whisper.sh "$WHISPER" || true
+  [ -x "$WHISPER" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.whisper=$WHISPER"
 fi
 # macOS menu-bar item (native/build-bar.sh); rebuilt when the Swift source changes.
 if [ "$(uname -s)" = Darwin ] && command -v swiftc >/dev/null; then

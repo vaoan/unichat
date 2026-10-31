@@ -338,6 +338,12 @@
 .file-name { -fx-font-weight: bold; }
 .file-size { -fx-font-size: 0.84em; -fx-text-fill: -text-3; }
 .bubble.out .file-name, .bubble.out .file-size { -fx-text-fill: white; }
+/* Voice note transcript (stt/Transcripts) under the audio chip. */
+.transcript { -fx-text-fill: -bubble-in-text; -fx-padding: 2 2 0 2; }
+.transcript.empty, .transcript-status { -fx-text-fill: -text-2; -fx-font-size: 0.88em; -fx-font-style: italic; -fx-padding: 0 2; }
+.transcript-action { -fx-text-fill: -accent; -fx-font-size: 0.88em; -fx-padding: 0 2; -fx-border-color: transparent; }
+.bubble.out .transcript, .bubble.out .transcript-status, .bubble.out .transcript-action { -fx-text-fill: white; }
+.transcript-action:hover { -fx-underline: true; }
 
 .reactions { -fx-padding: 2 4 0 4; }
 .reaction-pill {
@@ -640,7 +646,7 @@
 .root.contrast .chat-preview, .root.contrast .chat-stamp, .root.contrast .thread-subtitle { -fx-text-fill: -text-2; }
 .root.contrast .split-pane > .split-pane-divider { -fx-background-color: -border; -fx-padding: 0 1 0 1; }
 .root.contrast .thread-header { -fx-border-color: transparent transparent -border transparent; -fx-border-width: 0 0 1.5 0; }
-.root.contrast .msg-link { -fx-underline: true; }
+.root.contrast .msg-link, .root.contrast .transcript-action { -fx-underline: true; }
 
 /* ================================================================ multiple accounts */
 /* Your account on a network with several: tiny avatar (initials or last phone digits) in the account's color. */

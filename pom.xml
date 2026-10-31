@@ -73,6 +73,12 @@
       <artifactId>jcodec-javase</artifactId>
       <version>0.2.5</version>
     </dependency>
+    <!-- Pure-Java Opus decoder: voice notes (Ogg/Opus) decoded to WAV for local Whisper transcription (BSD-3). -->
+    <dependency>
+      <groupId>io.github.jaredmdobson</groupId>
+      <artifactId>concentus</artifactId>
+      <version>1.0.2</version>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>

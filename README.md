@@ -26,6 +26,12 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   solo las redes que tienes conectadas).
 - **Hilos** con burbujas agrupadas, separadores de día, respuestas, reacciones, edición, borrado,
   emojis grandes, enlaces, **negrita**/*cursiva*/`código`, imágenes, archivos, video y audio.
+- **Notas de voz a texto**: "Transcribir" bajo cada audio (o la tecla T). Usa Whisper, que viene con Unichat y
+  corre en tu computador, gratis y sin enviar el audio a ningún servicio; el modelo (60 o 190 MB) se descarga
+  la primera vez. En Ajustes → Voz a texto puedes elegir modelo e idioma, o poner tu propio comando
+  (`{archivo}`, `{idioma}`). Claude Code y Codex no sirven para esto: no reciben audio.
+- **Medios bajo demanda**: fotos, videos y archivos se descargan solo cuando los abres; lo descargado ocupa como
+  máximo lo que elijas en Ajustes → Privacidad (1 GB por defecto).
 - Estados de entrega (enviando → enviado → entregado → leído) e indicador de "escribiendo…".
 - Compositor: Enter envía (configurable), adjuntar o arrastrar archivos, selector de emojis,
   ↑ edita tu último mensaje, borradores por chat.
@@ -112,7 +118,8 @@ UNICHAT_IT_HOMESERVER=http://localhost:8008 ./mvnw test -Dtest=MatrixLiveIT
 ## Datos locales
 
 Ajustes y sesión en `%APPDATA%\Unichat` (Windows), `~/Library/Application Support/Unichat` (macOS) o
-`~/.config/unichat` (Linux). El token de acceso se guarda en texto plano en `settings.properties`.
+`~/.config/unichat` (Linux). El token de acceso se guarda en texto plano en `settings.properties`. Ahí mismo:
+`cache/media` (fotos y videos vistos, con límite), `models/` (modelo de voz) y `transcripts/` (transcripciones).
 
 ## Limitaciones conocidas
 

@@ -31,6 +31,10 @@ fi
 if [ "$(uname -s)" = Darwin ]; then
   mkdir -p target/pkg/server
   native/fetch-gif2webp.sh "$PWD/target/pkg/server/gif2webp" || echo "Aviso: sin gif2webp los stickers animados se envían fijos a WhatsApp." >&2
+  # Voice notes to text (stt/Transcriber); the model is downloaded by the app on first use.
+  mkdir -p target/pkg/server/whisper
+  native/build-whisper.sh "$PWD/target/pkg/server/whisper/whisper-cli" \
+    || echo "Aviso: sin whisper no se pueden transcribir notas de voz (salvo con un comando propio)." >&2
 fi
 
 COMMON="--name Unichat --app-version $VERSION --vendor Unichat --input target/pkg --main-jar unichat.jar
