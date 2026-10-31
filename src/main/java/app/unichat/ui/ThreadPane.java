@@ -177,8 +177,13 @@ public final class ThreadPane extends BorderPane {
         setCenter(emptyState);
 
         list.skinProperty().addListener((o, a, s) -> Platform.runLater(this::hookScrollBar));
+        // Bubble widths come from the list's width when a cell is built: rebuild them once it settles (opening the side
+        // panel narrowed the list and cut outgoing bubbles at the right edge).
+        javafx.animation.PauseTransition rewrap = new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
+        rewrap.setOnFinished(e -> list.refresh());
         list.widthProperty().addListener((o, a, w) -> {
             if (pinnedBottom && chat != null) scrollToBottom();
+            if (Math.abs(w.doubleValue() - a.doubleValue()) > 1) rewrap.playFromStart();
         });
         // After every layout: if we follow the bottom and something grew (media loaded, text wrapped), stay there.
         sceneProperty().addListener((o, a, sc) -> {
@@ -347,6 +352,9 @@ public final class ThreadPane extends BorderPane {
     private final class RowCell extends ListCell<ThreadRows.Row> {
         RowCell() {
             getStyleClass().add("row-cell");
+            // Sized to the viewport, not to the widest row (mistakes.md): otherwise one wide row stretched every cell
+            // and outgoing bubbles, aligned right, ended past the visible edge.
+            setPrefWidth(0);
         }
 
         @Override

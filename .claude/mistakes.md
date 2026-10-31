@@ -14,7 +14,8 @@
 - **JavaFX 21 rendered emoji monochrome** → upgraded to JavaFX 23 and forced emoji font families on emoji-only
   controls.
 - **Labels with a min width from the parent HBox**: list cells must use `setPrefWidth(0)` so they size to the
-  viewport instead of content.
+  viewport instead of content. The timeline's `RowCell` missed it: with the side panel open one wide row stretched
+  every cell and outgoing bubbles were cut at the right edge.
 - **Appending to a generated YAML without a trailing newline** glued `rc_message:` to a comment line (Synapse
   test config). Use `printf '\n...'` when appending.
 - Matrix media messages keep the name in `fileName`, not `body` (body = caption) — match on both in tests.
