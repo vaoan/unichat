@@ -45,6 +45,8 @@ jobs:
             release/*.zip
             release/*.msi
           if-no-files-found: error
+          # ~350 MB per push: the default 90 days filled the artifact storage quota in a day.
+          retention-days: 7
 
   macos:
     needs: test
@@ -61,3 +63,4 @@ jobs:
         with:
           name: unichat-macos
           path: release/*.dmg
+          retention-days: 7
