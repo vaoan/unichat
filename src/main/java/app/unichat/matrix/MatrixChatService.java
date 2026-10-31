@@ -346,22 +346,34 @@ public final class MatrixChatService implements ChatService {
     }
 
     /**
-     * Deep copy of a /sync response with bridge-bot room message content blanked, so login credentials
-     * (cookies, tokens, QR data) sent in those DMs never reach the on-disk cache. Input is not mutated.
+     * A /sync response with bridge-bot room message content blanked, so login credentials (cookies, tokens, QR
+     * data) sent in those DMs never reach the on-disk cache. Input is not mutated, and it isn't copied whole either
+     * (a full sync of thousands of rooms is hundreds of MB as a tree; a deep copy ran the heap out at startup): only
+     * the path down to each bot room is new, everything else is shared.
      */
     static JsonNode redactForCache(JsonNode fullSync, Set<String> botRoomIds) {
-        JsonNode copy = fullSync.deepCopy();
+        if (!(fullSync instanceof ObjectNode root) || !(fullSync.path("rooms") instanceof ObjectNode rooms)) return fullSync;
+        ObjectNode outRooms = null;
         for (String section : new String[]{"join", "invite", "leave"}) {
-            JsonNode sec = copy.path("rooms").path(section);
+            if (!(rooms.path(section) instanceof ObjectNode sec)) continue;
+            ObjectNode outSec = null;
             for (String id : botRoomIds) {
-                JsonNode room = sec.path(id);
-                if (!room.isObject()) continue;
-                blank(room.path("timeline").path("events"));
-                blank(room.path("state").path("events"));
-                blank(room.path("invite_state").path("events"));
+                if (!(sec.get(id) instanceof ObjectNode room)) continue;
+                if (outSec == null) outSec = sec.objectNode().setAll(sec);
+                ObjectNode copy = room.deepCopy();
+                blank(copy.path("timeline").path("events"));
+                blank(copy.path("state").path("events"));
+                blank(copy.path("invite_state").path("events"));
+                outSec.set(id, copy);
             }
+            if (outSec == null) continue;
+            if (outRooms == null) outRooms = rooms.objectNode().setAll(rooms);
+            outRooms.set(section, outSec);
         }
-        return copy;
+        if (outRooms == null) return fullSync;
+        ObjectNode out = root.objectNode().setAll(root);
+        out.set("rooms", outRooms);
+        return out;
     }
 
     /** Blanks message-type events (no state_key); state events keep their content so the room still resolves. */

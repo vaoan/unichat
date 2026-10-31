@@ -47,7 +47,7 @@ try {
 
 $common = @("--name", "Unichat", "--app-version", $Version, "--vendor", "Unichat",
             "--input", "target\pkg", "--main-jar", "unichat.jar", "--main-class", "app.unichat.Launcher",
-            "--dest", "release", "--icon", "packaging\unichat.ico", "--java-options", "-Xmx512m")
+            "--dest", "release", "--icon", "packaging\unichat.ico", "--java-options", "-Xmx1g")
 
 jpackage @common --type app-image
 if ($LASTEXITCODE -ne 0) { throw "jpackage app-image failed" }

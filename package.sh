@@ -38,7 +38,7 @@ if [ "$(uname -s)" = Darwin ]; then
 fi
 
 COMMON="--name Unichat --app-version $VERSION --vendor Unichat --input target/pkg --main-jar unichat.jar
-  --main-class app.unichat.Launcher --dest release --java-options -Xmx512m"
+  --main-class app.unichat.Launcher --dest release --java-options -Xmx1g"
 
 case "$(uname -s)" in
   Darwin)
