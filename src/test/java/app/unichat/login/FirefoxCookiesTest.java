@@ -18,7 +18,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class FirefoxCookiesTest {
     private static final Instant NOW = Instant.parse("2026-10-26T00:00:00Z");
-    private static final long FUTURE = NOW.getEpochSecond() + 86400;
+    /** Far ahead: findSessions checks expiry against the real clock, not NOW (a 1-day margin broke on 2026-10-27). */
+    private static final long FUTURE = NOW.getEpochSecond() + 10L * 365 * 86400;
     private final CookieSpec spec = CookieSpec.forNetwork(Network.INSTAGRAM);
 
     @AfterEach
