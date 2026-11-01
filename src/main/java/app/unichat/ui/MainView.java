@@ -86,6 +86,10 @@ public final class MainView extends StackPane {
         info = new InfoPane(svc, this::toggleInfo, this::toast);
         panel = new SidePanel(info);
         thread.setLibrary(library);
+        thread.setOnShowServer(id -> {
+            listPane.showSpace(id);
+            listPane.setSelected(thread.chat() == null ? null : thread.chat().id());
+        });
         StickerGrid stickers = new StickerGrid(svc, library, thread::chat, this::toast);
         panel.setContent(SidePanel.Tab.STICKERS, stickers, stickers::refresh);
         GifGrid gifs = new GifGrid(svc, library, thread::chat, this::toast);
@@ -292,6 +296,9 @@ public final class MainView extends StackPane {
         Chat c = svc.chat(id);
         if (c != null) {
             pendingOpenId = null;
+            // From a notification: a channel shows inside its server, so it's clear where it came from.
+            Chat server = SpaceTree.serverOf(c, svc.chats());
+            if (server != null) listPane.showSpace(server.id());
             openChat(c, true);
             return;
         }

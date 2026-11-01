@@ -67,6 +67,9 @@ public final class ThreadPane extends BorderPane {
     private final Avatar headerAvatar = new Avatar(34);
     private final Label headerTitle = new Label();
     private final Label headerSubtitle = new Label();
+    /** The server a channel belongs to ("Servidor Unichat ›"): opens its channels in the list. */
+    private final Hyperlink serverLink = new Hyperlink();
+    private Consumer<String> onShowServer = id -> { };
     private final Button favButton;
     private final Button archiveButton;
     private final VBox emptyState;
@@ -96,7 +99,18 @@ public final class ThreadPane extends BorderPane {
         // Header
         headerTitle.getStyleClass().add("thread-title");
         headerSubtitle.getStyleClass().add("thread-subtitle");
-        VBox titles = new VBox(1, headerTitle, headerSubtitle);
+        serverLink.getStyleClass().add("thread-server");
+        serverLink.setVisible(false);
+        serverLink.setManaged(false);
+        // Its own click: the title area underneath toggles the info panel.
+        serverLink.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.event.Event::consume);
+        serverLink.setOnAction(e -> {
+            if (serverLink.getUserData() instanceof String id) onShowServer.accept(id);
+        });
+        HBox subtitleRow = new HBox(4, serverLink, headerSubtitle);
+        subtitleRow.setAlignment(Pos.CENTER_LEFT);
+        headerSubtitle.setMinWidth(0);
+        VBox titles = new VBox(1, headerTitle, subtitleRow);
         titles.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(titles, Priority.ALWAYS);
         titles.setMinWidth(0);
@@ -252,11 +266,23 @@ public final class ThreadPane extends BorderPane {
         if (svc.messages(c.id()).size() < 20) loadOlder();
     }
 
+    /** Called with a server's id when its name in the header is clicked. */
+    public void setOnShowServer(Consumer<String> r) { this.onShowServer = r; }
+
     public void refreshHeader() {
         if (chat == null) return;
         headerAvatar.set(chat.title(), chat.id(), chat.avatarUrl(), svc);
         headerAvatar.setNetwork(chat.network(), Settings.get().showNetworkBadges());
         headerTitle.setText(chat.title());
+        Chat server = SpaceTree.serverOf(chat, svc.chats());
+        serverLink.setVisible(server != null);
+        serverLink.setManaged(server != null);
+        if (server != null) {
+            serverLink.setText(server.title() + " ›");
+            serverLink.setUserData(server.id());
+            serverLink.setAccessibleText("Ver los canales de " + server.title());
+            serverLink.setTooltip(new javafx.scene.control.Tooltip("Ver los canales de " + server.title()));
+        }
         String sub = chat.network().displayName();
         String account = Accounts.forChat(svc, chat);
         if (account != null) sub += " · " + account;

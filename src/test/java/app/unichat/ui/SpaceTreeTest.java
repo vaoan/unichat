@@ -128,4 +128,23 @@ class SpaceTreeTest {
         assertEquals(List.of("home", SpaceTree.LOOSE), names(SpaceTree.build(chats, Network.TELEGRAM, "telegram:home", Map.of())));
         assertEquals(List.of("home", "work", SpaceTree.LOOSE), names(SpaceTree.build(chats, Network.TELEGRAM, null, Map.of())));
     }
+
+    @Test
+    void aChannelKnowsItsServer() {
+        Chat bridgeFolder = space("!discord", Network.DISCORD, "!srv");
+        bridgeFolder.setPersonalSpace(true);
+        Chat srv = space("!srv", Network.DISCORD, "!c1");
+        Chat c1 = chat("!c1", Network.DISCORD);
+        Chat c2 = chat("!c2", Network.DISCORD);
+        c2.setSpaceParents(Set.of("!srv"));
+        Chat dm = chat("!dm", Network.DISCORD);
+        Chat otherNet = chat("!tg", Network.TELEGRAM);
+        otherNet.setSpaceParents(Set.of("!srv"));
+
+        assertEquals(srv, SpaceTree.serverOf(c1, chats), "the server lists it");
+        assertEquals(srv, SpaceTree.serverOf(c2, chats), "it names its server");
+        assertNull(SpaceTree.serverOf(dm, chats), "a DM has none (the bridge's folder doesn't count)");
+        assertNull(SpaceTree.serverOf(srv, chats), "a server isn't a channel");
+        assertNull(SpaceTree.serverOf(otherNet, chats));
+    }
 }

@@ -72,6 +72,20 @@ public final class SpaceTree {
         return roots;
     }
 
+    /**
+     * The server (Discord server, Telegram forum, any group space that isn't the bridge's own folder) that
+     * {@code chat} belongs to, or null: either side may declare it (the space lists the chat, or the chat names its
+     * parent). The closest one when they nest.
+     */
+    public static Chat serverOf(Chat chat, java.util.Collection<Chat> all) {
+        if (chat == null || chat.space()) return null;
+        for (Chat s : all) {
+            if (!s.space() || s.personalSpace() || s.network() != chat.network()) continue;
+            if (s.spaceChildren().contains(chat.id()) || chat.spaceParents().contains(s.id())) return s;
+        }
+        return null;
+    }
+
     private static List<String> childIds(Chat space, Map<String, List<String>> declaredChildren) {
         Set<String> ids = new LinkedHashSet<>(space.spaceChildren());
         ids.addAll(declaredChildren.getOrDefault(space.id(), List.of()));

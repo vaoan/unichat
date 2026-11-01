@@ -260,6 +260,9 @@
 }
 .thread-title { -fx-font-size: 1.12em; -fx-font-weight: bold; -fx-text-overrun: ellipsis; -fx-cursor: hand; }
 .thread-subtitle { -fx-font-size: 0.86em; -fx-text-fill: -text-3; }
+/* Server of the open channel in the header: a link to its channel list. */
+.thread-server { -fx-font-size: 0.86em; -fx-font-weight: bold; -fx-text-fill: -accent; -fx-padding: 0; -fx-border-color: transparent; }
+.thread-server:hover { -fx-underline: true; }
 
 .timeline { -fx-background-color: -bg; -fx-padding: 8 0; }
 .timeline .list-cell { -fx-padding: 0 18; }
@@ -646,7 +649,7 @@
 .root.contrast .chat-preview, .root.contrast .chat-stamp, .root.contrast .thread-subtitle { -fx-text-fill: -text-2; }
 .root.contrast .split-pane > .split-pane-divider { -fx-background-color: -border; -fx-padding: 0 1 0 1; }
 .root.contrast .thread-header { -fx-border-color: transparent transparent -border transparent; -fx-border-width: 0 0 1.5 0; }
-.root.contrast .msg-link, .root.contrast .transcript-action { -fx-underline: true; }
+.root.contrast .msg-link, .root.contrast .transcript-action, .root.contrast .thread-server { -fx-underline: true; }
 
 /* ================================================================ multiple accounts */
 /* Your account on a network with several: tiny avatar (initials or last phone digits) in the account's color. */

@@ -26,6 +26,8 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   solo las redes que tienes conectadas).
 - **Hilos** con burbujas agrupadas, separadores de día, respuestas, reacciones, edición, borrado,
   emojis grandes, enlaces, **negrita**/*cursiva*/`código`, imágenes, archivos, video y audio.
+- **Servidores** (Discord, foros de Telegram): el encabezado de un canal muestra su servidor; un clic abre la lista
+  de canales. Al abrir una notificación de un canal, la lista muestra su servidor con el canal marcado.
 - **Favoritos**: clic derecho (o la tecla de menú) sobre un emoji, sticker o GIF, en el chat o en el panel lateral,
   para agregarlo o quitarlo de favoritos o de recientes. La pestaña **Favoritos** del panel los junta todos.
 - **Notas de voz a texto**: "Transcribir" bajo cada audio (o la tecla T). Usa Whisper, que viene con Unichat y
