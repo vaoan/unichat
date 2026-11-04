@@ -26,6 +26,10 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   solo las redes que tienes conectadas).
 - **Hilos** con burbujas agrupadas, separadores de día, respuestas, reacciones, edición, borrado,
   emojis grandes, enlaces, **negrita**/*cursiva*/`código`, imágenes, archivos, video y audio.
+- **Estado de las cuentas, claro y en vivo**: si una red deja de funcionar, una franja arriba de la lista lo dice.
+  Roja con "Volver a vincular" si se cerró la sesión; ámbar mientras Unichat la recupera solo. En la barra lateral
+  la red queda marcada. Con el servidor local, Unichat reinicia por su cuenta un puente que no responde, que lleva
+  10 minutos desconectado o que se desconecta una y otra vez.
 - **Servidores** (Discord, foros de Telegram): el encabezado de un canal muestra su servidor; un clic abre la lista
   de canales. Al abrir una notificación de un canal, la lista muestra su servidor con el canal marcado.
 - **Favoritos**: clic derecho (o la tecla de menú) sobre un emoji, sticker o GIF, en el chat o en el panel lateral,

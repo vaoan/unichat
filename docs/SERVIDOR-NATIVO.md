@@ -86,6 +86,14 @@ La misma que el stack Docker (`server/setup.sh`), cambiando Postgres por SQLite 
   resincronización de Telegram se guardaba entero (11 GB en 4 días). Los mensajes anteriores al cambio siguen
   apuntando a su copia local. Inconveniente: un archivo que la red ya borró (WhatsApp los borra tras un tiempo)
   solo vuelve si el teléfono lo conserva (`direct_media_auto_request`).
+- **Estado en vivo** (`status_endpoint`): cada puente avisa los cambios de conexión de sus cuentas a
+  `127.0.0.1:<puerto libre>/status/<puente>` (servido por Unichat, `StatusEndpoint`; solo acepta el `as_token` de
+  ese puente). `BridgeStates` los guarda y la lista de cuentas los usa en vez de preguntar `list-logins`.
+- **Vigilante** (`Watchdog`): cada 30 s pregunta al servidor y a cada puente si responden. Reinicia uno que no
+  responde 3 veces seguidas, cuyas cuentas llevan 10 min desconectadas, o que se desconectó 5 veces en 10 min
+  (mautrix-discord acumula suscripciones a servidores en cada reconexión hasta que Discord lo corta con 4008). Entre
+  reinicios espera 5 min, el doble cada vez, hasta 1 h. Una sesión cerrada no se reinicia: solo la arregla volver
+  a vincular. El tiempo se mide sin contar el Mac dormido.
 - Lo descargado por Unichat (`cache/media`) tiene un límite (Ajustes → Privacidad, 1 GB por defecto): se borra
   primero lo que hace más tiempo no se ve (`MediaCache`).
 
