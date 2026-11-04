@@ -325,6 +325,7 @@ public final class MainView extends StackPane {
         thread.open(c);
         if (infoVisible) panel.show(c, panel.current());
         svc.markRead(c.id());
+        notifier.clear(c.id());
         listPane.refresh();
     }
 

@@ -68,3 +68,6 @@
   `AnimatedImage.still` (with direct media a "thumbnail" can be the original animated GIF).
 - **A thread reading a child process's output must never stop reading**: when `Supervisor.pump` died (OOM) the
   pipe stayed open and full, and the Discord bridge sat in write() for a day, alive but deaf.
+- **A JavaFX window shown while someone types takes the keyboard**: the notification card (a Button) got the next
+  space/Enter and opened its chat, so "the chat changed while typing". Notifications go to macOS now (UnichatBar.app);
+  the fallback card hands focus back and ignores keys.

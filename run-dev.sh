@@ -22,8 +22,8 @@ if [ "$(uname -s)" = Darwin ]; then
 fi
 # macOS menu-bar item (native/build-bar.sh); rebuilt when the Swift source changes.
 if [ "$(uname -s)" = Darwin ] && command -v swiftc >/dev/null; then
-  BAR="$HOME/Library/Caches/unichat-build/UnichatBar"
-  [ -x "$BAR" ] && [ "$BAR" -nt native/UnichatBar.swift ] || native/build-bar.sh "$BAR" >/dev/null
+  BAR="$HOME/Library/Caches/unichat-build/UnichatBar.app/Contents/MacOS/UnichatBar"
+  [ -x "$BAR" ] && [ "$BAR" -nt native/UnichatBar.swift ] || native/build-bar.sh "$HOME/Library/Caches/unichat-build/UnichatBar.app" >/dev/null
   [ -x "$BAR" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.barHelper=$BAR"
 fi
 exec java $JAVA_OPTS -cp "target/classes:$(cat target/classpath.txt)" app.unichat.Launcher "$@"

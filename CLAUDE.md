@@ -27,9 +27,12 @@ Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix
 - `server/StatusEndpoint` + `BridgeStates` (bridges POST their account states, mautrix `status_endpoint`) feed
   `MatrixChatService.accounts()` and `ui/AccountAlerts` (strip over the list); `server/Watchdog` restarts hung,
   stuck or flapping processes (awake time, backoff). Demo: `-Dunichat.demoAccounts=WHATSAPP:NEEDS_LOGIN,...`.
-- `native/UnichatBar.swift` (`native/build-bar.sh`) — macOS menu-bar item drawn natively (narrower than Java's
-  TrayIcon, real NSMenu; same design as InstaTray), driven by `ui/NativeBar` over stdin; `Notifier` falls back to the
-  AWT TrayIcon when it's missing or dies. run-dev.sh builds it; package.sh ships it as `Contents/app/native/UnichatBar`.
+- `native/UnichatBar.swift` (`native/build-bar.sh`) — macOS helper, built as `UnichatBar.app` (bundle id
+  `app.unichat.helper`, shown as "Unichat"): the menu-bar item (narrower than Java's TrayIcon, real NSMenu) and
+  **system notifications** (UNUserNotificationCenter needs a bundle; clicks come back as `open <chat id>`). Driven by
+  `ui/NativeBar` over stdin; `Notifier` uses it when macOS allows notifications, else `DesktopToast` (own card, must
+  never take keyboard focus), and the AWT TrayIcon if the helper is missing or dies. package.sh ships it as
+  `Contents/app/native/UnichatBar.app`.
 - `stt/` — voice notes to text: `Transcriber` runs whisper.cpp's `whisper-cli` (`native/build-whisper.sh` on Mac,
   pinned official zip in package.ps1; shipped in `app/server/whisper/`) or the user's own command (`CommandLine`);
   `OggOpus` decodes Opus at 48 kHz then low-passes to 16 kHz (Concentus returns silence for the first CELT frames

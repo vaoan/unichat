@@ -60,7 +60,7 @@ public final class Notifier {
         NativeBar b = NativeBar.start(barHelper(), menu, () -> EventQueue.invokeLater(() -> {
             bar = null;
             if (tray == null && !disposed) addAwtTray(); // the helper died: keep a tray icon
-        }));
+        }), onOpen);
         if (b == null) return false;
         bar = b;
         EventQueue.invokeLater(() -> {
@@ -87,13 +87,17 @@ public final class Notifier {
         }
     }
 
-    /** native/UnichatBar: -Dunichat.barHelper (development) or Contents/app/native/UnichatBar in the packaged app. */
+    /**
+     * The helper's executable: -Dunichat.barHelper (development) or Contents/app/native/UnichatBar.app in the packaged
+     * app (run from inside its bundle, which notifications need).
+     */
     private static java.nio.file.Path barHelper() {
         String o = System.getProperty("unichat.barHelper");
         if (o != null) return java.nio.file.Path.of(o);
         String launcher = System.getProperty("jpackage.app-path");
         if (launcher == null) return null;
-        return java.nio.file.Path.of(launcher).getParent().resolveSibling("app").resolve("native").resolve("UnichatBar");
+        return java.nio.file.Path.of(launcher).getParent().resolveSibling("app").resolve("native")
+                .resolve("UnichatBar.app").resolve("Contents").resolve("MacOS").resolve("UnichatBar");
     }
 
     private void addAwtTray() {
@@ -118,13 +122,30 @@ public final class Notifier {
         lastChatId = chat.id();
         String title = chat.group() ? m.senderName() + " · " + chat.title() : chat.title();
         String body = s.notificationPreview() ? m.preview() : "Mensaje nuevo · " + chat.network().displayName();
+        NativeBar b = bar;
+        if (b != null && Boolean.TRUE.equals(b.notificationsAllowed())) {
+            // macOS's own notification: never takes the keyboard, follows Do Not Disturb and Focus.
+            b.notify(chat.id(), title, body, s.notificationSound());
+            return;
+        }
         show(title, body, chat.id(), TrayIcon.MessageType.NONE);
         if (s.notificationSound()) awt(() -> Toolkit.getDefaultToolkit().beep());
     }
 
     public void reminder(Chat chat) {
         lastChatId = chat.id();
+        NativeBar b = bar;
+        if (b != null && Boolean.TRUE.equals(b.notificationsAllowed())) {
+            b.notify(chat.id(), "Recordatorio", chat.title(), Settings.get().notificationSound());
+            return;
+        }
         show("Recordatorio", chat.title(), chat.id(), TrayIcon.MessageType.INFO);
+    }
+
+    /** {@code chatId} was read: its notifications leave Notification Center (macOS). */
+    public void clear(String chatId) {
+        NativeBar b = bar;
+        if (b != null && chatId != null) b.clear(chatId);
     }
 
     /** Call on the FX thread. Windows: native balloon (clicking it fires the tray action). macOS: own card. */

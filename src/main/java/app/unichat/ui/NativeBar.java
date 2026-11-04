@@ -42,12 +42,16 @@ final class NativeBar {
         this.out = new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8);
     }
 
-    /** Starts the helper; null if it is not there or cannot run. onExit runs (once, any thread) if it dies later. */
-    static NativeBar start(Path helper, PopupMenu menu, Runnable onExit) {
+    /**
+     * Starts the helper; null if it is not there or cannot run. onExit runs (once, any thread) if it dies later;
+     * {@code onOpenChat} gets the chat id of a clicked notification (any thread).
+     */
+    static NativeBar start(Path helper, PopupMenu menu, Runnable onExit, java.util.function.Consumer<String> onOpenChat) {
         if (helper == null || !Files.isExecutable(helper)) return null;
         try {
             NativeBar bar = new NativeBar(new ProcessBuilder(helper.toString())
                     .redirectError(ProcessBuilder.Redirect.DISCARD).start(), menu);
+            bar.onOpenChat = onOpenChat;
             Thread reader = new Thread(() -> bar.readClicks(onExit), "native-bar");
             reader.setDaemon(true);
             reader.start();
@@ -70,6 +74,24 @@ final class NativeBar {
 
     boolean isAlive() {
         return alive;
+    }
+
+    private volatile java.util.function.Consumer<String> onOpenChat = id -> { };
+    /** Whether macOS lets the helper post notifications: null until it says, then true or false. */
+    private volatile Boolean notificationsAllowed;
+
+    Boolean notificationsAllowed() {
+        return notificationsAllowed;
+    }
+
+    /** A system notification; clicking it opens {@code chatId}. */
+    void notify(String chatId, String title, String body, boolean sound) {
+        send("notify\t" + clean(chatId) + "\t" + (sound ? "1" : "0") + "\t" + clean(title) + "\t" + clean(body) + "\n");
+    }
+
+    /** Removes {@code chatId}'s notifications from Notification Center (it was read). */
+    void clear(String chatId) {
+        send("clear\t" + clean(chatId) + "\n");
     }
 
     void setIcon(BufferedImage image) {
@@ -135,6 +157,15 @@ final class NativeBar {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = in.readLine()) != null) {
+                if (line.startsWith("open\t")) {
+                    onOpenChat.accept(line.substring(5).strip());
+                    continue;
+                }
+                if (line.startsWith("notify-auth\t")) {
+                    notificationsAllowed = line.endsWith("1");
+                    System.err.println("System notifications: " + (notificationsAllowed ? "allowed" : "not allowed (Unichat's own cards instead)"));
+                    continue;
+                }
                 if (!line.startsWith("click\t")) continue;
                 int index;
                 try {

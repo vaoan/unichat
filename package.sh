@@ -14,9 +14,10 @@ if [ -n "${TUWUNEL_BIN:-}" ]; then
 else
   echo "Aviso: sin TUWUNEL_BIN la app no trae el servidor local (solo servidores externos)." >&2
 fi
-# macOS menu-bar item: native helper (Contents/app/native/UnichatBar); without swiftc the Java tray icon is used.
+# macOS menu-bar item and system notifications: native helper (Contents/app/native/UnichatBar.app); without swiftc
+# the Java tray icon and Unichat's own notification cards are used.
 if [ "$(uname -s)" = Darwin ] && command -v swiftc >/dev/null; then
-  mkdir -p target/pkg/native && native/build-bar.sh "$PWD/target/pkg/native/UnichatBar" >/dev/null
+  mkdir -p target/pkg/native && native/build-bar.sh "$PWD/target/pkg/native/UnichatBar.app" >/dev/null
 fi
 # macOS bridges link libolm (Homebrew dropped it): ship ours (native/build-libolm.sh).
 if [ "$(uname -s)" = Darwin ]; then

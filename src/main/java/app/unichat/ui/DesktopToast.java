@@ -48,7 +48,12 @@ final class DesktopToast {
         Rectangle2D area = Screen.getPrimary().getVisualBounds();
         stage.setX(area.getMaxX() - WIDTH - MARGIN);
         stage.setY(area.getMinY() + MARGIN);
+        // Showing a window takes the keyboard: hand it straight back. While someone typed, their next space or
+        // Enter "pressed" the card and opened its chat (the chat changed under them).
+        javafx.stage.Window had = javafx.stage.Window.getWindows().stream()
+                .filter(w -> w != stage && w.isFocused()).findFirst().orElse(null);
         stage.show();
+        if (had != null) had.requestFocus();
         timer.playFromStart();
     }
 
@@ -68,10 +73,13 @@ final class DesktopToast {
         card.setPrefWidth(WIDTH);
         card.setMaxWidth(WIDTH);
         card.setCursor(Cursor.HAND);
+        // Clicked with the mouse only: it must never be the target of keys typed for the chat.
+        card.setFocusTraversable(false);
         card.setOnAction(e -> {
             hide();
             onOpen.accept(chatId);
         });
+        card.addEventFilter(javafx.scene.input.KeyEvent.ANY, javafx.event.Event::consume);
         // Keep it while the pointer is on it, like system notifications.
         card.setOnMouseEntered(e -> timer.pause());
         card.setOnMouseExited(e -> timer.playFromStart());

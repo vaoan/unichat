@@ -4,8 +4,65 @@
 //   tip <text>            tooltip
 //   menu <n>              followed by n lines, each "item <tag> <enabled 0|1> <checked -1|0|1> <label>" or "sep"
 //   open                  opens the menu as a click would, or closes it if it is open (for tests)
-// It writes "click <tag>" to stdout when a menu item is chosen, and exits when stdin closes (the app quit or died).
+//   notify <chat id> <sound 0|1> <title> <body>   a system notification (Notification Center, Do Not Disturb…)
+//   clear <chat id>       removes that chat's notifications (it was read)
+// It writes to stdout: "click <tag>" when a menu item is chosen, "open <chat id>" when a notification is clicked,
+// "notify-auth <1|0>" once notifications are allowed or not, and exits when stdin closes (the app quit or died).
+// Notifications need it to run from its bundle (UnichatBar.app, built by native/build-bar.sh): that's what macOS
+// shows ("Unichat") and asks permission for. A plain java process can't post them.
 import AppKit
+import UserNotifications
+
+/** One writer for stdout: menu clicks and notification callbacks come from different threads. */
+let output = DispatchQueue(label: "stdout")
+func emit(_ line: String) {
+    output.async {
+        print(line)
+        fflush(stdout)
+    }
+}
+
+final class Notes: NSObject, UNUserNotificationCenterDelegate {
+    private let center = UNUserNotificationCenter.current()
+
+    func setUp() {
+        center.delegate = self
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            emit("notify-auth\t\(granted ? 1 : 0)")
+        }
+    }
+
+    func post(chat: String, sound: Bool, title: String, body: String) {
+        let c = UNMutableNotificationContent()
+        c.title = title
+        c.body = body
+        c.threadIdentifier = chat // grouped per chat in Notification Center
+        c.userInfo = ["chat": chat]
+        if sound { c.sound = .default }
+        center.add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil)) { error in
+            if let error { emit("notify-error\t\(error.localizedDescription)") }
+        }
+    }
+
+    func clear(chat: String) {
+        center.getDeliveredNotifications { delivered in
+            let ids = delivered.filter { ($0.request.content.userInfo["chat"] as? String) == chat }.map { $0.request.identifier }
+            self.center.removeDeliveredNotifications(withIdentifiers: ids)
+        }
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler done: @escaping () -> Void) {
+        if let chat = response.notification.request.content.userInfo["chat"] as? String { emit("open\t\(chat)") }
+        done()
+    }
+
+    /** Shown even if this helper counts as frontmost (it never is: it has no windows). */
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler done: @escaping (UNNotificationPresentationOptions) -> Void) {
+        done([.banner, .list, .sound])
+    }
+}
 
 final class Bar: NSObject, NSMenuDelegate {
     static let size: CGFloat = 22
@@ -43,6 +100,11 @@ final class Bar: NSObject, NSMenuDelegate {
             guard expected > 0 else { return }
             incoming.append(parts)
             if incoming.count == expected { apply() }
+        case "notify":
+            guard parts.count >= 5 else { return }
+            notes.post(chat: parts[1], sound: parts[2] == "1", title: parts[3], body: parts[4])
+        case "clear":
+            if parts.count > 1 { notes.clear(chat: parts[1]) }
         default:
             break
         }
@@ -72,13 +134,15 @@ final class Bar: NSObject, NSMenuDelegate {
     func menuDidClose(_ menu: NSMenu) { isOpen = false }
 
     @objc func pick(_ sender: NSMenuItem) {
-        print("click\t\(sender.tag)")
-        fflush(stdout)
+        emit("click\t\(sender.tag)")
     }
 }
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
+let notes = Notes()
+// Only from the bundle: outside one, UNUserNotificationCenter aborts the process.
+if Bundle.main.bundleIdentifier != nil { notes.setUp() } else { emit("notify-auth\t0") }
 let bar = Bar()
 Thread {
     while let line = readLine() {
