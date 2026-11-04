@@ -52,9 +52,9 @@ class AnimatedImageTest {
         Message photo = new Message("3", "!c", "@a", "a", false, Instant.now());
         photo.setType(MessageType.IMAGE);
         photo.setMimeType("image/jpeg");
-        assertTrue(ThreadPane.mayBeAnimated(sticker));
-        assertTrue(ThreadPane.mayBeAnimated(gif));
-        assertFalse(ThreadPane.mayBeAnimated(photo), "photos keep using server thumbnails");
+        assertTrue(MessageMedia.mayBeAnimated(sticker));
+        assertTrue(MessageMedia.mayBeAnimated(gif));
+        assertFalse(MessageMedia.mayBeAnimated(photo), "photos keep using server thumbnails");
     }
 
     private static boolean same(BufferedImage a, BufferedImage b) {
@@ -80,9 +80,9 @@ class AnimatedImageTest {
     void gifFramesAreHandedOutOneByOne(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
         Path gif = dir.resolve("a.gif");
         writeGif(gif, 5);
-        assertEquals(5, app.unichat.matrix.GifFrames.count(gif));
+        assertEquals(5, app.unichat.gif.GifFrames.count(gif));
         int[] seen = {0};
-        app.unichat.matrix.GifFrames.read(gif, f -> {
+        app.unichat.gif.GifFrames.read(gif, f -> {
             seen[0]++;
             assertEquals(20, f.image().getWidth());
         });

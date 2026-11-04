@@ -1,9 +1,10 @@
 package app.unichat.ui;
 
+import app.unichat.support.Os;
+
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -28,15 +29,14 @@ public final class Speaker {
     }
 
     static List<String> command() {
-        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-        if (os.contains("win")) {
+        if (Os.windows()) {
             return List.of("powershell", "-NoProfile", "-NonInteractive", "-Command",
                     "[Console]::InputEncoding = [Text.Encoding]::UTF8; "
                             + "Add-Type -AssemblyName System.Speech; "
                             + "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
                             + "$s.Speak([Console]::In.ReadToEnd())");
         }
-        if (os.contains("mac")) return List.of("say", "-f", "-");
+        if (Os.mac()) return List.of("say", "-f", "-");
         return List.of("sh", "-c", "if command -v spd-say >/dev/null; then spd-say -e; else espeak --stdin; fi");
     }
 

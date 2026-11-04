@@ -37,13 +37,17 @@ final class StickerGrid extends ScrollPane {
         this.library = library;
         this.chat = chat;
         this.toast = toast;
+        setUp(this, content, library, this::refresh);
+    }
+
+    /** The look of a media tab; a favourite added or removed anywhere (chat, Favoritos tab) shows on it at once. */
+    static void setUp(javafx.scene.control.ScrollPane pane, javafx.scene.layout.Region content, MediaLibrary library, Runnable refresh) {
         content.getStyleClass().add("sticker-grid");
-        setContent(content);
-        setFitToWidth(true);
-        getStyleClass().add("side-panel-scroll");
-        // A favourite added or removed anywhere (chat, Favoritos tab) shows here at once.
+        pane.setContent(content);
+        pane.setFitToWidth(true);
+        pane.getStyleClass().add("side-panel-scroll");
         library.addListener(() -> Platform.runLater(() -> {
-            if (getScene() != null) refresh();
+            if (pane.getScene() != null) refresh.run();
         }));
     }
 
@@ -81,7 +85,7 @@ final class StickerGrid extends ScrollPane {
         view.setFitWidth(TILE);
         view.setFitHeight(TILE);
         view.setPreserveRatio(true);
-        ThreadPane.loadMedia(svc, view, MediaItems.message(item), TILE * 2, TILE * 2);
+        MessageMedia.loadMedia(svc, view, MediaItems.message(item), TILE * 2, TILE * 2);
         StackPane tile = new StackPane(view);
         tile.getStyleClass().add("sticker-tile");
         tile.setMinSize(TILE, TILE);

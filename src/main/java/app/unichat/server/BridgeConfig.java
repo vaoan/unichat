@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import app.unichat.bridge.BridgePorts;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -17,20 +18,9 @@ import java.nio.file.Path;
  * with SQLite and 127.0.0.1 instead of Postgres and Docker host names. See docs/SERVIDOR-NATIVO.md.
  */
 public final class BridgeConfig {
-    /** Telegram chats created per chat sync (the bridge's default is 15); raising it triggers one resync. */
-    public static final int TELEGRAM_CREATE_LIMIT = 100;
     static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory()
             .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
             .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
-
-    /**
-     * Server name of a bridge's direct media: its messages carry {@code mxc://media-<bridge>.localhost/...} URIs
-     * that the bridge resolves from the network only when opened, so no media is copied to the server.
-     * Unichat downloads them from the bridge itself (no federation; see LocalServer.directMediaBase).
-     */
-    public static String mediaServerName(String bridge) {
-        return "media-" + bridge + ".localhost";
-    }
 
     /** Room tag for archived chats; must match SyncProcessor.TAG_ARCHIVED. */
     static final String ARCHIVE_TAG = "u.archived";
@@ -96,7 +86,7 @@ public final class BridgeConfig {
             obj(c, "/backfill").put("enabled", true).put("max_initial_messages", 50).put("max_catchup_messages", 500);
             obj(c, "/logging").put("min_level", "info").set("writers", writers);
             // Media stays on the network until opened (the server_key the bridge generated is kept).
-            obj(c, "/direct_media").put("enabled", true).put("server_name", mediaServerName(b));
+            obj(c, "/direct_media").put("enabled", true).put("server_name", BridgePorts.mediaServerName(b));
             switch (b) {
                 case "instagram" -> {
                     set(c, "/network/mode", "instagram");
@@ -119,8 +109,8 @@ public final class BridgeConfig {
                     net.put("api_hash", s.telegramApiHash());
                     obj(c, "/network/animated_sticker").put("target", "gif").put("convert_from_webm", true);
                     // 15 by default: most chats never showed up. The bridge paces itself on Telegram's flood waits.
-                    setExisting(c, "/network/sync/create_limit", TELEGRAM_CREATE_LIMIT);
-                    setExisting(c, "/network/sync/login_sync_limit", TELEGRAM_CREATE_LIMIT);
+                    setExisting(c, "/network/sync/create_limit", BridgePorts.TELEGRAM_CREATE_LIMIT);
+                    setExisting(c, "/network/sync/login_sync_limit", BridgePorts.TELEGRAM_CREATE_LIMIT);
                 }
                 default -> { }
             }
@@ -139,7 +129,7 @@ public final class BridgeConfig {
             obj(c, "/bridge/backfill/forward_limits/missed").put("dm", 500).put("channel", 0);
             // Big public servers: no missed-message backfill at all (only new messages come in).
             setExisting(c, "/bridge/backfill/max_guild_members", 1000);
-            obj(c, "/bridge/direct_media").put("enabled", true).put("server_name", mediaServerName(b));
+            obj(c, "/bridge/direct_media").put("enabled", true).put("server_name", BridgePorts.mediaServerName(b));
             obj(c, "/logging").put("min_level", "info").set("writers", writers);
         }
         return c;

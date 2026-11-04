@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class DiscordGuildsTest {
     @Test
     void parsesTheBridgesGuildList() {
-        List<MatrixChatService.DiscordGuild> g = MatrixChatService.parseGuilds("""
+        List<MatrixChatService.DiscordGuild> g = BridgeProtocol.parseGuilds("""
                 List of guilds:
                 * FF14 Housing (`123456789012345678`) - never bridge messages
                 * Amigos (con paréntesis) (`223456789012345678`) - bridge all messages and create portals on first message
@@ -24,7 +24,7 @@ class DiscordGuildsTest {
 
     @Test
     void noGuilds() {
-        assertEquals(0, MatrixChatService.parseGuilds("No guilds found").size());
+        assertEquals(0, BridgeProtocol.parseGuilds("No guilds found").size());
     }
 
     private static final List<MatrixChatService.DiscordGuild> GUILDS = List.of(
@@ -34,7 +34,7 @@ class DiscordGuildsTest {
 
     @Test
     void aServerWhoseSpaceAlreadyArrivedIsNoLongerToAdd() {
-        assertEquals(List.of("3"), MatrixChatService.offers(GUILDS, java.util.Set.of("1")).stream()
+        assertEquals(List.of("3"), BridgeProtocol.offers(GUILDS, java.util.Set.of("1")).stream()
                 .map(app.unichat.service.ChatService.GroupOffer::id).toList());
     }
 }

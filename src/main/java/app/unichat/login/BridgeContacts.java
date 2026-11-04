@@ -94,7 +94,7 @@ public final class BridgeContacts {
         if (body != null) b.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(body.toString()));
         else b.method(method, HttpRequest.BodyPublishers.noBody());
         HttpResponse<String> r = HTTP.send(b.build(), HttpResponse.BodyHandlers.ofString());
-        JsonNode j = r.body() == null || r.body().isBlank() ? JSON.createObjectNode() : JSON.readTree(r.body());
+        JsonNode j = BridgeLogin.bodyOf(r);
         if (r.statusCode() == 404 && "M_UNRECOGNIZED".equals(j.path("errcode").asText())) return null;
         if (r.statusCode() >= 400) {
             throw new BridgeLogin.BridgeLoginException(j.path("errcode").asText("M_UNKNOWN"), j.path("error").asText("HTTP " + r.statusCode()));

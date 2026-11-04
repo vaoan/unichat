@@ -1,6 +1,7 @@
 package app.unichat;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.Redactor;
 
 import java.io.FileOutputStream;
 import java.io.IOException;

@@ -21,7 +21,7 @@ class AvailableNetworksTest {
 
     @Test
     void localServerOffersEveryNetworkItCanInstall() {
-        MatrixChatService.setBridgeProvisioner(new MatrixChatService.BridgeProvisioner() {
+        MatrixChatService.setBridgeProvisioner(new BridgeProvisioner() {
             @Override public void ensure(Network n) { }
             @Override public boolean provides(Network n) { return n != Network.SIGNAL; }
         });

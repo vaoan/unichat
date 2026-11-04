@@ -5,7 +5,6 @@ import app.unichat.model.Member;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
-import app.unichat.model.Network;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -19,9 +18,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
+
+import static app.unichat.matrix.SyncEvents.*;
 
 /**
  * Turns Matrix /sync and /messages JSON into live {@link Chat} and {@link Message} objects.
@@ -49,6 +49,8 @@ final class SyncProcessor {
     }
 
     private final String me;
+    private final RoomFields fields;
+    private final SystemMessages systemMessages;
     private final Map<String, MatrixRoom> rooms = new LinkedHashMap<>();
     private final Map<String, String> directRoomUser = new HashMap<>();
     private ObjectNode directContent = MatrixClient.JSON.createObjectNode();
@@ -56,7 +58,13 @@ final class SyncProcessor {
 
     SyncProcessor(String myUserId) {
         this.me = myUserId;
+        this.fields = new RoomFields(me, directRoomUser, this::room);
+        this.systemMessages = new SystemMessages(fields, this::room);
     }
+
+    void refresh(MatrixRoom room) { fields.refresh(room); }
+
+    String nameOf(MatrixRoom room, String userId) { return fields.nameOf(room, userId); }
 
     String myUserId() { return me; }
     Collection<MatrixRoom> rooms() { return rooms.values(); }
@@ -126,7 +134,7 @@ final class SyncProcessor {
         if (un.has("notification_count")) room.chat.setUnreadCount(un.get("notification_count").asInt());
         if (un.has("highlight_count")) room.chat.setMentionCount(un.get("highlight_count").asInt());
 
-        refresh(room);
+        fields.refresh(room);
     }
 
     private void processInvite(String roomId, JsonNode j, Result r) {
@@ -140,7 +148,7 @@ final class SyncProcessor {
             r.invites.add(roomId);
         }
         for (JsonNode ev : j.path("invite_state").path("events")) applyState(room, ev);
-        refresh(room);
+        fields.refresh(room);
         r.chatsChanged = true;
     }
 
@@ -178,7 +186,7 @@ final class SyncProcessor {
         r.hasMore = room.prevBatch != null && !chunk.isEmpty();
         r.messagesChanged.add(roomId);
         if (!older.isEmpty()) {
-            refresh(room);
+            fields.refresh(room);
             r.chatsChanged = true;
         }
         return r;
@@ -245,16 +253,6 @@ final class SyncProcessor {
         room.members.put(userId, new Member(userId, cleanName(name), avatar));
     }
 
-    /** Bridges append the network to puppet names ("Ana (WA)"); the app shows a network badge instead. */
-    private static final java.util.regex.Pattern NETWORK_SUFFIX = java.util.regex.Pattern.compile(
-            "\\s*\\((WA|WhatsApp|Telegram|Signal|Instagram|Facebook|Messenger|Discord|Slack|Google Messages|GMessages|SMS|Twitter|X|LinkedIn)\\)$");
-
-    static String cleanName(String name) {
-        if (name == null) return null;
-        String n = NETWORK_SUFFIX.matcher(name).replaceFirst("");
-        return n.isBlank() ? name : n;
-    }
-
     /** Fills in a profile fetched separately (lazy-loaded members); returns the rooms whose chat changed. */
     List<String> applyProfile(String userId, String name, String avatar) {
         List<String> changed = new ArrayList<>();
@@ -263,7 +261,7 @@ final class SyncProcessor {
             Member old = room.members.get(userId);
             if (old != null && old.name() != null && !old.name().isBlank()) continue;
             room.members.put(userId, new Member(userId, cleanName(name), avatar != null ? avatar : old == null ? null : old.avatarUrl()));
-            refresh(room);
+            fields.refresh(room);
             changed.add(room.id);
         }
         return changed;
@@ -274,7 +272,7 @@ final class SyncProcessor {
         Set<String> out = new LinkedHashSet<>();
         for (MatrixRoom room : rooms.values()) {
             if (room.invite) continue;
-            for (String u : otherUsers(room)) {
+            for (String u : fields.otherUsers(room)) {
                 Member m = room.members.get(u);
                 if ((m == null || m.name() == null || m.name().isBlank()) && !isBot(u)) out.add(u);
             }
@@ -342,7 +340,7 @@ final class SyncProcessor {
             case "m.room.redaction" -> applyRedaction(room, ev, r);
             default -> {
                 if (!ev.has("state_key") || redacted) return;
-                String text = systemText(room, ev);
+                String text = systemMessages.of(room, ev);
                 if (text == null) return;
                 Message m = newMessage(room, ev);
                 m.setType(MessageType.SYSTEM);
@@ -355,7 +353,7 @@ final class SyncProcessor {
     private Message newMessage(MatrixRoom room, JsonNode ev) {
         String sender = text(ev, "sender");
         long ts = ev.path("origin_server_ts").asLong(0);
-        return new Message(text(ev, "event_id"), room.id, sender, nameOf(room, sender), me.equals(sender),
+        return new Message(text(ev, "event_id"), room.id, sender, fields.nameOf(room, sender), me.equals(sender),
                 Instant.ofEpochMilli(ts));
     }
 
@@ -388,57 +386,6 @@ final class SyncProcessor {
 
     private void addPending(MatrixRoom room, String targetId, JsonNode ev) {
         room.pending.computeIfAbsent(targetId, k -> new ArrayList<>()).add(ev);
-    }
-
-    /** Sets type, body, media fields from a message content (also used for m.new_content). */
-    static void applyContent(Message m, String msgtype, String body, JsonNode content) {
-        MessageType t = switch (msgtype == null ? "" : msgtype) {
-            case "m.emote" -> MessageType.EMOTE;
-            case "m.notice" -> MessageType.NOTICE;
-            case "m.image" -> MessageType.IMAGE;
-            case "m.video" -> MessageType.VIDEO;
-            case "m.audio" -> MessageType.AUDIO;
-            case "m.file" -> MessageType.FILE;
-            case "m.sticker" -> MessageType.STICKER;
-            default -> MessageType.TEXT;
-        };
-        String b = body == null ? "" : body;
-        m.setType(t);
-        if (!m.isMedia()) {
-            m.setBody(b);
-            return;
-        }
-        String url = text(content, "url");
-        if (url == null && content.has("file")) {
-            m.setType(MessageType.TEXT);
-            m.setBody("🔒 Archivo cifrado no compatible");
-            return;
-        }
-        m.setMediaUrl(url);
-        String filename = text(content, "filename");
-        if (filename != null && !filename.equals(b)) {
-            m.setFileName(filename);
-            m.setBody(b);
-        } else {
-            m.setFileName(b.isEmpty() ? null : b);
-            m.setBody("");
-        }
-        JsonNode info = content.path("info");
-        if (info.isObject()) m.setMediaInfo(info);
-        m.setMimeType(text(info, "mimetype"));
-        m.setSize(info.path("w").asInt(0), info.path("h").asInt(0));
-        m.setFileSize(info.path("size").asLong(0));
-    }
-
-    /** Removes the "> quoted" reply fallback that precedes the real body. */
-    static String stripReplyFallback(String body) {
-        if (body == null || !body.startsWith(">")) return body;
-        String[] lines = body.split("\n", -1);
-        int i = 0;
-        while (i < lines.length && lines[i].startsWith(">")) i++;
-        if (i < lines.length && lines[i].isEmpty()) i++;
-        if (i >= lines.length) return body;
-        return String.join("\n", java.util.Arrays.copyOfRange(lines, i, lines.length));
     }
 
     private void applyEdit(MatrixRoom room, JsonNode ev, Result r) {
@@ -515,7 +462,7 @@ final class SyncProcessor {
             m.reactions().clear();
             r.messagesChanged.add(room.id);
             r.chatsChanged = true;
-            refresh(room);
+            fields.refresh(room);
         }
     }
 
@@ -528,7 +475,7 @@ final class SyncProcessor {
             room.chat.typing().clear();
             for (JsonNode u : c.path("user_ids")) {
                 String uid = u.asText();
-                if (!uid.equals(me)) room.chat.typing().add(nameOf(room, uid));
+                if (!uid.equals(me)) room.chat.typing().add(fields.nameOf(room, uid));
             }
             r.chatsChanged = true;
         } else if ("m.receipt".equals(type)) {
@@ -613,230 +560,16 @@ final class SyncProcessor {
         }
     }
 
-    /** Rooms with a room (or per-room override) push rule that does not notify. */
-    static Set<String> mutedRoomsFrom(JsonNode pushRules) {
-        Set<String> muted = new HashSet<>();
-        JsonNode global = pushRules.path("global");
-        for (JsonNode rule : global.path("room")) {
-            if (rule.path("enabled").asBoolean(true) && isSilent(rule.path("actions"))) {
-                String id = text(rule, "rule_id");
-                if (id != null) muted.add(id);
-            }
-        }
-        for (JsonNode rule : global.path("override")) {
-            String id = text(rule, "rule_id");
-            if (id == null || !id.startsWith("!") || !rule.path("enabled").asBoolean(true)) continue;
-            if (isSilent(rule.path("actions"))) muted.add(id);
-        }
-        return muted;
-    }
-
-    private static boolean isSilent(JsonNode actions) {
-        if (!actions.isArray() || actions.isEmpty()) return true;
-        for (JsonNode a : actions) if ("dont_notify".equals(a.asText())) return true;
-        return false;
-    }
-
     // ---------------------------------------------------------------- derived chat fields
 
-    /** Recomputes title, avatar, network, group, members and preview of a room's chat. */
-    void refresh(MatrixRoom room) {
-        Chat c = room.chat;
-        boolean botRoom = isBridgeBotRoom(room);
-        c.setBridgeBot(botRoom);
-        c.setNetwork(detectNetwork(room, botRoom));
-        c.setFeatures(room.roomFeatures != null ? app.unichat.model.RoomFeatures.parse(room.roomFeatures)
-                : c.network() == Network.DISCORD ? app.unichat.model.RoomFeatures.discord() : app.unichat.model.RoomFeatures.UNKNOWN);
-        c.setSpace(room.space);
-        // The bridge's own folder: bridgev2 marks it with a "__" channel; mautrix-discord's folders ("Your Discord
-        // bridged chats", "direct messages") are made by its bot with no channel at all.
-        c.setPersonalSpace(room.space && (room.bridgeChannelId != null ? room.bridgeChannelId.startsWith("__") : room.createdByBridge));
-        c.setSpaceChildren(orderedChildren(room));
-        c.setSpaceParents(room.spaceParents);
-        boolean group = !botRoom && !room.space && isGroup(room);
-        c.setGroup(group);
-        c.setTopic(room.topic);
-
-        String counterpart = group ? null : counterpart(room);
-        String title = cleanName(blankToNull(room.name));
-        if (title == null && counterpart != null) title = nameOf(room, counterpart);
-        if (title == null) title = heroesTitle(room);
-        if (title == null) title = blankToNull(room.canonicalAlias);
-        if (title == null) title = room.invite ? "Invitación" : "Chat vacío";
-        c.setTitle(title);
-
-        String avatar = room.avatar;
-        if (avatar == null && counterpart != null) {
-            Member m = room.members.get(counterpart);
-            if (m != null) avatar = m.avatarUrl();
-        }
-        c.setAvatarUrl(avatar);
-
-        List<Member> members = new ArrayList<>();
-        for (Map.Entry<String, String> e : room.membership.entrySet()) {
-            if (!"join".equals(e.getValue()) && !"invite".equals(e.getValue())) continue;
-            Member m = room.members.get(e.getKey());
-            members.add(m != null ? m : new Member(e.getKey(), null, null));
-        }
-        if (!members.equals(c.members())) {
-            c.members().clear();
-            c.members().addAll(members);
-        }
-
-        Message last = null;
-        for (int i = room.timeline.size() - 1; i >= 0; i--) {
-            Message m = room.timeline.get(i);
-            if (last == null) last = m;
-            if (m.type() != MessageType.SYSTEM) {
-                last = m;
-                break;
-            }
-        }
-        if (last != null) {
-            c.applyLastMessage(last);
-        } else if (room.invite) {
-            String inviter = room.inviter;
-            c.setLastActivity(room.invitedAt);
-            c.setLastPreview(inviter != null ? "Invitación de " + nameOf(room, inviter) : "Te invitaron a este chat");
-        } else {
-            // Joined but no messages loaded yet: no stale invite text, and don't jump to the top of the
-            // inbox just because the bridge created the room now (bridges create hundreds after a login).
-            c.setLastPreview("");
-            c.setLastSenderName(null);
-            c.setLastActivity(Instant.EPOCH);
-        }
-    }
-
-    /** Children with an {@code order} first (lexicographic, as the spec says), then the rest in arrival order. */
-    private static List<String> orderedChildren(MatrixRoom room) {
-        List<String> ordered = new ArrayList<>(), rest = new ArrayList<>();
-        room.spaceChildOrder.forEach((id, order) -> (order.isEmpty() ? rest : ordered).add(id));
-        ordered.sort(java.util.Comparator.comparing(room.spaceChildOrder::get));
-        ordered.addAll(rest);
-        return ordered;
-    }
-
-    private boolean isBridgeBotRoom(MatrixRoom room) {
-        if (room.space) return false;
-        if (room.bridgeProtocol != null) return false;
-        List<String> others = otherUsers(room);
-        if (others.isEmpty()) return false;
-        for (String u : others) if (!isBot(u)) return false;
-        int count = memberCount(room);
-        return count <= 2;
-    }
-
-    private Network detectNetwork(MatrixRoom room, boolean botRoom) {
-        Network n = Network.fromProtocolId(room.bridgeProtocol);
-        if (n != null) return n;
-        for (String u : otherUsers(room)) {
-            n = Network.fromUserId(u);
-            if (n != null) return n;
-        }
-        for (String u : room.membership.keySet()) {
-            n = Network.fromUserId(u);
-            if (n != null) return n;
-        }
-        return Network.MATRIX;
-    }
-
-    private boolean isGroup(MatrixRoom room) {
-        if (room.bridgeRoomType != null) return !"dm".equals(room.bridgeRoomType);
-        if (directRoomUser.containsKey(room.id) || room.directInvite) return false;
-        // A native Matrix room someone gave a name to is a group even with two members;
-        // bridged portals are excluded because bridges name their DM portals too.
-        if (room.name != null && !room.name.isBlank() && room.bridgeProtocol == null
-                && room.membership.keySet().stream().noneMatch(u -> Network.fromUserId(u) != null)) return true;
-        int count = memberCount(room);
-        int bots = 0;
-        for (Map.Entry<String, String> e : room.membership.entrySet()) {
-            if (isBot(e.getKey()) && ("join".equals(e.getValue()) || "invite".equals(e.getValue()))) bots++;
-        }
-        return count - bots > 2;
-    }
-
-    private int memberCount(MatrixRoom room) {
-        if (room.joinedCount >= 0) return room.joinedCount + Math.max(0, room.invitedCount);
-        int n = 0;
-        for (String m : room.membership.values()) if ("join".equals(m) || "invite".equals(m)) n++;
-        return Math.max(n, room.heroes.size() + 1);
-    }
-
-    /** Active members (falling back to heroes) other than me. */
-    private List<String> otherUsers(MatrixRoom room) {
-        Set<String> out = new LinkedHashSet<>();
-        for (String u : room.membership.keySet()) if (!u.equals(me) && room.isActiveMember(u)) out.add(u);
-        for (String u : room.heroes) if (!u.equals(me) && !"leave".equals(room.membership.get(u))
-                && !"ban".equals(room.membership.get(u))) out.add(u);
-        return new ArrayList<>(out);
-    }
-
-    private String counterpart(MatrixRoom room) {
-        String direct = directRoomUser.get(room.id);
-        if (direct != null && !direct.equals(me)) return direct;
-        List<String> others = otherUsers(room);
-        for (String u : others) if (!isBot(u)) return u;
-        return others.isEmpty() ? null : others.get(0);
-    }
-
-    private String heroesTitle(MatrixRoom room) {
-        List<String> names = new ArrayList<>();
-        for (String u : otherUsers(room)) {
-            if (isBot(u)) continue;
-            names.add(nameOf(room, u));
-            if (names.size() == 4) break;
-        }
-        return names.isEmpty() ? null : String.join(", ", names);
-    }
-
     // ---------------------------------------------------------------- system messages
-
-    private String systemText(MatrixRoom room, JsonNode ev) {
-        String type = text(ev, "type");
-        String sender = text(ev, "sender");
-        if (isBot(sender) || !isGroup(room)) return null;
-        String sn = nameOf(room, sender);
-        JsonNode c = ev.path("content");
-        switch (type) {
-            case "m.room.member" -> {
-                String target = text(ev, "state_key");
-                if (target == null || isBot(target)) return null;
-                JsonNode prev = prevContent(ev);
-                String mem = text(c, "membership");
-                String prevMem = text(prev, "membership");
-                String dn = text(c, "displayname");
-                String tn = dn != null ? dn : nameOf(room, target);
-                if (mem == null) return null;
-                return switch (mem) {
-                    case "join" -> {
-                        if (!"join".equals(prevMem)) yield tn + " se unió";
-                        String pn = text(prev, "displayname");
-                        yield pn != null && dn != null && !pn.equals(dn) ? pn + " cambió su nombre a " + dn : null;
-                    }
-                    case "invite" -> sn + " invitó a " + tn;
-                    case "leave" -> target.equals(sender)
-                            ? ("invite".equals(prevMem) ? tn + " rechazó la invitación" : tn + " salió")
-                            : sn + " eliminó a " + tn;
-                    case "ban" -> sn + " bloqueó a " + tn;
-                    default -> null;
-                };
-            }
-            case "m.room.name" -> {
-                String n = blankToNull(text(c, "name"));
-                return n == null ? sn + " quitó el nombre del grupo" : sn + " cambió el nombre del grupo a " + n;
-            }
-            case "m.room.topic" -> { return sn + " cambió la descripción del grupo"; }
-            case "m.room.avatar" -> { return sn + " cambió la foto del grupo"; }
-            default -> { return null; }
-        }
-    }
 
     // ---------------------------------------------------------------- local echo & helpers for the service
 
     /** Appends an outgoing message shown while it is being sent. */
     Message addLocalEcho(String roomId, String txnId, Consumer<Message> init) {
         MatrixRoom room = rooms.get(roomId);
-        Message m = new Message(LOCAL_PREFIX + txnId, roomId, me, room == null ? null : nameOf(room, me), true, Instant.now());
+        Message m = new Message(LOCAL_PREFIX + txnId, roomId, me, room == null ? null : fields.nameOf(room, me), true, Instant.now());
         m.setStatus(MessageStatus.SENDING);
         init.accept(m);
         if (room != null) {
@@ -864,7 +597,7 @@ final class SyncProcessor {
         room.byId.put(eventId, real);
         Result ignored = new Result();
         applyPending(room, eventId, ignored);
-        refresh(room);
+        fields.refresh(room);
     }
 
     void failLocalEcho(String roomId, String txnId) {
@@ -879,7 +612,7 @@ final class SyncProcessor {
         Message m = room.byId.remove(messageId);
         if (m != null) {
             room.timeline.remove(m);
-            refresh(room);
+            fields.refresh(room);
         }
     }
 
@@ -917,67 +650,4 @@ final class SyncProcessor {
         return null;
     }
 
-    static Message copy(Message src, String newId) {
-        Message m = new Message(newId, src.chatId(), src.senderId(), src.senderName(), src.outgoing(), src.timestamp());
-        m.setType(src.type());
-        m.setBody(src.body());
-        m.setMediaUrl(src.mediaUrl());
-        m.setFileName(src.fileName());
-        m.setFileSize(src.fileSize());
-        m.setSize(src.width(), src.height());
-        m.setReplyToId(src.replyToId());
-        m.setEdited(src.edited());
-        m.setDeleted(src.deleted());
-        m.setStatus(src.status());
-        src.reactions().forEach((k, v) -> m.reactions().put(k, new LinkedHashSet<>(v)));
-        return m;
-    }
-
-    String nameOf(MatrixRoom room, String userId) {
-        Member m = room.members.get(userId);
-        if (m != null && m.name() != null && !m.name().isBlank()) return m.name();
-        return fallbackName(userId);
-    }
-
-    /** Name for a user whose profile isn't known yet: "+57300…" for phone puppets, else "Contacto de WhatsApp". */
-    static String fallbackName(String userId) {
-        String local = localpart(userId);
-        Network n = Network.fromUserId(userId);
-        if (n == null || n.puppetPrefix() == null || !local.startsWith(n.puppetPrefix())) return local;
-        String rest = local.substring(n.puppetPrefix().length());
-        if (rest.matches("\\d{6,15}")) return "+" + rest;
-        return "Contacto de " + n.displayName();
-    }
-
-    static String localpart(String userId) {
-        if (userId == null) return "";
-        int colon = userId.indexOf(':');
-        int start = userId.startsWith("@") ? 1 : 0;
-        return colon > start ? userId.substring(start, colon) : userId.substring(start);
-    }
-
-    /** True if {@code userId} is a bridge bot (e.g. {@code @whatsappbot:server}). */
-    static boolean isBot(String userId) {
-        Network n = Network.fromUserId(userId);
-        return n != null && Objects.equals(localpart(userId), n.botLocalpart());
-    }
-
-    private static JsonNode prevContent(JsonNode ev) {
-        JsonNode p = ev.path("unsigned").path("prev_content");
-        return p.isMissingNode() ? ev.path("prev_content") : p;
-    }
-
-    static String text(JsonNode node, String field) {
-        if (node == null) return null;
-        JsonNode v = node.get(field);
-        return v != null && v.isTextual() ? v.asText() : null;
-    }
-
-    private static String blankToNull(String s) { return s == null || s.isBlank() ? null : s; }
-
-    private static List<String> strings(JsonNode arr) {
-        List<String> out = new ArrayList<>();
-        for (JsonNode n : arr) if (n.isTextual()) out.add(n.asText());
-        return List.copyOf(out);
-    }
 }

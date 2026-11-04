@@ -1,6 +1,8 @@
 package app.unichat.matrix;
 
+import app.unichat.gif.GifFrames;
 import app.unichat.model.Network;
+import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +29,7 @@ class StickerVideoTest {
 
     @AfterEach
     void reset() {
-        Settings.get().set(StickerConverter.modeKey(Network.WHATSAPP), null);
+        Settings.get().set(StickerMode.key(Network.WHATSAPP), null);
     }
 
     /** A two-frame animated GIF (red, then blue), 0.5 s per frame. */
@@ -77,11 +79,11 @@ class StickerVideoTest {
 
     @Test
     void theChoiceIsPerNetworkAndDefaultsToSticker() {
-        assertEquals(StickerConverter.Mode.STICKER, StickerConverter.mode(Network.WHATSAPP));
-        Settings.get().set(StickerConverter.modeKey(Network.WHATSAPP), "GIF");
-        assertEquals(StickerConverter.Mode.GIF, StickerConverter.mode(Network.WHATSAPP));
-        assertEquals(StickerConverter.Mode.STICKER, StickerConverter.mode(Network.TELEGRAM));
-        Settings.get().set(StickerConverter.modeKey(Network.WHATSAPP), "nonsense");
-        assertEquals(StickerConverter.Mode.STICKER, StickerConverter.mode(Network.WHATSAPP));
+        assertEquals(StickerMode.STICKER, StickerMode.of(Network.WHATSAPP));
+        Settings.get().set(StickerMode.key(Network.WHATSAPP), "GIF");
+        assertEquals(StickerMode.GIF, StickerMode.of(Network.WHATSAPP));
+        assertEquals(StickerMode.STICKER, StickerMode.of(Network.TELEGRAM));
+        Settings.get().set(StickerMode.key(Network.WHATSAPP), "nonsense");
+        assertEquals(StickerMode.STICKER, StickerMode.of(Network.WHATSAPP));
     }
 }

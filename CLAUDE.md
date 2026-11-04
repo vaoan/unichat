@@ -5,12 +5,16 @@ Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix
 **Spanish**; code, comments, commits in English. Must keep working on **Windows** (user's target).
 
 ## Layout
+Package rules: `docs/ARQUITECTURA.md`, enforced by `ArchitectureTest` (no cycles, JavaFX only in `ui`, `ui` talks to `service`). Read it before adding a dependency between packages.
 - `model/` — mutable `Chat`, `Message`, records `Member`, `Account`; `Network` maps each network to its bridge
   bot localpart / puppet prefix / protocol id (must match `server/setup.*`).
-- `service/ChatService` — the only API the UI uses. Live model objects, listeners on any thread (UI marshals with
-  `Platform.runLater`, coalesced in `MainView`). `MockChatService` = demo mode.
-- `matrix/` — `MatrixChatService` (sync loop, sending, media cache), `SyncProcessor` (pure /sync → model, unit
-  tested), `MatrixClient` (HTTP). `MatrixLiveIT` = end-to-end test, needs `UNICHAT_IT_HOMESERVER`.
+- `support/` — leaf utilities (`Os`, `Hashes`, `Redactor`, `BundledTools`).
+- `bridge/` — what `matrix` and `server` share about bridges (`BridgeStates`, `BridgePorts`).
+- `service/ChatService` — the only API the UI uses (made of small role interfaces; take the narrowest one). Live model objects, listeners on any thread (UI marshals with
+  `Platform.runLater`, coalesced in `MainView`). `MockChatService` = demo mode. `BridgeAccess` = what only bridge-backed services add.
+- `matrix/` — `MatrixChatService` (facade: lifecycle, sync loop) over `MatrixCore` (shared), `MessageSender`, `ChatActions`,
+  `BridgeAccounts`, `DiscordServers`, `ContactActions`, `MediaDownloader`, `SyncCache`, `MatrixLogin`; `SyncProcessor`
+  (pure /sync → model, unit tested) with `RoomFields`, `SystemMessages`, `SyncEvents`; `BridgeProtocol` (pure), `BotChat`, `MatrixClient` (HTTP). `MatrixLiveIT` = end-to-end test, needs `UNICHAT_IT_HOMESERVER`.
 - `ui/` — `MainView` (rail | `ChatListPane` | `ThreadPane` + `InfoPane`, overlays, shortcuts), `Composer`,
   `CommandBar`, `AddAccountPane`, `SettingsWindow`, `Notifier` (AWT tray), `Theme`. Pure logic with tests:
   `ChatFilter`, `ThreadRows`, `RichText`, `Formats`.
@@ -61,6 +65,7 @@ follows OS high contrast / reduced motion. Every new control needs an accessible
 `FilterUiTest` (same flag) checks that the rail keeps the chosen chip when switching network.
 
 ## Rules
-- Run `./mvnw test` before committing. Never point tests at the real data dir (surefire sets `unichat.dataDir`).
+- KISS, DRY, SOLID (`docs/ARQUITECTURA.md`). Java files stay under 800 lines, methods under 100 (Checkstyle fails the build); split by responsibility.
+- Run `./mvnw verify` before committing (tests, architecture rules, copied code). Never point tests at the real data dir (surefire sets `unichat.dataDir`).
 - Don't copy anything from Beeper's app bundle (proprietary). Design tokens were only used as reference.
 - See `.claude/mistakes.md` before touching CSS sizing, icons, AWT/tray or Javadoc.

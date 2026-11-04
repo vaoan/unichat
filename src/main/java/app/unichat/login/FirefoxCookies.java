@@ -44,13 +44,8 @@ public final class FirefoxCookies {
 
     /** Roots to scan: the {@value #ROOTS_PROPERTY} override if set, else {@link #profilesRoot()}. */
     static List<Path> roots() {
-        String override = System.getProperty(ROOTS_PROPERTY);
-        if (override == null || override.isBlank()) return List.of(profilesRoot());
-        List<Path> out = new ArrayList<>();
-        for (String part : override.split(";|" + java.util.regex.Pattern.quote(java.io.File.pathSeparator))) {
-            if (!part.isBlank()) out.add(Paths.get(part.trim()));
-        }
-        return out;
+        List<Path> override = rootsOverride();
+        return override != null ? override : List.of(profilesRoot());
     }
 
     /** Reads the network's cookies from a (non-locked) cookies.sqlite, dropping expired ones. */
@@ -117,12 +112,28 @@ public final class FirefoxCookies {
         } catch (IOException | RuntimeException e) {
             return null;
         } finally {
-            deleteQuietly(wal);
-            if (tmp != null) {
-                deleteQuietly(tmp);
-                deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-shm"));
-                deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-journal"));
-            }
+            deleteCopy(tmp, wal);
+        }
+    }
+
+    /** The folders set in {@link #ROOTS_PROPERTY}, or null when it isn't set. */
+    static List<Path> rootsOverride() {
+        String override = System.getProperty(ROOTS_PROPERTY);
+        if (override == null || override.isBlank()) return null;
+        List<Path> out = new ArrayList<>();
+        for (String part : override.split(";|" + java.util.regex.Pattern.quote(java.io.File.pathSeparator))) {
+            if (!part.isBlank()) out.add(Paths.get(part.trim()));
+        }
+        return out;
+    }
+
+    /** Removes a temporary copy of a browser's database and the files SQLite left beside it. */
+    static void deleteCopy(Path tmp, Path wal) {
+        deleteQuietly(wal);
+        if (tmp != null) {
+            deleteQuietly(tmp);
+            deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-shm"));
+            deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-journal"));
         }
     }
 

@@ -1,12 +1,13 @@
 package app.unichat.settings;
 
+import app.unichat.support.Os;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Locale;
 import java.util.Properties;
 
 /**
@@ -40,13 +41,12 @@ public final class Settings {
     public static Path dataDir() {
         String override = System.getProperty("unichat.dataDir");
         if (override != null) return Path.of(override);
-        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         String home = System.getProperty("user.home");
-        if (os.contains("win")) {
+        if (Os.windows()) {
             String appData = System.getenv("APPDATA");
             return Path.of(appData != null ? appData : home, "Unichat");
         }
-        if (os.contains("mac")) return Path.of(home, "Library", "Application Support", "Unichat");
+        if (Os.mac()) return Path.of(home, "Library", "Application Support", "Unichat");
         String xdg = System.getenv("XDG_CONFIG_HOME");
         return Path.of(xdg != null ? xdg : home + "/.config", "unichat");
     }
@@ -185,16 +185,7 @@ public final class Settings {
     }
     public void setMediaCacheMb(int mb) { set("cache.mediaMb", Integer.toString(mb)); }
 
-    // Voice notes to text (stt/Transcriber).
-    public app.unichat.stt.Transcriber.Engine sttEngine() {
-        return "CUSTOM".equals(getString("stt.engine", "WHISPER")) ? app.unichat.stt.Transcriber.Engine.CUSTOM
-                : app.unichat.stt.Transcriber.Engine.WHISPER;
-    }
-    public void setSttEngine(app.unichat.stt.Transcriber.Engine e) { set("stt.engine", e.name()); }
-    public app.unichat.stt.WhisperModel sttModel() {
-        return "BASE".equals(getString("stt.model", "SMALL")) ? app.unichat.stt.WhisperModel.BASE : app.unichat.stt.WhisperModel.SMALL;
-    }
-    public void setSttModel(app.unichat.stt.WhisperModel m) { set("stt.model", m.name()); }
+    // Voice notes to text (engine and model: stt/SttSettings).
     /** Whisper language code ("es", "en"…) or "auto". */
     public String sttLanguage() { return getString("stt.language", "auto"); }
     public void setSttLanguage(String lang) { set("stt.language", lang); }

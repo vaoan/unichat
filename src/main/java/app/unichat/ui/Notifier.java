@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.settings.Settings;
+import app.unichat.support.Os;
 
 import javax.imageio.ImageIO;
 import java.awt.EventQueue;
@@ -22,7 +23,7 @@ import java.util.function.Consumer;
  * macOS menu bar) with balloon messages, plus the dock/taskbar badge where supported.
  */
 public final class Notifier {
-    private static final boolean MAC = System.getProperty("os.name", "").toLowerCase().contains("mac");
+    private static final boolean MAC = Os.mac();
 
     private volatile TrayIcon tray;
     private volatile String lastChatId;

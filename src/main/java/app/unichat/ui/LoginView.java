@@ -1,8 +1,9 @@
 package app.unichat.ui;
 
-import app.unichat.matrix.MatrixChatService;
+import app.unichat.matrix.MatrixLogin;
 import app.unichat.server.LocalServer;
 import app.unichat.service.ChatService;
+import app.unichat.settings.Settings;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -58,7 +59,7 @@ public final class LoginView extends StackPane {
             spin.setVisible(true);
             error.setVisible(false);
             error.setManaged(false);
-            MatrixChatService.login(server.getText().trim(), user.getText().trim(), pass.getText())
+            MatrixLogin.login(server.getText().trim(), user.getText().trim(), pass.getText())
                     .whenComplete((svc, err) -> Platform.runLater(() -> {
                         login.setDisable(false);
                         spin.setVisible(false);
@@ -75,43 +76,15 @@ public final class LoginView extends StackPane {
         Label localStatus = new Label("Unichat instala y mantiene su propio servidor. No necesitas Docker ni contraseñas.");
         localStatus.getStyleClass().add("login-subtitle");
         localStatus.setWrapText(true);
-        useLocal.setOnAction(e -> {
-            useLocal.setDisable(true);
-            login.setDisable(true);
-            error.setVisible(false);
-            error.setManaged(false);
-            Thread.ofVirtual().name("local-server-setup").start(() -> {
-                try {
-                    local.ensureRunning(msg -> Platform.runLater(() -> localStatus.setText(msg)));
-                    String[] cred = local.credentials();
-                    Platform.runLater(() -> localStatus.setText("Iniciando sesión…"));
-                    ChatService svc = MatrixChatService.login(LocalServer.URL, cred[0], cred[1]).join();
-                    app.unichat.settings.Settings.get().setLocalServer(true);
-                    Platform.runLater(() -> onLoggedIn.accept(svc));
-                } catch (Exception ex) {
-                    Platform.runLater(() -> {
-                        useLocal.setDisable(false);
-                        login.setDisable(false);
-                        localStatus.setText("");
-                        showError(error, AccountsPane.rootMessage(ex));
-                    });
-                }
-            });
-        });
+        useLocal.setOnAction(e -> startLocalServer(local, useLocal, login, localStatus, error, onLoggedIn));
         if (local != null) {
             login.getStyleClass().setAll("button", "secondary-button");
             login.setDefaultButton(false);
             useLocal.setDefaultButton(true);
         }
 
-        Button demo = new Button("Probar el modo demo");
-        demo.getStyleClass().add("secondary-button");
-        demo.setMaxWidth(Double.MAX_VALUE);
-        demo.setOnAction(e -> onDemo.run());
-
-        Hyperlink help = new Hyperlink("¿No tienes servidor? Mira docs/BRIDGES.md para montarlo con Docker.");
-        help.getStyleClass().add("login-help");
-        help.setOnAction(e -> openLink.accept("https://github.com/vaoan/unichat/blob/main/docs/BRIDGES.md"));
+        Button demo = demoButton(onDemo);
+        Hyperlink help = helpLink(openLink);
 
         StackPane loginRow = new StackPane(login, spin);
         StackPane.setAlignment(spin, Pos.CENTER_RIGHT);
@@ -122,6 +95,46 @@ public final class LoginView extends StackPane {
         card.getStyleClass().addAll("login-card", "card");
         card.setMaxSize(420, VBox.USE_PREF_SIZE);
         getChildren().add(card);
+    }
+
+    private static void startLocalServer(LocalServer local, Button useLocal, Button login, Label localStatus, Label error,
+                                         Consumer<ChatService> onLoggedIn) {
+        useLocal.setDisable(true);
+        login.setDisable(true);
+        error.setVisible(false);
+        error.setManaged(false);
+        Thread.ofVirtual().name("local-server-setup").start(() -> {
+            try {
+                local.ensureRunning(msg -> Platform.runLater(() -> localStatus.setText(msg)));
+                String[] cred = local.credentials();
+                Platform.runLater(() -> localStatus.setText("Iniciando sesión…"));
+                ChatService svc = MatrixLogin.login(LocalServer.URL, cred[0], cred[1]).join();
+                Settings.get().setLocalServer(true);
+                Platform.runLater(() -> onLoggedIn.accept(svc));
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    useLocal.setDisable(false);
+                    login.setDisable(false);
+                    localStatus.setText("");
+                    showError(error, AccountsPane.rootMessage(ex));
+                });
+            }
+        });
+    }
+
+    private static Button demoButton(Runnable onDemo) {
+        Button demo = new Button("Probar el modo demo");
+        demo.getStyleClass().add("secondary-button");
+        demo.setMaxWidth(Double.MAX_VALUE);
+        demo.setOnAction(e -> onDemo.run());
+        return demo;
+    }
+
+    private static Hyperlink helpLink(Consumer<String> openLink) {
+        Hyperlink help = new Hyperlink("¿No tienes servidor? Mira docs/BRIDGES.md para montarlo con Docker.");
+        help.getStyleClass().add("login-help");
+        help.setOnAction(e -> openLink.accept("https://github.com/vaoan/unichat/blob/main/docs/BRIDGES.md"));
+        return help;
     }
 
     private static void showError(Label l, String text) {

@@ -1,4 +1,4 @@
-package app.unichat.server;
+package app.unichat.bridge;
 
 import com.fasterxml.jackson.databind.JsonNode;
 

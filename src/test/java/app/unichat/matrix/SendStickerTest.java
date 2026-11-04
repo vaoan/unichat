@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.model.MediaLibrary;
+import app.unichat.service.StickerMode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -106,7 +107,7 @@ class SendStickerTest {
         assertTrue(sent.path("info").path("size").asLong() != 999, "size describes the new file");
     }
 
-    private JsonNode sendAs(StickerConverter.Mode mode) throws Exception {
+    private JsonNode sendAs(StickerMode mode) throws Exception {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
         app.unichat.model.RoomFeatures wa = app.unichat.model.RoomFeatures.parse(MatrixClient.JSON.readTree(
                 "{\"id\":\"wa\",\"file\":{\"m.sticker\":{\"mime_types\":{\"image/webp\":2}},\"m.video\":{\"mime_types\":{\"video/mp4\":2}}}}"));
@@ -119,7 +120,7 @@ class SendStickerTest {
 
     @Test
     void chosenGifGoesAsALoopingWhatsappGif() throws Exception {
-        JsonNode sent = sendAs(StickerConverter.Mode.GIF);
+        JsonNode sent = sendAs(StickerMode.GIF);
         assertEquals("m.video", sent.path("msgtype").asText());
         assertEquals("video/mp4", sent.path("info").path("mimetype").asText());
         assertTrue(sent.path("info").path("fi.mau.gif").asBoolean(), "WhatsApp plays it as a GIF");
@@ -127,7 +128,7 @@ class SendStickerTest {
 
     @Test
     void chosenVideoGoesAsAPlainVideo() throws Exception {
-        JsonNode sent = sendAs(StickerConverter.Mode.VIDEO);
+        JsonNode sent = sendAs(StickerMode.VIDEO);
         assertEquals("m.video", sent.path("msgtype").asText());
         assertTrue(sent.path("info").path("fi.mau.gif").isMissingNode());
     }

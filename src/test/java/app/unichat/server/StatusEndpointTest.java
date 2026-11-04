@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import app.unichat.bridge.BridgeStates;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 

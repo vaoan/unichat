@@ -1,7 +1,6 @@
 package app.unichat.ui;
 
 import app.unichat.model.MediaLibrary;
-import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -30,13 +29,7 @@ final class FavoritesPane extends ScrollPane {
         this.gifs = gifs;
         this.insertEmoji = insertEmoji;
         this.toast = toast;
-        content.getStyleClass().add("sticker-grid");
-        setContent(content);
-        setFitToWidth(true);
-        getStyleClass().add("side-panel-scroll");
-        library.addListener(() -> Platform.runLater(() -> {
-            if (getScene() != null) refresh();
-        }));
+        StickerGrid.setUp(this, content, library, this::refresh);
     }
 
     void refresh() {

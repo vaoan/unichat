@@ -20,14 +20,14 @@ class MatrixServiceDirectTest {
     @Test
     void keepsServerEntriesAndAddsNewBot() {
         JsonNode server = json("{\"@a:x\":[\"!1\"],\"@b:x\":[\"!2\"]}");
-        ObjectNode out = MatrixChatService.mergeDirect(server, json("{}"), "@c:x", "!3");
+        ObjectNode out = BridgeProtocol.mergeDirect(server, json("{}"), "@c:x", "!3");
         assertEquals(json("{\"@a:x\":[\"!1\"],\"@b:x\":[\"!2\"],\"@c:x\":[\"!3\"]}"), out);
     }
 
     @Test
     void doesNotDuplicateRoom() {
         JsonNode server = json("{\"@a:x\":[\"!1\"]}");
-        ObjectNode out = MatrixChatService.mergeDirect(server, json("{\"@a:x\":[\"!1\"]}"), "@a:x", "!1");
+        ObjectNode out = BridgeProtocol.mergeDirect(server, json("{\"@a:x\":[\"!1\"]}"), "@a:x", "!1");
         assertEquals(json("{\"@a:x\":[\"!1\"]}"), out);
     }
 
@@ -35,16 +35,16 @@ class MatrixServiceDirectTest {
     void nullOrEmptyServerFallsBackToCached() {
         JsonNode cached = json("{\"@a:x\":[\"!1\"]}");
         assertEquals(json("{\"@a:x\":[\"!1\"],\"@c:x\":[\"!3\"]}"),
-                MatrixChatService.mergeDirect(null, cached, "@c:x", "!3"));
+                BridgeProtocol.mergeDirect(null, cached, "@c:x", "!3"));
         assertEquals(json("{\"@a:x\":[\"!1\"],\"@c:x\":[\"!3\"]}"),
-                MatrixChatService.mergeDirect(json("{}"), cached, "@c:x", "!3"));
+                BridgeProtocol.mergeDirect(json("{}"), cached, "@c:x", "!3"));
     }
 
     @Test
     void localOnlyEntrySurvivesAndListsAreUnioned() {
         JsonNode server = json("{\"@a:x\":[\"!1\"]}");
         JsonNode cached = json("{\"@a:x\":[\"!1\",\"!9\"],\"@l:x\":[\"!8\"]}");
-        ObjectNode out = MatrixChatService.mergeDirect(server, cached, "@a:x", "!3");
+        ObjectNode out = BridgeProtocol.mergeDirect(server, cached, "@a:x", "!3");
         assertEquals(json("{\"@a:x\":[\"!1\",\"!9\",\"!3\"],\"@l:x\":[\"!8\"]}"), out);
         assertTrue(out.has("@l:x"));
     }

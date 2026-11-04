@@ -2,13 +2,12 @@ package app.unichat.ui;
 
 import app.unichat.login.BrowserSession;
 import app.unichat.login.CookieLogin;
-import app.unichat.login.CookieSpec;
-import app.unichat.login.SessionCookies;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Message;
-import app.unichat.model.MessageType;
 import app.unichat.model.Network;
+import app.unichat.server.TelegramKeys;
+import app.unichat.service.BridgeAccess;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
 import javafx.application.Platform;
@@ -21,18 +20,13 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SeparatorMenuItem;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
 
-import java.io.File;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -52,7 +46,18 @@ public final class AccountsPane extends VBox {
     private final Label title = new Label();
     private final Button back;
     private Runnable onBack;
-    private Wizard wizard;
+    private LoginWizard wizard;
+    private final LoginChoosers choosers;
+    private final LoginWizard.Navigation navigation = new LoginWizard.Navigation() {
+        @Override public void openBotChat(String chatId) {
+            closeSheet();
+            openChatId.accept(chatId);
+        }
+        @Override public void showPicker() { AccountsPane.this.showPicker(); }
+        @Override public void showList() { AccountsPane.this.showList(); }
+        @Override public void startLogin(Network n) { AccountsPane.this.startLogin(n); }
+        @Override public void setBack(Runnable action) { onBack = action; }
+    };
 
     /** {@code close} null = embedded in the settings window (no close button, no card frame). */
     public AccountsPane(ChatService svc, Runnable close, Consumer<String> toast, Consumer<String> openChatId) {
@@ -60,6 +65,7 @@ public final class AccountsPane extends VBox {
         this.close = close;
         this.toast = toast;
         this.openChatId = openChatId;
+        this.choosers = new LoginChoosers(svc, toast, this::setView, this::getScene, () -> wizard);
         getStyleClass().add("accounts-sheet");
         if (close != null) {
             getStyleClass().add("card");
@@ -153,7 +159,7 @@ public final class AccountsPane extends VBox {
         Button more = Composer.iconButton(Icons.MORE, "Opciones de " + Accounts.name(a), null);
         more.setOnAction(e -> accountMenu(a).show(more, Side.BOTTOM, 0, 4));
         HBox row = new HBox(12, icon, text, status, more);
-        if (a.network() == Network.DISCORD && svc instanceof app.unichat.matrix.MatrixChatService m) {
+        if (a.network() == Network.DISCORD && svc instanceof BridgeAccess m) {
             // Discord bridges no server by default: choosing them is part of connecting Discord.
             Button servers = new Button("Servidores");
             servers.getStyleClass().add("secondary-button");
@@ -162,7 +168,7 @@ public final class AccountsPane extends VBox {
             servers.setOnAction(e -> showDiscordGuilds(m));
             row.getChildren().add(2, servers);
         }
-        if (a.network() == Network.TELEGRAM && a.status() == app.unichat.model.AccountStatus.CONNECTED) {
+        if (a.network() == Network.TELEGRAM && a.status() == AccountStatus.CONNECTED) {
             // Telegram lists your chats only once, at login: this goes through the list again.
             Button sync = new Button("Sincronizar chats");
             sync.getStyleClass().add("secondary-button");
@@ -188,7 +194,7 @@ public final class AccountsPane extends VBox {
      * Which Discord servers come into Unichat: search, one switch per server, bridged ones first. A server's
      * channels appear as people write in them (no room is created for every channel at once).
      */
-    private void showDiscordGuilds(app.unichat.matrix.MatrixChatService m) {
+    private void showDiscordGuilds(BridgeAccess m) {
         dispose();
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(36, 36);
@@ -215,8 +221,8 @@ public final class AccountsPane extends VBox {
             rows.getStyleClass().add("settings-group");
             java.util.Set<String> on = new java.util.HashSet<>();
             for (var g : guilds) if (g.bridged()) on.add(g.id());
-            List<app.unichat.matrix.MatrixChatService.DiscordGuild> sorted = guilds.stream()
-                    .sorted(java.util.Comparator.comparing((app.unichat.matrix.MatrixChatService.DiscordGuild g) -> !g.bridged())
+            List<BridgeAccess.DiscordGuild> sorted = guilds.stream()
+                    .sorted(java.util.Comparator.comparing((BridgeAccess.DiscordGuild g) -> !g.bridged())
                             .thenComparing(g -> g.name().toLowerCase(java.util.Locale.ROOT)))
                     .toList();
             Runnable render = () -> {
@@ -426,8 +432,8 @@ public final class AccountsPane extends VBox {
     public void startLogin(Network n) {
         dispose();
         // Local server: the bridge itself says how to log in (always up to date). Otherwise: the bot chat.
-        if (svc instanceof app.unichat.matrix.MatrixChatService m && m.bridgeLogin(n) != null) {
-            if (n == Network.TELEGRAM && !app.unichat.server.TelegramKeys.saved()) {
+        if (svc instanceof BridgeAccess m && m.bridgeLogin(n) != null) {
+            if (n == Network.TELEGRAM && !TelegramKeys.saved()) {
                 // Telegram won't run without the person's own keys: ask here, not as an error afterwards.
                 setView("Conectar Telegram", new TelegramKeysForm("Guardar y continuar", () -> startBridgeLogin(m, n)), this::showPicker);
                 return;
@@ -438,7 +444,7 @@ public final class AccountsPane extends VBox {
         startBotLogin(n);
     }
 
-    private void startBridgeLogin(app.unichat.matrix.MatrixChatService m, Network n) {
+    private void startBridgeLogin(BridgeAccess m, Network n) {
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(36, 36);
         Label wait = new Label("Preparando " + n.displayName() + "… La primera vez se descarga su conector; tarda unos segundos.");
@@ -492,15 +498,15 @@ public final class AccountsPane extends VBox {
                 spin.setVisible(false);
                 return;
             }
-            wizard = new Wizard(n, botChatId, since);
+            wizard = new LoginWizard(svc, toast, navigation, n, botChatId, since);
             Runnable cancel = () -> {
                 wizard.cancel();
                 showPicker();
             };
             if (CookieLogin.isCookieNetwork(n)) {
-                showCookieSources(n, botChatId, cancel);
+                choosers.showCookieSources(n, botChatId, cancel);
             } else if (n == Network.DISCORD) {
-                showDiscordChoice(n, botChatId, cancel);
+                choosers.showDiscordChoice(n, botChatId, cancel);
             } else {
                 setView("Conectar " + n.displayName(), wizard.root, cancel);
             }
@@ -509,194 +515,7 @@ public final class AccountsPane extends VBox {
 
     // ------------------------------------------------------------------ 3a. Discord
 
-    /**
-     * Discord's QR login through the bridge ends in a captcha the bridge can't show (seen every time). Logging in on
-     * discord.com inside Unichat lets the user solve it; the account token is then handed to the bridge (which
-     * deletes that message).
-     */
-    private void showDiscordChoice(Network n, String botChatId, Runnable cancel) {
-        Wizard w = wizard;
-        Label heading = new Label("Conecta tu cuenta de Discord");
-        heading.getStyleClass().add("wizard-instructions");
-        heading.setWrapText(true);
-
-        Button web = new Button("Iniciar sesión en Discord");
-        web.getStyleClass().add("primary-button");
-        web.setMaxWidth(Double.MAX_VALUE);
-        web.setAccessibleText("Iniciar sesión en Discord en una ventana de Unichat");
-        // The bridge's own QR login always ended in a captcha it can't show; the web page's QR (inside this window) works.
-        Label webHelp = new Label("Se abre Discord aquí mismo. Entra con tu correo y contraseña o escanea el QR de la página con la app de Discord; si te pide un captcha, lo resuelves ahí.");
-        webHelp.setWrapText(true);
-        webHelp.getStyleClass().add("settings-help");
-
-
-        Label status = new Label();
-        status.setWrapText(true);
-        status.getStyleClass().add("settings-help");
-
-        VBox content = new VBox(12, heading, web, webHelp, status);
-        ScrollPane scroll = new ScrollPane(content);
-        scroll.setFitToWidth(true);
-        scroll.getStyleClass().add("sheet-scroll");
-
-        Consumer<String> send = command -> {
-            setView("Conectar " + n.displayName(), w.root, cancel);
-            w.sessionSent();
-            svc.sendLoginInput(n, botChatId, command).exceptionally(err -> {
-                Platform.runLater(() -> {
-                    if (wizard != w || w.finished) return;
-                    w.sessionFailed();
-                    setView("Conectar " + n.displayName(), scroll, cancel);
-                    status.setText("No se pudo enviar: " + rootMessage(err));
-                });
-                return null;
-            });
-        };
-        web.setOnAction(e -> {
-            if (LoginWebView.isOpen() || getScene() == null) return;
-            LoginWebView.openForToken(getScene().getWindow(), n, app.unichat.login.DiscordToken.LOGIN_URL,
-                    app.unichat.login.DiscordToken.EXTRACT_JS, app.unichat.login.DiscordToken::isToken,
-                    token -> send.accept("!" + n.protocolId() + " login-token user " + token), () -> { });
-        });
-        w.chooserActive = true;
-        setView("Conectar " + n.displayName(), scroll, cancel);
-    }
-
     // ------------------------------------------------------------------ 3b. cookie-source chooser
-
-    /**
-     * Friendly login for cookie networks: reuse a browser session, log in inside the app, or load a cookies.txt.
-     * Cookies are read only for {@code n}, sent only to the user's own bridge bot, and never logged.
-     */
-    private void showCookieSources(Network n, String botChatId, Runnable cancel) {
-        Wizard w = wizard;
-        String net = n.displayName();
-        Label searching = new Label("Buscando tu sesión de " + net + " en tus navegadores…");
-        searching.setWrapText(true);
-        searching.getStyleClass().add("settings-help");
-        ProgressIndicator spin = new ProgressIndicator();
-        spin.setMaxSize(22, 22);
-        HBox searchRow = new HBox(10, spin, searching);
-        searchRow.setAlignment(Pos.CENTER_LEFT);
-        VBox found = new VBox(10);
-        VBox top = new VBox(8, searchRow);
-        if (macNotice()) {
-            Label notice = new Label("macOS puede pedirte permiso para usar tu sesión del navegador.");
-            notice.setWrapText(true);
-            notice.getStyleClass().add("settings-help");
-            top.getChildren().add(notice);
-        }
-
-        Label status = new Label();
-        status.setWrapText(true);
-        status.setMinHeight(Region.USE_PREF_SIZE);
-        status.getStyleClass().add("settings-help");
-        status.setVisible(false);
-        status.setManaged(false);
-
-        ScrollPane[] chooser = new ScrollPane[1];
-        Consumer<SessionCookies> sendSession = cookies -> {
-            setView("Conectar " + net, w.root, cancel);
-            w.sessionSent();
-            svc.sendLoginInput(n, botChatId, cookies.toBridgeJson()).exceptionally(err -> {
-                Platform.runLater(() -> {
-                    toast.accept("No se pudo enviar: " + rootMessage(err));
-                    // undo the waiting state so the user can retry from the chooser
-                    if (wizard == w && !w.finished) {
-                        w.sessionFailed();
-                        setView("Conectar " + net, chooser[0], cancel);
-                    }
-                });
-                return null;
-            });
-        };
-
-        Label heading = new Label("Elige cómo conectar tu cuenta de " + net);
-        heading.setWrapText(true);
-        heading.getStyleClass().add("wizard-instructions");
-
-        Button other = new Button("Iniciar sesión con otra cuenta");
-        other.getStyleClass().add("secondary-button");
-        other.setMaxWidth(Double.MAX_VALUE);
-        other.setOnAction(e -> {
-            if (LoginWebView.isOpen() || getScene() == null) return;
-            LoginWebView.open(getScene().getWindow(), n, CookieSpec.forNetwork(n), sendSession, () -> { });
-        });
-        other.setDisable(LoginWebView.isOpen());
-
-        Button file = new Button("Elegir archivo cookies.txt…");
-        file.getStyleClass().add("secondary-button");
-        file.setMaxWidth(Double.MAX_VALUE);
-        file.setOnAction(e -> {
-            if (getScene() == null) return;
-            FileChooser fc = new FileChooser();
-            fc.setTitle("Elige tu archivo cookies.txt");
-            fc.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("cookies.txt", "*.txt"),
-                    new FileChooser.ExtensionFilter("Todos los archivos", "*.*"));
-            File f = fc.showOpenDialog(getScene().getWindow());
-            if (f == null) return;
-            CookieLogin.TxtResult r = CookieLogin.fromCookieTxt(f.toPath(), n);
-            switch (r.kind()) {
-                case OK -> sendSession.accept(r.cookies());
-                case MISSING -> showStatus(status, missingMessage(n, r.missing()));
-                default -> showStatus(status, r.message());
-            }
-        });
-
-        Button paste = new Button("Pegar cookies manualmente");
-        paste.getStyleClass().add("link-button");
-        paste.setOnAction(e -> {
-            w.chooserActive = false;
-            setView("Conectar " + net, w.root, cancel);
-            w.update();
-        });
-
-        VBox content = new VBox(12, heading, top, found, other, file, status, paste);
-        ScrollPane scroll = new ScrollPane(content);
-        scroll.setFitToWidth(true);
-        scroll.getStyleClass().add("sheet-scroll");
-        chooser[0] = scroll;
-        w.chooserActive = true;
-        setView("Conectar " + net, scroll, cancel);
-
-        CookieLogin.findBrowserSessions(n).whenComplete((sessions, err) -> Platform.runLater(() -> {
-            if (wizard != w) return; // user left the screen meanwhile
-            top.getChildren().remove(searchRow);
-            List<BrowserSession> list = err != null || sessions == null ? List.of() : sessions;
-            if (list.isEmpty()) {
-                Label none = new Label("No encontramos una sesión en tus navegadores.");
-                none.setWrapText(true);
-                none.getStyleClass().add("settings-help");
-                found.getChildren().add(none);
-            }
-            for (BrowserSession s : list) {
-                String label = sessionLabel(net, s);
-                Label l = new Label(label);
-                l.setWrapText(true);
-                l.getStyleClass().add("settings-label");
-                HBox.setHgrow(l, Priority.ALWAYS);
-                l.setMaxWidth(Double.MAX_VALUE);
-                Button use = new Button("Usar esta sesión");
-                use.getStyleClass().add("primary-button");
-                use.setAccessibleText(label);
-                use.setOnAction(e -> sendSession.accept(s.cookies()));
-                HBox card = new HBox(12, l, use);
-                card.setAlignment(Pos.CENTER_LEFT);
-                card.getStyleClass().add("settings-row");
-                found.getChildren().add(card);
-            }
-        }));
-    }
-
-    private static void showStatus(Label status, String text) {
-        status.setText(text);
-        status.setVisible(true);
-        status.setManaged(true);
-    }
-
-    private static boolean macNotice() {
-        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
-    }
 
     /** Card caption for a browser session, e.g. "Usar tu sesión de Instagram de Firefox (default)". */
     static String sessionLabel(String net, BrowserSession s) {
@@ -710,221 +529,6 @@ public final class AccountsPane extends VBox {
                 + ". Exporta las cookies con la sesión de " + n.displayName() + " abierta.";
     }
 
-    /** Mirrors the bridge-bot conversation as a friendly form. */
-    private final class Wizard implements ChatService.Listener {
-        final Network network;
-        final String botChatId;
-        final Instant since;
-        final VBox root = new VBox(14);
-        final Label instructions = new Label();
-        final StackPane qrBox = new StackPane();
-        final ImageView qr = new ImageView();
-        final Label botText = new Label();
-        final TextArea input = new TextArea();
-        final Button send = new Button("Enviar");
-        final HBox inputRow;
-        final VBox done = new VBox(12);
-        String shownQr;
-        boolean finished;
-        boolean sent;
-        Instant sentAt = Instant.EPOCH;
-        /** True while the cookie-source chooser is on screen: bot messages must not replace it. */
-        boolean chooserActive;
-
-        Wizard(Network network, String botChatId, Instant since) {
-            this.network = network;
-            this.botChatId = botChatId;
-            this.since = since;
-            instructions.setText(instructions(network));
-            instructions.setWrapText(true);
-            instructions.setMinHeight(Region.USE_PREF_SIZE);
-            instructions.getStyleClass().add("wizard-instructions");
-
-            qr.setFitWidth(260);
-            qr.setFitHeight(260);
-            qr.setPreserveRatio(true);
-            qr.setSmooth(false); // keep QR modules crisp
-            qrBox.getChildren().add(qr);
-            qrBox.getStyleClass().add("qr-box");
-            qrBox.setMaxSize(284, 284);
-            qrBox.setVisible(false);
-            qrBox.setManaged(false);
-            qrBox.setAccessibleText("Código QR para vincular " + network.displayName());
-
-            botText.setWrapText(true);
-            botText.setMinHeight(Region.USE_PREF_SIZE);
-            botText.getStyleClass().add("wizard-bot");
-
-            input.setPromptText(promptFor(network));
-            input.setWrapText(true);
-            input.setPrefRowCount(3);
-            input.setAccessibleText(promptFor(network));
-            HBox.setHgrow(input, Priority.ALWAYS);
-            send.getStyleClass().add("primary-button");
-            send.setOnAction(e -> submit());
-            send.disableProperty().bind(input.textProperty().map(String::isBlank));
-            input.setOnKeyPressed(e -> {
-                if (e.getCode() == javafx.scene.input.KeyCode.ENTER && e.isShortcutDown()) submit();
-            });
-            inputRow = new HBox(8, input, send);
-            inputRow.setAlignment(Pos.BOTTOM_LEFT);
-            boolean needsInput = !qrNetwork(network);
-            inputRow.setVisible(needsInput);
-            inputRow.setManaged(needsInput);
-
-            Button details = new Button("Ver el chat técnico del puente");
-            details.getStyleClass().add("link-button");
-            details.setOnAction(e -> {
-                closeSheet();
-                openChatId.accept(botChatId);
-            });
-            done.setVisible(false);
-            done.setManaged(false);
-            done.setAlignment(Pos.CENTER);
-
-            root.getChildren().addAll(instructions, qrBox, botText, inputRow, done, details);
-            root.setAlignment(Pos.TOP_CENTER);
-            svc.addListener(this);
-            update();
-        }
-
-        /** A session was sent to the bridge: hide the manual-paste UI and wait for its answer. */
-        void sessionSent() {
-            sent = true;
-            chooserActive = false;
-            sentAt = Instant.now();
-            instructions.setText("Enviamos tu sesión al puente. Esperando su confirmación…");
-            inputRow.setVisible(false);
-            inputRow.setManaged(false);
-        }
-
-        /** Sending the session failed: back to the manual state. */
-        void sessionFailed() {
-            sent = false;
-            chooserActive = true;
-            instructions.setText(instructions(network));
-            inputRow.setVisible(true);
-            inputRow.setManaged(true);
-        }
-
-        void dispose() {
-            svc.removeListener(this);
-        }
-
-        void cancel() {
-            dispose();
-            if (!finished) svc.cancelLogin(network, botChatId);
-        }
-
-        @Override
-        public void messagesChanged(String chatId) {
-            if (botChatId.equals(chatId)) Platform.runLater(this::update);
-        }
-
-        private void submit() {
-            String text = input.getText().strip();
-            if (text.isEmpty()) return;
-            input.clear();
-            svc.sendLoginInput(network, botChatId, text).exceptionally(err -> {
-                Platform.runLater(() -> toast.accept("No se pudo enviar: " + rootMessage(err)));
-                return null;
-            });
-        }
-
-        /** Renders the newest bot state: QR image, last instruction text, success or failure. */
-        void update() {
-            if (finished || chooserActive) return;
-            List<Message> msgs = svc.messages(botChatId).stream()
-                    .filter(m -> !m.outgoing() && !m.timestamp().isBefore(since)).toList();
-            Message lastImage = null;
-            Message lastText = null;
-            for (Message m : msgs) {
-                if (m.deleted()) continue;
-                if (m.type() == MessageType.IMAGE && m.mediaUrl() != null) lastImage = m;
-                else if (!m.body().isBlank()) lastText = m;
-            }
-            if (lastText != null) {
-                String b = lastText.body().toLowerCase(Locale.ROOT);
-                if (b.contains("successfully logged in") || b.contains("sesión iniciada")) {
-                    success(lastText.body());
-                    return;
-                }
-                if (b.contains("login failed") || b.contains("login cancelled") || b.contains("invalid")
-                        || b.contains("timed out")) {
-                    failure(lastText.body());
-                    return;
-                }
-                botText.setText("Puente: " + lastText.body());
-                boolean asksInput = !qrNetwork(network) || b.contains("password") || b.contains("contraseña")
-                        || ((b.contains("code") || b.contains("código")) && !b.contains("qr"));
-                // after a session was sent, only a prompt newer than that send re-opens the input
-                boolean showInput = asksInput && (!sent || lastText.timestamp().isAfter(sentAt));
-                inputRow.setVisible(showInput);
-                inputRow.setManaged(showInput);
-            }
-            if (lastImage != null && !lastImage.mediaUrl().equals(shownQr)) {
-                String url = lastImage.mediaUrl();
-                shownQr = url;
-                svc.media(url, 0, 0).thenAccept(p -> Platform.runLater(() -> {
-                    if (!url.equals(shownQr)) return;
-                    qr.setImage(new Image(p.toUri().toString()));
-                    qrBox.setVisible(true);
-                    qrBox.setManaged(true);
-                }));
-            }
-        }
-
-        private void success(String botMessage) {
-            finished = true;
-            dispose();
-            Label ok = new Label("✅");
-            ok.getStyleClass().add("jumbo-emoji");
-            Label head = new Label(network.displayName() + " conectado");
-            head.getStyleClass().add("sheet-title");
-            Label sub = new Label(botMessage.replaceAll("(?i)successfully logged in as", "Sesión iniciada como")
-                    + "\nTus chats van a ir apareciendo en la bandeja en los próximos minutos.");
-            sub.setWrapText(true);
-            sub.getStyleClass().add("settings-help");
-            Button another = new Button("Agregar otra cuenta");
-            another.getStyleClass().add("secondary-button");
-            another.setOnAction(e -> showPicker());
-            Button finish = new Button("Listo");
-            finish.getStyleClass().add("primary-button");
-            finish.setDefaultButton(true);
-            finish.setOnAction(e -> showList());
-            HBox buttons = new HBox(10, another, finish);
-            buttons.setAlignment(Pos.CENTER);
-            done.getChildren().setAll(ok, head, sub, buttons);
-            show(done);
-            onBack = AccountsPane.this::showList;
-            Platform.runLater(finish::requestFocus);
-        }
-
-        private void failure(String botMessage) {
-            finished = true;
-            dispose();
-            Label head = new Label("No se pudo conectar " + network.displayName());
-            head.getStyleClass().add("sheet-title");
-            Label sub = new Label("El puente respondió: " + botMessage);
-            sub.setWrapText(true);
-            sub.getStyleClass().add("settings-help");
-            Button retry = new Button("Intentar de nuevo");
-            retry.getStyleClass().add("primary-button");
-            retry.setOnAction(e -> startLogin(network));
-            done.getChildren().setAll(head, sub, retry);
-            show(done);
-            onBack = AccountsPane.this::showPicker;
-        }
-
-        private void show(Node only) {
-            for (Node n : root.getChildren()) {
-                boolean keep = n == only;
-                n.setVisible(keep);
-                n.setManaged(keep);
-            }
-        }
-    }
-
     static boolean qrNetwork(Network n) {
         return switch (n) {
             case WHATSAPP, SIGNAL, TELEGRAM, DISCORD -> true;
@@ -932,7 +536,7 @@ public final class AccountsPane extends VBox {
         };
     }
 
-    private static String promptFor(Network n) {
+    static String promptFor(Network n) {
         return switch (n) {
             case SLACK -> "Correo o código de verificación";
             case INSTAGRAM, MESSENGER, X, LINKEDIN, GOOGLE_MESSAGES -> "Pega aquí el cURL o las cookies";

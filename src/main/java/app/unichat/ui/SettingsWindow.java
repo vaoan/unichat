@@ -1,9 +1,15 @@
 package app.unichat.ui;
 
-import app.unichat.model.Account;
-import app.unichat.model.AccountStatus;
+import app.unichat.gif.GifProviders;
+import app.unichat.model.Network;
+import app.unichat.server.LocalServer;
+import app.unichat.server.LogFiles;
 import app.unichat.service.ChatService;
+import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
+import app.unichat.stt.SttSettings;
+import app.unichat.stt.Transcriber;
+import app.unichat.stt.WhisperModel;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -386,7 +392,7 @@ public final class SettingsWindow {
             b.setOnAction(e -> {
                 if (!b.isSelected()) b.setSelected(true);
                 s.setLogRetentionDays(d);
-                Thread.ofVirtual().start(() -> app.unichat.LogFiles.cleanOld(app.unichat.LogFiles.roots(),
+                Thread.ofVirtual().start(() -> LogFiles.cleanOld(LogFiles.roots(),
                         java.time.Duration.ofDays(d), java.time.Instant.now()));
             });
             days.getChildren().add(b);
@@ -396,7 +402,7 @@ public final class SettingsWindow {
         clear.setOnAction(e -> {
             clear.setDisable(true);
             Thread.ofVirtual().start(() -> {
-                app.unichat.LogFiles.clearAll(app.unichat.LogFiles.roots());
+                LogFiles.clearAll(LogFiles.roots());
                 javafx.application.Platform.runLater(() -> {
                     clear.setText("Registros borrados");
                     clear.setDisable(false);
@@ -417,7 +423,7 @@ public final class SettingsWindow {
         return page("Redes", intro, telegramGroup(), group("WhatsApp",
                 row("Stickers animados", "WhatsApp no acepta los stickers animados de otras redes tal cual. Sticker: se "
                         + "convierte en sticker animado. GIF: llega como un GIF que se repite. Video: llega como un video corto.",
-                        stickerModeChoice(app.unichat.model.Network.WHATSAPP))),
+                        stickerModeChoice(Network.WHATSAPP))),
                 group("Discord",
                         row("Borrar fotos y videos de canales después de", "Discord guarda en tu disco una copia de cada "
                                 + "imagen y video de los canales de servidores. Los avatares, emojis y los demás chats no "
@@ -431,7 +437,7 @@ public final class SettingsWindow {
         done.getStyleClass().add("settings-help");
         TelegramKeysForm form = new TelegramKeysForm("Guardar claves", () -> {
             done.setText("Guardadas.");
-            app.unichat.server.LocalServer local = app.unichat.server.LocalServer.get();
+            LocalServer local = LocalServer.get();
             if (local == null) return;
             Thread t = new Thread(() -> {
                 try {
@@ -471,14 +477,14 @@ public final class SettingsWindow {
         return box;
     }
 
-    private static Node stickerModeChoice(app.unichat.model.Network n) {
+    private static Node stickerModeChoice(Network n) {
         Settings s = Settings.get();
-        String key = app.unichat.matrix.StickerConverter.modeKey(n);
-        app.unichat.matrix.StickerConverter.Mode current = app.unichat.matrix.StickerConverter.mode(n);
+        String key = StickerMode.key(n);
+        StickerMode current = StickerMode.of(n);
         ToggleGroup tg = new ToggleGroup();
         HBox box = new HBox(6);
         box.setAccessibleText("Cómo enviar stickers animados a " + n.displayName());
-        for (var m : app.unichat.matrix.StickerConverter.Mode.values()) {
+        for (var m : StickerMode.values()) {
             String label = switch (m) {
                 case STICKER -> "Sticker";
                 case GIF -> "GIF";
@@ -511,13 +517,13 @@ public final class SettingsWindow {
         modelState.getStyleClass().add("settings-help");
         modelState.setWrapText(true);
         modelState.setMaxWidth(240);
-        Runnable refreshModel = () -> modelState.setText(s.sttModel().isInstalled(app.unichat.stt.Transcriber.modelsDir())
+        Runnable refreshModel = () -> modelState.setText(SttSettings.model().isInstalled(Transcriber.modelsDir())
                 ? "Descargado." : "Se descarga la primera vez que transcribes.");
         refreshModel.run();
         Node models = chips("Modelo de Whisper", java.util.List.of(app.unichat.stt.WhisperModel.values()),
-                m -> m == app.unichat.stt.WhisperModel.BASE ? "Rápido · 60 MB" : "Preciso · 190 MB",
-                s.sttModel(), m -> {
-                    s.setSttModel(m);
+                m -> m == WhisperModel.BASE ? "Rápido · 60 MB" : "Preciso · 190 MB",
+                SttSettings.model(), m -> {
+                    SttSettings.setModel(m);
                     refreshModel.run();
                 });
         Node languages = chips("Idioma de las notas de voz", java.util.List.of("auto", "es", "en", "pt"),
@@ -529,14 +535,14 @@ public final class SettingsWindow {
                 }, s.sttLanguage(), s::setSttLanguage);
 
         TextField command = new TextField(s.sttCommand());
-        command.setPromptText(app.unichat.stt.Transcriber.EXAMPLE_COMMAND);
+        command.setPromptText(Transcriber.EXAMPLE_COMMAND);
         command.setPrefColumnCount(16);
         command.setAccessibleText("Comando propio para transcribir");
         command.textProperty().addListener((o, a, b) -> s.setSttCommand(b.strip()));
         Node engines = chips("Cómo transcribir", java.util.List.of(app.unichat.stt.Transcriber.Engine.values()),
-                e -> e == app.unichat.stt.Transcriber.Engine.WHISPER ? "Whisper (incluido)" : "Comando propio",
-                s.sttEngine(), s::setSttEngine);
-        boolean bundled = app.unichat.stt.Transcriber.whisperBinary() != null;
+                e -> e == Transcriber.Engine.WHISPER ? "Whisper (incluido)" : "Comando propio",
+                SttSettings.engine(), SttSettings::setEngine);
+        boolean bundled = Transcriber.whisperBinary() != null;
         return page("Voz a texto", intro,
                 group("Motor", row("Cómo transcribir", bundled ? "Whisper viene con Unichat y funciona sin internet una vez "
                         + "descargado el modelo." : "Esta instalación no trae Whisper: usa un comando propio.", engines)),
@@ -586,7 +592,7 @@ public final class SettingsWindow {
         intro.setWrapText(true);
         intro.getStyleClass().add("settings-help");
         groups.add(intro);
-        for (app.unichat.gif.GifProviders.Known k : app.unichat.gif.GifProviders.known()) {
+        for (GifProviders.Known k : GifProviders.known()) {
             String enabledKey = "gif." + k.id() + ".enabled", keyKey = "gif." + k.id() + ".key";
             PasswordField key = new PasswordField();
             key.setText(s.getString(keyKey, ""));

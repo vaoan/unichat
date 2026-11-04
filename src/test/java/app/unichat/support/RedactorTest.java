@@ -1,4 +1,4 @@
-package app.unichat;
+package app.unichat.support;
 
 import org.junit.jupiter.api.Test;
 

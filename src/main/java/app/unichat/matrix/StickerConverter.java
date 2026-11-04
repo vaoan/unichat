@@ -1,13 +1,14 @@
 package app.unichat.matrix;
 
+import app.unichat.gif.GifFrames;
 import app.unichat.model.RoomFeatures;
+import app.unichat.support.BundledTools;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -19,22 +20,6 @@ public final class StickerConverter {
     static final String WEBP = "image/webp", PNG = "image/png";
 
     record Result(Path file, String mime) {}
-
-    /** How a network gets animated (GIF) stickers: Ajustes → Redes. */
-    public enum Mode { STICKER, GIF, VIDEO }
-
-    public static String modeKey(app.unichat.model.Network n) {
-        return n.name().toLowerCase(Locale.ROOT) + ".animatedStickers";
-    }
-
-    public static Mode mode(app.unichat.model.Network n) {
-        String v = app.unichat.settings.Settings.get().getString(modeKey(n), Mode.STICKER.name());
-        try {
-            return Mode.valueOf(v);
-        } catch (IllegalArgumentException e) {
-            return Mode.STICKER;
-        }
-    }
 
     private static final int FPS = 25;
     /** Short stickers are looped up to this long, so a video isn't over before it's seen. */
@@ -85,7 +70,7 @@ public final class StickerConverter {
      * the PATH; null when there's none.
      */
     static Path gif2webp() {
-        return app.unichat.BundledTools.find("unichat.gif2webp", null, "gif2webp");
+        return BundledTools.find("unichat.gif2webp", null, "gif2webp");
     }
 
     static Result convert(Path in, String target, Path dir) throws IOException {

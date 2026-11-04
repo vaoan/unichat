@@ -25,7 +25,7 @@ class BridgesLiveIT {
 
     @Test
     void everyBridgeAnswersLogin() throws Exception {
-        MatrixChatService svc = MatrixChatService.login(System.getenv("UNICHAT_IT_BRIDGES"),
+        MatrixChatService svc = MatrixLogin.login(System.getenv("UNICHAT_IT_BRIDGES"),
                 System.getenv("UNICHAT_IT_USER"), System.getenv("UNICHAT_IT_PASSWORD")).join();
         svc.start();
         try {
@@ -42,14 +42,14 @@ class BridgesLiveIT {
             StringBuilder failures = new StringBuilder();
             for (Network n : available) {
                 String roomId = svc.connectNetwork(n).join();
-                String cmd = MatrixChatService.botCommand(n, MatrixChatService.loginCommand(n));
+                String cmd = BridgeProtocol.botCommand(n, BridgeProtocol.loginCommand(n));
                 String reply = awaitBotReply(svc, roomId, cmd);
                 System.out.println("=== " + n + " <- " + cmd + "\n" + reply);
                 String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
                 if (reply == null || lower.contains("invalid login flow") || lower.contains("unknown command")) {
                     failures.append(n).append(": ").append(reply).append('\n');
                 }
-                svc.sendText(roomId, MatrixChatService.botCommand(n, "cancel"), null).join();
+                svc.sendText(roomId, BridgeProtocol.botCommand(n, "cancel"), null).join();
             }
             System.out.println("accounts = " + svc.accounts());
             assertFalse(available.isEmpty(), "no bridge bots found");

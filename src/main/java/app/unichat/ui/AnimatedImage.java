@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.gif.GifFrames;
+
 import com.twelvemonkeys.imageio.plugins.webp.WebPImageReaderSpi;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -23,7 +25,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Animated stickers/GIFs, decoded here and played by {@link #play}, which stops when the view leaves the screen.
@@ -130,11 +131,11 @@ public final class AnimatedImage {
         String key = file + "|" + maxW + "x" + maxH;
         Frames hit = cached(key);
         if (hit != null) return hit;
-        int count = app.unichat.matrix.GifFrames.count(file);
+        int count = GifFrames.count(file);
         List<Image> images = new ArrayList<>();
         List<Integer> delays = new ArrayList<>();
         int[] step = {1};
-        app.unichat.matrix.GifFrames.read(file, f -> {
+        GifFrames.read(file, f -> {
             int i = delays.size();
             delays.add(f.delayMs());
             BufferedImage scaled = i % step[0] == 0 ? scale(f.image(), maxW, maxH) : null;

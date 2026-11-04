@@ -87,6 +87,33 @@ public final class LoginWebView {
      * The window: shows {@code url}; every 1.5 s and after each page load asks {@code finish} whether the login
      * is done; a non-null answer closes the window and then runs it.
      */
+    /** Fresh local storage per window (another account can log in; nothing stays behind). */
+    private static Path freshStorage(WebEngine engine) {
+        Path storage = null;
+        try {
+            storage = Files.createTempDirectory("unichat-login");
+            engine.setUserDataDirectory(storage.toFile());
+        } catch (IOException | RuntimeException ignored) {
+            // Default storage: login still works.
+        }
+        return storage;
+    }
+
+    private static HBox cancelBar(Network network, Button cancel) {
+        Label hint = new Label("Inicia sesión como en la web de " + network.displayName()
+                + ". Puede tardar unos segundos en cargar; la ventana se cerrará sola al terminar.");
+        hint.getStyleClass().add("settings-help");
+        hint.setWrapText(true);
+        cancel.setAccessibleText("Cancelar el inicio de sesión en " + network.displayName());
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox bar = new HBox(10, hint, spacer, cancel);
+        bar.setAlignment(Pos.CENTER_LEFT);
+        bar.setPadding(new Insets(10, 14, 10, 14));
+        bar.getStyleClass().add("settings-row");
+        return bar;
+    }
+
     private static void openWindow(Window owner, Network network, String url,
                                    BiFunction<WebEngine, CookieManager, Runnable> finish, Runnable onCancel) {
         if (openStage != null) { // never swap the global handler twice
@@ -101,15 +128,7 @@ public final class LoginWebView {
         web.setContextMenuEnabled(false);
         WebEngine engine = web.getEngine();
         engine.setUserAgent(LoginUrls.userAgent());
-        // Fresh local storage per window (another account can log in; nothing stays behind).
-        Path storage = null;
-        try {
-            storage = Files.createTempDirectory("unichat-login");
-            engine.setUserDataDirectory(storage.toFile());
-        } catch (IOException | RuntimeException ignored) {
-            // Default storage: login still works.
-        }
-        Path storageDir = storage;
+        Path storageDir = freshStorage(engine);
         web.setAccessibleText("Página de inicio de sesión de " + network.displayName());
 
         Stage stage = new Stage();
@@ -117,18 +136,8 @@ public final class LoginWebView {
         stage.initModality(Modality.WINDOW_MODAL);
         stage.setTitle("Iniciar sesión en " + network.displayName());
 
-        Label hint = new Label("Inicia sesión como en la web de " + network.displayName()
-                + ". Puede tardar unos segundos en cargar; la ventana se cerrará sola al terminar.");
-        hint.getStyleClass().add("settings-help");
-        hint.setWrapText(true);
         Button cancel = new Button("Cancelar");
-        cancel.setAccessibleText("Cancelar el inicio de sesión en " + network.displayName());
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox bar = new HBox(10, hint, spacer, cancel);
-        bar.setAlignment(Pos.CENTER_LEFT);
-        bar.setPadding(new Insets(10, 14, 10, 14));
-        bar.getStyleClass().add("settings-row");
+        HBox bar = cancelBar(network, cancel);
 
         BorderPane root = new BorderPane(web);
         root.setTop(bar);

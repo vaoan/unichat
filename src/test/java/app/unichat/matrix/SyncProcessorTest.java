@@ -111,7 +111,7 @@ class SyncProcessorTest {
         assertEquals("$1", reply.replyToId());
         assertEquals("my answer", reply.body());
         assertTrue(messages("!r:example.org").get(0).outgoing());
-        assertEquals("plain", SyncProcessor.stripReplyFallback("plain"));
+        assertEquals("plain", SyncEvents.stripReplyFallback("plain"));
     }
 
     @Test
@@ -325,7 +325,7 @@ class SyncProcessorTest {
 
     @Test
     void mutedFromOverrideRule() {
-        Set<String> muted = SyncProcessor.mutedRoomsFrom(json("""
+        Set<String> muted = SyncEvents.mutedRoomsFrom(json("""
                 {'global':{'override':[{'rule_id':'!a:x','enabled':true,'actions':['dont_notify']},
                   {'rule_id':'.m.rule.master','enabled':false,'actions':[]}],
                  'room':[{'rule_id':'!b:x','enabled':true,'actions':['notify']}]}}"""));

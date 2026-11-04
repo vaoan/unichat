@@ -2,8 +2,12 @@ package app.unichat.ui;
 
 import app.unichat.model.Chat;
 import app.unichat.model.ConnectionState;
+import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
+import app.unichat.model.Network;
 import app.unichat.service.ChatService;
+import app.unichat.settings.Settings;
+import app.unichat.support.Os;
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
 import javafx.animation.SequentialTransition;
@@ -22,12 +26,11 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.function.Consumer;
 
 /** Main window content: rail | chat list | thread (+ info panel), overlays and toasts. */
 public final class MainView extends StackPane {
-    public static final boolean MAC = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
+    public static final boolean MAC = Os.mac();
 
     private final ChatService svc;
     private final Stage stage;
@@ -51,10 +54,10 @@ public final class MainView extends StackPane {
     private boolean infoVisible;
     private SidePanel panel;
     /** Favourite and recent stickers/GIFs, shared by every chat. */
-    private final app.unichat.model.MediaLibrary library =
-            new app.unichat.model.MediaLibrary(app.unichat.settings.Settings.dataDir().resolve("media-library.json"));
+    private final MediaLibrary library =
+            new MediaLibrary(Settings.dataDir().resolve("media-library.json"));
 
-    public app.unichat.model.MediaLibrary library() { return library; }
+    public MediaLibrary library() { return library; }
     private final java.util.Set<String> dirtyThreads = new java.util.HashSet<>();
 
     private final ChatService.Listener listener = new ChatService.Listener() {
@@ -72,7 +75,7 @@ public final class MainView extends StackPane {
         @Override public void reminderDue(Chat chat) {
             Platform.runLater(() -> {
                 notifier.reminder(chat);
-                if (app.unichat.settings.Settings.get().speakMessages()) Speaker.say("Recordatorio: " + chat.title());
+                if (Settings.get().speakMessages()) Speaker.say("Recordatorio: " + chat.title());
             });
         }
     };
@@ -247,7 +250,7 @@ public final class MainView extends StackPane {
 
     private void onIncoming(Chat chat, Message m) {
         boolean viewing = stage.isFocused() && stage.isShowing() && thread.chat() != null && thread.chat().id().equals(chat.id());
-        var settings = app.unichat.settings.Settings.get();
+        var settings = Settings.get();
         if (NotificationPolicy.shouldNotify(chat.archived(), settings.notifyArchived(), viewing)) notifier.notify(chat, m);
         if (settings.speakMessages() && (!chat.archived() || settings.notifyArchived())) Speaker.say(spoken(chat, m));
     }
@@ -256,12 +259,12 @@ public final class MainView extends StackPane {
     static String spoken(Chat chat, Message m) {
         String who = chat.group() ? m.senderName() + " en " + chat.title() : chat.title();
         String head = "Mensaje de " + who + ", " + chat.network().displayName();
-        return app.unichat.settings.Settings.get().notificationPreview() ? head + ": " + m.preview() : head;
+        return Settings.get().notificationPreview() ? head + ": " + m.preview() : head;
     }
 
     /** Rebuilds the strip of accounts that aren't working; announced to screen readers when it changes. */
     private void showAccountAlerts() {
-        java.util.Set<app.unichat.model.Network> inUse = java.util.EnumSet.noneOf(app.unichat.model.Network.class);
+        java.util.Set<Network> inUse = java.util.EnumSet.noneOf(Network.class);
         for (Chat c : svc.chats()) if (!c.bridgeBot() && !c.space()) inUse.add(c.network());
         java.util.List<AccountAlerts.Alert> alerts = AccountAlerts.of(svc.accounts(), inUse);
         String key = alerts.toString();
@@ -443,12 +446,12 @@ public final class MainView extends StackPane {
     }
 
     /** Filters the inbox to one network (all its accounts). */
-    public void showNetwork(app.unichat.model.Network n) {
+    public void showNetwork(Network n) {
         listPane.goTo(listPane.filterProperty().get().switchTo(n, null));
     }
 
     /** Starts the login of one more account on {@code n} and opens its bridge-bot chat. */
-    public void addAccount(app.unichat.model.Network n) {
+    public void addAccount(Network n) {
         showAccounts().startLogin(n);
     }
 
@@ -462,7 +465,7 @@ public final class MainView extends StackPane {
 
     /** Text size: delta 0 resets to 100 %. */
     private void zoom(double delta) {
-        var s = app.unichat.settings.Settings.get();
+        var s = Settings.get();
         s.setFontScale(delta == 0 ? 1.0 : s.fontScale() + delta);
         Theme.applyAll();
         listPane.refresh();

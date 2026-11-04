@@ -32,7 +32,7 @@ class SyncCacheKeyTest {
         Files.writeString(stale, "{}");
         Path unrelated = stale.resolveSibling("avatar-123.png");
         Files.writeString(unrelated, "x");
-        MatrixChatService.dropSyncCaches();
+        SyncCache.drop();
         assertFalse(Files.exists(stale));
         assertTrue(Files.exists(unrelated), "only sync caches are removed");
         Files.delete(unrelated);

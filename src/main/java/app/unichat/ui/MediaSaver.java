@@ -1,8 +1,8 @@
 package app.unichat.ui;
 
+import app.unichat.service.MediaSource;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
-import app.unichat.service.ChatService;
 import javafx.application.Platform;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
@@ -65,7 +65,7 @@ final class MediaSaver {
     }
 
     /** Asks where to save, then copies the downloaded file there. */
-    static void save(Window owner, ChatService svc, Message m, Consumer<String> toast) {
+    static void save(Window owner, MediaSource svc, Message m, Consumer<String> toast) {
         FileChooser fc = new FileChooser();
         fc.setTitle("Guardar como");
         fc.setInitialFileName(suggestedName(m, ZoneId.systemDefault()));

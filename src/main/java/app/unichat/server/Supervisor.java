@@ -1,6 +1,6 @@
 package app.unichat.server;
 
-import app.unichat.Redactor;
+import app.unichat.support.Redactor;
 
 import java.io.BufferedReader;
 import java.io.IOException;

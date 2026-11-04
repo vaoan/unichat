@@ -1,5 +1,10 @@
 package app.unichat.server;
 
+import app.unichat.settings.Settings;
+import app.unichat.bridge.BridgePorts;
+import app.unichat.bridge.BridgeStates;
+import app.unichat.support.Redactor;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -40,10 +45,6 @@ public final class LocalServer {
     static final String USER = "yo";
 
     /** Appservice port of each bridge (same as server/setup.sh). */
-    static final Map<String, Integer> BRIDGE_PORTS = Map.of(
-            "whatsapp", 29318, "telegram", 29317, "signal", 29328, "instagram", 29319, "facebook", 29320,
-            "discord", 29334, "slack", 29335, "gmessages", 29336, "twitter", 29327, "linkedin", 29341);
-
     private static LocalServer instance;
 
     private final Platform platform;
@@ -65,7 +66,7 @@ public final class LocalServer {
         this.manifest = Manifest.bundled();
         this.store = new BinaryStore(dir.resolve("bin"), platform);
         this.supervisor = new Supervisor(dir.resolve("run"));
-        java.util.Map<String, Integer> ports = new java.util.HashMap<>(BRIDGE_PORTS);
+        java.util.Map<String, Integer> ports = new java.util.HashMap<>(BridgePorts.BRIDGE_PORTS);
         ports.put("tuwunel", PORT);
         this.watchdog = new Watchdog(ports, this::watched, states, (name, why) -> supervisor.kill(name));
         // Whatever way Unichat ends (Salir, ⌘Q, logout of the Mac, kill), its server and bridges end with it.
@@ -100,7 +101,7 @@ public final class LocalServer {
 
     /** A bridge's as_token, from its registration (it authorizes the bridge's status reports). */
     private String asToken(String bridge) {
-        if (!BRIDGE_PORTS.containsKey(bridge)) return null;
+        if (!BridgePorts.BRIDGE_PORTS.containsKey(bridge)) return null;
         return asTokens.computeIfAbsent(bridge, b -> {
             try {
                 return BridgeConfig.read(Files.readString(dir.resolve(b).resolve("registration.yaml"))).path("as_token").asText(null);
@@ -118,25 +119,13 @@ public final class LocalServer {
 
     /** The bridge's login API (bridgev2 bridges serve it on their appservice port); null for legacy bridges. */
     public String provisioningUrl(String bridge) {
-        Integer port = BRIDGE_PORTS.get(bridge);
+        Integer port = BridgePorts.BRIDGE_PORTS.get(bridge);
         return port == null || LEGACY_BRIDGES.contains(bridge) ? null : "http://127.0.0.1:" + port + "/_matrix/provision";
-    }
-
-    /**
-     * Where to download {@code mxc://<serverName>/...} when it's a bridge's direct media
-     * ({@link BridgeConfig#mediaServerName}): the bridge serves the client media API on its appservice port and
-     * fetches the file from the network then. Null for any other server name. Static: needs no running server.
-     */
-    public static String directMediaBase(String serverName) {
-        for (Map.Entry<String, Integer> e : BRIDGE_PORTS.entrySet()) {
-            if (BridgeConfig.mediaServerName(e.getKey()).equals(serverName)) return "http://127.0.0.1:" + e.getValue();
-        }
-        return null;
     }
 
     /** Whether this server can install {@code bridge} here (pinned in versions.env, with a known port). */
     public boolean provides(String bridge) {
-        return BRIDGE_PORTS.containsKey(bridge) && manifest.bridge(bridge) != null;
+        return BridgePorts.BRIDGE_PORTS.containsKey(bridge) && manifest.bridge(bridge) != null;
     }
 
     /** Login of the account on this server: {user, password}. Available after {@link #ensureRunning}. */
@@ -177,7 +166,7 @@ public final class LocalServer {
      * it with the server (a restart of a few seconds) and starts it. Blocking.
      */
     public synchronized void ensureBridge(String bridge, Consumer<String> progress) throws IOException, InterruptedException {
-        if (!BRIDGE_PORTS.containsKey(bridge)) throw new IOException("Red no disponible en el servidor local: " + bridge);
+        if (!BridgePorts.BRIDGE_PORTS.containsKey(bridge)) throw new IOException("Red no disponible en el servidor local: " + bridge);
         if (!running) ensureRunning(progress);
         Set<String> active = activeBridges();
         if (!active.contains(bridge)) {
@@ -195,7 +184,7 @@ public final class LocalServer {
             startBridge(bridge);
         }
         progress.accept("Esperando al puente…");
-        awaitPort(BRIDGE_PORTS.get(bridge), 60);
+        awaitPort(BridgePorts.BRIDGE_PORTS.get(bridge), 60);
     }
 
     public synchronized void stop() {
@@ -231,7 +220,7 @@ public final class LocalServer {
             }
         }
         String[] tg = telegramKeys(b);
-        BridgeConfig.rewrite(config, new BridgeConfig.Settings(b, BRIDGE_PORTS.get(b), DOMAIN, "@" + USER + ":" + DOMAIN,
+        BridgeConfig.rewrite(config, new BridgeConfig.Settings(b, BridgePorts.BRIDGE_PORTS.get(b), DOMAIN, "@" + USER + ":" + DOMAIN,
                 URL, bd, secrets.getProperty("double_puppet_token"), tg[0], tg[1], statusEndpoint.url(b)));
         Path reg = bd.resolve("registration.yaml");
         if (!Files.exists(reg)) run(bd, store.path(b).toString(), "-g", "-c", "config.yaml", "-r", "registration.yaml");
@@ -251,7 +240,7 @@ public final class LocalServer {
         List<String> command = new ArrayList<>(List.of(store.path("tuwunel").toString(), "-c", hs.resolve("tuwunel.toml").toString()));
         // Old Discord attachments go before the bridge starts (it must not be using its database meanwhile).
         if (!supervisor.isRunning("discord")) {
-            int days = app.unichat.settings.Settings.get().discordMediaDays();
+            int days = Settings.get().discordMediaDays();
             List<String> old = MediaPrune.takeOldDiscordAttachments(dir.resolve("discord").resolve("discord.db"),
                     days == 0 ? null : Duration.ofDays(days), java.time.Instant.now());
             if (!old.isEmpty()) {
@@ -489,7 +478,7 @@ public final class LocalServer {
             throw new IOException("Tiempo agotado: " + Path.of(cmd[0]).getFileName());
         }
         if (p.exitValue() != 0) {
-            String text = app.unichat.Redactor.redact(out.getNow("").strip());
+            String text = Redactor.redact(out.getNow("").strip());
             System.err.println("Bridge setup failed (" + Path.of(cmd[0]).getFileName() + ", exit " + p.exitValue() + "): " + text);
             String last = text.lines().reduce((a, b) -> b).orElse("sin detalles");
             throw new IOException(Path.of(cmd[0]).getFileName() + " no pudo prepararse: " + last);

@@ -1,6 +1,9 @@
 package app.unichat.ui;
 
+import app.unichat.model.Account;
+import app.unichat.model.AccountStatus;
 import app.unichat.model.Chat;
+import app.unichat.model.Network;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
 import javafx.beans.property.ObjectProperty;
@@ -46,7 +49,7 @@ public final class ChatListPane extends VBox {
     private final ToggleGroup chips = new ToggleGroup();
     private final Spaces spaces;
     /** Network of each server-to-add row shown (they're not chats yet, so they carry no network of their own). */
-    private final java.util.Map<String, app.unichat.model.Network> offerNetworks = new java.util.HashMap<>();
+    private final java.util.Map<String, Network> offerNetworks = new java.util.HashMap<>();
     private FlowPane chipRow;
     private Runnable onNewChat;
     private final Consumer<Chat> onOpen;
@@ -58,7 +61,7 @@ public final class ChatListPane extends VBox {
     /** The server whose channels cover the list (Telegram-forum style), or null. */
     private String openSpace;
     /** The accounts as of the last refresh: list cells need them, and computing them walks every room. */
-    private List<app.unichat.model.Account> accounts = List.of();
+    private List<Account> accounts = List.of();
     private InboxRows.Rows spaceRows = InboxRows.Rows.EMPTY;
     private final ObservableList<Chat> spaceItems = FXCollections.observableArrayList();
     private final ListView<Chat> spaceList = new ListView<>(spaceItems);
@@ -75,6 +78,42 @@ public final class ChatListPane extends VBox {
         spaces.setOnChanged(this::refresh);
         getStyleClass().add("chat-list-pane");
 
+        Node header = buildHeader();
+        Node searchBox = buildSearchBox();
+
+        chipRow = new FlowPane(6, 6,
+                chip("Todos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.INBOX)),
+                chip("No leídos", f -> f.withUnreadOnly(true).withView(ChatFilter.View.INBOX)),
+                chip("Favoritos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.FAVORITES)),
+                chip("Prioridad baja", f -> f.withUnreadOnly(false).withView(ChatFilter.View.LOW_PRIORITY)));
+        chipRow.getStyleClass().add("chip-row");
+        chips.getToggles().get(0).setSelected(true);
+        chips.selectedToggleProperty().addListener((o, a, b) -> { if (b == null) a.setSelected(true); });
+
+        favorites.getStyleClass().add("favorites");
+        favorites.setHgap(4);
+        favorites.setVgap(4);
+
+        configureList();
+
+        accountRow.getStyleClass().addAll("chip-row", "account-row");
+        accountRow.setAccessibleText("Cuentas");
+        HBox spaceHeader = buildSpaceHeader();
+        configureSpaceList();
+        spaceView = new VBox(6, spaceHeader, spaceList);
+        spaceView.getStyleClass().add("space-view");
+        VBox.setVgrow(spaceView, Priority.ALWAYS);
+        spaceView.setVisible(false);
+        spaceView.setManaged(false);
+        getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list, spaceView);
+        filter.addListener((o, a, b) -> {
+            syncChips(b);
+            refresh();
+        });
+        refresh();
+    }
+
+    private Node buildHeader() {
         title.getStyleClass().add("pane-title");
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
@@ -83,7 +122,10 @@ public final class ChatListPane extends VBox {
         HBox header = new HBox(6, title, headerSpacer, newChat);
         header.getStyleClass().add("chat-list-header");
         header.setAlignment(Pos.CENTER_LEFT);
+        return header;
+    }
 
+    private Node buildSearchBox() {
         search.setPromptText("Buscar   " + (MainView.MAC ? "⌘K" : "Ctrl+K"));
         search.getStyleClass().add("search-field");
         search.setAccessibleText("Buscar chats");
@@ -100,20 +142,10 @@ public final class ChatListPane extends VBox {
         StackPane.setMargin(searchIcon, new Insets(0, 0, 0, 10));
         searchIcon.setMouseTransparent(true);
         searchBox.getStyleClass().add("search-box");
+        return searchBox;
+    }
 
-        chipRow = new FlowPane(6, 6,
-                chip("Todos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.INBOX)),
-                chip("No leídos", f -> f.withUnreadOnly(true).withView(ChatFilter.View.INBOX)),
-                chip("Favoritos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.FAVORITES)),
-                chip("Prioridad baja", f -> f.withUnreadOnly(false).withView(ChatFilter.View.LOW_PRIORITY)));
-        chipRow.getStyleClass().add("chip-row");
-        chips.getToggles().get(0).setSelected(true);
-        chips.selectedToggleProperty().addListener((o, a, b) -> { if (b == null) a.setSelected(true); });
-
-        favorites.getStyleClass().add("favorites");
-        favorites.setHgap(4);
-        favorites.setVgap(4);
-
+    private void configureList() {
         list.getStyleClass().add("chat-list");
         list.setAccessibleText("Chats");
         list.setCellFactory(v -> new ChatCell());
@@ -134,9 +166,9 @@ public final class ChatListPane extends VBox {
         empty.setWrapText(true);
         list.setPlaceholder(empty);
         VBox.setVgrow(list, Priority.ALWAYS);
+    }
 
-        accountRow.getStyleClass().addAll("chip-row", "account-row");
-        accountRow.setAccessibleText("Cuentas");
+    private HBox buildSpaceHeader() {
         // A server's channels slide over the list, like a Telegram forum's topics.
         javafx.scene.control.Button back = Composer.iconButton(Icons.CHEVRON_LEFT, "Volver a la bandeja", this::closeSpace);
         spaceTitle.getStyleClass().add("space-title");
@@ -146,6 +178,10 @@ public final class ChatListPane extends VBox {
         HBox spaceHeader = new HBox(8, back, spaceTitle, markSpaceRead);
         spaceHeader.setAlignment(Pos.CENTER_LEFT);
         spaceHeader.getStyleClass().add("space-header");
+        return spaceHeader;
+    }
+
+    private void configureSpaceList() {
         spaceList.getStyleClass().addAll("chat-list", "space-list");
         spaceList.setCellFactory(v -> new ChatCell());
         Label noChannels = new Label("Trayendo los canales…");
@@ -162,17 +198,6 @@ public final class ChatListPane extends VBox {
             if (!updating && c != null && spaceList.isFocused() && actsLikeChat(c)) open(c);
         });
         VBox.setVgrow(spaceList, Priority.ALWAYS);
-        spaceView = new VBox(6, spaceHeader, spaceList);
-        spaceView.getStyleClass().add("space-view");
-        VBox.setVgrow(spaceView, Priority.ALWAYS);
-        spaceView.setVisible(false);
-        spaceView.setManaged(false);
-        getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list, spaceView);
-        filter.addListener((o, a, b) -> {
-            syncChips(b);
-            refresh();
-        });
-        refresh();
     }
 
     private ToggleButton chip(String text, java.util.function.UnaryOperator<ChatFilter> change) {
@@ -274,7 +299,7 @@ public final class ChatListPane extends VBox {
         empty.setText(f.searching() ? "Sin resultados para «" + f.query() + "»"
                 : f.view() == ChatFilter.View.ARCHIVE ? "No hay chats archivados"
                 : f.unreadOnly() ? "¡Todo al día! No tienes mensajes sin leer 🎉"
-                : svc.accounts().stream().noneMatch(a -> a.status() == app.unichat.model.AccountStatus.CONNECTED)
+                : svc.accounts().stream().noneMatch(a -> a.status() == AccountStatus.CONNECTED)
                     ? "Aún no conectaste ninguna red.\nHaz clic en una red de la izquierda (o en +) para iniciar sesión."
                 : "No hay chats aquí todavía");
 
@@ -294,9 +319,9 @@ public final class ChatListPane extends VBox {
         offerNetworks.clear();
         if (f.view() != ChatFilter.View.INBOX || f.unreadOnly()) return List.of();
         List<Chat> out = new java.util.ArrayList<>();
-        List<app.unichat.model.Network> nets = f.network() != null ? List.of(f.network())
-                : java.util.Arrays.stream(app.unichat.model.Network.values()).filter(app.unichat.model.Network::isBridged).toList();
-        for (app.unichat.model.Network n : nets) {
+        List<Network> nets = f.network() != null ? List.of(f.network())
+                : java.util.Arrays.stream(Network.values()).filter(Network::isBridged).toList();
+        for (Network n : nets) {
             for (ChatService.GroupOffer o : spaces.offers(n)) {
                 if (f.searching() && !ChatFilter.normalize(o.name()).contains(ChatFilter.normalize(f.query()))) continue;
                 Chat p = new Chat(Spaces.OFFER_PREFIX + o.id());
@@ -326,7 +351,7 @@ public final class ChatListPane extends VBox {
 
     /** "Todas · Personal · Trabajo" chips, shown only for a network with several accounts. */
     private void refreshAccountRow(ChatFilter f) {
-        List<app.unichat.model.Account> accounts = f.network() == null ? List.of() : Accounts.of(this.accounts, f.network());
+        List<Account> accounts = f.network() == null ? List.of() : Accounts.of(this.accounts, f.network());
         // Only offer per-account filters when every chat of the network knows its account; otherwise a filter
         // would silently hide chats (Matrix bridges don't always say which login a portal belongs to).
         boolean attributed = f.network() != null && svc.chats().stream()
@@ -339,7 +364,7 @@ public final class ChatListPane extends VBox {
         ToggleGroup group = new ToggleGroup();
         accountRow.getChildren().add(accountChip("Todas las cuentas", f.accountId() == null, group,
                 () -> filter.set(filter.get().withAccount(f.network(), null))));
-        for (app.unichat.model.Account a : accounts) {
+        for (Account a : accounts) {
             accountRow.getChildren().add(accountChip(Accounts.name(a), a.id().equals(f.accountId()), group,
                     () -> filter.set(filter.get().withAccount(f.network(), a.id()))));
         }

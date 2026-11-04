@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.Os;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 
@@ -9,7 +10,6 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -117,19 +117,15 @@ public final class Theme {
         if (on) root.getStyleClass().add(cls);
     }
 
-    private static String os() {
-        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-    }
-
     /** Windows high-contrast theme / macOS "Aumentar contraste". */
     static boolean systemHighContrast() {
         if (systemContrast != null) return systemContrast;
         try {
-            if (os().contains("win")) {
+            if (Os.windows()) {
                 String out = run("reg", "query", "HKCU\\Control Panel\\Accessibility\\HighContrast", "/v", "Flags");
                 java.util.regex.Matcher m = java.util.regex.Pattern.compile("REG_SZ\\s+(\\d+)").matcher(out);
                 systemContrast = m.find() && (Integer.parseInt(m.group(1)) & 1) == 1;
-            } else if (os().contains("mac")) {
+            } else if (Os.mac()) {
                 systemContrast = run("defaults", "read", "com.apple.universalaccess", "increaseContrast").trim().equals("1");
             } else {
                 systemContrast = run("gsettings", "get", "org.gnome.desktop.a11y.interface", "high-contrast").contains("true");
@@ -144,10 +140,10 @@ public final class Theme {
     static boolean systemReducedMotion() {
         if (systemReducedMotion != null) return systemReducedMotion;
         try {
-            if (os().contains("win")) {
+            if (Os.windows()) {
                 String out = run("reg", "query", "HKCU\\Control Panel\\Desktop\\WindowMetrics", "/v", "MinAnimate");
                 systemReducedMotion = out.matches("(?s).*REG_SZ\\s+0\\b.*");
-            } else if (os().contains("mac")) {
+            } else if (Os.mac()) {
                 systemReducedMotion = run("defaults", "read", "com.apple.universalaccess", "reduceMotion").trim().equals("1");
             } else {
                 systemReducedMotion = run("gsettings", "get", "org.gnome.desktop.interface", "enable-animations").contains("false");
@@ -161,13 +157,12 @@ public final class Theme {
     /** Reads the OS appearance once per {@link #applyAll()}: Windows registry / macOS defaults / GTK theme. */
     static boolean systemDark() {
         if (systemDark != null) return systemDark;
-        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         try {
-            if (os.contains("win")) {
+            if (Os.windows()) {
                 String out = run("reg", "query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
                         "/v", "AppsUseLightTheme");
                 systemDark = out.contains("0x0");
-            } else if (os.contains("mac")) {
+            } else if (Os.mac()) {
                 systemDark = run("defaults", "read", "-g", "AppleInterfaceStyle").trim().equalsIgnoreCase("dark");
             } else {
                 systemDark = run("gsettings", "get", "org.gnome.desktop.interface", "color-scheme").contains("dark");

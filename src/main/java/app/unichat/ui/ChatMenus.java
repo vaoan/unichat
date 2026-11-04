@@ -1,7 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.Chat;
-import app.unichat.service.ChatService;
+import app.unichat.service.ChatPreferences;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
@@ -19,15 +19,13 @@ import java.time.temporal.TemporalAdjusters;
 public final class ChatMenus {
     private ChatMenus() {}
 
-    public static ContextMenu forChat(Chat c, ChatService svc, Runnable afterLeave) {
+    public static ContextMenu forChat(Chat c, ChatPreferences svc, Runnable afterLeave) {
         String id = c.id();
         ContextMenu menu = new ContextMenu();
         menu.getItems().addAll(
                 item(c.isUnread() ? "Marcar como leído" : "Marcar como no leído",
                         () -> { if (c.isUnread()) svc.markRead(id); else svc.setMarkedUnread(id, true); }),
-                item(c.favorite() ? "Quitar de favoritos" : "Añadir a favoritos", () -> svc.setFavorite(id, !c.favorite())),
-                item(c.pinned() ? "Desfijar" : "Fijar arriba", () -> svc.setPinned(id, !c.pinned())),
-                item(c.muted() ? "Activar notificaciones" : "Silenciar", () -> svc.setMuted(id, !c.muted())),
+                favoriteItem(c, svc), pinItem(c, svc), muteItem(c, svc),
                 reminderMenu(c, svc),
                 new SeparatorMenuItem(),
                 item(c.lowPriority() ? "Mover a la bandeja" : "Mover a prioridad baja", () -> svc.setLowPriority(id, !c.lowPriority())),
@@ -41,19 +39,29 @@ public final class ChatMenus {
     }
 
     /** A server/group in the Bandeja: what makes sense for a container of chats. */
-    public static ContextMenu forSpace(Chat c, ChatService svc) {
+    public static ContextMenu forSpace(Chat c, ChatPreferences svc) {
         String id = c.id();
         ContextMenu menu = new ContextMenu();
         menu.getItems().addAll(
-                item(c.favorite() ? "Quitar de favoritos" : "Añadir a favoritos", () -> svc.setFavorite(id, !c.favorite())),
-                item(c.pinned() ? "Desfijar" : "Fijar arriba", () -> svc.setPinned(id, !c.pinned())),
-                item(c.muted() ? "Activar notificaciones" : "Silenciar", () -> svc.setMuted(id, !c.muted())),
+                favoriteItem(c, svc), pinItem(c, svc), muteItem(c, svc),
                 new SeparatorMenuItem(),
                 item(c.archived() ? "Desarchivar" : "Archivar", () -> svc.setArchived(id, !c.archived())));
         return menu;
     }
 
-    static Menu reminderMenu(Chat c, ChatService svc) {
+    private static MenuItem favoriteItem(Chat c, ChatPreferences svc) {
+        return item(c.favorite() ? "Quitar de favoritos" : "Añadir a favoritos", () -> svc.setFavorite(c.id(), !c.favorite()));
+    }
+
+    private static MenuItem pinItem(Chat c, ChatPreferences svc) {
+        return item(c.pinned() ? "Desfijar" : "Fijar arriba", () -> svc.setPinned(c.id(), !c.pinned()));
+    }
+
+    private static MenuItem muteItem(Chat c, ChatPreferences svc) {
+        return item(c.muted() ? "Activar notificaciones" : "Silenciar", () -> svc.setMuted(c.id(), !c.muted()));
+    }
+
+    static Menu reminderMenu(Chat c, ChatPreferences svc) {
         Menu m = new Menu("Recordarme");
         ZoneId zone = ZoneId.systemDefault();
         Instant now = Instant.now();

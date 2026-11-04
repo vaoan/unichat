@@ -19,6 +19,7 @@ import java.time.Duration;
 
 /** Thin blocking wrapper over the Matrix Client-Server API. Thread-safe. */
 final class MatrixClient {
+    static final String CLIENT = "/_matrix/client/v3";
     static final ObjectMapper JSON = new ObjectMapper();
     static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 

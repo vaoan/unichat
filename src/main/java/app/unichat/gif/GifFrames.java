@@ -1,4 +1,4 @@
-package app.unichat.matrix;
+package app.unichat.gif;
 
 import org.w3c.dom.Node;
 
@@ -27,7 +27,7 @@ public final class GifFrames {
 
     private GifFrames() {}
 
-    static List<Frame> read(Path gif) throws IOException {
+    public static List<Frame> read(Path gif) throws IOException {
         List<Frame> out = new ArrayList<>();
         read(gif, out::add);
         return out;

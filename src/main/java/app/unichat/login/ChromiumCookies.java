@@ -131,13 +131,7 @@ public final class ChromiumCookies {
     }
 
     private static List<Path> overrideRoots() {
-        String override = System.getProperty(FirefoxCookies.ROOTS_PROPERTY);
-        if (override == null || override.isBlank()) return null;
-        List<Path> out = new ArrayList<>();
-        for (String part : override.split(";|" + java.util.regex.Pattern.quote(java.io.File.pathSeparator))) {
-            if (!part.isBlank()) out.add(Paths.get(part.trim()));
-        }
-        return out;
+        return FirefoxCookies.rootsOverride();
     }
 
     private static List<Path> profiles(Path root) {
@@ -201,12 +195,7 @@ public final class ChromiumCookies {
         } catch (IOException | RuntimeException e) {
             return null;
         } finally {
-            deleteQuietly(wal);
-            if (tmp != null) {
-                deleteQuietly(tmp);
-                deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-shm"));
-                deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-journal"));
-            }
+            FirefoxCookies.deleteCopy(tmp, wal);
         }
     }
 

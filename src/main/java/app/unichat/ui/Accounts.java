@@ -1,10 +1,10 @@
 package app.unichat.ui;
 
+import app.unichat.service.NetworkAccounts;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
-import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
 
 import java.util.List;
@@ -20,7 +20,7 @@ final class Accounts {
     }
 
     /** Connected (or connecting) accounts of a network, excluding logins still waiting for the user. */
-    static List<Account> of(ChatService svc, Network n) {
+    static List<Account> of(NetworkAccounts svc, Network n) {
         return of(svc.accounts(), n);
     }
 
@@ -29,12 +29,12 @@ final class Accounts {
         return accounts.stream().filter(a -> a.network() == n && a.status() != AccountStatus.NEEDS_LOGIN).toList();
     }
 
-    static boolean multi(ChatService svc, Network n) {
+    static boolean multi(NetworkAccounts svc, Network n) {
         return of(svc, n).size() > 1;
     }
 
     /** Name of the account a chat belongs to, only when its network has several accounts; else null. */
-    static String forChat(ChatService svc, Chat c) {
+    static String forChat(NetworkAccounts svc, Chat c) {
         return c.accountId() == null ? null : forChat(svc.accounts(), c);
     }
 

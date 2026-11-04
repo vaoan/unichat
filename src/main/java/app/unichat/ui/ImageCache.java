@@ -1,6 +1,6 @@
 package app.unichat.ui;
 
-import app.unichat.service.ChatService;
+import app.unichat.service.MediaSource;
 import javafx.scene.image.Image;
 
 import java.util.Collections;
@@ -40,7 +40,7 @@ final class ImageCache {
      * The photo for {@code url}: cached, already loading, or a new (single) download + decode off the FX thread.
      * Completes with null when it can't be loaded (then the initials stay; retried after a while, not per click).
      */
-    static CompletableFuture<Image> load(String url, ChatService svc) {
+    static CompletableFuture<Image> load(String url, MediaSource svc) {
         Image cached = CACHE.get(url);
         if (cached != null) return CompletableFuture.completedFuture(cached);
         Long failedAt = FAILED.get(url);

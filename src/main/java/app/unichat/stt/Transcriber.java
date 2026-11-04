@@ -1,6 +1,7 @@
 package app.unichat.stt;
 
-import app.unichat.BundledTools;
+import app.unichat.support.BundledTools;
+import app.unichat.support.Os;
 import app.unichat.settings.Settings;
 
 import java.io.IOException;
@@ -11,7 +12,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -46,14 +46,14 @@ public final class Transcriber {
             Path input = prepare(audio, work);
             String lang = s.sttLanguage();
             List<String> cmd;
-            if (s.sttEngine() == Engine.CUSTOM) {
+            if (SttSettings.engine() == Engine.CUSTOM) {
                 String template = s.sttCommand();
                 if (template.isBlank()) throw new IOException("Escribe tu comando en Ajustes → Voz a texto");
                 cmd = CommandLine.expand(template, Map.of("archivo", input.toString(), "original", audio.toString(), "idioma", lang));
             } else {
                 Path bin = whisperBinary();
                 if (bin == null) throw new IOException("Whisper no viene en esta instalación; usa un comando propio en Ajustes → Voz a texto");
-                WhisperModel model = s.sttModel();
+                WhisperModel model = SttSettings.model();
                 if (!model.isInstalled(modelsDir())) status.accept("Descargando el modelo de voz (solo la primera vez)…");
                 int[] shown = {-1};
                 Path m = model.ensure(modelsDir(), p -> {
@@ -83,11 +83,11 @@ public final class Transcriber {
         }
         if (whisperReads(audio)) return audio;
         Path wav = work.resolve("audio.wav");
-        Path ffmpeg = BundledTools.onPath(BundledTools.windows() ? "ffmpeg.exe" : "ffmpeg");
+        Path ffmpeg = BundledTools.onPath(Os.windows() ? "ffmpeg.exe" : "ffmpeg");
         List<String> cmd;
         if (ffmpeg != null) {
             cmd = List.of(ffmpeg.toString(), "-loglevel", "error", "-y", "-i", audio.toString(), "-ar", "16000", "-ac", "1", wav.toString());
-        } else if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")) {
+        } else if (Os.mac()) {
             cmd = List.of("/usr/bin/afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", audio.toString(), wav.toString());
         } else {
             throw new IOException("Este formato de audio necesita ffmpeg instalado");

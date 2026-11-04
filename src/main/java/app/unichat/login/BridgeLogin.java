@@ -178,7 +178,7 @@ public final class BridgeLogin {
             b.method(method, HttpRequest.BodyPublishers.noBody());
         }
         HttpResponse<String> r = http.send(b.build(), HttpResponse.BodyHandlers.ofString());
-        JsonNode j = r.body() == null || r.body().isBlank() ? JSON.createObjectNode() : JSON.readTree(r.body());
+        JsonNode j = bodyOf(r);
         if (r.statusCode() >= 400) {
             throw new BridgeLoginException(j.path("errcode").asText("M_UNKNOWN"), j.path("error").asText("HTTP " + r.statusCode()));
         }
@@ -187,5 +187,9 @@ public final class BridgeLogin {
 
     private static String enc(String s) {
         return URLEncoder.encode(s, StandardCharsets.UTF_8);
+    }
+
+    static JsonNode bodyOf(HttpResponse<String> r) throws java.io.IOException {
+        return r.body() == null || r.body().isBlank() ? JSON.createObjectNode() : JSON.readTree(r.body());
     }
 }

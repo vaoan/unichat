@@ -27,7 +27,7 @@ class SyncCacheRedactionTest {
     @Test
     void redactsBotRoomButKeepsEverythingElse() throws Exception {
         JsonNode in = MatrixClient.JSON.readTree(SYNC);
-        JsonNode out = MatrixChatService.redactForCache(in, Set.of("!bot:s"));
+        JsonNode out = SyncCache.redact(in, Set.of("!bot:s"));
         String s = MatrixClient.JSON.writeValueAsString(out);
         assertFalse(s.contains("SECRETVALUE"));
         assertFalse(s.contains("login sessionid"));
@@ -39,7 +39,7 @@ class SyncCacheRedactionTest {
         assertTrue(MatrixClient.JSON.writeValueAsString(in).contains("SECRETVALUE"));
         // Thousands of rooms: only the bot room is copied, the rest is shared (a full copy exhausted the heap).
         org.junit.jupiter.api.Assertions.assertSame(in.at("/rooms/join/!ok:s"), out.at("/rooms/join/!ok:s"));
-        org.junit.jupiter.api.Assertions.assertSame(in, MatrixChatService.redactForCache(in, Set.of("!other:s")));
+        org.junit.jupiter.api.Assertions.assertSame(in, SyncCache.redact(in, Set.of("!other:s")));
     }
 
     @Test
@@ -50,7 +50,7 @@ class SyncCacheRedactionTest {
                   {"type":"m.room.name","state_key":"","content":{"name":"Instagram bridge"}},
                   {"type":"m.room.message","content":{"body":"cookie sessionid=SECRETVALUE"}}]}}}}}
                 """;
-        JsonNode out = MatrixChatService.redactForCache(MatrixClient.JSON.readTree(json), Set.of("!bot:s"));
+        JsonNode out = SyncCache.redact(MatrixClient.JSON.readTree(json), Set.of("!bot:s"));
         String s = MatrixClient.JSON.writeValueAsString(out);
         assertTrue(s.contains("Bridge Bot"));
         assertTrue(s.contains("Instagram bridge"));

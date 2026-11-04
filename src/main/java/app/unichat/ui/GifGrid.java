@@ -134,7 +134,7 @@ final class GifGrid extends VBox {
         String preview = GifFiles.preview(i);
         // Provider previews load directly; anything else (mxc://…) goes through the media service.
         if (preview != null && preview.startsWith("http")) probe.setImage(new Image(preview, TILE_W * 2, 0, true, true, true));
-        else ThreadPane.loadMedia(svc, probe, MediaItems.message(i), TILE_W * 2, TILE_H * 2);
+        else MessageMedia.loadMedia(svc, probe, MediaItems.message(i), TILE_W * 2, TILE_H * 2);
         Node tile = tile(probe, what, accepted, () -> sendFromLibrary(i));
         LibraryMenu.attach(tile, library, i, accepted ? () -> sendFromLibrary(i) : null, toast);
         return tile;

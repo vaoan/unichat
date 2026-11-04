@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.bridge.BridgePorts;
 import app.unichat.model.Network;
 import app.unichat.server.BridgeConfig;
 import org.junit.jupiter.api.Test;
@@ -12,24 +13,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ChatResyncTest {
     @Test
     void resyncOnceForEachNewLimit() {
-        int limit = BridgeConfig.TELEGRAM_CREATE_LIMIT;
-        assertTrue(MatrixChatService.needsChatResync(null, limit), "never done");
-        assertTrue(MatrixChatService.needsChatResync("15", limit), "limit went up");
-        assertFalse(MatrixChatService.needsChatResync(Integer.toString(limit), limit), "already done for this limit");
-        assertTrue(MatrixChatService.needsChatResync("garbage", limit));
+        int limit = BridgePorts.TELEGRAM_CREATE_LIMIT;
+        assertTrue(BridgeProtocol.needsChatResync(null, limit), "never done");
+        assertTrue(BridgeProtocol.needsChatResync("15", limit), "limit went up");
+        assertFalse(BridgeProtocol.needsChatResync(Integer.toString(limit), limit), "already done for this limit");
+        assertTrue(BridgeProtocol.needsChatResync("garbage", limit));
     }
 
     @Test
     void theBridgeCommandIsSyncChats() {
-        assertEquals("!telegram sync-chats", MatrixChatService.botCommand(Network.TELEGRAM, "sync-chats"));
-        assertEquals(100, BridgeConfig.TELEGRAM_CREATE_LIMIT);
+        assertEquals("!telegram sync-chats", BridgeProtocol.botCommand(Network.TELEGRAM, "sync-chats"));
+        assertEquals(100, BridgePorts.TELEGRAM_CREATE_LIMIT);
     }
 
     @Test
     void aBrokenBotRoomIsRecognised() {
-        assertTrue(MatrixChatService.brokenRoom(new MatrixException(500, "M_UNKNOWN",
+        assertTrue(BridgeProtocol.brokenRoom(new MatrixException(500, "M_UNKNOWN",
                 "cannot create a non-create event in a room with no forward extremities in !x:localhost")));
-        assertFalse(MatrixChatService.brokenRoom(new MatrixException(403, "M_FORBIDDEN", "not in room")));
-        assertFalse(MatrixChatService.brokenRoom(new java.io.IOException("timeout")));
+        assertFalse(BridgeProtocol.brokenRoom(new MatrixException(403, "M_FORBIDDEN", "not in room")));
+        assertFalse(BridgeProtocol.brokenRoom(new java.io.IOException("timeout")));
     }
 }

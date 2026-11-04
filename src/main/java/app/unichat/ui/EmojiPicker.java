@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.model.MediaLibrary;
+
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -36,7 +38,7 @@ public final class EmojiPicker {
     }
 
     /** With a library: right-click adds to or removes from the favourites, and a pick counts as recent. */
-    static VBox grid(Consumer<String> onPick, double wrap, app.unichat.model.MediaLibrary library, Consumer<String> toast) {
+    static VBox grid(Consumer<String> onPick, double wrap, MediaLibrary library, Consumer<String> toast) {
         VBox content = new VBox(6);
         content.setPadding(new Insets(10));
         for (Map.Entry<String, String> cat : CATEGORIES.entrySet()) {
@@ -51,16 +53,16 @@ public final class EmojiPicker {
     }
 
     /** One emoji; {@code library} may be null (no menu, no recents). */
-    static Button button(String e, Consumer<String> onPick, app.unichat.model.MediaLibrary library, Consumer<String> toast) {
+    static Button button(String e, Consumer<String> onPick, MediaLibrary library, Consumer<String> toast) {
         Button b = new Button(e);
         b.getStyleClass().add("emoji-button");
         b.setAccessibleText("Emoji " + e);
         Runnable use = () -> {
             onPick.accept(e);
-            if (library != null) library.addRecent(app.unichat.model.MediaLibrary.emoji(e));
+            if (library != null) library.addRecent(MediaLibrary.emoji(e));
         };
         b.setOnAction(ev -> use.run());
-        if (library != null) LibraryMenu.attach(b, library, app.unichat.model.MediaLibrary.emoji(e), use, toast);
+        if (library != null) LibraryMenu.attach(b, library, MediaLibrary.emoji(e), use, toast);
         return b;
     }
 

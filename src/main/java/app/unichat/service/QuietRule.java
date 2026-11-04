@@ -19,13 +19,13 @@ public final class QuietRule {
     private QuietRule() {}
 
     /** The chat and, for a server/group, every chat inside it (its joined channels, sub-groups included). */
-    public static List<String> targets(ChatService svc, String chatId) {
+    public static List<String> targets(ChatReader svc, String chatId) {
         Set<String> out = new LinkedHashSet<>();
         collect(svc, chatId, out);
         return new ArrayList<>(out);
     }
 
-    private static void collect(ChatService svc, String id, Set<String> out) {
+    private static void collect(ChatReader svc, String id, Set<String> out) {
         if (!out.add(id)) return;
         Chat c = svc.chat(id);
         if (c == null || !c.space()) return;

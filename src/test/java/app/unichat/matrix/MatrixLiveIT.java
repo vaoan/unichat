@@ -45,7 +45,7 @@ class MatrixLiveIT {
 
     @Test
     void fullConversationRoundTrip() throws Exception {
-        MatrixChatService alice = MatrixChatService.login(hs, "alice", "pass1234").join();
+        MatrixChatService alice = MatrixLogin.login(hs, "alice", "pass1234").join();
         List<Message> notified = new CopyOnWriteArrayList<>();
         alice.addListener(new ChatService.Listener() {
             @Override public void incomingMessage(Chat chat, Message m) { notified.add(m); }

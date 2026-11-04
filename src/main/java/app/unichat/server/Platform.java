@@ -1,5 +1,7 @@
 package app.unichat.server;
 
+import app.unichat.support.Os;
+
 import java.nio.file.Path;
 
 /** Where the native server stack runs: release asset naming and the per-user data folder. */
@@ -23,10 +25,9 @@ public enum Platform {
 
     /** The machine this runs on, or null when the native stack isn't supported (Intel Mac, Linux, 32-bit). */
     public static Platform current() {
-        String name = System.getProperty("os.name", "").toLowerCase();
         String arch = System.getProperty("os.arch", "").toLowerCase();
-        if (name.contains("mac") && (arch.equals("aarch64") || arch.equals("arm64"))) return MAC_ARM64;
-        if (name.contains("win") && (arch.equals("amd64") || arch.equals("x86_64"))) return WINDOWS_AMD64;
+        if (Os.mac() && (arch.equals("aarch64") || arch.equals("arm64"))) return MAC_ARM64;
+        if (Os.windows() && (arch.equals("amd64") || arch.equals("x86_64"))) return WINDOWS_AMD64;
         return null;
     }
 

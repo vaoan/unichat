@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import app.unichat.bridge.BridgeStates;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 

@@ -15,10 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ContactServiceTest {
     @Test
     void theAccountCarriesItsBridgeLogin() {
-        Account a = new Account(MatrixChatService.accountId(Network.WHATSAPP, "573001112233"), Network.WHATSAPP, "Trabajo",
+        Account a = new Account(BridgeProtocol.accountId(Network.WHATSAPP, "573001112233"), Network.WHATSAPP, "Trabajo",
                 AccountStatus.CONNECTED, null);
-        assertEquals("573001112233", MatrixChatService.loginIdOf(a));
-        assertNull(MatrixChatService.loginIdOf(new Account("whatsapp", Network.WHATSAPP, "x", AccountStatus.CONNECTED, null)));
+        assertEquals("573001112233", BridgeProtocol.loginIdOf(a));
+        assertNull(BridgeProtocol.loginIdOf(new Account("whatsapp", Network.WHATSAPP, "x", AccountStatus.CONNECTED, null)));
     }
 
     @Test
@@ -43,7 +43,7 @@ class ContactServiceTest {
         server.start();
         try {
             String base = "http://127.0.0.1:" + server.getAddress().getPort() + "/_matrix/provision";
-            MatrixChatService.setBridgeProvisioner(new MatrixChatService.BridgeProvisioner() {
+            MatrixChatService.setBridgeProvisioner(new BridgeProvisioner() {
                 @Override public void ensure(Network n) { }
                 @Override public String provisioningUrl(Network n) { return base; }
             });

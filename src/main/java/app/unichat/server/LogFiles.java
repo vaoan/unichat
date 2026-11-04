@@ -1,6 +1,5 @@
-package app.unichat;
+package app.unichat.server;
 
-import app.unichat.server.Platform;
 import app.unichat.settings.Settings;
 
 import java.io.IOException;

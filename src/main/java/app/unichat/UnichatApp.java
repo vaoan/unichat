@@ -1,7 +1,12 @@
 package app.unichat;
 
+import app.unichat.matrix.MatrixLogin;
+import app.unichat.matrix.BridgeProvisioner;
 import app.unichat.matrix.MatrixChatService;
+import app.unichat.model.Network;
+import app.unichat.bridge.BridgeStates;
 import app.unichat.server.LocalServer;
+import app.unichat.server.LogFiles;
 import app.unichat.service.ChatService;
 import app.unichat.service.MockChatService;
 import app.unichat.settings.Settings;
@@ -10,6 +15,8 @@ import app.unichat.ui.LoginView;
 import app.unichat.ui.MacQuit;
 import app.unichat.ui.MainView;
 import app.unichat.ui.Notifier;
+import app.unichat.ui.SettingsWindow;
+import app.unichat.ui.SidePanel;
 import app.unichat.ui.Theme;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -82,7 +89,7 @@ public final class UnichatApp extends Application {
         if (s.localServer()) startLocalServer();
         ChatService restored = switch (s.backend() == null ? "" : s.backend()) {
             case "demo" -> new MockChatService();
-            case "matrix" -> MatrixChatService.fromSettings();
+            case "matrix" -> MatrixLogin.fromSettings();
             default -> null;
         };
         if (restored != null) showMain(restored); else showLogin();
@@ -97,7 +104,7 @@ public final class UnichatApp extends Application {
         String startLogin = System.getProperty("unichat.startLogin");
         if (startLogin != null && mainView != null) {
             javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(3));
-            wait.setOnFinished(e -> mainView.addAccount(app.unichat.model.Network.fromProtocolId(startLogin)));
+            wait.setOnFinished(e -> mainView.addAccount(Network.fromProtocolId(startLogin)));
             wait.play();
         }
         snapshotIfRequested();
@@ -119,9 +126,9 @@ public final class UnichatApp extends Application {
             if (chatId != null && mainView != null) mainView.openChatId(chatId);
             if (Boolean.getBoolean("unichat.info") && mainView != null) mainView.toggleInfo();
             String panelTab = System.getProperty("unichat.panel");
-            if (panelTab != null && mainView != null) mainView.showPanel(app.unichat.ui.SidePanel.Tab.valueOf(panelTab));
+            if (panelTab != null && mainView != null) mainView.showPanel(SidePanel.Tab.valueOf(panelTab));
             String net = System.getProperty("unichat.network");
-            if (net != null && mainView != null) mainView.showNetwork(app.unichat.model.Network.fromProtocolId(net));
+            if (net != null && mainView != null) mainView.showNetwork(Network.fromProtocolId(net));
             String space = System.getProperty("unichat.openSpace");
             if (space != null && mainView != null) mainView.showSpace(space);
             String overlay = System.getProperty("unichat.overlay", "");
@@ -130,7 +137,7 @@ public final class UnichatApp extends Application {
             if (mainView != null && overlay.equals("add")) mainView.showAccounts();
             if (mainView != null && overlay.equals("picker")) mainView.showAccounts().showPicker();
             if (mainView != null && overlay.startsWith("login:")) {
-                mainView.addAccount(app.unichat.model.Network.fromProtocolId(overlay.substring(6)));
+                mainView.addAccount(Network.fromProtocolId(overlay.substring(6)));
             }
             if (mainView != null && overlay.startsWith("settings")) {
                 mainView.showSettings();
@@ -139,7 +146,7 @@ public final class UnichatApp extends Application {
             javafx.animation.PauseTransition shoot = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(Double.parseDouble(System.getProperty("unichat.snapshotDelay", "1.5"))));
             shoot.setOnFinished(ev -> {
                 try {
-                    var settings = app.unichat.ui.SettingsWindow.current();
+                    var settings = SettingsWindow.current();
                     var img = (settings != null ? settings.getScene() : scene).snapshot(null);
                     javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(img, null), "png", new java.io.File(out));
                 } catch (Exception ex) {
@@ -186,21 +193,21 @@ public final class UnichatApp extends Application {
     }
 
     /** Adding a network on the local server installs and starts its bridge first. */
-    private static MatrixChatService.BridgeProvisioner provisioner(LocalServer local) {
-        return new MatrixChatService.BridgeProvisioner() {
-            @Override public void ensure(app.unichat.model.Network n) throws Exception {
+    private static BridgeProvisioner provisioner(LocalServer local) {
+        return new BridgeProvisioner() {
+            @Override public void ensure(Network n) throws Exception {
                 local.ensureBridge(n.protocolId(), msg -> { });
             }
 
-            @Override public boolean provides(app.unichat.model.Network n) {
+            @Override public boolean provides(Network n) {
                 return local.provides(n.protocolId());
             }
 
-            @Override public String provisioningUrl(app.unichat.model.Network n) {
+            @Override public String provisioningUrl(Network n) {
                 return local.provisioningUrl(n.protocolId());
             }
 
-            @Override public app.unichat.server.BridgeStates states() {
+            @Override public BridgeStates states() {
                 return local.states();
             }
         };

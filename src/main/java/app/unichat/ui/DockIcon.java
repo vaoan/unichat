@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.support.Os;
+
 import com.sun.jna.Function;
 import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
@@ -12,7 +14,7 @@ import com.sun.jna.Pointer;
  */
 public final class DockIcon {
     private static final long POLICY_REGULAR = 0, POLICY_ACCESSORY = 1;
-    private static final boolean MAC = System.getProperty("os.name", "").toLowerCase().contains("mac");
+    private static final boolean MAC = Os.mac();
     private static volatile boolean broken;
 
     private DockIcon() {}

@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.Chat;
+import app.unichat.model.MediaLibrary;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
@@ -15,17 +16,12 @@ import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollBar;
-import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.ToggleButton;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.MouseButton;
@@ -36,32 +32,26 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.stage.Window;
-import javafx.scene.shape.Rectangle;
 import javafx.scene.text.TextFlow;
-import javafx.stage.Popup;
 
-import java.awt.Desktop;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.function.Consumer;
 
 /** Right side: chat header, message timeline, typing line and composer. */
 public final class ThreadPane extends BorderPane {
-    private static final double MAX_MEDIA = 320;
-
     private final ChatService svc;
     private final ObservableList<ThreadRows.Row> rows = FXCollections.observableArrayList();
     private final ListView<ThreadRows.Row> list = new ListView<>(rows);
     private final Composer composer;
+    private final MessageMedia media;
+    private final MessageActionsUi messageActions;
     private final Label typing = new Label();
     private final Button jumpDown;
     private final Consumer<String> openLink;
     private final Consumer<String> toast;
-    private app.unichat.model.MediaLibrary library;
+    private MediaLibrary library;
     private final Runnable toggleInfo;
     private final ToggleButton infoButton = new ToggleButton();
     private final Avatar headerAvatar = new Avatar(34);
@@ -95,69 +85,17 @@ public final class ThreadPane extends BorderPane {
         this.toast = toast;
         getStyleClass().add("thread-pane");
         composer = new Composer(svc, toast);
+        media = new MessageMedia(svc, openLink, toast, () -> library, this::getScene);
+        messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, () -> library, this::getScene, this::member);
 
-        // Header
-        headerTitle.getStyleClass().add("thread-title");
-        headerSubtitle.getStyleClass().add("thread-subtitle");
-        serverLink.getStyleClass().add("thread-server");
-        serverLink.setVisible(false);
-        serverLink.setManaged(false);
-        // Its own click: the title area underneath toggles the info panel.
-        serverLink.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.event.Event::consume);
-        serverLink.setOnAction(e -> {
-            if (serverLink.getUserData() instanceof String id) onShowServer.accept(id);
-        });
-        HBox subtitleRow = new HBox(4, serverLink, headerSubtitle);
-        subtitleRow.setAlignment(Pos.CENTER_LEFT);
-        headerSubtitle.setMinWidth(0);
-        VBox titles = new VBox(1, headerTitle, subtitleRow);
-        titles.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(titles, Priority.ALWAYS);
-        titles.setMinWidth(0);
         favButton = Composer.iconButton(Icons.STAR, "Favorito", () -> svc.setFavorite(chat.id(), !chat.favorite()));
         archiveButton = Composer.iconButton(Icons.ARCHIVE, "Archivar (" + (MainView.MAC ? "⌘E" : "Ctrl+E") + ")",
                 () -> svc.setArchived(chat.id(), !chat.archived()));
-        infoButton.setGraphic(Icons.icon(Icons.INFO, 18));
-        infoButton.getStyleClass().add("icon-button");
-        infoButton.setTooltip(new javafx.scene.control.Tooltip("Información del chat"));
-        infoButton.setOnAction(e -> toggleInfo.run());
-        infoButton.setAccessibleText("Información del chat");
-        Button more = Composer.iconButton(Icons.MORE, "Más opciones", null);
-        more.setOnAction(e -> ChatMenus.forChat(chat, svc, null).show(more, Side.BOTTOM, 0, 4));
-        HBox header = new HBox(10, headerAvatar, titles, favButton, archiveButton, infoButton, more);
-        header.getStyleClass().add("thread-header");
-        header.setAlignment(Pos.CENTER_LEFT);
-        titles.setOnMouseClicked(e -> toggleInfo.run());
+        Node header = buildHeader();
 
-        // Timeline
-        list.getStyleClass().add("timeline");
-        list.setCellFactory(v -> new RowCell());
-        list.setAccessibleText("Mensajes");
-        list.setAccessibleHelp("Flechas para recorrer mensajes. R responder, E editar, Enter o Espacio abre las acciones, "
-                + "1 a 6 reacciones rápidas, T transcribir una nota de voz, " + (MainView.MAC ? "⌘" : "Ctrl+") + "C copiar, "
-                + "Esc vuelve al campo de texto.");
-        list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, this::onTimelineKey);
-        list.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> userScrolled());
-        list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, e -> {
-            switch (e.getCode()) {
-                case PAGE_UP, PAGE_DOWN, HOME, END, UP, DOWN -> userScrolled();
-                default -> { }
-            }
-        });
-        list.focusedProperty().addListener((o, a, focused) -> {
-            if (focused && list.getSelectionModel().isEmpty() && !rows.isEmpty()) {
-                list.getSelectionModel().select(rows.size() - 1);
-            }
-        });
+        configureTimeline();
         jumpDown = Composer.iconButton(Icons.LOW, "Ir al final", this::scrollToBottom);
-        // Transcript progress redraws the visible rows; coalesced so a model download doesn't flood the FX thread.
-        java.util.concurrent.atomic.AtomicBoolean refreshQueued = new java.util.concurrent.atomic.AtomicBoolean();
-        Transcripts.get().addListener(() -> {
-            if (refreshQueued.compareAndSet(false, true)) Platform.runLater(() -> {
-                refreshQueued.set(false);
-                list.refresh();
-            });
-        });
+        redrawOnTranscriptProgress();
         jumpDown.getStyleClass().add("jump-down");
         jumpDown.setVisible(false);
         StackPane.setAlignment(jumpDown, Pos.BOTTOM_RIGHT);
@@ -244,11 +182,76 @@ public final class ThreadPane extends BorderPane {
         return vbar == null || !vbar.isVisible() || vbar.getValue() >= vbar.getMax() - 0.002;
     }
 
+    private Node buildHeader() {
+        headerTitle.getStyleClass().add("thread-title");
+        headerSubtitle.getStyleClass().add("thread-subtitle");
+        serverLink.getStyleClass().add("thread-server");
+        serverLink.setVisible(false);
+        serverLink.setManaged(false);
+        // Its own click: the title area underneath toggles the info panel.
+        serverLink.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.event.Event::consume);
+        serverLink.setOnAction(e -> {
+            if (serverLink.getUserData() instanceof String id) onShowServer.accept(id);
+        });
+        HBox subtitleRow = new HBox(4, serverLink, headerSubtitle);
+        subtitleRow.setAlignment(Pos.CENTER_LEFT);
+        headerSubtitle.setMinWidth(0);
+        VBox titles = new VBox(1, headerTitle, subtitleRow);
+        titles.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(titles, Priority.ALWAYS);
+        titles.setMinWidth(0);
+        infoButton.setGraphic(Icons.icon(Icons.INFO, 18));
+        infoButton.getStyleClass().add("icon-button");
+        infoButton.setTooltip(new javafx.scene.control.Tooltip("Información del chat"));
+        infoButton.setOnAction(e -> toggleInfo.run());
+        infoButton.setAccessibleText("Información del chat");
+        Button more = Composer.iconButton(Icons.MORE, "Más opciones", null);
+        more.setOnAction(e -> ChatMenus.forChat(chat, svc, null).show(more, Side.BOTTOM, 0, 4));
+        HBox header = new HBox(10, headerAvatar, titles, favButton, archiveButton, infoButton, more);
+        header.getStyleClass().add("thread-header");
+        header.setAlignment(Pos.CENTER_LEFT);
+        titles.setOnMouseClicked(e -> toggleInfo.run());
+        return header;
+    }
+
+    private void configureTimeline() {
+        list.getStyleClass().add("timeline");
+        list.setCellFactory(v -> new RowCell());
+        list.setAccessibleText("Mensajes");
+        list.setAccessibleHelp("Flechas para recorrer mensajes. R responder, E editar, Enter o Espacio abre las acciones, "
+                + "1 a 6 reacciones rápidas, T transcribir una nota de voz, " + (MainView.MAC ? "⌘" : "Ctrl+") + "C copiar, "
+                + "Esc vuelve al campo de texto.");
+        list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, this::onTimelineKey);
+        list.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> userScrolled());
+        list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, e -> {
+            switch (e.getCode()) {
+                case PAGE_UP, PAGE_DOWN, HOME, END, UP, DOWN -> userScrolled();
+                default -> { }
+            }
+        });
+        list.focusedProperty().addListener((o, a, focused) -> {
+            if (focused && list.getSelectionModel().isEmpty() && !rows.isEmpty()) {
+                list.getSelectionModel().select(rows.size() - 1);
+            }
+        });
+    }
+
+    private void redrawOnTranscriptProgress() {
+        // Transcript progress redraws the visible rows; coalesced so a model download doesn't flood the FX thread.
+        java.util.concurrent.atomic.AtomicBoolean refreshQueued = new java.util.concurrent.atomic.AtomicBoolean();
+        Transcripts.get().addListener(() -> {
+            if (refreshQueued.compareAndSet(false, true)) Platform.runLater(() -> {
+                refreshQueued.set(false);
+                list.refresh();
+            });
+        });
+    }
+
     public Chat chat() { return chat; }
     public Composer composer() { return composer; }
 
     /** Favourites and recents shared by every chat (MainView owns it). */
-    public void setLibrary(app.unichat.model.MediaLibrary library) { this.library = library; }
+    public void setLibrary(MediaLibrary library) { this.library = library; }
     public void setInfoSelected(boolean selected) { infoButton.setSelected(selected); }
 
     public void open(Chat c) {
@@ -473,11 +476,11 @@ public final class ThreadPane extends BorderPane {
             composer.focus();
         } else if (m == null || m.type() == MessageType.SYSTEM) {
             return;
-        } else if (code == javafx.scene.input.KeyCode.R && !e.isShortcutDown() && allows(m, MessageActions.Action.REPLY)) {
+        } else if (code == javafx.scene.input.KeyCode.R && !e.isShortcutDown() && messageActions.allows(m, MessageActions.Action.REPLY)) {
             composer.reply(m);
-        } else if (code == javafx.scene.input.KeyCode.T && !e.isShortcutDown() && allows(m, MessageActions.Action.TRANSCRIBE)) {
-            transcribe(m);
-        } else if (code == javafx.scene.input.KeyCode.E && !e.isShortcutDown() && allows(m, MessageActions.Action.EDIT)) {
+        } else if (code == javafx.scene.input.KeyCode.T && !e.isShortcutDown() && messageActions.allows(m, MessageActions.Action.TRANSCRIBE)) {
+            media.transcribe(m);
+        } else if (code == javafx.scene.input.KeyCode.E && !e.isShortcutDown() && messageActions.allows(m, MessageActions.Action.EDIT)) {
             composer.edit(m);
         } else if (code == javafx.scene.input.KeyCode.C && e.isShortcutDown() && !m.isMedia()) {
             ClipboardContent cc = new ClipboardContent();
@@ -487,7 +490,7 @@ public final class ThreadPane extends BorderPane {
                 || code == javafx.scene.input.KeyCode.CONTEXT_MENU) && !m.deleted()) {
             var cell = list.lookupAll(".row-cell").stream()
                     .filter(n -> n instanceof RowCell rc && rc.isSelected()).findFirst().orElse(list);
-            messageMenu(m).show(cell, Side.BOTTOM, 40, -10);
+            messageActions.messageMenu(m).show(cell, Side.BOTTOM, 40, -10);
         } else if (code.isDigitKey() && !e.isShortcutDown() && !m.deleted()) {
             int n = code.getCode() - javafx.scene.input.KeyCode.DIGIT1.getCode();
             java.util.List<String> offered = chat.features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK));
@@ -533,9 +536,9 @@ public final class ThreadPane extends BorderPane {
 
         Node bubble = bubble(m, row, maxBubble);
         column.getChildren().add(bubble);
-        if (!m.reactions().isEmpty()) column.getChildren().add(reactions(m));
+        if (!m.reactions().isEmpty()) column.getChildren().add(messageActions.reactions(m));
 
-        HBox actions = hoverActions(m, bubble);
+        HBox actions = messageActions.hoverActions(m, bubble);
         actions.setVisible(Settings.get().alwaysShowMessageActions());
         HBox line = new HBox(6);
         line.setAlignment(Pos.CENTER_LEFT);
@@ -608,10 +611,10 @@ public final class ThreadPane extends BorderPane {
             bubble.getChildren().add(l);
         } else if (m.type() == MessageType.IMAGE || m.type() == MessageType.STICKER) {
             bubble.getStyleClass().add(m.type() == MessageType.STICKER ? "sticker" : "media");
-            bubble.getChildren().add(imageNode(m));
+            bubble.getChildren().add(media.imageNode(m));
         } else if (m.isMedia()) {
-            bubble.getChildren().add(fileNode(m));
-            if (m.type() == MessageType.AUDIO && m.mediaUrl() != null) bubble.getChildren().add(transcriptNode(m, maxWidth));
+            bubble.getChildren().add(media.fileNode(m));
+            if (m.type() == MessageType.AUDIO && m.mediaUrl() != null) bubble.getChildren().add(media.transcriptNode(m, maxWidth));
         } else if ((m.type() == MessageType.TEXT) && RichText.isJumboEmoji(m.body()) && m.replyToId() == null) {
             bubble.getStyleClass().add("jumbo");
             Label l = new Label(m.body().strip());
@@ -643,7 +646,7 @@ public final class ThreadPane extends BorderPane {
         bubble.getChildren().add(metaRow);
         bubble.setFillWidth(true);
 
-        bubble.setOnContextMenuRequested(e -> messageMenu(m).show(bubble, e.getScreenX(), e.getScreenY()));
+        bubble.setOnContextMenuRequested(e -> messageActions.messageMenu(m).show(bubble, e.getScreenX(), e.getScreenY()));
         bubble.setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2 && !m.deleted()
                     && !chat.features().reactionsOffered(java.util.List.of("❤️")).isEmpty()) {
@@ -662,307 +665,6 @@ public final class ThreadPane extends BorderPane {
         };
         icon.getStyleClass().add("status-" + s.name().toLowerCase());
         return icon;
-    }
-
-    private Node imageNode(Message m) {
-        double w = m.width() > 0 ? m.width() : 240;
-        double h = m.height() > 0 ? m.height() : 180;
-        double scale = Math.min(1, Math.min(MAX_MEDIA / w, MAX_MEDIA / h));
-        double dw = Math.max(80, w * scale), dh = Math.max(60, h * scale);
-        boolean sticker = m.type() == MessageType.STICKER;
-        if (sticker) {
-            // Stickers are small and shown without a bubble, like on the phone.
-            double s = Math.min(1, Math.min(180 / w, 180 / h));
-            dw = Math.max(60, w * s);
-            dh = Math.max(60, h * s);
-        }
-        StackPane box = new StackPane();
-        box.getStyleClass().add(sticker ? "sticker-box" : "media-box");
-        box.setPrefSize(dw, dh);
-        box.setMinSize(dw, dh);
-        box.setMaxSize(dw, dh);
-        if (!sticker) {
-            Rectangle clip = new Rectangle(dw, dh);
-            clip.setArcWidth(24);
-            clip.setArcHeight(24);
-            box.setClip(clip);
-        }
-        ImageView view = new ImageView();
-        view.setFitWidth(dw);
-        view.setFitHeight(dh);
-        view.setPreserveRatio(sticker);
-        box.getChildren().add(view);
-        if (m.mediaUrl() != null) {
-            loadInto(view, m, (int) (dw * 2), (int) (dh * 2));
-            if (library != null && MessageActions.isStickerOrGif(m)) library.rememberSeen(MediaItems.of(m));
-            // On release, not click: the first press selects the message and may scroll the list, and a press and
-            // release over different spots is no "click" (it took a second click to open). Stickers open too: the
-            // viewer plays animated WebP.
-            box.setOnMouseReleased(e -> {
-                if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress() && getScene() != null) {
-                    Window owner = getScene().getWindow();
-                    MediaViewer.show(owner, svc.media(m.mediaUrl(), 0, 0), sticker ? "Sticker" : m.fileName(),
-                            () -> MediaSaver.save(owner, svc, m, toast));
-                }
-            });
-            box.setCursor(javafx.scene.Cursor.HAND);
-            box.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
-            box.setAccessibleText((sticker ? "Sticker" : "Imagen") + (m.fileName() == null || sticker ? "" : " " + m.fileName())
-                    + ", abrir en grande");
-        }
-        return box;
-    }
-
-    /** Stickers, GIFs and WebP may be animated: those load the original file, never a (static) thumbnail. */
-    static boolean mayBeAnimated(Message m) {
-        String mime = m.mimeType() == null ? "" : m.mimeType();
-        return m.type() == MessageType.STICKER || mime.equals("image/gif") || mime.equals("image/webp");
-    }
-
-    private void loadInto(ImageView view, Message m, int pxW, int pxH) {
-        loadMedia(svc, view, m, pxW, pxH);
-    }
-
-    /** Thumbnail first, then the (possibly animated) original; shared with the sticker and GIF grids. */
-    static void loadMedia(ChatService svc, ImageView view, Message m, int pxW, int pxH) {
-        if (!mayBeAnimated(m)) {
-            svc.media(m.mediaUrl(), pxW, pxH).thenAcceptAsync(p -> showStill(view, p, pxW, pxH, false), AnimatedImage.DECODER);
-            return;
-        }
-        // Placeholder: a still picture shows at once; decoding a long animation takes seconds. (With direct media
-        // the "thumbnail" is the original file, maybe an animated GIF: only its first frame is used.)
-        svc.media(m.mediaUrl(), pxW, pxH).thenAcceptAsync(p -> showStill(view, p, pxW, pxH, true), AnimatedImage.DECODER);
-        svc.media(m.mediaUrl(), 0, 0).thenAcceptAsync(p -> {
-            try {
-                AnimatedImage.Frames frames;
-                if (AnimatedImage.isWebp(p)) frames = AnimatedImage.decodeWebp(p, pxW, pxH);
-                else if (AnimatedImage.isGif(p)) frames = AnimatedImage.decodeGif(p, pxW, pxH);
-                else {
-                    // Labelled as a sticker but a plain PNG/JPEG: never handed to JavaFX's own GIF animation.
-                    Image img = new Image(p.toUri().toString(), pxW, pxH, true, true, false);
-                    Platform.runLater(() -> view.setImage(img));
-                    return;
-                }
-                Platform.runLater(() -> AnimatedImage.play(view, frames));
-            } catch (Exception e) {
-                System.err.println("Could not decode " + m.mediaUrl() + ": " + e);
-            }
-        }, AnimatedImage.DECODER);
-    }
-
-    /** Decodes {@code p} as a still picture (off the FX thread) and shows it; {@code ifEmpty}: only if nothing's shown. */
-    private static void showStill(ImageView view, java.nio.file.Path p, int pxW, int pxH, boolean ifEmpty) {
-        try {
-            Image img = AnimatedImage.still(p, pxW, pxH);
-            Platform.runLater(() -> {
-                if (!ifEmpty || view.getImage() == null) view.setImage(img);
-            });
-        } catch (Exception e) {
-            System.err.println("Could not decode " + p.getFileName() + ": " + e);
-        }
-    }
-
-    private Node fileNode(Message m) {
-        String icon = switch (m.type()) {
-            case VIDEO, AUDIO -> Icons.PLAY;
-            default -> Icons.FILE;
-        };
-        StackPane ic = new StackPane(Icons.icon(icon, 18));
-        ic.getStyleClass().add("file-icon");
-        Label name = new Label(m.fileName() == null ? m.body() : m.fileName());
-        name.getStyleClass().add("file-name");
-        Label size = new Label((m.type() == MessageType.AUDIO ? "Audio" : m.type() == MessageType.VIDEO ? "Video" : "Archivo")
-                + (m.fileSize() > 0 ? " · " + Formats.fileSize(m.fileSize()) : ""));
-        size.getStyleClass().add("file-size");
-        VBox text = new VBox(1, name, size);
-        HBox box = new HBox(10, ic, text, Icons.icon(Icons.DOWNLOAD, 16));
-        box.setAlignment(Pos.CENTER_LEFT);
-        box.getStyleClass().add("file-chip");
-        box.setCursor(javafx.scene.Cursor.HAND);
-        box.setOnMouseClicked(e -> openFile(m));
-        box.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
-        box.setAccessibleText(size.getText() + " " + name.getText() + ", abrir");
-        return box;
-    }
-
-    private void transcribe(Message m) {
-        Transcripts.get().request(m.mediaUrl(), () -> svc.media(m.mediaUrl(), 0, 0));
-    }
-
-    /** Under a voice note: "Transcribir", the progress, the text, or the error with "Reintentar". */
-    private Node transcriptNode(Message m, double maxWidth) {
-        Transcripts.State st = Transcripts.get().state(m.mediaUrl());
-        if (st instanceof Transcripts.Done d) {
-            Label text = new Label(d.text().isEmpty() ? "Sin voz" : d.text());
-            text.getStyleClass().add("transcript");
-            if (d.text().isEmpty()) text.getStyleClass().add("empty");
-            text.setWrapText(true);
-            text.setMaxWidth(maxWidth - 24);
-            return text;
-        }
-        if (st instanceof Transcripts.Working w) {
-            Label l = new Label(w.what());
-            l.getStyleClass().add("transcript-status");
-            return l;
-        }
-        Hyperlink action = new Hyperlink(st instanceof Transcripts.Failed ? "Reintentar" : "Transcribir");
-        action.getStyleClass().add("transcript-action");
-        // Keyboard: T or the message's menu (rows are navigated as a whole, like reactions).
-        action.setFocusTraversable(false);
-        action.setAccessibleText("Transcribir la nota de voz");
-        action.setOnAction(e -> transcribe(m));
-        if (st instanceof Transcripts.Failed f) {
-            Label err = new Label("No se pudo transcribir: " + f.error());
-            err.getStyleClass().add("transcript-status");
-            err.setWrapText(true);
-            err.setMaxWidth(maxWidth - 24);
-            return new VBox(2, err, action);
-        }
-        return action;
-    }
-
-    private void openFile(Message m) {
-        if (m.mediaUrl() == null) return;
-        svc.media(m.mediaUrl(), 0, 0).thenAccept(p -> {
-            try {
-                if (Desktop.isDesktopSupported()) Desktop.getDesktop().open(p.toFile());
-            } catch (Exception ex) {
-                openLink.accept(p.toUri().toString());
-            }
-        });
-    }
-
-    private Node reactions(Message m) {
-        HBox box = new HBox(4);
-        box.getStyleClass().add("reactions");
-        for (Map.Entry<String, Set<String>> r : m.reactions().entrySet()) {
-            Label emoji = new Label(r.getKey());
-            emoji.getStyleClass().add("reaction-emoji");
-            HBox content = new HBox(4, emoji);
-            content.setAlignment(Pos.CENTER);
-            if (r.getValue().size() > 1) {
-                Label count = new Label(Integer.toString(r.getValue().size()));
-                count.getStyleClass().add("reaction-count");
-                content.getChildren().add(count);
-            }
-            Button b = new Button();
-            b.setGraphic(content);
-            b.getStyleClass().add("reaction-pill");
-            if (r.getValue().contains(svc.myUserId())) b.getStyleClass().add("mine");
-            b.setTooltip(new javafx.scene.control.Tooltip(String.join(", ", r.getValue().stream().map(this::nameOf).toList())));
-            b.setOnAction(e -> svc.toggleReaction(chat.id(), m.id(), r.getKey()));
-            b.setFocusTraversable(false);
-            boolean mine = r.getValue().contains(svc.myUserId());
-            b.setAccessibleText("Reacción " + r.getKey() + ", " + r.getValue().size()
-                    + (mine ? ", incluida la tuya. Pulsa para quitarla" : ". Pulsa para reaccionar igual"));
-            box.getChildren().add(b);
-        }
-        return box;
-    }
-
-    private String nameOf(String userId) {
-        if (userId.equals(svc.myUserId())) return "Tú";
-        Member mem = member(userId);
-        return mem == null ? userId : mem.displayName();
-    }
-
-    private HBox hoverActions(Message m, Node bubble) {
-        HBox box = new HBox(2);
-        box.getStyleClass().add("hover-actions");
-        box.setAlignment(Pos.CENTER);
-        if (m.deleted()) return box;
-        if (!chat.features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK)).isEmpty() || chat.features().anyReaction()) {
-            Button react = Composer.iconButton(Icons.EMOJI, "Reaccionar", null);
-            react.setOnAction(e -> reactionPopup(m, react));
-            box.getChildren().add(react);
-        }
-        if (allows(m, MessageActions.Action.REPLY)) box.getChildren().add(Composer.iconButton(Icons.REPLY, "Responder", () -> composer.reply(m)));
-        Button more = Composer.iconButton(Icons.MORE, "Más", null);
-        more.setOnAction(e -> messageMenu(m).show(more, Side.BOTTOM, 0, 0));
-        box.getChildren().add(more);
-        // Reachable with the timeline keys instead; tabbing through every message would be unusable.
-        box.getChildren().forEach(n -> n.setFocusTraversable(false));
-        return box;
-    }
-
-    private void reactionPopup(Message m, Node anchor) {
-        Popup p = new Popup();
-        p.setAutoHide(true);
-        HBox row = new HBox(2);
-        row.getStyleClass().addAll("popup-surface", "quick-reactions");
-        row.getStylesheets().addAll(getScene().getStylesheets());
-        row.getStyleClass().addAll(getScene().getRoot().getStyleClass());
-        row.setStyle(getScene().getRoot().getStyle());
-        for (String e : chat.features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK))) {
-            Button b = new Button(e);
-            b.getStyleClass().add("emoji-button");
-            b.setOnAction(ev -> {
-                svc.toggleReaction(chat.id(), m.id(), e);
-                p.hide();
-            });
-            row.getChildren().add(b);
-        }
-        if (chat.features().anyReaction()) {
-            Button plus = Composer.iconButton(Icons.PLUS, "Más emojis", null);
-            plus.setOnAction(ev -> {
-                p.hide();
-                EmojiPicker.show(anchor, e -> svc.toggleReaction(chat.id(), m.id(), e));
-            });
-            row.getChildren().add(plus);
-        }
-        p.getContent().add(row);
-        var b = anchor.localToScreen(anchor.getBoundsInLocal());
-        p.show(anchor, b.getMinX() - 120, b.getMinY() - 52);
-    }
-
-    /** Same rules as the message menu, for the shortcuts and hover buttons. */
-    private boolean allows(Message m, MessageActions.Action a) {
-        return MessageActions.of(m, chat.features(), java.time.Instant.now()).contains(a);
-    }
-
-    private ContextMenu messageMenu(Message m) {
-        ContextMenu menu = new ContextMenu();
-        java.util.Set<MessageActions.Action> a = MessageActions.of(m, chat.features(), Instant.now());
-        if (a.isEmpty()) return menu;
-        if (a.contains(MessageActions.Action.REPLY)) menu.getItems().add(ChatMenus.item("Responder", () -> composer.reply(m)));
-        if (a.contains(MessageActions.Action.COPY)) menu.getItems().add(ChatMenus.item("Copiar texto", () -> {
-            ClipboardContent cc = new ClipboardContent();
-            cc.putString(m.body());
-            Clipboard.getSystemClipboard().setContent(cc);
-        }));
-        if (a.contains(MessageActions.Action.OPEN_FILE)) menu.getItems().add(ChatMenus.item("Abrir archivo", () -> openFile(m)));
-        if (a.contains(MessageActions.Action.SAVE_AS)) menu.getItems().add(ChatMenus.item("Guardar como…", () -> {
-            if (getScene() != null) MediaSaver.save(getScene().getWindow(), svc, m, toast);
-        }));
-        if (a.contains(MessageActions.Action.TRANSCRIBE)) {
-            if (Transcripts.get().state(m.mediaUrl()) instanceof Transcripts.Done d) {
-                if (!d.text().isEmpty()) menu.getItems().add(ChatMenus.item("Copiar transcripción", () -> {
-                    ClipboardContent cc = new ClipboardContent();
-                    cc.putString(d.text());
-                    Clipboard.getSystemClipboard().setContent(cc);
-                }));
-            } else {
-                menu.getItems().add(ChatMenus.item("Transcribir", () -> transcribe(m)));
-            }
-        }
-        if (a.contains(MessageActions.Action.FAVORITE) && library != null) {
-            boolean fav = library.isFavorite(m.mediaUrl());
-            menu.getItems().add(ChatMenus.item(fav ? "Quitar de favoritos" : "Agregar a favoritos", () -> {
-                boolean now = library.toggleFavorite(MediaItems.of(m));
-                toast.accept(now ? "Agregado a favoritos" : "Quitado de favoritos");
-            }));
-        }
-        if (a.contains(MessageActions.Action.EDIT)) menu.getItems().add(ChatMenus.item("Editar", () -> composer.edit(m)));
-        java.util.List<String> reactions = chat.features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK));
-        if (!reactions.isEmpty()) {
-            menu.getItems().add(new SeparatorMenuItem());
-            for (String e : reactions) menu.getItems().add(ChatMenus.item("Reaccionar " + e, () -> svc.toggleReaction(chat.id(), m.id(), e)));
-        }
-        if (a.contains(MessageActions.Action.DELETE_FOR_EVERYONE)) {
-            menu.getItems().add(new SeparatorMenuItem());
-            menu.getItems().add(ChatMenus.danger(ChatMenus.item("Eliminar para todos", () -> svc.deleteMessage(chat.id(), m.id()))));
-        }
-        return menu;
     }
 
     private void scrollTo(Message target) {

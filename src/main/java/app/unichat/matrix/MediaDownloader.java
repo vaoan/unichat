@@ -1,0 +1,140 @@
+package app.unichat.matrix;
+
+import app.unichat.bridge.BridgePorts;
+import app.unichat.settings.Settings;
+import app.unichat.support.Hashes;
+
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+
+/** Downloads media on demand into {@code cache/media} and keeps that folder under its limit ({@link MediaCache}). */
+final class MediaDownloader {
+    private final MatrixClient client;
+    private final ExecutorService io;
+    private final Map<String, CompletableFuture<Path>> mediaInFlight = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicLong lastCacheTrim = new java.util.concurrent.atomic.AtomicLong();
+
+    MediaDownloader(MatrixClient client, ExecutorService io) {
+        this.client = client;
+        this.io = io;
+    }
+
+    /** The local file of {@code url}: from the cache, or downloaded once however many ask at the same time. */
+    CompletableFuture<Path> media(String url, int width, int height) {
+        if (url == null || url.isBlank()) return CompletableFuture.failedFuture(new MatrixException(0, null, "Sin URL"));
+        if (url.startsWith("file:")) return CompletableFuture.completedFuture(Path.of(URI.create(url)));
+        String key = url + "|" + Math.max(0, width) + "x" + Math.max(0, height);
+        Path dir = Settings.get().cacheDir().resolve("media");
+        String hash = Hashes.sha256(key);
+        Path cached = findCached(dir, hash);
+        if (cached != null) {
+            MediaCache.touch(cached);
+            return CompletableFuture.completedFuture(cached);
+        }
+        CompletableFuture<Path> f = new CompletableFuture<>();
+        CompletableFuture<Path> prev = mediaInFlight.putIfAbsent(key, f);
+        if (prev != null) return prev;
+        io.execute(() -> {
+            try {
+                f.complete(download(url, width, height, dir, hash));
+                trimMediaCache(dir);
+            } catch (Throwable t) {
+                f.completeExceptionally(t);
+            } finally {
+                mediaInFlight.remove(key, f);
+            }
+        });
+        return f;
+    }
+
+    /** At most once a minute: listing thousands of files after every thumbnail would cost more than it saves. */
+    private void trimMediaCache(Path dir) {
+        long now = System.currentTimeMillis(), last = lastCacheTrim.get();
+        if (now - last < 60_000 || !lastCacheTrim.compareAndSet(last, now)) return;
+        MediaCache.trim(dir, Settings.get().mediaCacheMb() * 1024L * 1024L);
+    }
+
+    private Path download(String url, int w, int h, Path dir, String hash) throws IOException {
+        Path tmp = dir.resolve(hash + ".download");
+        Files.deleteIfExists(tmp);
+        String contentType;
+        if (url.startsWith("mxc://")) {
+            String rest = url.substring("mxc://".length());
+            int slash = rest.indexOf('/');
+            if (slash <= 0) throw new MatrixException(0, null, "URL de medio no válida");
+            String sm = MatrixClient.enc(rest.substring(0, slash)) + "/" + MatrixClient.enc(rest.substring(slash + 1));
+            contentType = null;
+            String bridge = BridgePorts.directMediaBase(rest.substring(0, slash));
+            if (bridge != null) {
+                // Direct media: the bridge fetches it from the network now (nothing was copied to the server).
+                contentType = client.download(bridge + "/_matrix/client/v1/media/download/" + sm, false, tmp);
+            } else if (w > 0 && h > 0) {
+                String q = "?width=" + w + "&height=" + h + "&method=scale";
+                try {
+                    contentType = fetchMedia("/thumbnail/" + sm + q, tmp);
+                } catch (MatrixException e) {
+                    contentType = null; // not thumbnailable: fall back to the original
+                }
+            }
+            if (contentType == null && !Files.exists(tmp)) contentType = fetchMedia("/download/" + sm, tmp);
+        } else if (url.startsWith("http://") || url.startsWith("https://")) {
+            contentType = client.download(url, false, tmp);
+        } else {
+            throw new MatrixException(0, null, "URL de medio no compatible");
+        }
+        Path target = dir.resolve(hash + extension(contentType));
+        Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+        return target;
+    }
+
+    /** Authenticated media (Matrix 1.11) with fallback to the legacy unauthenticated endpoints. */
+    private String fetchMedia(String suffix, Path tmp) throws IOException {
+        try {
+            return client.download("/_matrix/client/v1/media" + suffix, true, tmp);
+        } catch (MatrixException e) {
+            if (!e.isUnrecognized()) throw e;
+            return client.download("/_matrix/media/v3" + suffix, true, tmp);
+        }
+    }
+
+    private static Path findCached(Path dir, String hash) {
+        if (!Files.isDirectory(dir)) return null;
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, hash + "*")) {
+            for (Path p : ds) {
+                String n = p.getFileName().toString();
+                if (!n.endsWith(".download") && !n.contains(".part")) return p;
+            }
+        } catch (IOException ignored) {
+            // treat as not cached
+        }
+        return null;
+    }
+
+    private static String extension(String contentType) {
+        if (contentType == null) return "";
+        String ct = contentType.split(";")[0].trim().toLowerCase(Locale.ROOT);
+        return switch (ct) {
+            case "image/jpeg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/gif" -> ".gif";
+            case "image/webp" -> ".webp";
+            case "image/svg+xml" -> ".svg";
+            case "video/mp4" -> ".mp4";
+            case "video/webm" -> ".webm";
+            case "audio/ogg" -> ".ogg";
+            case "audio/mpeg" -> ".mp3";
+            case "audio/mp4" -> ".m4a";
+            case "application/pdf" -> ".pdf";
+            default -> "";
+        };
+    }
+}
