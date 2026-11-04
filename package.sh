@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 VERSION=1.0.0
 ./mvnw -q -DskipTests package
 rm -rf target/pkg release && mkdir -p target/pkg release
-cp target/unichat.jar target/pkg/
+cp target/unichat.jar LICENSE THIRD-PARTY.md target/pkg/
 # The local server's homeserver ships inside the app (Contents/app/server/tuwunel; see LocalServer).
 # CI builds it from source; locally pass TUWUNEL_BIN=<path to a tuwunel built at the versions.env tag>.
 if [ -n "${TUWUNEL_BIN:-}" ]; then

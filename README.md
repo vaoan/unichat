@@ -137,6 +137,14 @@ Ajustes y sesión en `%APPDATA%\Unichat` (Windows), `~/Library/Application Suppo
 - El estado de cada cuenta conectada es aproximado (se deduce de los mensajes del bot del bridge).
 - Cada arranque hace una sincronización inicial completa.
 
+## Licencia
+
+El código de Unichat es [0BSD](LICENSE): úsalo, cópialo, modifícalo y distribúyelo como quieras, sin necesidad de
+dar crédito. Eso cubre solo este código. Las piezas de terceros conservan sus propias licencias: JavaFX
+(GPLv2 con excepción de classpath), las bibliotecas Java (Apache 2.0 y BSD), whisper.cpp (MIT), libwebp (BSD), tuwunel
+y libolm (Apache 2.0). Los puentes de mautrix (AGPL-3.0) no vienen en la app: se descargan aparte al conectar cada red.
+La lista completa, con los textos de licencia, está en [THIRD-PARTY.md](THIRD-PARTY.md), que también va dentro de los paquetes.
+
 ---
 
 No afiliado a Beeper ni a Automattic. Las marcas de cada red pertenecen a sus dueños.

@@ -10,7 +10,7 @@ if ($LASTEXITCODE -ne 0) { throw "Maven build failed" }
 
 Remove-Item -Recurse -Force target\pkg, release -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force target\pkg, release | Out-Null
-Copy-Item target\unichat.jar target\pkg\
+Copy-Item target\unichat.jar, LICENSE, THIRD-PARTY.md target\pkg\
 
 # Animated stickers for chats that only take WebP (WhatsApp): libwebp's gif2webp, pinned (see StickerConverter
 # and native/fetch-gif2webp.sh for the macOS build of the same release).
