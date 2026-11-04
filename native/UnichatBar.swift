@@ -7,7 +7,7 @@
 //   notify <chat id> <sound 0|1> <title> <body>   a system notification (Notification Center, Do Not Disturb…)
 //   clear <chat id>       removes that chat's notifications (it was read)
 // It writes to stdout: "click <tag>" when a menu item is chosen, "open <chat id>" when a notification is clicked,
-// "notify-auth <1|0>" once notifications are allowed or not, and exits when stdin closes (the app quit or died).
+// "notify-auth <1|0>" when notifications become allowed or not (also later), and exits when stdin closes (the app quit or died).
 // Notifications need it to run from its bundle (UnichatBar.app, built by native/build-bar.sh): that's what macOS
 // shows ("Unichat") and asks permission for. A plain java process can't post them.
 import AppKit
@@ -24,11 +24,34 @@ func emit(_ line: String) {
 
 final class Notes: NSObject, UNUserNotificationCenterDelegate {
     private let center = UNUserNotificationCenter.current()
+    /** Only touched on the output queue. */
+    private var lastReported: Bool?
 
     func setUp() {
         center.delegate = self
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
-            emit("notify-auth\t\(granted ? 1 : 0)")
+            self.report(granted)
+            // The first answer can be "no" even when the person clicks Allow, and System Settings can change it at
+            // any time: keep asking, so Unichat follows without a restart.
+            DispatchQueue.main.async {
+                Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in self.check() }
+            }
+        }
+    }
+
+    private func check() {
+        center.getNotificationSettings { settings in
+            self.report(settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional)
+        }
+    }
+
+    /** Tells Unichat only when the answer changes. */
+    private func report(_ allowed: Bool) {
+        output.async {
+            if self.lastReported == allowed { return }
+            self.lastReported = allowed
+            print("notify-auth\t\(allowed ? 1 : 0)")
+            fflush(stdout)
         }
     }
 
