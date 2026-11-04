@@ -176,6 +176,19 @@ class BridgeConfigTest {
     }
 
     @Test
+    void bridgesReportTheirStateToUnichat() throws Exception {
+        BridgeConfig.Settings with = new BridgeConfig.Settings("whatsapp", 29318, "localhost", "@yo:localhost",
+                "http://127.0.0.1:8008", Path.of("/data/whatsapp"), "dp", null, null, "http://127.0.0.1:5000/status/whatsapp");
+        ObjectNode c = BridgeConfig.apply(BridgeConfig.read(V2), with);
+        assertEquals("http://127.0.0.1:5000/status/whatsapp", c.at("/homeserver/status_endpoint").asText());
+        ObjectNode legacy = BridgeConfig.apply(BridgeConfig.read(LEGACY), new BridgeConfig.Settings("discord", 29334,
+                "localhost", "@yo:localhost", "http://127.0.0.1:8008", Path.of("/data/discord"), "dp", null, null,
+                "http://127.0.0.1:5000/status/discord"));
+        assertEquals("http://127.0.0.1:5000/status/discord", legacy.at("/homeserver/status_endpoint").asText());
+        assertTrue(BridgeConfig.apply(BridgeConfig.read(V2), settings("signal")).at("/homeserver/status_endpoint").isNull());
+    }
+
+    @Test
     void aMistypedKeyIsNotInvented() throws Exception {
         ObjectNode c = BridgeConfig.read(V2);
         assertFalse(BridgeConfig.setExisting(c, "/network/sync/create_limitt", 100));

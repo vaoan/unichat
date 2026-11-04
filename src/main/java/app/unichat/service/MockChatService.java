@@ -495,9 +495,20 @@ public final class MockChatService implements ChatService {
 
     @Override
     public List<Account> accounts() {
+        List<Account> out;
         synchronized (accounts) {
-            return new ArrayList<>(accounts.values());
+            out = new ArrayList<>(accounts.values());
         }
+        // Snapshots of the "not working" strip: -Dunichat.demoAccounts=WHATSAPP:NEEDS_LOGIN,DISCORD:CONNECTING
+        String broken = System.getProperty("unichat.demoAccounts", "");
+        for (String part : broken.split(",")) {
+            String[] nv = part.split(":");
+            if (nv.length != 2) continue;
+            Network n = Network.valueOf(nv[0].strip());
+            AccountStatus st = AccountStatus.valueOf(nv[1].strip());
+            out.replaceAll(acc -> acc.network() == n ? new Account(acc.id(), n, acc.label(), st, null) : acc);
+        }
+        return out;
     }
 
     @Override public List<Network> availableNetworks() { return AVAILABLE; }

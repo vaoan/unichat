@@ -199,6 +199,10 @@ public final class UnichatApp extends Application {
             @Override public String provisioningUrl(app.unichat.model.Network n) {
                 return local.provisioningUrl(n.protocolId());
             }
+
+            @Override public app.unichat.server.BridgeStates states() {
+                return local.states();
+            }
         };
     }
 

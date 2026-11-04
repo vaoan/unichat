@@ -266,10 +266,18 @@ public final class MatrixChatService implements ChatService {
         io.execute(this::loadProfile);
         io.execute(this::checkBridges);
         timer.scheduleWithFixedDelay(this::checkReminders, 10, 10, TimeUnit.SECONDS);
+        BridgeProvisioner p = provisioner;
+        liveStates = p == null ? null : p.states();
+        if (liveStates != null) liveStates.addListener(liveChanged);
     }
+
+    /** The bridges' live reports: accounts are re-read from them on every change (and every 30 s, see tick). */
+    private app.unichat.server.BridgeStates liveStates;
+    private final Runnable liveChanged = () -> fire(Listener::accountsChanged);
 
     @Override
     public synchronized void stop() {
+        if (liveStates != null) liveStates.removeListener(liveChanged);
         running = false;
         if (syncThread != null) syncThread.interrupt();
         timer.shutdownNow();
@@ -1487,11 +1495,28 @@ public final class MatrixChatService implements ChatService {
                 if (r.chat.bridgeBot()) botRooms.put(r.chat.network(), r);
                 else portalCount.merge(r.chat.network(), 1, Integer::sum);
             }
+            BridgeProvisioner prov = provisioner;
+            app.unichat.server.BridgeStates live = prov == null ? null : prov.states();
+            long now = app.unichat.server.BridgeStates.now();
             for (Network n : Network.values()) {
                 if (!n.isBridged()) continue;
                 int portals = portalCount.getOrDefault(n, 0);
                 MatrixRoom botRoom = botRooms.get(n);
                 List<Login> cachedLogins = logins.get(n);
+                List<app.unichat.server.BridgeStates.State> reported = live == null ? List.of() : live.accounts(n.protocolId());
+                if (!reported.isEmpty()) {
+                    // The bridge's own live report beats anything inferred from its bot chat.
+                    for (app.unichat.server.BridgeStates.State st : reported) {
+                        String name = st.remoteName();
+                        if (name.isBlank() && cachedLogins != null) {
+                            for (Login l : cachedLogins) if (l.id().equals(st.remoteId()) && l.name() != null) name = l.name();
+                        }
+                        AccountStatus status = liveStatus(st.event(), st.since(), now);
+                        out.add(new Account(accountId(n, st.remoteId()), n, name.isBlank() ? st.remoteId() : name,
+                                status, liveDetail(status)));
+                    }
+                    continue;
+                }
                 if (cachedLogins != null && !cachedLogins.isEmpty()) {
                     // Known logins don't depend on rooms: show them even before the first sync arrives.
                     for (Login l : cachedLogins) {
@@ -1548,6 +1573,34 @@ public final class MatrixChatService implements ChatService {
 
         /** Base URL of the bridge's own login API ({@code .../_matrix/provision}), or null when unreachable. */
         default String provisioningUrl(Network network) { return null; }
+
+        /** What the bridges report live about their accounts (the local server); null when unknown. */
+        default app.unichat.server.BridgeStates states() { return null; }
+    }
+
+    /** A drop shorter than this still shows as connected: bridges usually reconnect within seconds. */
+    static final long LIVE_GRACE_MS = 60_000;
+
+    /** Account status from a bridge's live report. */
+    static AccountStatus liveStatus(String event, long since, long now) {
+        boolean brief = now - since < LIVE_GRACE_MS;
+        return switch (event) {
+            case "CONNECTED", "BACKFILLING" -> AccountStatus.CONNECTED;
+            case "BAD_CREDENTIALS", "LOGGED_OUT" -> AccountStatus.NEEDS_LOGIN;
+            case "UNKNOWN_ERROR" -> brief ? AccountStatus.CONNECTED : AccountStatus.ERROR;
+            default -> brief ? AccountStatus.CONNECTED : AccountStatus.CONNECTING;
+        };
+    }
+
+    /** What to tell the person about a live state (Spanish, short). */
+    static String liveDetail(AccountStatus status) {
+        return switch (status) {
+            case CONNECTED -> "Conectado";
+            case CONNECTING -> "Reconectando… (se arregla solo)";
+            case ERROR -> "Con errores; se reinicia solo";
+            case NEEDS_LOGIN -> "Se cerró la sesión: vuelve a vincular la cuenta";
+            case NOT_AVAILABLE -> "No disponible";
+        };
     }
 
     /**

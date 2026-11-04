@@ -236,6 +236,17 @@ public final class Supervisor {
         return s == null ? 0 : s.restarts;
     }
 
+    /**
+     * Kills {@code name} at once (it's hung or broken): it's restarted like after a crash. Unlike {@link #stop},
+     * it stays wanted.
+     */
+    public void kill(String name) {
+        Service s = services.get(name);
+        Process p = s == null ? null : s.process;
+        if (p != null) p.descendants().forEach(ProcessHandle::destroyForcibly);
+        if (p != null) p.destroyForcibly();
+    }
+
     /** Asks the process to exit, then kills it after 5 s. */
     public void stop(String name) {
         Service s = services.remove(name);

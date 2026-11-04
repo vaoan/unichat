@@ -79,18 +79,27 @@ public final class Rail extends VBox {
         networks.getChildren().clear();
         List<Account> accounts = svc.accounts();
         for (Network n : Network.values()) {
-            Account acc = accounts.stream().filter(a -> a.network() == n).findFirst().orElse(null);
+            // The account to speak for the network: a broken one before working ones.
+            Account acc = accounts.stream().filter(a -> a.network() == n)
+                    .max(java.util.Comparator.comparingInt((Account a) -> switch (a.status()) {
+                        case NEEDS_LOGIN -> 3;
+                        case ERROR -> 2;
+                        case CONNECTING -> 1;
+                        default -> 0;
+                    })).orElse(null);
             // Only networks you actually use: a working account, or native Matrix chats.
             boolean shown = n == Network.MATRIX
                     ? chats.stream().anyMatch(c -> c.network() == n && !c.bridgeBot() && !c.space())
-                    : !Accounts.of(accounts, n).isEmpty();
+                    : !Accounts.of(accounts, n).isEmpty()
+                    // A session that closed still has its chats: keep the network in sight (marked), not gone.
+                    || (acc != null && chats.stream().anyMatch(c -> c.network() == n && !c.bridgeBot() && !c.space()));
             if (!shown) continue;
             Label letter = NetworkIcons.tile(n, 26, "rail-network");
             String status = acc == null ? "" : switch (acc.status()) {
                 case CONNECTED -> "";
-                case CONNECTING -> " (conectando…)";
-                case NEEDS_LOGIN -> " (inicia sesión)";
-                case ERROR -> " (error)";
+                case CONNECTING -> " (sin conexión, reconectando)";
+                case NEEDS_LOGIN -> " (sesión cerrada: vuelve a vincular)";
+                case ERROR -> " (con errores, reiniciando)";
                 case NOT_AVAILABLE -> " (no disponible)";
             };
             List<Account> netAccounts = Accounts.of(accounts, n);
@@ -99,6 +108,9 @@ public final class Rail extends VBox {
                     listPane.goTo(listPane.filterProperty().get().switchTo(n, null)));
             if (n.isBridged()) b.setOnContextMenuRequested(e -> networkMenu(n, netAccounts).show(b, e.getScreenX(), e.getScreenY()));
             setActive(b, f.network() == n);
+            if (acc != null && acc.status() != AccountStatus.CONNECTED) {
+                b.getStyleClass().add(acc.status() == AccountStatus.NEEDS_LOGIN ? "rail-broken" : "rail-recovering");
+            }
             setUnreadBadge(b, chats.stream().filter(c -> c.network() == n && ChatFilter.inboxUnread(c)).count());
             networks.getChildren().add(b);
         }

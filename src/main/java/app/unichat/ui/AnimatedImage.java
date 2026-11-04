@@ -56,6 +56,17 @@ public final class AnimatedImage {
 
     private static final String TIMELINE = "unichat.animation";
 
+    /** Whether {@code n} can be seen now: its window showing and not minimized, every ancestor visible, inside the window. */
+    static boolean onScreen(javafx.scene.Node n) {
+        javafx.scene.Scene sc = n.getScene();
+        if (sc == null) return false;
+        javafx.stage.Window w = sc.getWindow();
+        if (w == null || !w.isShowing() || (w instanceof javafx.stage.Stage st && st.isIconified())) return false;
+        for (javafx.scene.Node p = n; p != null; p = p.getParent()) if (!p.isVisible() || p.getOpacity() == 0) return false;
+        javafx.geometry.Bounds b = n.localToScene(n.getBoundsInLocal());
+        return b.getMaxX() > 0 && b.getMaxY() > 0 && b.getMinX() < sc.getWidth() && b.getMinY() < sc.getHeight();
+    }
+
     /** Most frames kept of one animation; longer ones keep every n-th frame (same total duration). */
     static final int MAX_FRAMES = 120;
     /** Most pixel memory for one animation: big or long ones drop frames until they fit. */
@@ -276,7 +287,11 @@ public final class AnimatedImage {
         double at = 0;
         for (int i = 0; i < frames.images().size(); i++) {
             Image img = frames.images().get(i);
-            t.getKeyFrames().add(new KeyFrame(Duration.millis(at), e -> view.setImage(img)));
+            t.getKeyFrames().add(new KeyFrame(Duration.millis(at), e -> {
+                // Off screen (scrolled away, hidden tab, window minimized): no new frame, so nothing gets redrawn.
+                // Every running animation used to repaint the window ~60 times a second (a third of a core).
+                if (onScreen(view)) view.setImage(img);
+            }));
             at += frames.durationsMs().get(i);
         }
         t.getKeyFrames().add(new KeyFrame(Duration.millis(at)));

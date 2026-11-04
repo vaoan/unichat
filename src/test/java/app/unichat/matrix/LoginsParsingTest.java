@@ -42,4 +42,15 @@ class LoginsParsingTest {
         assertFalse(MatrixChatService.loginChanged("You're not logged in"), "list-logins reply must not loop");
         assertFalse(MatrixChatService.loginChanged("* `x` (y) - `LOGGED_OUT`"));
     }
+
+    @Test
+    void liveStatesGiveABriefDropTimeToHeal() {
+        long t = 1_000_000;
+        assertEquals(app.unichat.model.AccountStatus.CONNECTED, MatrixChatService.liveStatus("TRANSIENT_DISCONNECT", t - 30_000, t));
+        assertEquals(app.unichat.model.AccountStatus.CONNECTING, MatrixChatService.liveStatus("TRANSIENT_DISCONNECT", t - 90_000, t));
+        assertEquals(app.unichat.model.AccountStatus.ERROR, MatrixChatService.liveStatus("UNKNOWN_ERROR", t - 90_000, t));
+        assertEquals(app.unichat.model.AccountStatus.NEEDS_LOGIN, MatrixChatService.liveStatus("LOGGED_OUT", t, t),
+                "a closed session shows at once");
+        assertEquals(app.unichat.model.AccountStatus.CONNECTED, MatrixChatService.liveStatus("BACKFILLING", t - 999_999, t));
+    }
 }

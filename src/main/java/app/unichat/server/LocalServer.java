@@ -53,6 +53,11 @@ public final class LocalServer {
     private final Supervisor supervisor;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private boolean running;
+    /** Live connection state of every bridge account, reported by the bridges themselves. */
+    private final BridgeStates states = new BridgeStates();
+    private final StatusEndpoint statusEndpoint = new StatusEndpoint(states, this::asToken);
+    private final java.util.Map<String, String> asTokens = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Watchdog watchdog;
 
     private LocalServer(Platform platform) {
         this.platform = platform;
@@ -60,6 +65,9 @@ public final class LocalServer {
         this.manifest = Manifest.bundled();
         this.store = new BinaryStore(dir.resolve("bin"), platform);
         this.supervisor = new Supervisor(dir.resolve("run"));
+        java.util.Map<String, Integer> ports = new java.util.HashMap<>(BRIDGE_PORTS);
+        ports.put("tuwunel", PORT);
+        this.watchdog = new Watchdog(ports, this::watched, states, (name, why) -> supervisor.kill(name));
         // Whatever way Unichat ends (Salir, ⌘Q, logout of the Mac, kill), its server and bridges end with it.
         Runtime.getRuntime().addShutdownHook(new Thread(supervisor::stopAll, "local-server-shutdown"));
     }
@@ -74,6 +82,33 @@ public final class LocalServer {
     }
 
     public Path dir() { return dir; }
+
+    /** What the bridges report about their accounts (live; listeners run on a background thread). */
+    public BridgeStates states() { return states; }
+
+    /** The processes that should be up: the server and the bridges in use. */
+    private Iterable<String> watched() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (supervisor.isRunning("tuwunel") || running) out.add("tuwunel");
+        try {
+            out.addAll(activeBridges());
+        } catch (IOException e) {
+            // no list yet
+        }
+        return out;
+    }
+
+    /** A bridge's as_token, from its registration (it authorizes the bridge's status reports). */
+    private String asToken(String bridge) {
+        if (!BRIDGE_PORTS.containsKey(bridge)) return null;
+        return asTokens.computeIfAbsent(bridge, b -> {
+            try {
+                return BridgeConfig.read(Files.readString(dir.resolve(b).resolve("registration.yaml"))).path("as_token").asText(null);
+            } catch (IOException e) {
+                return null;
+            }
+        });
+    }
 
     /**
      * Bridges on the older mautrix framework (not bridgev2): no {@code -e} to write an example config and no login
@@ -131,6 +166,7 @@ public final class LocalServer {
             if (!supervisor.isRunning(b)) startBridge(b);
         }
         running = true;
+        watchdog.start();
     }
 
     /**
@@ -156,7 +192,9 @@ public final class LocalServer {
     }
 
     public synchronized void stop() {
+        watchdog.stop();
         supervisor.stopAll();
+        statusEndpoint.stop();
         running = false;
     }
 
@@ -187,7 +225,7 @@ public final class LocalServer {
         }
         String[] tg = telegramKeys(b);
         BridgeConfig.rewrite(config, new BridgeConfig.Settings(b, BRIDGE_PORTS.get(b), DOMAIN, "@" + USER + ":" + DOMAIN,
-                URL, bd, secrets.getProperty("double_puppet_token"), tg[0], tg[1]));
+                URL, bd, secrets.getProperty("double_puppet_token"), tg[0], tg[1], statusEndpoint.url(b)));
         Path reg = bd.resolve("registration.yaml");
         if (!Files.exists(reg)) run(bd, store.path(b).toString(), "-g", "-c", "config.yaml", "-r", "registration.yaml");
         Files.copy(reg, dir.resolve("appservices").resolve(b + ".yaml"), StandardCopyOption.REPLACE_EXISTING);

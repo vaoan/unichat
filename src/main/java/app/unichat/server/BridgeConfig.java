@@ -38,9 +38,16 @@ public final class BridgeConfig {
     /**
      * @param dir         the bridge's folder (database and log go there)
      * @param telegramApiId / telegramApiHash only used by the telegram bridge
+     * @param statusEndpoint where the bridge reports its connection state (StatusEndpoint); null for none
      */
     public record Settings(String bridge, int port, String domain, String adminUserId, String homeserverUrl,
-                           Path dir, String doublePuppetToken, String telegramApiId, String telegramApiHash) {}
+                           Path dir, String doublePuppetToken, String telegramApiId, String telegramApiHash,
+                           String statusEndpoint) {
+        public Settings(String bridge, int port, String domain, String adminUserId, String homeserverUrl,
+                        Path dir, String doublePuppetToken, String telegramApiId, String telegramApiHash) {
+            this(bridge, port, domain, adminUserId, homeserverUrl, dir, doublePuppetToken, telegramApiId, telegramApiHash, null);
+        }
+    }
 
     private BridgeConfig() {}
 
@@ -58,6 +65,9 @@ public final class BridgeConfig {
         set(c, "/homeserver/address", s.homeserverUrl());
         set(c, "/homeserver/domain", s.domain());
         set(c, "/homeserver/software", "standard");
+        // Live connection state of every account, for Unichat's status and its watchdog (both layouts).
+        if (s.statusEndpoint() != null) set(c, "/homeserver/status_endpoint", s.statusEndpoint());
+        else obj(c, "/homeserver").putNull("status_endpoint");
         set(c, "/appservice/address", "http://127.0.0.1:" + s.port());
         set(c, "/appservice/hostname", "127.0.0.1");
         obj(c, "/appservice").put("port", s.port());

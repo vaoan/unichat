@@ -489,6 +489,16 @@
 }
 .root.dark .connection-banner { -fx-background-color: derive(-accent, -55%); }
 .connection-banner.error { -fx-background-color: -danger; -fx-text-fill: white; }
+/* Accounts that aren't working (AccountAlerts): red when only a new login fixes it, amber while it recovers. */
+.account-alert { -fx-padding: 6 14; -fx-font-size: 0.9em; }
+.account-alert.relink { -fx-background-color: -danger; }
+.account-alert.relink .label { -fx-text-fill: white; }
+.account-alert.recovering { -fx-background-color: #F5A524; }
+.account-alert.recovering .label { -fx-text-fill: #1C2024; }
+.alert-action { -fx-background-color: white; -fx-text-fill: -danger; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 4 10; -fx-cursor: hand; }
+.alert-action:focused { -fx-border-color: #1C2024; -fx-border-width: 2; -fx-border-radius: 8; }
+.rail-button.rail-broken { -fx-border-color: -danger; -fx-border-width: 2; -fx-border-radius: 10; }
+.rail-button.rail-recovering { -fx-border-color: #F5A524; -fx-border-width: 2; -fx-border-radius: 10; }
 
 .media-viewer { -fx-background-color: rgba(0, 0, 0, 0.92); }
 

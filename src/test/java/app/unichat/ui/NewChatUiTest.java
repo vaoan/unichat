@@ -91,6 +91,7 @@ class NewChatUiTest {
                 .map(n -> ((Label) n).getText()).filter(t -> n(t)).findFirst().orElse(""));
         assertTrue(help.contains("Grupos"), help);
 
+        awaitSearch(scene);
         fx(() -> {
             Event.fireEvent(search(scene), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
             return null;
@@ -141,6 +142,7 @@ class NewChatUiTest {
         type(scene, "Pedro");
         Thread.sleep(1500);
         enter(scene);
+        awaitSearch(scene);
         fx(() -> {
             Event.fireEvent(search(scene), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
             return null;
@@ -164,6 +166,7 @@ class NewChatUiTest {
         shortcutN(scene);
         chooseNetwork(scene, "Discord");
         Thread.sleep(300);
+        awaitSearch(scene);
         String help = fx(() -> search(scene).getAccessibleHelp());
         assertTrue(help != null && help.contains("Grupos"), String.valueOf(help));
         chooseNetwork(scene, "WhatsApp");
@@ -182,8 +185,17 @@ class NewChatUiTest {
         return n != null && n.isVisible() && n.getScene() != null ? n : null;
     }
 
+    /** The search field, waiting up to 5 s for the pane to show it (fixed sleeps made this test flaky). */
     private static TextField search(Scene s) {
         return (TextField) s.getRoot().lookup(".new-chat-search");
+    }
+
+    private static void awaitSearch(Scene s) throws Exception {
+        long end = System.currentTimeMillis() + 5000;
+        while (System.currentTimeMillis() < end) {
+            if (fx(() -> search(s) != null)) return;
+            Thread.sleep(50);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -214,6 +226,7 @@ class NewChatUiTest {
     }
 
     private static void type(Scene s, String text) throws Exception {
+        awaitSearch(s);
         fx(() -> {
             search(s).setText(text);
             return null;
@@ -221,6 +234,7 @@ class NewChatUiTest {
     }
 
     private static void enter(Scene s) throws Exception {
+        awaitSearch(s);
         fx(() -> {
             Event.fireEvent(search(s), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
             return null;

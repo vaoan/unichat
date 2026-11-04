@@ -15,7 +15,9 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -38,6 +40,9 @@ public final class MainView extends StackPane {
     private final StackPane overlay = new StackPane();
     private final Label toast = new Label();
     private final Label connection = new Label();
+    /** One line per network that isn't working (AccountAlerts), under the connection banner. */
+    private final VBox accountAlerts = new VBox();
+    private String shownAlerts = "";
     private final Runnable onLogout;
     private final Consumer<String> openLink;
     private boolean chatsDirty;
@@ -59,6 +64,7 @@ public final class MainView extends StackPane {
             scheduleChats();
             Platform.runLater(() -> {
                 if (SettingsWindow.accountsPage() != null) SettingsWindow.accountsPage().refresh();
+                showAccountAlerts();
             });
         }
         @Override public void connectionChanged(ConnectionState s) { Platform.runLater(() -> showConnection(s)); }
@@ -118,9 +124,11 @@ public final class MainView extends StackPane {
         connection.setVisible(false);
         connection.setManaged(false);
 
+        accountAlerts.getStyleClass().add("account-alerts");
+        accountAlerts.setAccessibleRole(javafx.scene.AccessibleRole.TEXT);
         BorderPane main = new BorderPane(split);
         main.setLeft(rail);
-        main.setTop(connection);
+        main.setTop(new VBox(connection, accountAlerts));
 
         overlay.getStyleClass().add("overlay");
         overlay.setVisible(false);
@@ -140,6 +148,7 @@ public final class MainView extends StackPane {
 
         svc.addListener(listener);
         showConnection(svc.connectionState());
+        showAccountAlerts();
         refreshAll();
     }
 
@@ -248,6 +257,39 @@ public final class MainView extends StackPane {
         String who = chat.group() ? m.senderName() + " en " + chat.title() : chat.title();
         String head = "Mensaje de " + who + ", " + chat.network().displayName();
         return app.unichat.settings.Settings.get().notificationPreview() ? head + ": " + m.preview() : head;
+    }
+
+    /** Rebuilds the strip of accounts that aren't working; announced to screen readers when it changes. */
+    private void showAccountAlerts() {
+        java.util.Set<app.unichat.model.Network> inUse = java.util.EnumSet.noneOf(app.unichat.model.Network.class);
+        for (Chat c : svc.chats()) if (!c.bridgeBot() && !c.space()) inUse.add(c.network());
+        java.util.List<AccountAlerts.Alert> alerts = AccountAlerts.of(svc.accounts(), inUse);
+        String key = alerts.toString();
+        if (key.equals(shownAlerts)) return;
+        shownAlerts = key;
+        accountAlerts.getChildren().clear();
+        for (AccountAlerts.Alert a : alerts) {
+            Label text = new Label(a.text());
+            text.setWrapText(true);
+            text.setMinWidth(0);
+            HBox.setHgrow(text, javafx.scene.layout.Priority.ALWAYS);
+            text.setMaxWidth(Double.MAX_VALUE);
+            HBox row = new HBox(10, NetworkIcons.tile(a.network(), 18, "alert-network"), text);
+            row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            row.getStyleClass().addAll("account-alert", a.relink() ? "relink" : "recovering");
+            if (a.relink()) {
+                javafx.scene.control.Button fix = new javafx.scene.control.Button("Volver a vincular");
+                fix.getStyleClass().add("alert-action");
+                fix.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+                fix.setAccessibleText("Volver a vincular " + a.network().displayName());
+                fix.setOnAction(e -> addAccount(a.network()));
+                row.getChildren().add(fix);
+            }
+            accountAlerts.getChildren().add(row);
+        }
+        String spoken = alerts.stream().map(AccountAlerts.Alert::text).collect(java.util.stream.Collectors.joining(" "));
+        accountAlerts.setAccessibleText(spoken.isEmpty() ? null : spoken);
+        if (!spoken.isEmpty()) accountAlerts.notifyAccessibleAttributeChanged(javafx.scene.AccessibleAttribute.TEXT);
     }
 
     private void showConnection(ConnectionState s) {
