@@ -510,6 +510,7 @@
 .login-subtitle { -fx-text-fill: -text-2; -fx-text-alignment: center; }
 .login-field { -fx-pref-width: 340; }
 .login-error { -fx-text-fill: -danger; }
+.telegram-keys { -fx-padding: 10 0 6 0; }
 .login-help { -fx-text-fill: -text-3; -fx-font-size: 0.85em; -fx-border-width: 0; }
 
 /* ---------------------------------------------------------------- settings */

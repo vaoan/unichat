@@ -414,7 +414,7 @@ public final class SettingsWindow {
         Label intro = new Label("Opciones que solo existen en una red.");
         intro.setWrapText(true);
         intro.getStyleClass().add("settings-help");
-        return page("Redes", intro, group("WhatsApp",
+        return page("Redes", intro, telegramGroup(), group("WhatsApp",
                 row("Stickers animados", "WhatsApp no acepta los stickers animados de otras redes tal cual. Sticker: se "
                         + "convierte en sticker animado. GIF: llega como un GIF que se repite. Video: llega como un video corto.",
                         stickerModeChoice(app.unichat.model.Network.WHATSAPP))),
@@ -422,6 +422,31 @@ public final class SettingsWindow {
                         row("Borrar fotos y videos de canales después de", "Discord guarda en tu disco una copia de cada "
                                 + "imagen y video de los canales de servidores. Los avatares, emojis y los demás chats no "
                                 + "se borran nunca.", discordMediaChoice())));
+    }
+
+    /** The person's own Telegram keys; only the local server uses them (other servers keep theirs in their setup). */
+    private static Node telegramGroup() {
+        if (!Settings.get().localServer()) return new javafx.scene.layout.Region();
+        Label done = new Label();
+        done.getStyleClass().add("settings-help");
+        TelegramKeysForm form = new TelegramKeysForm("Guardar claves", () -> {
+            done.setText("Guardadas.");
+            app.unichat.server.LocalServer local = app.unichat.server.LocalServer.get();
+            if (local == null) return;
+            Thread t = new Thread(() -> {
+                try {
+                    // Telegram restarts with the new keys when it's in use; otherwise they wait for its first login.
+                    local.restartBridge("telegram", msg -> { });
+                } catch (Exception e) {
+                    System.err.println("Telegram restart failed: " + e);
+                    javafx.application.Platform.runLater(() -> done.setText("No se pudo reiniciar Telegram; se aplican al abrir Unichat de nuevo."));
+                }
+            }, "telegram-keys");
+            t.setDaemon(true);
+            t.start();
+        });
+        form.getChildren().add(done);
+        return group("Telegram", form);
     }
 
     private static Node discordMediaChoice() {

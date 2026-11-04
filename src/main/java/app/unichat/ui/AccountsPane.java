@@ -427,6 +427,11 @@ public final class AccountsPane extends VBox {
         dispose();
         // Local server: the bridge itself says how to log in (always up to date). Otherwise: the bot chat.
         if (svc instanceof app.unichat.matrix.MatrixChatService m && m.bridgeLogin(n) != null) {
+            if (n == Network.TELEGRAM && !app.unichat.server.TelegramKeys.saved()) {
+                // Telegram won't run without the person's own keys: ask here, not as an error afterwards.
+                setView("Conectar Telegram", new TelegramKeysForm("Guardar y continuar", () -> startBridgeLogin(m, n)), this::showPicker);
+                return;
+            }
             startBridgeLogin(m, n);
             return;
         }

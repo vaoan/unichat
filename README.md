@@ -30,6 +30,8 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   Roja con "Volver a vincular" si se cerró la sesión; ámbar mientras Unichat la recupera solo. En la barra lateral
   la red queda marcada. Con el servidor local, Unichat reinicia por su cuenta un puente que no responde, que lleva
   10 minutos desconectado o que se desconecta una y otra vez.
+- **Telegram con tus propias claves**: Telegram exige que cada persona saque un `api_id` y `api_hash` gratis en
+  my.telegram.org. Unichat los pide, con los pasos, al conectar Telegram; se cambian en Ajustes → Redes.
 - **Servidores** (Discord, foros de Telegram): el encabezado de un canal muestra su servidor; un clic abre la lista
   de canales. Al abrir una notificación de un canal, la lista muestra su servidor con el canal marcado.
 - **Favoritos**: clic derecho (o la tecla de menú) sobre un emoji, sticker o GIF, en el chat o en el panel lateral,

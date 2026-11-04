@@ -91,7 +91,7 @@ public final class LocalServer {
         java.util.List<String> out = new java.util.ArrayList<>();
         if (supervisor.isRunning("tuwunel") || running) out.add("tuwunel");
         try {
-            out.addAll(activeBridges());
+            out.addAll(usableBridges());
         } catch (IOException e) {
             // no list yet
         }
@@ -157,12 +157,15 @@ public final class LocalServer {
         store.installBundled("tuwunel", bundledHomeserver(), manifest.tuwunelVersion());
         installLibolm();
         writeDoublePuppet(secrets);
-        for (String b : activeBridges()) prepareBridge(b, secrets, progress);
+        if (activeBridges().contains("telegram") && !TelegramKeys.saved()) {
+            System.err.println("Telegram not started: no valid API keys (Ajustes → Redes)");
+        }
+        for (String b : usableBridges()) prepareBridge(b, secrets, progress);
         writeHomeserverConfig(secrets);
 
         if (!supervisor.isRunning("tuwunel")) startHomeserver(progress);
         ensureAccount(secrets);
-        for (String b : activeBridges()) {
+        for (String b : usableBridges()) {
             if (!supervisor.isRunning(b)) startBridge(b);
         }
         running = true;
@@ -186,7 +189,11 @@ public final class LocalServer {
             supervisor.stop("tuwunel");
             startHomeserver(progress);
         }
-        if (!supervisor.isRunning(bridge)) startBridge(bridge);
+        if (!supervisor.isRunning(bridge)) {
+            // Skipped at startup if its keys were missing then: its config needs them now.
+            prepareBridge(bridge, secrets(), progress);
+            startBridge(bridge);
+        }
         progress.accept("Esperando al puente…");
         awaitPort(BRIDGE_PORTS.get(bridge), 60);
     }
@@ -234,12 +241,8 @@ public final class LocalServer {
     /** Telegram only runs with the user's own api_id/api_hash (my.telegram.org). */
     private String[] telegramKeys(String b) throws IOException {
         if (!b.equals("telegram")) return new String[]{null, null};
-        app.unichat.settings.Settings s = app.unichat.settings.Settings.get();
-        String id = s.getString("server.telegram.apiId", null), hash = s.getString("server.telegram.apiHash", null);
-        if (id == null || id.isBlank() || hash == null || hash.isBlank()) {
-            throw new IOException("Telegram necesita tu api_id y api_hash de my.telegram.org");
-        }
-        return new String[]{id.strip(), hash.strip()};
+        if (!TelegramKeys.saved()) throw new IOException("Telegram necesita tu api_id y api_hash de my.telegram.org");
+        return new String[]{TelegramKeys.apiId().strip(), TelegramKeys.apiHash().strip()};
     }
 
     private void startHomeserver(Consumer<String> progress) throws IOException, InterruptedException {
@@ -351,6 +354,25 @@ public final class LocalServer {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString())).build(), HttpResponse.BodyHandlers.ofString());
         return new ObjectMapper().readTree(r.body());
+    }
+
+    /**
+     * The bridges in use that can run: Telegram without valid keys is left out, so one network's missing keys never
+     * keep the server and the other networks from starting.
+     */
+    private Set<String> usableBridges() throws IOException {
+        Set<String> out = new LinkedHashSet<>(activeBridges());
+        if (!TelegramKeys.saved()) out.remove("telegram");
+        return out;
+    }
+
+    /** Applies new settings to a bridge that's in use (its config is rewritten, then it restarts). Blocking. */
+    public synchronized void restartBridge(String bridge, Consumer<String> progress) throws IOException, InterruptedException {
+        if (!running || !usableBridges().contains(bridge)) return;
+        prepareBridge(bridge, secrets(), progress);
+        supervisor.stop(bridge);
+        states.restarting(bridge, BridgeStates.now());
+        startBridge(bridge);
     }
 
     private Set<String> activeBridges() throws IOException {
