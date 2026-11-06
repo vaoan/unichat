@@ -30,14 +30,14 @@ final class LibraryMenu {
             case GIF -> "GIF";
         };
         if (use != null) menu.getItems().add(ChatMenus.item(item.kind() == MediaLibrary.Kind.EMOJI ? "Insertar" : "Enviar", use));
-        boolean fav = library.isFavorite(item.url());
+        boolean fav = library.isFavorite(item);
         menu.getItems().add(ChatMenus.item(fav ? "Quitar de favoritos" : "Agregar a favoritos", () -> {
             boolean now = library.toggleFavorite(item);
             toast.accept(what + (now ? " agregado a favoritos" : " quitado de favoritos"));
         }));
-        if (library.isRecent(item.url())) {
+        if (library.isRecent(item)) {
             menu.getItems().add(new SeparatorMenuItem());
-            menu.getItems().add(ChatMenus.item("Quitar de recientes", () -> library.removeRecent(item.url())));
+            menu.getItems().add(ChatMenus.item("Quitar de recientes", () -> library.removeRecent(item)));
         }
         return menu;
     }

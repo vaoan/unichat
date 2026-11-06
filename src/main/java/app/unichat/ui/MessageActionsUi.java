@@ -164,7 +164,7 @@ final class MessageActionsUi {
             }
         }
         if (a.contains(MessageActions.Action.FAVORITE) && library.get() != null) {
-            boolean fav = library.get().isFavorite(m.mediaUrl());
+            boolean fav = library.get().isFavorite(MediaItems.of(m));
             menu.getItems().add(ChatMenus.item(fav ? "Quitar de favoritos" : "Agregar a favoritos", () -> {
                 boolean now = library.get().toggleFavorite(MediaItems.of(m));
                 toast.accept(now ? "Agregado a favoritos" : "Quitado de favoritos");

@@ -26,7 +26,7 @@ Package rules: `docs/ARQUITECTURA.md`, enforced by `ArchitectureTest` (no cycles
   is missing, start and supervise). Read `docs/SERVIDOR-NATIVO.md` before touching it.
   Bridges run with `direct_media` (`mxc://media-<bridge>.localhost/…`, nothing copied to the server); Unichat
   downloads those from the bridge's port (`LocalServer.directMediaBase`), and `matrix/MediaCache` caps `cache/media`
-  (`cache.mediaMb`, LRU; files over 1 MB go first, saved stickers/GIFs are pinned, `MediaSource.keepCached`; one file per direct-media URL whatever the size). Media grids keep their tiles (`ui/TileCache`) and `MessageMedia.loadMedia` shows what `AnimatedImage` already decoded at once. `server/MediaPrune` deletes Discord attachments older than `discord.mediaDays` (default 30, 0 = never; Ajustes →
+  (`cache.mediaMb`, LRU; files over 1 MB go first, saved stickers/GIFs are pinned, `MediaSource.keepCached`; one file per direct-media URL whatever the size). `model/MediaLibrary.same` says when two items are one sticker (bridge id, else format, dimensions and bytes), since direct media gives the same file a new URL in each message. Media grids keep their tiles (`ui/TileCache`) and `MessageMedia.loadMedia` shows what `AnimatedImage` already decoded at once. `server/MediaPrune` deletes Discord attachments older than `discord.mediaDays` (default 30, 0 = never; Ajustes →
   Redes) on each server start; avatars/emoji kept.
 - `server/StatusEndpoint` + `BridgeStates` (bridges POST their account states, mautrix `status_endpoint`) feed
   `MatrixChatService.accounts()` and `ui/AccountAlerts` + `AccountAlertBar` (foot of the chat list, so chats don't jump); `server/Watchdog` restarts hung,

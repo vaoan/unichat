@@ -54,9 +54,13 @@ public final class MediaLibrary {
         return favorites.stream().anyMatch(i -> i.url().equals(url));
     }
 
-    /** Used or received: moves to the front of its kind's recents (unique by url, at most 60 per kind). */
+    public synchronized boolean isFavorite(Item item) {
+        return favorites.stream().anyMatch(i -> same(i, item));
+    }
+
+    /** Used or received: moves to the front of its kind's recents (one per sticker, whatever its url; at most 60 per kind). */
     public synchronized void addRecent(Item item) {
-        recents.removeIf(i -> i.url().equals(item.url()));
+        recents.removeIf(i -> same(i, item));
         recents.add(0, item);
         int seen = 0;
         for (var it = recents.iterator(); it.hasNext(); ) {
@@ -69,20 +73,28 @@ public final class MediaLibrary {
         return recents.stream().anyMatch(i -> i.url().equals(url));
     }
 
+    public synchronized boolean isRecent(Item item) {
+        return recents.stream().anyMatch(i -> same(i, item));
+    }
+
     /** Takes it out of the recents (it comes back the next time it's used or received). */
     public synchronized void removeRecent(String url) {
         if (recents.removeIf(i -> i.url().equals(url))) changed();
     }
 
+    public synchronized void removeRecent(Item item) {
+        if (recents.removeIf(i -> same(i, item))) changed();
+    }
+
     /** A sticker/GIF shown in a chat: added to the recents if it's new, without moving existing ones. */
     public synchronized void rememberSeen(Item item) {
-        if (recents.stream().anyMatch(i -> i.url().equals(item.url()))) return;
+        if (recents.stream().anyMatch(i -> same(i, item))) return;
         addRecent(item);
     }
 
     /** Adds or removes a favourite; true when it's now a favourite. */
     public synchronized boolean toggleFavorite(Item item) {
-        boolean removed = favorites.removeIf(i -> i.url().equals(item.url()));
+        boolean removed = favorites.removeIf(i -> same(i, item));
         if (!removed) favorites.add(0, item);
         changed();
         return !removed;
@@ -94,10 +106,44 @@ public final class MediaLibrary {
             JsonNode root = JSON.readTree(file.toFile());
             for (JsonNode n : root.path("favorites")) if (known(n)) favorites.add(item(n));
             for (JsonNode n : root.path("recents")) if (known(n)) recents.add(item(n));
+            if (dropCopies(favorites) | dropCopies(recents)) save();
         } catch (IOException | RuntimeException e) {
             favorites.clear();
             recents.clear();
         }
+    }
+
+    /** Keeps the first of each sticker: lists are newest first. True if any went. */
+    private static boolean dropCopies(List<Item> items) {
+        List<Item> kept = new ArrayList<>();
+        for (Item i : items) if (kept.stream().noneMatch(k -> same(k, i))) kept.add(i);
+        boolean dropped = kept.size() < items.size();
+        items.clear();
+        items.addAll(kept);
+        return dropped;
+    }
+
+    /**
+     * Whether two items are one sticker or GIF: bridges with direct media give the same file another address in each message.
+     * The bridge's own id decides when both have one; otherwise the same format, dimensions and bytes (a stored copy has no id).
+     */
+    static boolean same(Item a, Item b) {
+        if (a.kind() != b.kind()) return false;
+        if (a.url().equals(b.url())) return true;
+        String idA = bridgeId(a), idB = bridgeId(b);
+        if (idA != null && idB != null) return idA.equals(idB);
+        long size = size(a);
+        return size > 0 && size == size(b) && a.width() == b.width() && a.height() == b.height()
+                && java.util.Objects.equals(a.mime(), b.mime());
+    }
+
+    private static String bridgeId(Item i) {
+        JsonNode sticker = i.info() == null ? null : i.info().get("fi.mau.bridged_sticker");
+        return sticker == null ? null : sticker.path("id").asText(null);
+    }
+
+    private static long size(Item i) {
+        return i.info() == null ? 0 : i.info().path("size").asLong(0);
     }
 
     /** An item of a kind this version doesn't know (written by a newer Unichat) is skipped, not the whole file. */

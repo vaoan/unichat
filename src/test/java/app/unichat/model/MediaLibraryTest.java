@@ -97,4 +97,94 @@ class MediaLibraryTest {
                 + "{\"kind\":\"STICKER\",\"url\":\"mxc://s/a\"}],\"recents\":[]}");
         assertEquals(1, new MediaLibrary(f).favorites(MediaLibrary.Kind.STICKER).size());
     }
+
+    private static MediaLibrary.Item telegram(String url, String id, int size) {
+        var info = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("size", size);
+        if (id != null) info.putObject("fi.mau.bridged_sticker").put("network", "telegram").put("id", id);
+        return new MediaLibrary.Item(MediaLibrary.Kind.STICKER, url, "image/webp", 256, 256, info);
+    }
+
+    @Test
+    void theSameStickerUnderAnotherUrlIsOneRecent() {
+        MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
+        lib.addRecent(telegram("mxc://t/1", "doc-1", 100));
+        lib.addRecent(telegram("mxc://t/2", "doc-2", 200));
+        lib.addRecent(telegram("mxc://t/3", "doc-1", 100));
+        List<MediaLibrary.Item> r = lib.recents(MediaLibrary.Kind.STICKER);
+        assertEquals(List.of("mxc://t/3", "mxc://t/2"), r.stream().map(MediaLibrary.Item::url).toList(), "the newest address stays");
+    }
+
+    @Test
+    void seeingACopyDoesNotMoveOrRepeatIt() {
+        MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
+        lib.addRecent(telegram("mxc://t/1", "doc-1", 100));
+        lib.addRecent(telegram("mxc://t/2", "doc-2", 200));
+        lib.rememberSeen(telegram("mxc://t/9", "doc-1", 100));
+        assertEquals(List.of("mxc://t/2", "mxc://t/1"), lib.recents(MediaLibrary.Kind.STICKER).stream().map(MediaLibrary.Item::url).toList());
+    }
+
+    @Test
+    void withoutAnIdTheSameBytesAreTheSameSticker() {
+        MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
+        lib.addRecent(telegram("mxc://t/1", "doc-1", 100));
+        lib.addRecent(telegram("mxc://localhost/1", null, 100));
+        assertEquals(1, lib.recents(MediaLibrary.Kind.STICKER).size(), "the bridge's copy and a stored copy");
+    }
+
+    @Test
+    void differentIdsAreDifferentStickersEvenWithTheSameSize() {
+        MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
+        lib.addRecent(telegram("mxc://t/1", "doc-1", 100));
+        lib.addRecent(telegram("mxc://t/2", "doc-2", 100));
+        assertEquals(2, lib.recents(MediaLibrary.Kind.STICKER).size());
+    }
+
+    @Test
+    void withNoSizeOnlyTheUrlCounts() {
+        MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
+        lib.addRecent(sticker("mxc://s/a"));
+        lib.addRecent(sticker("mxc://s/b"));
+        assertEquals(2, lib.recents(MediaLibrary.Kind.STICKER).size());
+    }
+
+    @Test
+    void aFavoriteIsRecognisedAndRemovedUnderAnotherUrl() {
+        MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
+        lib.toggleFavorite(telegram("mxc://t/1", "doc-1", 100));
+        assertTrue(lib.isFavorite(telegram("mxc://t/2", "doc-1", 100)));
+        assertFalse(lib.toggleFavorite(telegram("mxc://t/2", "doc-1", 100)), "toggling the copy removes it");
+        assertTrue(lib.favorites(MediaLibrary.Kind.STICKER).isEmpty());
+    }
+
+    @Test
+    void removingARecentRemovesItsCopiesToo() {
+        MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
+        lib.addRecent(telegram("mxc://t/1", "doc-1", 100));
+        assertTrue(lib.isRecent(telegram("mxc://t/2", "doc-1", 100)));
+        lib.removeRecent(telegram("mxc://t/2", "doc-1", 100));
+        assertTrue(lib.recents(MediaLibrary.Kind.STICKER).isEmpty());
+    }
+
+    @Test
+    void copiesAlreadySavedAreCleanedOnOpeningAndTheFileIsFixed() throws Exception {
+        Path f = dir.resolve("lib.json");
+        String one = "{\"kind\":\"STICKER\",\"url\":\"mxc://t/%s\",\"mime\":\"image/webp\",\"width\":256,\"height\":256,"
+                + "\"info\":{\"size\":100,\"fi.mau.bridged_sticker\":{\"id\":\"doc-1\"}}}";
+        Files.writeString(f, "{\"favorites\":[" + one.formatted("f1") + "," + one.formatted("f2") + "],\"recents\":["
+                + one.formatted("new") + "," + one.formatted("old") + "]}");
+        MediaLibrary lib = new MediaLibrary(f);
+        assertEquals(List.of("mxc://t/new"), lib.recents(MediaLibrary.Kind.STICKER).stream().map(MediaLibrary.Item::url).toList());
+        assertEquals(List.of("mxc://t/f1"), lib.favorites(MediaLibrary.Kind.STICKER).stream().map(MediaLibrary.Item::url).toList());
+        assertFalse(Files.readString(f).contains("mxc://t/old"), "saved without them");
+    }
+
+    @Test
+    void aGifAndAStickerAreNeverTheSame() {
+        MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
+        lib.addRecent(telegram("mxc://t/1", null, 100));
+        var info = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("size", 100);
+        lib.addRecent(new MediaLibrary.Item(MediaLibrary.Kind.GIF, "mxc://t/2", "image/webp", 256, 256, info));
+        assertEquals(1, lib.recents(MediaLibrary.Kind.STICKER).size());
+        assertEquals(1, lib.recents(MediaLibrary.Kind.GIF).size());
+    }
 }
