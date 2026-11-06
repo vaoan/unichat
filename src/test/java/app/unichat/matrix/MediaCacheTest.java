@@ -50,4 +50,35 @@ class MediaCacheTest {
         assertTrue(Files.exists(partial));
         assertTrue(Files.exists(downloading));
     }
+
+    @Test
+    void bigFilesGoBeforeSmallOnesHoweverRecentlySeen(@TempDir Path dir) throws Exception {
+        Path sticker = file(dir, "sticker.webp", 50_000, 1_000);
+        Path longGif = file(dir, "largo.gif", (int) MediaCache.SMALL_BYTES + 1, 9_000);
+
+        MediaCache.trim(dir, 100_000);
+
+        assertTrue(Files.exists(sticker), "seen long ago, but small");
+        assertFalse(Files.exists(longGif));
+    }
+
+    @Test
+    void pinnedFilesStayEvenOverTheLimit(@TempDir Path dir) throws Exception {
+        String hash = "a".repeat(64);
+        Path saved = file(dir, hash + ".gif", (int) MediaCache.SMALL_BYTES * 2, 1_000);
+        Path other = file(dir, "b".repeat(64) + ".gif", (int) MediaCache.SMALL_BYTES * 2, 9_000);
+
+        MediaCache.trim(dir, 0, java.util.Set.of(hash));
+
+        assertTrue(Files.exists(saved));
+        assertFalse(Files.exists(other));
+    }
+
+    @Test
+    void onlyWhatCanBeScaledHasOneFilePerSize() {
+        String direct = "mxc://media-whatsapp.localhost/abc";
+        assertEquals(MediaDownloader.cacheKey(direct, 0, 0), MediaDownloader.cacheKey(direct, 152, 152));
+        assertEquals(MediaDownloader.cacheKey("https://x/y.gif", 0, 0), MediaDownloader.cacheKey("https://x/y.gif", 200, 200));
+        assertFalse(MediaDownloader.cacheKey("mxc://local/abc", 0, 0).equals(MediaDownloader.cacheKey("mxc://local/abc", 152, 152)));
+    }
 }

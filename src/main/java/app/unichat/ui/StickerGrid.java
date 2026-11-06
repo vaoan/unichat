@@ -31,6 +31,7 @@ final class StickerGrid extends ScrollPane {
     private final Supplier<Chat> chat;
     private final Consumer<String> toast;
     private final VBox content = new VBox(10);
+    private final TileCache tiles = new TileCache();
 
     StickerGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Consumer<String> toast) {
         this.svc = svc;
@@ -53,6 +54,7 @@ final class StickerGrid extends ScrollPane {
 
     /** Rebuilds the grid (opening the tab, after sending, after a favourite changes). */
     void refresh() {
+        tiles.next();
         content.getChildren().clear();
         Chat c = chat.get();
         boolean accepted = c == null || c.features().accepts(RoomFeatures.STICKER);
@@ -70,8 +72,13 @@ final class StickerGrid extends ScrollPane {
         Label t = new Label(title);
         t.getStyleClass().add("emoji-category");
         FlowPane grid = new FlowPane(6, 6);
-        for (MediaLibrary.Item i : items) grid.getChildren().add(tile(i, what, accepted));
+        for (MediaLibrary.Item i : items) grid.getChildren().add(tiles.get(what + accepted + i.url(), () -> tile(i, what, accepted)));
         content.getChildren().addAll(t, grid);
+    }
+
+    boolean accepts() {
+        Chat c = chat.get();
+        return c == null || c.features().accepts(RoomFeatures.STICKER);
     }
 
     /** A sticker tile for the open chat (also used by the Favoritos tab). */

@@ -22,6 +22,7 @@ final class FavoritesPane extends ScrollPane {
     private final Consumer<String> insertEmoji;
     private final Consumer<String> toast;
     private final VBox content = new VBox(10);
+    private final TileCache tiles = new TileCache();
 
     FavoritesPane(MediaLibrary library, StickerGrid stickers, GifGrid gifs, Consumer<String> insertEmoji, Consumer<String> toast) {
         this.library = library;
@@ -33,6 +34,7 @@ final class FavoritesPane extends ScrollPane {
     }
 
     void refresh() {
+        tiles.next();
         content.getChildren().clear();
         section("Emojis", library.favorites(MediaLibrary.Kind.EMOJI), 2,
                 i -> EmojiPicker.button(i.url(), insertEmoji, library, toast));
@@ -52,7 +54,7 @@ final class FavoritesPane extends ScrollPane {
         Label t = new Label(title);
         t.getStyleClass().add("emoji-category");
         FlowPane grid = new FlowPane(gap, gap);
-        for (MediaLibrary.Item i : items) grid.getChildren().add(tile.apply(i));
+        for (MediaLibrary.Item i : items) grid.getChildren().add(tiles.get(i.kind().name() + stickers.accepts() + gifs.accepts() + i.url(), () -> tile.apply(i)));
         content.getChildren().addAll(t, grid);
     }
 }

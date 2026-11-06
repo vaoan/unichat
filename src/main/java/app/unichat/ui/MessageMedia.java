@@ -232,20 +232,23 @@ final class MessageMedia {
             svc.media(m.mediaUrl(), pxW, pxH).thenAcceptAsync(p -> showStill(view, p, pxW, pxH, false), AnimatedImage.DECODER);
             return;
         }
+        java.util.concurrent.CompletableFuture<java.nio.file.Path> original = svc.media(m.mediaUrl(), 0, 0);
+        if (Platform.isFxApplicationThread() && original.isDone() && !original.isCompletedExceptionally()) {
+            AnimatedImage.Frames ready = AnimatedImage.decoded(original.join(), pxW, pxH);
+            if (ready != null) {
+                AnimatedImage.play(view, ready);
+                return;
+            }
+        }
         // Placeholder: a still picture shows at once; decoding a long animation takes seconds. (With direct media
         // the "thumbnail" is the original file, maybe an animated GIF: only its first frame is used.)
         svc.media(m.mediaUrl(), pxW, pxH).thenAcceptAsync(p -> showStill(view, p, pxW, pxH, true), AnimatedImage.DECODER);
-        svc.media(m.mediaUrl(), 0, 0).thenAcceptAsync(p -> {
+        original.thenAcceptAsync(p -> {
             try {
                 AnimatedImage.Frames frames;
                 if (AnimatedImage.isWebp(p)) frames = AnimatedImage.decodeWebp(p, pxW, pxH);
                 else if (AnimatedImage.isGif(p)) frames = AnimatedImage.decodeGif(p, pxW, pxH);
-                else {
-                    // Labelled as a sticker but a plain PNG/JPEG: never handed to JavaFX's own GIF animation.
-                    Image img = new Image(p.toUri().toString(), pxW, pxH, true, true, false);
-                    Platform.runLater(() -> view.setImage(img));
-                    return;
-                }
+                else frames = AnimatedImage.decodePlain(p, pxW, pxH); // labelled as a sticker, but a plain PNG/JPEG
                 Platform.runLater(() -> AnimatedImage.play(view, frames));
             } catch (Exception e) {
                 System.err.println("Could not decode " + m.mediaUrl() + ": " + e);

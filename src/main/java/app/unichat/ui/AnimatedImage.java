@@ -73,7 +73,7 @@ public final class AnimatedImage {
     /** Most pixel memory for one animation: big or long ones drop frames until they fit. */
     static final long MAX_ANIMATION_BYTES = 24L << 20;
     /** Every decoded animation together; the least recently used go first. */
-    static final long CACHE_BYTES = 64L << 20;
+    static final long CACHE_BYTES = 128L << 20;
 
     /** One ANMF chunk of an animated WebP. */
     record AnimFrame(int x, int y, int width, int height, int durationMs, boolean noBlend, boolean disposeToBackground) {}
@@ -83,6 +83,20 @@ public final class AnimatedImage {
 
     private static final LinkedHashMap<String, Frames> CACHE = new LinkedHashMap<>(16, 0.75f, true);
     private static long cachedBytes;
+
+    /** What's already decoded for this file at this size, or null: shown at once, with no blank moment. */
+    static Frames decoded(Path file, int maxW, int maxH) {
+        return cached(file + "|" + maxW + "x" + maxH);
+    }
+
+    /** A plain picture (a PNG sticker, say), remembered like an animation. Blocking. */
+    static Frames decodePlain(Path file, int maxW, int maxH) throws IOException {
+        Frames hit = decoded(file, maxW, maxH);
+        if (hit != null) return hit;
+        Image img = new Image(file.toUri().toString(), maxW, maxH, true, true, false);
+        if (img.isError()) throw new IOException("Imagen no válida");
+        return remember(file + "|" + maxW + "x" + maxH, new Frames(List.of(img), List.of(0)));
+    }
 
     private static Frames cached(String key) {
         synchronized (CACHE) {

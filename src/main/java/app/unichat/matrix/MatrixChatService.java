@@ -444,6 +444,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess {
     @Override public void addListener(Listener listener) { core.listeners.add(listener); }
     @Override public void removeListener(Listener listener) { core.listeners.remove(listener); }
     @Override public Chat chat(String chatId) { return core.chat(chatId); }
+    @Override public void keepCached(java.util.Collection<String> urls) { media.keep(urls); }
     @Override public CompletableFuture<Path> media(String url, int width, int height) { return media.media(url, width, height); }
 
     @Override public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) { return sender.sendText(chatId, text, replyToId); }

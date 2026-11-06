@@ -79,7 +79,7 @@ public final class SettingsWindow {
         BorderPane content = new BorderPane();
         content.getStyleClass().add("settings-content");
         ListView<String> nav = new ListView<>();
-        nav.getItems().addAll("Cuentas", "Perfil", "Apariencia", "Accesibilidad", "Notificaciones", "Privacidad", "Redes", "Voz a texto", "GIFs", "Atajos de teclado", "Acerca de");
+        nav.getItems().addAll("Cuentas", "Perfil", "Apariencia", "Accesibilidad", "Notificaciones", "Privacidad", "Redes", "Voz a texto", "Responder con IA", "GIFs", "Atajos de teclado", "Acerca de");
         nav.getStyleClass().add("settings-nav");
         nav.setPrefWidth(200);
         nav.getSelectionModel().selectedItemProperty().addListener((o, a, s) -> {
@@ -101,6 +101,7 @@ public final class SettingsWindow {
                 case "Privacidad" -> privacyPage();
                 case "Redes" -> networksPage();
                 case "Voz a texto" -> speechPage();
+                case "Responder con IA" -> AiReplyPage.build();
                 case "GIFs" -> gifsPage();
                 case "Atajos de teclado" -> shortcutsPage();
                 case "Acerca de" -> aboutPage();
@@ -127,7 +128,7 @@ public final class SettingsWindow {
         stage.show();
     }
 
-    private static VBox page(String title, Node... nodes) {
+    static VBox page(String title, Node... nodes) {
         Label t = new Label(title);
         t.getStyleClass().add("settings-title");
         VBox v = new VBox(16);
@@ -137,7 +138,7 @@ public final class SettingsWindow {
         return v;
     }
 
-    private static VBox group(String title, Node... rows) {
+    static VBox group(String title, Node... rows) {
         Label t = new Label(title);
         t.getStyleClass().add("settings-group-title");
         VBox box = new VBox(0, rows);
@@ -145,7 +146,7 @@ public final class SettingsWindow {
         return new VBox(6, t, box);
     }
 
-    private static Node row(String label, String help, Node control) {
+    static Node row(String label, String help, Node control) {
         Label l = new Label(label);
         l.getStyleClass().add("settings-label");
         VBox text = new VBox(2, l);
@@ -167,7 +168,7 @@ public final class SettingsWindow {
         return row;
     }
 
-    private static CheckBox toggle(boolean value, Consumer<Boolean> save) {
+    static CheckBox toggle(boolean value, Consumer<Boolean> save) {
         CheckBox c = new CheckBox();
         c.getStyleClass().add("switch");
         c.setSelected(value);
@@ -381,8 +382,8 @@ public final class SettingsWindow {
                 row("Indicador de escritura", "Los demás ven cuando estás escribiendo.",
                         toggle(s.sendTypingNotifications(), s::setSendTypingNotifications))),
                 group("Datos locales", row("Carpeta de datos", s.dir().toString(), new Label()),
-                        row("Espacio para fotos y videos", "Los medios se descargan solo cuando los abres. Al llenarse "
-                                + "este espacio se borran los que hace más tiempo no ves; se vuelven a descargar si los abres.",
+                        row("Espacio para fotos y videos", "Los medios se descargan solo cuando los abres. Al llenarse se borra primero lo más pesado y lo que llevas "
+                                + "más tiempo sin ver; se puede volver a bajar. Tus stickers y GIFs guardados se conservan siempre.",
                                 mediaCacheChoice())),
                 logsGroup(s));
     }
@@ -636,7 +637,7 @@ public final class SettingsWindow {
     }
 
     /** One choice out of {@code values} as a row of chips. */
-    private static <T> Node chips(String accessible, java.util.List<T> values, java.util.function.Function<T, String> label,
+    static <T> Node chips(String accessible, java.util.List<T> values, java.util.function.Function<T, String> label,
                                   T current, Consumer<T> save) {
         ToggleGroup tg = new ToggleGroup();
         javafx.scene.layout.FlowPane box = new javafx.scene.layout.FlowPane(6, 6);

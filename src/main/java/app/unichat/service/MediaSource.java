@@ -10,4 +10,7 @@ public interface MediaSource {
      * caching it if needed. Thumbnails: pass width/height > 0 to request a scaled version.
      */
     CompletableFuture<Path> media(String url, int width, int height);
+
+    /** Media that must stay on disk whatever the cache's limit: the person's saved stickers and GIFs. Replaces the last list. */
+    default void keepCached(java.util.Collection<String> urls) { }
 }

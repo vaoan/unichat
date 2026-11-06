@@ -23,6 +23,8 @@ final class MediaDownloader {
     private final Map<String, CompletableFuture<Path>> mediaInFlight = new ConcurrentHashMap<>();
     private final java.util.concurrent.atomic.AtomicLong lastCacheTrim = new java.util.concurrent.atomic.AtomicLong();
 
+    private volatile java.util.Set<String> pinned = java.util.Set.of();
+
     MediaDownloader(MatrixClient client, ExecutorService io) {
         this.client = client;
         this.io = io;
@@ -32,7 +34,7 @@ final class MediaDownloader {
     CompletableFuture<Path> media(String url, int width, int height) {
         if (url == null || url.isBlank()) return CompletableFuture.failedFuture(new MatrixException(0, null, "Sin URL"));
         if (url.startsWith("file:")) return CompletableFuture.completedFuture(Path.of(URI.create(url)));
-        String key = url + "|" + Math.max(0, width) + "x" + Math.max(0, height);
+        String key = cacheKey(url, width, height);
         Path dir = Settings.get().cacheDir().resolve("media");
         String hash = Hashes.sha256(key);
         Path cached = findCached(dir, hash);
@@ -56,11 +58,31 @@ final class MediaDownloader {
         return f;
     }
 
+    /** Pinned in the cache from now on: {@link MediaCache}. */
+    void keep(java.util.Collection<String> urls) {
+        pinned = urls.stream().map(u -> Hashes.sha256(cacheKey(u, 0, 0))).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    /**
+     * A bridge's direct media and web addresses only come as the original, whatever the size asked: one file for all of them.
+     * Each size used to be a whole copy (a GIF of several MB, twice or more).
+     */
+    static String cacheKey(String url, int width, int height) {
+        boolean scalable = url.startsWith("mxc://") && BridgePorts.directMediaBase(serverOf(url)) == null;
+        return url + "|" + (scalable ? Math.max(0, width) + "x" + Math.max(0, height) : "0x0");
+    }
+
+    private static String serverOf(String mxc) {
+        String rest = mxc.substring("mxc://".length());
+        int slash = rest.indexOf('/');
+        return slash < 0 ? rest : rest.substring(0, slash);
+    }
+
     /** At most once a minute: listing thousands of files after every thumbnail would cost more than it saves. */
     private void trimMediaCache(Path dir) {
         long now = System.currentTimeMillis(), last = lastCacheTrim.get();
         if (now - last < 60_000 || !lastCacheTrim.compareAndSet(last, now)) return;
-        MediaCache.trim(dir, Settings.get().mediaCacheMb() * 1024L * 1024L);
+        MediaCache.trim(dir, Settings.get().mediaCacheMb() * 1024L * 1024L, pinned);
     }
 
     private Path download(String url, int w, int h, Path dir, String hash) throws IOException {

@@ -103,6 +103,8 @@ public final class MainView extends StackPane {
             listPane.setSelected(thread.chat() == null ? null : thread.chat().id());
         });
         StickerGrid stickers = new StickerGrid(svc, library, thread::chat, this::toast);
+        MediaItems.keepCached(svc, library);
+        library.addListener(() -> MediaItems.keepCached(svc, library));
         panel.setContent(SidePanel.Tab.STICKERS, stickers, stickers::refresh);
         GifGrid gifs = new GifGrid(svc, library, thread::chat, this::toast);
         panel.setContent(SidePanel.Tab.GIFS, gifs, gifs::refresh);

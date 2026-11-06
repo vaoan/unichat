@@ -47,6 +47,11 @@ final class GifGrid extends VBox {
     private final VBox libraryBox = new VBox(10);
     private final PauseTransition debounce = new PauseTransition(Duration.millis(450));
     private int generation;
+    private final TileCache libraryTiles = new TileCache();
+    /** What the results on screen were searched for, and when; trending changes, so not for ever. */
+    private String resultsFor;
+    private long resultsAt;
+    private static final long RESULTS_LAST_MS = 10 * 60_000;
 
     GifGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Consumer<String> toast) {
         super(8);
@@ -73,10 +78,17 @@ final class GifGrid extends VBox {
 
     /** Rebuilds for the open chat: notices, favourites/recents, then search results (or trending). */
     void refresh() {
+        String q0 = search.getText().strip();
+        String shownFor = q0 + "|" + accepts() + "|" + GifProviders.active(k -> Settings.get().getString(k, null)).size();
+        // Changing chats shouldn't search the web again or reload what's on screen.
+        if (shownFor.equals(resultsFor) && System.currentTimeMillis() - resultsAt < RESULTS_LAST_MS) {
+            refreshLibrary();
+            return;
+        }
+        resultsFor = null;
         int gen = ++generation;
         content.getChildren().clear();
-        Chat c = chat.get();
-        boolean accepted = c == null || c.features().accepts(RoomFeatures.GIF);
+        boolean accepted = accepts();
         if (!accepted) content.getChildren().add(help("Esta red no acepta GIFs."));
         GifSearch providers = new GifSearch(GifProviders.active(k -> Settings.get().getString(k, null)));
         String q = search.getText().strip();
@@ -94,6 +106,10 @@ final class GifGrid extends VBox {
                 .thenAccept(gifs -> Platform.runLater(() -> {
                     if (gen != generation) return; // a newer search replaced this one
                     content.getChildren().remove(loading);
+                    if (!gifs.isEmpty()) {
+                        resultsFor = shownFor;
+                        resultsAt = System.currentTimeMillis();
+                    }
                     if (gifs.isEmpty()) content.getChildren().add(help("No se encontraron GIFs."));
                     for (Gif g : gifs) {
                         Node tile = tile(new Image(g.previewUrl(), TILE_W * 2, 0, true, true, true),
@@ -105,7 +121,13 @@ final class GifGrid extends VBox {
                 }));
     }
 
+    boolean accepts() {
+        Chat c = chat.get();
+        return c == null || c.features().accepts(RoomFeatures.GIF);
+    }
+
     private void refreshLibrary() {
+        libraryTiles.next();
         libraryBox.getChildren().clear();
         if (!search.getText().strip().isEmpty()) return;
         Chat c = chat.get();
@@ -118,7 +140,8 @@ final class GifGrid extends VBox {
         if (items.isEmpty()) return;
         FlowPane grid = new FlowPane(6, 6);
         for (MediaLibrary.Item i : items) {
-            grid.getChildren().add(libraryTile(i, title.equals("Favoritos") ? "GIF favorito" : "GIF reciente", accepted));
+            String what = title.equals("Favoritos") ? "GIF favorito" : "GIF reciente";
+            grid.getChildren().add(libraryTiles.get(what + accepted + i.url(), () -> libraryTile(i, what, accepted)));
         }
         libraryBox.getChildren().addAll(section(title), grid);
     }
@@ -132,9 +155,11 @@ final class GifGrid extends VBox {
     private Node libraryTile(MediaLibrary.Item i, String what, boolean accepted) {
         ImageView probe = new ImageView();
         String preview = GifFiles.preview(i);
-        // Provider previews load directly; anything else (mxc://…) goes through the media service.
-        if (preview != null && preview.startsWith("http")) probe.setImage(new Image(preview, TILE_W * 2, 0, true, true, true));
-        else MessageMedia.loadMedia(svc, probe, MediaItems.message(i), TILE_W * 2, TILE_H * 2);
+        // A provider's preview, through the media service too, so it's on disk from then on.
+        if (preview != null && preview.startsWith("http")) {
+            MessageMedia.loadMedia(svc, probe, MediaItems.message(new MediaLibrary.Item(MediaLibrary.Kind.STICKER, preview, "image/gif", i.width(), i.height(), null)),
+                    TILE_W * 2, TILE_H * 2);
+        } else MessageMedia.loadMedia(svc, probe, MediaItems.message(i), TILE_W * 2, TILE_H * 2);
         Node tile = tile(probe, what, accepted, () -> sendFromLibrary(i));
         LibraryMenu.attach(tile, library, i, accepted ? () -> sendFromLibrary(i) : null, toast);
         return tile;

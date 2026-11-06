@@ -771,7 +771,7 @@
 .side-panel-scroll > .viewport { -fx-background-color: transparent; }
 .side-panel-placeholder { -fx-padding: 24; }
 .side-panel .info-pane { -fx-border-width: 0; }
-.gif-button { -fx-font-size: 0.78em; -fx-font-weight: bold; -fx-text-fill: -text-3; }
+.gif-button { -fx-font-size: 0.78em; -fx-font-weight: bold; -fx-text-fill: -text-3; -fx-padding: 0; -fx-pref-width: 3.2em; -fx-min-width: 3.2em; -fx-max-width: 3.2em; }
 .sticker-grid { -fx-padding: 10; }
 .sticker-tile { -fx-background-radius: 10; -fx-padding: 2; }
 .sticker-tile:hover, .sticker-tile:focused { -fx-background-color: -hover; }
