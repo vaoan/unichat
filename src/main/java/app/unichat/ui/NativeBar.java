@@ -127,6 +127,11 @@ final class NativeBar {
         send("open\n");
     }
 
+    /** The count beside the icon; 0 shows none. */
+    void setCount(int count) {
+        send("count\t" + (count > 0 ? Formats.badge(count) : "") + "\n");
+    }
+
     void setTooltip(String text) {
         send("tip\t" + clean(text) + "\n");
     }

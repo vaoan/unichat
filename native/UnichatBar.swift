@@ -2,6 +2,7 @@
 // 12pt margin on each side). Unichat starts it and drives it through stdin, one tab-separated command per line:
 //   icon <base64 png>     44×44 px, shown at 22×22 pt (2x)
 //   tip <text>            tooltip
+//   count <text>          beside the icon, the unread count; empty shows the icon alone
 //   menu <n>              followed by n lines, each "item <tag> <enabled 0|1> <checked -1|0|1> <label>" or "sep"
 //   open                  opens the menu as a click would, or closes it if it is open (for tests)
 //   notify <chat id> <sound 0|1> <title> <body>   a system notification (Notification Center, Do Not Disturb…)
@@ -145,6 +146,11 @@ final class Bar: NSObject, NSMenuDelegate {
             item.button?.image = image
         case "open": // as if clicked, or closes it if open (lets tests capture the highlight and the open menu)
             if isOpen { menu.cancelTracking() } else { item.button?.performClick(nil) }
+        case "count":
+            let text = parts.count > 1 ? parts[1] : ""
+            item.button?.title = text
+            item.button?.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize + 1, weight: .semibold)
+            item.button?.imagePosition = text.isEmpty ? .imageOnly : .imageLeading
         case "tip":
             item.button?.toolTip = parts.count > 1 ? parts[1] : nil
         case "menu":

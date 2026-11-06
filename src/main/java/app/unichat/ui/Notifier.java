@@ -52,11 +52,16 @@ public final class Notifier {
         addAwtTray();
     }
 
+    private static final int BADGED_SIZE = 32;
+    private static final int BADGE_HEIGHT = 20;
+
     private final PopupMenu menu;
     private final Consumer<String> onOpen;
     private final Runnable onShow;
     private volatile NativeBar bar;
     private volatile String tooltip = "Unichat";
+    private volatile int unread;
+    private BufferedImage trayIcon;
     private volatile boolean disposed;
 
     private boolean startNativeBar() {
@@ -70,6 +75,7 @@ public final class Notifier {
         EventQueue.invokeLater(() -> {
             b.setIcon(menuBarIcon());
             b.setTooltip(tooltip);
+            b.setCount(unread);
             b.syncMenu();
         });
         return true;
@@ -108,7 +114,8 @@ public final class Notifier {
         if (!SystemTray.isSupported()) return;
         try (InputStream in = Notifier.class.getResourceAsStream("/app/unichat/icons/tray.png")) {
             BufferedImage img = in == null ? new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB) : ImageIO.read(in);
-            tray = new TrayIcon(img, tooltip, menu);
+            trayIcon = img;
+            tray = new TrayIcon(withCount(img, unread), tooltip, menu);
             tray.setImageAutoSize(true);
             tray.addActionListener(e -> onOpen.accept(lastChatId));
             SystemTray.getSystemTray().add(tray);
@@ -168,10 +175,18 @@ public final class Notifier {
     }
 
     private void setUnreadNow(int count) {
+        boolean changed = count != unread;
+        unread = count;
         tooltip = count > 0 ? "Unichat — " + count + " sin leer" : "Unichat";
-        if (tray != null) tray.setToolTip(tooltip);
+        if (tray != null) {
+            tray.setToolTip(tooltip);
+            if (changed) tray.setImage(withCount(trayIcon, count));
+        }
         NativeBar b = bar;
-        if (b != null) b.setTooltip(tooltip);
+        if (b != null) {
+            b.setTooltip(tooltip);
+            if (changed) b.setCount(count);
+        }
         try {
             if (Taskbar.isTaskbarSupported() && Taskbar.getTaskbar().isSupported(Taskbar.Feature.ICON_BADGE_NUMBER)) {
                 Taskbar.getTaskbar().setIconBadge(count > 0 ? Integer.toString(count) : null);
@@ -179,6 +194,29 @@ public final class Notifier {
         } catch (Exception ignored) {
             // Badge is cosmetic.
         }
+    }
+
+    /** The tray icon with the count in a corner, as a Windows notification area shows it: no text fits beside it. */
+    static BufferedImage withCount(BufferedImage icon, int count) {
+        if (count <= 0) return icon;
+        BufferedImage out = new BufferedImage(BADGED_SIZE, BADGED_SIZE, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = out.createGraphics();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.drawImage(icon, 0, 0, BADGED_SIZE, BADGED_SIZE, null);
+        String text = Formats.badge(count);
+        g.setFont(new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.BOLD, text.length() > 2 ? 15 : 19));
+        java.awt.FontMetrics fm = g.getFontMetrics();
+        int w = Math.max(BADGE_HEIGHT, fm.stringWidth(text) + 6);
+        int x = BADGED_SIZE - w;
+        int y = BADGED_SIZE - BADGE_HEIGHT;
+        g.setColor(new java.awt.Color(0xD92D20));
+        g.fillRoundRect(x, y, w, BADGE_HEIGHT, BADGE_HEIGHT, BADGE_HEIGHT);
+        g.setColor(java.awt.Color.WHITE);
+        g.drawString(text, x + (w - fm.stringWidth(text)) / 2, y + (BADGE_HEIGHT + fm.getAscent() - fm.getDescent()) / 2);
+        g.dispose();
+        return out;
     }
 
     public void dispose() {

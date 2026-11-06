@@ -165,7 +165,7 @@ public final class Rail extends VBox {
         String tip = b.getTooltip() == null ? "" : b.getTooltip().getText();
         b.setAccessibleText(count > 0 ? tip + ", " + count + (count == 1 ? " chat sin leer" : " chats sin leer") : tip);
         if (count > 0) {
-            Label badge = new Label(count > 99 ? "99+" : Long.toString(count));
+            Label badge = new Label(Formats.badge(count));
             badge.getStyleClass().add("rail-badge");
             StackPane.setAlignment(badge, Pos.TOP_RIGHT);
             badge.setTranslateX(12);

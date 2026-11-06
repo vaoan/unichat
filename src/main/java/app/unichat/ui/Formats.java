@@ -44,6 +44,11 @@ public final class Formats {
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
+    /** A count on a badge. */
+    public static String badge(long count) {
+        return count > 99 ? "99+" : Long.toString(count);
+    }
+
     public static String fileSize(long bytes) {
         if (bytes <= 0) return "";
         if (bytes < 1024) return bytes + " B";
