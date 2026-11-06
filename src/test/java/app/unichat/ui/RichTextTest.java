@@ -41,4 +41,12 @@ class RichTextTest {
         assertFalse(RichText.isJumboEmoji("ok 👍"));
         assertFalse(RichText.isJumboEmoji("😂😂😂😂"));
     }
+
+    @Test
+    void aLongAddressIsShortenedOnlyToShow() {
+        String url = "https://a.example/" + "x".repeat(100);
+        assertEquals(List.of(url), RichText.addresses("mira " + url + "."));
+        assertEquals(30, RichText.shown(url, 30).length());
+        assertEquals("https://a.example/", RichText.shown("https://a.example/", 60));
+    }
 }

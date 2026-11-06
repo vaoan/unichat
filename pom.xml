@@ -80,6 +80,12 @@
       <version>1.0.2</version>
     </dependency>
     <dependency>
+      <!-- Reads message HTML as a browser would: what bridges write is often badly nested. -->
+      <groupId>org.jsoup</groupId>
+      <artifactId>jsoup</artifactId>
+      <version>1.18.3</version>
+    </dependency>
+    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <version>5.10.3</version>

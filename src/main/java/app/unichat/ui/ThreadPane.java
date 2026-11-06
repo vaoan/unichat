@@ -444,6 +444,7 @@ public final class ThreadPane extends BorderPane {
             case STICKER -> "Sticker";
             default -> m.preview();
         });
+        if (m.htmlText() != null && !m.body().isBlank()) sb.append(". ").append(m.htmlText());
         if (m.edited() && !m.deleted()) sb.append(", editado");
         if (m.type() == MessageType.AUDIO && Transcripts.get().state(m.mediaUrl()) instanceof Transcripts.Done d) {
             sb.append(". Transcripción: ").append(d.text().isEmpty() ? "sin voz" : d.text());
@@ -551,6 +552,7 @@ public final class ThreadPane extends BorderPane {
         HBox actions = messageActions.hoverActions(m, bubble);
         actions.setVisible(Settings.get().alwaysShowMessageActions());
         HBox line = new HBox(6);
+        line.setFillHeight(false); // or the hover actions stretch to a tall message's whole height
         line.setAlignment(Pos.CENTER_LEFT);
         if (out) {
             Region grow = new Region();
@@ -638,13 +640,20 @@ public final class ThreadPane extends BorderPane {
             bubble.getChildren().add(l);
         } else {
             String body = m.type() == MessageType.EMOTE ? "* " + m.senderName() + " " + m.body() : m.body();
-            TextFlow flow = new TextFlow();
-            flow.getChildren().addAll(RichText.nodes(body, openLink));
-            flow.getStyleClass().add("message-text");
-            flow.setLineSpacing(Theme.lineSpacing());
-            if (m.type() == MessageType.NOTICE) flow.getStyleClass().add("notice");
-            flow.setMaxWidth(maxWidth - 24);
-            bubble.getChildren().add(flow);
+            double textWidth = maxWidth - 24;
+            if (m.html() != null && m.type() != MessageType.EMOTE) {
+                bubble.getChildren().add(HtmlView.of(m.html(), textWidth, media, openLink));
+            } else {
+                TextFlow flow = new TextFlow();
+                flow.getChildren().addAll(RichText.nodes(body, openLink, textWidth));
+                flow.getStyleClass().add("message-text");
+                flow.setLineSpacing(Theme.lineSpacing());
+                if (m.type() == MessageType.NOTICE) flow.getStyleClass().add("notice");
+                flow.setMaxWidth(textWidth);
+                bubble.getChildren().add(flow);
+            }
+            if (m.previewHtml() != null) bubble.getChildren().add(HtmlView.of(m.previewHtml(), textWidth, media, openLink));
+            if (!followedByItsOwnMedia(m)) bubble.getChildren().add(media.linkPlayers(links(m), chat, textWidth));
         }
 
         HBox meta = new HBox(4);
@@ -670,6 +679,23 @@ public final class ThreadPane extends BorderPane {
             }
         });
         return bubble;
+    }
+
+    private static java.util.List<String> links(Message m) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>(m.html() != null ? HtmlView.links(m.html()) : RichText.addresses(m.body()));
+        if (m.previewHtml() != null) out.addAll(HtmlView.links(m.previewHtml()));
+        return java.util.List.copyOf(out);
+    }
+
+    /** A bridge sends the video it could get as a message of its own right after, at the same moment: no second player. */
+    private boolean followedByItsOwnMedia(Message m) {
+        for (Object row : rows) {
+            if (row instanceof ThreadRows.MessageRow r && r.message() != m && r.message().timestamp().equals(m.timestamp())
+                    && r.message().senderId().equals(m.senderId()) && (r.message().type() == MessageType.VIDEO || r.message().type() == MessageType.AUDIO)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Node statusIcon(MessageStatus s) {

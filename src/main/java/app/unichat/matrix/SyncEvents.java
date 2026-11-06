@@ -40,7 +40,14 @@ final class SyncEvents {
         String b = body == null ? "" : body;
         m.setType(t);
         if (!m.isMedia()) {
-            m.setBody(b);
+            String html = MessageHtml.of(content);
+            String previews = MessageHtml.previews(content);
+            String own = MessageHtml.withoutEmbedText(b, html);
+            m.setBody(own);
+            m.setHtml(html);
+            m.setPreviewHtml(previews);
+            String extra = (own.equals(b) ? "" : MessageHtml.text(html)) + (previews == null ? "" : " " + MessageHtml.text(previews));
+            m.setHtmlText(extra.isBlank() ? null : extra.strip());
             return;
         }
         String url = text(content, "url");
@@ -105,6 +112,9 @@ final class SyncEvents {
         Message m = new Message(newId, src.chatId(), src.senderId(), src.senderName(), src.outgoing(), src.timestamp());
         m.setType(src.type());
         m.setBody(src.body());
+        m.setHtml(src.html());
+        m.setPreviewHtml(src.previewHtml());
+        m.setHtmlText(src.htmlText());
         m.setMediaUrl(src.mediaUrl());
         m.setFileName(src.fileName());
         m.setFileSize(src.fileSize());

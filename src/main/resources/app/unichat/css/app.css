@@ -329,6 +329,17 @@
     -fx-cursor: hand;
 }
 .bubble.out .reply-quote { -fx-background-color: rgba(255, 255, 255, 0.16); -fx-border-color: transparent transparent transparent white; }
+.html-quote {
+    -fx-background-color: rgba(0, 0, 0, 0.09);
+    -fx-background-radius: 8;
+    -fx-border-color: transparent transparent transparent -text-3;
+    -fx-border-width: 0 0 0 4;
+    -fx-padding: 6 8 6 12;
+}
+.bubble.out .html-quote { -fx-background-color: rgba(255, 255, 255, 0.16); -fx-border-color: transparent transparent transparent white; }
+.html-pre { -fx-background-color: rgba(0, 0, 0, 0.09); -fx-background-radius: 6; -fx-padding: 6 8; }
+.html-mark { -fx-text-fill: -text-2; }
+.bubble.out .html-mark { -fx-text-fill: white; }
 .reply-sender { -fx-font-weight: bold; -fx-font-size: 0.85em; -fx-text-fill: -accent; }
 .reply-text { -fx-font-size: 0.88em; -fx-text-fill: -text-2; -fx-text-overrun: ellipsis; }
 .bubble.out .reply-sender, .bubble.out .reply-text { -fx-text-fill: white; }

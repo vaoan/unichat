@@ -44,6 +44,7 @@ import java.util.function.Consumer;
  * typing and read receipts are simulated so every UI state can be exercised without a server.
  */
 public final class MockChatService implements ChatService, FolderForwarding {
+    private final Map<String, app.unichat.model.LinkMedia> demoLinks = new java.util.concurrent.ConcurrentHashMap<>();
     static final String ME = "@yo:demo.unichat";
     static final String WA_PERSONAL = "whatsapp:personal";
     static final String WA_WORK = "whatsapp:trabajo";
@@ -484,13 +485,23 @@ public final class MockChatService implements ChatService, FolderForwarding {
     // ---------------------------------------------------------------- media
 
     @Override
+    public CompletableFuture<java.util.Optional<app.unichat.model.LinkMedia>> linkMedia(String url) {
+        return CompletableFuture.completedFuture(java.util.Optional.ofNullable(demoLinks.get(url)));
+    }
+
+    /** The demo opens nothing on the web: these are the links it pretends hold media. */
+    public void addLinkMedia(String url, app.unichat.model.LinkMedia media) {
+        demoLinks.put(url, media);
+    }
+
+    @Override
     public CompletableFuture<Path> media(String url, int width, int height) {
         if (url == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Sin URL"));
         if (url.startsWith("file:")) return CompletableFuture.completedFuture(Path.of(java.net.URI.create(url)));
-        if (url.startsWith("demo://")) {
+        if (url.startsWith("demo://") || url.startsWith("mxc://demo/")) {
             return CompletableFuture.supplyAsync(() -> {
                 try {
-                    String name = url.substring("demo://".length());
+                    String name = url.substring(url.indexOf("demo") + (url.startsWith("demo://") ? "demo://" : "demo/").length());
                     return name.endsWith(".ogg") ? demoAudio(name) : demoImage(name);
                 } catch (IOException e) {
                     throw new java.io.UncheckedIOException(e);

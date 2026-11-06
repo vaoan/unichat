@@ -19,6 +19,7 @@ El código propio de Unichat es [0BSD](LICENSE). Los paquetes de Unichat tambié
 | ZXing core | 3.5.3 | Apache-2.0 | códigos QR |
 | TwelveMonkeys ImageIO | 3.12.0 | BSD-3-Clause | leer WebP |
 | JCodec (incluye un decodificador derivado de JAAD) | 0.2.5 | BSD-2-Clause | videos desde GIF |
+| jsoup | 1.18.3 | MIT | leer el HTML de los mensajes |
 | Concentus | 1.0.2 | BSD-3-Clause | decodificar notas de voz Opus |
 | Crates de Rust dentro de tuwunel | ver lista | varias, ver abajo | servidor Matrix local |
 | OpenJDK (runtime de Java) | el del JDK que empaqueta | GPL-2.0 con excepción de classpath | ejecutar la app |
@@ -4425,14 +4426,14 @@ country of residence.
 **gstreamer.md**
 
 ```text
-## GStreamer v1.28.3
+## GStreamer v1.28.8
 
 ### GStreamer Notice
 '''
 
-You are receiving a copy of GStreamer, Version: 1.28.3 in either source or
+You are receiving a copy of GStreamer, Version: 1.28.8 in either source or
 object code in the JavaFX runtime or JavaFX SDK. The terms of the
-Oracle license do NOT apply to the GStreamer, Version: 1.28.3; it is
+Oracle license do NOT apply to the GStreamer, Version: 1.28.8; it is
 licensed under the following license, separately from the Oracle programs
 you receive. If you do not wish to install this library, you may delete
 this library:
@@ -14137,6 +14138,34 @@ LOSS OF USE, DATA, OR PROFITS;  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
 ANY  THEORY  OF  LIABILITY,  WHETHER  IN  CONTRACT,  STRICT LIABILITY,  OR TORT 
 (INCLUDING  NEGLIGENCE OR OTHERWISE)  ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+### jsoup
+
+**LICENSE**
+
+```text
+The MIT License
+
+Copyright (c) 2009-2026 Jonathan Hedley <https://jsoup.org/>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### Concentus

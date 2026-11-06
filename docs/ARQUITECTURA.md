@@ -11,13 +11,14 @@ Cada paquete solo puede depender de los que están debajo. `ArchitectureTest` lo
 |---|---|---|
 | raíz (`app.unichat`) | Arranque: crea y conecta todo. Nadie depende de ella | todo |
 | `ui` | Pantallas JavaFX. Único paquete (además de la raíz) que usa JavaFX | lo de abajo, salvo `matrix` |
-| `matrix` | `ChatService` sobre Matrix | `service`, `bridge`, `gif`, `login`, `model`, `settings`, `support` |
+| `matrix` | `ChatService` sobre Matrix | `service`, `bridge`, `gif`, `links`, `login`, `model`, `settings`, `support` |
 | `service` | La API que usa la UI (`ChatService`, `BridgeAccess`) y el modo demo | `login`, `model`, `settings` |
 | `server` | Servidor local: instala, arranca y vigila tuwunel y los puentes | `bridge`, `settings`, `support` |
 | `stt` | Voz a texto | `settings`, `support` |
 | `assist` | Borradores de respuesta con el CLI de IA de la persona | `model`, `settings`, `support` |
 | `video` | ffmpeg y la conversión de stickers WebM | `settings`, `support` |
 | `voice` | Grabar notas de voz, limpiarlas y codificarlas | `model`, `settings`, `support`, `video` |
+| `links` | Abre los enlaces de los mensajes para saber si tienen video o audio, sin llegar nunca a esta máquina ni a su red | `model` |
 | `gif` | Buscadores de GIF y lectura de cuadros | `model`, `settings` |
 | `login` | Inicio de sesión en los puentes y cookies del navegador | `model` |
 | `settings` | Preferencias | `support` |

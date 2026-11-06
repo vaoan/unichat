@@ -374,4 +374,23 @@ class SyncProcessorTest {
                 {'ephemeral':{'events':[{'type':'m.receipt','content':{'$1':{'m.read':{'@bob:example.org':{'ts':950}}}}}]}}""", true);
         assertTrue(r.readByMe.isEmpty(), "others' receipts don't count");
     }
+
+    @Test
+    void htmlComesAlongAndAnEmbedLeavesTheBodyEvenWhenItArrivesWithALaterEdit() {
+        String room = "!embed:example.org";
+        sync(room, "{'timeline':{'events':[%s]}}".formatted(text("$1", "@bob:example.org", 1, "https://a.example")), false);
+        Message m = messages(room).get(0);
+        assertNull(m.html());
+        String html = "<blockquote class=\\\"discord-embed\\\"><p>Hola</p></blockquote>";
+        String nc = "{'msgtype':'m.text','body':'https://a.example\\n> Hola','format':'org.matrix.custom.html','formatted_body':'" + html + "'}";
+        sync(room, "{'timeline':{'events':[{'type':'m.room.message','event_id':'$2','sender':'@bob:example.org','origin_server_ts':2,"
+                + "'content':{'msgtype':'m.text','body':'* x','m.new_content':" + nc + ",'m.relates_to':{'rel_type':'m.replace','event_id':'$1'}}}]}}", true);
+        assertEquals("https://a.example", m.body());
+        assertTrue(m.html().contains("discord-embed"));
+        assertEquals("Hola", m.htmlText());
+        sync(room, "{'timeline':{'events':[{'type':'m.room.message','event_id':'$3','sender':'@bob:example.org','origin_server_ts':3,"
+                + "'content':{'msgtype':'m.text','body':'* y','m.new_content':{'msgtype':'m.text','body':'y'},'m.relates_to':{'rel_type':'m.replace','event_id':'$1'}}}]}}", true);
+        assertNull(m.html(), "an edit that drops it");
+        assertNull(m.htmlText());
+    }
 }

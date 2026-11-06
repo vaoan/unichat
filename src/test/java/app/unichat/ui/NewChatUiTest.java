@@ -59,6 +59,8 @@ class NewChatUiTest {
         shortcutN(scene);
         assertTrue(fx(() -> pane(scene) != null), "⌘N opens Nuevo chat");
         chooseNetwork(scene, "WhatsApp");
+        // The contacts arrive on another thread: under load, after the assertion unless it waits for them.
+        for (int i = 0; i < 100 && rows(scene).size() < 6; i++) Thread.sleep(100);
         assertEquals(6, rows(scene).size(), rows(scene).toString());
 
         type(scene, "ana");

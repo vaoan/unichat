@@ -74,6 +74,7 @@ COMPONENTS = [
     ("TwelveMonkeys ImageIO", "3.12.0", "BSD-3-Clause", "leer WebP", [("LICENSE", fetch(GH + "haraldk/TwelveMonkeys/master/LICENSE.txt"))]),
     ("JCodec (incluye un decodificador derivado de JAAD)", "0.2.5", "BSD-2-Clause", "videos desde GIF",
      [("LICENSE", fetch(GH + "jcodec/jcodec/master/LICENSE"))]),
+    ("jsoup", "1.18.3", "MIT", "leer el HTML de los mensajes", [("LICENSE", fetch(GH + "jhy/jsoup/master/LICENSE"))]),
     ("Concentus", "1.0.2", "BSD-3-Clause", "decodificar notas de voz Opus", [("LICENSE", fetch(GH + "lostromb/concentus/master/LICENSE"))]),
 ]
 APACHE = fetch("https://www.apache.org/licenses/LICENSE-2.0.txt")

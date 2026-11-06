@@ -5,6 +5,7 @@ import app.unichat.video.WebmStickers;
 import javafx.scene.control.ProgressIndicator;
 import app.unichat.service.MediaSource;
 import app.unichat.model.MediaLibrary;
+import app.unichat.model.LinkMedia;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.stt.Transcripts;
@@ -47,6 +48,11 @@ final class MessageMedia {
     }
 
     private static final double MAX_MEDIA = 320;
+    private static final double DEFAULT_SHAPE = 16.0 / 9;
+    private static final int MAX_LINKS_OPENED = 5;
+    private static final int MAX_LINK_PLAYERS = 3;
+    /** Width over height of the pictures seen so far in messages' HTML. */
+    private final java.util.Map<String, Double> pictureShapes = new java.util.HashMap<>();
 
     Node imageNode(Message m) {
         double w = m.width() > 0 ? m.width() : 240;
@@ -81,6 +87,90 @@ final class MessageMedia {
             });
         }
         return box;
+    }
+
+    /**
+     * A picture in a message's HTML. Its size isn't known beforehand, so it takes its shape once loaded; that's
+     * remembered, or the row would grow again each time it scrolls back into view.
+     */
+    Node htmlPicture(String url, double width, double maxHeight) {
+        StackPane box = mediaBox(width, Math.min(maxHeight, width / pictureShapes.getOrDefault(url, DEFAULT_SHAPE)), false);
+        ImageView view = new ImageView();
+        view.setFitWidth(width);
+        view.setFitHeight(maxHeight);
+        view.setPreserveRatio(true);
+        box.getChildren().add(view);
+        whenLoaded(url, (int) (Math.max(width, maxHeight) * 2), img -> {
+            view.setImage(img);
+            double shape = img.getWidth() / img.getHeight();
+            pictureShapes.put(url, shape);
+            double h = Math.min(maxHeight, width / shape);
+            box.setPrefHeight(h);
+            box.setMinHeight(h);
+            box.setMaxHeight(h);
+            ((Rectangle) box.getClip()).setHeight(h);
+        });
+        clickable(box, "Imagen, abrir en grande", () -> {
+            Window owner = scene.get().getWindow();
+            Message holder = new Message(url, "", "", null, false, java.time.Instant.now());
+            holder.setType(MessageType.IMAGE);
+            holder.setMediaUrl(url);
+            MediaViewer.show(owner, svc.media(url, 0, 0), "Imagen", () -> MediaSaver.save(owner, svc, holder, toast));
+        });
+        return box;
+    }
+
+    /** A custom emoji or small icon, in the running text. */
+    Node inlinePicture(String url, double height, String description) {
+        ImageView view = new ImageView();
+        view.setFitHeight(height);
+        view.setPreserveRatio(true);
+        view.setAccessibleText(description);
+        whenLoaded(url, (int) (height * 2), view::setImage);
+        return view;
+    }
+
+    private void whenLoaded(String url, int px, java.util.function.Consumer<Image> show) {
+        svc.media(url, px, px).thenAcceptAsync(p -> {
+            try {
+                Image img = AnimatedImage.still(p, px, px);
+                if (img.getHeight() > 0) Platform.runLater(() -> show.accept(img));
+            } catch (Exception e) {
+                System.err.println("Could not decode " + p.getFileName() + ": " + e);
+            }
+        }, AnimatedImage.DECODER);
+    }
+
+    /**
+     * Players for what a message's links hold, added as each answers. A short video plays by itself; a longer one is a
+     * chip that opens it, so nothing large downloads unasked; audio has its controls.
+     */
+    Node linkPlayers(java.util.List<String> links, Chat chat, double width) {
+        VBox box = new VBox(4);
+        box.setMaxWidth(width);
+        java.util.Set<String> shown = new java.util.HashSet<>();
+        for (String link : links.stream().limit(MAX_LINKS_OPENED).toList()) {
+            svc.linkMedia(link).thenAcceptAsync(found -> found.ifPresent(lm -> {
+                if (shown.size() < MAX_LINK_PLAYERS && shown.add(lm.url())) box.getChildren().add(player(lm, chat));
+            }), Platform::runLater);
+        }
+        return box;
+    }
+
+    private Node player(LinkMedia lm, Chat chat) {
+        Message m = new Message(lm.url(), chat.id(), "", null, false, java.time.Instant.now());
+        m.setMediaUrl(lm.url());
+        m.setMimeType(lm.mimeType());
+        m.setFileSize(lm.size());
+        String name = lm.url().replaceAll("[?#].*", "").replaceAll(".*/", "");
+        m.setFileName(name.isBlank() ? lm.url() : java.net.URLDecoder.decode(name.replace("+", "%2B"), java.nio.charset.StandardCharsets.UTF_8));
+        if (lm.kind() == LinkMedia.Kind.AUDIO) {
+            m.setType(MessageType.AUDIO);
+            return audioNode(m, chat);
+        }
+        m.setType(MessageType.VIDEO);
+        m.setMediaInfo(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode());
+        return m.playsInline() ? inlineVideoNode(m) : fileNode(m);
     }
 
     /** A video that plays by itself (Message.playsInline), and opens big like a picture. */

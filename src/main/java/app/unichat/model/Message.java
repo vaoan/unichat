@@ -125,6 +125,19 @@ public final class Message {
 
     public static boolean isCustomReaction(String key) { return key != null && key.startsWith("mxc://"); }
 
+    private String html;
+    private String previewHtml;
+    private String htmlText;
+    /** The message as HTML, when it came so ({@code ui.HtmlView} draws it); {@link #body()} remains its plain text. */
+    public String html() { return html; }
+    public void setHtml(String html) { this.html = html; }
+    /** Link previews, as HTML, shown under the message. */
+    public String previewHtml() { return previewHtml; }
+    public void setPreviewHtml(String previewHtml) { this.previewHtml = previewHtml; }
+    /** In words, what the HTML shows that the body doesn't say (an embed); null if nothing. */
+    public String htmlText() { return htmlText; }
+    public void setHtmlText(String htmlText) { this.htmlText = htmlText; }
+
     public boolean isMedia() {
         return type == MessageType.IMAGE || type == MessageType.VIDEO || type == MessageType.AUDIO
                 || type == MessageType.FILE || type == MessageType.STICKER;
@@ -149,7 +162,7 @@ public final class Message {
             case FILE -> "📎 " + (fileName == null ? "Archivo" : fileName);
             case STICKER -> "Sticker";
             case EMOTE -> "* " + senderName() + " " + body;
-            default -> body.replace('\n', ' ');
+            default -> body.isBlank() && htmlText != null ? htmlText : body.replace('\n', ' ');
         };
     }
 }

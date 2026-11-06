@@ -1,5 +1,7 @@
 package app.unichat.matrix;
 
+import app.unichat.links.LinkInspector;
+import app.unichat.model.LinkMedia;
 import app.unichat.bridge.BridgePorts;
 import app.unichat.settings.Settings;
 import app.unichat.support.Hashes;
@@ -19,6 +21,7 @@ import java.util.concurrent.ExecutorService;
 /** Downloads media on demand into {@code cache/media} and keeps that folder under its limit ({@link MediaCache}). */
 final class MediaDownloader {
     private final MatrixClient client;
+    private final LinkInspector links = new LinkInspector();
     private final ExecutorService io;
     private final Map<String, CompletableFuture<Path>> mediaInFlight = new ConcurrentHashMap<>();
     private final java.util.concurrent.atomic.AtomicLong lastCacheTrim = new java.util.concurrent.atomic.AtomicLong();
@@ -56,6 +59,10 @@ final class MediaDownloader {
             }
         });
         return f;
+    }
+
+    CompletableFuture<java.util.Optional<LinkMedia>> linkMedia(String url) {
+        return links.inspect(url);
     }
 
     /** Pinned in the cache from now on: {@link MediaCache}. */
@@ -109,7 +116,8 @@ final class MediaDownloader {
             }
             if (contentType == null && !Files.exists(tmp)) contentType = fetchMedia("/download/" + sm, tmp);
         } else if (url.startsWith("http://") || url.startsWith("https://")) {
-            contentType = client.download(url, false, tmp);
+            // Web addresses come from messages: never to this machine or its network.
+            contentType = links.download(url, tmp);
         } else {
             throw new MatrixException(0, null, "URL de medio no compatible");
         }

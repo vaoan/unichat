@@ -148,8 +148,15 @@ final class DemoChats {
         server.setSpaceChildren(List.of("!srv-general:demo", "!srv-memes:demo", MockChatService.UNJOINED_CHANNEL_ID));
         svc.adopt(server);
         svc.chats.put(server.id(), server);
-        ChatBuilder.group(svc, "srv-general", Network.DISCORD, "#general", "xNico", "Mafe")
+        ChatBuilder.group(svc, "srv-general", Network.DISCORD, "#general", "xNico", "Mafe", "Pipe")
                 .in(-5000, "xNico", "Bienvenidos al servidor")
+                .html(-4000, "Pipe", "<h2>Novedades</h2><p>Una <strong>lista</strong> con <em>formato</em> y <code>código</code>:</p><ul><li>uno</li><li>dos</li></ul>"
+                        + "<table><tr><th>Equipo</th><th>Puntos</th></tr><tr><td>Rojo</td><td>12</td></tr></table>")
+                .html(-3000, "Mafe", "https://fixupx.com/mafe/status/1234567890123456789012345678901234567890\n"
+                        + "<blockquote class=\"discord-embed\" background-color=\"#6364FF\"><p class=\"discord-embed-author\">"
+                        + "<img data-mx-emoticon height=\"24\" src=\"demo://avatar\" alt=\"\">&nbsp;<a href=\"https://x.com/mafe/status/1\">Mafe (@mafe)</a></p>"
+                        + "<p class=\"discord-embed-description\"><p>Foto del torneo ❤️<br><a href=\"https://x.com/hashtag/torneo\">#torneo</a></p></p>"
+                        + "<p class=\"discord-embed-image\"><img src=\"demo://torneo\" alt=\"\"></p><p class=\"discord-embed-footer\"><sub>FixupX</sub></p></blockquote>")
                 .unread(2).done();
         ChatBuilder.group(svc, "srv-memes", Network.DISCORD, "#memes", "Mafe")
                 .in(-7000, "Mafe", "😂")
@@ -213,6 +220,12 @@ final class DemoChats {
             msg.setMediaUrl("demo://" + name);
             msg.setFileName(name + ".png");
             msg.setSize(640, 420);
+            return this;
+        }
+
+        ChatBuilder html(long secs, String who, String html) {
+            in(secs, who, html.replaceAll("<[^>]+>", " ").strip());
+            list.get(list.size() - 1).setHtml(html.replace("demo://", "mxc://demo/"));
             return this;
         }
 
