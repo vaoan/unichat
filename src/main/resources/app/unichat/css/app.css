@@ -785,6 +785,10 @@
 .space-title { -fx-font-weight: bold; -fx-font-size: 1.1em; -fx-text-fill: -text; }
 .chat-cell .disclosure { -fx-text-fill: -text-2; -fx-font-size: 0.85em; }
 .chat-cell .chat-name.unjoined { -fx-opacity: 0.6; }
+/* Carpetas */
+.folder-names { -fx-padding: 0 0 8 0; }
+.folder-new { -fx-alignment: center; }
+.folder-dialog { -fx-padding: 18; -fx-spacing: 14; }
 /* Nuevo chat */
 .new-chat-pane { -fx-padding: 18; -fx-spacing: 10; }
 .new-chat-list { -fx-background-color: transparent; }

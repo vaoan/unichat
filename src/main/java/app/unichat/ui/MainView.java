@@ -37,6 +37,7 @@ public final class MainView extends StackPane {
     private final ThreadPane thread;
     private final InfoPane info;
     private final Rail rail;
+    private final FolderDialogs folderDialogs;
     private final BorderPane threadArea = new BorderPane();
     private final StackPane overlay = new StackPane();
     private final Label toast = new Label();
@@ -90,11 +91,12 @@ public final class MainView extends StackPane {
         this.openLink = openLink;
         getStyleClass().add("main-root");
 
-        listPane = new ChatListPane(svc, this::openChat);
+        folderDialogs = new FolderDialogs(svc, this::showOverlay, this::hideOverlay);
+        listPane = new ChatListPane(svc, this::openChat, folderDialogs);
         listPane.setOnNewChat(this::showNewChat);
         listPane.setFooter(accountAlerts);
         listPane.setToast(this::toast);
-        thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast, audio);
+        thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast, audio, folderDialogs);
         info = new InfoPane(svc, this::toggleInfo, this::toast);
         panel = new SidePanel(info);
         thread.setLibrary(library);
@@ -141,6 +143,8 @@ public final class MainView extends StackPane {
         overlay.setOnMouseClicked(e -> { if (e.getTarget() == overlay) hideOverlay(); });
 
         toast.getStyleClass().add("toast");
+        toast.setWrapText(true);
+        toast.setMaxWidth(560);
         toast.setVisible(false);
         toast.setMouseTransparent(true);
         StackPane.setAlignment(toast, Pos.BOTTOM_CENTER);
@@ -156,10 +160,14 @@ public final class MainView extends StackPane {
         showConnection(svc.connectionState());
         showAccountAlerts();
         refreshAll();
+        String warning = svc.preferencesWarning();
+        if (warning != null) toast(warning);
+        svc.onSaveFailure(text -> Platform.runLater(() -> toast(text)));
     }
 
     public void dispose() {
         svc.removeListener(listener);
+        svc.onSaveFailure(null);
     }
 
     // ------------------------------------------------------------------ updates (coalesced)
@@ -303,7 +311,8 @@ public final class MainView extends StackPane {
     private void openChat(Chat c, boolean keepFilters) {
         if (c == null) return;
         hideOverlay();
-        if (!keepFilters && c.archived() && listPane.filterProperty().get().view() != ChatFilter.View.ARCHIVE && !listPane.filterProperty().get().searching()) {
+        if (!keepFilters && c.archived() && listPane.filterProperty().get().view() != ChatFilter.View.ARCHIVE && !listPane.filterProperty().get().searching()
+                && !listPane.foldersOpen()) { // a folder shows its archived chats: the filter it covers stays put
             listPane.filterProperty().set(listPane.filterProperty().get().withView(ChatFilter.View.ARCHIVE));
         }
         listPane.setSelected(c.id());
@@ -312,6 +321,18 @@ public final class MainView extends StackPane {
         svc.markRead(c.id());
         notifier.clear(c.id());
         listPane.refresh();
+    }
+
+    /** Shows the folders, or inside the one called {@code name} (snapshot diagnostics). */
+    public void showFolders(String name) {
+        if (name == null) listPane.showFolders();
+        else listPane.showFolder(name);
+    }
+
+    /** Asks for a new folder's name, or to delete the second folder (snapshot diagnostics). */
+    public void showFolderDialog(boolean delete) {
+        if (delete) folderDialogs.delete(svc.folders().get(1), () -> { });
+        else folderDialogs.create(() -> { });
     }
 
     /** Shows a server's channels over the chat list (snapshot diagnostics). */
@@ -406,6 +427,7 @@ public final class MainView extends StackPane {
                 new CommandBar.Command("Ver favoritos", m + "3", () -> setView(ChatFilter.View.FAVORITES, false)),
                 new CommandBar.Command("Ver prioridad baja", m + "4", () -> setView(ChatFilter.View.LOW_PRIORITY, false)),
                 new CommandBar.Command("Ver archivados", "", () -> setView(ChatFilter.View.ARCHIVE, false)),
+                new CommandBar.Command("Ver carpetas", "", listPane::showFolders),
                 new CommandBar.Command("Nuevo chat", m + "N", this::showNewChat),
                 new CommandBar.Command("Cuentas", "", this::showAccounts),
                 new CommandBar.Command("Agregar cuenta", "", () -> showAccounts().showPicker()),

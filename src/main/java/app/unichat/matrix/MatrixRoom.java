@@ -60,6 +60,11 @@ final class MatrixRoom {
     Instant invitedAt;
     String inviter;
     String prevBatch;
+    /** Names in the last m.tag; null until one is heard. Only input for the preferences file (see {@link RoomPreferences}). */
+    java.util.Set<String> serverTags;
+    /** Last reminder account data; {@link #reminderKnown} once heard, null when it's empty. */
+    Instant serverReminder;
+    boolean reminderKnown;
 
     MatrixRoom(String id) {
         this.id = id;

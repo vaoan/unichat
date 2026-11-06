@@ -11,6 +11,7 @@ public final class Icons {
     public static final String SEARCH = "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Zm-9 7a9 9 0 1 1 16.03 5.62l3.68 3.67-1.42 1.42-3.67-3.68A9 9 0 0 1 2 11Z";
     public static final String INBOX = "M4 4h16l2 9v7H2v-7l2-9Zm1.6 2-1.33 6H9l1 2h4l1-2h4.73L18.4 6H5.6ZM4 14v4h16v-4h-3.76l-1 2H8.76l-1-2H4Z";
     public static final String ARCHIVE = "M3 3h18v5h-1v13H4V8H3V3Zm3 5v11h12V8H6Zm-1-3v1h14V5H5Zm4 6h6v2H9v-2Z";
+    public static final String FOLDER = "M3 5h7l2 2h9v13H3V5Zm2 2v11h14V9h-7.83l-2-2H5Z";
     public static final String SETTINGS = "M10.3 2h3.4l.5 2.6 1.6.9 2.5-.9 1.7 2.9-2 1.8v1.8l2 1.7-1.7 3-2.5-.9-1.6.9-.5 2.6h-3.4l-.5-2.6-1.6-.9-2.5.9-1.7-3 2-1.7V9.3l-2-1.8 1.7-2.9 2.5.9 1.6-.9.5-2.6ZM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z";
     public static final String SEND = "M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2v6.4Z";
     public static final String ATTACH = "M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6h-1.5Z";

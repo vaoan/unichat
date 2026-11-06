@@ -23,6 +23,23 @@ final class DemoChats {
 
     private DemoChats() {}
 
+    /**
+     * Gives a demo chat its key and applies what the file has chosen. Only fields the file has override the demo's own
+     * values ({@link PreferencesFile#preview} falls back to them), so an empty file changes nothing.
+     */
+    static void adopt(PreferencesFile prefs, Chat c) {
+        c.setPrefKey(ChatKeys.of(null, null, c.id()));
+        var demo = new PreferencesFile.ServerValues(c.archived(), c.muted(), c.favorite(), c.lowPriority(), c.pinned(),
+                c.reminderAt(), true);
+        var e = prefs.preview(c.prefKey(), demo);
+        c.setArchived(e.archived());
+        c.setMuted(e.muted());
+        c.setFavorite(e.favorite());
+        c.setLowPriority(e.lowPriority());
+        c.setPinned(e.pinned());
+        c.setReminderAt(e.reminder());
+    }
+
     static void seed(MockChatService svc) {
         Map<String, Account> accounts = svc.accounts;
         Instant now = Instant.now();
@@ -129,6 +146,7 @@ final class DemoChats {
         server.setTitle("Servidor Unichat");
         server.setSpace(true);
         server.setSpaceChildren(List.of("!srv-general:demo", "!srv-memes:demo", MockChatService.UNJOINED_CHANNEL_ID));
+        svc.adopt(server);
         svc.chats.put(server.id(), server);
         ChatBuilder.group(svc, "srv-general", Network.DISCORD, "#general", "xNico", "Mafe")
                 .in(-5000, "xNico", "Bienvenidos al servidor")
@@ -241,6 +259,7 @@ final class DemoChats {
             }
             list.sort(Comparator.comparing(Message::timestamp));
             if (!list.isEmpty()) chat.applyLastMessage(list.get(list.size() - 1));
+            svc.adopt(chat);
             svc.chats.put(chat.id(), chat);
             svc.messages.put(chat.id(), list);
         }

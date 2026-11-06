@@ -34,7 +34,7 @@ Lo que solo existe con puentes va en `BridgeAccess`, que el demo no implementa. 
 ## `service`: interfaces pequeñas
 
 `ChatService` junta interfaces por rol: `ChatSession`, `ChatReader`, `MediaSource`, `ChatMessaging`, `ChatPreferences`,
-`NetworkAccounts`, `ContactDirectory` y `GroupDirectory`. Una clase nueva pide solo el rol que necesita: `ImageCache`
+`NetworkAccounts`, `ContactDirectory`, `GroupDirectory` y `ChatFolders` (carpetas). Una clase nueva pide solo el rol que necesita: `ImageCache`
 recibe `MediaSource`, no todo el servicio.
 
 ## `matrix`
@@ -53,6 +53,7 @@ recibe `MediaSource`, no todo el servicio.
 | `BridgeAccounts` | Puentes y cuentas |
 | `BotChat`, `BridgeProtocol` | El chat con el bot de cada puente; comandos y respuestas |
 | `DiscordServers`, `ContactActions`, `MediaDownloader` | Servidores de Discord, contactos, descargas |
+| `RoomPreferences` | Lo que dice el servidor frente a `PreferencesFile`, que decide; la regla de silencio que vuelve al servidor |
 | `MatrixClient` | HTTP |
 
 ## Límites de código

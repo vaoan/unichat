@@ -12,6 +12,12 @@ Package rules: `docs/ARQUITECTURA.md`, enforced by `ArchitectureTest` (no cycles
 - `bridge/` — what `matrix` and `server` share about bridges (`BridgeStates`, `BridgePorts`).
 - `service/ChatService` — the only API the UI uses (made of small role interfaces; take the narrowest one). Live model objects, listeners on any thread (UI marshals with
   `Platform.runLater`, coalesced in `MainView`). `MockChatService` = demo mode. `BridgeAccess` = what only bridge-backed services add.
+- Data dir files: `preferences.json` (per-chat archived/muted/favorite/lowPriority/pinned + folders; `service/PreferencesFile`), `settings.properties` and
+  `media-library.json` travel with the person (copy them to a new machine); `session.properties` (token, `matrix.*`, `server.*`, `window.*`; `Settings.staysOnThisMachine`
+  decides, older keys migrate out of settings.properties) and `server-seen.json` stay. An older version will ask you to log in again, because the session moved to session.properties; nothing is lost. `preferences.json.bak` is the version before the last save, tried when the main file is damaged. Preference rules (`matrix/RoomPreferences`): the file wins; a field the
+  person never touched follows the server; a server false counts only if the same server (identity `homeserver|deviceId`) said true, so a fresh server doesn't
+  erase copied choices. Only the mute rule still goes to the server (unread counts come from it). Chat identity across servers: `service/ChatKeys`,
+  `<protocol>:<channel.id>`. `service/ChatFolders` is the role for folders (`FolderActions`, `FolderForwarding`); `ui/FolderView` (+ `FolderRows`, `FolderDialogs`) shows them.
 - `matrix/` — `MatrixChatService` (facade: lifecycle, sync loop) over `MatrixCore` (shared), `MessageSender`, `ChatActions`,
   `BridgeAccounts`, `DiscordServers`, `ContactActions`, `MediaDownloader`, `SyncCache`, `MatrixLogin`; `SyncProcessor`
   (pure /sync → model, unit tested) with `RoomFields`, `SystemMessages`, `SyncEvents`; `BridgeProtocol` (pure), `BotChat`, `MatrixClient` (HTTP). `MatrixLiveIT` = end-to-end test, needs `UNICHAT_IT_HOMESERVER`.
@@ -60,7 +66,7 @@ Package rules: `docs/ARQUITECTURA.md`, enforced by `ArchitectureTest` (no cycles
 `-Dunichat.snapshot=out.png` writes the window to a PNG and exits; combine with `-Dunichat.dataDir=<dir>` (put
 `session.backend=demo` and optionally `ui.theme=LIGHT` in `<dir>/settings.properties`),
 `-Dunichat.openChat=<id>` (demo ids like `!familia:demo`), `-Dunichat.openSpace=<id>` (a server's channels, e.g. `!servidor:demo`), `-Dunichat.info=true`, `-Dunichat.panel=EMOJIS|STICKERS|GIFS`,
-`-Dunichat.overlay=command|newchat|add|settings:<Página>`, `-Dunichat.network=<protocolo>` (settings snapshots the settings window).
+`-Dunichat.overlay=command|newchat|add|folderNew|folderDelete|settings:<Página>`, `-Dunichat.openFolders=true` (folder list), `-Dunichat.openFolder=<name>` (inside one), `-Dunichat.network=<protocolo>` (settings snapshots the settings window).
 Run via `JAVA_OPTS=... ./run-dev.sh`, then read the PNG. Do this after every visual change.
 
 ## Accessibility (user requirement — keep it working)

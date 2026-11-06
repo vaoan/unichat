@@ -37,12 +37,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * Offline demo backend: a believable multi-network inbox that lives in memory. Incoming messages,
  * typing and read receipts are simulated so every UI state can be exercised without a server.
  */
-public final class MockChatService implements ChatService {
+public final class MockChatService implements ChatService, FolderForwarding {
     static final String ME = "@yo:demo.unichat";
     static final String WA_PERSONAL = "whatsapp:personal";
     static final String WA_WORK = "whatsapp:trabajo";
@@ -63,9 +64,24 @@ public final class MockChatService implements ChatService {
     private ScheduledExecutorService scheduler;
     private volatile ConnectionState state = ConnectionState.CONNECTING;
 
+    private final PreferencesFile prefs;
+    private final FolderActions folders;
+
+    /** Demo mode with nothing kept on disk (tests, snapshots). */
     public MockChatService() {
+        this(PreferencesFile.inMemory());
+    }
+
+    /** Demo mode whose choices and folders live in {@code prefs}, like the real service. */
+    public MockChatService(PreferencesFile prefs) {
+        this.prefs = prefs;
+        this.folders = new FolderActions(prefs, this::fireChats);
         DemoChats.seed(this);
     }
+
+    void adopt(Chat c) { DemoChats.adopt(prefs, c); }
+
+    @Override public ChatFolders folderActions() { return folders; }
 
     // ---------------------------------------------------------------- lifecycle
 
@@ -162,6 +178,7 @@ public final class MockChatService implements ChatService {
             space.setTitle("Servidor de juegos");
             space.setSpace(true);
             space.setSpaceChildren(List.of("!juegos-general:demo"));
+            adopt(space);
             chats.put(space.id(), space);
             DemoChats.ChatBuilder.group(this, "juegos-general", Network.DISCORD, "#general", "xNico")
                     .in(-100, "xNico", "¿Quién juega hoy?").done();
@@ -413,8 +430,8 @@ public final class MockChatService implements ChatService {
     }
 
     @Override public CompletableFuture<Void> setMarkedUnread(String id, boolean v) { return update(id, c -> c.setMarkedUnread(v)); }
-    @Override public CompletableFuture<Void> setFavorite(String id, boolean v) { return update(id, c -> c.setFavorite(v)); }
-    @Override public CompletableFuture<Void> setLowPriority(String id, boolean v) { return update(id, c -> c.setLowPriority(v)); }
+    @Override public CompletableFuture<Void> setFavorite(String id, boolean v) { return choose(id, PreferencesFile.Flag.FAVORITE, v, c -> c.setFavorite(v)); }
+    @Override public CompletableFuture<Void> setLowPriority(String id, boolean v) { return choose(id, PreferencesFile.Flag.LOW_PRIORITY, v, c -> c.setLowPriority(v)); }
     @Override public CompletableFuture<Void> setArchived(String id, boolean v) { return quiet(id, v); }
     @Override public CompletableFuture<Void> setMuted(String id, boolean v) { return quiet(id, v); }
 
@@ -423,14 +440,21 @@ public final class MockChatService implements ChatService {
         for (String t : QuietRule.targets(this, id)) {
             Chat c = chats.get(t);
             if (c == null) continue;
+            if (c.prefKey() != null) prefs.batch(() -> {
+                prefs.choose(c.prefKey(), PreferencesFile.Flag.ARCHIVED, v);
+                prefs.choose(c.prefKey(), PreferencesFile.Flag.MUTED, v);
+            });
             c.setArchived(v);
             c.setMuted(v);
         }
         fireChats();
         return CompletableFuture.completedFuture(null);
     }
-    @Override public CompletableFuture<Void> setPinned(String id, boolean v) { return update(id, c -> c.setPinned(v)); }
-    @Override public CompletableFuture<Void> setReminder(String id, Instant at) { return update(id, c -> c.setReminderAt(at)); }
+    @Override public CompletableFuture<Void> setPinned(String id, boolean v) { return choose(id, PreferencesFile.Flag.PINNED, v, c -> c.setPinned(v)); }
+    @Override public CompletableFuture<Void> setReminder(String id, Instant at) { return update(id, c -> {
+        if (c.prefKey() != null) prefs.chooseReminder(c.prefKey(), at);
+        c.setReminderAt(at);
+    }); }
 
     @Override
     public CompletableFuture<Void> leaveChat(String chatId) {
@@ -440,7 +464,15 @@ public final class MockChatService implements ChatService {
         return CompletableFuture.completedFuture(null);
     }
 
-    private CompletableFuture<Void> update(String chatId, java.util.function.Consumer<Chat> change) {
+    private CompletableFuture<Void> choose(String id, PreferencesFile.Flag flag, boolean v,
+                                           Consumer<Chat> change) {
+        return update(id, c -> {
+            if (c.prefKey() != null) prefs.choose(c.prefKey(), flag, v);
+            change.accept(c);
+        });
+    }
+
+    private CompletableFuture<Void> update(String chatId, Consumer<Chat> change) {
         Chat c = chats.get(chatId);
         if (c != null) {
             change.accept(c);
@@ -598,6 +630,7 @@ public final class MockChatService implements ChatService {
             bot.setTitle(network.displayName() + " bridge bot");
             bot.setBridgeBot(true);
             bot.members().add(botMember(network));
+            adopt(bot);
             messages.put(k, new ArrayList<>());
             return bot;
         });

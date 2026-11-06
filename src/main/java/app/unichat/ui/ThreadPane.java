@@ -79,8 +79,12 @@ public final class ThreadPane extends BorderPane {
     /** Newest message shown, to notice your own new message (always jumps to it). */
     private String lastMessageId;
 
-    public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast, AudioPlayback audio) {
+    private final FolderDialogs folderDialogs;
+
+    public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast, AudioPlayback audio,
+                      FolderDialogs folderDialogs) {
         this.audio = audio;
+        this.folderDialogs = folderDialogs;
         this.svc = svc;
         this.openLink = openLink;
         this.toggleInfo = toggleInfo;
@@ -209,7 +213,7 @@ public final class ThreadPane extends BorderPane {
         infoButton.setOnAction(e -> toggleInfo.run());
         infoButton.setAccessibleText("Información del chat");
         Button more = Composer.iconButton(Icons.MORE, "Más opciones", null);
-        more.setOnAction(e -> ChatMenus.forChat(chat, svc, null).show(more, Side.BOTTOM, 0, 4));
+        more.setOnAction(e -> ChatMenus.forChat(chat, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4));
         HBox header = new HBox(10, headerAvatar, titles, favButton, archiveButton, infoButton, more);
         header.getStyleClass().add("thread-header");
         header.setAlignment(Pos.CENTER_LEFT);

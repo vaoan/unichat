@@ -11,7 +11,11 @@ import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
 import app.unichat.model.VoiceNote;
 import app.unichat.service.BridgeAccess;
+import app.unichat.service.ChatFolders;
 import app.unichat.service.ChatService;
+import app.unichat.service.FolderActions;
+import app.unichat.service.FolderForwarding;
+import app.unichat.service.PreferencesFile;
 import app.unichat.service.QuietRule;
 import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
@@ -44,7 +48,7 @@ import static app.unichat.matrix.MatrixClient.enc;
  * Model mutations happen under the {@link SyncProcessor} lock; listeners are called from background threads.
  * End-to-end encryption is not supported: bridges must be configured without encryption.
  */
-public final class MatrixChatService implements ChatService, BridgeAccess {
+public final class MatrixChatService implements ChatService, BridgeAccess, FolderForwarding {
     private static final String SYNC_FILTER =
             "{\"room\":{\"state\":{\"lazy_load_members\":true},\"timeline\":{\"limit\":30,\"lazy_load_members\":true}}}";
     private static final String HISTORY_FILTER = "{\"lazy_load_members\":true}";
@@ -80,29 +84,45 @@ public final class MatrixChatService implements ChatService, BridgeAccess {
     private final ContactActions contacts;
     private final DiscordServers discord;
 
+    private final String serverIdentity;
+    private final PreferencesFile prefs;
+    private final FolderActions folders;
     private final String accessToken;
     /** Distinguishes this sign-in's cache from earlier sessions of the same user (see syncCacheFile). */
     private final String sessionKey;
 
     public MatrixChatService(String homeserver, String userId, String accessToken) {
+        this(homeserver, userId, accessToken, new PreferencesFile(Settings.get().dir().resolve("preferences.json"),
+                Settings.get().dir().resolve("server-seen.json")), Settings.get().deviceId());
+    }
+
+    MatrixChatService(String homeserver, String userId, String accessToken, PreferencesFile prefs, String deviceId) {
+        this.serverIdentity = serverIdentity(homeserver, deviceId, userId);
+        this.prefs = prefs;
         this.client = new MatrixClient(homeserver, accessToken);
         this.accessToken = accessToken;
         this.sessionKey = Hashes.sha256(accessToken).substring(0, 8);
         this.userId = userId;
         this.serverName = userId.substring(userId.indexOf(':') + 1);
         this.proc = new SyncProcessor(userId);
+        proc.setPreferences(prefs);
         this.displayName = SyncEvents.localpart(userId);
         this.core = new MatrixCore(client, proc, userId, serverName, accessToken);
         this.io = core.io;
+        this.folders = new FolderActions(prefs, () -> core.fire(Listener::chatsChanged));
         this.cache = new SyncCache(proc, serverName, userId, sessionKey);
         this.media = new MediaDownloader(client, io);
         this.sender = new MessageSender(core, media);
         BotChat bots = new BotChat(core, sender);
         this.discord = new DiscordServers(core, bots, this::accounts);
         this.bridges = new BridgeAccounts(core, bots, discord);
-        this.chatActions = new ChatActions(core, this, discord);
+        this.chatActions = new ChatActions(core, this, discord, prefs);
         this.contacts = new ContactActions(core);
     }
+
+    // ---------------------------------------------------------------- folders
+
+    @Override public ChatFolders folderActions() { return folders; }
 
     // ---------------------------------------------------------------- session
 
@@ -112,6 +132,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess {
     public synchronized void start() {
         if (core.running) return;
         core.running = true;
+        prefs.useServer(serverIdentity);
         bridges.loadCachedLogins();
         syncThread = new Thread(this::syncLoop, "matrix-sync");
         syncThread.setDaemon(true);
@@ -173,7 +194,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess {
             if (token == null) return false;
             SyncProcessor.Result r;
             synchronized (proc) {
-                r = proc.process(resp, false);
+                r = proc.replay(resp);
             }
             nextBatch = token;
             dispatch(r, false);
@@ -218,6 +239,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess {
                         // The cached token was rejected (expired/purged): fall back to a full sync.
                         catchUp = false;
                         nextBatch = null;
+                        synchronized (proc) {
+                            proc.forgetServerValues();
+                        }
                         continue;
                     }
                     throw e;
@@ -226,21 +250,10 @@ public final class MatrixChatService implements ChatService, BridgeAccess {
                 // Missed messages during the catch-up don't notify, like the initial sync.
                 boolean live = core.initialSyncDone && !catchUp;
                 SyncProcessor.Result r;
-                List<String> mutedElsewhere;
-                List<String> inArchivedServer;
                 synchronized (proc) {
                     r = proc.process(resp, live);
-                    List<Chat> now = proc.rooms().stream().map(x -> x.chat).toList();
-                    mutedElsewhere = QuietRule.toArchive(mutedSeen, now);
-                    mutedSeen.clear();
-                    for (Chat c : now) if (c.muted()) mutedSeen.add(c.id());
-                    inArchivedServer = QuietRule.toInherit(knownChats, now);
-                    for (Chat c : now) knownChats.add(c.id());
                 }
-                // Muted on the phone (or anywhere): archived too, like a mute made here.
-                for (String id : mutedElsewhere) chatActions.archiveOnly(id, true).exceptionally(e -> null);
-                // A channel that arrived in an archived server goes quiet like its siblings.
-                for (String id : inArchivedServer) chatActions.quiet(id, true).exceptionally(e -> null);
+                applyQuietRules();
                 nextBatch = resp.path("next_batch").asText(null);
                 if (initial) cache.save(resp);
                 else if (catchUp) refreshSyncCache();
@@ -266,6 +279,33 @@ public final class MatrixChatService implements ChatService, BridgeAccess {
                 failures = backoff(++failures, e);
             }
         }
+    }
+
+    /** What follows from a sync the server answered: see {@link QuietRule}, and the mute rules the file asks for. */
+    void applyQuietRules() {
+        List<String> mutedElsewhere;
+        List<String> inArchivedServer;
+        synchronized (proc) {
+            List<Chat> now = proc.rooms().stream().map(x -> x.chat).toList();
+            mutedElsewhere = QuietRule.toArchive(mutedSeen, now);
+            mutedSeen.clear();
+            for (Chat c : now) if (c.muted()) mutedSeen.add(c.id());
+            inArchivedServer = QuietRule.toInherit(knownChats, now);
+            for (Chat c : now) knownChats.add(c.id());
+        }
+        // Muted on the phone (or anywhere): archived too, like a mute made here.
+        chatActions.followArchived(mutedElsewhere);
+        // A channel that arrived in an archived server goes quiet like its siblings.
+        chatActions.followQuiet(inArchivedServer);
+        chatActions.applyMutes();
+    }
+
+    /**
+     * Which server's answers these are, for {@link PreferencesFile#useServer}. The URL alone isn't enough: the local
+     * server is always at the same one, wiped or not. A new login has a new device, and forgetting then is the safe side.
+     */
+    static String serverIdentity(String homeserver, String deviceId, String userId) {
+        return homeserver + "|" + (deviceId == null || deviceId.isBlank() ? userId : deviceId);
     }
 
     private int backoff(int failures, Exception e) {
@@ -438,6 +478,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess {
     // ---------------------------------------------------------------- the parts
 
     Path syncCacheFile() { return cache.file(); }
+    SyncProcessor processor() { return proc; }
+    MatrixCore core() { return core; }
+    ChatActions actions() { return chatActions; }
 
     public static void setBridgeProvisioner(BridgeProvisioner p) { BridgeAccounts.provisioner = p; }
 

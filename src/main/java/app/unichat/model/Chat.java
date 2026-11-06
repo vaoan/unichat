@@ -15,6 +15,8 @@ public final class Chat {
     private Network network = Network.MATRIX;
     /** {@link Account#id()} of the login this chat comes through; null when unknown. */
     private String accountId;
+    /** Identity of this chat in the preferences file ({@link app.unichat.service.ChatKeys}); null until computed. */
+    private String prefKey;
     private String title = "";
     private String avatarUrl;
     private boolean group;
@@ -25,6 +27,8 @@ public final class Chat {
     private boolean lowPriority;
     private boolean archived;
     private boolean muted;
+    /** Invited, not joined yet. */
+    private boolean invite;
     private boolean pinned;
     private Instant reminderAt;
     private Instant lastActivity = Instant.EPOCH;
@@ -52,6 +56,10 @@ public final class Chat {
     public void setNetwork(Network network) { this.network = network == null ? Network.MATRIX : network; }
     public String accountId() { return accountId; }
     public void setAccountId(String accountId) { this.accountId = accountId; }
+    public boolean invite() { return invite; }
+    public void setInvite(boolean invite) { this.invite = invite; }
+    public String prefKey() { return prefKey; }
+    public void setPrefKey(String prefKey) { this.prefKey = prefKey; }
     public String title() { return title; }
     public void setTitle(String title) { this.title = title == null ? "" : title; }
     public String avatarUrl() { return avatarUrl; }

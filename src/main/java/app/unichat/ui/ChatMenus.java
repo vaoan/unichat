@@ -2,7 +2,10 @@ package app.unichat.ui;
 
 import app.unichat.model.Chat;
 import app.unichat.service.ChatPreferences;
+import app.unichat.service.PreferencesFile;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
@@ -14,12 +17,15 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
+import java.util.function.Function;
 
 /** The per-chat actions menu (right-click in the list, "⋯" in the thread header). */
 public final class ChatMenus {
+    private static final int MENU_NAME_MAX = 40;
+
     private ChatMenus() {}
 
-    public static ContextMenu forChat(Chat c, ChatPreferences svc, Runnable afterLeave) {
+    public static ContextMenu forChat(Chat c, ChatPreferences svc, FolderDialogs folders, Runnable afterLeave) {
         String id = c.id();
         ContextMenu menu = new ContextMenu();
         menu.getItems().addAll(
@@ -29,7 +35,9 @@ public final class ChatMenus {
                 reminderMenu(c, svc),
                 new SeparatorMenuItem(),
                 item(c.lowPriority() ? "Mover a la bandeja" : "Mover a prioridad baja", () -> svc.setLowPriority(id, !c.lowPriority())),
-                item(c.archived() ? "Desarchivar" : "Archivar", () -> svc.setArchived(id, !c.archived())),
+                item(c.archived() ? "Desarchivar" : "Archivar", () -> svc.setArchived(id, !c.archived())));
+        addFoldersMenu(menu, c, folders);
+        menu.getItems().addAll(
                 new SeparatorMenuItem(),
                 danger(item(c.group() ? "Salir del grupo" : "Eliminar chat", () -> {
                     svc.leaveChat(id);
@@ -39,14 +47,45 @@ public final class ChatMenus {
     }
 
     /** A server/group in the Bandeja: what makes sense for a container of chats. */
-    public static ContextMenu forSpace(Chat c, ChatPreferences svc) {
+    public static ContextMenu forSpace(Chat c, ChatPreferences svc, FolderDialogs folders) {
         String id = c.id();
         ContextMenu menu = new ContextMenu();
         menu.getItems().addAll(
                 favoriteItem(c, svc), pinItem(c, svc), muteItem(c, svc),
                 new SeparatorMenuItem(),
                 item(c.archived() ? "Desarchivar" : "Archivar", () -> svc.setArchived(id, !c.archived())));
+        addFoldersMenu(menu, c, folders);
         return menu;
+    }
+
+    /** One tick per folder, so a chat can be in several; only for what a folder can hold. */
+    private static void addFoldersMenu(ContextMenu menu, Chat c, FolderDialogs dialogs) {
+        if (!FolderRows.canHold(c)) return;
+        Menu m = new Menu("Carpetas");
+        for (PreferencesFile.Folder f : dialogs.folders().folders()) {
+            CheckMenuItem i = new CheckMenuItem(shortName(f.name()));
+            i.setMnemonicParsing(false); // a name is text: "a_b" keeps its underscore
+            i.setSelected(f.chatKeys().contains(c.prefKey()));
+            i.setOnAction(e -> dialogs.folders().setInFolder(f.id(), c, i.isSelected()));
+            m.getItems().add(i);
+        }
+        if (!m.getItems().isEmpty()) m.getItems().add(new SeparatorMenuItem());
+        m.getItems().add(item("Nueva carpeta…", () -> dialogs.createWith(c)));
+        menu.getItems().add(m);
+    }
+
+    /** Menu items don't ellipsize: a long name would widen the whole menu. */
+    private static String shortName(String name) {
+        return name.length() <= MENU_NAME_MAX ? name : name.substring(0, MENU_NAME_MAX) + "…";
+    }
+
+    /** The menu key lands on the list, not on a row: it opens the selected row's menu ({@code menu} may give none). */
+    static <T> void onMenuKey(ListView<T> list, Function<T, ContextMenu> menu) {
+        list.setOnContextMenuRequested(e -> {
+            T row = list.getSelectionModel().getSelectedItem();
+            ContextMenu m = row != null && e.isKeyboardTrigger() ? menu.apply(row) : null;
+            if (m != null) m.show(list, e.getScreenX(), e.getScreenY());
+        });
     }
 
     private static MenuItem favoriteItem(Chat c, ChatPreferences svc) {

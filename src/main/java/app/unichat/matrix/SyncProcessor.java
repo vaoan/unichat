@@ -5,6 +5,7 @@ import app.unichat.model.Member;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
+import app.unichat.service.PreferencesFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -25,7 +26,8 @@ import static app.unichat.matrix.SyncEvents.*;
 
 /**
  * Turns Matrix /sync and /messages JSON into live {@link Chat} and {@link Message} objects.
- * Pure (no I/O) and not thread-safe: callers synchronize on the processor instance.
+ * No network, and not thread-safe: callers synchronize on the processor instance. Preferences aren't set here: what
+ * arrives about them is kept raw on the room and {@link RoomPreferences} decides at the end of each response.
  */
 final class SyncProcessor {
     static final String LOCAL_PREFIX = "local:";
@@ -54,7 +56,7 @@ final class SyncProcessor {
     private final Map<String, MatrixRoom> rooms = new LinkedHashMap<>();
     private final Map<String, String> directRoomUser = new HashMap<>();
     private ObjectNode directContent = MatrixClient.JSON.createObjectNode();
-    private Set<String> mutedRooms = new HashSet<>();
+    private final RoomPreferences preferences = new RoomPreferences();
 
     SyncProcessor(String myUserId) {
         this.me = myUserId;
@@ -72,15 +74,38 @@ final class SyncProcessor {
     MatrixRoom removeRoom(String id) { return rooms.remove(id); }
     ObjectNode directContentCopy() { return directContent.deepCopy(); }
 
-    void setMutedLocal(String roomId, boolean muted) {
-        if (muted) mutedRooms.add(roomId); else mutedRooms.remove(roomId);
-        MatrixRoom r = rooms.get(roomId);
-        if (r != null) r.chat.setMuted(muted);
+    // ---------------------------------------------------------------- preferences
+
+    void setPreferences(PreferencesFile file) { preferences.use(file); }
+
+    /** The key to use for this room in the preferences file, always computed. */
+    String prefKey(MatrixRoom room) { return preferences.keyOf(room); }
+
+    /** Shows what the file says now, after a change from outside /sync. */
+    void showPreferences(MatrixRoom room) { preferences.show(room); }
+
+    /** Room → the mute rule to write: where the file and the server differ. */
+    Map<String, Boolean> mutesToApply() { return mutesToApply(Instant.now()); }
+
+    Map<String, Boolean> mutesToApply(Instant now) { return preferences.mutesToApply(rooms.values(), now); }
+
+    void muteWriteStarted(String roomId) { preferences.writeStarted(roomId); }
+
+    void muteWriteFinished(String roomId, boolean muted, boolean ok, Instant now) {
+        preferences.writeFinished(roomId, muted, ok, now);
     }
+
+    /** The cached token was rejected: a full sync follows, and what the cache said no longer counts. */
+    void forgetServerValues() { preferences.forgetHeard(rooms.values()); }
 
     // ---------------------------------------------------------------- /sync
 
-    Result process(JsonNode sync, boolean live) {
+    Result process(JsonNode sync, boolean live) { return process(sync, live, true); }
+
+    /** The sync saved on disk: everything shows at once, but preferences only count when the server answers. */
+    Result replay(JsonNode cached) { return process(cached, false, false); }
+
+    private Result process(JsonNode sync, boolean live, boolean serverAnswered) {
         Result r = new Result();
         for (JsonNode ev : sync.path("account_data").path("events")) applyGlobalAccountData(ev, r);
 
@@ -96,6 +121,8 @@ final class SyncProcessor {
         for (Iterator<String> it = roomsNode.path("leave").fieldNames(); it.hasNext(); ) {
             if (rooms.remove(it.next()) != null) r.chatsChanged = true;
         }
+        // Last: m.bridge state (the key), tags and the global rules are all in by now.
+        if (preferences.settle(rooms.values(), serverAnswered)) r.chatsChanged = true;
         return r;
     }
 
@@ -105,7 +132,6 @@ final class SyncProcessor {
         if (isNew) {
             room = new MatrixRoom(roomId);
             rooms.put(roomId, room);
-            room.chat.setMuted(mutedRooms.contains(roomId));
         }
         room.invite = false;
         r.chatsChanged = true;
@@ -522,11 +548,8 @@ final class SyncProcessor {
         if (type == null) return;
         switch (type) {
             case "m.tag" -> {
-                JsonNode tags = c.path("tags");
-                chat.setFavorite(tags.has("m.favourite"));
-                chat.setLowPriority(tags.has("m.lowpriority"));
-                chat.setArchived(tags.has(TAG_ARCHIVED));
-                chat.setPinned(tags.has(TAG_PINNED));
+                room.serverTags = new HashSet<>();
+                c.path("tags").fieldNames().forEachRemaining(room.serverTags::add);
             }
             case "m.marked_unread" -> {
                 room.markedUnreadStable = true;
@@ -537,7 +560,8 @@ final class SyncProcessor {
             }
             case REMINDER_TYPE -> {
                 long ts = c.path("ts").asLong(0);
-                chat.setReminderAt(ts > 0 ? Instant.ofEpochMilli(ts) : null);
+                room.serverReminder = ts > 0 ? Instant.ofEpochMilli(ts) : null;
+                room.reminderKnown = true;
             }
             default -> { }
         }
@@ -556,8 +580,7 @@ final class SyncProcessor {
             rooms.values().forEach(this::refresh);
             r.chatsChanged = true;
         } else if ("m.push_rules".equals(type)) {
-            mutedRooms = mutedRoomsFrom(c);
-            for (MatrixRoom room : rooms.values()) room.chat.setMuted(mutedRooms.contains(room.id));
+            preferences.hearRules(mutedRoomsFrom(c));
             r.chatsChanged = true;
         }
     }

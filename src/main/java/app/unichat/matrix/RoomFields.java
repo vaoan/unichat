@@ -33,6 +33,7 @@ final class RoomFields {
         Chat c = room.chat;
         boolean botRoom = isBridgeBotRoom(room);
         c.setBridgeBot(botRoom);
+        c.setInvite(room.invite);
         c.setNetwork(detectNetwork(room, botRoom));
         c.setFeatures(room.roomFeatures != null ? RoomFeatures.parse(room.roomFeatures)
                 : c.network() == Network.DISCORD ? RoomFeatures.discord() : RoomFeatures.UNKNOWN);

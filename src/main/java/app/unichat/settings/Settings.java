@@ -2,12 +2,13 @@ package app.unichat.settings;
 
 import app.unichat.support.Os;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Properties;
 
 /**
@@ -28,12 +29,48 @@ public final class Settings {
 
     private final Path dir;
     private final Path file;
+    private final Path sessionFile;
+    /** Preferences, safe to copy between machines. */
     private final Properties props = new Properties();
+    /** Session, secrets and per-machine state (see {@link #staysOnThisMachine}); never copied. */
+    private final Properties machine = new Properties();
 
     Settings(Path dir) {
         this.dir = dir;
         this.file = dir.resolve("settings.properties");
-        load();
+        this.sessionFile = dir.resolve("session.properties");
+        load(file, props);
+        load(sessionFile, machine);
+        migrate();
+    }
+
+    /** True for keys that hold the session, a secret or a value only meaningful on this computer. */
+    static boolean staysOnThisMachine(String key) {
+        return key.startsWith("matrix.") || key.startsWith("session.") || key.startsWith("server.")
+                || key.startsWith("window.") || key.startsWith("discord.guilds.")
+                || (key.startsWith("gif.") && key.endsWith(".key"));
+    }
+
+    private Properties holder(String key) { return staysOnThisMachine(key) ? machine : props; }
+
+    /**
+     * Moves machine keys left in settings.properties (older versions, or a crash between the two writes) to
+     * session.properties. The session file is written first, so a crash never loses the session; on a conflict it wins.
+     */
+    private void migrate() {
+        var moving = props.stringPropertyNames().stream().filter(Settings::staysOnThisMachine).toList();
+        if (!moving.isEmpty()) {
+            for (String k : moving) {
+                machine.putIfAbsent(k, props.getProperty(k));
+                props.remove(k);
+            }
+            save();
+        }
+        try {
+            Files.deleteIfExists(dir.resolve("settings.properties.docker-backup"));
+        } catch (IOException e) {
+            System.err.println("Could not delete the old settings backup: " + e);
+        }
     }
 
     public static Settings get() { return INSTANCE; }
@@ -54,32 +91,44 @@ public final class Settings {
     public Path dir() { return dir; }
     public Path cacheDir() { return dir.resolve("cache"); }
 
-    private void load() {
-        if (!Files.exists(file)) return;
-        try (InputStream in = Files.newInputStream(file)) {
-            props.load(in);
+    private static void load(Path from, Properties into) {
+        if (!Files.exists(from)) return;
+        try (InputStream in = Files.newInputStream(from)) {
+            into.load(in);
         } catch (IOException e) {
             System.err.println("Could not read settings: " + e);
         }
     }
 
+    /** Writes session.properties first, then settings.properties; each through a temp file, so a failure keeps the old one. */
     public synchronized void save() {
         try {
             Files.createDirectories(dir);
-            Path tmp = dir.resolve("settings.properties.tmp");
-            try (OutputStream out = Files.newOutputStream(tmp)) {
-                props.store(out, "Unichat settings");
+            if (!machine.isEmpty() || Files.exists(sessionFile)) {
+                write(sessionFile, machine, "Unichat session and secrets: do not copy to another computer", true);
             }
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            write(file, props, "Unichat settings", false);
         } catch (IOException e) {
             System.err.println("Could not save settings: " + e);
         }
     }
 
-    public synchronized String getString(String key, String def) { return props.getProperty(key, def); }
+    private void write(Path target, Properties from, String comment, boolean ownerOnly) throws IOException {
+        Path tmp = dir.resolve(target.getFileName() + ".tmp");
+        ByteArrayOutputStream content = new ByteArrayOutputStream();
+        from.store(content, comment);
+        if (ownerOnly && tmp.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            SyncedFile.write(tmp, content.toByteArray(), PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+        } else {
+            SyncedFile.write(tmp, content.toByteArray());
+        }
+        Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    public synchronized String getString(String key, String def) { return holder(key).getProperty(key, def); }
 
     public synchronized void set(String key, String value) {
-        if (value == null) props.remove(key); else props.setProperty(key, value);
+        if (value == null) holder(key).remove(key); else holder(key).setProperty(key, value);
         save();
     }
 
@@ -109,18 +158,18 @@ public final class Settings {
     public String deviceId() { return getString("matrix.deviceId", null); }
 
     public synchronized void setMatrixSession(String homeserver, String userId, String accessToken, String deviceId) {
-        props.setProperty("matrix.homeserver", homeserver);
-        props.setProperty("matrix.userId", userId);
-        props.setProperty("matrix.accessToken", accessToken);
-        if (deviceId != null) props.setProperty("matrix.deviceId", deviceId);
-        props.setProperty("session.backend", "matrix");
+        machine.setProperty("matrix.homeserver", homeserver);
+        machine.setProperty("matrix.userId", userId);
+        machine.setProperty("matrix.accessToken", accessToken);
+        if (deviceId != null) machine.setProperty("matrix.deviceId", deviceId);
+        machine.setProperty("session.backend", "matrix");
         save();
     }
 
     public synchronized void clearSession() {
-        props.stringPropertyNames().stream()
+        machine.stringPropertyNames().stream()
                 .filter(k -> k.startsWith("matrix.") || k.startsWith("session."))
-                .forEach(props::remove);
+                .forEach(machine::remove);
         save();
     }
 

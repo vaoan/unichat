@@ -27,6 +27,7 @@ public final class Rail extends VBox {
     private final VBox networks = new VBox(6);
     private final Button inbox;
     private final Button archive;
+    private final Button folders;
 
     private final java.util.function.Consumer<Network> onAddAccount;
 
@@ -47,6 +48,7 @@ public final class Rail extends VBox {
         archive.getStyleClass().add("rail-archive");
         Button add = railButton(Icons.icon(Icons.PLUS, 20), "Agregar o administrar cuentas (Ajustes)", onConnect);
         add.getStyleClass().add("rail-add");
+        folders = railButton(Icons.icon(Icons.FOLDER, 20), "Carpetas", listPane::showFolders);
         Button settings = railButton(Icons.icon(Icons.SETTINGS, 20), "Ajustes", onSettings);
 
         Region grow = new Region();
@@ -54,8 +56,9 @@ public final class Rail extends VBox {
         networks.setAlignment(Pos.TOP_CENTER);
         Region sep = new Region();
         sep.getStyleClass().add("rail-separator");
-        getChildren().addAll(new StackPane(inbox), sep, networks, archive, add, grow, settings);
+        getChildren().addAll(new StackPane(inbox), sep, networks, archive, add, grow, folders, settings);
         listPane.filterProperty().addListener((o, a, b) -> refresh());
+        listPane.foldersOpenProperty().addListener((o, a, b) -> refresh());
         refresh();
     }
 
@@ -72,8 +75,10 @@ public final class Rail extends VBox {
     public void refresh() {
         ChatFilter f = listPane.filterProperty().get();
         List<Chat> chats = svc.chats();
-        setActive(inbox, f.network() == null && f.view() != ChatFilter.View.ARCHIVE);
-        setActive(archive, f.view() == ChatFilter.View.ARCHIVE);
+        boolean inFolders = listPane.foldersOpen();
+        setActive(inbox, !inFolders && f.network() == null && f.view() != ChatFilter.View.ARCHIVE);
+        setActive(archive, !inFolders && f.view() == ChatFilter.View.ARCHIVE);
+        setActive(folders, inFolders);
         setUnreadBadge(inbox, chats.stream().filter(ChatFilter::inboxUnread).count());
 
         networks.getChildren().clear();

@@ -131,8 +131,12 @@ UNICHAT_IT_HOMESERVER=http://localhost:8008 ./mvnw test -Dtest=MatrixLiveIT
 ## Datos locales
 
 Ajustes y sesión en `%APPDATA%\Unichat` (Windows), `~/Library/Application Support/Unichat` (macOS) o
-`~/.config/unichat` (Linux). El token de acceso se guarda en texto plano en `settings.properties`. Ahí mismo:
+`~/.config/unichat` (Linux). El token de acceso se guarda en texto plano en `session.properties`, que no se copia entre equipos. Para
+llevarte tus datos a otro equipo copia `settings.properties`, `preferences.json` (archivados, silenciados, favoritos y
+carpetas) y `media-library.json`. Ahí mismo:
 `cache/media` (fotos y videos vistos, con límite), `models/` (modelo de voz) y `transcripts/` (transcripciones).
+Si vuelves a una versión anterior de Unichat te pedirá iniciar sesión otra vez, porque la sesión pasó a
+`session.properties`; no se pierde nada.
 
 ## Limitaciones conocidas
 

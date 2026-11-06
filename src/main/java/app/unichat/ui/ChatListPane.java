@@ -6,7 +6,9 @@ import app.unichat.model.Chat;
 import app.unichat.model.Network;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -70,10 +72,17 @@ public final class ChatListPane extends VBox {
             Composer.iconButton(Icons.CHECK_DOUBLE, "Marcar todo como leído", this::markSpaceRead);
     private final java.util.Set<String> channelsAsked = new java.util.HashSet<>();
     private final VBox spaceView;
+    private javafx.scene.control.Button spaceBack;
+    private javafx.scene.control.Button newChat;
+    private final FolderDialogs folderDialogs;
+    private final FolderView folderView;
+    /** In folders (the names, one folder, or a server opened from one). */
+    private final BooleanProperty inFolders = new SimpleBooleanProperty();
 
-    public ChatListPane(ChatService svc, Consumer<Chat> onOpen) {
+    public ChatListPane(ChatService svc, Consumer<Chat> onOpen, FolderDialogs folderDialogs) {
         this.svc = svc;
         this.onOpen = onOpen;
+        this.folderDialogs = folderDialogs;
         this.spaces = new Spaces(svc, c -> open(c));
         spaces.setOnChanged(this::refresh);
         getStyleClass().add("chat-list-pane");
@@ -105,7 +114,15 @@ public final class ChatListPane extends VBox {
         VBox.setVgrow(spaceView, Priority.ALWAYS);
         spaceView.setVisible(false);
         spaceView.setManaged(false);
-        getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list, spaceView);
+        folderView = new FolderView(svc, ChatCell::new, this::open);
+        folderView.setDialogs(folderDialogs);
+        folderView.setOnLeave(() -> {
+            goTo(filter.get().switchTo(null, null));
+            list.requestFocus();
+        });
+        ChatMenus.onMenuKey(folderView.chatList(), this::rowMenu);
+        VBox.setVgrow(folderView, Priority.ALWAYS);
+        getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list, spaceView, folderView);
         filter.addListener((o, a, b) -> {
             syncChips(b);
             refresh();
@@ -122,7 +139,7 @@ public final class ChatListPane extends VBox {
         title.getStyleClass().add("pane-title");
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-        javafx.scene.control.Button newChat = Composer.iconButton(Icons.PLUS, "Nuevo chat", () -> { if (onNewChat != null) onNewChat.run(); });
+        newChat = Composer.iconButton(Icons.PLUS, "Nuevo chat", () -> { if (onNewChat != null) onNewChat.run(); });
         newChat.setTooltip(new javafx.scene.control.Tooltip("Nuevo chat (" + (MainView.MAC ? "⌘N" : "Ctrl+N") + ")"));
         HBox header = new HBox(6, title, headerSpacer, newChat);
         header.getStyleClass().add("chat-list-header");
@@ -170,17 +187,18 @@ public final class ChatListPane extends VBox {
         empty.getStyleClass().add("empty-label");
         empty.setWrapText(true);
         list.setPlaceholder(empty);
+        ChatMenus.onMenuKey(list, this::rowMenu);
         VBox.setVgrow(list, Priority.ALWAYS);
     }
 
     private HBox buildSpaceHeader() {
         // A server's channels slide over the list, like a Telegram forum's topics.
-        javafx.scene.control.Button back = Composer.iconButton(Icons.CHEVRON_LEFT, "Volver a la bandeja", this::closeSpace);
+        spaceBack = Composer.iconButton(Icons.CHEVRON_LEFT, "Volver a la bandeja", this::closeSpace);
         spaceTitle.getStyleClass().add("space-title");
         spaceTitle.setMinWidth(0);
         spaceTitle.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(spaceTitle, Priority.ALWAYS);
-        HBox spaceHeader = new HBox(8, back, spaceTitle, markSpaceRead);
+        HBox spaceHeader = new HBox(8, spaceBack, spaceTitle, markSpaceRead);
         spaceHeader.setAlignment(Pos.CENTER_LEFT);
         spaceHeader.getStyleClass().add("space-header");
         return spaceHeader;
@@ -192,6 +210,7 @@ public final class ChatListPane extends VBox {
         Label noChannels = new Label("Trayendo los canales…");
         noChannels.getStyleClass().add("empty-label");
         spaceList.setPlaceholder(noChannels);
+        ChatMenus.onMenuKey(spaceList, this::rowMenu);
         spaceList.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER) open(spaceList.getSelectionModel().getSelectedItem());
             if (e.getCode() == KeyCode.ESCAPE || e.getCode() == KeyCode.LEFT) {
@@ -233,6 +252,7 @@ public final class ChatListPane extends VBox {
      */
     public void goTo(ChatFilter f) {
         openSpace = null;
+        leaveFolders();
         if (f.equals(filter.get())) refresh();
         else filter.set(f);
     }
@@ -248,6 +268,10 @@ public final class ChatListPane extends VBox {
 
     /** Focuses the chat list (F6 cycle), keeping the open chat selected. */
     public void focusList() {
+        if (openSpace == null && foldersOpen()) {
+            folderView.focus();
+            return;
+        }
         if (openSpace != null) {
             spaceList.requestFocus();
             if (spaceList.getSelectionModel().isEmpty() && !spaceItems.isEmpty()) spaceList.getSelectionModel().select(0);
@@ -260,6 +284,7 @@ public final class ChatListPane extends VBox {
     public void setSelected(String chatId) {
         selectedId = chatId;
         selectInList();
+        folderView.select(chatId);
     }
 
     /** Rebuilds the visible list from the service; call on the FX thread after chatsChanged. */
@@ -272,6 +297,8 @@ public final class ChatListPane extends VBox {
         spaces.checkPending();
         visible.addAll(offerRows(f));
         if (openSpace != null && (f.searching() || svc.chat(openSpace) == null)) openSpace = null;
+        if (f.searching()) leaveFolders();
+        if (foldersOpen() && openSpace == null) folderView.refresh(all); // closeSpace refreshes it
         if (openSpace == null) {
             spaceRows = InboxRows.Rows.EMPTY;
         } else {
@@ -298,7 +325,8 @@ public final class ChatListPane extends VBox {
             case LOW_PRIORITY -> "Prioridad baja";
             case ARCHIVE -> "Archivados";
         };
-        title.setText(f.network() == null ? base : f.network().displayName());
+        newChat.setVisible(!foldersOpen()); // beside the title Carpetas, + would read as a new folder
+        title.setText(foldersOpen() ? "Carpetas" : f.network() == null ? base : f.network().displayName());
         refreshAccountRow(f);
         refreshView(f);
         empty.setText(f.searching() ? "Sin resultados para «" + f.query() + "»"
@@ -308,7 +336,7 @@ public final class ChatListPane extends VBox {
                     ? "Aún no conectaste ninguna red.\nHaz clic en una red de la izquierda (o en +) para iniciar sesión."
                 : "No hay chats aquí todavía");
 
-        boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && openSpace == null;
+        boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && openSpace == null && !foldersOpen();
         List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.personalSpace() && !c.archived() && !c.bridgeBot()
                 && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).limit(8).toList() : List.of();
         favorites.getChildren().setAll(favs.stream().map(this::favoriteTile).toList());
@@ -342,10 +370,16 @@ public final class ChatListPane extends VBox {
     /** A server's channels cover the list while open. */
     private void refreshView(ChatFilter f) {
         boolean space = openSpace != null;
+        boolean folders = !space && foldersOpen();
         for (Node x : List.of(chipRow, list)) {
-            x.setVisible(!space);
-            x.setManaged(!space);
+            x.setVisible(!space && !folders);
+            x.setManaged(!space && !folders);
         }
+        folderView.setVisible(folders);
+        folderView.setManaged(folders);
+        String backTo = foldersOpen() ? "Volver a la carpeta" : "Volver a la bandeja";
+        spaceBack.setAccessibleText(backTo);
+        spaceBack.getTooltip().setText(backTo);
         if (space) {
             accountRow.setVisible(false);
             accountRow.setManaged(false);
@@ -433,15 +467,15 @@ public final class ChatListPane extends VBox {
         tile.getStyleClass().add("favorite-tile");
         if (c.id().equals(selectedId)) tile.getStyleClass().add("selected");
         tile.setOnMouseClicked(e -> {
-            if (e.getButton() == MouseButton.PRIMARY) openFavorite(c);
+            if (e.getButton() == MouseButton.PRIMARY) open(c);
         });
         tile.setFocusTraversable(true);
         tile.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
         tile.setAccessibleText("Favorito: " + describe(c, Accounts.forChat(accounts, c)));
         tile.setOnKeyPressed(e -> {
-            if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) openFavorite(c);
+            if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) open(c);
         });
-        tile.setOnContextMenuRequested(e -> menuFor(c).show(tile, e.getScreenX(), e.getScreenY()));
+        tile.setOnContextMenuRequested(e -> menuFor(c).show(this, e.getScreenX(), e.getScreenY()));
         return tile;
     }
 
@@ -472,10 +506,6 @@ public final class ChatListPane extends VBox {
         String t = s.replaceAll("^[#@]", "").trim();
         int sp = t.indexOf(' ');
         return sp > 0 ? t.substring(0, sp) : t;
-    }
-
-    private void openFavorite(Chat c) {
-        open(c);
     }
 
     /** Clears the unread state of every channel of the open server. */
@@ -509,6 +539,10 @@ public final class ChatListPane extends VBox {
         String was = openSpace;
         openSpace = null;
         refresh();
+        if (foldersOpen()) {
+            folderView.focusOn(was);
+            return;
+        }
         list.requestFocus();
         for (int i = 0; i < items.size(); i++) {
             if (items.get(i).id().equals(was)) {
@@ -531,8 +565,42 @@ public final class ChatListPane extends VBox {
         return openSpace != null;
     }
 
-    private ContextMenu menuFor(Chat c) {
-        return c.space() ? ChatMenus.forSpace(c, svc) : ChatMenus.forChat(c, svc, null);
+    /** Shows the list of folders. A network filter would leave out part of what a folder's servers count, so it goes. */
+    public void showFolders() {
+        openSpace = null;
+        search.clear();
+        folderView.reset();
+        inFolders.set(true);
+        ChatFilter all = filter.get().switchTo(null, null);
+        if (all.equals(filter.get())) refresh();
+        else filter.set(all);
+        folderView.focus();
+    }
+
+    /** Goes into the folder called {@code name} (snapshot diagnostics). */
+    public void showFolder(String name) {
+        showFolders();
+        folderView.openNamed(name);
+    }
+
+    public boolean foldersOpen() { return inFolders.get(); }
+
+    BooleanProperty foldersOpenProperty() { return inFolders; }
+
+    private void leaveFolders() {
+        folderView.reset();
+        inFolders.set(false);
+    }
+
+    ContextMenu menuFor(Chat c) {
+        ContextMenu menu = c.space() ? ChatMenus.forSpace(c, svc, folderDialogs) : ChatMenus.forChat(c, svc, folderDialogs, null);
+        if (openSpace == null && foldersOpen()) folderView.offerRemoval(menu, c);
+        return menu;
+    }
+
+    /** The menu of a row, if it has one: a channel to join or a server to add aren't chats yet. */
+    private ContextMenu rowMenu(Chat c) {
+        return c.space() || actsLikeChat(c) ? menuFor(c) : null;
     }
 
     private void open(Chat c) {
@@ -555,6 +623,8 @@ public final class ChatListPane extends VBox {
 
     /** Opens the next/previous visible chat (Alt+↓ / Alt+↑). */
     public void move(int delta, boolean unreadOnly) {
+        boolean folder = openSpace == null && foldersOpen();
+        List<Chat> items = folder ? folderView.rows() : this.items;
         if (items.isEmpty()) return;
         int idx = -1;
         for (int i = 0; i < items.size(); i++) if (items.get(i).id().equals(selectedId)) idx = i;
@@ -564,7 +634,8 @@ public final class ChatListPane extends VBox {
             Chat c = items.get(i);
             if (actsLikeChat(c) && (!unreadOnly || c.isUnread())) {
                 open(c);
-                list.scrollTo(i);
+                if (folder) folderView.reveal(i);
+                else list.scrollTo(i);
                 return;
             }
         }
@@ -619,8 +690,9 @@ public final class ChatListPane extends VBox {
                 if (e.getButton() == MouseButton.PRIMARY && getItem() != null) open(getItem());
             });
             setOnContextMenuRequested(e -> {
-                Chat it = getItem();
-                if (it != null && (it.space() || actsLikeChat(it))) menuFor(it).show(this, e.getScreenX(), e.getScreenY());
+                // Anchored to the column: rows are redrawn as messages arrive, and a menu closes with its owner.
+                ContextMenu menu = getItem() == null ? null : rowMenu(getItem());
+                if (menu != null) menu.show(ChatListPane.this, e.getScreenX(), e.getScreenY());
             });
         }
 

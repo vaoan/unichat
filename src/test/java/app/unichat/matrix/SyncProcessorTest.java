@@ -222,7 +222,7 @@ class SyncProcessorTest {
         assertFalse(c.markedUnread(), "stable m.marked_unread wins over the unstable type");
         assertFalse(c.favorite());
         assertTrue(c.lowPriority());
-        assertNull(c.reminderAt());
+        assertEquals(Instant.ofEpochMilli(1700000000000L), c.reminderAt(), "a reminder in the file isn't cleared by the server");
 
         proc.process(json("""
                 {'account_data':{'events':[{'type':'m.push_rules','content':{'global':{'room':[
@@ -316,6 +316,14 @@ class SyncProcessorTest {
         assertEquals("Equipo", proc.room("!i:example.org").chat.title());
         proc.process(json("{'rooms':{'leave':{'!i:example.org':{}}}}"), true);
         assertNull(proc.room("!i:example.org"));
+    }
+
+    @Test
+    void aChatSaysItIsAnInvitationUntilJoined() {
+        proc.process(json("{'rooms':{'invite':{'!i:example.org':{'invite_state':{'events':[]}}}}}"), true);
+        assertTrue(proc.room("!i:example.org").chat.invite());
+        sync("!i:example.org", "{'timeline':{'events':[" + text("$1", "@bob:example.org", 1, "hola") + "]}}", true);
+        assertFalse(proc.room("!i:example.org").chat.invite());
     }
 
     @Test

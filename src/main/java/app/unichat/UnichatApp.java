@@ -9,6 +9,7 @@ import app.unichat.server.LocalServer;
 import app.unichat.server.LogFiles;
 import app.unichat.service.ChatService;
 import app.unichat.service.MockChatService;
+import app.unichat.service.PreferencesFile;
 import app.unichat.settings.Settings;
 import app.unichat.ui.DockIcon;
 import app.unichat.ui.TrayReopen;
@@ -95,7 +96,7 @@ public final class UnichatApp extends Application {
         LogFiles.scheduleCleanup();
         if (s.localServer()) startLocalServer();
         ChatService restored = switch (s.backend() == null ? "" : s.backend()) {
-            case "demo" -> new MockChatService();
+            case "demo" -> demoService();
             case "matrix" -> MatrixLogin.fromSettings();
             default -> null;
         };
@@ -123,7 +124,8 @@ public final class UnichatApp extends Application {
      * Diagnostics for screenshots/CI: {@code -Dunichat.snapshot=out.png} writes the window to a PNG
      * and exits; {@code -Dunichat.openChat=<id>} opens a chat first, {@code -Dunichat.info=true} the info panel,
      * {@code -Dunichat.openSpace=<id>} a server's channels,
-     * {@code -Dunichat.overlay=command|newchat|add|picker|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
+     * {@code -Dunichat.openFolders=true} the list of folders, {@code -Dunichat.openFolder=<name>} inside one,
+     * {@code -Dunichat.overlay=command|newchat|add|picker|folder|folderDelete|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
      * {@code -Dunichat.network=<protocol id>} filters the inbox to one network.
      */
     private void snapshotIfRequested() {
@@ -140,10 +142,13 @@ public final class UnichatApp extends Application {
             if (net != null && mainView != null) mainView.showNetwork(Network.fromProtocolId(net));
             String space = System.getProperty("unichat.openSpace");
             if (space != null && mainView != null) mainView.showSpace(space);
+            String folder = System.getProperty("unichat.openFolder");
+            if ((folder != null || Boolean.getBoolean("unichat.openFolders")) && mainView != null) mainView.showFolders(folder);
             String overlay = System.getProperty("unichat.overlay", "");
             if (mainView != null && overlay.equals("command")) mainView.showCommandBar();
             if (mainView != null && overlay.equals("newchat")) mainView.showNewChat();
             if (mainView != null && overlay.equals("add")) mainView.showAccounts();
+            if (mainView != null && overlay.startsWith("folder")) mainView.showFolderDialog(overlay.equals("folderDelete"));
             if (mainView != null && overlay.equals("picker")) mainView.showAccounts().showPicker();
             if (mainView != null && overlay.startsWith("login:")) {
                 mainView.addAccount(Network.fromProtocolId(overlay.substring(6)));
@@ -174,12 +179,18 @@ public final class UnichatApp extends Application {
         wait.play();
     }
 
+    /** The demo keeps its choices and folders in the same files as the real service. */
+    private static MockChatService demoService() {
+        return new MockChatService(new PreferencesFile(
+                Settings.dataDir().resolve("preferences.json"), Settings.dataDir().resolve("server-seen.json")));
+    }
+
     private void showLogin() {
         if (mainView != null) mainView.dispose();
         mainView = null;
         scene.setRoot(new LoginView(svc -> showMain(svc), () -> {
             Settings.get().setBackend("demo");
-            showMain(new MockChatService());
+            showMain(demoService());
         }, this::openLink));
         Theme.applyAll();
     }

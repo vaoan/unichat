@@ -78,7 +78,7 @@ La misma que el stack Docker (`server/setup.sh`), cambiando Postgres por SQLite 
 - WhatsApp: solo los 50 chats más recientes al conectar; los archivados en el teléfono llegan a "Archivados"
   (etiqueta `u.archived`, en un solo sentido).
 - Telegram: cada persona usa su propio `api_id`/`api_hash` de my.telegram.org; Unichat no trae ninguno. Los pide al
-  conectar Telegram y se cambian en Ajustes → Redes (`TelegramKeys`, guardados en `settings.properties`). Sin claves
+  conectar Telegram y se cambian en Ajustes → Redes (`TelegramKeys`, guardados en `session.properties`). Sin claves
   válidas Telegram no arranca, pero el servidor y las demás redes sí.
 - Instagram: mautrix-meta v0.2607.0 en modo instagram (la última versión que funciona para Instagram).
 - **Medios bajo demanda (`direct_media`)**: los puentes ya no copian fotos, videos ni archivos al servidor. Cada

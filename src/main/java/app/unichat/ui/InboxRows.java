@@ -50,18 +50,28 @@ public final class InboxRows {
         // A channel lives in its server, except in a search and in the archive (where archived channels go).
         boolean flat = f.searching() || f.view() == ChatFilter.View.ARCHIVE;
         for (Chat c : f.apply(all)) if (flat || !inServer.contains(c.id())) top.add(c);
-        top.sort(Comparator.comparing(Chat::pinned).reversed()
+        top.sort(order(activity));
+        return new Rows(top, Set.of(), unread, latest);
+    }
+
+    /** Pinned first, then newest; {@code activity} says when a server was last active (its newest channel). */
+    static Comparator<Chat> order(Map<String, Instant> activity) {
+        return Comparator.comparing(Chat::pinned).reversed()
                 .thenComparing((Chat c) -> activity.getOrDefault(c.id(), c.lastActivity()), Comparator.reverseOrder())
                 .thenComparing((Chat c) -> !c.space())
-                .thenComparing(Chat::title));
-        return new Rows(top, Set.of(), unread, latest);
+                .thenComparing(Chat::title);
     }
 
     /** The channels of server {@code spaceId}, newest first, then the ones you could join (and sub-groups' channels). */
     public static Rows channels(List<Chat> all, String spaceId, String accountId, Map<String, String> names) {
         Chat space = all.stream().filter(c -> c.id().equals(spaceId)).findFirst().orElse(null);
         if (space == null) return Rows.EMPTY;
-        SpaceTree.Node node = find(SpaceTree.build(all, space.network(), accountId, names), spaceId);
+        return channels(SpaceTree.build(all, space.network(), accountId, names), space);
+    }
+
+    /** The same over a tree of the server's network that's already built: a server's channels, for many servers. */
+    static Rows channels(List<SpaceTree.Node> tree, Chat space) {
+        SpaceTree.Node node = find(tree, space.id());
         if (node == null) return Rows.EMPTY;
         List<Chat> joined = new ArrayList<>();
         List<Chat> toJoin = new ArrayList<>();
