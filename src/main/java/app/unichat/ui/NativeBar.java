@@ -46,12 +46,14 @@ final class NativeBar {
      * Starts the helper; null if it is not there or cannot run. onExit runs (once, any thread) if it dies later;
      * {@code onOpenChat} gets the chat id of a clicked notification (any thread).
      */
-    static NativeBar start(Path helper, PopupMenu menu, Runnable onExit, java.util.function.Consumer<String> onOpenChat) {
+    static NativeBar start(Path helper, PopupMenu menu, Runnable onExit, java.util.function.Consumer<String> onOpenChat, Runnable onHotkey) {
         if (helper == null || !Files.isExecutable(helper)) return null;
         try {
             NativeBar bar = new NativeBar(new ProcessBuilder(helper.toString())
                     .redirectError(ProcessBuilder.Redirect.DISCARD).start(), menu);
             bar.onOpenChat = onOpenChat;
+            bar.onHotkey = onHotkey;
+            current = bar;
             Thread reader = new Thread(() -> bar.readClicks(onExit), "native-bar");
             reader.setDaemon(true);
             reader.start();
@@ -59,6 +61,11 @@ final class NativeBar {
         } catch (IOException e) {
             return null;
         }
+    }
+
+    /** The shortcut that brings Unichat to the front from any app: it isn't in ⌘Tab without a Dock icon. */
+    void setGlobalShortcut(boolean on) {
+        send("hotkey\t" + (on ? 1 : 0) + "\n");
     }
 
     /** Removes the item (Unichat is quitting): the helper exits when its input closes. */
@@ -77,6 +84,15 @@ final class NativeBar {
     }
 
     private volatile java.util.function.Consumer<String> onOpenChat = id -> { };
+    private volatile Runnable onHotkey = () -> { };
+    /** The one running, for Ajustes to reach; null when there's none. */
+    private static volatile NativeBar current;
+
+    /** Applies the setting at once, if the helper is running. */
+    static void applyGlobalShortcut(boolean on) {
+        NativeBar b = current;
+        if (b != null) b.setGlobalShortcut(on);
+    }
     /** Whether macOS lets the helper post notifications: null until it says, then true or false. */
     private volatile Boolean notificationsAllowed;
 
@@ -157,6 +173,14 @@ final class NativeBar {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = in.readLine()) != null) {
+                if (line.equals("hotkey")) {
+                    onHotkey.run();
+                    continue;
+                }
+                if (line.startsWith("hotkey-error\t")) {
+                    System.err.println("The global shortcut is taken by another app");
+                    continue;
+                }
                 if (line.startsWith("open\t")) {
                     onOpenChat.accept(line.substring(5).strip());
                     continue;

@@ -53,7 +53,7 @@ final class MessageActionsUi {
         HBox box = new HBox(4);
         box.getStyleClass().add("reactions");
         for (Map.Entry<String, Set<String>> r : m.reactions().entrySet()) {
-            Label emoji = new Label(r.getKey());
+            Label emoji = ReactionEmoji.of(r.getKey(), svc);
             emoji.getStyleClass().add("reaction-emoji");
             HBox content = new HBox(4, emoji);
             content.setAlignment(Pos.CENTER);
@@ -66,11 +66,12 @@ final class MessageActionsUi {
             b.setGraphic(content);
             b.getStyleClass().add("reaction-pill");
             if (r.getValue().contains(svc.myUserId())) b.getStyleClass().add("mine");
-            b.setTooltip(new javafx.scene.control.Tooltip(String.join(", ", r.getValue().stream().map(this::nameOf).toList())));
+            b.setTooltip(new javafx.scene.control.Tooltip((Message.isCustomReaction(r.getKey()) ? m.reactionLabel(r.getKey()) + ": " : "")
+                    + String.join(", ", r.getValue().stream().map(this::nameOf).toList())));
             b.setOnAction(e -> svc.toggleReaction(chat.get().id(), m.id(), r.getKey()));
             b.setFocusTraversable(false);
             boolean mine = r.getValue().contains(svc.myUserId());
-            b.setAccessibleText("Reacción " + r.getKey() + ", " + r.getValue().size()
+            b.setAccessibleText("Reacción " + m.reactionLabel(r.getKey()) + ", " + r.getValue().size()
                     + (mine ? ", incluida la tuya. Pulsa para quitarla" : ". Pulsa para reaccionar igual"));
             box.getChildren().add(b);
         }

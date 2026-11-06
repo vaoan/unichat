@@ -42,7 +42,7 @@ class FormatsTest {
         assertEquals("00", Formats.accountShort("16505550000"));
         assertEquals("T", Formats.accountShort("Trabajo"));
         assertEquals("AP", Formats.accountShort("Ana Pérez"));
-        assertEquals("H", Formats.accountShort("@ejemplo"));
+        assertEquals("H", Formats.accountShort("@hector"));
         assertEquals("?", Formats.accountShort(null));
     }
 }

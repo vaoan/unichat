@@ -19,9 +19,7 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -43,10 +41,10 @@ public final class MainView extends StackPane {
     private final StackPane overlay = new StackPane();
     private final Label toast = new Label();
     private final Label connection = new Label();
-    /** One line per network that isn't working (AccountAlerts), under the connection banner. */
-    private final VBox accountAlerts = new VBox();
-    private String shownAlerts = "";
+    private final AccountAlertBar accountAlerts = new AccountAlertBar(this::addAccount);
     private final Runnable onLogout;
+    /** The one audio playing, whichever chat is open. */
+    private final AudioPlayback audio;
     private final Consumer<String> openLink;
     private boolean chatsDirty;
     private String pendingOpenId;
@@ -84,14 +82,19 @@ public final class MainView extends StackPane {
         this.svc = svc;
         this.stage = stage;
         this.notifier = notifier;
-        this.onLogout = onLogout;
+        this.audio = new AudioPlayback(svc, this::toast);
+        this.onLogout = () -> {
+            audio.stop();
+            onLogout.run();
+        };
         this.openLink = openLink;
         getStyleClass().add("main-root");
 
         listPane = new ChatListPane(svc, this::openChat);
         listPane.setOnNewChat(this::showNewChat);
+        listPane.setFooter(accountAlerts);
         listPane.setToast(this::toast);
-        thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast);
+        thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast, audio);
         info = new InfoPane(svc, this::toggleInfo, this::toast);
         panel = new SidePanel(info);
         thread.setLibrary(library);
@@ -127,11 +130,9 @@ public final class MainView extends StackPane {
         connection.setVisible(false);
         connection.setManaged(false);
 
-        accountAlerts.getStyleClass().add("account-alerts");
-        accountAlerts.setAccessibleRole(javafx.scene.AccessibleRole.TEXT);
         BorderPane main = new BorderPane(split);
         main.setLeft(rail);
-        main.setTop(new VBox(connection, accountAlerts));
+        main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true))));
 
         overlay.getStyleClass().add("overlay");
         overlay.setVisible(false);
@@ -262,37 +263,10 @@ public final class MainView extends StackPane {
         return Settings.get().notificationPreview() ? head + ": " + m.preview() : head;
     }
 
-    /** Rebuilds the strip of accounts that aren't working; announced to screen readers when it changes. */
     private void showAccountAlerts() {
         java.util.Set<Network> inUse = java.util.EnumSet.noneOf(Network.class);
         for (Chat c : svc.chats()) if (!c.bridgeBot() && !c.space()) inUse.add(c.network());
-        java.util.List<AccountAlerts.Alert> alerts = AccountAlerts.of(svc.accounts(), inUse);
-        String key = alerts.toString();
-        if (key.equals(shownAlerts)) return;
-        shownAlerts = key;
-        accountAlerts.getChildren().clear();
-        for (AccountAlerts.Alert a : alerts) {
-            Label text = new Label(a.text());
-            text.setWrapText(true);
-            text.setMinWidth(0);
-            HBox.setHgrow(text, javafx.scene.layout.Priority.ALWAYS);
-            text.setMaxWidth(Double.MAX_VALUE);
-            HBox row = new HBox(10, NetworkIcons.tile(a.network(), 18, "alert-network"), text);
-            row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-            row.getStyleClass().addAll("account-alert", a.relink() ? "relink" : "recovering");
-            if (a.relink()) {
-                javafx.scene.control.Button fix = new javafx.scene.control.Button("Volver a vincular");
-                fix.getStyleClass().add("alert-action");
-                fix.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
-                fix.setAccessibleText("Volver a vincular " + a.network().displayName());
-                fix.setOnAction(e -> addAccount(a.network()));
-                row.getChildren().add(fix);
-            }
-            accountAlerts.getChildren().add(row);
-        }
-        String spoken = alerts.stream().map(AccountAlerts.Alert::text).collect(java.util.stream.Collectors.joining(" "));
-        accountAlerts.setAccessibleText(spoken.isEmpty() ? null : spoken);
-        if (!spoken.isEmpty()) accountAlerts.notifyAccessibleAttributeChanged(javafx.scene.AccessibleAttribute.TEXT);
+        accountAlerts.show(AccountAlerts.of(svc.accounts(), inUse));
     }
 
     private void showConnection(ConnectionState s) {
@@ -312,6 +286,12 @@ public final class MainView extends StackPane {
     }
 
     // ------------------------------------------------------------------ navigation
+
+    AudioPlayback audio() { return audio; }
+
+    ThreadPane thread() { return thread; }
+
+    ChatListPane list() { return listPane; }
 
     public void openChat(Chat c) {
         openChat(c, false);

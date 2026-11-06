@@ -1,19 +1,10 @@
 package app.unichat.stt;
 
+import app.unichat.support.Downloads;
+
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
-import java.util.HexFormat;
 import java.util.function.DoubleConsumer;
 
 /**
@@ -53,33 +44,7 @@ public enum WhisperModel {
     public Path ensure(Path modelsDir, DoubleConsumer progress) throws IOException, InterruptedException {
         Path target = path(modelsDir);
         if (isInstalled(modelsDir)) return target;
-        Files.createDirectories(modelsDir);
-        Path part = modelsDir.resolve(file + ".part");
-        HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(20)).build();
-        try {
-            HttpResponse<InputStream> res = http.send(HttpRequest.newBuilder(URI.create(REPO + file)).build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (res.statusCode() != 200) throw new IOException("HTTP " + res.statusCode() + " descargando el modelo de voz");
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            try (InputStream in = new DigestInputStream(res.body(), md);
-                 var out = Files.newOutputStream(part)) {
-                byte[] buf = new byte[1 << 16];
-                long done = 0;
-                for (int n; (n = in.read(buf)) > 0; ) {
-                    out.write(buf, 0, n);
-                    done += n;
-                    progress.accept(Math.min(1, (double) done / size));
-                }
-            }
-            String got = HexFormat.of().formatHex(md.digest());
-            if (!got.equals(sha256)) throw new IOException("El modelo de voz descargado está dañado; se intentará de nuevo");
-            Files.move(part, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            return target;
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        } finally {
-            Files.deleteIfExists(part);
-        }
+        Downloads.fetch(REPO + file, size, sha256, target, "el modelo de voz", progress);
+        return target;
     }
 }

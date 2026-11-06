@@ -11,6 +11,7 @@ import app.unichat.service.ChatService;
 import app.unichat.service.MockChatService;
 import app.unichat.settings.Settings;
 import app.unichat.ui.DockIcon;
+import app.unichat.ui.TrayReopen;
 import app.unichat.ui.LoginView;
 import app.unichat.ui.MacQuit;
 import app.unichat.ui.MainView;
@@ -69,12 +70,18 @@ public final class UnichatApp extends Application {
             });
         }, this::quit);
         Platform.setImplicitExit(!notifier.hasTray());
+        DockIcon.setTrayAvailable(notifier.hasTray());
         // macOS "Salir" (⌘Q, app menu, Dock, logout) quits for real; closing the window only hides it in the tray.
-        MacQuit.install(this::quit);
+        MacQuit.install(this::quit, () -> {
+            if (TrayReopen.shouldShow(stage.isShowing(), System.currentTimeMillis() - hiddenAt)) showWindow();
+        });
 
         scene = new Scene(new javafx.scene.layout.StackPane(), stage.getWidth(), stage.getHeight());
         Theme.register(scene);
         stage.setScene(scene);
+        // Without a Dock icon there's no app menu either, and ⌘Q lives in that menu.
+        if (MainView.MAC) scene.getAccelerators().put(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.Q,
+                javafx.scene.input.KeyCombination.SHORTCUT_DOWN), this::quit);
         stage.setOnCloseRequest(e -> {
             saveGeometry();
             if (toTray()) {
@@ -98,6 +105,8 @@ public final class UnichatApp extends Application {
             stage.setOpacity(0);
             stage.setX(-10000);
         }
+        // A menu bar app isn't made active by opening: the window would open behind the others. Diagnostics never take focus.
+        if (System.getProperty("unichat.snapshot") == null) DockIcon.show();
         stage.show();
         if (System.getProperty("unichat.snapshot") != null) stage.toBack();
         // -Dunichat.startLogin=<protocol id>: open Ajustes > Cuentas with that network's login wizard.
@@ -246,11 +255,14 @@ public final class UnichatApp extends Application {
         getHostServices().showDocument(url);
     }
 
+    private long hiddenAt;
+
     private boolean toTray() {
         return notifier.hasTray() && Settings.get().minimizeToTray();
     }
 
     private void hideToTray() {
+        hiddenAt = System.currentTimeMillis();
         stage.hide();
         DockIcon.hide();
     }

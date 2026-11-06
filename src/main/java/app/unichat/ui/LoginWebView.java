@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.login.BridgeCookies;
+import app.unichat.login.BridgeLogin;
 import app.unichat.login.CookieSpec;
 import app.unichat.login.SessionCookies;
 import app.unichat.model.Network;
@@ -33,6 +35,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -44,6 +47,8 @@ import java.util.function.Predicate;
  * holds) the window closes itself and hands it back. Values are never logged.
  */
 public final class LoginWebView {
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
     private LoginWebView() {}
 
     /** The single open login window; only one may swap the JVM-wide cookie handler at a time. */
@@ -63,6 +68,80 @@ public final class LoginWebView {
             SessionCookies s = spec.select(byName);
             return s.complete() ? () -> onDone.accept(s) : null;
         }, onCancel);
+    }
+
+    /**
+     * Same window, for bridges that want what the page itself sends (LinkedIn's request headers). The window can't read
+     * outgoing headers, but scripts on the page can see the ones the page sets, so it notes those as they go by, and
+     * builds the Cookie header from the cookie store, which HttpOnly cookies are in as well.
+     */
+    public static void openCapturing(Window owner, Network network, BridgeLogin.CookieParams params,
+                                     Consumer<Map<String, String>> onDone, Runnable onCancel) {
+        String domain = BridgeCookies.cookieDomain(params);
+        String hook = headerHook(BridgeCookies.headersToWatch(params));
+        openWindow(owner, network, params.url(), (engine, manager) -> {
+            Map<String, String> headers;
+            try {
+                engine.executeScript(hook);
+                headers = seenHeaders(engine.executeScript("JSON.stringify(window.__unichatHeaders || {})"));
+            } catch (RuntimeException e) {
+                return null; // page not ready yet
+            }
+            Map<String, String> cookies = new LinkedHashMap<>();
+            for (HttpCookie c : manager.getCookieStore().getCookies()) {
+                if (!c.hasExpired() && BridgeCookies.belongs(c.getDomain(), domain)) cookies.put(c.getName(), c.getValue());
+            }
+            Map<String, String> values = BridgeCookies.captured(params, engine.getLocation(), cookies, headers);
+            return values == null ? null : () -> onDone.accept(values);
+        }, onCancel);
+    }
+
+    /** Wraps XMLHttpRequest and fetch once per page, keeping only the wanted headers. It never changes what's sent. */
+    static String headerHook(java.util.Set<String> wanted) {
+        String names;
+        try {
+            names = JSON.writeValueAsString(wanted);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+        return """
+                (function () {
+                  if (window.__unichatHooked) return;
+                  window.__unichatHooked = true;
+                  window.__unichatHeaders = {};
+                  var wanted = %s;
+                  function note(name, value) {
+                    var n = String(name).toLowerCase();
+                    if (value && wanted.indexOf(n) >= 0) window.__unichatHeaders[n] = String(value);
+                  }
+                  var set = XMLHttpRequest.prototype.setRequestHeader;
+                  XMLHttpRequest.prototype.setRequestHeader = function (name, value) {
+                    note(name, value);
+                    return set.apply(this, arguments);
+                  };
+                  if (window.fetch) {
+                    var original = window.fetch;
+                    window.fetch = function (input, init) {
+                      try {
+                        var h = (init && init.headers) || (input && input.headers);
+                        if (h && typeof h.forEach === 'function' && !Array.isArray(h)) h.forEach(function (v, n) { note(n, v); });
+                        else if (h) for (var k in h) note(k, h[k]);
+                      } catch (e) {}
+                      return original.apply(this, arguments);
+                    };
+                  }
+                })();
+                """.formatted(names);
+    }
+
+    private static Map<String, String> seenHeaders(Object json) {
+        Map<String, String> out = new HashMap<>();
+        try {
+            JSON.readTree(String.valueOf(json)).fields().forEachRemaining(e -> out.put(e.getKey(), e.getValue().asText()));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return out; // never the contents: these are credentials
+        }
+        return out;
     }
 
     /**

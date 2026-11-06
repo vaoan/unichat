@@ -31,6 +31,8 @@ Los avisos del runtime de Java van en la carpeta `legal` del propio runtime. Un 
 |---|---|
 | Puentes de mautrix (WhatsApp, Telegram, Signal, Meta, Discord, Slack, Google Messages, X, LinkedIn) | AGPL-3.0 |
 | Modelos de voz de Whisper (ggml) | MIT |
+| FFmpeg, si hace falta y no lo tienes (compilaciones de martin-riedl.de y gyan.dev) | GPL-3.0 |
+| Modelo de ruido de RNNoise `sh.rnnn` (GregorR/rnnoise-models), al mejorar notas de voz | sin derechos de autor, según su autor |
 
 ## Notas
 

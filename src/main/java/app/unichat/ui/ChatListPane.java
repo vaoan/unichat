@@ -113,6 +113,11 @@ public final class ChatListPane extends VBox {
         refresh();
     }
 
+    /** Goes under the list, whether the inbox or a server's channels are showing. */
+    void setFooter(Node footer) {
+        getChildren().add(footer);
+    }
+
     private Node buildHeader() {
         title.getStyleClass().add("pane-title");
         Region headerSpacer = new Region();
@@ -646,10 +651,11 @@ public final class ChatListPane extends VBox {
             toggle(stamp, "unread", unread && !c.muted());
             toggle(preview, "typing", !c.typing().isEmpty());
             if (!c.typing().isEmpty()) {
-                preview.setText(c.group() ? Formats.typing(c.typing()) : "escribiendo…");
+                TypingDots.show(preview, c.group() ? Formats.typing(c.typing()) : "escribiendo…");
             } else {
                 String who = c.lastOutgoing() ? "Tú: " : c.group() && c.lastSenderName() != null
                         ? c.lastSenderName().split(" ")[0] + ": " : "";
+                TypingDots.show(preview, null); // cells are recycled: this one may have been someone typing
                 preview.setText(who + c.lastPreview());
             }
             toggle(preview, "unread", unread);
@@ -673,6 +679,7 @@ public final class ChatListPane extends VBox {
             if (offer) {
                 boolean busy = spaces.adding(c.id().substring(Spaces.OFFER_PREFIX.length()));
                 stamp.setText("");
+                TypingDots.show(preview, null);
                 preview.setText(busy ? "Agregando…" : "Servidor sin agregar · toca para traer sus canales");
                 badge.setVisible(false);
                 badge.setManaged(false);
@@ -681,6 +688,7 @@ public final class ChatListPane extends VBox {
                 Chat latest = rows.latest().get(c.id());
                 int u = rows.unread().getOrDefault(c.id(), 0);
                 stamp.setText(latest == null ? "" : Formats.listStamp(latest.lastActivity(), Instant.now(), ZoneId.systemDefault()));
+                TypingDots.show(preview, null);
                 preview.setText(latest == null ? "Sin mensajes" : latest.title() + ": " + latest.lastPreview());
                 boolean un = u > 0;
                 toggle(name, "unread", un);
@@ -695,6 +703,7 @@ public final class ChatListPane extends VBox {
                         + (latest == null ? "" : ". " + latest.title() + ": " + latest.lastPreview()) + ". Abre sus canales";
             } else if (unjoined) {
                 stamp.setText("");
+                TypingDots.show(preview, null);
                 preview.setText("Toca para unirte");
                 badge.setVisible(false);
                 badge.setManaged(false);

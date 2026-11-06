@@ -81,4 +81,26 @@ class LoginCopyTest {
                 List.of(), null, null, null);
         assertEquals("Escribe tu PIN de X Chat", LoginCopy.step(Network.X, enter).title());
     }
+
+    private static BridgeLogin.Field pin(String pattern) {
+        return new BridgeLogin.Field("password", "pin", "PIN", "", null, true, pattern, List.of());
+    }
+
+    @Test
+    void aPinSaysTheLengthItsNetworkAsksFor() {
+        assertEquals("PIN de 6 dígitos", LoginCopy.fieldLabel(pin("^[0-9]{6}$")), "Messenger");
+        assertEquals("PIN de 4 dígitos", LoginCopy.fieldLabel(pin("^[0-9]{4}$")), "X");
+        assertEquals("PIN", LoginCopy.fieldLabel(pin(null)), "never a length nobody said");
+    }
+
+    @Test
+    void messengersHistoryPinExplainsThatItCanBeLeftEmpty() {
+        BridgeLogin.Step step = new BridgeLogin.Step("L", "user_input", "fi.mau.meta.history_pin",
+                "Enter your Messenger secure storage PIN to restore encrypted chat history. Leave it empty to continue without restoring history.",
+                List.of(pin("^[0-9]{6}$")), null, null, null);
+        LoginCopy.StepText t = LoginCopy.step(Network.MESSENGER, step);
+        assertTrue(t.title().contains("historial"), t.title());
+        assertTrue(String.join(" ", t.steps()).contains("6 dígitos"));
+        assertTrue(String.join(" ", t.steps()).contains("vacío"));
+    }
 }

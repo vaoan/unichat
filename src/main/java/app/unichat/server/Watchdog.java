@@ -12,6 +12,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -20,6 +21,10 @@ import java.util.function.Supplier;
  * disconnected too long, or one that keeps dropping its connection (mautrix-discord piles up guild subscriptions
  * on every reconnect until Discord rate-limits it, which makes it reconnect again). Accounts that need a new login
  * aren't restarted: nothing but the person can fix those. Times are awake time ({@link BridgeStates#now}).
+ *
+ * <p>Without internet a disconnected bridge is doing nothing wrong: restarting it only made things worse (mautrix-discord
+ * started offline fails once and never tries again, and every restart lengthened the wait for the next one). So those
+ * restarts wait, and when the internet returns every bridge starts again at once, with a fresh connection and its catch-up.
  */
 final class Watchdog {
     static final long PROBE_EVERY_MS = 30_000;
@@ -34,6 +39,22 @@ final class Watchdog {
     static final long COOLDOWN_MS = 5 * 60_000;
     static final long MAX_COOLDOWN_MS = 60 * 60_000;
 
+    /** Sessions a restart can cost (MetaSessions), and bringing back the ones already lost. */
+    interface SessionKeeper {
+        /** A bridge that's only restarted for its own troubles, not just because the internet returned. */
+        boolean fragile(String bridge);
+
+        boolean safeToRestart(String bridge);
+
+        void tick(boolean online, long now);
+    }
+
+    private static final SessionKeeper NO_KEEPER = new SessionKeeper() {
+        @Override public boolean fragile(String bridge) { return false; }
+        @Override public boolean safeToRestart(String bridge) { return true; }
+        @Override public void tick(boolean online, long now) { }
+    };
+
     /** What's known about one process. {@code troubledSince}: -1 when every account is fine. */
     record Health(int probeFailures, long troubledSince, int drops) {}
 
@@ -45,6 +66,11 @@ final class Watchdog {
         return null;
     }
 
+    /** {@link #reason(Health, long)} knowing whether there's internet: without it, only a hung process counts. */
+    static String reason(Health h, long now, boolean online) {
+        return online || h.probeFailures() >= PROBE_FAILURES ? reason(h, now) : null;
+    }
+
     /** Wait after the {@code restartsInARow}-th restart in a row. */
     static long cooldown(int restartsInARow) {
         return Math.min(MAX_COOLDOWN_MS, COOLDOWN_MS << Math.min(Math.max(0, restartsInARow - 1), 8));
@@ -54,6 +80,9 @@ final class Watchdog {
     private final Supplier<Iterable<String>> running;
     private final BridgeStates states;
     private final BiConsumer<String, String> restart;
+    private final BooleanSupplier internet;
+    private final SessionKeeper keeper;
+    private boolean wasOnline = true;
     private final Map<String, Integer> failures = new HashMap<>();
     private final Map<String, Long> lastRestart = new HashMap<>();
     private final Map<String, Integer> inARow = new HashMap<>();
@@ -64,13 +93,21 @@ final class Watchdog {
      * @param ports   process name → port it answers HTTP on ("tuwunel" and every bridge)
      * @param running names of the processes that should be up now
      * @param restart (name, reason) kills and restarts a process
+     * @param internet whether this computer reaches the internet now
      */
     Watchdog(Map<String, Integer> ports, Supplier<Iterable<String>> running, BridgeStates states,
-             BiConsumer<String, String> restart) {
+             BiConsumer<String, String> restart, BooleanSupplier internet) {
+        this(ports, running, states, restart, internet, NO_KEEPER);
+    }
+
+    Watchdog(Map<String, Integer> ports, Supplier<Iterable<String>> running, BridgeStates states,
+             BiConsumer<String, String> restart, BooleanSupplier internet, SessionKeeper keeper) {
         this.ports = ports;
         this.running = running;
         this.states = states;
         this.restart = restart;
+        this.internet = internet;
+        this.keeper = keeper;
     }
 
     synchronized void start() {
@@ -88,9 +125,12 @@ final class Watchdog {
         timer = null;
     }
 
-    private void check() {
+    void check() {
         try {
             long now = BridgeStates.now();
+            boolean online = internet.getAsBoolean();
+            boolean internetBack = online && !wasOnline;
+            wasOnline = online;
             for (String name : running.get()) {
                 Integer port = ports.get(name);
                 if (port == null) continue;
@@ -98,19 +138,25 @@ final class Watchdog {
                 failures.put(name, f);
                 Health h = name.equals("tuwunel") ? new Health(f, -1, 0)
                         : new Health(f, states.troubledSince(name), states.dropsWithin(name, FLAP_WINDOW_MS, now));
-                String why = reason(h, now);
+                boolean bridge = !name.equals("tuwunel");
+                boolean fresh = internetBack && bridge && !keeper.fragile(name);
+                String why = fresh ? "volvió internet" : reason(h, now, online);
                 Long last = lastRestart.get(name);
                 int row = inARow.getOrDefault(name, 0);
                 // A long quiet run since the last restart: the next one starts with a short wait again.
                 if (last != null && why == null && now - last > MAX_COOLDOWN_MS) inARow.put(name, row = 0);
-                if (why == null || (last != null && now - last < cooldown(row))) continue;
+                if (fresh) inARow.put(name, row = 0);
+                else if (why == null || (last != null && now - last < cooldown(row))) continue;
+                // A hung process can't lose more than it has; anything else waits until a restart can't cost its session.
+                if (h.probeFailures() < PROBE_FAILURES && !keeper.safeToRestart(name)) continue;
                 System.err.println("Watchdog: restarting " + name + " (" + why + ")");
                 lastRestart.put(name, now);
                 inARow.put(name, row + 1);
                 failures.put(name, 0);
-                if (!name.equals("tuwunel")) states.restarting(name, now);
+                if (bridge) states.restarting(name, now);
                 restart.accept(name, why);
             }
+            keeper.tick(online, now);
             states.tick();
         } catch (Throwable t) {
             // The watchdog itself must never stop.

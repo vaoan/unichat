@@ -11,6 +11,7 @@ import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
 import app.unichat.model.Network;
+import app.unichat.model.VoiceNote;
 import app.unichat.settings.Settings;
 
 import javax.imageio.ImageIO;
@@ -306,6 +307,22 @@ public final class MockChatService implements ChatService {
         m.setMimeType(item.mime());
         m.setSize(item.width(), item.height());
         m.setMediaInfo(item.info());
+        append(chat, m);
+        deliver(chat, m);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) {
+        Chat chat = chats.get(chatId);
+        if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Chat no encontrado"));
+        Message m = outgoing(chatId);
+        m.setType(MessageType.AUDIO);
+        m.setFileName(note.file().getFileName().toString());
+        m.setMimeType("audio/ogg");
+        m.setMediaUrl(note.file().toUri().toString());
+        m.setReplyToId(replyToId);
+        m.setMediaInfo(com.fasterxml.jackson.databind.json.JsonMapper.builder().build().createObjectNode().put("duration", note.durationMs()));
         append(chat, m);
         deliver(chat, m);
         return CompletableFuture.completedFuture(null);

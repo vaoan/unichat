@@ -142,7 +142,9 @@ o.append("Los avisos del runtime de Java van en la carpeta `legal` del propio ru
          "no lleva tuwunel ni libolm.\n")
 o.append("## No incluidos: se descargan al usarlos\n\n| Componente | Licencia |\n|---|---|\n"
          "| Puentes de mautrix (WhatsApp, Telegram, Signal, Meta, Discord, Slack, Google Messages, X, LinkedIn) | AGPL-3.0 |\n"
-         "| Modelos de voz de Whisper (ggml) | MIT |\n")
+         "| Modelos de voz de Whisper (ggml) | MIT |\n"
+         "| FFmpeg, si hace falta y no lo tienes (compilaciones de martin-riedl.de y gyan.dev) | GPL-3.0 |\n"
+         "| Modelo de ruido de RNNoise `sh.rnnn` (GregorR/rnnoise-models), al mejorar notas de voz | sin derechos de autor, según su autor |\n")
 o.append("## Notas\n\n"
          "- **LGPL en JavaFX**: WebKit y GStreamer/GLib van como bibliotecas nativas aparte dentro de JavaFX. Su código "
          "fuente está en <https://github.com/openjdk/jfx>.\n"

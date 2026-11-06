@@ -33,6 +33,7 @@ public final class Notifier {
     public Notifier(Runnable onShow, Consumer<String> onOpen, Runnable onQuit) {
         toast = MAC ? new DesktopToast(onOpen) : null;
         this.onOpen = onOpen;
+        this.onShow = onShow;
         if (GraphicsEnvironment.isHeadless()) { // tests, snapshot runs: no tray, and AWT menus can't be built
             this.menu = null;
             return;
@@ -53,6 +54,7 @@ public final class Notifier {
 
     private final PopupMenu menu;
     private final Consumer<String> onOpen;
+    private final Runnable onShow;
     private volatile NativeBar bar;
     private volatile String tooltip = "Unichat";
     private volatile boolean disposed;
@@ -61,9 +63,10 @@ public final class Notifier {
         NativeBar b = NativeBar.start(barHelper(), menu, () -> EventQueue.invokeLater(() -> {
             bar = null;
             if (tray == null && !disposed) addAwtTray(); // the helper died: keep a tray icon
-        }), onOpen);
+        }), onOpen, onShow);
         if (b == null) return false;
         bar = b;
+        b.setGlobalShortcut(app.unichat.settings.Settings.get().globalShortcut());
         EventQueue.invokeLater(() -> {
             b.setIcon(menuBarIcon());
             b.setTooltip(tooltip);

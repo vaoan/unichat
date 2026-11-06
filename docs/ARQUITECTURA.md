@@ -15,6 +15,8 @@ Cada paquete solo puede depender de los que están debajo. `ArchitectureTest` lo
 | `service` | La API que usa la UI (`ChatService`, `BridgeAccess`) y el modo demo | `login`, `model`, `settings` |
 | `server` | Servidor local: instala, arranca y vigila tuwunel y los puentes | `bridge`, `settings`, `support` |
 | `stt` | Voz a texto | `settings`, `support` |
+| `video` | ffmpeg y la conversión de stickers WebM | `settings`, `support` |
+| `voice` | Grabar notas de voz, limpiarlas y codificarlas | `model`, `settings`, `support`, `video` |
 | `gif` | Buscadores de GIF y lectura de cuadros | `model`, `settings` |
 | `login` | Inicio de sesión en los puentes y cookies del navegador | `model` |
 | `settings` | Preferencias | `support` |

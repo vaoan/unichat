@@ -1,5 +1,15 @@
 package app.unichat.ui;
 
+import app.unichat.model.Chat;
+import app.unichat.model.VoiceNote;
+import app.unichat.settings.Settings;
+import app.unichat.voice.Microphone;
+import app.unichat.voice.VoiceEnhancer;
+import app.unichat.voice.PcmSource;
+import app.unichat.voice.VoiceRecorder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.Callable;
 import app.unichat.model.Message;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
@@ -31,6 +41,8 @@ import java.util.function.Consumer;
  * input edits your last message, Esc cancels reply/edit. Drafts are kept per chat.
  */
 public final class Composer extends VBox {
+    private static final long MIN_VOICE_MS = 700;
+
     private final ChatService svc;
     private final TextArea input = new TextArea();
     private final HBox banner = new HBox(8);
@@ -43,6 +55,13 @@ public final class Composer extends VBox {
     private Message replyTo;
     private Message editing;
     private boolean typingSent;
+    private final HBox row;
+    private final Button send;
+    private final Button mic;
+    private VoiceBar voiceBar;
+    private VoiceRecorder recorder;
+    private Runnable beforeRecording = () -> { };
+    private Callable<PcmSource> microphone = Microphone::open;
 
     public Composer(ChatService svc, Consumer<String> onError) {
         this.svc = svc;
@@ -88,10 +107,15 @@ public final class Composer extends VBox {
         send.getStyleClass().add("send-button");
         send.disableProperty().bind(input.textProperty().map(t -> t.isBlank()));
 
-        HBox row = new HBox(4, attach, input, stickers, emoji, send);
+        this.send = send;
+        mic = iconButton(Icons.MIC, "Grabar una nota de voz", this::startRecording);
+        mic.getStyleClass().add("mic-button");
+        row = new HBox(4, attach, input, stickers, emoji, mic, send);
         row.setAlignment(Pos.BOTTOM_CENTER);
         row.getStyleClass().add("composer-row");
         getChildren().addAll(banner, row);
+        input.textProperty().addListener((o, a, t) -> refreshVoice());
+        refreshVoice();
 
         setOnDragOver(e -> {
             if (e.getDragboard().hasFiles()) e.acceptTransferModes(TransferMode.COPY);
@@ -120,6 +144,7 @@ public final class Composer extends VBox {
             stopTyping();
             drafts.put(chatId, editing == null ? input.getText() : "");
         }
+        if (recorder != null) discardRecording("Grabación descartada al cambiar de chat");
         chatId = newChatId;
         replyTo = null;
         editing = null;
@@ -129,6 +154,104 @@ public final class Composer extends VBox {
     }
 
     public void focus() { input.requestFocus(); }
+
+    /** The microphone takes the send button's place while there's nothing written and this chat takes voice notes. */
+    void refreshVoice() {
+        Chat c = chatId == null ? null : svc.chat(chatId);
+        boolean offer = c != null && c.features().voiceSend() != null && input.getText().isBlank() && editing == null;
+        mic.setVisible(offer);
+        mic.setManaged(offer);
+        send.setVisible(!offer);
+        send.setManaged(!offer);
+    }
+
+    /** Runs before a recording starts: what's playing shouldn't end up in it. */
+    void setBeforeRecording(Runnable r) { beforeRecording = r; }
+
+    void setMicrophone(Callable<PcmSource> source) { microphone = source; }
+
+    private void startRecording() {
+        beforeRecording.run();
+        mic.setDisable(true);
+        // Opening it can wait for the system's permission question.
+        Thread.ofVirtual().name("open-microphone").start(() -> {
+            try {
+                PcmSource source = microphone.call();
+                Path file = Settings.get().cacheDir().resolve("media").resolve("voice-" + java.util.UUID.randomUUID() + ".ogg");
+                VoiceRecorder r = new VoiceRecorder(source, file);
+                Platform.runLater(() -> showRecording(r));
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    mic.setDisable(false);
+                    onError.accept(e.getMessage() != null ? e.getMessage() : "No se pudo usar el micrófono");
+                });
+            }
+        });
+    }
+
+    private void showRecording(VoiceRecorder r) {
+        recorder = r;
+        mic.setDisable(false);
+        voiceBar = new VoiceBar(r, () -> discardRecording(null), this::sendRecording, this::discardRecording);
+        getChildren().set(getChildren().indexOf(row), voiceBar);
+        r.start();
+        voiceBar.focusSend();
+    }
+
+    private VoiceRecorder endRecordingUi() {
+        VoiceRecorder r = recorder;
+        recorder = null;
+        if (voiceBar != null) getChildren().set(getChildren().indexOf(voiceBar), row);
+        voiceBar = null;
+        return r;
+    }
+
+    private void discardRecording(String message) {
+        VoiceRecorder r = endRecordingUi();
+        if (r == null) return;
+        Thread.ofVirtual().name("voice-discard").start(() -> {
+            try {
+                r.cancel();
+            } catch (Exception e) {
+                System.err.println("Could not discard a recording: " + e.getClass().getSimpleName());
+            }
+        });
+        if (message != null) onError.accept(message);
+        focus();
+    }
+
+    private void sendRecording() {
+        VoiceRecorder r = endRecordingUi();
+        if (r == null) return;
+        String toChat = chatId;
+        String reply = replyTo == null ? null : replyTo.id();
+        cancelMode();
+        focus();
+        Thread.ofVirtual().name("voice-send").start(() -> {
+            try {
+                VoiceNote note = r.stop();
+                if (note.durationMs() < MIN_VOICE_MS) {
+                    r.deleteRaw();
+                    Files.deleteIfExists(note.file());
+                    Platform.runLater(() -> onError.accept("La nota de voz es demasiado corta"));
+                    return;
+                }
+                boolean[] told = {false};
+                VoiceNote improved = VoiceEnhancer.improve(note, r.raw(), r.rate(), done -> {
+                    if (told[0]) return;
+                    told[0] = true;
+                    Platform.runLater(() -> onError.accept("Instalando la mejora de audio; solo pasa la primera vez…"));
+                });
+                r.deleteRaw();
+                svc.sendVoice(toChat, improved, reply).exceptionally(err -> {
+                    Platform.runLater(() -> onError.accept("No se pudo enviar la nota de voz"));
+                    return null;
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> onError.accept("No se pudo guardar la nota de voz"));
+            }
+        });
+    }
 
     public void reply(Message m) {
         editing = null;

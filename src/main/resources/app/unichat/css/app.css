@@ -380,6 +380,8 @@
     -fx-translate-x: -20;
     -fx-translate-y: -12;
 }
+.typing-dot { -fx-background-color: -text-3; -fx-background-radius: 3; }
+.chat-preview.typing .typing-dot { -fx-background-color: -accent; }
 .typing-line { -fx-text-fill: -text-3; -fx-font-size: 0.86em; -fx-font-style: italic; -fx-padding: 0 22 2 22; }
 
 .composer { -fx-padding: 6 14 14 14; -fx-spacing: 6; -fx-background-color: -bg; }
@@ -490,17 +492,33 @@
 .root.dark .connection-banner { -fx-background-color: derive(-accent, -55%); }
 .connection-banner.error { -fx-background-color: -danger; -fx-text-fill: white; }
 /* Accounts that aren't working (AccountAlerts): red when only a new login fixes it, amber while it recovers. */
-.account-alert { -fx-padding: 6 14; -fx-font-size: 0.9em; }
-.account-alert.relink { -fx-background-color: -danger; }
-.account-alert.relink .label { -fx-text-fill: white; }
-.account-alert.recovering { -fx-background-color: #F5A524; }
-.account-alert.recovering .label { -fx-text-fill: #1C2024; }
-.alert-action { -fx-background-color: white; -fx-text-fill: -danger; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 4 10; -fx-cursor: hand; }
-.alert-action:focused { -fx-border-color: #1C2024; -fx-border-width: 2; -fx-border-radius: 8; }
+.account-alerts { -fx-spacing: 4; -fx-padding: 6 8 8 8; }
+.account-alert { -fx-padding: 5 8; -fx-background-radius: 8; -fx-font-size: 0.85em; }
+.account-alert.recovering .label { -fx-text-fill: -text-2; }
+.account-alert.relink { -fx-background-color: rgba(229, 72, 77, 0.12); }
+.account-alert.relink .label { -fx-text-fill: -text; }
+.account-alert .alert-action { -fx-background-color: -bg; -fx-border-color: -danger; -fx-border-radius: 6; -fx-background-radius: 6; -fx-text-fill: -text; -fx-font-weight: bold; -fx-padding: 2 8; -fx-cursor: hand; }
+.account-alert .alert-action:focused { -fx-border-color: -text; -fx-border-width: 2; }
 .rail-button.rail-broken { -fx-border-color: -danger; -fx-border-width: 2; -fx-border-radius: 10; }
-.rail-button.rail-recovering { -fx-border-color: #F5A524; -fx-border-width: 2; -fx-border-radius: 10; }
+.rail-button.rail-recovering { -fx-opacity: 0.55; }
+.root.contrast .rail-button.rail-recovering { -fx-opacity: 1; -fx-border-color: -warning; -fx-border-width: 2; -fx-border-radius: 10; }
+.root.contrast .account-alert { -fx-border-color: -text; -fx-border-radius: 8; }
 
 .media-viewer { -fx-background-color: rgba(0, 0, 0, 0.92); }
+.audio-bar { -fx-padding: 4 12; -fx-background-color: -surface-2; -fx-border-color: transparent transparent -border transparent; }
+.audio-who { -fx-font-weight: bold; -fx-font-size: 0.9em; -fx-text-fill: -text; -fx-padding: 0; }
+.audio-time { -fx-font-size: 0.8em; -fx-text-fill: -text-2; }
+.bubble.out .audio-time { -fx-text-fill: white; }
+.bubble.out .audio-toggle .icon { -fx-background-color: white; }
+.voice-bar { -fx-padding: 6 8; }
+.voice-dot { -fx-background-color: -danger; -fx-background-radius: 5; }
+.voice-time { -fx-text-fill: -text; }
+.video-top { -fx-padding: 10; }
+.video-controls { -fx-padding: 8 14 12 14; }
+.video-controls .icon { -fx-background-color: white; }
+.video-time, .video-message { -fx-text-fill: white; }
+.video-badge { -fx-background-color: rgba(0, 0, 0, 0.55); -fx-background-radius: 24; }
+.video-badge .icon { -fx-background-color: white; }
 
 /* ---------------------------------------------------------------- login */
 

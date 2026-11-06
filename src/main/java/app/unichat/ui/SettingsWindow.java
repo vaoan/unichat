@@ -1,5 +1,8 @@
 package app.unichat.ui;
 
+import app.unichat.video.Ffmpeg;
+import app.unichat.voice.VoiceEnhancer;
+import app.unichat.video.WebmStickers;
 import app.unichat.gif.GifProviders;
 import app.unichat.model.Network;
 import app.unichat.server.LocalServer;
@@ -332,7 +335,7 @@ public final class SettingsWindow {
 
     private static Node notificationsPage() {
         Settings s = Settings.get();
-        return page("Notificaciones", group("Escritorio",
+        Node[] rows = {
                 row("Notificaciones", "Avisos del sistema para mensajes nuevos (los chats silenciados no avisan).",
                         toggle(s.notificationsEnabled(), s::setNotificationsEnabled)),
                 row("Mostrar contenido", "Si lo desactivas, solo se ve quién escribió.", toggle(s.notificationPreview(), s::setNotificationPreview)),
@@ -340,7 +343,34 @@ public final class SettingsWindow {
                 row("Chats archivados", "Avisar también de los mensajes nuevos en chats archivados.",
                         toggle(s.notifyArchived(), s::setNotifyArchived)),
                 row("Seguir en la bandeja al cerrar", "Cerrar la ventana la oculta en el área de notificaciones.",
-                        toggle(s.minimizeToTray(), s::setMinimizeToTray))));
+                        toggle(s.minimizeToTray(), s::setMinimizeToTray)),
+                dockRow(s),
+                shortcutRow(s),
+        };
+        return page("Notificaciones", group("Escritorio", java.util.Arrays.stream(rows).filter(java.util.Objects::nonNull).toArray(Node[]::new)));
+    }
+
+    /** Without a Dock icon a Mac app isn't in ⌘Tab; null elsewhere. */
+    private static Node shortcutRow(Settings s) {
+        if (!MainView.MAC) return null;
+        return row("Abrir con ⌃⌥U desde cualquier app", "Control + Opción + U trae Unichat al frente, aunque esté en la barra de menú. "
+                + "Sirve como ⌘Tab, que en Mac solo muestra las apps con icono en el Dock.",
+                toggle(s.globalShortcut(), v -> {
+                    s.setGlobalShortcut(v);
+                    NativeBar.applyGlobalShortcut(v);
+                }));
+    }
+
+    /** Only a Mac has one; null elsewhere. */
+    private static Node dockRow(Settings s) {
+        if (!MainView.MAC) return null;
+        return row("Mostrar en el Dock", "Apagado, Unichat vive en la barra de menú: no aparece en el Dock ni en ⌘Tab, y se abre desde su icono "
+                        + "arriba a la derecha o con el atajo. Encendido, tiene icono en el Dock y en ⌘Tab mientras la ventana esté abierta. Si ya salía entre las apps "
+                        + "recientes del Dock, quítalo una vez con clic derecho.",
+                        toggle(s.showInDock(), v -> {
+                            s.setShowInDock(v);
+                            DockIcon.show();
+                        }));
     }
 
     private static Node privacyPage() {
@@ -415,12 +445,61 @@ public final class SettingsWindow {
                 row("Borrar ahora", "De Unichat, del servidor y de los puentes.", clear));
     }
 
+    /** ffmpeg, for the stickers that arrive as WebM: the person's own, or a download when they need it. */
+    private static Node stickerVideoGroup() {
+        Label state = new Label();
+        state.getStyleClass().add("settings-help");
+        state.setWrapText(true);
+        state.setMaxWidth(240);
+        Button install = new Button("Instalar ahora");
+        install.getStyleClass().add("secondary-button");
+        install.setMinWidth(Region.USE_PREF_SIZE);
+        Runnable refresh = () -> {
+            boolean found = Ffmpeg.find() != null;
+            state.setText(found ? "Instalado." : !Ffmpeg.canInstall() ? "No hay una descarga para este computador: instala ffmpeg."
+                    : Ffmpeg.autoInstall() ? "Se descarga la primera vez que llegue uno · " + Formats.fileSize(Ffmpeg.downloadSize())
+                    : "Sin instalar: esos stickers se ven como archivo.");
+            install.setVisible(!found && Ffmpeg.canInstall());
+            install.setManaged(install.isVisible());
+        };
+        refresh.run();
+        install.setOnAction(e -> {
+            install.setDisable(true);
+            state.setText("Descargando…");
+            WebmStickers.WORKER.execute(() -> {
+                String error = null;
+                try {
+                    Ffmpeg.install(done -> javafx.application.Platform.runLater(() -> state.setText("Descargando… " + (int) (done * 100) + " %")));
+                } catch (Exception ex) {
+                    error = ex.getMessage();
+                }
+                String failed = error;
+                javafx.application.Platform.runLater(() -> {
+                    install.setDisable(false);
+                    refresh.run();
+                    if (failed != null) state.setText("No se pudo instalar: " + failed);
+                });
+            });
+        });
+        return group("Stickers, videos y notas de voz",
+                row("Mejorar el audio de tus notas de voz", "Quita el ruido de fondo y empareja el volumen antes de enviar, "
+                        + "en este computador: el audio no pasa por ningún servicio. Si no se puede, se envía tal como se grabó.",
+                        toggle(VoiceEnhancer.enabled(), VoiceEnhancer::setEnabled)),
+                row("Instalar el conversor automáticamente", "Algunos stickers y videos llegan en formatos que Unichat no reproduce "
+                        + "por sí solo, y mejorar el audio también lo necesita. ffmpeg lo hace en este computador; se usa el tuyo si ya lo tienes.",
+                        toggle(Ffmpeg.autoInstall(), v -> {
+                            Ffmpeg.setAutoInstall(v);
+                            refresh.run();
+                        })),
+                row("Conversor", null, new VBox(6, state, install)));
+    }
+
     /** Options that only make sense for one network; each network gets its own group. */
     private static Node networksPage() {
         Label intro = new Label("Opciones que solo existen en una red.");
         intro.setWrapText(true);
         intro.getStyleClass().add("settings-help");
-        return page("Redes", intro, telegramGroup(), group("WhatsApp",
+        return page("Redes", intro, telegramGroup(), stickerVideoGroup(), group("WhatsApp",
                 row("Stickers animados", "WhatsApp no acepta los stickers animados de otras redes tal cual. Sticker: se "
                         + "convierte en sticker animado. GIF: llega como un GIF que se repite. Video: llega como un video corto.",
                         stickerModeChoice(Network.WHATSAPP))),
@@ -637,6 +716,10 @@ public final class SettingsWindow {
                 {"Esc", "Cancelar respuesta o edición"},
                 {"Doble clic en un mensaje", "Reaccionar con ❤️"},
         };
+        if (MainView.MAC) {
+            keys = java.util.Arrays.copyOf(keys, keys.length + 1);
+            keys[keys.length - 1] = new String[]{"⌃⌥U", "Traer Unichat al frente desde cualquier app"};
+        }
         GridPane grid = new GridPane();
         grid.setHgap(24);
         grid.setVgap(10);

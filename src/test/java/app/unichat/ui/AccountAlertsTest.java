@@ -49,4 +49,17 @@ class AccountAlertsTest {
         assertEquals(1, a.size());
         assertTrue(a.get(0).text().startsWith("WhatsApp (Trabajo):"), a.get(0).text());
     }
+
+    @Test
+    void whatFixesItselfSharesOneShortLine() {
+        List<AccountAlerts.Alert> a = AccountAlerts.of(List.of(
+                acc(Network.TELEGRAM, "yo", AccountStatus.CONNECTING),
+                acc(Network.DISCORD, "yo", AccountStatus.ERROR)), ALL);
+        assertEquals("Reconectando Telegram…", AccountAlerts.recoveringLine(a.subList(0, 1)));
+        assertEquals("Reconectando Telegram y Discord…", AccountAlerts.recoveringLine(a));
+        assertEquals("Reconectando 3 redes…", AccountAlerts.recoveringLine(AccountAlerts.of(List.of(
+                acc(Network.TELEGRAM, "yo", AccountStatus.CONNECTING),
+                acc(Network.DISCORD, "yo", AccountStatus.CONNECTING),
+                acc(Network.SLACK, "yo", AccountStatus.CONNECTING)), ALL)));
+    }
 }

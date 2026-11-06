@@ -50,6 +50,7 @@ final class SyncEvents {
             return;
         }
         m.setMediaUrl(url);
+        m.setExternalUrl(text(content, "external_url"));
         String filename = text(content, "filename");
         if (filename != null && !filename.equals(b)) {
             m.setFileName(filename);

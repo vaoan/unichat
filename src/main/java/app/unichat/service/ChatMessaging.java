@@ -2,6 +2,7 @@ package app.unichat.service;
 
 import app.unichat.model.Network;
 import app.unichat.model.MediaLibrary;
+import app.unichat.model.VoiceNote;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 
@@ -19,6 +20,11 @@ public interface ChatMessaging {
         return CompletableFuture.failedFuture(new UnsupportedOperationException("Stickers no disponibles"));
     }
     /** Sends a GIF (mp4 or gif file) from the GIF tab. */
+    /** A recorded voice note; a network without them gets it as an audio file. */
+    default CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) {
+        return sendFile(chatId, note.file(), replyToId);
+    }
+
     default CompletableFuture<Void> sendGif(String chatId, java.nio.file.Path file, String mime, int width, int height) {
         return sendFile(chatId, file, null);
     }

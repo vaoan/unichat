@@ -14,8 +14,12 @@ import java.util.List;
 final class AccountAlerts {
     private AccountAlerts() {}
 
-    /** {@code relink}: only a new login fixes it (button shown); otherwise Unichat is recovering it by itself. */
-    record Alert(Network network, String text, boolean relink) {}
+    /**
+     * @param who    the network, and the account when it has several
+     * @param text   the whole explanation (tooltip, screen readers)
+     * @param relink only a new login fixes it (button shown); otherwise Unichat is recovering it by itself
+     */
+    record Alert(Network network, String who, String text, boolean relink) {}
 
     /**
      * @param inUse networks with chats: a closed session only matters there (a bridge installed but never signed
@@ -32,14 +36,24 @@ final class AccountAlerts {
             if (worst == null) continue;
             String who = n.displayName() + (many ? " (" + worst.label() + ")" : "");
             switch (worst.status()) {
-                case NEEDS_LOGIN -> out.add(new Alert(n, who + ": se cerró la sesión. No llegan mensajes hasta que la vuelvas a vincular.", true));
-                case ERROR -> out.add(new Alert(n, who + ": tiene errores. Unichat lo está reiniciando…", false));
-                case CONNECTING -> out.add(new Alert(n, who + ": sin conexión. Reconectando solo…", false));
+                case NEEDS_LOGIN -> out.add(new Alert(n, who, who + ": se cerró la sesión. No llegan mensajes hasta que la vuelvas a vincular.", true));
+                case ERROR -> out.add(new Alert(n, who, who + ": tiene errores. Unichat lo está reiniciando…", false));
+                case CONNECTING -> out.add(new Alert(n, who, who + ": sin conexión. Reconectando solo…", false));
                 default -> { }
             }
         }
         out.sort((a, b) -> Boolean.compare(b.relink(), a.relink()));
         return out;
+    }
+
+    /** One short line for everything that's fixing itself: its size mustn't grow with the number of networks. */
+    static String recoveringLine(List<Alert> recovering) {
+        List<String> names = recovering.stream().map(Alert::who).toList();
+        return switch (names.size()) {
+            case 1 -> "Reconectando " + names.get(0) + "…";
+            case 2 -> "Reconectando " + names.get(0) + " y " + names.get(1) + "…";
+            default -> "Reconectando " + names.size() + " redes…";
+        };
     }
 
     /** How bad, for picking the account a network's line talks about; 0 = fine. */

@@ -305,8 +305,7 @@ final class BridgeLoginPane extends StackPane {
 
     /** "1234" for a pattern like ^[0-9]{4}$, else "123456" (the usual code length). */
     static String sampleDigits(String pattern) {
-        java.util.regex.Matcher m = pattern == null ? null : Pattern.compile("\\{(\\d{1,2})}").matcher(pattern);
-        int n = m != null && m.find() ? Integer.parseInt(m.group(1)) : 6;
+        int n = LoginCopy.digits(pattern) > 0 ? LoginCopy.digits(pattern) : 6;
         return "1234567890".repeat(2).substring(0, Math.max(1, Math.min(n, 12)));
     }
 
@@ -327,6 +326,7 @@ final class BridgeLoginPane extends StackPane {
     }
 
     private Node cookies(BridgeLogin.Step s) {
+        if (BridgeCookies.needsWindowCapture(s.cookies())) return capture(s);
         if (!BridgeCookies.canCollect(s.cookies())) return unsupported();
         CookieSpec spec = BridgeCookies.spec(network, s.cookies());
         VBox found = new VBox(8, new HBox(8, spinner(16), label("Buscando tu sesión en tus navegadores…")));
@@ -383,6 +383,24 @@ final class BridgeLoginPane extends StackPane {
             }
         }));
         return new VBox(10, found, here, file, status);
+    }
+
+    /** This network needs what its page sends while you use it: only signing in here can get that. */
+    private Node capture(BridgeLogin.Step s) {
+        Label why = label("Inicia sesión en la ventana que se abre. Cuando veas tu página de inicio de " + network.displayName()
+                + ", se cierra sola. Unichat no ve tu contraseña.");
+        Button here = new Button("Iniciar sesión en " + network.displayName());
+        here.getStyleClass().add("primary-button");
+        here.setMaxWidth(Double.MAX_VALUE);
+        here.setAccessibleText("Abrir " + network.displayName() + " en una ventana de Unichat para iniciar sesión");
+        here.setOnAction(e -> LoginWebView.openCapturing(owner.get(), network, s.cookies(), values -> {
+            show(waiting("Conectando…"));
+            background(() -> {
+                BridgeLogin.Step after = api.submit(s, values);
+                Platform.runLater(() -> render(after));
+            });
+        }, () -> { }));
+        return new VBox(10, why, here);
     }
 
     private Node unsupported() {

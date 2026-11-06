@@ -45,6 +45,7 @@ public final class ThreadPane extends BorderPane {
     private final ObservableList<ThreadRows.Row> rows = FXCollections.observableArrayList();
     private final ListView<ThreadRows.Row> list = new ListView<>(rows);
     private final Composer composer;
+    private final AudioPlayback audio;
     private final MessageMedia media;
     private final MessageActionsUi messageActions;
     private final Label typing = new Label();
@@ -78,14 +79,16 @@ public final class ThreadPane extends BorderPane {
     /** Newest message shown, to notice your own new message (always jumps to it). */
     private String lastMessageId;
 
-    public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast) {
+    public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast, AudioPlayback audio) {
+        this.audio = audio;
         this.svc = svc;
         this.openLink = openLink;
         this.toggleInfo = toggleInfo;
         this.toast = toast;
         getStyleClass().add("thread-pane");
         composer = new Composer(svc, toast);
-        media = new MessageMedia(svc, openLink, toast, () -> library, this::getScene);
+        composer.setBeforeRecording(audio::pause);
+        media = new MessageMedia(svc, openLink, toast, () -> library, this::getScene, audio);
         messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, () -> library, this::getScene, this::member);
 
         favButton = Composer.iconButton(Icons.STAR, "Favorito", () -> svc.setFavorite(chat.id(), !chat.favorite()));
@@ -219,7 +222,7 @@ public final class ThreadPane extends BorderPane {
         list.setCellFactory(v -> new RowCell());
         list.setAccessibleText("Mensajes");
         list.setAccessibleHelp("Flechas para recorrer mensajes. R responder, E editar, Enter o Espacio abre las acciones, "
-                + "1 a 6 reacciones rápidas, T transcribir una nota de voz, " + (MainView.MAC ? "⌘" : "Ctrl+") + "C copiar, "
+                + "1 a 6 reacciones rápidas, P reproducir un audio, T transcribir una nota de voz, " + (MainView.MAC ? "⌘" : "Ctrl+") + "C copiar, "
                 + "Esc vuelve al campo de texto.");
         list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, this::onTimelineKey);
         list.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> userScrolled());
@@ -296,7 +299,7 @@ public final class ThreadPane extends BorderPane {
         if (chat.favorite()) favButton.getStyleClass().add("active");
         archiveButton.getStyleClass().remove("active");
         if (chat.archived()) archiveButton.getStyleClass().add("active");
-        typing.setText(chat.typing().isEmpty() ? "" : Formats.typing(chat.typing()));
+        TypingDots.show(typing, chat.typing().isEmpty() ? null : Formats.typing(chat.typing()));
         typing.setVisible(!chat.typing().isEmpty());
         typing.setManaged(!chat.typing().isEmpty());
     }
@@ -315,6 +318,7 @@ public final class ThreadPane extends BorderPane {
             selected = null;
         }
         lastMessageId = newest == null ? null : newest.id();
+        composer.refreshVoice(); // what the chat takes can arrive after it was opened
         rows.setAll(ThreadRows.build(msgs, ZoneId.systemDefault()));
         if (selected != null && !forceBottom) select(selected);
         if (wasAtBottom && !(list.isFocused() && selected != null)) scrollToBottom();
@@ -442,7 +446,7 @@ public final class ThreadPane extends BorderPane {
         }
         if (!m.reactions().isEmpty()) {
             sb.append(". Reacciones: ");
-            m.reactions().forEach((emoji, users) -> sb.append(emoji).append(' ').append(users.size()).append(", "));
+            m.reactions().forEach((emoji, users) -> sb.append(m.reactionLabel(emoji)).append(' ').append(users.size()).append(", "));
             sb.setLength(sb.length() - 2);
         }
         if (m.outgoing()) sb.append(switch (m.status()) {
@@ -480,6 +484,8 @@ public final class ThreadPane extends BorderPane {
             composer.reply(m);
         } else if (code == javafx.scene.input.KeyCode.T && !e.isShortcutDown() && messageActions.allows(m, MessageActions.Action.TRANSCRIBE)) {
             media.transcribe(m);
+        } else if (code == javafx.scene.input.KeyCode.P && !e.isShortcutDown() && m.type() == MessageType.AUDIO && m.mediaUrl() != null) {
+            audio.toggle(m, chat);
         } else if (code == javafx.scene.input.KeyCode.E && !e.isShortcutDown() && messageActions.allows(m, MessageActions.Action.EDIT)) {
             composer.edit(m);
         } else if (code == javafx.scene.input.KeyCode.C && e.isShortcutDown() && !m.isMedia()) {
@@ -609,9 +615,15 @@ public final class ThreadPane extends BorderPane {
             Label l = new Label("Mensaje eliminado");
             l.getStyleClass().add("deleted-text");
             bubble.getChildren().add(l);
+        } else if (m.playsInline()) {
+            bubble.getStyleClass().add(m.type() == MessageType.STICKER ? "sticker" : "media");
+            bubble.getChildren().add(media.inlineVideoNode(m));
         } else if (m.type() == MessageType.IMAGE || m.type() == MessageType.STICKER) {
             bubble.getStyleClass().add(m.type() == MessageType.STICKER ? "sticker" : "media");
             bubble.getChildren().add(media.imageNode(m));
+        } else if (m.type() == MessageType.AUDIO && m.mediaUrl() != null) {
+            bubble.getChildren().add(media.audioNode(m, chat));
+            bubble.getChildren().add(media.transcriptNode(m, maxWidth));
         } else if (m.isMedia()) {
             bubble.getChildren().add(media.fileNode(m));
             if (m.type() == MessageType.AUDIO && m.mediaUrl() != null) bubble.getChildren().add(media.transcriptNode(m, maxWidth));
@@ -670,7 +682,12 @@ public final class ThreadPane extends BorderPane {
     private void scrollTo(Message target) {
         for (int i = 0; i < rows.size(); i++) {
             if (rows.get(i) instanceof ThreadRows.MessageRow mr && mr.message() == target) {
+                // Stop following the bottom, or the next layout pulse (keepBottom) brings the list straight back down.
+                pinnedBottom = false;
+                userScrollAt = 0;
+                list.getSelectionModel().select(i);
                 list.scrollTo(Math.max(0, i - 2));
+                jumpDown.setVisible(true);
                 return;
             }
         }

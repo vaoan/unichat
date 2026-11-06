@@ -95,7 +95,10 @@ La misma que el stack Docker (`server/setup.sh`), cambiando Postgres por SQLite 
   responde 3 veces seguidas, cuyas cuentas llevan 10 min desconectadas, o que se desconectó 5 veces en 10 min
   (mautrix-discord acumula suscripciones a servidores en cada reconexión hasta que Discord lo corta con 4008). Entre
   reinicios espera 5 min, el doble cada vez, hasta 1 h. Una sesión cerrada no se reinicia: solo la arregla volver
-  a vincular. El tiempo se mide sin contar el Mac dormido.
+  a vincular. El tiempo se mide sin contar el Mac dormido. **Sin internet** no reinicia un puente desconectado (solo uno
+  colgado): mautrix-discord, si arranca sin red, falla una vez y no reintenta. Para saberlo intenta abrir una conexión a
+  `discord.com`, `web.whatsapp.com` o `telegram.org`, sin enviar nada. **Al volver internet** reinicia los puentes de una vez, sin esperas, y cada uno se pone al día; Facebook e Instagram no, porque un reinicio les puede costar la sesión.
+- **Sesiones de Meta** (`MetaSessions`): en algunas redes (Claro, en Colombia) `www.facebook.com` redirige a `web.facebook.com`. mautrix-meta manda sus cookies como cabecera, Go las descarta en esa redirección, Facebook responde con el inicio de sesión y el puente **borra las cookies**, aunque seguían siendo válidas. Por eso: se guarda una copia privada de las cookies (`<puente>/session-backup.json`, solo legible por ti, como la base de datos); no se reinicia uno de estos puentes mientras haya esa redirección; y si el puente borró las cookies de una cuenta que sigue listada, se devuelven en cuanto la red lo permita, hasta 2 veces (si la sesión de verdad se cerró, Facebook las rechaza y hay que vincular de nuevo). Una cuenta desvinculada a propósito ya no está listada, y su copia se elimina.
 - Lo descargado por Unichat (`cache/media`) tiene un límite (Ajustes → Privacidad, 1 GB por defecto): se borra
   primero lo que hace más tiempo no se ve (`MediaCache`).
 

@@ -119,7 +119,7 @@ final class MediaDownloader {
         return null;
     }
 
-    private static String extension(String contentType) {
+    static String extension(String contentType) {
         if (contentType == null) return "";
         String ct = contentType.split(";")[0].trim().toLowerCase(Locale.ROOT);
         return switch (ct) {
@@ -130,9 +130,13 @@ final class MediaDownloader {
             case "image/svg+xml" -> ".svg";
             case "video/mp4" -> ".mp4";
             case "video/webm" -> ".webm";
+            // JavaFX refuses a ".mov" by its name, but plays the same file as ".mp4".
+            case "video/quicktime" -> ".mp4";
+            case "video/x-m4v" -> ".m4v";
             case "audio/ogg" -> ".ogg";
             case "audio/mpeg" -> ".mp3";
-            case "audio/mp4" -> ".m4a";
+            case "audio/mp4", "audio/x-m4a" -> ".m4a";
+            case "audio/wav", "audio/x-wav" -> ".wav";
             case "application/pdf" -> ".pdf";
             default -> "";
         };

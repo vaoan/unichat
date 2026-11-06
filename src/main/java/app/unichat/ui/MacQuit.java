@@ -13,8 +13,12 @@ import java.util.Map;
 public final class MacQuit {
     private MacQuit() {}
 
-    /** Call on the FX thread after the toolkit started. No-op off macOS. */
-    public static void install(Runnable onQuit) {
+    /**
+     * Call on the FX thread after the toolkit started. No-op off macOS.
+     *
+     * @param onActive the app was activated: the Dock icon clicked, or the app opened again
+     */
+    public static void install(Runnable onQuit, Runnable onActive) {
         if (!MainView.MAC) return;
         try {
             Application app = Application.GetApplication();
@@ -26,7 +30,10 @@ public final class MacQuit {
                 @Override public void handleWillFinishLaunchingAction(Application a, long t) { original.handleWillFinishLaunchingAction(a, t); }
                 @Override public void handleDidFinishLaunchingAction(Application a, long t) { original.handleDidFinishLaunchingAction(a, t); }
                 @Override public void handleWillBecomeActiveAction(Application a, long t) { original.handleWillBecomeActiveAction(a, t); }
-                @Override public void handleDidBecomeActiveAction(Application a, long t) { original.handleDidBecomeActiveAction(a, t); }
+                @Override public void handleDidBecomeActiveAction(Application a, long t) {
+                    original.handleDidBecomeActiveAction(a, t);
+                    onActive.run();
+                }
                 @Override public void handleWillResignActiveAction(Application a, long t) { original.handleWillResignActiveAction(a, t); }
                 @Override public void handleDidResignActiveAction(Application a, long t) { original.handleDidResignActiveAction(a, t); }
                 @Override public void handleDidReceiveMemoryWarning(Application a, long t) { original.handleDidReceiveMemoryWarning(a, t); }

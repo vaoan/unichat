@@ -52,6 +52,7 @@ public final class LocalServer {
     private final Manifest manifest;
     private final BinaryStore store;
     private final Supervisor supervisor;
+    private final MetaSessions metaSessions;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private boolean running;
     /** Live connection state of every bridge account, reported by the bridges themselves. */
@@ -68,7 +69,9 @@ public final class LocalServer {
         this.supervisor = new Supervisor(dir.resolve("run"));
         java.util.Map<String, Integer> ports = new java.util.HashMap<>(BridgePorts.BRIDGE_PORTS);
         ports.put("tuwunel", PORT);
-        this.watchdog = new Watchdog(ports, this::watched, states, (name, why) -> supervisor.kill(name));
+        this.metaSessions = new MetaSessions(dir, states, MetaSessions::redirecting, this::restoreSession);
+        this.watchdog = new Watchdog(ports, this::watched, states, (name, why) -> supervisor.kill(name), Internet::reachable,
+                metaSessions);
         // Whatever way Unichat ends (Salir, ⌘Q, logout of the Mac, kill), its server and bridges end with it.
         Runtime.getRuntime().addShutdownHook(new Thread(supervisor::stopAll, "local-server-shutdown"));
     }
@@ -88,6 +91,18 @@ public final class LocalServer {
     public BridgeStates states() { return states; }
 
     /** The processes that should be up: the server and the bridges in use. */
+    private synchronized void restoreSession(String bridge) {
+        try {
+            if (!running || !usableBridges().contains(bridge)) return;
+            supervisor.stop(bridge);
+            metaSessions.restore(bridge);
+            states.restarting(bridge, BridgeStates.now());
+            startBridge(bridge);
+        } catch (IOException e) {
+            System.err.println("Could not restart " + bridge + " with its session: " + e.getClass().getSimpleName());
+        }
+    }
+
     private Iterable<String> watched() {
         java.util.List<String> out = new java.util.ArrayList<>();
         if (supervisor.isRunning("tuwunel") || running) out.add("tuwunel");

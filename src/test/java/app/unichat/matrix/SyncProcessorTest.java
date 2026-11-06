@@ -100,6 +100,23 @@ class SyncProcessorTest {
     }
 
     @Test
+    void aCustomEmojiReactionKeepsItsNameAndNeverReadsAsItsAddress() {
+        sync("!r:example.org", """
+                {'timeline':{'events':[%s,
+                  {'type':'m.reaction','event_id':'$2','sender':'@bob:example.org','origin_server_ts':2,
+                   'content':{'com.beeper.reaction.shortcode':':orclove:','m.relates_to':{'rel_type':'m.annotation','event_id':'$1','key':'mxc://s/orc'}}},
+                  {'type':'m.reaction','event_id':'$3','sender':'@ann:example.org','origin_server_ts':3,
+                   'content':{'m.relates_to':{'rel_type':'m.annotation','event_id':'$1','key':'mxc://s/sinnombre'}}},
+                  {'type':'m.reaction','event_id':'$4','sender':'@ann:example.org','origin_server_ts':4,
+                   'content':{'m.relates_to':{'rel_type':'m.annotation','event_id':'$1','key':'👍'}}}]}}
+                """.formatted(text("$1", ME, 1, "hola")), false);
+        Message m = messages("!r:example.org").get(0);
+        assertEquals(":orclove:", m.reactionLabel("mxc://s/orc"));
+        assertEquals("emoji personalizado", m.reactionLabel("mxc://s/sinnombre"));
+        assertEquals("👍", m.reactionLabel("👍"));
+    }
+
+    @Test
     void stripsReplyFallback() {
         sync("!r:example.org", """
                 {'timeline':{'events':[%s,

@@ -6,11 +6,14 @@
 //   open                  opens the menu as a click would, or closes it if it is open (for tests)
 //   notify <chat id> <sound 0|1> <title> <body>   a system notification (Notification Center, Do Not Disturb…)
 //   clear <chat id>       removes that chat's notifications (it was read)
+//   hotkey <0|1>          turns the global shortcut (⌃⌥U) off or on
 // It writes to stdout: "click <tag>" when a menu item is chosen, "open <chat id>" when a notification is clicked,
+// "hotkey" when the global shortcut is pressed,
 // "notify-auth <1|0>" when notifications become allowed or not (also later), and exits when stdin closes (the app quit or died).
 // Notifications need it to run from its bundle (UnichatBar.app, built by native/build-bar.sh): that's what macOS
 // shows ("Unichat") and asks permission for. A plain java process can't post them.
 import AppKit
+import Carbon.HIToolbox
 import UserNotifications
 
 /** One writer for stdout: menu clicks and notification callbacks come from different threads. */
@@ -87,6 +90,35 @@ final class Notes: NSObject, UNUserNotificationCenterDelegate {
     }
 }
 
+/**
+ * ⌃⌥U from any app: without a Dock icon Unichat isn't in ⌘Tab, and macOS has no way to be in one and not the other.
+ * Carbon's hot keys are the ones that need no Accessibility permission.
+ */
+final class Hotkey {
+    private var ref: EventHotKeyRef?
+    private var installed = false
+
+    func set(on: Bool) {
+        if !on {
+            if let ref { UnregisterEventHotKey(ref) }
+            ref = nil
+            return
+        }
+        if ref != nil { return }
+        if !installed {
+            var type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+            InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
+                emit("hotkey")
+                return noErr
+            }, 1, &type, nil, nil)
+            installed = true
+        }
+        let id = EventHotKeyID(signature: OSType(0x554E4348), id: 1) // "UNCH"
+        let status = RegisterEventHotKey(UInt32(kVK_ANSI_U), UInt32(controlKey | optionKey), id, GetApplicationEventTarget(), 0, &ref)
+        emit(status == noErr ? "hotkey-ok" : "hotkey-error\t\(status)")
+    }
+}
+
 final class Bar: NSObject, NSMenuDelegate {
     static let size: CGFloat = 22
     /** Variable length: macOS sizes the item to the image and centres it (a fixed length left it off-centre). */
@@ -128,6 +160,8 @@ final class Bar: NSObject, NSMenuDelegate {
             notes.post(chat: parts[1], sound: parts[2] == "1", title: parts[3], body: parts[4])
         case "clear":
             if parts.count > 1 { notes.clear(chat: parts[1]) }
+        case "hotkey":
+            hotkey.set(on: parts.count > 1 && parts[1] == "1")
         default:
             break
         }
@@ -166,6 +200,7 @@ app.setActivationPolicy(.accessory)
 let notes = Notes()
 // Only from the bundle: outside one, UNUserNotificationCenter aborts the process.
 if Bundle.main.bundleIdentifier != nil { notes.setUp() } else { emit("notify-auth\t0") }
+let hotkey = Hotkey()
 let bar = Bar()
 Thread {
     while let line = readLine() {

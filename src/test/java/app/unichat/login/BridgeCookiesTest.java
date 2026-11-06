@@ -46,4 +46,43 @@ class BridgeCookiesTest {
         assertFalse(BridgeCookies.canCollect(linkedin));
         assertTrue(BridgeCookies.canCollect(INSTAGRAM));
     }
+
+    /** What mautrix-linkedin asks for. */
+    private static BridgeLogin.CookieParams linkedin() {
+        return new BridgeLogin.CookieParams("https://linkedin.com/login", "UA", List.of(
+                new BridgeLogin.CookieField("cookie_header", true, List.of(new BridgeLogin.Source("request_header", "Cookie", null)), "\\bJSESSIONID=[^;]+"),
+                new BridgeLogin.CookieField("track", true, List.of(new BridgeLogin.Source("request_header", "X-LI-Track", null)), "clientVersion"),
+                new BridgeLogin.CookieField("page", true, List.of(new BridgeLogin.Source("request_header", "X-LI-Page-Instance", null)), "urn:li:page")),
+                null, "^https://www\\.linkedin\\.com/feed.*$");
+    }
+
+    private static final Map<String, String> SESSION = new java.util.TreeMap<>(Map.of("JSESSIONID", "ajax", "li_at", "abc"));
+    private static final Map<String, String> SENT = Map.of("x-li-track", "{\"clientVersion\":\"1\"}", "x-li-page-instance", "urn:li:page:feed");
+
+    @Test
+    void headersTakeTheWindowNotABrowserProfile() {
+        assertFalse(BridgeCookies.canCollect(linkedin()));
+        assertTrue(BridgeCookies.needsWindowCapture(linkedin()));
+        assertEquals(java.util.Set.of("x-li-track", "x-li-page-instance"), BridgeCookies.headersToWatch(linkedin()), "Cookie comes from the store");
+        assertEquals("linkedin.com", BridgeCookies.cookieDomain(linkedin()));
+    }
+
+    @Test
+    void itsDoneOnlyWithEverythingAndAtTheEnd() {
+        String feed = "https://www.linkedin.com/feed/";
+        Map<String, String> v = BridgeCookies.captured(linkedin(), feed, SESSION, SENT);
+        assertEquals("JSESSIONID=ajax; li_at=abc", v.get("cookie_header"));
+        assertEquals("urn:li:page:feed", v.get("page"));
+        assertTrue(v.get("track").contains("clientVersion"));
+        assertEquals(null, BridgeCookies.captured(linkedin(), "https://www.linkedin.com/checkpoint/2fa", SESSION, SENT), "still in 2FA");
+        assertEquals(null, BridgeCookies.captured(linkedin(), feed, SESSION, Map.of()), "no request seen yet");
+        assertEquals(null, BridgeCookies.captured(linkedin(), feed, Map.of("li_at", "abc"), SENT), "the shape the bridge wants");
+    }
+
+    @Test
+    void onlyThatSitesCookies() {
+        assertTrue(BridgeCookies.belongs(".linkedin.com", "linkedin.com"));
+        assertTrue(BridgeCookies.belongs("www.linkedin.com", "linkedin.com"));
+        assertFalse(BridgeCookies.belongs("notlinkedin.com", "linkedin.com"));
+    }
 }

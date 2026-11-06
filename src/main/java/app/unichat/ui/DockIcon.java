@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.settings.Settings;
 import app.unichat.support.Os;
 
 import com.sun.jna.Function;
@@ -7,8 +8,9 @@ import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
 
 /**
- * macOS only: shows the Dock icon while the window is open and removes it while Unichat lives in the menu bar,
- * by switching NSApplication's activation policy (regular ↔ accessory). Java has no API for this, so it goes
+ * macOS only: by default Unichat lives in the menu bar and has no Dock icon at all (the package declares LSUIElement, so
+ * it isn't there at launch nor among the Dock's recent apps); Ajustes can show one while the window is open, by switching
+ * NSApplication's activation policy (regular ↔ accessory). Java has no API for this, so it goes
  * through the Objective-C runtime with JNA. On other systems every call is a no-op: a hidden window already
  * leaves the Windows taskbar. Call on the FX thread, which on macOS is AppKit's main thread.
  */
@@ -16,17 +18,27 @@ public final class DockIcon {
     private static final long POLICY_REGULAR = 0, POLICY_ACCESSORY = 1;
     private static final boolean MAC = Os.mac();
     private static volatile boolean broken;
+    private static volatile boolean trayAvailable = true;
 
     private DockIcon() {}
 
-    /** Window about to be shown: bring the Dock icon back and make Unichat the active app. */
+    /** Whether the menu bar icon exists; without it the Dock is the only way back to a hidden window. */
+    public static void setTrayAvailable(boolean available) { trayAvailable = available; }
+
+    /** Whether the Dock icon goes with the window: the person's choice, unless it's the only way in. */
+    static boolean wanted(boolean setting, boolean tray) { return setting || !tray; }
+
+    /** Window about to be shown (or the setting changed while it is): the Dock icon if wanted, and the active app. */
     public static void show() {
-        if (setPolicy(POLICY_REGULAR)) send("activateIgnoringOtherApps:", 1L);
+        setPolicy(wanted(Settings.get().showInDock(), trayAvailable) ? POLICY_REGULAR : POLICY_ACCESSORY);
+        send("activateIgnoringOtherApps:", 1L);
     }
 
     /** Window hidden: remove the Dock icon; the menu bar icon stays. */
     public static void hide() {
         setPolicy(POLICY_ACCESSORY);
+        // Otherwise it stays the active app, and a click on the Dock icon wouldn't activate it: nothing would happen.
+        send("deactivate", 0L);
     }
 
     private static boolean setPolicy(long policy) {

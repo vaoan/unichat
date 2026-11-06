@@ -37,6 +37,10 @@ public final class Icons {
     public static final String FILE = "M6 2h8l6 6v14H6V2Zm7 1.5V9h5.5L13 3.5ZM8 4v16h10V11h-7V4H8Z";
     public static final String DOWNLOAD = "M11 3h2v9.2l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4 3.6 3.6V3ZM4 19h16v2H4v-2Z";
     public static final String PLAY = "M8 5v14l11-7L8 5Z";
+    public static final String MIC = "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-6 9h2a4 4 0 0 0 8 0h2a6 6 0 0 1-5 5.9V21h-2v-3.1A6 6 0 0 1 6 12Z";
+    public static final String PAUSE = "M7 5h4v14H7V5Zm6 0h4v14h-4V5Z";
+    public static final String VOLUME = "M4 9v6h4l5 4V5L8 9H4Zm12 .5a4 4 0 0 1 0 5v-5Z";
+    public static final String VOLUME_OFF = "M4 9v6h4l5 4V5L8 9H4Zm11.5.5 1-1 2 2 2-2 1 1-2 2 2 2-1 1-2-2-2 2-1-1 2-2-2-2Z";
     public static final String ERROR = "M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm-1 5v7h2V7h-2Zm0 9v2h2v-2h-2Z";
     public static final String LOGOUT = "M10 3h9a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-9v-2h9V5h-9V3Zm1.6 4.4L13 6l6 6-6 6-1.4-1.4L15.2 13H3v-2h12.2l-3.6-3.6Z";
     public static final String PEOPLE = "M9 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm7.5 0a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7ZM1 20c0-3.3 3.6-6 8-6s8 2.7 8 6v1h-2v-1c0-2-2.7-4-6-4s-6 2-6 4v1H1v-1Zm16.7-5.9c3 .4 5.3 2.3 5.3 4.9v2h-2v-2c0-1.4-1.3-2.6-3.3-3.1v-1.8Z";

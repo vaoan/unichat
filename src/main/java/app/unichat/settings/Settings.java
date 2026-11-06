@@ -232,5 +232,11 @@ public final class Settings {
     public void setSpeakMessages(boolean v) { setBool("a11y.speak", v); }
 
     public boolean minimizeToTray() { return getBool("app.minimizeToTray", true); }
+    /** macOS: ⌃⌥U brings Unichat to the front from any app, which ⌘Tab can't without a Dock icon. */
+    public boolean globalShortcut() { return getBool("app.globalShortcut", true); }
+    public void setGlobalShortcut(boolean v) { setBool("app.globalShortcut", v); }
+    /** macOS: an icon in the Dock while the window is open; off, Unichat lives only in the menu bar. */
+    public boolean showInDock() { return getBool("app.showInDock", false); }
+    public void setShowInDock(boolean v) { setBool("app.showInDock", v); }
     public void setMinimizeToTray(boolean v) { setBool("app.minimizeToTray", v); }
 }

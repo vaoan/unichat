@@ -42,8 +42,33 @@ public final class OggOpus {
         return body + 8 <= n && new String(head, body, 8, java.nio.charset.StandardCharsets.US_ASCII).equals("OpusHead");
     }
 
+    /** The decoded samples at 48 kHz: {@code length} of {@code samples} are in use. */
+    private record Decoded(short[] samples, int length) {}
+
     /** Decodes {@code in} to a 16-bit 16 kHz mono WAV at {@code out}; returns the duration in seconds. */
     public static double toWav(Path in, Path out) throws IOException {
+        Decoded d = decode(in);
+        byte[] data = decimate(d.samples(), d.length());
+        write(out, data, RATE);
+        return data.length / 2.0 / RATE;
+    }
+
+    /** For listening: the 48 kHz as decoded (16 kHz is what Whisper reads, and it sounds like a telephone). */
+    public static void toPlayableWav(Path in, Path out) throws IOException {
+        Decoded d = decode(in);
+        ByteBuffer data = ByteBuffer.allocate(d.length() * 2).order(ByteOrder.LITTLE_ENDIAN);
+        for (int i = 0; i < d.length(); i++) data.putShort(d.samples()[i]);
+        write(out, data.array(), DECODE_RATE);
+    }
+
+    private static void write(Path out, byte[] data, int rate) throws IOException {
+        try (OutputStream o = Files.newOutputStream(out)) {
+            o.write(wavHeader(data.length, rate));
+            o.write(data);
+        }
+    }
+
+    private static Decoded decode(Path in) throws IOException {
         List<byte[]> packets = packets(Files.readAllBytes(in));
         if (packets.size() < 2 || !startsWith(packets.get(0), "OpusHead")) throw new IOException("No es un audio Opus");
         byte[] head = packets.get(0);
@@ -74,12 +99,7 @@ public final class OggOpus {
             System.arraycopy(frame, from, all, total, n - from);
             total += n - from;
         }
-        byte[] data = decimate(all, total);
-        try (OutputStream o = Files.newOutputStream(out)) {
-            o.write(wavHeader(data.length));
-            o.write(data);
-        }
-        return data.length / 2.0 / RATE;
+        return new Decoded(all, total);
     }
 
     /** 48 kHz → 16 kHz: low-pass, then every third sample. 16-bit little-endian bytes. */
@@ -150,10 +170,14 @@ public final class OggOpus {
     }
 
     static byte[] wavHeader(int dataBytes) {
+        return wavHeader(dataBytes, RATE);
+    }
+
+    private static byte[] wavHeader(int dataBytes, int rate) {
         ByteBuffer b = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN);
         b.put("RIFF".getBytes(java.nio.charset.StandardCharsets.US_ASCII)).putInt(36 + dataBytes)
                 .put("WAVEfmt ".getBytes(java.nio.charset.StandardCharsets.US_ASCII))
-                .putInt(16).putShort((short) 1).putShort((short) 1).putInt(RATE).putInt(RATE * 2)
+                .putInt(16).putShort((short) 1).putShort((short) 1).putInt(rate).putInt(rate * 2)
                 .putShort((short) 2).putShort((short) 16)
                 .put("data".getBytes(java.nio.charset.StandardCharsets.US_ASCII)).putInt(dataBytes);
         return b.array();

@@ -104,6 +104,24 @@ public final class RoomFeatures {
         return m.contains(x) || m.contains("*/*") || (slash > 0 && m.contains(x.substring(0, slash) + "/*"));
     }
 
+    /**
+     * How a recorded voice note goes out here, or null when it can't: Opus in Ogg is what's recorded, so a chat that only
+     * takes other formats isn't offered it. WhatsApp insists on the codec in the type, which the others don't name.
+     *
+     * @param voice false: as a plain audio file (the network has no voice notes, but takes the file)
+     */
+    public record VoiceSend(String mime, boolean voice) {}
+
+    private static final String OPUS_WITH_CODEC = "audio/ogg; codecs=opus", OGG = "audio/ogg";
+
+    public VoiceSend voiceSend() {
+        if (anyFile) return new VoiceSend(OGG, true);
+        java.util.Set<String> voice = mimes.get(VOICE);
+        if (voice != null && voice.contains(OPUS_WITH_CODEC)) return new VoiceSend(OPUS_WITH_CODEC, true);
+        if (voice != null && voice.contains(OGG)) return new VoiceSend(OGG, true);
+        return acceptsMime("m.audio", OGG) ? new VoiceSend(OGG, false) : null;
+    }
+
     /** Largest file the network takes for {@code type}, in bytes; 0 when not stated. */
     public long maxSize(String type) {
         return files.getOrDefault(type, 0L);

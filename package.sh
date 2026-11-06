@@ -51,7 +51,10 @@ case "$(uname -s)" in
     done
     iconutil -c icns "$ICONSET" -o target/Unichat.icns
     jpackage $COMMON --type app-image --icon target/Unichat.icns --mac-package-identifier app.unichat
-    jpackage $COMMON --type dmg --icon target/Unichat.icns --mac-package-identifier app.unichat || echo "dmg skipped"
+    # A menu bar app: no Dock icon at launch nor among the Dock's recent apps (Ajustes can show one, see ui/DockIcon).
+    plutil -insert LSUIElement -bool true release/Unichat.app/Contents/Info.plist
+    codesign --force --deep -s - release/Unichat.app
+    jpackage --type dmg --name Unichat --app-version $VERSION --vendor Unichat --dest release --app-image release/Unichat.app || echo "dmg skipped"
     ;;
   *)
     jpackage $COMMON --type app-image --icon src/main/resources/app/unichat/icons/app-256.png

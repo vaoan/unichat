@@ -431,6 +431,8 @@ final class SyncProcessor {
             addPending(room, target, ev);
             return;
         }
+        String shortcode = text(ev.path("content"), "com.beeper.reaction.shortcode");
+        if (shortcode != null) t.setReactionName(key, shortcode);
         Set<String> users = t.reactions().get(key);
         if (users == null || !users.contains(sender)) t.toggleReaction(key, sender);
         r.messagesChanged.add(room.id);

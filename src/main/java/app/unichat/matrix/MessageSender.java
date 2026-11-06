@@ -1,5 +1,8 @@
 package app.unichat.matrix;
 
+import app.unichat.model.RoomFeatures;
+import app.unichat.model.VoiceNote;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import app.unichat.model.Chat;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
@@ -49,7 +52,7 @@ final class MessageSender {
         String body = emote ? text.substring(4) : text;
         content.put("msgtype", emote ? "m.emote" : "m.text");
         content.put("body", body);
-        addReply(chatId, content, replyToId);
+        addReply(content, replyToId);
         synchronized (proc) {
             proc.addLocalEcho(chatId, txn, m -> {
                 m.setType(emote ? MessageType.EMOTE : MessageType.TEXT);
@@ -140,26 +143,13 @@ final class MessageSender {
         }).thenCompose(f -> f);
     }
 
-    /** Adds m.relates_to and the plain-text reply fallback. */
-    private void addReply(String chatId, ObjectNode content, String replyToId) {
+    /**
+     * Adds m.relates_to. No "> quote" in the body: Matrix dropped that fallback (v1.13) and bridges pass the body on as
+     * it is, so the network would show the quote, Matrix ids included, under the real reply.
+     */
+    private static void addReply(ObjectNode content, String replyToId) {
         if (replyToId == null || replyToId.startsWith(SyncProcessor.LOCAL_PREFIX)) return;
         content.putObject("m.relates_to").putObject("m.in_reply_to").put("event_id", replyToId);
-        Message orig;
-        synchronized (proc) {
-            MatrixRoom r = proc.room(chatId);
-            orig = r == null ? null : r.byId.get(replyToId);
-        }
-        if (orig == null) return;
-        String quoted = orig.isMedia() ? orig.preview() : orig.body();
-        StringBuilder sb = new StringBuilder();
-        String[] lines = quoted.split("\n");
-        for (int i = 0; i < lines.length; i++) {
-            sb.append("> ");
-            if (i == 0) sb.append('<').append(orig.senderId()).append("> ");
-            sb.append(lines[i]).append('\n');
-        }
-        sb.append('\n').append(content.path("body").asText());
-        content.put("body", sb.toString());
     }
 
     private CompletableFuture<Void> sendEvent(String chatId, String type, String txn, ObjectNode content) {
@@ -194,8 +184,35 @@ final class MessageSender {
         return sendMedia(chatId, file, null, mime, width, height, true);
     }
 
+    /**
+     * As a voice note where the chat has them: the flag and the waveform are what make a network show a player instead
+     * of a file.
+     */
+    CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) {
+        Chat c = core.chat(chatId);
+        RoomFeatures.VoiceSend how = (c == null ? RoomFeatures.UNKNOWN : c.features()).voiceSend();
+        if (how == null) return CompletableFuture.failedFuture(new MatrixException(0, null, "Este chat no acepta notas de voz"));
+        return sendMedia(chatId, note.file(), replyToId, how.mime(), 0, 0, note.durationMs(), content -> {
+            content.with("info").put("duration", note.durationMs());
+            if (!how.voice()) return;
+            content.putObject("org.matrix.msc3245.voice");
+            ObjectNode audio = content.putObject("org.matrix.msc1767.audio");
+            audio.put("duration", note.durationMs());
+            ArrayNode wave = audio.putArray("waveform");
+            note.waveform().forEach(wave::add);
+        });
+    }
+
     private CompletableFuture<Void> sendMedia(String chatId, Path file, String replyToId, String mime, int width, int height,
                                               boolean gif) {
+        return sendMedia(chatId, file, replyToId, mime, width, height, 0, content -> {
+            if (gif) content.with("info").put("fi.mau.gif", true);
+        });
+    }
+
+    /** @param extra adds what's particular to this kind of media to the event's content */
+    private CompletableFuture<Void> sendMedia(String chatId, Path file, String replyToId, String mime, int width, int height,
+                                              long durationMs, java.util.function.Consumer<ObjectNode> extra) {
         String txn = core.newTxnId();
         String name = file.getFileName().toString();
         MessageType type = mime.startsWith("image/") ? MessageType.IMAGE
@@ -216,6 +233,8 @@ final class MessageSender {
                 m.setFileSize(size);
                 m.setSize(wh[0], wh[1]);
                 m.setReplyToId(replyToId);
+                m.setMimeType(mime);
+                if (durationMs > 0) m.setMediaInfo(MatrixClient.JSON.createObjectNode().put("duration", durationMs));
             });
         }
         fireLocal(chatId);
@@ -247,8 +266,8 @@ final class MessageSender {
                 info.put("w", wh[0]);
                 info.put("h", wh[1]);
             }
-            if (gif) info.put("fi.mau.gif", true);
-            addReply(chatId, content, replyToId);
+            extra.accept(content);
+            addReply(content, replyToId);
             return sendEvent(chatId, "m.room.message", txn, content);
         });
     }

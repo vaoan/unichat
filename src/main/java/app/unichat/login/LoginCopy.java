@@ -95,6 +95,15 @@ public final class LoginCopy {
         if (s.display() != null && "emoji".equals(s.display().type())) {
             return new StepText("Toca este emoji en tu teléfono", List.of("Abre " + net + " en tu teléfono", "Toca el emoji que coincide con este"));
         }
+        if (id.endsWith(".history_pin")) {
+            // It comes back with the bridge's reason first when the last attempt failed.
+            String[] parts = s.instructions().split("\n\n", 2);
+            List<String> lines = new java.util.ArrayList<>();
+            if (parts.length == 2) lines.add(parts[0]);
+            lines.add("Si usas el almacenamiento seguro de Messenger, escribe su PIN de 6 dígitos para recuperar tus chats cifrados anteriores.");
+            lines.add("Si no lo tienes, déjalo vacío y pulsa Continuar: te conectas igual, sin ese historial.");
+            return new StepText("Recuperar tu historial cifrado", lines);
+        }
         if (id.endsWith(".juicebox_pin")) {
             // X's encrypted chats ("X Chat") are protected with a 4-digit PIN the user chooses.
             boolean create = s.instructions().contains("No PIN code is registered");
@@ -122,9 +131,19 @@ public final class LoginCopy {
         return new StepText(net, s.instructions().isBlank() ? List.of() : List.of(s.instructions()));
     }
 
+    /** The digits a pattern like {@code ^[0-9]{6}$} asks for; 0 when it doesn't say. */
+    public static int digits(String pattern) {
+        java.util.regex.Matcher m = pattern == null ? null : java.util.regex.Pattern.compile("\\{(\\d{1,2})}").matcher(pattern);
+        return m != null && m.find() ? Integer.parseInt(m.group(1)) : 0;
+    }
+
     /** Spanish label for an input field, by its type (the bridge's name when we don't know it). */
     public static String fieldLabel(BridgeLogin.Field f) {
-        if ("pin".equals(f.id())) return "PIN de 4 dígitos";
+        if ("pin".equals(f.id())) {
+            // How long depends on the network (X asks for 4, Messenger for 6): the bridge's pattern says.
+            int digits = digits(f.pattern());
+            return digits > 0 ? "PIN de " + digits + " dígitos" : "PIN";
+        }
         return switch (f.type()) {
             case "phone_number" -> "Número de teléfono";
             case "2fa_code" -> "Código";

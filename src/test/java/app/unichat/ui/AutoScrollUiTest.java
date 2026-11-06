@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.service.MockChatService;
 import javafx.application.Platform;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.IndexedCell;
 import javafx.scene.control.ListView;
@@ -69,6 +70,38 @@ class AutoScrollUiTest {
     }
 
     /** The last row is the last visible cell and its bottom edge is inside the viewport. */
+    @Test
+    void clickingTheQuoteOfAReplyGoesToTheOriginalAndStaysThere() throws Exception {
+        Scene scene = start();
+        String firstId = fx(() -> svc.messages(CHAT).get(0).id());
+        svc.sendText(CHAT, "te respondo", firstId);
+        Thread.sleep(900);
+        assertTrue("bottom".equals(bottomState(scene)), "starts at the bottom: " + bottomState(scene));
+
+        fx(() -> {
+            // The demo chat has replies of its own: this one's is the lowest on screen.
+            Node quote = timeline(scene).lookupAll(".reply-quote").stream()
+                    .max(java.util.Comparator.comparingDouble(n -> n.localToScene(n.getBoundsInLocal()).getMinY())).orElseThrow();
+            quote.fireEvent(new javafx.scene.input.MouseEvent(javafx.scene.input.MouseEvent.MOUSE_CLICKED, 0, 0, 0, 0,
+                    javafx.scene.input.MouseButton.PRIMARY, 1, false, false, false, false, true, false, false, true, false, true, null));
+            return null;
+        });
+        Thread.sleep(900);
+        assertTrue(!"bottom".equals(bottomState(scene)), "it stayed up: " + bottomState(scene));
+        assertTrue(fx(() -> {
+            ListView<Object> list = timeline(scene);
+            VirtualFlow<?> flow = (VirtualFlow<?>) list.lookup(".virtual-flow");
+            for (int i = 0; i < list.getItems().size(); i++) {
+                if (list.getItems().get(i) instanceof ThreadRows.MessageRow mr && mr.message().id().equals(firstId)) {
+                    return flow.getFirstVisibleCell().getIndex() <= i && i <= flow.getLastVisibleCell().getIndex();
+                }
+            }
+            return false;
+        }), "the original is on screen");
+        assertTrue(fx(() -> scene.getRoot().lookup(".jump-down").isVisible()), "a way back down");
+        svc.stop();
+    }
+
     private static String bottomState(Scene s) throws Exception {
         return fx(() -> {
             ListView<Object> list = timeline(s);

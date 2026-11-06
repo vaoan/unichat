@@ -9,6 +9,7 @@ import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
+import app.unichat.model.VoiceNote;
 import app.unichat.service.BridgeAccess;
 import app.unichat.service.ChatService;
 import app.unichat.service.QuietRule;
@@ -449,6 +450,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess {
     @Override public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item) { return sender.sendSticker(chatId, item); }
     CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features, StickerMode mode) { return sender.sendSticker(chatId, item, features, mode); }
     CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features) { return sender.sendSticker(chatId, item, features); }
+    @Override public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) { return sender.sendVoice(chatId, note, replyToId); }
     @Override public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId) { return sender.sendFile(chatId, file, replyToId); }
     @Override public CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height) { return sender.sendGif(chatId, file, mime, width, height); }
     @Override public CompletableFuture<Void> editMessage(String chatId, String messageId, String newText) { return sender.editMessage(chatId, messageId, newText); }

@@ -55,6 +55,39 @@ public final class Message {
     public String mediaUrl() { return mediaUrl; }
     public void setMediaUrl(String mediaUrl) { this.mediaUrl = mediaUrl; }
     /** The event's original {@code info} (e.g. fi.mau.bridged_sticker), kept so a sticker can be sent again natively. */
+    private String externalUrl;
+    /** Where the message lives on its network, when the bridge says (an Instagram reel's page). */
+    public String externalUrl() { return externalUrl; }
+    public void setExternalUrl(String url) { this.externalUrl = url; }
+
+    /** Past this, a video waits to be opened: it may be a whole clip, and it would download by itself. */
+    private static final long INLINE_MAX_BYTES = 2L * 1024 * 1024;
+    private static final long INLINE_MAX_MS = 15_000;
+
+    /**
+     * Whether a video plays in the timeline by itself (muted, looping), like a GIF: GIFs that bridges deliver as video,
+     * stickers that came as video, and short clips, going by the size and duration the bridge reports.
+     */
+    public boolean playsInline() {
+        if (mediaUrl == null) return false;
+        if (type == MessageType.STICKER) return mimeType != null && mimeType.startsWith("video/");
+        if (type != MessageType.VIDEO || mediaInfo == null) return false;
+        if (mediaInfo.path("fi.mau.gif").asBoolean(false)) return true;
+        long ms = mediaInfo.path("duration").asLong(0);
+        return fileSize > 0 && fileSize <= INLINE_MAX_BYTES && ms <= INLINE_MAX_MS;
+    }
+
+    /** A reel that came only as its picture and a link: the bridge has no video to give, its page does. */
+    public boolean isReelLink() {
+        return type == MessageType.IMAGE && externalUrl != null
+                && externalUrl.matches("https://(www\\.)?(instagram|facebook)\\.com/(reel|reels)/.*");
+    }
+
+    /** How long the audio or video lasts, as the bridge reports it; 0 when it doesn't. */
+    public long durationMs() {
+        return mediaInfo == null ? 0 : mediaInfo.path("duration").asLong(0);
+    }
+
     private com.fasterxml.jackson.databind.JsonNode mediaInfo;
     public com.fasterxml.jackson.databind.JsonNode mediaInfo() { return mediaInfo; }
     public void setMediaInfo(com.fasterxml.jackson.databind.JsonNode info) { this.mediaInfo = info; }
@@ -78,6 +111,19 @@ public final class Message {
     public MessageStatus status() { return status; }
     public void setStatus(MessageStatus status) { this.status = status; }
     public Map<String, Set<String>> reactions() { return reactions; }
+
+    private final Map<String, String> reactionNames = new java.util.HashMap<>();
+
+    /** Custom emoji reactions have a picture's address for a key, and maybe a name (Discord's ":orclove:"). */
+    public void setReactionName(String key, String name) { reactionNames.put(key, name); }
+
+    /** What to call a reaction in words; never its address. */
+    public String reactionLabel(String key) {
+        if (!isCustomReaction(key)) return key;
+        return reactionNames.getOrDefault(key, "emoji personalizado");
+    }
+
+    public static boolean isCustomReaction(String key) { return key != null && key.startsWith("mxc://"); }
 
     public boolean isMedia() {
         return type == MessageType.IMAGE || type == MessageType.VIDEO || type == MessageType.AUDIO

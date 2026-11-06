@@ -34,7 +34,11 @@ public final class BridgeLogin {
     /** Where a cookie-step value comes from; {@code type} is cookie, local_storage, request_header, request_body or special. */
     public record Source(String type, String name, String cookieDomain) {}
 
-    public record CookieField(String id, boolean required, List<Source> sources) {}
+    public record CookieField(String id, boolean required, List<Source> sources, String pattern) {
+        public CookieField(String id, boolean required, List<Source> sources) {
+            this(id, required, sources, null);
+        }
+    }
 
     public record CookieParams(String url, String userAgent, List<CookieField> fields, String extractJs, String waitForUrlPattern) {}
 
@@ -152,7 +156,7 @@ public final class BridgeLogin {
                 for (JsonNode s : f.path("sources")) {
                     sources.add(new Source(s.path("type").asText(), s.path("name").asText(), text(s, "cookie_domain")));
                 }
-                cf.add(new CookieField(f.path("id").asText(), f.path("required").asBoolean(false), List.copyOf(sources)));
+                cf.add(new CookieField(f.path("id").asText(), f.path("required").asBoolean(false), List.copyOf(sources), text(f, "pattern")));
             }
             cookies = new CookieParams(c.path("url").asText(), text(c, "user_agent"), List.copyOf(cf), text(c, "extract_js"),
                     text(c, "wait_for_url_pattern"));
