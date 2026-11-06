@@ -119,7 +119,10 @@ class RowMenuUiTest {
             scene.getRoot().layout();
             List<Node> rows = scene.getRoot().lookupAll(".chat-list .list-cell").stream()
                     .filter(n -> n instanceof ListCell<?> c && c.getItem() != null && n.isVisible()).toList();
-            Event.fireEvent(rows.get(rows.size() - 1), new ContextMenuEvent(ContextMenuEvent.CONTEXT_MENU_REQUESTED, 0, 0, 0, 0, false, null));
+            // From the bottom: some rows aren't chats yet (a server to add) and have no menu.
+            for (int i = rows.size() - 1; i >= 0 && openMenus().isEmpty(); i--) {
+                Event.fireEvent(rows.get(i), new ContextMenuEvent(ContextMenuEvent.CONTEXT_MENU_REQUESTED, 0, 0, 0, 0, false, null));
+            }
             return null;
         });
         ContextMenu menu = fx(() -> openMenus().get(0));

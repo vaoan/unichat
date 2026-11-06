@@ -66,7 +66,7 @@ public final class MainView extends StackPane {
             scheduleChats();
             Platform.runLater(() -> {
                 if (SettingsWindow.accountsPage() != null) SettingsWindow.accountsPage().refresh();
-                showAccountAlerts();
+                if (stage.isShowing()) showAccountAlerts();
             });
         }
         @Override public void connectionChanged(ConnectionState s) { Platform.runLater(() -> showConnection(s)); }
@@ -152,6 +152,9 @@ public final class MainView extends StackPane {
 
         getChildren().addAll(main, overlay, toast);
         addEventFilter(KeyEvent.KEY_PRESSED, this::onKey);
+        stage.showingProperty().addListener((o, a, showing) -> {
+            if (showing) Platform.runLater(this::catchUp);
+        });
         stage.focusedProperty().addListener((o, a, focused) -> {
             if (focused && thread.chat() != null) svc.markRead(thread.chat().id());
         });
@@ -208,6 +211,10 @@ public final class MainView extends StackPane {
             synchronized (dirtyThreads) { dirtyThreads.remove(chatId); }
             Chat open = thread.chat();
             if (open != null && open.id().equals(chatId)) {
+                if (!stage.isShowing()) {
+                    threadStale = true;
+                    return;
+                }
                 thread.rebuild(false);
                 thread.refreshHeader();
                 if (stage.isFocused() && open.isUnread()) svc.markRead(chatId);
@@ -228,7 +235,32 @@ public final class MainView extends StackPane {
         for (Chat c : recent) ImageCache.load(c.avatarUrl(), svc);
     }
 
+    /**
+     * With the window closed to the menu bar nothing is drawn, and JavaFX only forgets the nodes that changed when it draws: all
+     * that's built meanwhile stays in memory, even what's thrown away (1 GB in a night, a real heap dump). So it waits for the window.
+     */
+    private boolean staleWhileHidden;
+    private boolean threadStale;
+
+    private void catchUp() {
+        if (!stage.isShowing()) return;
+        if (staleWhileHidden) {
+            staleWhileHidden = false;
+            refreshAll();
+            showAccountAlerts();
+        }
+        if (threadStale) {
+            threadStale = false;
+            thread.rebuild(false);
+        }
+    }
+
     private void refreshAll() {
+        if (!stage.isShowing()) {
+            staleWhileHidden = true;
+            showUnread();
+            return;
+        }
         preloadAvatars();
         if (pendingOpenId != null) {
             Chat pending = svc.chat(pendingOpenId);
@@ -254,6 +286,10 @@ public final class MainView extends StackPane {
                 if (infoVisible) panel.refresh();
             }
         }
+        showUnread();
+    }
+
+    private void showUnread() {
         long unread = svc.chats().stream().filter(ChatFilter::inboxUnread).count();
         notifier.setUnread((int) unread);
         stage.setTitle(unread > 0 ? "Unichat (" + unread + ")" : "Unichat");

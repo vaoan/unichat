@@ -25,6 +25,8 @@ public final class Rail extends VBox {
     private final ChatService svc;
     private final ChatListPane listPane;
     private final VBox networks = new VBox(6);
+    /** Kept between refreshes: this runs on every change of any chat, several times a second on a busy account. */
+    private final java.util.Map<Network, Button> networkButtons = new java.util.EnumMap<>(Network.class);
     private final Button inbox;
     private final Button archive;
     private final Button folders;
@@ -81,7 +83,7 @@ public final class Rail extends VBox {
         setActive(folders, inFolders);
         setUnreadBadge(inbox, chats.stream().filter(ChatFilter::inboxUnread).count());
 
-        networks.getChildren().clear();
+        List<Node> shownButtons = new java.util.ArrayList<>();
         List<Account> accounts = svc.accounts();
         for (Network n : Network.values()) {
             // The account to speak for the network: a broken one before working ones.
@@ -99,7 +101,6 @@ public final class Rail extends VBox {
                     // A session that closed still has its chats: keep the network in sight (marked), not gone.
                     || (acc != null && chats.stream().anyMatch(c -> c.network() == n && !c.bridgeBot() && !c.space()));
             if (!shown) continue;
-            Label letter = NetworkIcons.tile(n, 26, "rail-network");
             String status = acc == null ? "" : switch (acc.status()) {
                 case CONNECTED -> "";
                 case CONNECTING -> " (sin conexión, reconectando)";
@@ -109,16 +110,17 @@ public final class Rail extends VBox {
             };
             List<Account> netAccounts = Accounts.of(accounts, n);
             String count = netAccounts.size() > 1 ? " (" + netAccounts.size() + " cuentas)" : "";
-            Button b = railButton(letter, n.displayName() + count + status, () ->
-                    listPane.goTo(listPane.filterProperty().get().switchTo(n, null)));
+            Button b = networkButtons.computeIfAbsent(n, x -> railButton(NetworkIcons.tile(x, 26, "rail-network"), "", () ->
+                    listPane.goTo(listPane.filterProperty().get().switchTo(x, null))));
+            b.getTooltip().setText(n.displayName() + count + status);
             if (n.isBridged()) b.setOnContextMenuRequested(e -> networkMenu(n, netAccounts).show(b, e.getScreenX(), e.getScreenY()));
             setActive(b, f.network() == n);
-            if (acc != null && acc.status() != AccountStatus.CONNECTED) {
-                b.getStyleClass().add(acc.status() == AccountStatus.NEEDS_LOGIN ? "rail-broken" : "rail-recovering");
-            }
+            setMarked(b, "rail-broken", acc != null && acc.status() == AccountStatus.NEEDS_LOGIN);
+            setMarked(b, "rail-recovering", acc != null && acc.status() != AccountStatus.CONNECTED && acc.status() != AccountStatus.NEEDS_LOGIN);
             setUnreadBadge(b, chats.stream().filter(c -> c.network() == n && ChatFilter.inboxUnread(c)).count());
-            networks.getChildren().add(b);
+            shownButtons.add(b);
         }
+        if (!networks.getChildren().equals(shownButtons)) networks.getChildren().setAll(shownButtons);
     }
 
     /** Right-click on a network: pick one of its accounts or add another. */
@@ -138,8 +140,13 @@ public final class Rail extends VBox {
     }
 
     private static void setActive(Button b, boolean on) {
-        b.getStyleClass().remove("active");
-        if (on) b.getStyleClass().add("active");
+        setMarked(b, "active", on);
+    }
+
+    private static void setMarked(Button b, String styleClass, boolean on) {
+        if (on == b.getStyleClass().contains(styleClass)) return;
+        if (on) b.getStyleClass().add(styleClass);
+        else b.getStyleClass().remove(styleClass);
     }
 
     /**
