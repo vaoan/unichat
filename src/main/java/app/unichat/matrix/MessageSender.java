@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.bridge.BridgePorts;
 import app.unichat.model.RoomFeatures;
 import app.unichat.model.VoiceNote;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -7,6 +8,7 @@ import app.unichat.model.Chat;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
 import app.unichat.service.ChatService.Listener;
 import app.unichat.service.StickerMode;
@@ -97,6 +99,23 @@ final class MessageSender {
 
     /** Sends {@code item}; when the chat refuses its format (a GIF on WhatsApp) a converted copy is uploaded first. */
     CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features) {
+        Chat c = core.chat(chatId);
+        return sendSticker(chatId, item, features, c != null && needsCopy(item.url(), c.network()));
+    }
+
+    /**
+     * Direct media is only readable from the bridge it came from: another bridge asks the server, which answers "Remote media
+     * not found" (no federation), and the sticker is lost. So what goes to another network goes as a copy on our server.
+     */
+    static boolean needsCopy(String url, Network network) {
+        if (url == null || !url.startsWith("mxc://")) return false;
+        String server = url.substring("mxc://".length()).split("/", 2)[0];
+        if (BridgePorts.directMediaBase(server) == null) return false;
+        String bot = network.botLocalpart();
+        return bot == null || !server.equals(BridgePorts.mediaServerName(bot.replaceAll("bot$", "")));
+    }
+
+    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features, boolean copy) {
         String txn = core.newTxnId();
         ObjectNode content = MatrixClient.JSON.createObjectNode();
         content.put("body", "sticker");
@@ -117,16 +136,22 @@ final class MessageSender {
         }
         fireLocal(chatId);
         String target = StickerConverter.target(info.path("mimetype").asText(null), features);
-        if (target == null) return sendEvent(chatId, "m.sticker", txn, content);
+        if (target == null && !copy) return sendEvent(chatId, "m.sticker", txn, content);
         return media.media(item.url(), 0, 0).thenApplyAsync(src -> {
             try {
-                StickerConverter.Result r = StickerConverter.convert(src, target, Settings.get().cacheDir().resolve("stickers"));
-                String ext = r.mime().equals(StickerConverter.WEBP) ? ".webp" : ".png";
-                content.put("url", client.upload(r.file(), r.mime(), "sticker" + ext));
-                info.put("mimetype", r.mime());
-                info.put("size", Files.size(r.file()));
+                if (target == null) {
+                    String mime = info.path("mimetype").asText("application/octet-stream");
+                    content.put("url", client.upload(src, mime, "sticker." + mime.replaceAll(".*/", "")));
+                    info.remove(java.util.List.of("thumbnail_url", "thumbnail_info")); // on the same bridge as the sticker
+                } else {
+                    StickerConverter.Result r = StickerConverter.convert(src, target, Settings.get().cacheDir().resolve("stickers"));
+                    String ext = r.mime().equals(StickerConverter.WEBP) ? ".webp" : ".png";
+                    content.put("url", client.upload(r.file(), r.mime(), "sticker" + ext));
+                    info.put("mimetype", r.mime());
+                    info.put("size", Files.size(r.file()));
+                    Files.deleteIfExists(r.file());
+                }
                 info.remove("fi.mau.bridged_sticker"); // no longer that network's own sticker
-                Files.deleteIfExists(r.file());
                 return content;
             } catch (IOException e) {
                 throw new CompletionException(e);

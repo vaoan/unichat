@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.model.MediaLibrary;
+import app.unichat.model.Network;
 import app.unichat.service.StickerMode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
@@ -14,6 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A favourite sticker goes out as m.sticker keeping its info (bridges resend the native sticker from it). */
@@ -131,5 +134,36 @@ class SendStickerTest {
         JsonNode sent = sendAs(StickerMode.VIDEO);
         assertEquals("m.video", sent.path("msgtype").asText());
         assertTrue(sent.path("info").path("fi.mau.gif").isMissingNode());
+    }
+
+    @Test
+    void aBridgeOnlyReadsItsOwnDirectMedia() {
+        String telegram = "mxc://media-telegram.localhost/abc";
+        assertFalse(MessageSender.needsCopy(telegram, Network.TELEGRAM), "its own sticker: the bridge resends it natively");
+        assertTrue(MessageSender.needsCopy(telegram, Network.DISCORD), "the error: Remote media not found");
+        assertTrue(MessageSender.needsCopy(telegram, Network.MATRIX), "a native room can't reach any bridge");
+        assertTrue(MessageSender.needsCopy("mxc://media-facebook.localhost/abc", Network.WHATSAPP));
+        assertFalse(MessageSender.needsCopy("mxc://media-facebook.localhost/abc", Network.MESSENGER), "bridge names differ from networks");
+        assertFalse(MessageSender.needsCopy("mxc://media-twitter.localhost/abc", Network.X));
+        assertFalse(MessageSender.needsCopy("mxc://media-discord.localhost/abc", Network.DISCORD));
+        assertFalse(MessageSender.needsCopy("mxc://localhost/abc", Network.DISCORD), "on our server: every bridge reads it");
+        assertFalse(MessageSender.needsCopy("https://example.org/a.webp", Network.DISCORD));
+    }
+
+    @Test
+    void aStickerFromAnotherBridgeGoesAsACopyOnOurServer() throws Exception {
+        MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
+        JsonNode info = MatrixClient.JSON.readTree("""
+                {"mimetype":"image/webp","w":512,"h":512,"thumbnail_url":"mxc://s/t","fi.mau.bridged_sticker":{"network":"telegram","id":"123"}}""");
+        svc.sendStickerCopy("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/abc", "image/webp", 512, 512, info),
+                app.unichat.model.RoomFeatures.UNKNOWN).get(10, TimeUnit.SECONDS);
+        assertEquals("image/webp", uploadedType);
+        assertTrue(path.contains("/send/m.sticker/"), path);
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertNotEquals("mxc://s/abc", sent.path("url").asText());
+        assertTrue(sent.path("url").asText().startsWith("mxc://"));
+        assertTrue(sent.path("info").path("fi.mau.bridged_sticker").isMissingNode(), "no longer that network's own sticker");
+        assertTrue(sent.path("info").path("thumbnail_url").isMissingNode(), "the other bridge couldn't read it either");
+        assertEquals(512, sent.path("info").path("w").asInt());
     }
 }
