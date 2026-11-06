@@ -49,6 +49,36 @@ import java.util.function.Predicate;
 public final class LoginWebView {
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
 
+    private static final long HEADER_WAIT_MS = 8_000;
+
+    /**
+     * JavaFX's HTTP client keeps the handler it first saw for good (HTTP2Loader.HTTP_CLIENT), so a second window's cookies
+     * went to the first window's store and it waited forever. Every window goes through this one, which forwards to its own.
+     */
+    private static final class CurrentCookies extends CookieHandler {
+        volatile CookieManager store;
+
+        @Override
+        public Map<String, java.util.List<String>> get(java.net.URI uri, Map<String, java.util.List<String>> headers) throws java.io.IOException {
+            CookieManager s = store;
+            return s == null ? Map.of() : s.get(uri, headers);
+        }
+
+        @Override
+        public void put(java.net.URI uri, Map<String, java.util.List<String>> headers) throws java.io.IOException {
+            CookieManager s = store;
+            if (s != null) s.put(uri, headers);
+        }
+    }
+
+    private static final CurrentCookies COOKIES = new CurrentCookies();
+
+    private static void stopCookies(CookieManager manager, CookieHandler previous) {
+        if (COOKIES.store != manager) return; // somebody else's window by now
+        COOKIES.store = null;
+        CookieHandler.setDefault(previous);
+    }
+
     private LoginWebView() {}
 
     /** The single open login window; only one may swap the JVM-wide cookie handler at a time. */
@@ -59,7 +89,7 @@ public final class LoginWebView {
 
     public static void open(Window owner, Network network, CookieSpec spec,
                             Consumer<SessionCookies> onDone, Runnable onCancel) {
-        openWindow(owner, network, LoginUrls.startUrl(network), (engine, manager) -> {
+        openWindow(owner, network, LoginUrls.startUrl(network), LoginUrls.userAgent(), (engine, manager) -> {
             Map<String, String> byName = new HashMap<>();
             for (HttpCookie c : manager.getCookieStore().getCookies()) {
                 if (c.hasExpired() || !spec.isForNetwork(c.getDomain())) continue;
@@ -79,7 +109,11 @@ public final class LoginWebView {
                                      Consumer<Map<String, String>> onDone, Runnable onCancel) {
         String domain = BridgeCookies.cookieDomain(params);
         String hook = headerHook(BridgeCookies.headersToWatch(params));
-        openWindow(owner, network, params.url(), (engine, manager) -> {
+        Map<String, String> fallbacks = BridgeCookies.headerFallbacks(network, params);
+        long[] signedInAt = {0};
+        // The bridge will use this session as this browser: signing in as another one can get it closed.
+        String agent = params.userAgent() == null || params.userAgent().isBlank() ? LoginUrls.userAgent() : params.userAgent();
+        openWindow(owner, network, params.url(), agent, (engine, manager) -> {
             Map<String, String> headers;
             try {
                 engine.executeScript(hook);
@@ -92,7 +126,15 @@ public final class LoginWebView {
                 if (!c.hasExpired() && BridgeCookies.belongs(c.getDomain(), domain)) cookies.put(c.getName(), c.getValue());
             }
             Map<String, String> values = BridgeCookies.captured(params, engine.getLocation(), cookies, headers);
-            return values == null ? null : () -> onDone.accept(values);
+            if (values != null) return () -> onDone.accept(values);
+            // Signed in, but the page isn't showing its headers: give it a moment, then manage without them if that's possible.
+            Map<String, String> fallback = BridgeCookies.captured(params, engine.getLocation(), cookies, headers, fallbacks);
+            if (fallback == null) {
+                signedInAt[0] = 0;
+                return null;
+            }
+            if (signedInAt[0] == 0) signedInAt[0] = System.currentTimeMillis();
+            return System.currentTimeMillis() - signedInAt[0] < HEADER_WAIT_MS ? null : () -> onDone.accept(fallback);
         }, onCancel);
     }
 
@@ -151,7 +193,7 @@ public final class LoginWebView {
      */
     public static void openForToken(Window owner, Network network, String url, String extractJs,
                                     Predicate<String> valid, Consumer<String> onToken, Runnable onCancel) {
-        openWindow(owner, network, url, (engine, manager) -> {
+        openWindow(owner, network, url, LoginUrls.userAgent(), (engine, manager) -> {
             Object r;
             try {
                 r = engine.executeScript(extractJs);
@@ -193,7 +235,7 @@ public final class LoginWebView {
         return bar;
     }
 
-    private static void openWindow(Window owner, Network network, String url,
+    private static void openWindow(Window owner, Network network, String url, String userAgent,
                                    BiFunction<WebEngine, CookieManager, Runnable> finish, Runnable onCancel) {
         if (openStage != null) { // never swap the global handler twice
             openStage.toFront();
@@ -206,7 +248,7 @@ public final class LoginWebView {
         WebView web = new WebView();
         web.setContextMenuEnabled(false);
         WebEngine engine = web.getEngine();
-        engine.setUserAgent(LoginUrls.userAgent());
+        engine.setUserAgent(userAgent);
         Path storageDir = freshStorage(engine);
         web.setAccessibleText("Página de inicio de sesión de " + network.displayName());
 
@@ -254,8 +296,7 @@ public final class LoginWebView {
         stage.setOnHidden(e -> {
             poll.stop();
             engine.load("about:blank");
-            // Restore the JVM-wide handler only if nobody replaced ours meanwhile.
-            if (CookieHandler.getDefault() == manager) CookieHandler.setDefault(previous);
+            stopCookies(manager, previous);
             openStage = null;
             deleteQuietly(storageDir);
             if (!finished[0]) {
@@ -266,7 +307,8 @@ public final class LoginWebView {
 
         // Install the global handler only after all risky setup succeeded; undo on failure.
         // WebView reads the JVM-wide default handler: give it a fresh, empty store while open.
-        CookieHandler.setDefault(manager);
+        COOKIES.store = manager;
+        CookieHandler.setDefault(COOKIES);
         openStage = stage;
         try {
             stage.show();
@@ -275,7 +317,7 @@ public final class LoginWebView {
         } catch (RuntimeException ex) {
             poll.stop();
             stage.close(); // no orphan modal window
-            if (CookieHandler.getDefault() == manager) CookieHandler.setDefault(previous);
+            stopCookies(manager, previous);
             openStage = null;
             throw ex;
         }

@@ -76,13 +76,59 @@ public final class BridgeCookies {
      * @param headers what the page sent, by lower-case name
      */
     public static Map<String, String> captured(BridgeLogin.CookieParams p, String location, Map<String, String> cookies, Map<String, String> headers) {
+        return captured(p, location, cookies, headers, Map.of());
+    }
+
+    /** @param fallbacks by field id, for what the page didn't send ({@link #headerFallbacks}) */
+    public static Map<String, String> captured(BridgeLogin.CookieParams p, String location, Map<String, String> cookies,
+                                               Map<String, String> headers, Map<String, String> fallbacks) {
         if (p.waitForUrlPattern() != null && (location == null || !Pattern.compile(p.waitForUrlPattern()).matcher(location).find())) return null;
         Map<String, String> out = new HashMap<>();
         for (BridgeLogin.CookieField f : p.fields()) {
             String v = value(f, cookies, headers);
+            if ((v == null || v.isBlank()) && fallbacks.containsKey(f.id())) v = fallbacks.get(f.id());
             boolean ok = v != null && !v.isBlank() && (f.pattern() == null || Pattern.compile(f.pattern()).matcher(v).find());
             if (ok) out.put(f.id(), v);
             else if (f.required()) return null;
+        }
+        return out;
+    }
+
+    /**
+     * What to send for headers only a live page has, where the bridge manages without them. mautrix-linkedin checks that
+     * they look right, and then replaces both with its own defaults unless X-LI-Track names LinkedIn's web client
+     * (pkg/linkedingo/client.go): so this doesn't pretend to be any browser, it asks for those defaults. Empty elsewhere.
+     */
+    public static Map<String, String> headerFallbacks(Network n, BridgeLogin.CookieParams p) {
+        if (n != Network.LINKEDIN) return Map.of();
+        Map<String, String> out = new HashMap<>();
+        for (BridgeLogin.CookieField f : p.fields()) {
+            BridgeLogin.Source h = headerSource(f);
+            if (h == null || isCookieHeader(h)) continue;
+            String name = h.name().toLowerCase(Locale.ROOT);
+            if (name.equals("x-li-track")) out.put(f.id(), "{\"clientVersion\":\"\"}");
+            else if (name.equals("x-li-page-instance")) out.put(f.id(), "urn:li:page:messaging_thread");
+        }
+        return out;
+    }
+
+    /** Whether a browser's session or a cookies.txt is enough here, though the step asks for request headers. */
+    public static boolean canUseSavedSession(Network n, BridgeLogin.CookieParams p) {
+        if (!needsWindowCapture(p)) return false;
+        Map<String, String> fallbacks = headerFallbacks(n, p);
+        for (BridgeLogin.CookieField f : p.fields()) {
+            BridgeLogin.Source h = headerSource(f);
+            if (f.required() && h != null && !isCookieHeader(h) && !fallbacks.containsKey(f.id())) return false;
+        }
+        return !fallbacks.isEmpty();
+    }
+
+    /** The step's values from a saved session. */
+    public static Map<String, String> savedSessionValues(Network n, BridgeLogin.CookieParams p, SessionCookies found) {
+        Map<String, String> out = new HashMap<>(headerFallbacks(n, p));
+        for (BridgeLogin.CookieField f : p.fields()) {
+            BridgeLogin.Source h = headerSource(f);
+            if (h != null && isCookieHeader(h)) out.put(f.id(), cookieHeader(new java.util.TreeMap<>(found.values())));
         }
         return out;
     }

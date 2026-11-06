@@ -85,4 +85,34 @@ class BridgeCookiesTest {
         assertTrue(BridgeCookies.belongs("www.linkedin.com", "linkedin.com"));
         assertFalse(BridgeCookies.belongs("notlinkedin.com", "linkedin.com"));
     }
+
+    @Test
+    void aSavedLinkedInSessionWorksWithoutThePagesHeaders() {
+        assertTrue(BridgeCookies.canUseSavedSession(Network.LINKEDIN, linkedin()));
+        Map<String, String> v = BridgeCookies.savedSessionValues(Network.LINKEDIN, linkedin(),
+                new SessionCookies(Network.LINKEDIN, Map.of("li_at", "abc", "JSESSIONID", "ajax")));
+        assertEquals("JSESSIONID=ajax; li_at=abc", v.get("cookie_header"));
+        assertTrue(v.get("track").contains("clientVersion"), "the shape the bridge checks");
+        assertFalse(v.get("track").contains("voyager-web"), "so the bridge uses its own values instead of these");
+        assertTrue(v.get("page").contains("urn:li:page"));
+    }
+
+    @Test
+    void onlyWhereTheBridgeIsKnownToManageWithoutThem() {
+        assertFalse(BridgeCookies.canUseSavedSession(Network.X, linkedin()));
+        assertEquals(Map.of(), BridgeCookies.headerFallbacks(Network.X, linkedin()));
+    }
+
+    @Test
+    void theWindowCanFinishWithTheFallbacksToo() {
+        Map<String, String> fallbacks = BridgeCookies.headerFallbacks(Network.LINKEDIN, linkedin());
+        String feed = "https://www.linkedin.com/feed/";
+        assertEquals(null, BridgeCookies.captured(linkedin(), feed, SESSION, Map.of()), "real ones first");
+        Map<String, String> v = BridgeCookies.captured(linkedin(), feed, SESSION, Map.of(), fallbacks);
+        assertTrue(v.get("track").contains("clientVersion"));
+        Map<String, String> seen = BridgeCookies.captured(linkedin(), feed, SESSION, SENT, fallbacks);
+        assertEquals("urn:li:page:feed", seen.get("page"), "what the page really sent wins");
+        assertEquals(null, BridgeCookies.captured(linkedin(), "https://www.linkedin.com/login", SESSION, Map.of(), fallbacks), "not before the end");
+        assertEquals(null, BridgeCookies.captured(linkedin(), feed, Map.of(), Map.of(), fallbacks), "never without the session");
+    }
 }

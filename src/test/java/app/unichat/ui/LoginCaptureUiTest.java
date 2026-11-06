@@ -36,9 +36,14 @@ class LoginCaptureUiTest {
         Platform.setImplicitExit(false);
     }
 
+    private static volatile String agent;
+
     private static void page(HttpServer server, String path, String html) {
         server.createContext(path, ex -> {
-            if (path.equals("/login")) ex.getResponseHeaders().add("Set-Cookie", "JSESSIONID=ajax123; Path=/; HttpOnly");
+            if (path.equals("/login")) {
+                ex.getResponseHeaders().add("Set-Cookie", "JSESSIONID=ajax123; Path=/; HttpOnly");
+                agent = ex.getRequestHeaders().getFirst("User-Agent");
+            }
             byte[] b = html.getBytes(StandardCharsets.UTF_8);
             ex.getResponseHeaders().add("Content-Type", "text/html");
             ex.sendResponseHeaders(200, b.length);
@@ -84,9 +89,40 @@ class LoginCaptureUiTest {
         try {
             Map<String, String> v = done.get(30, TimeUnit.SECONDS);
             assertTrue(v.get("cookie_header").contains("JSESSIONID=ajax123"), "an HttpOnly cookie too");
+            assertEquals("UA", agent, "the browser the bridge asked for");
             assertEquals("{\"clientVersion\":\"1.2.3\"}", v.get("track"));
             assertEquals("urn:li:page:d_flagship3_feed", v.get("page"));
             assertEquals(3, v.size(), "only what was asked for");
+        } finally {
+            server.stop(0);
+            Platform.runLater(() -> { if (owner[0] != null) owner[0].close(); });
+        }
+    }
+
+    @Test
+    void aPageThatShowsNoHeadersStillFinishes() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        page(server, "/login", "<script>setTimeout(function () { location.href = '/feed'; }, 300);</script>");
+        page(server, "/feed", "<p>sin peticiones</p>");
+        server.start();
+        String base = "http://127.0.0.1:" + server.getAddress().getPort();
+        BridgeLogin.CookieParams params = new BridgeLogin.CookieParams(base + "/login", "UA", List.of(
+                new BridgeLogin.CookieField("cookie_header", true, List.of(new BridgeLogin.Source("request_header", "Cookie", null)), "\\bJSESSIONID=[^;]+"),
+                new BridgeLogin.CookieField("track", true, List.of(new BridgeLogin.Source("request_header", "X-LI-Track", null)), "clientVersion"),
+                new BridgeLogin.CookieField("page", true, List.of(new BridgeLogin.Source("request_header", "X-LI-Page-Instance", null)), "urn:li:page")),
+                null, ".*/feed.*");
+        CompletableFuture<Map<String, String>> done = new CompletableFuture<>();
+        Stage[] owner = new Stage[1];
+        Platform.runLater(() -> {
+            owner[0] = new Stage();
+            owner[0].setScene(new Scene(new StackPane(), 200, 100));
+            owner[0].show();
+            LoginWebView.openCapturing(owner[0], Network.LINKEDIN, params, done::complete, () -> done.completeExceptionally(new AssertionError("cancelled")));
+        });
+        try {
+            Map<String, String> v = done.get(30, TimeUnit.SECONDS);
+            assertTrue(v.get("cookie_header").contains("JSESSIONID=ajax123"));
+            assertTrue(v.get("track").contains("clientVersion"));
         } finally {
             server.stop(0);
             Platform.runLater(() -> { if (owner[0] != null) owner[0].close(); });

@@ -326,9 +326,10 @@ final class BridgeLoginPane extends StackPane {
     }
 
     private Node cookies(BridgeLogin.Step s) {
-        if (BridgeCookies.needsWindowCapture(s.cookies())) return capture(s);
-        if (!BridgeCookies.canCollect(s.cookies())) return unsupported();
-        CookieSpec spec = BridgeCookies.spec(network, s.cookies());
+        boolean headers = BridgeCookies.needsWindowCapture(s.cookies());
+        if (headers && !BridgeCookies.canUseSavedSession(network, s.cookies())) return capture(s);
+        if (!headers && !BridgeCookies.canCollect(s.cookies())) return unsupported();
+        CookieSpec spec = headers ? CookieSpec.forNetwork(network) : BridgeCookies.spec(network, s.cookies());
         VBox found = new VBox(8, new HBox(8, spinner(16), label("Buscando tu sesión en tus navegadores…")));
         Label status = label("");
         status.setVisible(false);
@@ -336,7 +337,8 @@ final class BridgeLoginPane extends StackPane {
         java.util.function.Consumer<SessionCookies> send = cookies -> {
             show(waiting("Conectando…"));
             background(() -> {
-                BridgeLogin.Step after = api.submit(s, BridgeCookies.values(s.cookies(), cookies));
+                BridgeLogin.Step after = api.submit(s, headers ? BridgeCookies.savedSessionValues(network, s.cookies(), cookies)
+                        : BridgeCookies.values(s.cookies(), cookies));
                 Platform.runLater(() -> render(after));
             });
         };
@@ -344,7 +346,10 @@ final class BridgeLoginPane extends StackPane {
         here.getStyleClass().add("secondary-button");
         here.setMaxWidth(Double.MAX_VALUE);
         here.setAccessibleText("Abrir " + network.displayName() + " en una ventana de Unichat para iniciar sesión");
-        here.setOnAction(e -> LoginWebView.open(owner.get(), network, spec, send, () -> { }));
+        here.setOnAction(e -> {
+            if (headers) openCapture(s);
+            else LoginWebView.open(owner.get(), network, spec, send, () -> { });
+        });
         Button file = new Button("Elegir archivo cookies.txt…");
         file.getStyleClass().add("secondary-button");
         file.setMaxWidth(Double.MAX_VALUE);
@@ -393,14 +398,18 @@ final class BridgeLoginPane extends StackPane {
         here.getStyleClass().add("primary-button");
         here.setMaxWidth(Double.MAX_VALUE);
         here.setAccessibleText("Abrir " + network.displayName() + " en una ventana de Unichat para iniciar sesión");
-        here.setOnAction(e -> LoginWebView.openCapturing(owner.get(), network, s.cookies(), values -> {
+        here.setOnAction(e -> openCapture(s));
+        return new VBox(10, why, here);
+    }
+
+    private void openCapture(BridgeLogin.Step s) {
+        LoginWebView.openCapturing(owner.get(), network, s.cookies(), values -> {
             show(waiting("Conectando…"));
             background(() -> {
                 BridgeLogin.Step after = api.submit(s, values);
                 Platform.runLater(() -> render(after));
             });
-        }, () -> { }));
-        return new VBox(10, why, here);
+        }, () -> { });
     }
 
     private Node unsupported() {

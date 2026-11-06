@@ -71,3 +71,5 @@
 - **A JavaFX window shown while someone types takes the keyboard**: the notification card (a Button) got the next
   space/Enter and opened its chat, so "the chat changed while typing". Notifications go to macOS now (UnichatBar.app);
   the fallback card hands focus back and ignores keys.
+- **JavaFX's WebView keeps the first CookieHandler it saw for the whole process** (`HTTP2Loader.HTTP_CLIENT`): changing the
+  default later does nothing, so a second login window never saw its cookies. `LoginWebView.CurrentCookies` stays installed and forwards.
