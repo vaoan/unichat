@@ -42,6 +42,7 @@ class LoginCaptureUiTest {
         server.createContext(path, ex -> {
             if (path.equals("/login")) {
                 ex.getResponseHeaders().add("Set-Cookie", "JSESSIONID=ajax123; Path=/; HttpOnly");
+                ex.getResponseHeaders().add("Set-Cookie", "li_at=sesion; Path=/; HttpOnly");
                 agent = ex.getRequestHeaders().getFirst("User-Agent");
             }
             byte[] b = html.getBytes(StandardCharsets.UTF_8);

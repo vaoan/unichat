@@ -112,25 +112,9 @@ public final class BridgeCookies {
         return out;
     }
 
-    /** Whether a browser's session or a cookies.txt is enough here, though the step asks for request headers. */
-    public static boolean canUseSavedSession(Network n, BridgeLogin.CookieParams p) {
-        if (!needsWindowCapture(p)) return false;
-        Map<String, String> fallbacks = headerFallbacks(n, p);
-        for (BridgeLogin.CookieField f : p.fields()) {
-            BridgeLogin.Source h = headerSource(f);
-            if (f.required() && h != null && !isCookieHeader(h) && !fallbacks.containsKey(f.id())) return false;
-        }
-        return !fallbacks.isEmpty();
-    }
-
-    /** The step's values from a saved session. */
-    public static Map<String, String> savedSessionValues(Network n, BridgeLogin.CookieParams p, SessionCookies found) {
-        Map<String, String> out = new HashMap<>(headerFallbacks(n, p));
-        for (BridgeLogin.CookieField f : p.fields()) {
-            BridgeLogin.Source h = headerSource(f);
-            if (h != null && isCookieHeader(h)) out.put(f.id(), cookieHeader(new java.util.TreeMap<>(found.values())));
-        }
-        return out;
+    /** Whether these are a signed-in session: networks have guest cookies too (mautrix/linkedin#67). */
+    public static boolean signedIn(Network n, Map<String, String> cookies) {
+        return CookieSpec.forNetwork(n) == null || CookieSpec.forNetwork(n).missing(cookies).isEmpty();
     }
 
     private static String value(BridgeLogin.CookieField f, Map<String, String> cookies, Map<String, String> headers) {

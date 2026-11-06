@@ -125,6 +125,7 @@ public final class LoginWebView {
             for (HttpCookie c : manager.getCookieStore().getCookies()) {
                 if (!c.hasExpired() && BridgeCookies.belongs(c.getDomain(), domain)) cookies.put(c.getName(), c.getValue());
             }
+            if (!BridgeCookies.signedIn(network, cookies)) return null;
             Map<String, String> values = BridgeCookies.captured(params, engine.getLocation(), cookies, headers);
             if (values != null) return () -> onDone.accept(values);
             // Signed in, but the page isn't showing its headers: give it a moment, then manage without them if that's possible.

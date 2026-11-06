@@ -1,6 +1,8 @@
 package app.unichat.ui;
 
 import app.unichat.login.BridgeCookies;
+import app.unichat.login.ChromeLogin;
+import app.unichat.settings.Settings;
 import app.unichat.login.BridgeLogin;
 import app.unichat.login.BrowserSession;
 import app.unichat.login.CookieLogin;
@@ -56,6 +58,7 @@ final class BridgeLoginPane extends StackPane {
     private final Runnable onConnected;
     private final Runnable onUseBotChat;
     private volatile boolean closed;
+    private volatile ChromeLogin chromeLogin;
     private volatile BridgeLogin.Step current;
     private String lastStepId;
     private int stepNumber;
@@ -77,6 +80,8 @@ final class BridgeLoginPane extends StackPane {
     /** Leaving the screen: stop waiting and cancel the login on the bridge. */
     void dispose() {
         closed = true;
+        ChromeLogin chrome = chromeLogin;
+        if (chrome != null) chrome.cancel();
         BridgeLogin.Step s = current;
         if (s != null && !s.isComplete()) Thread.ofVirtual().start(() -> api.cancel(s));
     }
@@ -326,10 +331,9 @@ final class BridgeLoginPane extends StackPane {
     }
 
     private Node cookies(BridgeLogin.Step s) {
-        boolean headers = BridgeCookies.needsWindowCapture(s.cookies());
-        if (headers && !BridgeCookies.canUseSavedSession(network, s.cookies())) return capture(s);
-        if (!headers && !BridgeCookies.canCollect(s.cookies())) return unsupported();
-        CookieSpec spec = headers ? CookieSpec.forNetwork(network) : BridgeCookies.spec(network, s.cookies());
+        if (BridgeCookies.needsWindowCapture(s.cookies())) return capture(s);
+        if (!BridgeCookies.canCollect(s.cookies())) return unsupported();
+        CookieSpec spec = BridgeCookies.spec(network, s.cookies());
         VBox found = new VBox(8, new HBox(8, spinner(16), label("Buscando tu sesión en tus navegadores…")));
         Label status = label("");
         status.setVisible(false);
@@ -337,8 +341,7 @@ final class BridgeLoginPane extends StackPane {
         java.util.function.Consumer<SessionCookies> send = cookies -> {
             show(waiting("Conectando…"));
             background(() -> {
-                BridgeLogin.Step after = api.submit(s, headers ? BridgeCookies.savedSessionValues(network, s.cookies(), cookies)
-                        : BridgeCookies.values(s.cookies(), cookies));
+                BridgeLogin.Step after = api.submit(s, BridgeCookies.values(s.cookies(), cookies));
                 Platform.runLater(() -> render(after));
             });
         };
@@ -346,10 +349,7 @@ final class BridgeLoginPane extends StackPane {
         here.getStyleClass().add("secondary-button");
         here.setMaxWidth(Double.MAX_VALUE);
         here.setAccessibleText("Abrir " + network.displayName() + " en una ventana de Unichat para iniciar sesión");
-        here.setOnAction(e -> {
-            if (headers) openCapture(s);
-            else LoginWebView.open(owner.get(), network, spec, send, () -> { });
-        });
+        here.setOnAction(e -> LoginWebView.open(owner.get(), network, spec, send, () -> { }));
         Button file = new Button("Elegir archivo cookies.txt…");
         file.getStyleClass().add("secondary-button");
         file.setMaxWidth(Double.MAX_VALUE);
@@ -399,7 +399,43 @@ final class BridgeLoginPane extends StackPane {
         here.setMaxWidth(Double.MAX_VALUE);
         here.setAccessibleText("Abrir " + network.displayName() + " en una ventana de Unichat para iniciar sesión");
         here.setOnAction(e -> openCapture(s));
-        return new VBox(10, why, here);
+        java.nio.file.Path browser = ChromeLogin.usefulFor(network) ? ChromeLogin.findChrome() : null;
+        if (browser == null) return new VBox(10, why, here);
+        why.setText("Se abre Chrome, aparte del tuyo y sin tocar tu sesión. Inicia sesión como siempre, también con Google. "
+                + "Cuando veas tu página de inicio de " + network.displayName() + ", se cierra solo y se borra lo que quedó ahí.");
+        Button chrome = new Button("Iniciar sesión en Chrome");
+        chrome.getStyleClass().add("primary-button");
+        chrome.setMaxWidth(Double.MAX_VALUE);
+        chrome.setAccessibleText("Abrir " + network.displayName() + " en Chrome para iniciar sesión, también con Google");
+        chrome.setOnAction(e -> signInWithChrome(s, browser));
+        here.setText("Usar correo y contraseña aquí");
+        here.getStyleClass().setAll("button", "secondary-button");
+        return new VBox(10, why, chrome, here);
+    }
+
+    private void signInWithChrome(BridgeLogin.Step s, java.nio.file.Path browser) {
+        ChromeLogin login = new ChromeLogin(network, s.cookies(), browser, Settings.get().cacheDir().resolve("login-chrome"));
+        chromeLogin = login;
+        Label wait = label("Inicia sesión en la ventana de Chrome. Unichat sigue aquí cuando termines.");
+        Button cancel = new Button("Cancelar");
+        cancel.getStyleClass().add("secondary-button");
+        cancel.setOnAction(e -> login.cancel());
+        show(new VBox(10, new HBox(8, spinner(16), wait), cancel));
+        background(() -> {
+            java.util.Map<String, String> values;
+            try {
+                values = login.run();
+            } catch (InterruptedException e) {
+                values = null;
+            }
+            if (values == null) {
+                if (!closed) Platform.runLater(() -> render(s)); // closed or cancelled: the same choice again
+                return;
+            }
+            Platform.runLater(() -> show(waiting("Conectando…")));
+            BridgeLogin.Step after = api.submit(s, values);
+            Platform.runLater(() -> render(after));
+        });
     }
 
     private void openCapture(BridgeLogin.Step s) {
@@ -459,7 +495,7 @@ final class BridgeLoginPane extends StackPane {
 
     /** Runs blocking bridge calls off the FX thread; failures become a friendly error screen. */
     private void background(ThrowingRunnable r) {
-        Thread.ofVirtual().name("bridge-login").start(() -> {
+        Thread.ofPlatform().daemon().name("bridge-login").start(() -> { // can block for minutes
             try {
                 r.run();
             } catch (Exception e) {

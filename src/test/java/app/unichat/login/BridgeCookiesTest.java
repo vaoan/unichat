@@ -87,20 +87,14 @@ class BridgeCookiesTest {
     }
 
     @Test
-    void aSavedLinkedInSessionWorksWithoutThePagesHeaders() {
-        assertTrue(BridgeCookies.canUseSavedSession(Network.LINKEDIN, linkedin()));
-        Map<String, String> v = BridgeCookies.savedSessionValues(Network.LINKEDIN, linkedin(),
-                new SessionCookies(Network.LINKEDIN, Map.of("li_at", "abc", "JSESSIONID", "ajax")));
-        assertEquals("JSESSIONID=ajax; li_at=abc", v.get("cookie_header"));
-        assertTrue(v.get("track").contains("clientVersion"), "the shape the bridge checks");
-        assertFalse(v.get("track").contains("voyager-web"), "so the bridge uses its own values instead of these");
-        assertTrue(v.get("page").contains("urn:li:page"));
+    void onlyWhereTheBridgeIsKnownToManageWithoutThem() {
+        assertEquals(Map.of(), BridgeCookies.headerFallbacks(Network.X, linkedin()));
     }
 
     @Test
-    void onlyWhereTheBridgeIsKnownToManageWithoutThem() {
-        assertFalse(BridgeCookies.canUseSavedSession(Network.X, linkedin()));
-        assertEquals(Map.of(), BridgeCookies.headerFallbacks(Network.X, linkedin()));
+    void aGuestIsNotSignedIn() {
+        assertFalse(BridgeCookies.signedIn(Network.LINKEDIN, Map.of("JSESSIONID", "x")));
+        assertTrue(BridgeCookies.signedIn(Network.LINKEDIN, Map.of("JSESSIONID", "x", "li_at", "y")));
     }
 
     @Test
