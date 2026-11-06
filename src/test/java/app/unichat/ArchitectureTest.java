@@ -67,7 +67,7 @@ class ArchitectureTest {
     @Test
     void theBaseLayersStayAtTheBottom() {
         noClasses().that().resideInAnyPackage("..model..", "..support..", "..bridge..")
-                .should().dependOnClassesThat().resideInAnyPackage("..settings..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..gif..")
+                .should().dependOnClassesThat().resideInAnyPackage("..settings..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..assist..", "..gif..")
                 .check(APP);
         noClasses().that().resideInAPackage("..settings..")
                 .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..gif..")

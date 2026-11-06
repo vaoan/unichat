@@ -58,6 +58,7 @@ public final class Composer extends VBox {
     private final HBox row;
     private final Button send;
     private final Button mic;
+    private AiReplyButton ai;
     private VoiceBar voiceBar;
     private VoiceRecorder recorder;
     private Runnable beforeRecording = () -> { };
@@ -100,6 +101,7 @@ public final class Composer extends VBox {
         });
         Button stickers = new Button("GIF");
         stickers.getStyleClass().addAll("icon-button", "gif-button");
+        stickers.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE); // 160 % text: "GIF", not "…"
         stickers.setAccessibleText("Stickers y GIFs");
         stickers.setTooltip(new javafx.scene.control.Tooltip("Stickers y GIFs"));
         stickers.setOnAction(e -> { if (onPanel != null) onPanel.accept(SidePanel.Tab.STICKERS); });
@@ -110,7 +112,8 @@ public final class Composer extends VBox {
         this.send = send;
         mic = iconButton(Icons.MIC, "Grabar una nota de voz", this::startRecording);
         mic.getStyleClass().add("mic-button");
-        row = new HBox(4, attach, input, stickers, emoji, mic, send);
+        ai = new AiReplyButton(this::aiRequest, this::aiDraft, onError);
+        row = new HBox(4, attach, input, ai.node(), stickers, emoji, mic, send);
         row.setAlignment(Pos.BOTTOM_CENTER);
         row.getStyleClass().add("composer-row");
         getChildren().addAll(banner, row);
@@ -174,7 +177,7 @@ public final class Composer extends VBox {
         beforeRecording.run();
         mic.setDisable(true);
         // Opening it can wait for the system's permission question.
-        Thread.ofVirtual().name("open-microphone").start(() -> {
+        Thread.ofPlatform().daemon().name("open-microphone").start(() -> {
             try {
                 PcmSource source = microphone.call();
                 Path file = Settings.get().cacheDir().resolve("media").resolve("voice-" + java.util.UUID.randomUUID() + ".ogg");
@@ -209,7 +212,7 @@ public final class Composer extends VBox {
     private void discardRecording(String message) {
         VoiceRecorder r = endRecordingUi();
         if (r == null) return;
-        Thread.ofVirtual().name("voice-discard").start(() -> {
+        Thread.ofPlatform().daemon().name("voice-discard").start(() -> {
             try {
                 r.cancel();
             } catch (Exception e) {
@@ -227,7 +230,7 @@ public final class Composer extends VBox {
         String reply = replyTo == null ? null : replyTo.id();
         cancelMode();
         focus();
-        Thread.ofVirtual().name("voice-send").start(() -> {
+        Thread.ofPlatform().daemon().name("voice-send").start(() -> {
             try {
                 VoiceNote note = r.stop();
                 if (note.durationMs() < MIN_VOICE_MS) {
@@ -251,6 +254,32 @@ public final class Composer extends VBox {
                 Platform.runLater(() -> onError.accept("No se pudo guardar la nota de voz"));
             }
         });
+    }
+
+    /** Tests: a stand-in for the AI program. */
+    void useAiWriter(java.util.function.Supplier<AiReplyButton.Writer> writers) {
+        HBox parent = row;
+        int at = parent.getChildren().indexOf(ai.node());
+        ai = new AiReplyButton(this::aiRequest, this::aiDraft, onError, writers);
+        parent.getChildren().set(at, ai.node());
+    }
+
+    /** The chat so far, the message chosen with "Responder" if any, and what's written as the idea. Null with nothing to answer. */
+    private AiReplyButton.Request aiRequest() {
+        java.util.List<Message> chat = chatId == null ? java.util.List.of() : svc.messages(chatId);
+        if (chat.isEmpty()) return null;
+        return new AiReplyButton.Request(chatId, AiReplyButton.prompt(chat, replyTo, input.getText()));
+    }
+
+    /** Into the box of the chat it was for: what was written there went into the prompt as the idea. */
+    private void aiDraft(String forChat, String draft) {
+        if (!forChat.equals(chatId)) {
+            drafts.put(forChat, draft);
+            return;
+        }
+        input.setText(draft);
+        input.positionCaret(input.getLength());
+        focus();
     }
 
     public void reply(Message m) {

@@ -37,6 +37,7 @@ public final class Icons {
     public static final String FILE = "M6 2h8l6 6v14H6V2Zm7 1.5V9h5.5L13 3.5ZM8 4v16h10V11h-7V4H8Z";
     public static final String DOWNLOAD = "M11 3h2v9.2l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4 3.6 3.6V3ZM4 19h16v2H4v-2Z";
     public static final String PLAY = "M8 5v14l11-7L8 5Z";
+    public static final String SPARKLE = "M11 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6Zm7.5 11 1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1 1-2.5Z";
     public static final String MIC = "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-6 9h2a4 4 0 0 0 8 0h2a6 6 0 0 1-5 5.9V21h-2v-3.1A6 6 0 0 1 6 12Z";
     public static final String PAUSE = "M7 5h4v14H7V5Zm6 0h4v14h-4V5Z";
     public static final String VOLUME = "M4 9v6h4l5 4V5L8 9H4Zm12 .5a4 4 0 0 1 0 5v-5Z";
