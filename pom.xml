@@ -185,4 +185,22 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <!-- UI tests with no display and no windows: ./mvnw verify -Pheadless-ui. Monocle is the newest published, for JavaFX 21. -->
+    <profile>
+      <id>headless-ui</id>
+      <properties>
+        <argLine>-Dunichat.uiTests=true -Dunichat.headless=true -Dglass.platform=Monocle -Dmonocle.platform=Headless -Dprism.order=sw -Dprism.text=t2k -Djava.awt.headless=true</argLine>
+        <surefire.rerunFailingTestsCount>1</surefire.rerunFailingTestsCount>
+      </properties>
+      <dependencies>
+        <dependency>
+          <groupId>org.testfx</groupId>
+          <artifactId>openjfx-monocle</artifactId>
+          <version>21.0.2</version>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
 </project>

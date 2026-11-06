@@ -146,7 +146,7 @@ class VoiceUiTest {
         Message first = svc.messages(CHAT).get(0);
         fx(() -> { composer.reply(first); return null; });
         startRecording();
-        Thread.sleep(900);
+        Thread.sleep(1500); // well over the shortest note, even on a busy machine
         fx(() -> { ((Button) composer.lookup(".voice-bar .send-button")).fire(); return null; });
         await(() -> voiceNotes().size() == 1, "sent");
         assertEquals(first.id(), voiceNotes().get(0).replyToId());

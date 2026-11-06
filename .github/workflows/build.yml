@@ -21,6 +21,19 @@ jobs:
           cache: maven
       - run: ./mvnw -B verify
 
+  ui-headless:
+    runs-on: ubuntu-latest
+    # Informative for now: a couple of these tests are still unstable, and they shouldn't hold back the packages.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: ./mvnw -B verify -Pheadless-ui
+
   windows:
     needs: test
     runs-on: windows-latest

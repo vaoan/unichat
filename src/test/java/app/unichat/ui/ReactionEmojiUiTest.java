@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A reaction shows an emoji, whatever it is made of; never the address of one. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
+@org.junit.jupiter.api.condition.DisabledIfSystemProperty(named = "unichat.headless", matches = "true", disabledReason = "JavaFX stops under Monocle; needs a display")
 class ReactionEmojiUiTest {
     @TempDir Path dir;
 
