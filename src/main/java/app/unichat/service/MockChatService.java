@@ -97,9 +97,12 @@ public final class MockChatService implements ChatService, FolderForwarding {
     }
 
     @Override
-    public synchronized void stop() {
-        if (scheduler != null) scheduler.shutdownNow();
-        scheduler = null;
+    public void stop() {
+        synchronized (this) {
+            if (scheduler != null) scheduler.shutdownNow();
+            scheduler = null;
+        }
+        prefs.flush();
     }
 
     @Override

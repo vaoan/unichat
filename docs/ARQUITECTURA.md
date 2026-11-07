@@ -57,6 +57,26 @@ recibe `MediaSource`, no todo el servicio.
 | `RoomPreferences` | Lo que dice el servidor frente a `PreferencesFile`, que decide; la regla de silencio que vuelve al servidor |
 | `MatrixClient` | HTTP |
 
+## `ui`
+
+Una ventana grande se parte por lo que hace cada pieza, no por pantallas:
+
+| Clase | Responsabilidad |
+|---|---|
+| `MainView`, `WindowShortcuts`, `Throttle` | La ventana y sus capas; las teclas de toda la ventana, F6 y el zoom; cuántas veces por segundo se redibuja |
+| `ChatListPane`, `ChatRowCell`, `SpaceChannelsView` | La columna de chats; cómo se dibuja cada fila; los canales de un servidor |
+| `ThreadPane`, `TimelineScroll`, `MessageRowView`, `MessageLine` | El chat abierto; adónde mira la lista; cómo se dibuja un mensaje; sus botones al pasar el ratón |
+| `A11yText` | Lo que dicen el lector de pantalla y la voz (texto puro, con pruebas) |
+| `SettingsWindow`, `SettingsForm` y las páginas (`NetworksPage`, `AiReplyPage`…) | La ventana de ajustes; las piezas de un formulario; cada familia de páginas |
+
+## `server`
+
+`LocalServer` arranca y vigila los procesos. `BridgeInstaller` deja listo un puente (descarga, configuración y comandos de preparación) y `ServerSecrets` guarda el archivo de secretos.
+
+## Guardar preferencias
+
+`PreferencesFile` no escribe en el hilo de quien cambia algo: copia el estado con su candado y escribe en un hilo daemon, una vez por muchos cambios seguidos. `ChatSession.stop()` espera esa escritura, y a `stop()` se llega al salir (`UnichatApp.quit`, también desde `MacQuit`), al cerrar sesión y desde un gancho de apagado.
+
 ## Límites de código
 
 No hay un número oficial: Checkstyle trae por defecto 2.000 líneas por archivo y 150 por método. Unichat es más estricto

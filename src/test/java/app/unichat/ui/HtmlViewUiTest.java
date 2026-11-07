@@ -107,9 +107,13 @@ class HtmlViewUiTest {
             view.openChatId(CHAT);
             return sc;
         });
-        for (int i = 0; i < 150 && !fx(() -> chipShown(scene)); i++) Thread.sleep(100);
-        fx(() -> {
-            Node bubble = bubbleWith(scene, "Hola ");
+        // Checked in the same turn that sees the chip: the row can be drawn again at any moment (the list settling its
+        // width), and a new drawing has no chip until its links answer, a turn later.
+        boolean checked = false;
+        for (int i = 0; i < 150 && !checked; i++) {
+            checked = fx(() -> {
+                if (!chipShown(scene)) return false;
+                Node bubble = bubbleWith(scene, "Hola ");
             String all = texts(bubble);
             for (String shown : List.of("mundo", "Título", "uno", "celda", "sin cargar")) assertTrue(all.contains(shown), shown + " in: " + all);
             for (String gone : List.of("alert", "malo", "secreto")) assertFalse(all.contains(gone), gone + " in: " + all);
@@ -124,7 +128,10 @@ class HtmlViewUiTest {
             Hyperlink veil = (Hyperlink) bubble.lookup(".html-spoiler");
             veil.fire();
             assertTrue(texts(bubble).contains("secreto"), "shown when asked for");
-            return null;
-        });
+                return true;
+            });
+            if (!checked) Thread.sleep(100);
+        }
+        assertTrue(checked, "the chip showed");
     }
 }

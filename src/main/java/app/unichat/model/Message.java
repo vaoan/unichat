@@ -136,7 +136,7 @@ public final class Message {
     /** Changes when anything drawn from this message does. Rows ask it for every message each time one arrives, so it stays cheap. */
     public int revision() {
         return java.util.Objects.hash(type, body, senderName, mediaUrl, fileName, mimeType, fileSize, width, height, replyToId, edited,
-                deleted, status, reactions, html, previewHtml, htmlText, externalUrl, mediaInfo);
+                deleted, status, reactions, reactionNames, html, previewHtml, htmlText, externalUrl, mediaInfo);
     }
 
     /** The same message under another id, the way a local echo becomes the event the server gave it. */

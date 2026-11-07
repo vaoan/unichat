@@ -32,7 +32,7 @@ final class AiReplyPage {
             found.setText(e.find() == null ? e.label() + " no está instalado en este computador." : "Instalado.");
         };
         refresh.run();
-        Node engines = SettingsWindow.chips("Programa de IA", List.of(AiEngine.values()), AiEngine::label, AiSettings.engine(), e -> {
+        Node engines = SettingsForm.chips("Programa de IA", List.of(AiEngine.values()), AiEngine::label, AiSettings.engine(), e -> {
             AiSettings.setEngine(e);
             refresh.run();
         });
@@ -45,14 +45,14 @@ final class AiReplyPage {
         Label instructionsHelp = new Label("Se envían con cada borrador, antes de la conversación. Al corregir no se usan.");
         instructionsHelp.getStyleClass().add("settings-help");
 
-        return SettingsWindow.page("Escribir con IA", intro, privacy,
-                SettingsWindow.group("General",
-                        SettingsWindow.row("Mostrar los botones", "Aparecen en todos los chats.", SettingsWindow.toggle(AiSettings.enabled(), on -> {
+        return SettingsForm.page("Escribir con IA", intro, privacy,
+                SettingsForm.group("General",
+                        SettingsForm.row("Mostrar los botones", "Aparecen en todos los chats.", SettingsForm.toggle(AiSettings.enabled(), on -> {
                             AiSettings.setEnabled(on);
                             AiReplyButton.SHOWN.set(on);
                         })),
-                        SettingsWindow.row("Programa", "Usa tu propia sesión y tu plan.", new VBox(4, engines, found)),
-                        SettingsWindow.row("Carpeta que puede leer", "Por ejemplo la de tu hoja de vida. Claude Code solo puede leer esta carpeta. "
+                        SettingsForm.row("Programa", "Usa tu propia sesión y tu plan.", new VBox(4, engines, found)),
+                        SettingsForm.row("Carpeta que puede leer", "Por ejemplo la de tu hoja de vida. Claude Code solo puede leer esta carpeta. "
                                 + "Codex no puede escribir, pero sí leer el resto del disco.", folderControl())),
                 new VBox(6, new Label("Instrucciones"), instructions, instructionsHelp));
     }

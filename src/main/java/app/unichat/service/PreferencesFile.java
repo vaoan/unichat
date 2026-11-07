@@ -29,6 +29,9 @@ import java.util.UUID;
  * "true" about, so a fresh server's empty answers don't erase what was copied from the old one.
  * Disk errors are logged, never thrown: memory stays right and the old file stays whole. Each save keeps the version it
  * replaces as {@code preferences.json.bak}, the way back if the file turns up damaged.
+ * Changes never wait for the disk: callers change preferences on the UI thread or holding the sync lock, so what changed
+ * is copied under this lock and written on a daemon thread, one write for however many changes came meanwhile.
+ * {@link #flush} waits for it: whoever ends the app (or a session) must call it, a daemon thread doesn't outlive the JVM.
  */
 public final class PreferencesFile {
     public enum Flag {
@@ -91,6 +94,9 @@ public final class PreferencesFile {
     private boolean damagedInPlace;
     private Runnable onSaveFailure;
     private int batching;
+    private boolean writePending, writerRunning;
+    /** Times the main file was replaced since this object was created. */
+    private int mainWrites;
 
     public PreferencesFile(Path preferences, Path serverSeen) {
         this.file = preferences;
@@ -240,10 +246,9 @@ public final class PreferencesFile {
         server = homeserver;
         seen.clear();
         seenDirty = true;
-        save();
+        saveLater();
     }
 
-    /** Several changes, written once at the end: a server's hundreds of channels shouldn't rewrite the file each. */
     /** Muted = archived ({@link QuietRule}): the person's choice covers both. */
     public synchronized void chooseQuiet(String key, boolean on) {
         batch(() -> {
@@ -252,19 +257,35 @@ public final class PreferencesFile {
         });
     }
 
+    /** Several changes, written once at the end: a server's hundreds of channels shouldn't rewrite the file each. */
     public synchronized void batch(Runnable changes) {
         batching++;
         try {
             changes.run();
         } finally {
-            if (--batching == 0) flush();
+            if (--batching == 0 && (dirty || seenDirty)) saveLater();
         }
     }
 
-    /** Writes what reconcile changed, if anything. */
+    /**
+     * Returns once everything changed so far has been written, or has failed to be (reported as ever): for the end of the
+     * app and of a session. Blocks, so never on the UI thread during normal use. The writer takes this lock: don't call it
+     * from inside {@link #batch}, and don't hold a lock that a batch's changes may need.
+     */
     public synchronized void flush() {
-        if (dirty || seenDirty) save();
+        if (dirty || seenDirty) saveLater();
+        boolean interrupted = false;
+        while (writerRunning) {
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                interrupted = true; // the last change is worth more than a prompt answer
+            }
+        }
+        if (interrupted) Thread.currentThread().interrupt();
     }
+
+    synchronized int mainWrites() { return mainWrites; }
 
     public synchronized List<Folder> folders() {
         return folders.stream().map(f -> new Folder(f.id, f.name, List.copyOf(f.keys))).toList();
@@ -322,7 +343,7 @@ public final class PreferencesFile {
 
     private void changed() {
         dirty = true;
-        if (batching == 0) save();
+        if (batching == 0) saveLater();
     }
 
     private void load() {
@@ -468,14 +489,62 @@ public final class PreferencesFile {
         }
     }
 
-    private void save() {
+    private void saveLater() {
         if (file == null) return;
-        if (unreadable) setAsideBadFile();
-        if (dirty && !unreadable) writeMain();
-        if (seenDirty && write(seenFile, seenTree(), false)) seenDirty = false;
-        boolean failing = dirty || seenDirty;
-        if (failing && !saveFailing && onSaveFailure != null) announce(onSaveFailure);
-        saveFailing = failing;
+        writePending = true;
+        if (writerRunning) return;
+        writerRunning = true;
+        Thread.ofPlatform().daemon().name("preferences-save").start(this::writeWhilePending);
+    }
+
+    private void writeWhilePending() {
+        boolean more = true;
+        while (more) {
+            try {
+                writeOnce();
+            } finally {
+                // Decided in one step: a change between "nothing more" and "stopped" would start no writer and wait forever.
+                synchronized (this) {
+                    more = writePending;
+                    if (!more) {
+                        writerRunning = false;
+                        notifyAll();
+                    }
+                }
+            }
+        }
+    }
+
+    /** A copy under the lock, the disk outside it, the outcome under it again. A change made meanwhile asks for another round. */
+    private void writeOnce() {
+        ObjectNode main = null, seenNow = null;
+        boolean keepPrevious = false;
+        synchronized (this) {
+            writePending = false;
+            if (unreadable) setAsideBadFile();
+            if (dirty && !unreadable) {
+                main = tree();
+                keepPrevious = !damagedInPlace;
+                dirty = false;
+            }
+            if (seenDirty) {
+                seenNow = seenTree();
+                seenDirty = false;
+            }
+        }
+        boolean mainSaved = main == null || write(file, main, keepPrevious);
+        boolean seenSaved = seenNow == null || write(seenFile, seenNow, false);
+        synchronized (this) {
+            if (main != null && mainSaved) {
+                damagedInPlace = false;
+                mainWrites++;
+            }
+            if (!mainSaved) dirty = true;
+            if (!seenSaved) seenDirty = true;
+            boolean failing = !mainSaved || !seenSaved || (dirty && unreadable);
+            if (failing && !saveFailing && onSaveFailure != null) announce(onSaveFailure);
+            saveFailing = failing;
+        }
     }
 
     private void writeMain() {
@@ -530,7 +599,7 @@ public final class PreferencesFile {
             if (keepPrevious) keepPrevious(target);
             SyncedFile.replace(target, bytes, false);
             return true;
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException | Error e) { // out of memory included: the change stays pending
             System.err.println("Could not save " + target.getFileName() + ": " + e);
             return false;
         }

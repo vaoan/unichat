@@ -3,10 +3,14 @@ package app.unichat.server;
 /**
  * Child process for SupervisorTest: "run" stays up, "crash" exits with an error at once; a second argument is printed.
  * "chatty &lt;dir&gt;" writes 1 MB to its output (far more than a pipe holds), creates dir/done, waits for dir/go and
- * prints "after".
+ * prints "after". "bridge ..." and "broken-bridge ..." are a bridge's setup commands, for BridgeInstallerTest.
  */
 public final class FakeService {
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws Exception {
+        if (args.length > 0 && args[0].endsWith("bridge")) {
+            bridgeSetup(args);
+            return;
+        }
         System.out.println("started");
         if (args.length > 1 && !args[0].equals("chatty")) System.out.println(args[1]);
         System.out.flush();
@@ -27,5 +31,52 @@ public final class FakeService {
             }
         }
         Thread.sleep(60_000);
+    }
+
+    /** Works in its current folder, like a bridge: writes what it's asked for and leaves a line per call in calls.txt. */
+    private static void bridgeSetup(String[] args) throws java.io.IOException {
+        java.nio.file.Path here = java.nio.file.Path.of("").toAbsolutePath();
+        java.nio.file.Files.writeString(here.resolve("calls.txt"), String.join(" ", args).substring(args[0].length()).strip() + "\n",
+                java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+        if (args[0].equals("broken-bridge")) {
+            System.out.println("first line");
+            System.out.println("no database here");
+            System.exit(7);
+        }
+        String flag = args[1];
+        if (flag.equals("-e")) {
+            java.nio.file.Files.writeString(here.resolve("config.yaml"), """
+                    network:
+                        some_network_key: 1
+                    homeserver:
+                        address: http://example.localhost:8008
+                    appservice:
+                        address: http://localhost:29318
+                    bridge:
+                        permissions:
+                            example.com: user
+                    database:
+                        type: postgres
+                    """);
+        } else if (flag.equals("-g")) {
+            java.nio.file.Files.writeString(here.resolve("registration.yaml"), "as_token: fake\n");
+        } else {
+            // A legacy bridge fills in its config, logs to a file of its own, then stops asking for the homeserver.
+            java.nio.file.Files.writeString(here.resolve("config.yaml"), """
+                    homeserver:
+                        address: http://example.localhost:8008
+                    appservice:
+                        database:
+                            type: postgres
+                    bridge:
+                        backfill:
+                            forward_limits:
+                                initial:
+                                    dm: 0
+                    """);
+            java.nio.file.Files.createDirectories(here.resolve("logs"));
+            java.nio.file.Files.writeString(here.resolve("logs/first.log"), "unfiltered");
+            System.exit(1);
+        }
     }
 }

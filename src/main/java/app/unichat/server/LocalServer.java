@@ -4,18 +4,12 @@ import app.unichat.support.BundledTools;
 import app.unichat.settings.Settings;
 import app.unichat.bridge.BridgePorts;
 import app.unichat.bridge.BridgeStates;
-import app.unichat.support.Redactor;
-import app.unichat.support.Folders;
-import app.unichat.support.Processes;
-import app.unichat.settings.SyncedFile;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URI;
@@ -24,13 +18,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -52,6 +43,8 @@ public final class LocalServer {
     private final Path dir;
     private final Manifest manifest;
     private final BinaryStore store;
+    private final ServerSecrets secretsFile;
+    private final BridgeInstaller installer;
     private final Supervisor supervisor;
     private final MetaSessions metaSessions;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -67,6 +60,8 @@ public final class LocalServer {
         this.dir = platform.dataDir();
         this.manifest = Manifest.bundled();
         this.store = new BinaryStore(dir.resolve("bin"), platform);
+        this.secretsFile = new ServerSecrets(dir);
+        this.installer = new BridgeInstaller(dir, store, manifest);
         this.supervisor = new Supervisor(dir.resolve("run"));
         java.util.Map<String, Integer> ports = new java.util.HashMap<>(BridgePorts.BRIDGE_PORTS);
         ports.put("tuwunel", PORT);
@@ -127,16 +122,10 @@ public final class LocalServer {
         });
     }
 
-    /**
-     * Bridges on the older mautrix framework (not bridgev2): no {@code -e} to write an example config and no login
-     * API, so they log in through the bot chat.
-     */
-    static final Set<String> LEGACY_BRIDGES = Set.of("discord");
-
     /** The bridge's login API (bridgev2 bridges serve it on their appservice port); null for legacy bridges. */
     public String provisioningUrl(String bridge) {
         Integer port = BridgePorts.BRIDGE_PORTS.get(bridge);
-        return port == null || LEGACY_BRIDGES.contains(bridge) ? null : "http://127.0.0.1:" + port + "/_matrix/provision";
+        return port == null || BridgeInstaller.LEGACY_BRIDGES.contains(bridge) ? null : "http://127.0.0.1:" + port + "/_matrix/provision";
     }
 
     /** Whether this server can install {@code bridge} here (pinned in versions.env, with a known port). */
@@ -146,7 +135,7 @@ public final class LocalServer {
 
     /** Login of the account on this server: {user, password}. Available after {@link #ensureRunning}. */
     public synchronized String[] credentials() throws IOException {
-        Properties s = secrets();
+        Properties s = secretsFile.load();
         return new String[]{s.getProperty("user"), s.getProperty("password")};
     }
 
@@ -155,7 +144,7 @@ public final class LocalServer {
      * time. Blocking (call off the FX thread); {@code progress} gets short Spanish status lines.
      */
     public synchronized void ensureRunning(Consumer<String> progress) throws IOException, InterruptedException {
-        Properties secrets = secrets();
+        Properties secrets = secretsFile.load();
         if (!running) supervisor.reapOrphans();
         Files.createDirectories(dir.resolve("appservices"));
         progress.accept("Preparando el servidor…");
@@ -186,7 +175,7 @@ public final class LocalServer {
         if (!running) ensureRunning(progress);
         Set<String> active = activeBridges();
         if (!active.contains(bridge)) {
-            prepareBridge(bridge, secrets(), progress);
+            prepareBridge(bridge, secretsFile.load(), progress);
             active.add(bridge);
             Files.writeString(dir.resolve("bridges.active"), String.join(" ", active));
             // tuwunel reads appservice registrations at startup.
@@ -196,7 +185,7 @@ public final class LocalServer {
         }
         if (!supervisor.isRunning(bridge)) {
             // Skipped at startup if its keys were missing then: its config needs them now.
-            prepareBridge(bridge, secrets(), progress);
+            prepareBridge(bridge, secretsFile.load(), progress);
             startBridge(bridge);
         }
         progress.accept("Esperando al puente…");
@@ -213,41 +202,9 @@ public final class LocalServer {
     // ---------------------------------------------------------------- pieces
 
     private void prepareBridge(String b, Properties secrets, Consumer<String> progress) throws IOException, InterruptedException {
-        Manifest.Component c = manifest.bridge(b);
-        if (c == null) throw new IOException("Sin versión fijada para " + b);
-        if (!store.isInstalled(c)) {
-            progress.accept("Descargando el puente de " + b + "…");
-            store.install(c);
-        }
-        Path bd = dir.resolve(b);
-        Files.createDirectories(bd);
-        Path config = bd.resolve("config.yaml");
-        if (!Files.exists(config)) {
-            if (LEGACY_BRIDGES.contains(b)) {
-                // Legacy bridges have no -e: given an empty config they fill in every default, then stop asking for
-                // the homeserver (expected: the non-zero exit is ignored, the filled file is what we want).
-                Files.writeString(config, "{}\n");
-                runIgnoringExit(bd, store.path(b).toString(), "-c", "config.yaml");
-                if (Files.size(config) < 100) throw new IOException(b + " no generó su configuración");
-                // That run logged to its default file (unfiltered); from now on it logs to stdout (Redactor).
-                Folders.delete(bd.resolve("logs"));
-            } else {
-                run(bd, store.path(b).toString(), "-e", "-c", "config.yaml");
-            }
-        }
-        String[] tg = telegramKeys(b);
-        BridgeConfig.rewrite(config, new BridgeConfig.Settings(b, BridgePorts.BRIDGE_PORTS.get(b), DOMAIN, "@" + USER + ":" + DOMAIN,
-                URL, bd, secrets.getProperty("double_puppet_token"), tg[0], tg[1], statusEndpoint.url(b)));
-        Path reg = bd.resolve("registration.yaml");
-        if (!Files.exists(reg)) run(bd, store.path(b).toString(), "-g", "-c", "config.yaml", "-r", "registration.yaml");
-        Files.copy(reg, dir.resolve("appservices").resolve(b + ".yaml"), StandardCopyOption.REPLACE_EXISTING);
-    }
-
-    /** Telegram only runs with the user's own api_id/api_hash (my.telegram.org). */
-    private String[] telegramKeys(String b) throws IOException {
-        if (!b.equals("telegram")) return new String[]{null, null};
-        if (!TelegramKeys.saved()) throw new IOException("Telegram necesita tu api_id y api_hash de my.telegram.org");
-        return new String[]{TelegramKeys.apiId().strip(), TelegramKeys.apiHash().strip()};
+        BridgeInstaller.TelegramApi telegram = b.equals("telegram") && TelegramKeys.saved()
+                ? new BridgeInstaller.TelegramApi(TelegramKeys.apiId().strip(), TelegramKeys.apiHash().strip()) : null;
+        installer.prepare(b, secrets.getProperty("double_puppet_token"), statusEndpoint.url(b), telegram, progress);
     }
 
     private void startHomeserver(Consumer<String> progress) throws IOException, InterruptedException {
@@ -325,7 +282,7 @@ public final class LocalServer {
                   users:
                     - regex: '@.*:%s'
                       exclusive: false
-                """.formatted(secrets.getProperty("double_puppet_token"), random(48), DOMAIN));
+                """.formatted(secrets.getProperty("double_puppet_token"), ServerSecrets.random(48), DOMAIN));
     }
 
     /** Registers the account the first time (registration-token flow, two requests). */
@@ -351,7 +308,7 @@ public final class LocalServer {
 
     private void markAccountCreated(Properties secrets) throws IOException {
         secrets.setProperty("account_created", "yes");
-        saveSecrets(secrets);
+        secretsFile.save(secrets);
     }
 
     private JsonNode postJson(String path, JsonNode body) throws IOException, InterruptedException {
@@ -374,7 +331,7 @@ public final class LocalServer {
     /** Applies new settings to a bridge that's in use (its config is rewritten, then it restarts). Blocking. */
     public synchronized void restartBridge(String bridge, Consumer<String> progress) throws IOException, InterruptedException {
         if (!running || !usableBridges().contains(bridge)) return;
-        prepareBridge(bridge, secrets(), progress);
+        prepareBridge(bridge, secretsFile.load(), progress);
         supervisor.stop(bridge);
         states.restarting(bridge, BridgeStates.now());
         startBridge(bridge);
@@ -413,58 +370,4 @@ public final class LocalServer {
     }
 
     static final String LIBOLM_VERSION = "3.2.16";
-
-    // ---------------------------------------------------------------- secrets
-
-    private Properties secrets() throws IOException {
-        Path f = dir.resolve("secrets.properties");
-        Properties p = new Properties();
-        if (Files.exists(f)) {
-            try (InputStream in = Files.newInputStream(f)) {
-                p.load(in);
-            }
-        }
-        boolean changed = false;
-        for (String[] kv : new String[][]{{"user", USER}, {"password", null}, {"registration_token", null},
-                {"double_puppet_token", null}}) {
-            if (p.getProperty(kv[0]) == null) {
-                p.setProperty(kv[0], kv[1] != null ? kv[1] : random(kv[0].equals("password") ? 24 : 48));
-                changed = true;
-            }
-        }
-        if (changed) saveSecrets(p);
-        return p;
-    }
-
-    /** Whole or not at all: an empty file after a crash would mean a new password for an account that already exists. */
-    private void saveSecrets(Properties p) throws IOException {
-        Files.createDirectories(dir);
-        ByteArrayOutputStream content = new ByteArrayOutputStream();
-        p.store(content, "Unichat local server - private");
-        SyncedFile.replace(dir.resolve("secrets.properties"), content.toByteArray(), true);
-    }
-
-    private static String random(int n) {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        SecureRandom r = new SecureRandom();
-        StringBuilder sb = new StringBuilder(n);
-        for (int i = 0; i < n; i++) sb.append(chars.charAt(r.nextInt(chars.length())));
-        return sb.toString();
-    }
-
-    private static void runIgnoringExit(Path workDir, String... cmd) throws IOException, InterruptedException {
-        if (!Processes.quiet(List.of(cmd), workDir, 60).finished()) throw new IOException("Tiempo agotado: " + Path.of(cmd[0]).getFileName());
-    }
-
-    /** Runs a bridge setup command; on failure its (redacted) output goes to the log and the error message. */
-    private static void run(Path workDir, String... cmd) throws IOException, InterruptedException {
-        Processes.Result r = Processes.capture(new ProcessBuilder(cmd).directory(workDir.toFile()).redirectErrorStream(true), 60);
-        if (!r.finished()) throw new IOException("Tiempo agotado: " + Path.of(cmd[0]).getFileName());
-        if (r.exit() != 0) {
-            String text = Redactor.redact(r.out().strip());
-            System.err.println("Bridge setup failed (" + Path.of(cmd[0]).getFileName() + ", exit " + r.exit() + "): " + text);
-            String last = text.lines().reduce((a, b) -> b).orElse("sin detalles");
-            throw new IOException(Path.of(cmd[0]).getFileName() + " no pudo prepararse: " + last);
-        }
-    }
 }

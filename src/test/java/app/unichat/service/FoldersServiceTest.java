@@ -1,10 +1,12 @@
 package app.unichat.service;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -17,8 +19,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FoldersServiceTest {
     @TempDir Path dir;
 
+    private final List<MockChatService> opened = new ArrayList<>();
+
     private MockChatService service() {
-        return new MockChatService(new PreferencesFile(dir.resolve("preferences.json"), dir.resolve("server-seen.json")));
+        MockChatService svc = new MockChatService(new PreferencesFile(dir.resolve("preferences.json"), dir.resolve("server-seen.json")));
+        opened.add(svc);
+        return svc;
+    }
+
+    @AfterEach
+    void stopAll() {
+        opened.forEach(MockChatService::stop);
     }
 
     @Test
@@ -44,6 +55,7 @@ class FoldersServiceTest {
         MockChatService a = service();
         String id = a.createFolder("Trabajo");
         a.setInFolder(id, a.chat("!mama:demo"), true);
+        a.stop();
         MockChatService b = service();
         assertEquals("Trabajo", b.folders().get(0).name());
         assertEquals(List.of("matrix:!mama:demo"), b.folders().get(0).chatKeys());
@@ -55,6 +67,7 @@ class FoldersServiceTest {
         boolean before = a.chat("!mama:demo").favorite();
         a.setFavorite("!mama:demo", !before).join();
         a.setMuted("!andrea:demo", true).join();
+        a.stop();
         MockChatService b = service();
         assertEquals(!before, b.chat("!mama:demo").favorite());
         assertTrue(b.chat("!andrea:demo").archived() && b.chat("!andrea:demo").muted(), "quiet records both flags");
@@ -68,8 +81,17 @@ class FoldersServiceTest {
         MockChatService a = service();
         a.setMuted("!servidor:demo", true).join();
         assertNotNull(a.chat("!servidor:demo").prefKey());
+        a.stop();
         MockChatService b = service();
         assertTrue(b.chat("!servidor:demo").muted() && b.chat("!servidor:demo").archived());
+    }
+
+    @Test
+    void loggingOutSavesTheLastChange() {
+        MockChatService a = service();
+        a.createFolder("Trabajo");
+        a.logout().join();
+        assertEquals("Trabajo", new PreferencesFile(dir.resolve("preferences.json"), dir.resolve("server-seen.json")).folders().get(0).name());
     }
 
     @Test

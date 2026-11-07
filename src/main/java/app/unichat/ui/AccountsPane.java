@@ -15,7 +15,6 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
-import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TextField;
@@ -27,7 +26,6 @@ import javafx.scene.layout.VBox;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
@@ -37,7 +35,6 @@ import java.util.function.Consumer;
  */
 public final class AccountsPane extends VBox {
     private final ChatService svc;
-    private final Runnable close;
     private final Consumer<String> toast;
     private final Consumer<String> openChatId;
     private final StackPane body = new StackPane();
@@ -48,7 +45,7 @@ public final class AccountsPane extends VBox {
     private final LoginChoosers choosers;
     private final LoginWizard.Navigation navigation = new LoginWizard.Navigation() {
         @Override public void openBotChat(String chatId) {
-            closeSheet();
+            dispose();
             openChatId.accept(chatId);
         }
         @Override public void showPicker() { AccountsPane.this.showPicker(); }
@@ -57,18 +54,12 @@ public final class AccountsPane extends VBox {
         @Override public void setBack(Runnable action) { onBack = action; }
     };
 
-    /** {@code close} null = embedded in the settings window (no close button, no card frame). */
-    public AccountsPane(ChatService svc, Runnable close, Consumer<String> toast, Consumer<String> openChatId) {
+    public AccountsPane(ChatService svc, Consumer<String> toast, Consumer<String> openChatId) {
         this.svc = svc;
-        this.close = close;
         this.toast = toast;
         this.openChatId = openChatId;
         this.choosers = new LoginChoosers(svc, toast, this::setView, this::getScene, () -> wizard);
         getStyleClass().add("accounts-sheet");
-        if (close != null) {
-            getStyleClass().add("card");
-            setMaxSize(640, 640);
-        }
         setSpacing(14);
 
         title.getStyleClass().add("sheet-title");
@@ -76,7 +67,6 @@ public final class AccountsPane extends VBox {
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.ALWAYS);
         HBox head = new HBox(6, back, title, grow);
-        if (close != null) head.getChildren().add(Icons.iconButton(Icons.CLOSE, "Cerrar", this::closeSheet));
         head.setAlignment(Pos.CENTER_LEFT);
         VBox.setVgrow(body, Priority.ALWAYS);
         getChildren().addAll(head, body);
@@ -93,11 +83,6 @@ public final class AccountsPane extends VBox {
 
     /** The dynamic login on screen (local server), if any. */
     private BridgeLoginPane bridgeLogin;
-
-    private void closeSheet() {
-        dispose();
-        if (close != null) close.run();
-    }
 
     /** Re-reads accounts if the list is showing (accountsChanged). The wizard updates itself. */
     public void refresh() {
@@ -160,7 +145,7 @@ public final class AccountsPane extends VBox {
             servers.getStyleClass().add("secondary-button");
             servers.setMinWidth(Region.USE_PREF_SIZE);
             servers.setAccessibleText("Elegir qué servidores de Discord ver en Unichat");
-            servers.setOnAction(e -> showDiscordGuilds(m));
+            servers.setOnAction(e -> showDiscordServers(m));
             row.getChildren().add(2, servers);
         }
         if (a.network() == Network.TELEGRAM && a.status() == AccountStatus.CONNECTED) {
@@ -185,92 +170,9 @@ public final class AccountsPane extends VBox {
         return row;
     }
 
-    /**
-     * Which Discord servers come into Unichat: search, one switch per server, bridged ones first. A server's
-     * channels appear as people write in them (no room is created for every channel at once).
-     */
-    private void showDiscordGuilds(BridgeAccess m) {
+    private void showDiscordServers(BridgeAccess m) {
         dispose();
-        ProgressIndicator spin = new ProgressIndicator();
-        spin.setMaxSize(36, 36);
-        Label wait = new Label("Buscando tus servidores de Discord…");
-        wait.getStyleClass().add("settings-help");
-        VBox loading = new VBox(14, spin, wait);
-        loading.setAlignment(Pos.CENTER);
-        setView("Servidores de Discord", loading, this::showList);
-        m.discordGuilds().whenComplete((guilds, err) -> Platform.runLater(() -> {
-            if (err != null) {
-                spin.setVisible(false);
-                wait.setText("No se pudo leer la lista: " + LoginTexts.rootMessage(err));
-                return;
-            }
-            Label help = Labels.help("Elige los servidores que quieres ver. Sus canales aparecen en Unichat a medida que alguien escribe en ellos. Los mensajes directos y grupos privados llegan siempre.");
-            TextField search = new TextField();
-            search.setPromptText("Buscar servidor");
-            search.setAccessibleText("Buscar servidor de Discord");
-            Label count = new Label();
-            count.getStyleClass().add("settings-help");
-            VBox rows = new VBox(0);
-            rows.getStyleClass().add("settings-group");
-            java.util.Set<String> on = new java.util.HashSet<>();
-            for (var g : guilds) if (g.bridged()) on.add(g.id());
-            List<BridgeAccess.DiscordGuild> sorted = guilds.stream()
-                    .sorted(java.util.Comparator.comparing((BridgeAccess.DiscordGuild g) -> !g.bridged())
-                            .thenComparing(g -> g.name().toLowerCase(java.util.Locale.ROOT)))
-                    .toList();
-            Runnable render = () -> {
-                String q = ChatFilter.normalize(search.getText());
-                rows.getChildren().clear();
-                for (var g : sorted) {
-                    if (!q.isEmpty() && !ChatFilter.normalize(g.name()).contains(q)) continue;
-                    Label name = new Label(g.name());
-                    name.getStyleClass().add("settings-label");
-                    name.setWrapText(true);
-                    HBox.setHgrow(name, Priority.ALWAYS);
-                    name.setMaxWidth(Double.MAX_VALUE);
-                    javafx.scene.control.CheckBox sw = new javafx.scene.control.CheckBox();
-                    sw.getStyleClass().add("switch");
-                    sw.setSelected(on.contains(g.id()));
-                    sw.setAccessibleText("Ver " + g.name() + " en Unichat");
-                    sw.setOnAction(e -> {
-                        boolean want = sw.isSelected();
-                        sw.setDisable(true);
-                        m.setDiscordGuildBridged(g.id(), want).whenComplete((v, ex) -> Platform.runLater(() -> {
-                            sw.setDisable(false);
-                            if (ex != null) {
-                                sw.setSelected(!want);
-                                toast.accept("No se pudo cambiar " + g.name() + ": " + LoginTexts.rootMessage(ex));
-                            } else {
-                                if (want) on.add(g.id()); else on.remove(g.id());
-                                count.setText(on.size() + " de " + sorted.size() + " servidores en Unichat");
-                                toast.accept(want ? g.name() + ": sus canales irán apareciendo" : g.name() + " ya no se traerá");
-                            }
-                        }));
-                    });
-                    HBox row = new HBox(12, name, sw);
-                    row.setAlignment(Pos.CENTER_LEFT);
-                    row.getStyleClass().add("settings-row");
-                    rows.getChildren().add(row);
-                }
-                if (rows.getChildren().isEmpty()) {
-                    Label none = new Label(sorted.isEmpty() ? "Tu cuenta no está en ningún servidor." : "Ningún servidor coincide.");
-                    none.getStyleClass().add("settings-help");
-                    HBox row = new HBox(none);
-                    row.getStyleClass().add("settings-row");
-                    rows.getChildren().add(row);
-                }
-            };
-            count.setText(on.size() + " de " + sorted.size() + " servidores en Unichat");
-            search.textProperty().addListener((o, a, b) -> render.run());
-            render.run();
-            ScrollPane scroll = new ScrollPane(rows);
-            scroll.setFitToWidth(true);
-            scroll.getStyleClass().add("login-scroll");
-            VBox.setVgrow(scroll, Priority.ALWAYS);
-            VBox content = new VBox(10, help, search, count, scroll);
-            setView("Servidores de Discord", content, this::showList);
-            Platform.runLater(search::requestFocus);
-        }));
+        setView("Servidores de Discord", new DiscordServersPage(m, toast), this::showList);
     }
 
     private ContextMenu accountMenu(Account a) {
@@ -395,11 +297,7 @@ public final class AccountsPane extends VBox {
     }
 
     private void startBridgeLogin(BridgeAccess m, Network n) {
-        ProgressIndicator spin = new ProgressIndicator();
-        spin.setMaxSize(36, 36);
-        Label wait = Labels.help("Preparando " + n.displayName() + "… La primera vez se descarga su conector; tarda unos segundos.");
-        VBox loading = new VBox(14, spin, wait);
-        loading.setAlignment(Pos.CENTER);
+        LoadingView loading = new LoadingView("Preparando " + n.displayName() + "… La primera vez se descarga su conector; tarda unos segundos.");
         setView("Conectar " + n.displayName(), loading, this::showPicker);
         Thread.ofVirtual().name("prepare-bridge").start(() -> {
             try {
@@ -423,27 +321,18 @@ public final class AccountsPane extends VBox {
                     });
                 });
             } catch (Exception e) {
-                Platform.runLater(() -> {
-                    spin.setVisible(false);
-                    wait.setText("No se pudo preparar " + n.displayName() + ": " + LoginTexts.rootMessage(e));
-                });
+                Platform.runLater(() -> loading.fail("No se pudo preparar " + n.displayName() + ": " + LoginTexts.rootMessage(e)));
             }
         });
     }
 
     private void startBotLogin(Network n) {
-        ProgressIndicator spin = new ProgressIndicator();
-        spin.setMaxSize(36, 36);
-        Label wait = new Label("Preparando el inicio de sesión de " + n.displayName() + "…");
-        wait.getStyleClass().add("settings-help");
-        VBox loading = new VBox(14, spin, wait);
-        loading.setAlignment(Pos.CENTER);
+        LoadingView loading = new LoadingView("Preparando el inicio de sesión de " + n.displayName() + "…");
         setView("Conectar " + n.displayName(), loading, this::showPicker);
         Instant since = Instant.now().minusSeconds(2);
         svc.addAccount(n).whenComplete((botChatId, err) -> Platform.runLater(() -> {
             if (err != null) {
-                wait.setText("No se pudo iniciar: " + LoginTexts.rootMessage(err));
-                spin.setVisible(false);
+                loading.fail("No se pudo iniciar: " + LoginTexts.rootMessage(err));
                 return;
             }
             wizard = new LoginWizard(svc, toast, navigation, n, botChatId, since);

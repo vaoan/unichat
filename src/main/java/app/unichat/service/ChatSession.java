@@ -9,7 +9,7 @@ public interface ChatSession {
     void removeListener(ChatService.Listener listener);
     /** Starts syncing. Safe to call once; data appears through listener callbacks. */
     void start();
-    /** Stops background work (app exit). Does not log out. */
+    /** Stops background work and saves what's pending, waiting for the disk (app exit, end of a session). Does not log out. */
     void stop();
     /** Ends the session on the server and forgets stored credentials. */
     CompletableFuture<Void> logout();

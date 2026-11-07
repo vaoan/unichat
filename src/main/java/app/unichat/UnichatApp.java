@@ -17,8 +17,6 @@ import app.unichat.ui.LoginView;
 import app.unichat.ui.MacQuit;
 import app.unichat.ui.MainView;
 import app.unichat.ui.Notifier;
-import app.unichat.ui.SettingsWindow;
-import app.unichat.ui.SidePanel;
 import app.unichat.ui.Theme;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -33,7 +31,7 @@ public final class UnichatApp extends Application {
     private Stage stage;
     private Scene scene;
     private Notifier notifier;
-    private ChatService service;
+    private volatile ChatService service;
     private MainView mainView;
 
     public static void main(String[] args) {
@@ -93,6 +91,11 @@ public final class UnichatApp extends Application {
             }
         });
 
+        // Ending any other way than quit() (logging out of the computer, kill): what was chosen last still reaches the disk.
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            ChatService svc = service;
+            if (svc != null) svc.stop();
+        }, "preferences-shutdown"));
         LogFiles.scheduleCleanup();
         if (s.localServer()) startLocalServer();
         ChatService restored = switch (s.backend() == null ? "" : s.backend()) {
@@ -117,66 +120,8 @@ public final class UnichatApp extends Application {
             wait.setOnFinished(e -> mainView.addAccount(Network.fromProtocolId(startLogin)));
             wait.play();
         }
-        snapshotIfRequested();
-    }
-
-    /**
-     * Diagnostics for screenshots/CI: {@code -Dunichat.snapshot=out.png} writes the window to a PNG
-     * and exits; {@code -Dunichat.openChat=<id>} opens a chat first, {@code -Dunichat.info=true} the info panel,
-     * {@code -Dunichat.openSpace=<id>} a server's channels,
-     * {@code -Dunichat.openFolders=true} the list of folders, {@code -Dunichat.openFolder=<name>} inside one,
-     * {@code -Dunichat.overlay=command|newchat|add|picker|folder|folderDelete|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
-     * {@code -Dunichat.network=<protocol id>} filters the inbox to one network.
-     */
-    private void snapshotIfRequested() {
-        String out = System.getProperty("unichat.snapshot");
-        if (out == null) return;
-        String chatId = System.getProperty("unichat.openChat");
-        javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(1.5));
-        wait.setOnFinished(e -> {
-            if (chatId != null && mainView != null) mainView.openChatId(chatId);
-            if (Boolean.getBoolean("unichat.info") && mainView != null) mainView.toggleInfo();
-            String panelTab = System.getProperty("unichat.panel");
-            if (panelTab != null && mainView != null) mainView.showPanel(SidePanel.Tab.valueOf(panelTab));
-            String net = System.getProperty("unichat.network");
-            if (net != null && mainView != null) mainView.showNetwork(Network.fromProtocolId(net));
-            String space = System.getProperty("unichat.openSpace");
-            if (space != null && mainView != null) mainView.showSpace(space);
-            String folder = System.getProperty("unichat.openFolder");
-            if ((folder != null || Boolean.getBoolean("unichat.openFolders")) && mainView != null) mainView.showFolders(folder);
-            String overlay = System.getProperty("unichat.overlay", "");
-            if (mainView != null && overlay.equals("command")) mainView.showCommandBar();
-            if (mainView != null && overlay.equals("newchat")) mainView.showNewChat();
-            if (mainView != null && overlay.equals("add")) mainView.showAccounts();
-            if (mainView != null && overlay.startsWith("folder")) mainView.showFolderDialog(overlay.equals("folderDelete"));
-            if (mainView != null && overlay.equals("picker")) mainView.showAccounts().showPicker();
-            if (mainView != null && overlay.startsWith("login:")) {
-                mainView.addAccount(Network.fromProtocolId(overlay.substring(6)));
-            }
-            if (mainView != null && overlay.startsWith("settings")) {
-                mainView.showSettings();
-                if (overlay.contains(":")) app.unichat.ui.SettingsWindow.select(overlay.substring(overlay.indexOf(':') + 1));
-            }
-            javafx.animation.PauseTransition shoot = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(Double.parseDouble(System.getProperty("unichat.snapshotDelay", "1.5"))));
-            shoot.setOnFinished(ev -> {
-                try {
-                    var settings = SettingsWindow.current();
-                    var img = (settings != null ? settings.getScene() : scene).snapshot(null);
-                    javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(img, null), "png", new java.io.File(out));
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-                Thread guard = new Thread(() -> {
-                    try { Thread.sleep(4000); } catch (InterruptedException ignored) { }
-                    Runtime.getRuntime().halt(0);
-                });
-                guard.setDaemon(true);
-                guard.start();
-                quit();
-            });
-            shoot.play();
-        });
-        wait.play();
+        String snapshot = System.getProperty("unichat.snapshot");
+        if (snapshot != null) new SnapshotRun(mainView, scene, this::quit).start(snapshot);
     }
 
     /** The demo keeps its choices and folders in the same files as the real service. */

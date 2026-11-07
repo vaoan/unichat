@@ -2,6 +2,7 @@ package app.unichat.service;
 
 import app.unichat.service.PreferencesFile.Flag;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -9,6 +10,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -25,14 +28,28 @@ class PreferencesBackupTest {
 
     private Path prefs() { return dir.resolve("preferences.json"); }
     private Path bak() { return dir.resolve("preferences.json.bak"); }
-    private PreferencesFile open() { return new PreferencesFile(prefs(), dir.resolve("server-seen.json")); }
+    private final List<PreferencesFile> opened = new ArrayList<>();
+
+    private PreferencesFile open() {
+        PreferencesFile p = new PreferencesFile(prefs(), dir.resolve("server-seen.json"));
+        opened.add(p);
+        return p;
+    }
+
+    @AfterEach
+    void flushAll() {
+        opened.forEach(PreferencesFile::flush);
+    }
+
     private static String warning(PreferencesFile p) { return new FolderActions(p, () -> { }).preferencesWarning(); }
 
     /** The last write is in the main file, the one before it in the backup. */
     private void twoSaves() {
         var p = open();
         p.choose(A, Flag.MUTED, true);
+        p.flush();
         p.choose(B, Flag.FAVORITE, true);
+        p.flush();
     }
 
     private long setAsideFiles() throws IOException {
@@ -120,8 +137,10 @@ class PreferencesBackupTest {
     void aBackupThatCannotBeWrittenBlocksNothing() throws IOException {
         var p = open();
         p.choose(A, Flag.MUTED, true);
+        p.flush();
         Files.createDirectories(bak().resolve("in-the-way")); // a file Windows or an antivirus won't let go of
         p.choose(B, Flag.FAVORITE, true);
+        p.flush();
         var chats = JSON.readTree(prefs().toFile()).path("chats");
         assertTrue(chats.path(A).path("muted").asBoolean(), "the good file isn't lost");
         assertTrue(chats.path(B).path("favorite").asBoolean(), "the change is saved");
@@ -142,6 +161,7 @@ class PreferencesBackupTest {
             assertTrue(p.unreadable());
             assertTrue(warning(p).contains("no se guardará nada"), warning(p));
             p.choose(B, Flag.PINNED, true);
+            p.flush();
             assertEquals("{roto", Files.readString(prefs()));
         } finally {
             Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwxr-xr-x"));
@@ -182,6 +202,7 @@ class PreferencesBackupTest {
         assertTrue(text.contains("copia anterior") && text.contains("No se pudieron guardar"), text);
         first.choose(B, Flag.PINNED, true);
         first.choose(B, Flag.ARCHIVED, true);
+        first.flush();
         assertEquals(good, Files.readString(bak()), "failed saves leave the backup alone");
 
         var second = open();
@@ -218,6 +239,7 @@ class PreferencesBackupTest {
         assertEquals(good, Files.readString(bak()), "the retry replaces the damaged file without backing it up");
         assertTrue(JSON.readTree(prefs().toFile()).path("chats").path(A).path("muted").asBoolean());
         p.choose(B, Flag.PINNED, true);
+        p.flush();
         assertTrue(JSON.readTree(bak().toFile()).path("chats").path(A).path("muted").asBoolean(), "from here on, as always");
     }
 

@@ -135,11 +135,14 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     }
 
     @Override
-    public synchronized void stop() {
-        bridges.unwatchLiveStates();
-        core.running = false;
-        if (syncThread != null) syncThread.interrupt();
-        timer.shutdownNow();
+    public void stop() {
+        synchronized (this) {
+            bridges.unwatchLiveStates();
+            core.running = false;
+            if (syncThread != null) syncThread.interrupt();
+            timer.shutdownNow();
+        }
+        prefs.flush();
     }
 
     @Override

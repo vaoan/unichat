@@ -94,6 +94,14 @@ class ThreadRowsUpdateTest {
     }
 
     @Test
+    void aReactionsNameArrivingLaterRedrawsTheMessage() {
+        Message m = message(1, "a");
+        int before = m.revision();
+        m.setReactionName("mxc://x/y", ":orclove:");
+        assertNotEquals(before, m.revision());
+    }
+
+    @Test
     void aRepliedMessageThatChangesRedrawsTheReply() {
         Message original = message(1, "a");
         Message reply = message(2, "b");

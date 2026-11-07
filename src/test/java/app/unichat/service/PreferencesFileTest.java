@@ -5,6 +5,7 @@ import app.unichat.service.PreferencesFile.Flag;
 import app.unichat.service.PreferencesFile.ServerValues;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,7 +29,20 @@ class PreferencesFileTest {
 
     private Path prefs() { return dir.resolve("preferences.json"); }
     private Path seen() { return dir.resolve("server-seen.json"); }
-    private PreferencesFile open() { return new PreferencesFile(prefs(), seen()); }
+    private final List<PreferencesFile> opened = new ArrayList<>();
+
+    /** Like a restart: what the earlier ones hold is on disk first. */
+    private PreferencesFile open() {
+        flushAll();
+        PreferencesFile p = new PreferencesFile(prefs(), seen());
+        opened.add(p);
+        return p;
+    }
+
+    @AfterEach
+    void flushAll() {
+        opened.forEach(PreferencesFile::flush);
+    }
 
     private static ServerValues on(Flag f) {
         return new ServerValues(f == Flag.ARCHIVED, f == Flag.MUTED, f == Flag.FAVORITE, f == Flag.LOW_PRIORITY,
@@ -42,7 +57,10 @@ class PreferencesFileTest {
         return new ServerValues(null, null, null, null, null, at, true);
     }
 
-    private JsonNode read() throws IOException { return JSON.readTree(prefs().toFile()); }
+    private JsonNode read() throws IOException {
+        flushAll();
+        return JSON.readTree(prefs().toFile());
+    }
 
     @Test
     void serverValueEntersWhenTheFileHasNothing() throws IOException {
@@ -88,6 +106,7 @@ class PreferencesFileTest {
         var p = open();
         p.reconcile(K, on(Flag.ARCHIVED));
         p.choose(K, Flag.ARCHIVED, true);
+        p.flush();
         assertTrue(read().path("chats").path(K).path("fromServer").isMissingNode());
         assertTrue(p.reconcile(K, off()).archived());
     }
@@ -238,12 +257,14 @@ class PreferencesFileTest {
     void aFailedWriteKeepsTheOldFileAndMemory() throws IOException {
         var p = open();
         p.choose(K, Flag.MUTED, true);
+        p.flush();
         String before = Files.readString(prefs());
         assumeTrue(dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
         Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("r-xr-xr-x"));
         try {
             assumeTrue(!Files.isWritable(dir));
             assertDoesNotThrow(() -> p.choose(K, Flag.FAVORITE, true));
+            assertDoesNotThrow(p::flush);
             assertTrue(p.current(K).favorite());
             assertEquals(before, Files.readString(prefs()));
         } finally {
@@ -268,6 +289,7 @@ class PreferencesFileTest {
         var p = open();
         p.choose(K, Flag.PINNED, false);
         p.chooseReminder(K, null);
+        p.flush();
         String before = Files.readString(prefs());
         Instant at = Instant.parse("2026-11-07T14:00:00Z");
         var cached = new ServerValues(true, null, null, null, true, at, true);
@@ -294,11 +316,14 @@ class PreferencesFileTest {
             p.rekey(K, "telegram:2");
             assertFalse(Files.exists(prefs()));
         });
+        p.flush();
+        assertEquals(1, p.mainWrites());
         JsonNode e = read().path("chats").path("telegram:2");
         assertTrue(e.path("archived").asBoolean());
         assertTrue(e.path("muted").asBoolean());
         p.choose(K, Flag.PINNED, true);
-        assertTrue(read().path("chats").path(K).path("pinned").asBoolean(), "writes at once again");
+        p.flush();
+        assertTrue(read().path("chats").path(K).path("pinned").asBoolean(), "writes each change again");
     }
 
     @Test
@@ -313,11 +338,13 @@ class PreferencesFileTest {
             assertTrue(p.unreadable());
             assertNull(p.setAside());
             p.choose(K, Flag.MUTED, true);
+            p.flush();
             assertEquals("{roto", Files.readString(prefs()));
         } finally {
             Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwxr-xr-x"));
         }
         p.choose(K, Flag.FAVORITE, true);
+        p.flush();
         assertFalse(p.unreadable());
         assertEquals("{roto", Files.readString(dir.resolve(p.setAside())));
         JsonNode e = read().path("chats").path(K);
@@ -383,6 +410,72 @@ class PreferencesFileTest {
             assertEquals(bad, Files.readString(dir.resolve(p.setAside())));
             assertTrue(p.folders().isEmpty());
         }
+    }
+
+    @Test
+    void aChangeLeavesTheDiskToTheWriter() throws IOException {
+        var p = open();
+        synchronized (p) {
+            p.choose(K, Flag.MUTED, true);
+            assertTrue(p.current(K).muted());
+            assertFalse(Files.exists(prefs()), "nothing is written while the caller still holds the lock");
+        }
+        p.flush();
+        assertTrue(read().path("chats").path(K).path("muted").asBoolean());
+    }
+
+    @Test
+    void aBurstWritesFewerTimesThanChangesAndEndsWithTheLastState() throws IOException {
+        var p = open();
+        int changes = 1000;
+        for (int i = 0; i < changes; i++) p.choose("telegram:" + i, Flag.MUTED, i % 2 == 0);
+        p.choose(K, Flag.ARCHIVED, true);
+        p.flush();
+        assertTrue(p.mainWrites() < changes, p.mainWrites() + " writes");
+        assertTrue(p.mainWrites() >= 1);
+        JsonNode chats = read().path("chats");
+        assertFalse(chats.path("telegram:999").path("muted").asBoolean());
+        assertTrue(chats.path(K).path("archived").asBoolean());
+        assertTrue(open().current(K).archived());
+    }
+
+    @Test
+    void changesWhileTheLockIsHeldShareOneWrite() throws IOException {
+        var p = open();
+        synchronized (p) {
+            for (int i = 0; i < 50; i++) p.choose("telegram:" + i, Flag.FAVORITE, true);
+        }
+        p.flush();
+        assertEquals(1, p.mainWrites());
+        assertEquals(50, read().path("chats").size());
+    }
+
+    @Test
+    void flushAfterAFlushWritesNothingAndWakesNobody() {
+        var p = open();
+        p.choose(K, Flag.MUTED, true);
+        p.flush();
+        int writes = p.mainWrites();
+        p.flush();
+        assertEquals(writes, p.mainWrites());
+    }
+
+    @Test
+    void anInterruptDoesNotLoseTheLastChange() throws IOException {
+        var p = open();
+        p.choose(K, Flag.MUTED, true);
+        Thread.currentThread().interrupt();
+        p.flush();
+        assertTrue(Thread.interrupted(), "the interrupt is kept for the caller");
+        assertTrue(read().path("chats").path(K).path("muted").asBoolean());
+    }
+
+    @Test
+    void inMemoryHasNothingToWait() {
+        var p = PreferencesFile.inMemory();
+        p.choose(K, Flag.MUTED, true);
+        assertDoesNotThrow(p::flush);
+        assertTrue(p.current(K).muted());
     }
 
     @Test

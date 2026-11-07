@@ -16,7 +16,6 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.SplitPane;
-import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
@@ -47,7 +46,6 @@ public final class MainView extends StackPane {
     /** The one audio playing, whichever chat is open. */
     private final AudioPlayback audio;
     private final Consumer<String> openLink;
-    private boolean chatsDirty;
     private String pendingOpenId;
     private long pendingOpenUntil;
     private boolean infoVisible;
@@ -57,7 +55,13 @@ public final class MainView extends StackPane {
             new MediaLibrary(Settings.dataDir().resolve("media-library.json"));
 
     public MediaLibrary library() { return library; }
-    private final java.util.Set<String> dirtyThreads = new java.util.HashSet<>();
+    /**
+     * A busy account (big Discord servers) changes chats many times a second: rebuild at most every REFRESH_GAP_MS, so the UI
+     * thread isn't redrawing the whole inbox nonstop. Same for a chat where many people write: a few updates a second at most.
+     */
+    private static final long REFRESH_GAP_MS = 250;
+    private final Throttle chatsThrottle = new Throttle(REFRESH_GAP_MS);
+    private final Throttle threadThrottle = new Throttle(REFRESH_GAP_MS);
 
     private final ChatService.Listener listener = new ChatService.Listener() {
         @Override public void chatsChanged() { scheduleChats(); }
@@ -149,7 +153,7 @@ public final class MainView extends StackPane {
         toast.setTranslateY(-90);
 
         getChildren().addAll(main, overlay, toast);
-        addEventFilter(KeyEvent.KEY_PRESSED, this::onKey);
+        addEventFilter(KeyEvent.KEY_PRESSED, new WindowShortcuts(this, svc, rail, listPane, thread, panel));
         addEventFilter(KeyEvent.KEY_RELEASED, e -> thread.composer().aiKeyReleased(e.getCode()));
         stage.showingProperty().addListener((o, a, showing) -> {
             if (showing) Platform.runLater(this::catchUp);
@@ -175,61 +179,24 @@ public final class MainView extends StackPane {
     // ------------------------------------------------------------------ updates (coalesced)
 
     private void scheduleChats() {
-        synchronized (dirtyThreads) {
-            if (chatsDirty) return;
-            chatsDirty = true;
-        }
-        Platform.runLater(() -> {
-            // A busy account (big Discord servers) changes chats many times a second: rebuild at most every
-            // REFRESH_GAP_MS, so the UI thread isn't redrawing the whole inbox nonstop.
-            long wait = REFRESH_GAP_MS - (System.currentTimeMillis() - lastRefreshAt);
-            if (wait <= 0) {
-                runChatsRefresh();
-            } else {
-                javafx.animation.PauseTransition later = new javafx.animation.PauseTransition(javafx.util.Duration.millis(wait));
-                later.setOnFinished(e -> runChatsRefresh());
-                later.play();
-            }
+        chatsThrottle.schedule(chatsThrottle, () -> {
+            chatsThrottle.ran();
+            refreshAll();
         });
-    }
-
-    private static final long REFRESH_GAP_MS = 250;
-    private long lastRefreshAt;
-
-    private void runChatsRefresh() {
-        synchronized (dirtyThreads) { chatsDirty = false; }
-        lastRefreshAt = System.currentTimeMillis();
-        refreshAll();
     }
 
     private void scheduleThread(String chatId) {
-        synchronized (dirtyThreads) {
-            if (!dirtyThreads.add(chatId)) return;
-        }
-        Platform.runLater(() -> {
-            // Same as the inbox: a chat where many people write gets at most a few updates a second, however many messages.
-            long wait = REFRESH_GAP_MS - (System.currentTimeMillis() - lastThreadAt);
-            if (wait <= 0) {
-                refreshThread(chatId);
-            } else {
-                javafx.animation.PauseTransition later = new javafx.animation.PauseTransition(javafx.util.Duration.millis(wait));
-                later.setOnFinished(e -> refreshThread(chatId));
-                later.play();
-            }
-        });
+        threadThrottle.schedule(chatId, () -> refreshThread(chatId));
     }
 
-    private long lastThreadAt;
-
     private void refreshThread(String chatId) {
-        synchronized (dirtyThreads) { dirtyThreads.remove(chatId); }
         Chat open = thread.chat();
         if (open != null && open.id().equals(chatId)) {
             if (!stage.isShowing()) {
                 threadStale = true;
                 return;
             }
-            lastThreadAt = System.currentTimeMillis();
+            threadThrottle.ran();
             thread.rebuild(false);
             thread.refreshHeader();
             if (stage.isFocused() && open.isUnread()) svc.markRead(chatId);
@@ -313,14 +280,7 @@ public final class MainView extends StackPane {
         boolean viewing = stage.isFocused() && stage.isShowing() && thread.chat() != null && thread.chat().id().equals(chat.id());
         var settings = Settings.get();
         if (NotificationPolicy.shouldNotify(chat.archived(), settings.notifyArchived(), viewing)) notifier.notify(chat, m);
-        if (settings.speakMessages() && (!chat.archived() || settings.notifyArchived())) Speaker.say(spoken(chat, m));
-    }
-
-    /** "Mensaje de Laura en Familia, WhatsApp: hola" (only the sender when previews are hidden). */
-    static String spoken(Chat chat, Message m) {
-        String who = chat.group() ? m.senderName() + " en " + chat.title() : chat.title();
-        String head = "Mensaje de " + who + ", " + chat.network().displayName();
-        return Settings.get().notificationPreview() ? head + ": " + m.preview() : head;
+        if (settings.speakMessages() && (!chat.archived() || settings.notifyArchived())) Speaker.say(A11yText.spoken(chat, m, settings.notificationPreview()));
     }
 
     private void showAccountAlerts() {
@@ -425,6 +385,8 @@ public final class MainView extends StackPane {
         panel.show(thread.chat(), t);
     }
 
+    boolean infoVisible() { return infoVisible; }
+
     private void setInfo(boolean show) {
         if (show) {
             showPanel(panel.current());
@@ -455,7 +417,9 @@ public final class MainView extends StackPane {
         overlay.setVisible(true);
     }
 
-    private void hideOverlay() {
+    boolean overlayOpen() { return overlay.isVisible(); }
+
+    void hideOverlay() {
         overlay.setVisible(false);
         overlay.getChildren().clear();
         if (thread.chat() != null) thread.composer().focus();
@@ -486,7 +450,7 @@ public final class MainView extends StackPane {
         Platform.runLater(bar::focus);
     }
 
-    private void setView(ChatFilter.View v, boolean unread) {
+    void setView(ChatFilter.View v, boolean unread) {
         listPane.goTo(listPane.filterProperty().get().withView(v).withUnreadOnly(unread).withQuery(""));
     }
 
@@ -513,84 +477,5 @@ public final class MainView extends StackPane {
             refreshAll();
             thread.redraw();
         }, onLogout, this::openChatId, this::toast);
-    }
-
-    /** Text size: delta 0 resets to 100 %. */
-    private void zoom(double delta) {
-        var s = Settings.get();
-        s.setFontScale(delta == 0 ? 1.0 : s.fontScale() + delta);
-        Theme.applyAll();
-        listPane.refresh();
-        thread.redraw();
-        toast("Tamaño de texto: " + Math.round(s.fontScale() * 100) + " %");
-    }
-
-    /** F6 / Shift+F6: rail → chat list → messages → message input (→ side panel when open). */
-    private void cycleFocus(int dir) {
-        Node owner = getScene() == null ? null : getScene().getFocusOwner();
-        int current = -1;
-        for (Node n = owner; n != null; n = n.getParent()) {
-            if (n == rail) current = 0;
-            else if (n == listPane) current = 1;
-            else if (n instanceof javafx.scene.control.ListView<?> lv && lv.getStyleClass().contains("timeline")) current = 2;
-            else if (n == thread.composer()) current = 3;
-            else if (n == panel) current = 4;
-            if (current >= 0) break;
-        }
-        int zones = thread.chat() == null ? 2 : infoVisible ? 5 : 4;
-        int next = Math.floorMod((current < 0 ? (dir > 0 ? -1 : 0) : current) + dir, zones);
-        switch (next) {
-            case 0 -> { Node b = rail.lookup(".rail-button"); if (b != null) b.requestFocus(); }
-            case 1 -> listPane.focusList();
-            case 2 -> thread.focusTimeline();
-            case 4 -> { Node b = panel.lookup(".chip"); if (b != null) b.requestFocus(); }
-            default -> thread.composer().focus();
-        }
-    }
-
-    private void onKey(KeyEvent e) {
-        boolean mod = e.isShortcutDown();
-        Chat c = thread.chat();
-        if (mod && e.getCode() == KeyCode.K) {
-            showCommandBar();
-        } else if (mod && e.getCode() == KeyCode.N) {
-            showNewChat();
-        } else if (e.getCode() == KeyCode.ESCAPE && overlay.isVisible()) {
-            hideOverlay();
-        } else if (mod && e.getCode() == KeyCode.COMMA) {
-            showSettings();
-        } else if (mod && e.getCode() == KeyCode.F) {
-            listPane.focusSearch();
-        } else if (e.isAltDown() && (e.getCode() == KeyCode.UP || e.getCode() == KeyCode.DOWN)) {
-            listPane.move(e.getCode() == KeyCode.DOWN ? 1 : -1, e.isShiftDown());
-        } else if (mod && e.getCode() == KeyCode.E && c != null) {
-            svc.setArchived(c.id(), !c.archived());
-            toast(c.archived() ? "Chat desarchivado" : "Chat archivado");
-        } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.U && c != null) {
-            if (c.isUnread()) svc.markRead(c.id()); else svc.setMarkedUnread(c.id(), true);
-        } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.I && c != null) {
-            toggleInfo();
-        } else if (mod && !e.isShiftDown() && c != null && thread.composer().aiKeyPressed(e.getCode())) {
-            e.consume();
-        } else if (e.getCode() == KeyCode.F6) {
-            cycleFocus(e.isShiftDown() ? -1 : 1);
-        } else if (mod && (e.getCode() == KeyCode.EQUALS || e.getCode() == KeyCode.PLUS || e.getCode() == KeyCode.ADD)) {
-            zoom(0.1);
-        } else if (mod && (e.getCode() == KeyCode.MINUS || e.getCode() == KeyCode.SUBTRACT)) {
-            zoom(-0.1);
-        } else if (mod && (e.getCode() == KeyCode.DIGIT0 || e.getCode() == KeyCode.NUMPAD0)) {
-            zoom(0);
-        } else if (mod && e.getCode().isDigitKey()) {
-            switch (e.getCode()) {
-                case DIGIT1 -> setView(ChatFilter.View.INBOX, false);
-                case DIGIT2 -> setView(ChatFilter.View.INBOX, true);
-                case DIGIT3 -> setView(ChatFilter.View.FAVORITES, false);
-                case DIGIT4 -> setView(ChatFilter.View.LOW_PRIORITY, false);
-                default -> { return; }
-            }
-        } else {
-            return;
-        }
-        e.consume();
     }
 }

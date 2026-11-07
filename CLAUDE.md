@@ -11,18 +11,18 @@ Package rules: `docs/ARQUITECTURA.md`, enforced by `ArchitectureTest` (no cycles
 - `support/` — leaf utilities (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Processes`, `Folders`, `Urls`, `Errors`). Use them instead of writing another: process timeouts, folder deletion and URL encoding had each drifted apart.
 - `bridge/` — what `matrix` and `server` share about bridges (`BridgeStates`, `BridgePorts`).
 - `service/ChatService` — the only API the UI uses (made of small role interfaces; take the narrowest one). Live model objects, listeners on any thread (UI marshals with
-  `Platform.runLater`, coalesced in `MainView`). `MockChatService` = demo mode. `BridgeAccess` = what only bridge-backed services add.
+  `Platform.runLater`, coalesced in `MainView` by `ui/Throttle`). `MockChatService` = demo mode. `BridgeAccess` = what only bridge-backed services add.
 - Data dir files: `preferences.json` (per-chat archived/muted/favorite/lowPriority/pinned + folders; `service/PreferencesFile`), `settings.properties`,
   `media-library.json` and `media-library/` (a copy of each favourite sticker/GIF, `matrix/SavedMedia`) travel with the person (copy them to a new machine); `session.properties` (token, `matrix.*`, `server.*`, `window.*`; `Settings.staysOnThisMachine`
-  decides, older keys migrate out of settings.properties) and `server-seen.json` stay. An older version will ask you to log in again, because the session moved to session.properties; nothing is lost. `preferences.json.bak` is the version before the last save, tried when the main file is damaged. Preference rules (`matrix/RoomPreferences`): the file wins; a field the
+  decides, older keys migrate out of settings.properties) and `server-seen.json` stay. An older version will ask you to log in again, because the session moved to session.properties; nothing is lost. `preferences.json.bak` is the version before the last save, tried when the main file is damaged. Saves happen on a coalescing daemon thread (never on the caller's, which may be the UI or hold `proc`), so a test reading the file calls `flush()` first; `ChatSession.stop()` flushes, and quit, logout and a shutdown hook in `UnichatApp` all reach it. Preference rules (`matrix/RoomPreferences`): the file wins; a field the
   person never touched follows the server; a server false counts only if the same server (identity `homeserver|deviceId`) said true, so a fresh server doesn't
   erase copied choices. Only the mute rule still goes to the server (unread counts come from it). Chat identity across servers: `service/ChatKeys`,
   `<protocol>:<channel.id>`. `service/ChatFolders` is the role for folders (`FolderActions`, `FolderForwarding`); `ui/FolderView` (+ `FolderRows`, `FolderDialogs`) shows them.
 - `matrix/` — `MatrixChatService` (facade: lifecycle, sync loop) over `MatrixCore` (shared), `MessageSender`, `ChatActions`,
   `BridgeAccounts`, `DiscordServers`, `ContactActions`, `MediaDownloader`, `SyncCache`, `MatrixLogin`; `SyncProcessor`
   (pure /sync → model, unit tested) with `RoomFields`, `SystemMessages`, `SyncEvents`; `BridgeProtocol` (pure), `BotChat`, `MatrixClient` (HTTP). `MatrixLiveIT` = end-to-end test, needs `UNICHAT_IT_HOMESERVER`.
-- `ui/` — `MainView` (rail | `ChatListPane` | `ThreadPane` + `InfoPane`, overlays, shortcuts), `Composer`,
-  `CommandBar`, `AccountsPane`, `SettingsWindow`, `Notifier` (AWT tray), `Theme`. Pure logic with tests:
+- `ui/` — `MainView` (rail | `ChatListPane` | `ThreadPane` + `InfoPane`, overlays; keys, F6 and zoom in `WindowShortcuts`), `ChatListPane` (+ `ChatRowCell`, `SpaceChannelsView`), `ThreadPane` (+ `TimelineScroll`, `MessageRowView`, `MessageLine`), `Composer`,
+  `CommandBar`, `AccountsPane` (+ `DiscordServersPage`, `LoadingView`), `SettingsWindow` (pages built with `SettingsForm`: `AppearancePages`, `PrivacyPage`, `NetworksPage`, `SpeechPage`, `AiReplyPage`), `Notifier` (AWT tray), `Theme`. Pure logic with tests: `A11yText` (what a screen reader and the voice say),
   `ChatFilter`, `ThreadRows`, `RichText`, `Formats`, `MediaSizes`, `LoginTexts`. Shared bits: `Nodes` (show, style), `Labels.help`, `Chips.sticky`, `Icons.iconButton`, `MediaTile`.
 - Timeline updates: `ThreadRows.update` touches only rows that differ (`MessageRow.revision`, from `Message.revision()`: a new drawn field must go in there), since replacing the whole list redraws all that's on screen; `ThreadPane.redraw` is for changes of appearance; `MainView` updates the open chat at most every 250 ms. `ScrollPerfUiTest` (`-Dunichat.perfTests=true`, real display, ffmpeg) prints before/after numbers for a giant chat; compare with the Mac under similar load, which moves them a lot.
 - `css/app.css` — single stylesheet; light palette on `.root`, dark on `.root.dark`; `-accent` and font size
@@ -35,6 +35,7 @@ Package rules: `docs/ARQUITECTURA.md`, enforced by `ArchitectureTest` (no cycles
   downloads those from the bridge's port (`LocalServer.directMediaBase`), and `matrix/MediaCache` caps `cache/media`
   (`cache.mediaMb`, LRU; files over 1 MB go first, saved stickers/GIFs are pinned, `MediaSource.keepCached`; one file per direct-media URL whatever the size). `model/MediaLibrary.same` says when two items are one sticker (bridge id, else format, dimensions and bytes), since direct media gives the same file a new URL in each message. Media grids keep their tiles (`ui/TileCache`) and `MessageMedia.loadMedia` shows what `AnimatedImage` already decoded at once. `server/MediaPrune` deletes Discord attachments older than `discord.mediaDays` (default 30, 0 = never; Ajustes →
   Redes) on each server start; avatars/emoji kept.
+- `server/LocalServer` runs the processes; `server/BridgeInstaller` leaves a bridge ready (download, config, setup processes; tests with a temp dir and `FakeService`), `server/ServerSecrets` holds the secrets file.
 - `server/StatusEndpoint` + `BridgeStates` (bridges POST their account states, mautrix `status_endpoint`) feed
   `MatrixChatService.accounts()` and `ui/AccountAlerts` + `AccountAlertBar` (foot of the chat list, so chats don't jump); `server/Watchdog` restarts hung,
   stuck or flapping processes (awake time, backoff), and all but Meta's bridges when the internet returns; `server/MetaSessions` keeps Meta cookies safe from the bridge erasing them over a redirect (see docs/SERVIDOR-NATIVO.md). Demo: `-Dunichat.demoAccounts=WHATSAPP:NEEDS_LOGIN,...`.
@@ -66,7 +67,7 @@ Package rules: `docs/ARQUITECTURA.md`, enforced by `ArchitectureTest` (no cycles
 - `package.sh` / `package.ps1` — jpackage; `.github/workflows/build.yml` builds Windows zip/msi + macOS dmg.
 
 ## Checking UI changes
-`-Dunichat.snapshot=out.png` writes the window to a PNG and exits; combine with `-Dunichat.dataDir=<dir>` (put
+`-Dunichat.snapshot=out.png` (`SnapshotRun`) writes the window to a PNG and exits; combine with `-Dunichat.dataDir=<dir>` (put
 `session.backend=demo` and optionally `ui.theme=LIGHT` in `<dir>/settings.properties`),
 `-Dunichat.openChat=<id>` (demo ids like `!familia:demo`), `-Dunichat.openSpace=<id>` (a server's channels, e.g. `!servidor:demo`), `-Dunichat.info=true`, `-Dunichat.panel=EMOJIS|STICKERS|GIFS`,
 `-Dunichat.overlay=command|newchat|add|folderNew|folderDelete|settings:<Página>`, `-Dunichat.openFolders=true` (folder list), `-Dunichat.openFolder=<name>` (inside one), `-Dunichat.network=<protocolo>` (settings snapshots the settings window).

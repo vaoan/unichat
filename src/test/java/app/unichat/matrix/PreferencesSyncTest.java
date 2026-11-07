@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -42,8 +43,24 @@ class PreferencesSyncTest {
         proc = processor(prefs);
     }
 
+    private final List<PreferencesFile> opened = new ArrayList<>();
+
+    /** Like a restart: what the earlier ones hold is on disk first. */
     private PreferencesFile open() {
-        return new PreferencesFile(dir.resolve("preferences.json"), dir.resolve("server-seen.json"));
+        flushAll();
+        PreferencesFile p = new PreferencesFile(dir.resolve("preferences.json"), dir.resolve("server-seen.json"));
+        opened.add(p);
+        return p;
+    }
+
+    @AfterEach
+    void flushAll() {
+        opened.forEach(PreferencesFile::flush);
+    }
+
+    private String saved() throws IOException {
+        flushAll();
+        return Files.readString(dir.resolve("preferences.json"));
     }
 
     private static SyncProcessor processor(PreferencesFile file) {
@@ -298,12 +315,12 @@ class PreferencesSyncTest {
     void aReplayedSyncPreviewsWhatTheFileDoesNotHaveAndWritesNothing() throws IOException {
         prefs.choose("matrix:" + ROOM, Flag.FAVORITE, true);
         prefs.choose("matrix:" + ROOM, Flag.PINNED, false);
-        String before = Files.readString(dir.resolve("preferences.json"));
+        String before = saved();
         proc.replay(cachedSync(ROOM, tags("u.archived", "u.pinned"), ROOM));
         assertTrue(chat(ROOM).favorite(), "the file's value");
         assertFalse(chat(ROOM).pinned(), "the file wins over the cache");
         assertTrue(chat(ROOM).archived() && chat(ROOM).muted(), "first start after upgrading: no flash in the inbox");
-        assertEquals(before, Files.readString(dir.resolve("preferences.json")));
+        assertEquals(before, saved());
         assertFalse(Files.exists(dir.resolve("server-seen.json")), "no seen memory from old news");
         assertFalse(prefs.current("matrix:" + ROOM).archived());
     }
@@ -593,6 +610,15 @@ class PreferencesSyncTest {
     }
 
     @Test
+    void stoppingSavesTheLastChange() throws Exception {
+        MatrixChatService svc = service(prefs, "DEVICE");
+        svc.processor().process(room(ROOM, "", ""), true);
+        svc.setFavorite(ROOM, true).get(10, TimeUnit.SECONDS);
+        svc.stop();
+        assertTrue(Files.readString(dir.resolve("preferences.json")).contains("\"favorite\" : true"));
+    }
+
+    @Test
     void withNoDeviceIdTheUserIdentifiesTheSession() {
         assertEquals("http://h|DEV", MatrixChatService.serverIdentity("http://h", "DEV", "@u:h"));
         assertEquals("http://h|@u:h", MatrixChatService.serverIdentity("http://h", null, "@u:h"));
@@ -613,7 +639,7 @@ class PreferencesSyncTest {
         assertEquals(1, due.get());
         assertNull(svc.chat(ROOM).reminderAt());
         assertEquals(List.of(), writes());
-        assertTrue(Files.readString(dir.resolve("preferences.json")).contains("\"reminderAt\" : null"));
+        assertTrue(saved().contains("\"reminderAt\" : null"));
 
         svc.processor().process(room(ROOM, "", reminder(past)), true);
         svc.actions().checkReminders();

@@ -160,8 +160,8 @@ public final class ChromiumCookies {
     /** Asks the macOS keychain (native prompt) for the Safe Storage password; null if denied/absent. */
     private static byte[] keychainKey(String service) {
         try {
-            // The user may need time to answer the native prompt.
-            Processes.Result r = Processes.capture(List.of("security", "find-generic-password", "-wa", service), 60);
+            // The person may need time to answer the native prompt, or to find their password.
+            Processes.Result r = Processes.capture(List.of("security", "find-generic-password", "-wa", service), 600);
             if (!r.ok()) return null;
             String password = r.out().strip();
             return password.isEmpty() ? null : deriveKey(password);

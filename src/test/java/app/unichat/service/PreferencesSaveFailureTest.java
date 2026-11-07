@@ -53,10 +53,12 @@ class PreferencesSaveFailureTest {
 
             readOnly(false);
             p.choose(K, Flag.PINNED, true);
+            p.flush();
             assertNull(said.poll(200, TimeUnit.MILLISECONDS), "a success says nothing");
 
             readOnly(true);
             p.choose(K, Flag.ARCHIVED, true);
+            p.flush();
             assertSaidOnce();
         } finally {
             readOnly(false);
@@ -67,6 +69,7 @@ class PreferencesSaveFailureTest {
     void aSuccessfulSaveSaysNothing() throws Exception {
         p.onSaveFailure(() -> said.add("failed"));
         p.choose(K, Flag.MUTED, true);
+        p.flush();
         assertNull(said.poll(200, TimeUnit.MILLISECONDS));
     }
 
@@ -75,6 +78,7 @@ class PreferencesSaveFailureTest {
         try {
             readOnly(true);
             p.choose(K, Flag.MUTED, true);
+            p.flush();
             p.onSaveFailure(() -> said.add("failed"));
             assertSaidOnce();
         } finally {
@@ -91,10 +95,12 @@ class PreferencesSaveFailureTest {
         });
         try {
             readOnly(true);
-            // Even with the caller inside the monitor and waiting: a listener on this thread or needing the lock would hang here.
+            // Even with the caller back inside the monitor and waiting: a listener on this thread or needing the lock would hang here.
             synchronized (p) {
                 p.choose(K, Flag.MUTED, true);
-                assertNotNull(said.poll(5, TimeUnit.SECONDS), "must arrive while the lock is still held by the saver");
+                p.flush();
+                assertTrue(Thread.holdsLock(p));
+                assertNotNull(said.poll(5, TimeUnit.SECONDS), "must arrive while the lock is held by the caller");
             }
             assertFalse(heldLock.get());
         } finally {
@@ -109,6 +115,7 @@ class PreferencesSaveFailureTest {
         try {
             readOnly(true);
             p.choose(K, Flag.MUTED, true);
+            p.flush();
             String text = said.poll(5, TimeUnit.SECONDS);
             assertNotNull(text);
             assertTrue(text.startsWith("No se pudieron guardar tus preferencias"), text);
@@ -118,6 +125,7 @@ class PreferencesSaveFailureTest {
             folders.onSaveFailure(null);
             readOnly(true);
             p.choose(K, Flag.PINNED, true);
+            p.flush();
             assertNull(said.poll(200, TimeUnit.MILLISECONDS));
         } finally {
             readOnly(false);

@@ -41,7 +41,7 @@ class AccountsSyncUiTest {
         Scene scene = fx(() -> {
             Stage stage = new Stage();
             stage.setOpacity(0);
-            AccountsPane pane = new AccountsPane(svc, () -> { }, toasts::add, id -> { });
+            AccountsPane pane = new AccountsPane(svc, toasts::add, id -> { });
             Scene sc = new Scene(pane, 700, 600);
             Theme.register(sc);
             stage.setScene(sc);

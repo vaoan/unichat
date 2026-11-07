@@ -10,4 +10,9 @@ final class Shortcuts {
     static String key(String key) {
         return (Os.mac() ? "⌘" : "Ctrl+") + key;
     }
+
+    /** Text size: bigger, smaller, back to normal. */
+    static String zoomKeys() {
+        return key("+") + " / " + key("−") + " / " + key("0");
+    }
 }
