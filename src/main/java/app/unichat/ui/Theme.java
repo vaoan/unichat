@@ -69,10 +69,10 @@ public final class Theme {
         Parent root = scene.getRoot();
         if (root == null) return;
         Settings s = Settings.get();
-        toggle(root, "dark", isDark());
-        toggle(root, "contrast", highContrast());
-        toggle(root, "strong-focus", s.strongFocus());
-        toggle(root, "wide-spacing", s.wideSpacing());
+        Nodes.style(root, "dark", isDark());
+        Nodes.style(root, "contrast", highContrast());
+        Nodes.style(root, "strong-focus", s.strongFocus());
+        Nodes.style(root, "wide-spacing", s.wideSpacing());
         String accent = highContrast() ? accessibleAccent(s.accent()) : s.accent();
         String style = "-accent: " + accent + "; -fx-font-size: " + Math.round(13 * s.fontScale() * 10) / 10.0 + "px;";
         if (s.readableFont()) style += " -fx-font-family: \"Verdana\", \"Tahoma\", sans-serif;";
@@ -107,11 +107,6 @@ public final class Theme {
             cur = String.format("#%02X%02X%02X", r, g, b);
         }
         return cur;
-    }
-
-    private static void toggle(Parent root, String cls, boolean on) {
-        root.getStyleClass().remove(cls);
-        if (on) root.getStyleClass().add(cls);
     }
 
     /** Windows high-contrast theme / macOS "Aumentar contraste". */

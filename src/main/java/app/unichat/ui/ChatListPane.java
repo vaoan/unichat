@@ -50,8 +50,6 @@ public final class ChatListPane extends VBox {
     private final TextField search = new TextField();
     private final ToggleGroup chips = new ToggleGroup();
     private final Spaces spaces;
-    /** Network of each server-to-add row shown (they're not chats yet, so they carry no network of their own). */
-    private final java.util.Map<String, Network> offerNetworks = new java.util.HashMap<>();
     private FlowPane chipRow;
     private Runnable onNewChat;
     private final Consumer<Chat> onOpen;
@@ -69,7 +67,7 @@ public final class ChatListPane extends VBox {
     private final ListView<Chat> spaceList = new ListView<>(spaceItems);
     private final Label spaceTitle = new Label();
     private final javafx.scene.control.Button markSpaceRead =
-            Composer.iconButton(Icons.CHECK_DOUBLE, "Marcar todo como leído", this::markSpaceRead);
+            Icons.iconButton(Icons.CHECK_DOUBLE, "Marcar todo como leído", this::markSpaceRead);
     private final java.util.Set<String> channelsAsked = new java.util.HashSet<>();
     private final VBox spaceView;
     private javafx.scene.control.Button spaceBack;
@@ -112,10 +110,8 @@ public final class ChatListPane extends VBox {
         spaceView = new VBox(6, spaceHeader, spaceList);
         spaceView.getStyleClass().add("space-view");
         VBox.setVgrow(spaceView, Priority.ALWAYS);
-        spaceView.setVisible(false);
-        spaceView.setManaged(false);
-        folderView = new FolderView(svc, ChatCell::new, this::open);
-        folderView.setDialogs(folderDialogs);
+        Nodes.show(spaceView, false);
+        folderView = new FolderView(svc, folderDialogs, ChatCell::new, this::open);
         folderView.setOnLeave(() -> {
             goTo(filter.get().switchTo(null, null));
             list.requestFocus();
@@ -139,7 +135,7 @@ public final class ChatListPane extends VBox {
         title.getStyleClass().add("pane-title");
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-        newChat = Composer.iconButton(Icons.PLUS, "Nuevo chat", () -> { if (onNewChat != null) onNewChat.run(); });
+        newChat = Icons.iconButton(Icons.PLUS, "Nuevo chat", () -> { if (onNewChat != null) onNewChat.run(); });
         newChat.setTooltip(new javafx.scene.control.Tooltip("Nuevo chat (" + Shortcuts.key("N") + ")"));
         HBox header = new HBox(6, title, headerSpacer, newChat);
         header.getStyleClass().add("chat-list-header");
@@ -193,7 +189,7 @@ public final class ChatListPane extends VBox {
 
     private HBox buildSpaceHeader() {
         // A server's channels slide over the list, like a Telegram forum's topics.
-        spaceBack = Composer.iconButton(Icons.CHEVRON_LEFT, "Volver a la bandeja", this::closeSpace);
+        spaceBack = Icons.iconButton(Icons.CHEVRON_LEFT, "Volver a la bandeja", this::closeSpace);
         spaceTitle.getStyleClass().add("space-title");
         spaceTitle.setMinWidth(0);
         spaceTitle.setMaxWidth(Double.MAX_VALUE);
@@ -340,8 +336,7 @@ public final class ChatListPane extends VBox {
         List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.personalSpace() && !c.archived() && !c.bridgeBot()
                 && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).limit(8).toList() : List.of();
         favorites.getChildren().setAll(favs.stream().map(this::favoriteTile).toList());
-        favorites.setVisible(!favs.isEmpty());
-        favorites.setManaged(!favs.isEmpty());
+        Nodes.show(favorites, !favs.isEmpty());
     }
 
     /**
@@ -349,7 +344,6 @@ public final class ChatListPane extends VBox {
      * they come last; a search finds them by name.
      */
     private List<Chat> offerRows(ChatFilter f) {
-        offerNetworks.clear();
         if (f.view() != ChatFilter.View.INBOX || f.unreadOnly()) return List.of();
         List<Chat> out = new java.util.ArrayList<>();
         List<Network> nets = f.network() != null ? List.of(f.network())
@@ -361,7 +355,6 @@ public final class ChatListPane extends VBox {
                 p.setTitle(o.name());
                 p.setNetwork(n);
                 out.add(p);
-                offerNetworks.put(p.id(), n);
             }
         }
         return out;
@@ -372,20 +365,16 @@ public final class ChatListPane extends VBox {
         boolean space = openSpace != null;
         boolean folders = !space && foldersOpen();
         for (Node x : List.of(chipRow, list)) {
-            x.setVisible(!space && !folders);
-            x.setManaged(!space && !folders);
+            Nodes.show(x, !space && !folders);
         }
-        folderView.setVisible(folders);
-        folderView.setManaged(folders);
+        Nodes.show(folderView, folders);
         String backTo = foldersOpen() ? "Volver a la carpeta" : "Volver a la bandeja";
         spaceBack.setAccessibleText(backTo);
         spaceBack.getTooltip().setText(backTo);
         if (space) {
-            accountRow.setVisible(false);
-            accountRow.setManaged(false);
+            Nodes.show(accountRow, false);
         }
-        spaceView.setVisible(space);
-        spaceView.setManaged(space);
+        Nodes.show(spaceView, space);
     }
 
     /** "Todas · Personal · Trabajo" chips, shown only for a network with several accounts. */
@@ -396,8 +385,7 @@ public final class ChatListPane extends VBox {
         boolean attributed = f.network() != null && svc.chats().stream()
                 .filter(c -> c.network() == f.network() && !c.bridgeBot()).allMatch(c -> c.accountId() != null);
         boolean show = accounts.size() > 1 && !f.searching() && attributed;
-        accountRow.setVisible(show);
-        accountRow.setManaged(show);
+        Nodes.show(accountRow, show);
         accountRow.getChildren().clear();
         if (!show) return;
         ToggleGroup group = new ToggleGroup();
@@ -410,15 +398,8 @@ public final class ChatListPane extends VBox {
     }
 
     private ToggleButton accountChip(String text, boolean selected, ToggleGroup group, Runnable action) {
-        ToggleButton b = new ToggleButton(text);
-        b.getStyleClass().addAll("chip", "account-chip");
-        b.setMinWidth(Region.USE_PREF_SIZE);
-        b.setToggleGroup(group);
-        b.setSelected(selected);
-        b.setOnAction(e -> {
-            if (!b.isSelected()) b.setSelected(true);
-            action.run();
-        });
+        ToggleButton b = Chips.sticky(text, group, selected, action);
+        b.getStyleClass().add("account-chip");
         return b;
     }
 
@@ -515,7 +496,7 @@ public final class ChatListPane extends VBox {
     }
 
     private boolean actsLikeChat(Chat c) {
-        return !c.space() && !c.id().startsWith(Spaces.OFFER_PREFIX) && !spaceRows.unjoined().contains(c.id());
+        return !c.space() && !Spaces.isOffer(c) && !spaceRows.unjoined().contains(c.id());
     }
 
     /** Shows a server's channels over the list. */
@@ -609,8 +590,8 @@ public final class ChatListPane extends VBox {
             openSpace(c.id());
             return;
         }
-        if (offerNetworks.containsKey(c.id())) {
-            spaces.add(offerNetworks.get(c.id()), c.id().substring(Spaces.OFFER_PREFIX.length()), c.title());
+        if (Spaces.isOffer(c)) {
+            spaces.add(c.network(), Spaces.offerId(c), c.title());
             return;
         }
         if (spaceRows.unjoined().contains(c.id())) {
@@ -715,13 +696,12 @@ public final class ChatListPane extends VBox {
             accountTag.setText(account == null ? "" : Formats.accountShort(account));
             accountTag.setStyle(account == null ? "" : "-fx-background-color: " + Avatar.colorFor(account) + ";");
             accountTag.setTooltip(account == null ? null : new javafx.scene.control.Tooltip("Cuenta: " + account));
-            accountTag.setVisible(account != null);
-            accountTag.setManaged(account != null);
+            Nodes.show(accountTag, account != null);
             stamp.setText(Formats.listStamp(c.lastActivity(), Instant.now(), ZoneId.systemDefault()));
             boolean unread = c.isUnread();
-            toggle(name, "unread", unread);
-            toggle(stamp, "unread", unread && !c.muted());
-            toggle(preview, "typing", !c.typing().isEmpty());
+            Nodes.style(name, "unread", unread);
+            Nodes.style(stamp, "unread", unread && !c.muted());
+            Nodes.style(preview, "typing", !c.typing().isEmpty());
             if (!c.typing().isEmpty()) {
                 TypingDots.show(preview, c.group() ? Formats.typing(c.typing()) : "escribiendo…");
             } else {
@@ -730,31 +710,28 @@ public final class ChatListPane extends VBox {
                 TypingDots.show(preview, null); // cells are recycled: this one may have been someone typing
                 preview.setText(who + c.lastPreview());
             }
-            toggle(preview, "unread", unread);
+            Nodes.style(preview, "unread", unread);
             flags.getChildren().clear();
             if (c.reminderAt() != null) flags.getChildren().add(Icons.icon(Icons.CLOCK, 13));
             if (c.muted()) flags.getChildren().add(Icons.icon(Icons.BELL_OFF, 13));
             if (c.pinned()) flags.getChildren().add(Icons.icon(Icons.PIN, 13));
             int n = c.unreadCount();
-            badge.setText(c.mentionCount() > 0 ? "@" : n > 0 ? (n > 99 ? "99+" : Integer.toString(n)) : "");
-            badge.setVisible(unread);
-            badge.setManaged(unread);
-            toggle(badge, "muted", c.muted());
-            toggle(badge, "dot", n == 0 && c.mentionCount() == 0);
-            boolean offer = c.id().startsWith(Spaces.OFFER_PREFIX);
+            badge.setText(c.mentionCount() > 0 ? "@" : n > 0 ? Formats.badge(n) : "");
+            Nodes.show(badge, unread);
+            Nodes.style(badge, "muted", c.muted());
+            Nodes.style(badge, "dot", n == 0 && c.mentionCount() == 0);
+            boolean offer = Spaces.isOffer(c);
             boolean space = c.space(), unjoined = spaceRows.unjoined().contains(c.id());
             disclosure.setGraphic(space ? Icons.icon(Icons.CHEVRON_RIGHT, 14) : null);
-            disclosure.setVisible(space);
-            disclosure.setManaged(space);
-            toggle(name, "unjoined", unjoined);
+            Nodes.show(disclosure, space);
+            Nodes.style(name, "unjoined", unjoined);
             String a11y = describe(c, Accounts.forChat(accounts, c));
             if (offer) {
-                boolean busy = spaces.adding(c.id().substring(Spaces.OFFER_PREFIX.length()));
+                boolean busy = spaces.adding(Spaces.offerId(c));
                 stamp.setText("");
                 TypingDots.show(preview, null);
                 preview.setText(busy ? "Agregando…" : "Servidor sin agregar · toca para traer sus canales");
-                badge.setVisible(false);
-                badge.setManaged(false);
+                Nodes.show(badge, false);
                 a11y = c.title() + ", servidor de " + c.network().displayName() + " sin agregar, " + (busy ? "Agregando" : "Agregar");
             } else if (space) {
                 Chat latest = rows.latest().get(c.id());
@@ -763,13 +740,12 @@ public final class ChatListPane extends VBox {
                 TypingDots.show(preview, null);
                 preview.setText(latest == null ? "Sin mensajes" : latest.title() + ": " + latest.lastPreview());
                 boolean un = u > 0;
-                toggle(name, "unread", un);
-                toggle(stamp, "unread", un && !c.muted());
-                toggle(preview, "unread", un);
-                badge.setText(u > 99 ? "99+" : Integer.toString(u));
-                badge.setVisible(un);
-                badge.setManaged(un);
-                toggle(badge, "dot", false);
+                Nodes.style(name, "unread", un);
+                Nodes.style(stamp, "unread", un && !c.muted());
+                Nodes.style(preview, "unread", un);
+                badge.setText(Formats.badge(u));
+                Nodes.show(badge, un);
+                Nodes.style(badge, "dot", false);
                 a11y = c.title() + ", " + (c.network() == app.unichat.model.Network.DISCORD ? "servidor" : "grupo") + " de "
                         + c.network().displayName() + (un ? ", " + u + " sin leer" : "") + (c.muted() ? ", silenciado" : "")
                         + (latest == null ? "" : ". " + latest.title() + ": " + latest.lastPreview()) + ". Abre sus canales";
@@ -777,19 +753,13 @@ public final class ChatListPane extends VBox {
                 stamp.setText("");
                 TypingDots.show(preview, null);
                 preview.setText("Toca para unirte");
-                badge.setVisible(false);
-                badge.setManaged(false);
+                Nodes.show(badge, false);
                 a11y = c.title() + ", canal sin unirte, Unirse";
             }
             setGraphic(root);
             setAccessibleText(a11y);
             setPadding(compact ? new Insets(4, 10, 4, 10) : new Insets(8, 10, 8, 10));
             pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("current"), Objects.equals(c.id(), selectedId));
-        }
-
-        private static void toggle(Node n, String cls, boolean on) {
-            n.getStyleClass().remove(cls);
-            if (on) n.getStyleClass().add(cls);
         }
     }
 }

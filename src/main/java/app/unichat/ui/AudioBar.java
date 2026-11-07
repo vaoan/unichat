@@ -32,7 +32,7 @@ final class AudioBar extends HBox {
         HBox.setHgrow(controls, Priority.ALWAYS);
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.SOMETIMES);
-        Button close = Composer.iconButton(Icons.CLOSE, "Cerrar el reproductor", playback::stop);
+        Button close = Icons.iconButton(Icons.CLOSE, "Cerrar el reproductor", playback::stop);
         getChildren().addAll(who, controls, grow, close);
         playback.addListener(this::refresh);
         refresh();

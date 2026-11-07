@@ -33,6 +33,8 @@ public final class Message {
     /** emoji -> user ids that reacted with it, in insertion order. Never changed: replaced whole, so the UI can read it while the sync thread writes. */
     private volatile Map<String, Set<String>> reactions = Map.of();
 
+    private static final String EMOTE_COMMAND = "/me ";
+
     public Message(String id, String chatId, String senderId, String senderName, boolean outgoing, Instant timestamp) {
         this.id = id;
         this.chatId = chatId;
@@ -46,7 +48,6 @@ public final class Message {
     public String chatId() { return chatId; }
     public String senderId() { return senderId; }
     public String senderName() { return senderName == null || senderName.isBlank() ? senderId : senderName; }
-    public void setSenderName(String senderName) { this.senderName = senderName; }
     public boolean outgoing() { return outgoing; }
     public Instant timestamp() { return timestamp; }
     public MessageType type() { return type; }
@@ -109,6 +110,24 @@ public final class Message {
     public void setEdited(boolean edited) { this.edited = edited; }
     public boolean deleted() { return deleted; }
     public void setDeleted(boolean deleted) { this.deleted = deleted; }
+
+    /** Redacted: what it said and its reactions are gone, the row stays. */
+    public void markDeleted() {
+        deleted = true;
+        setBody("");
+        clearReactions();
+    }
+
+    /** Whether typed text is the {@code /me waves} command, sent as an emote. */
+    public static boolean isEmoteCommand(String text) {
+        return text.startsWith(EMOTE_COMMAND);
+    }
+
+    /** Typed text without the {@code /me} command. */
+    public static String withoutEmoteCommand(String text) {
+        return isEmoteCommand(text) ? text.substring(EMOTE_COMMAND.length()) : text;
+    }
+
     public MessageStatus status() { return status; }
     public void setStatus(MessageStatus status) { this.status = status; }
     /** A snapshot: later reactions don't change it. */

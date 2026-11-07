@@ -40,8 +40,7 @@ public final class MediaViewer {
         String name = title == null ? "Imagen" : title;
         PhotoPane photo = new PhotoPane(name, stage::close);
         FlowPane bar = bar(photo, onSave);
-        bar.setVisible(false);
-        bar.setManaged(false);
+        Nodes.show(bar, false);
         BorderPane root = new BorderPane(area);
         root.setBottom(bar);
         root.getStyleClass().add("media-viewer");
@@ -63,8 +62,7 @@ public final class MediaViewer {
                 if (err != null || p == null) throw new IOException("no file", err);
                 load(p, () -> {
                     area.getChildren().setAll(photo);
-                    bar.setManaged(true);
-                    bar.setVisible(true);
+                    Nodes.show(bar, true);
                 }, photo);
             } catch (Exception e) {
                 Platform.runLater(() -> {
@@ -80,8 +78,7 @@ public final class MediaViewer {
     private static void load(Path p, Runnable reveal, PhotoPane photo) throws IOException {
         if (AnimatedImage.isWebp(p) || AnimatedImage.isGif(p)) {
             // WebP JavaFX can't read; GIFs it animates forever, leaking every frame (AnimatedImage).
-            AnimatedImage.Frames frames = AnimatedImage.isGif(p) ? AnimatedImage.decodeGif(p, 1600, 1600)
-                    : AnimatedImage.decodeWebp(p, 1600, 1600);
+            AnimatedImage.Frames frames = AnimatedImage.decode(p, 1600, 1600);
             Platform.runLater(() -> {
                 reveal.run();
                 AnimatedImage.play(photo.view(), frames);
@@ -104,12 +101,12 @@ public final class MediaViewer {
         save.getStyleClass().add("secondary-button");
         save.setOnAction(e -> onSave.run());
         FlowPane bar = new FlowPane(6, 6,
-                Composer.iconButton(Icons.MINUS, "Alejar (-)", () -> photo.change(z -> z.zoomBy(1 / PhotoPane.STEP))),
+                Icons.iconButton(Icons.MINUS, "Alejar (-)", () -> photo.change(z -> z.zoomBy(1 / PhotoPane.STEP))),
                 percent,
-                Composer.iconButton(Icons.PLUS, "Acercar (+)", () -> photo.change(z -> z.zoomBy(PhotoPane.STEP))),
+                Icons.iconButton(Icons.PLUS, "Acercar (+)", () -> photo.change(z -> z.zoomBy(PhotoPane.STEP))),
                 textButton("Ajustar", "Ver la imagen completa (0)", () -> photo.change(PhotoZoom::fit)),
                 textButton("100 %", "Tamaño real (1)", () -> photo.change(PhotoZoom::actualSize)),
-                Composer.iconButton(Icons.ROTATE, "Girar 90° (R)", () -> photo.change(PhotoZoom::rotate)),
+                Icons.iconButton(Icons.ROTATE, "Girar 90° (R)", () -> photo.change(PhotoZoom::rotate)),
                 save);
         bar.setAlignment(Pos.CENTER);
         bar.setRowValignment(javafx.geometry.VPos.CENTER);

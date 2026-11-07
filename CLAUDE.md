@@ -22,8 +22,8 @@ Package rules: `docs/ARQUITECTURA.md`, enforced by `ArchitectureTest` (no cycles
   `BridgeAccounts`, `DiscordServers`, `ContactActions`, `MediaDownloader`, `SyncCache`, `MatrixLogin`; `SyncProcessor`
   (pure /sync → model, unit tested) with `RoomFields`, `SystemMessages`, `SyncEvents`; `BridgeProtocol` (pure), `BotChat`, `MatrixClient` (HTTP). `MatrixLiveIT` = end-to-end test, needs `UNICHAT_IT_HOMESERVER`.
 - `ui/` — `MainView` (rail | `ChatListPane` | `ThreadPane` + `InfoPane`, overlays, shortcuts), `Composer`,
-  `CommandBar`, `AddAccountPane`, `SettingsWindow`, `Notifier` (AWT tray), `Theme`. Pure logic with tests:
-  `ChatFilter`, `ThreadRows`, `RichText`, `Formats`.
+  `CommandBar`, `AccountsPane`, `SettingsWindow`, `Notifier` (AWT tray), `Theme`. Pure logic with tests:
+  `ChatFilter`, `ThreadRows`, `RichText`, `Formats`, `MediaSizes`, `LoginTexts`. Shared bits: `Nodes` (show, style), `Labels.help`, `Chips.sticky`, `Icons.iconButton`, `MediaTile`.
 - Timeline updates: `ThreadRows.update` touches only rows that differ (`MessageRow.revision`, from `Message.revision()`: a new drawn field must go in there), since replacing the whole list redraws all that's on screen; `ThreadPane.redraw` is for changes of appearance; `MainView` updates the open chat at most every 250 ms. `ScrollPerfUiTest` (`-Dunichat.perfTests=true`, real display, ffmpeg) prints before/after numbers for a giant chat; compare with the Mac under similar load, which moves them a lot.
 - `css/app.css` — single stylesheet; light palette on `.root`, dark on `.root.dark`; `-accent` and font size
   set inline by `Theme`.
@@ -75,7 +75,7 @@ Run via `JAVA_OPTS=... ./run-dev.sh`, then read the PNG. Do this after every vis
 ## Accessibility (user requirement — keep it working)
 Settings → Accesibilidad (`a11y.*` keys); `Theme` adds `contrast`, `strong-focus`, `wide-spacing` root classes and
 follows OS high contrast / reduced motion. Every new control needs an accessible text (icon buttons get it from
-`Composer.iconButton`), keyboard reachability, and must survive 160 % text + high contrast. `KeyboardUiTest`
+`Icons.iconButton`), keyboard reachability, and must survive 160 % text + high contrast. `KeyboardUiTest`
 (`-Dunichat.uiTests=true`, needs a display) checks F6 zones, timeline keys, zoom and screen-reader texts;
 `FilterUiTest` (same flag) checks that the rail keeps the chosen chip when switching network. `./mvnw verify -Pheadless-ui` runs them with no display or windows (Monocle); `AudioUiTest`, `ReactionEmojiUiTest` and `NetworkSettingsUiTest` still need a display (`-Dunichat.uiTests=true`): JavaFX stops under Monocle there. It proves logic, not focus, tray or Dock.
 

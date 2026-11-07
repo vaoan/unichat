@@ -1,6 +1,6 @@
 package app.unichat.video;
 
-import app.unichat.support.Hashes;
+import app.unichat.support.ConvertedFiles;
 import app.unichat.support.Os;
 
 import java.io.IOException;
@@ -22,11 +22,8 @@ public final class VideoTranscoder {
 
     /** Blocking, as long as the video takes to convert. */
     public static Path toPlayable(Path video, DoubleConsumer installProgress) throws IOException, InterruptedException {
-        Path out = video.resolveSibling("converted-" + Hashes.sha256(video.getFileName().toString()) + ".mp4");
-        if (Files.isRegularFile(out)) {
-            out.toFile().setLastModified(System.currentTimeMillis());
-            return out;
-        }
+        Path out = ConvertedFiles.beside(video, "mp4");
+        if (ConvertedFiles.reuse(out)) return out;
         Path ffmpeg = Ffmpeg.whenNeeded(installProgress);
         if (ffmpeg == null) throw new WebmStickers.NoConverter();
         Path tmp = out.resolveSibling(out.getFileName() + ".part");

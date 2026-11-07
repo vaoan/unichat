@@ -12,14 +12,8 @@ import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
 import app.unichat.model.Network;
 import app.unichat.model.VoiceNote;
-import app.unichat.settings.Settings;
 
 import javax.imageio.ImageIO;
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.GradientPaint;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -299,81 +293,67 @@ public final class MockChatService implements ChatService, FolderForwarding {
 
     @Override
     public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) {
+        CompletableFuture<Void> sent = sendLocal(chatId, replyToId, m -> {
+            m.setBody(Message.withoutEmoteCommand(text));
+            if (Message.isEmoteCommand(text)) m.setType(MessageType.EMOTE);
+        });
         Chat chat = chats.get(chatId);
-        if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Chat no encontrado"));
-        Message m = outgoing(chatId);
-        m.setBody(text);
-        if (text.startsWith("/me ")) {
-            m.setType(MessageType.EMOTE);
-            m.setBody(text.substring(4));
+        if (chat != null) {
+            if (chat.bridgeBot()) answerBridgeBot(chat, text.trim());
+            else if (random.nextInt(3) == 0) replyLater(chat, 3 + random.nextInt(4));
         }
-        m.setReplyToId(replyToId);
-        append(chat, m);
-        deliver(chat, m);
-        if (chat.bridgeBot()) answerBridgeBot(chat, text.trim());
-        else if (random.nextInt(3) == 0) replyLater(chat, 3 + random.nextInt(4));
-        return CompletableFuture.completedFuture(null);
+        return sent;
     }
 
     @Override
     public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) {
-        Chat chat = chats.get(chatId);
-        if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Chat no encontrado"));
-        Message m = outgoing(chatId);
-        m.setType(MessageType.STICKER);
-        m.setMediaUrl(item.url());
-        m.setMimeType(item.mime());
-        m.setSize(item.width(), item.height());
-        m.setMediaInfo(item.info());
-        m.setReplyToId(replyToId);
-        append(chat, m);
-        deliver(chat, m);
-        return CompletableFuture.completedFuture(null);
+        return sendLocal(chatId, replyToId, m -> {
+            m.setType(MessageType.STICKER);
+            m.setMediaUrl(item.url());
+            m.setMimeType(item.mime());
+            m.setSize(item.width(), item.height());
+            m.setMediaInfo(item.info());
+        });
     }
 
     @Override
     public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) {
-        Chat chat = chats.get(chatId);
-        if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Chat no encontrado"));
-        Message m = outgoing(chatId);
-        m.setType(MessageType.AUDIO);
-        m.setFileName(note.file().getFileName().toString());
-        m.setMimeType("audio/ogg");
-        m.setMediaUrl(note.file().toUri().toString());
-        m.setReplyToId(replyToId);
-        m.setMediaInfo(com.fasterxml.jackson.databind.json.JsonMapper.builder().build().createObjectNode().put("duration", note.durationMs()));
-        append(chat, m);
-        deliver(chat, m);
-        return CompletableFuture.completedFuture(null);
+        return sendLocal(chatId, replyToId, m -> {
+            m.setType(MessageType.AUDIO);
+            m.setFileName(note.file().getFileName().toString());
+            m.setMimeType("audio/ogg");
+            m.setMediaUrl(note.file().toUri().toString());
+            m.setMediaInfo(com.fasterxml.jackson.databind.json.JsonMapper.builder().build().createObjectNode().put("duration", note.durationMs()));
+        });
     }
 
     @Override
     public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId) {
+        return sendLocal(chatId, replyToId, m -> {
+            String name = file.getFileName().toString();
+            m.setFileName(name);
+            m.setBody(name);
+            m.setMediaUrl(file.toUri().toString());
+            try {
+                m.setFileSize(Files.size(file));
+                m.setType(MessageType.ofMime(Files.probeContentType(file)));
+                if (m.type() == MessageType.IMAGE) {
+                    BufferedImage img = ImageIO.read(file.toFile());
+                    if (img != null) m.setSize(img.getWidth(), img.getHeight());
+                }
+            } catch (IOException e) {
+                m.setType(MessageType.FILE);
+            }
+        });
+    }
+
+    /** What sending anything has in common: a new outgoing message that {@code fill} completes, then its delivery. */
+    private CompletableFuture<Void> sendLocal(String chatId, String replyToId, Consumer<Message> fill) {
         Chat chat = chats.get(chatId);
         if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Chat no encontrado"));
         Message m = outgoing(chatId);
-        String name = file.getFileName().toString();
-        m.setFileName(name);
-        m.setBody(name);
-        m.setMediaUrl(file.toUri().toString());
         m.setReplyToId(replyToId);
-        try {
-            m.setFileSize(Files.size(file));
-            String mime = Files.probeContentType(file);
-            if (mime != null && mime.startsWith("image/")) {
-                m.setType(MessageType.IMAGE);
-                BufferedImage img = ImageIO.read(file.toFile());
-                if (img != null) m.setSize(img.getWidth(), img.getHeight());
-            } else if (mime != null && mime.startsWith("video/")) {
-                m.setType(MessageType.VIDEO);
-            } else if (mime != null && mime.startsWith("audio/")) {
-                m.setType(MessageType.AUDIO);
-            } else {
-                m.setType(MessageType.FILE);
-            }
-        } catch (IOException e) {
-            m.setType(MessageType.FILE);
-        }
+        fill.accept(m);
         append(chat, m);
         deliver(chat, m);
         return CompletableFuture.completedFuture(null);
@@ -395,9 +375,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
     public CompletableFuture<Void> deleteMessage(String chatId, String messageId) {
         Message m = find(chatId, messageId);
         if (m != null) {
-            m.setDeleted(true);
-            m.setBody("");
-            m.clearReactions();
+            m.markDeleted();
             refreshPreview(chats.get(chatId));
             fireMessages(chatId);
         }
@@ -442,10 +420,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
         for (String t : QuietRule.targets(this, id)) {
             Chat c = chats.get(t);
             if (c == null) continue;
-            if (c.prefKey() != null) prefs.batch(() -> {
-                prefs.choose(c.prefKey(), PreferencesFile.Flag.ARCHIVED, v);
-                prefs.choose(c.prefKey(), PreferencesFile.Flag.MUTED, v);
-            });
+            if (c.prefKey() != null) prefs.chooseQuiet(c.prefKey(), v);
             c.setArchived(v);
             c.setMuted(v);
         }
@@ -503,54 +478,13 @@ public final class MockChatService implements ChatService, FolderForwarding {
             return CompletableFuture.supplyAsync(() -> {
                 try {
                     String name = url.substring(url.indexOf("demo") + (url.startsWith("demo://") ? "demo://" : "demo/").length());
-                    return name.endsWith(".ogg") ? demoAudio(name) : demoImage(name);
+                    return name.endsWith(".ogg") ? DemoMedia.demoAudio(name) : DemoMedia.demoImage(name);
                 } catch (IOException e) {
                     throw new java.io.UncheckedIOException(e);
                 }
             });
         }
         return CompletableFuture.failedFuture(new IllegalArgumentException("URL no soportada en demo: " + url));
-    }
-
-    /** The demo voice note (a 2 s tone, no speech), copied out of the app's resources. */
-    private Path demoAudio(String name) throws IOException {
-        Path dir = Settings.get().cacheDir().resolve("demo");
-        Files.createDirectories(dir);
-        Path file = dir.resolve(name);
-        if (Files.exists(file)) return file;
-        try (var in = MockChatService.class.getResourceAsStream("/app/unichat/demo/" + name)) {
-            if (in == null) throw new IOException("Falta el audio de demostración " + name);
-            Files.copy(in, file);
-        }
-        return file;
-    }
-
-    /** Renders a placeholder "photo" (gradient + caption) once and caches it. */
-    private Path demoImage(String name) throws IOException {
-        Path dir = Settings.get().cacheDir().resolve("demo");
-        Files.createDirectories(dir);
-        Path file = dir.resolve(name + ".png");
-        if (Files.exists(file)) return file;
-        int w = 640, h = 420;
-        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = img.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        int seed = Math.abs(name.hashCode());
-        Color a = Color.getHSBColor((seed % 360) / 360f, 0.55f, 0.95f);
-        Color b = Color.getHSBColor(((seed / 7) % 360) / 360f, 0.65f, 0.55f);
-        g.setPaint(new GradientPaint(0, 0, a, w, h, b));
-        g.fillRect(0, 0, w, h);
-        g.setColor(new Color(255, 255, 255, 60));
-        for (int i = 0; i < 6; i++) {
-            int r = 60 + (seed >> i) % 120;
-            g.fillOval((seed >> (i + 2)) % w, (seed >> (i + 4)) % h, r, r);
-        }
-        g.setColor(Color.WHITE);
-        g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 34));
-        g.drawString(name.replace('-', ' '), 32, h - 36);
-        g.dispose();
-        ImageIO.write(img, "png", file.toFile());
-        return file;
     }
 
     // ---------------------------------------------------------------- accounts
@@ -790,7 +724,4 @@ public final class MockChatService implements ChatService, FolderForwarding {
 
     private void fireChats() { listeners.forEach(Listener::chatsChanged); }
     private void fireMessages(String chatId) { listeners.forEach(l -> l.messagesChanged(chatId)); }
-
-    // ---------------------------------------------------------------- seed data
-
 }

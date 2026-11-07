@@ -6,7 +6,7 @@ import app.unichat.login.CookieSpec;
 import app.unichat.login.DiscordToken;
 import app.unichat.login.SessionCookies;
 import app.unichat.model.Network;
-import app.unichat.service.ChatService;
+import app.unichat.service.ChatMessaging;
 import app.unichat.support.Os;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
@@ -19,8 +19,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
-import java.io.File;
 import java.util.List;
 import java.util.function.Consumer;
 import javafx.scene.Scene;
@@ -33,13 +31,13 @@ final class LoginChoosers {
         void show(String heading, Node content, Runnable backAction);
     }
 
-    private final ChatService svc;
+    private final ChatMessaging svc;
     private final Consumer<String> toast;
     private final Views views;
     private final Supplier<Scene> scene;
     private final Supplier<LoginWizard> wizard;
 
-    LoginChoosers(ChatService svc, Consumer<String> toast, Views views, Supplier<Scene> scene, Supplier<LoginWizard> wizard) {
+    LoginChoosers(ChatMessaging svc, Consumer<String> toast, Views views, Supplier<Scene> scene, Supplier<LoginWizard> wizard) {
         this.svc = svc;
         this.toast = toast;
         this.views = views;
@@ -63,14 +61,10 @@ final class LoginChoosers {
         web.setMaxWidth(Double.MAX_VALUE);
         web.setAccessibleText("Iniciar sesión en Discord en una ventana de Unichat");
         // The bridge's own QR login always ended in a captcha it can't show; the web page's QR (inside this window) works.
-        Label webHelp = new Label("Se abre Discord aquí mismo. Entra con tu correo y contraseña o escanea el QR de la página con la app de Discord; si te pide un captcha, lo resuelves ahí.");
-        webHelp.setWrapText(true);
-        webHelp.getStyleClass().add("settings-help");
+        Label webHelp = Labels.help("Se abre Discord aquí mismo. Entra con tu correo y contraseña o escanea el QR de la página con la app de Discord; si te pide un captcha, lo resuelves ahí.");
 
 
-        Label status = new Label();
-        status.setWrapText(true);
-        status.getStyleClass().add("settings-help");
+        Label status = Labels.help("");
 
         VBox content = new VBox(12, heading, web, webHelp, status);
         ScrollPane scroll = new ScrollPane(content);
@@ -80,12 +74,12 @@ final class LoginChoosers {
         Consumer<String> send = command -> {
             views.show("Conectar " + n.displayName(), w.root, cancel);
             w.sessionSent();
-            svc.sendLoginInput(n, botChatId, command).exceptionally(err -> {
+            svc.sendText(botChatId, command, null).exceptionally(err -> {
                 Platform.runLater(() -> {
                     if (wizard.get() != w || w.finished) return;
                     w.sessionFailed();
                     views.show("Conectar " + n.displayName(), scroll, cancel);
-                    status.setText("No se pudo enviar: " + AccountsPane.rootMessage(err));
+                    status.setText("No se pudo enviar: " + LoginTexts.rootMessage(err));
                 });
                 return null;
             });
@@ -107,19 +101,15 @@ final class LoginChoosers {
     void showCookieSources(Network n, String botChatId, Runnable cancel) {
         LoginWizard w = wizard.get();
         String net = n.displayName();
-        Label searching = new Label("Buscando tu sesión de " + net + " en tus navegadores…");
-        searching.setWrapText(true);
-        searching.getStyleClass().add("settings-help");
+        Label searching = Labels.help("Buscando tu sesión de " + net + " en tus navegadores…");
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(22, 22);
         HBox searchRow = new HBox(10, spin, searching);
         searchRow.setAlignment(Pos.CENTER_LEFT);
         VBox found = new VBox(10);
         VBox top = new VBox(8, searchRow);
-        if (macNotice()) {
-            Label notice = new Label("macOS puede pedirte permiso para usar tu sesión del navegador.");
-            notice.setWrapText(true);
-            notice.getStyleClass().add("settings-help");
+        if (Os.mac()) {
+            Label notice = Labels.help("macOS puede pedirte permiso para usar tu sesión del navegador.");
             top.getChildren().add(notice);
         }
 
@@ -127,16 +117,15 @@ final class LoginChoosers {
         status.setWrapText(true);
         status.setMinHeight(Region.USE_PREF_SIZE);
         status.getStyleClass().add("settings-help");
-        status.setVisible(false);
-        status.setManaged(false);
+        Nodes.show(status, false);
 
         ScrollPane[] chooser = new ScrollPane[1];
         Consumer<SessionCookies> sendSession = cookies -> {
             views.show("Conectar " + net, w.root, cancel);
             w.sessionSent();
-            svc.sendLoginInput(n, botChatId, cookies.toBridgeJson()).exceptionally(err -> {
+            svc.sendText(botChatId, cookies.toBridgeJson(), null).exceptionally(err -> {
                 Platform.runLater(() -> {
-                    toast.accept("No se pudo enviar: " + AccountsPane.rootMessage(err));
+                    toast.accept("No se pudo enviar: " + LoginTexts.rootMessage(err));
                     // undo the waiting state so the user can retry from the chooser
                     if (wizard.get() == w && !w.finished) {
                         w.sessionFailed();
@@ -152,7 +141,7 @@ final class LoginChoosers {
         heading.getStyleClass().add("wizard-instructions");
 
         Button other = otherAccountButton(n, sendSession);
-        Button file = cookieFileButton(n, status, sendSession);
+        Button file = CookieFileButton.create(n, path -> CookieLogin.fromCookieTxt(path, n), sendSession, text -> showStatus(status, text));
 
         Button paste = new Button("Pegar cookies manualmente");
         paste.getStyleClass().add("link-button");
@@ -189,37 +178,13 @@ final class LoginChoosers {
         return other;
     }
 
-    private Button cookieFileButton(Network n, Label status, Consumer<SessionCookies> sendSession) {
-        Button file = new Button("Elegir archivo cookies.txt…");
-        file.getStyleClass().add("secondary-button");
-        file.setMaxWidth(Double.MAX_VALUE);
-        file.setOnAction(e -> {
-            if (scene.get() == null) return;
-            FileChooser fc = new FileChooser();
-            fc.setTitle("Elige tu archivo cookies.txt");
-            fc.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("cookies.txt", "*.txt"),
-                    new FileChooser.ExtensionFilter("Todos los archivos", "*.*"));
-            File f = fc.showOpenDialog(scene.get().getWindow());
-            if (f == null) return;
-            CookieLogin.TxtResult r = CookieLogin.fromCookieTxt(f.toPath(), n);
-            switch (r.kind()) {
-                case OK -> sendSession.accept(r.cookies());
-                case MISSING -> showStatus(status, AccountsPane.missingMessage(n, r.missing()));
-                default -> showStatus(status, r.message());
-            }
-        });
-        return file;
-    }
-
     private static void showSessions(String net, List<BrowserSession> list, VBox found, Consumer<SessionCookies> sendSession) {
         if (list.isEmpty()) {
-            Label none = new Label("No encontramos una sesión en tus navegadores.");
-            none.setWrapText(true);
-            none.getStyleClass().add("settings-help");
+            Label none = Labels.help("No encontramos una sesión en tus navegadores.");
             found.getChildren().add(none);
         }
         for (BrowserSession s : list) {
-            String label = AccountsPane.sessionLabel(net, s);
+            String label = LoginTexts.sessionLabel(net, s);
             Label l = new Label(label);
             l.setWrapText(true);
             l.getStyleClass().add("settings-label");
@@ -238,11 +203,6 @@ final class LoginChoosers {
 
     private static void showStatus(Label status, String text) {
         status.setText(text);
-        status.setVisible(true);
-        status.setManaged(true);
-    }
-
-    private static boolean macNotice() {
-        return Os.mac();
+        Nodes.show(status, true);
     }
 }

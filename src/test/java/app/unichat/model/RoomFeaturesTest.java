@@ -30,8 +30,6 @@ class RoomFeaturesTest {
         assertTrue(f.accepts("m.sticker"));
         assertTrue(f.accepts("fi.mau.gif"));
         assertFalse(f.accepts("org.matrix.msc3245.voice"));
-        assertEquals(104857600, f.maxSize("m.image"));
-        assertTrue(f.oneReactionPerUser());
         assertTrue(f.replies());
     }
 

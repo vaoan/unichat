@@ -77,12 +77,6 @@ public final class BridgeStates {
         return out;
     }
 
-    /** Whether {@code bridge} has reported anything since it started. */
-    public synchronized boolean heardFrom(String bridge) {
-        for (State s : states.values()) if (s.bridge().equals(bridge)) return true;
-        return false;
-    }
-
     /** Since when some account of {@code bridge} has been in a state it recovers from by itself; -1 when none. */
     public synchronized long troubledSince(String bridge) {
         long since = -1;

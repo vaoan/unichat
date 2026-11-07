@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.support.Os;
 import app.unichat.model.Network;
 import app.unichat.support.Folders;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -80,7 +81,7 @@ public final class ChromeLogin {
 
     private static List<Path> candidates() {
         List<Path> out = new ArrayList<>();
-        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
+        if (Os.windows()) {
             for (String env : List.of("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA")) {
                 String base = System.getenv(env);
                 if (base == null) continue;

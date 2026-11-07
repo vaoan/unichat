@@ -11,10 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
 
-import static app.unichat.matrix.BridgeProtocol.*;
-import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.support.Urls.enc;
-import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** The last full /sync on disk, shown instantly on the next start. Bot chats' messages never reach it ({@link #redact}). */
 final class SyncCache {

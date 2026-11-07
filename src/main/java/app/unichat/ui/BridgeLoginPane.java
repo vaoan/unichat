@@ -28,18 +28,14 @@ import javafx.scene.control.TextInputControl;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.stage.FileChooser;
 import javafx.stage.Window;
 
-import java.io.File;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -109,14 +105,12 @@ final class BridgeLoginPane extends StackPane {
         VBox more = new VBox(8);
         for (LoginCopy.Choice c : choices) (c.advanced() ? more : list).getChildren().add(choiceCard(c));
         if (!more.getChildren().isEmpty()) {
-            more.setVisible(false);
-            more.setManaged(false);
+            Nodes.show(more, false);
             Button toggle = new Button("Más opciones");
             toggle.getStyleClass().add("link-button");
             toggle.setOnAction(e -> {
                 boolean open = !more.isVisible();
-                more.setVisible(open);
-                more.setManaged(open);
+                Nodes.show(more, open);
                 toggle.setText(open ? "Menos opciones" : "Más opciones");
             });
             list.getChildren().addAll(toggle, more);
@@ -132,9 +126,7 @@ final class BridgeLoginPane extends StackPane {
         Label title = new Label(c.title());
         title.getStyleClass().add("settings-label");
         title.setWrapText(true);
-        Label sub = new Label(c.subtitle() == null ? "" : c.subtitle());
-        sub.getStyleClass().add("settings-help");
-        sub.setWrapText(true);
+        Label sub = Labels.help(c.subtitle() == null ? "" : c.subtitle());
         VBox text = new VBox(2, title, sub);
         text.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(text, Priority.ALWAYS);
@@ -218,9 +210,7 @@ final class BridgeLoginPane extends StackPane {
                 Button copy = new Button("Copiar");
                 copy.getStyleClass().add("secondary-button");
                 copy.setOnAction(e -> {
-                    ClipboardContent cc = new ClipboardContent();
-                    cc.putString(d.data());
-                    Clipboard.getSystemClipboard().setContent(cc);
+                    Clipboards.copy(d.data());
                     copy.setText("Copiado");
                 });
                 row.getChildren().add(copy);
@@ -229,7 +219,7 @@ final class BridgeLoginPane extends StackPane {
         } else {
             shown = waiting("Esperando a " + network.displayName() + "…");
         }
-        HBox waitingRow = new HBox(8, spinner(16), label("Esperando a que lo hagas en tu teléfono…"));
+        HBox waitingRow = new HBox(8, spinner(16), Labels.help("Esperando a que lo hagas en tu teléfono…"));
         waitingRow.setAlignment(Pos.CENTER_LEFT);
         background(() -> {
             BridgeLogin.Step next = api.await(s);
@@ -268,13 +258,12 @@ final class BridgeLoginPane extends StackPane {
             inputs.put(f, input);
             box.getChildren().addAll(l, input);
             if (f.description() != null && !f.description().isBlank() && "select".equals(f.type())) {
-                box.getChildren().add(label(f.description()));
+                box.getChildren().add(Labels.help(f.description()));
             }
         }
-        Label problem = label("");
+        Label problem = Labels.help("");
         problem.getStyleClass().setAll("label", "login-error");
-        problem.setVisible(false);
-        problem.setManaged(false);
+        Nodes.show(problem, false);
         Button next = new Button("Continuar");
         next.getStyleClass().add("primary-button");
         next.setDefaultButton(true);
@@ -289,8 +278,7 @@ final class BridgeLoginPane extends StackPane {
                 String why = invalid(f, v);
                 if (why != null) {
                     problem.setText(why);
-                    problem.setVisible(true);
-                    problem.setManaged(true);
+                    Nodes.show(problem, true);
                     if (en.getValue() instanceof Node n) n.requestFocus();
                     return;
                 }
@@ -298,10 +286,7 @@ final class BridgeLoginPane extends StackPane {
             }
             next.setDisable(true);
             next.setText("Enviando…");
-            background(() -> {
-                BridgeLogin.Step after = api.submit(s, values);
-                Platform.runLater(() -> render(after));
-            });
+            submit(s, values);
         });
         box.getChildren().addAll(problem, next);
         inputs.values().stream().findFirst().ifPresent(n -> Platform.runLater(((Node) n)::requestFocus));
@@ -334,51 +319,27 @@ final class BridgeLoginPane extends StackPane {
         if (BridgeCookies.needsWindowCapture(s.cookies())) return capture(s);
         if (!BridgeCookies.canCollect(s.cookies())) return unsupported();
         CookieSpec spec = BridgeCookies.spec(network, s.cookies());
-        VBox found = new VBox(8, new HBox(8, spinner(16), label("Buscando tu sesión en tus navegadores…")));
-        Label status = label("");
-        status.setVisible(false);
-        status.setManaged(false);
+        VBox found = new VBox(8, new HBox(8, spinner(16), Labels.help("Buscando tu sesión en tus navegadores…")));
+        Label status = Labels.help("");
+        Nodes.show(status, false);
         java.util.function.Consumer<SessionCookies> send = cookies -> {
             show(waiting("Conectando…"));
-            background(() -> {
-                BridgeLogin.Step after = api.submit(s, BridgeCookies.values(s.cookies(), cookies));
-                Platform.runLater(() -> render(after));
-            });
+            submit(s, BridgeCookies.values(s.cookies(), cookies));
         };
         Button here = new Button("Iniciar sesión aquí");
         here.getStyleClass().add("secondary-button");
         here.setMaxWidth(Double.MAX_VALUE);
         here.setAccessibleText("Abrir " + network.displayName() + " en una ventana de Unichat para iniciar sesión");
         here.setOnAction(e -> LoginWebView.open(owner.get(), network, spec, send, () -> { }));
-        Button file = new Button("Elegir archivo cookies.txt…");
-        file.getStyleClass().add("secondary-button");
-        file.setMaxWidth(Double.MAX_VALUE);
-        file.setOnAction(e -> {
-            FileChooser fc = new FileChooser();
-            fc.setTitle("Elige tu archivo cookies.txt");
-            File f = fc.showOpenDialog(owner.get());
-            if (f == null) return;
-            CookieLogin.TxtResult r = CookieLogin.fromCookieTxt(f.toPath(), spec);
-            switch (r.kind()) {
-                case OK -> send.accept(r.cookies());
-                case MISSING -> {
-                    status.setText("Al archivo le falta " + String.join(", ", r.missing()) + ". Exporta las cookies con la sesión de "
-                            + network.displayName() + " abierta.");
-                    status.setVisible(true);
-                    status.setManaged(true);
-                }
-                default -> {
-                    status.setText(r.message());
-                    status.setVisible(true);
-                    status.setManaged(true);
-                }
-            }
+        Button file = CookieFileButton.create(network, path -> CookieLogin.fromCookieTxt(path, spec), send, text -> {
+            status.setText(text);
+            Nodes.show(status, true);
         });
         CookieLogin.findBrowserSessions(spec).whenComplete((sessions, err) -> Platform.runLater(() -> {
             if (closed) return;
             found.getChildren().clear();
             List<BrowserSession> list = err != null || sessions == null ? List.of() : sessions;
-            if (list.isEmpty()) found.getChildren().add(label("No encontramos una sesión abierta en tus navegadores."));
+            if (list.isEmpty()) found.getChildren().add(Labels.help("No encontramos una sesión abierta en tus navegadores."));
             for (BrowserSession bs : list) {
                 Button use = new Button("Usar mi sesión de " + bs.browser() + (bs.profile() == null ? "" : " (" + bs.profile() + ")"));
                 use.getStyleClass().add("primary-button");
@@ -392,7 +353,7 @@ final class BridgeLoginPane extends StackPane {
 
     /** This network needs what its page sends while you use it: only signing in here can get that. */
     private Node capture(BridgeLogin.Step s) {
-        Label why = label("Inicia sesión en la ventana que se abre. Cuando veas tu página de inicio de " + network.displayName()
+        Label why = Labels.help("Inicia sesión en la ventana que se abre. Cuando veas tu página de inicio de " + network.displayName()
                 + ", se cierra sola. Unichat no ve tu contraseña.");
         Button here = new Button("Iniciar sesión en " + network.displayName());
         here.getStyleClass().add("primary-button");
@@ -416,7 +377,7 @@ final class BridgeLoginPane extends StackPane {
     private void signInWithChrome(BridgeLogin.Step s, java.nio.file.Path browser) {
         ChromeLogin login = new ChromeLogin(network, s.cookies(), browser, Settings.get().cacheDir().resolve("login-chrome"));
         chromeLogin = login;
-        Label wait = label("Inicia sesión en la ventana de Chrome. Unichat sigue aquí cuando termines.");
+        Label wait = Labels.help("Inicia sesión en la ventana de Chrome. Unichat sigue aquí cuando termines.");
         Button cancel = new Button("Cancelar");
         cancel.getStyleClass().add("secondary-button");
         cancel.setOnAction(e -> login.cancel());
@@ -433,23 +394,27 @@ final class BridgeLoginPane extends StackPane {
                 return;
             }
             Platform.runLater(() -> show(waiting("Conectando…")));
-            BridgeLogin.Step after = api.submit(s, values);
-            Platform.runLater(() -> render(after));
+            submit(s, values);
         });
     }
 
     private void openCapture(BridgeLogin.Step s) {
         LoginWebView.openCapturing(owner.get(), network, s.cookies(), values -> {
             show(waiting("Conectando…"));
-            background(() -> {
-                BridgeLogin.Step after = api.submit(s, values);
-                Platform.runLater(() -> render(after));
-            });
+            submit(s, values);
         }, () -> { });
     }
 
+    /** Sends a step's answers and shows what the bridge asks next. */
+    private void submit(BridgeLogin.Step s, Map<String, String> values) {
+        background(() -> {
+            BridgeLogin.Step after = api.submit(s, values);
+            Platform.runLater(() -> render(after));
+        });
+    }
+
     private Node unsupported() {
-        Label why = label("Esta forma de conectar necesita un paso que Unichat todavía no sabe mostrar.");
+        Label why = Labels.help("Esta forma de conectar necesita un paso que Unichat todavía no sabe mostrar.");
         Button bot = new Button("Conectar por chat con el puente");
         bot.getStyleClass().add("primary-button");
         bot.setOnAction(e -> onUseBotChat.run());
@@ -461,7 +426,7 @@ final class BridgeLoginPane extends StackPane {
         check.getStyleClass().add("login-done");
         Label title = new Label(text.title());
         title.getStyleClass().add("wizard-instructions");
-        Label sub = label("Tus chats van a ir apareciendo en la bandeja en unos minutos.");
+        Label sub = Labels.help("Tus chats van a ir apareciendo en la bandeja en unos minutos.");
         Button done = new Button("Listo");
         done.getStyleClass().add("primary-button");
         done.setDefaultButton(true);
@@ -477,13 +442,13 @@ final class BridgeLoginPane extends StackPane {
     private void error(String message, Throwable cause) {
         if (closed) return;
         String detail = cause instanceof BridgeLogin.BridgeLoginException b ? b.getMessage()
-                : cause != null ? AccountsPane.rootMessage(cause) : null;
+                : cause != null ? LoginTexts.rootMessage(cause) : null;
         Label what = new Label(message);
         what.getStyleClass().add("wizard-instructions");
         what.setWrapText(true);
         VBox box = new VBox(10, what);
         if (detail != null && !detail.isBlank()) {
-            Label d = label("Detalle: " + detail);
+            Label d = Labels.help("Detalle: " + detail);
             box.getChildren().add(d);
         }
         Button retry = new Button("Intentar de nuevo");
@@ -527,7 +492,7 @@ final class BridgeLoginPane extends StackPane {
     private static VBox numbered(List<String> steps) {
         VBox box = new VBox(6);
         for (int i = 0; i < steps.size(); i++) {
-            Label l = label((i + 1) + ". " + steps.get(i));
+            Label l = Labels.help((i + 1) + ". " + steps.get(i));
             l.getStyleClass().setAll("label", "login-step-line");
             box.getChildren().add(l);
         }
@@ -535,7 +500,7 @@ final class BridgeLoginPane extends StackPane {
     }
 
     private static Node waiting(String text) {
-        VBox box = new VBox(12, spinner(36), label(text));
+        VBox box = new VBox(12, spinner(36), Labels.help(text));
         box.setAlignment(Pos.CENTER);
         return box;
     }
@@ -546,12 +511,6 @@ final class BridgeLoginPane extends StackPane {
         return p;
     }
 
-    private static Label label(String text) {
-        Label l = new Label(text);
-        l.setWrapText(true);
-        l.getStyleClass().add("settings-help");
-        return l;
-    }
 
     /** QR as black modules on white, {@code size} px. */
     static WritableImage qr(String data, int size) {

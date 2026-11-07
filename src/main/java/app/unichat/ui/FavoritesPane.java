@@ -41,10 +41,8 @@ final class FavoritesPane extends ScrollPane {
         section("Stickers", library.favorites(MediaLibrary.Kind.STICKER), 6, i -> stickers.tile(i, "Sticker favorito"));
         section("GIFs", library.favorites(MediaLibrary.Kind.GIF), 6, i -> gifs.libraryTile(i, "GIF favorito"));
         if (content.getChildren().isEmpty()) {
-            Label l = new Label("Aquí tendrás juntos tus emojis, stickers y GIFs favoritos. Agrégalos con clic derecho → "
+            Label l = Labels.help("Aquí tendrás juntos tus emojis, stickers y GIFs favoritos. Agrégalos con clic derecho → "
                     + "Agregar a favoritos, en un mensaje del chat o en las pestañas Emojis, Stickers y GIFs.");
-            l.setWrapText(true);
-            l.getStyleClass().add("settings-help");
             content.getChildren().add(l);
         }
     }

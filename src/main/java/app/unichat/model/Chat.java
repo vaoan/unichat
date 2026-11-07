@@ -92,7 +92,6 @@ public final class Chat {
     public String lastSenderName() { return lastSenderName; }
     public void setLastSenderName(String lastSenderName) { this.lastSenderName = lastSenderName; }
     public boolean lastOutgoing() { return lastOutgoing; }
-    public void setLastOutgoing(boolean lastOutgoing) { this.lastOutgoing = lastOutgoing; }
     public String topic() { return topic; }
     public void setTopic(String topic) { this.topic = topic; }
     public boolean bridgeBot() { return bridgeBot; }

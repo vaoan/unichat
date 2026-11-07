@@ -3,7 +3,6 @@ package app.unichat.matrix;
 import app.unichat.login.BridgeLogin;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
-import app.unichat.model.Message;
 import app.unichat.model.Network;
 import app.unichat.bridge.BridgePorts;
 import app.unichat.bridge.BridgeStates;
@@ -14,7 +13,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -56,7 +54,6 @@ final class BridgeAccounts {
 
     private final Set<Network> refreshingLogins = ConcurrentHashMap.newKeySet();
 
-    private static final Pattern LOGGED_IN_AS = Pattern.compile("(?i)logged in as ([^\\n.]+)");
 
     private final Map<Network, Boolean> bridgeAvailable = new ConcurrentHashMap<>();
 
@@ -168,37 +165,12 @@ final class BridgeAccounts {
                     continue;
                 }
                 if (portals == 0 && botRoom == null) continue;
-                AccountStatus status = portals > 0 ? AccountStatus.CONNECTED : AccountStatus.NEEDS_LOGIN;
-                String label = n.displayName();
-                if (botRoom != null) {
-                    for (int i = botRoom.timeline.size() - 1; i >= 0; i--) {
-                        Message m = botRoom.timeline.get(i);
-                        if (m.outgoing() || m.deleted()) continue;
-                        String b = m.body().toLowerCase(Locale.ROOT);
-                        if (b.contains("logged out") || b.contains("not logged in") || b.contains("you're not logged")) {
-                            status = AccountStatus.NEEDS_LOGIN;
-                            break;
-                        }
-                        if (b.contains("successfully logged in") || b.contains("logged in as")) {
-                            status = AccountStatus.CONNECTED;
-                            Matcher mt = LOGGED_IN_AS.matcher(m.body());
-                            if (mt.find()) label = mt.group(1).replace("`", "").trim();
-                            break;
-                        }
-                    }
-                }
-                String detail = status == AccountStatus.CONNECTED
+                BotChatLogin login = inferFromBotChat(botRoom == null ? List.of() : botRoom.timeline, portals, n.displayName());
+                String detail = login.status() == AccountStatus.CONNECTED
                         ? portals + (portals == 1 ? " chat" : " chats")
                         : "Inicia sesión desde el chat del bot";
-                List<Login> known = logins.get(n);
-                if (known != null && !known.isEmpty()) {
-                    for (Login l : known) {
-                        out.add(accountOf(n, l));
-                    }
-                    continue;
-                }
-                if (known != null && portals == 0) status = AccountStatus.NEEDS_LOGIN;
-                out.add(new Account(n, label, status, detail));
+                AccountStatus status = cachedLogins != null && portals == 0 ? AccountStatus.NEEDS_LOGIN : login.status();
+                out.add(new Account(n, login.label(), status, detail));
             }
         }
         return out;
@@ -322,10 +294,9 @@ final class BridgeAccounts {
         core.fire(Listener::accountsChanged);
     }
 
-    /** After the first sync: load cached logins; refresh networks with no cache, no logins, or a cache over 6 h old. */
-    /** Cached {@code list-logins} answers, read at start so accounts show before the first sync finishes. */
     private final Map<Network, Long> loginsCachedAt = new ConcurrentHashMap<>();
 
+    /** Cached {@code list-logins} answers, read at start so accounts show before the first sync finishes. */
     void loadCachedLogins() {
         for (Network n : Network.values()) {
             if (!n.isBridged()) continue;
@@ -376,7 +347,7 @@ final class BridgeAccounts {
         if (n != Network.TELEGRAM) return CompletableFuture.failedFuture(new UnsupportedOperationException("syncChats"));
         return core.call(() -> {
             String reply = bots.query(n, "sync-chats", 600);
-            if (!reply.startsWith("Successfully")) throw new MatrixException(0, null, reply);
+            requireSuccess(reply);
             Settings.get().set("telegram.chatSyncLimit", Integer.toString(BridgePorts.TELEGRAM_CREATE_LIMIT));
             return reply;
         });

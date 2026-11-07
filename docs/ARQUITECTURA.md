@@ -18,11 +18,11 @@ Cada paquete solo puede depender de los que están debajo. `ArchitectureTest` lo
 | `assist` | Borradores de respuesta con el CLI de IA de la persona | `model`, `settings`, `support` |
 | `video` | ffmpeg y la conversión de stickers WebM | `settings`, `support` |
 | `voice` | Grabar notas de voz, limpiarlas y codificarlas | `model`, `settings`, `support`, `video` |
-| `links` | Abre los enlaces de los mensajes para saber si tienen video o audio, sin llegar nunca a esta máquina ni a su red | `model` |
+| `links` | Abre los enlaces de los mensajes para saber si tienen video o audio, sin llegar nunca a esta máquina ni a su red | `model`, `support` |
 | `gif` | Buscadores de GIF y lectura de cuadros | `model`, `settings`, `support` |
 | `login` | Inicio de sesión en los puentes y cookies del navegador | `model`, `support` |
 | `settings` | Preferencias | `support` |
-| `model`, `support`, `bridge` | Datos del dominio; utilidades (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Urls`, `Errors`, `Folders`, `Processes`); lo que `matrix` y `server` comparten de los puentes (`BridgeStates`, `BridgePorts`) | nada del proyecto |
+| `model`, `support`, `bridge` | Datos del dominio; utilidades (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Urls`, `Errors`, `Folders`, `Processes`, `Threads`, `ConvertedFiles`); lo que `matrix` y `server` comparten de los puentes (`BridgeStates`, `BridgePorts`) | nada del proyecto |
 
 Excepciones aceptadas:
 

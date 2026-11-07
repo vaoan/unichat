@@ -2,6 +2,7 @@ package app.unichat.matrix;
 
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
+import app.unichat.model.Message;
 import app.unichat.model.Network;
 import app.unichat.service.BridgeAccess.DiscordGuild;
 import app.unichat.service.ChatService.GroupOffer;
@@ -25,10 +26,40 @@ final class BridgeProtocol {
     /** A drop shorter than this still shows as connected: bridges usually reconnect within seconds. */
     static final long LIVE_GRACE_MS = 60_000;
 
+    private static final Pattern LOGGED_IN_AS = Pattern.compile("(?i)logged in as ([^\\n.]+)");
+
     /** A bridge login as reported by {@code list-logins}. */
     record Login(String id, String name, String state) {}
 
+    /** What a bridge's bot chat says about its only account. */
+    record BotChatLogin(AccountStatus status, String label) {}
+
     private BridgeProtocol() {}
+
+    /** A bot command that answers "Successfully…" on success: any other answer is the failure's message. */
+    static void requireSuccess(String reply) throws MatrixException {
+        if (!reply.startsWith("Successfully")) throw new MatrixException(0, null, reply);
+    }
+
+    /**
+     * The login state inferred from a bot chat's {@code timeline} (oldest first; empty without a bot chat) for a bridge that
+     * reports no accounts: its newest message about logging in decides, else having {@code portals} chats means connected.
+     */
+    static BotChatLogin inferFromBotChat(List<Message> timeline, int portals, String label) {
+        for (int i = timeline.size() - 1; i >= 0; i--) {
+            Message m = timeline.get(i);
+            if (m.outgoing() || m.deleted()) continue;
+            String b = m.body().toLowerCase(Locale.ROOT);
+            if (b.contains("logged out") || b.contains("not logged in") || b.contains("you're not logged")) {
+                return new BotChatLogin(AccountStatus.NEEDS_LOGIN, label);
+            }
+            if (b.contains("successfully logged in") || b.contains("logged in as")) {
+                Matcher mt = LOGGED_IN_AS.matcher(m.body());
+                return new BotChatLogin(AccountStatus.CONNECTED, mt.find() ? mt.group(1).replace("`", "").trim() : label);
+            }
+        }
+        return new BotChatLogin(portals > 0 ? AccountStatus.CONNECTED : AccountStatus.NEEDS_LOGIN, label);
+    }
 
     /**
      * Prefixes a bot command with {@code !<protocol id>} (e.g. {@code !whatsapp login qr}); server/setup.* sets that

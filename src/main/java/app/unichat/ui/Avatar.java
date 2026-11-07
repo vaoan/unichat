@@ -1,7 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.Network;
-import app.unichat.service.ChatService;
+import app.unichat.service.MediaSource;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -57,7 +57,7 @@ public final class Avatar extends StackPane {
     }
 
     /** Shows {@code name}'s initials and loads {@code url} through the service (may be null). */
-    public void set(String name, String key, String url, ChatService service) {
+    public void set(String name, String key, String url, MediaSource service) {
         initials.setText(Formats.initials(name));
         String color = COLORS[Math.floorMod((key == null ? name : key).hashCode(), COLORS.length)];
         initials.setStyle("-fx-font-size: " + Math.round(size * 0.38) + "px; -fx-background-color: " + color + ";");

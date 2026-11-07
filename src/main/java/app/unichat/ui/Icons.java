@@ -8,6 +8,17 @@ import javafx.scene.shape.SVGPath;
 public final class Icons {
     private Icons() {}
 
+    /** A button showing only an icon; {@code tooltip} is also what a screen reader says. */
+    static javafx.scene.control.Button iconButton(String icon, String tooltip, Runnable action) {
+        javafx.scene.control.Button b = new javafx.scene.control.Button();
+        b.setGraphic(icon(icon, 18));
+        b.getStyleClass().add("icon-button");
+        b.setTooltip(new javafx.scene.control.Tooltip(tooltip));
+        b.setAccessibleText(tooltip);
+        if (action != null) b.setOnAction(e -> action.run());
+        return b;
+    }
+
     public static final String SEARCH = "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Zm-9 7a9 9 0 1 1 16.03 5.62l3.68 3.67-1.42 1.42-3.67-3.68A9 9 0 0 1 2 11Z";
     public static final String INBOX = "M4 4h16l2 9v7H2v-7l2-9Zm1.6 2-1.33 6H9l1 2h4l1-2h4.73L18.4 6H5.6ZM4 14v4h16v-4h-3.76l-1 2H8.76l-1-2H4Z";
     public static final String ARCHIVE = "M3 3h18v5h-1v13H4V8H3V3Zm3 5v11h12V8H6Zm-1-3v1h14V5H5Zm4 6h6v2H9v-2Z";

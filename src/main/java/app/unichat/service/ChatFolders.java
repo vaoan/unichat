@@ -7,7 +7,7 @@ import java.util.function.Consumer;
 
 /** The person's own folders of chats. They live in Unichat's preferences file, not on the server. */
 public interface ChatFolders {
-    List<PreferencesFile.Folder> folders();
+    List<Folder> folders();
     String createFolder(String name);
     void renameFolder(String id, String name);
     void deleteFolder(String id);

@@ -17,7 +17,7 @@ public final class FolderActions implements ChatFolders {
         this.fireChatsChanged = fireChatsChanged;
     }
 
-    @Override public List<PreferencesFile.Folder> folders() { return prefs.folders(); }
+    @Override public List<Folder> folders() { return prefs.folders(); }
 
     @Override
     public String createFolder(String name) {

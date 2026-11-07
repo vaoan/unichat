@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 public interface FolderForwarding extends ChatFolders {
     ChatFolders folderActions();
 
-    @Override default List<PreferencesFile.Folder> folders() { return folderActions().folders(); }
+    @Override default List<Folder> folders() { return folderActions().folders(); }
     @Override default String createFolder(String name) { return folderActions().createFolder(name); }
     @Override default void renameFolder(String id, String name) { folderActions().renameFolder(id, name); }
     @Override default void deleteFolder(String id) { folderActions().deleteFolder(id); }

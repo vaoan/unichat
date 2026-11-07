@@ -5,12 +5,10 @@ import app.unichat.model.MediaLibrary;
 import app.unichat.model.RoomFeatures;
 import app.unichat.service.ChatService;
 import javafx.application.Platform;
-import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.ImageView;
-import javafx.scene.input.KeyCode;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -60,11 +58,11 @@ final class StickerGrid extends ScrollPane {
         content.getChildren().clear();
         Chat c = chat.get();
         boolean accepted = c == null || c.features().accepts(RoomFeatures.STICKER);
-        if (!accepted) content.getChildren().add(help("Esta red no acepta stickers."));
+        if (!accepted) content.getChildren().add(Labels.help("Esta red no acepta stickers."));
         section("Favoritos", library.favorites(MediaLibrary.Kind.STICKER), "Sticker favorito", accepted);
         section("Recientes", library.recents(MediaLibrary.Kind.STICKER), "Sticker reciente", accepted);
         if (library.favorites(MediaLibrary.Kind.STICKER).isEmpty() && library.recents(MediaLibrary.Kind.STICKER).isEmpty()) {
-            content.getChildren().add(help("Aún no tienes stickers. Los que te manden aparecerán aquí; guárdalos con clic "
+            content.getChildren().add(Labels.help("Aún no tienes stickers. Los que te manden aparecerán aquí; guárdalos con clic "
                     + "derecho → Agregar a favoritos, aquí o en el chat."));
         }
     }
@@ -91,31 +89,12 @@ final class StickerGrid extends ScrollPane {
 
     private Node tile(MediaLibrary.Item item, String what, boolean accepted) {
         ImageView view = new ImageView();
-        view.setFitWidth(TILE);
-        view.setFitHeight(TILE);
-        view.setPreserveRatio(true);
         var loading = MessageMedia.loadMedia(svc, view, MediaItems.message(item), TILE * 2, TILE * 2);
-        StackPane tile = new StackPane(view);
-        tile.getStyleClass().add("sticker-tile");
-        tile.setMinSize(TILE, TILE);
-        tile.setMaxSize(TILE, TILE);
-        tile.setFocusTraversable(true);
-        tile.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
-        tile.setAccessibleText(what + (accepted ? ", enviar" : ", esta red no acepta stickers"));
-        tile.setOpacity(accepted ? 1 : 0.4);
-        tile.setCursor(accepted ? Cursor.HAND : Cursor.DEFAULT);
         Runnable send = () -> send(item, accepted);
-        tile.setOnMouseClicked(e -> {
-            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) send.run();
-        });
+        StackPane tile = MediaTile.of(view, TILE, TILE, "sticker-tile",
+                what + (accepted ? ", enviar" : ", esta red no acepta stickers"), accepted, send);
         LibraryMenu.attach(tile, library, item, accepted ? send : null, toast);
         MediaItems.markIfLost(loading, tile);
-        tile.setOnKeyPressed(e -> {
-            if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
-                e.consume();
-                send.run();
-            }
-        });
         return tile;
     }
 
@@ -133,12 +112,5 @@ final class StickerGrid extends ScrollPane {
             }
             library.addRecent(item);
         }));
-    }
-
-    private static Label help(String text) {
-        Label l = new Label(text);
-        l.setWrapText(true);
-        l.getStyleClass().add("settings-help");
-        return l;
     }
 }

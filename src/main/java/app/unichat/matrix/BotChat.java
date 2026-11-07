@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -68,10 +69,7 @@ final class BotChat {
             proc.removeRoom(roomId);
         }
         // If the server still lists it as joined, never pick it as the bot chat again.
-        String known = Settings.get().getString("matrix.brokenRooms", "");
-        if (!java.util.Arrays.asList(known.split(",")).contains(roomId)) {
-            Settings.get().set("matrix.brokenRooms", known.isEmpty() ? roomId : known + "," + roomId);
-        }
+        Settings.get().addToSet("matrix.brokenRooms", roomId);
         core.fire(Listener::chatsChanged);
     }
 
@@ -128,7 +126,7 @@ final class BotChat {
     }
 
     String find(Network n) {
-        List<String> broken = java.util.Arrays.asList(Settings.get().getString("matrix.brokenRooms", "").split(","));
+        Set<String> broken = Settings.get().getSet("matrix.brokenRooms");
         synchronized (proc) {
             for (MatrixRoom r : proc.rooms()) {
                 if (r.chat.bridgeBot() && r.chat.network() == n && !r.invite && !broken.contains(r.id)) return r.id;
@@ -154,8 +152,6 @@ final class BotChat {
     }
 
     void send(String roomId, String text) throws IOException {
-        String txn = core.newTxnId();
-        ObjectNode content = MatrixClient.JSON.createObjectNode().put("msgtype", "m.text").put("body", text);
         boolean known;
         synchronized (proc) {
             known = proc.room(roomId) != null;
@@ -163,7 +159,8 @@ final class BotChat {
         if (known) {
             sender.sendText(roomId, text, null).join();
         } else {
-            client.put(CLIENT + "/rooms/" + enc(roomId) + "/send/m.room.message/" + enc(txn), content);
+            // Not in the sync yet: no chat to show an echo in.
+            client.sendEvent(roomId, "m.room.message", core.newTxnId(), MatrixClient.JSON.createObjectNode().put("msgtype", "m.text").put("body", text));
         }
     }
 

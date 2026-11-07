@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.support.Threads;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatService.Listener;
 
@@ -11,10 +12,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static app.unichat.matrix.BridgeProtocol.*;
-import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.support.Urls.enc;
-import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** What every part of the Matrix service shares: the connection, the rooms, the background threads and the listeners. */
 final class MatrixCore {
@@ -32,11 +29,7 @@ final class MatrixCore {
      * carrier. With as many waiters as CPU cores, nothing else could run: a bot command waiting for its own send
      * froze all background work.
      */
-    final ExecutorService io = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "matrix-io");
-        t.setDaemon(true);
-        return t;
-    });
+    final ExecutorService io = Executors.newCachedThreadPool(Threads.daemon("matrix-io"));
     final List<Listener> listeners = new CopyOnWriteArrayList<>();
 
     MatrixCore(MatrixClient client, SyncProcessor proc, String userId, String serverName, String accessToken) {

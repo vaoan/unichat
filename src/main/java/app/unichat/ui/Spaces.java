@@ -20,6 +20,17 @@ import java.util.function.Consumer;
 final class Spaces {
     /** List ids of servers you could add ({@link ChatService#groupOffers}). */
     static final String OFFER_PREFIX = "offer:";
+
+    /** Whether a list row is a server you could add. */
+    static boolean isOffer(Chat c) {
+        return c.id().startsWith(OFFER_PREFIX);
+    }
+
+    /** The {@link ChatService.GroupOffer#id} behind an offer row. */
+    static String offerId(Chat c) {
+        return c.id().substring(OFFER_PREFIX.length());
+    }
+
     /** How long a joined channel may take to arrive before we stop waiting to open it (tests shorten it). */
     static long joinWaitMs = 30_000;
 

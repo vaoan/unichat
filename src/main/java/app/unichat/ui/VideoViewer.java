@@ -112,8 +112,7 @@ final class VideoViewer {
 
     private void showPicture(Path file) {
         try {
-            AnimatedImage.Frames frames = AnimatedImage.isGif(file) ? AnimatedImage.decodeGif(file, MAX_PICTURE, MAX_PICTURE)
-                    : AnimatedImage.decodeWebp(file, MAX_PICTURE, MAX_PICTURE);
+            AnimatedImage.Frames frames = AnimatedImage.decode(file, MAX_PICTURE, MAX_PICTURE);
             Platform.runLater(() -> {
                 if (!stage.isShowing()) return;
                 ImageView view = new ImageView();
@@ -173,7 +172,7 @@ final class VideoViewer {
     }
 
     private HBox controls(MediaPlayer p) {
-        Button toggle = Composer.iconButton(Icons.PAUSE, "Pausar", this::togglePlay);
+        Button toggle = Icons.iconButton(Icons.PAUSE, "Pausar", this::togglePlay);
         p.statusProperty().addListener((o, a, st) -> {
             boolean playing = st == MediaPlayer.Status.PLAYING;
             toggle.setGraphic(Icons.icon(playing ? Icons.PAUSE : Icons.PLAY, 18));
@@ -194,7 +193,7 @@ final class VideoViewer {
         position.valueChangingProperty().addListener((o, a, moving) -> {
             if (!moving) p.seek(p.getTotalDuration().multiply(position.getValue()));
         });
-        Button mute = Composer.iconButton(Icons.VOLUME, "Silenciar", null);
+        Button mute = Icons.iconButton(Icons.VOLUME, "Silenciar", null);
         mute.setOnAction(e -> toggleMute(mute));
         HBox bar = new HBox(10, toggle, position, time, mute);
         bar.setAlignment(Pos.CENTER);

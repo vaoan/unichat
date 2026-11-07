@@ -91,7 +91,7 @@ class BinaryStoreTest {
     void checksumMismatchInstallsNothing() {
         publishedSum = "0".repeat(64);
         IOException e = assertThrows(IOException.class, () -> store().install(WA));
-        assertTrue(e.getMessage().contains("checksum"), e.getMessage());
+        assertTrue(e.getMessage().contains("dañado"), e.getMessage());
         assertFalse(Files.exists(dir.resolve("whatsapp")));
         assertFalse(Files.exists(dir.resolve("whatsapp.part")));
     }

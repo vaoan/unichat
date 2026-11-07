@@ -96,10 +96,9 @@ public final class MainView extends StackPane {
         listPane.setOnNewChat(this::showNewChat);
         listPane.setFooter(accountAlerts);
         listPane.setToast(this::toast);
-        thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast, audio, folderDialogs);
+        thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast, audio, folderDialogs, library);
         info = new InfoPane(svc, this::toggleInfo, this::toast);
         panel = new SidePanel(info);
-        thread.setLibrary(library);
         thread.setOnShowServer(id -> {
             listPane.showSpace(id);
             listPane.setSelected(thread.chat() == null ? null : thread.chat().id());
@@ -131,8 +130,7 @@ public final class MainView extends StackPane {
 
         connection.getStyleClass().add("connection-banner");
         connection.setMaxWidth(Double.MAX_VALUE);
-        connection.setVisible(false);
-        connection.setManaged(false);
+        Nodes.show(connection, false);
 
         BorderPane main = new BorderPane(split);
         main.setLeft(rail);
@@ -342,8 +340,7 @@ public final class MainView extends StackPane {
         connection.setText(text);
         connection.getStyleClass().removeAll("error");
         if (s == ConnectionState.OFFLINE || s == ConnectionState.LOGGED_OUT) connection.getStyleClass().add("error");
-        connection.setVisible(text != null);
-        connection.setManaged(text != null);
+        Nodes.show(connection, text != null);
         if (s == ConnectionState.LOGGED_OUT) onLogout.run();
     }
 
@@ -472,7 +469,7 @@ public final class MainView extends StackPane {
     }
 
     public void showCommandBar() {
-        CommandBar bar = new CommandBar(svc, List.of(
+        CommandBar bar = new CommandBar(svc, svc, List.of(
                 new CommandBar.Command("Ir a la bandeja", "", () -> setView(ChatFilter.View.INBOX, false)),
                 new CommandBar.Command("Ver no leídos", Shortcuts.key("2"), () -> setView(ChatFilter.View.INBOX, true)),
                 new CommandBar.Command("Ver favoritos", Shortcuts.key("3"), () -> setView(ChatFilter.View.FAVORITES, false)),

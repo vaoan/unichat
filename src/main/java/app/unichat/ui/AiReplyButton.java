@@ -64,20 +64,18 @@ final class AiReplyButton {
         this.onError = onError;
         this.onDone = onDone;
         this.writers = writers;
-        button = Composer.iconButton(look.icon(), "", this::pressed);
+        button = Icons.iconButton(look.icon(), "", this::pressed);
         button.getStyleClass().add(look.styleClass());
         button.visibleProperty().bind(SHOWN);
         button.managedProperty().bind(SHOWN);
         ProgressIndicator spinner = new ProgressIndicator();
         spinner.setMaxSize(14, 14);
-        spinner.setVisible(!Theme.reduceMotion());
-        spinner.setManaged(!Theme.reduceMotion());
+        Nodes.show(spinner, !Theme.reduceMotion());
         statusText.getStyleClass().add("settings-help");
         status = new HBox(6, spinner, statusText);
         status.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         status.getStyleClass().add("ai-status");
-        status.setVisible(false);
-        status.setManaged(false);
+        Nodes.show(status, false);
         idle();
     }
 
@@ -88,8 +86,7 @@ final class AiReplyButton {
 
     private void showWorking(boolean on) {
         if (ticking != null) ticking.stop();
-        status.setVisible(on);
-        status.setManaged(on);
+        Nodes.show(status, on);
         if (!on) return;
         String what = look.working() + " con " + AiSettings.engine().label();
         long start = System.currentTimeMillis();

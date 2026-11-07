@@ -56,8 +56,6 @@ public final class PreferencesFile {
     public record Effective(boolean archived, boolean muted, boolean favorite, boolean lowPriority, boolean pinned,
                             Instant reminder, boolean muteChosenHere) {}
 
-    public record Folder(String id, String name, List<String> chatKeys) {}
-
     private static final int VERSION = 1;
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -246,6 +244,14 @@ public final class PreferencesFile {
     }
 
     /** Several changes, written once at the end: a server's hundreds of channels shouldn't rewrite the file each. */
+    /** Muted = archived ({@link QuietRule}): the person's choice covers both. */
+    public synchronized void chooseQuiet(String key, boolean on) {
+        batch(() -> {
+            choose(key, Flag.ARCHIVED, on);
+            choose(key, Flag.MUTED, on);
+        });
+    }
+
     public synchronized void batch(Runnable changes) {
         batching++;
         try {

@@ -32,7 +32,7 @@ final class AudioControls extends HBox {
         this.message = message;
         getStyleClass().add("audio-controls");
         setAlignment(Pos.CENTER_LEFT);
-        toggle = Composer.iconButton(Icons.PLAY, "Reproducir", onToggle);
+        toggle = Icons.iconButton(Icons.PLAY, "Reproducir", onToggle);
         toggle.getStyleClass().add("audio-toggle");
         position.setAccessibleText("Posición del audio");
         position.setBlockIncrement(0.05);

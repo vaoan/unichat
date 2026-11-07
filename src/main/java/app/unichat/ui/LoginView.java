@@ -40,8 +40,7 @@ public final class LoginView extends StackPane {
         Label error = new Label();
         error.getStyleClass().add("login-error");
         error.setWrapText(true);
-        error.setVisible(false);
-        error.setManaged(false);
+        Nodes.show(error, false);
 
         ProgressIndicator spin = new ProgressIndicator();
         spin.setPrefSize(18, 18);
@@ -57,13 +56,12 @@ public final class LoginView extends StackPane {
             }
             login.setDisable(true);
             spin.setVisible(true);
-            error.setVisible(false);
-            error.setManaged(false);
+            Nodes.show(error, false);
             MatrixLogin.login(server.getText().trim(), user.getText().trim(), pass.getText())
                     .whenComplete((svc, err) -> Platform.runLater(() -> {
                         login.setDisable(false);
                         spin.setVisible(false);
-                        if (err != null) showError(error, AccountsPane.rootMessage(err));
+                        if (err != null) showError(error, LoginTexts.rootMessage(err));
                         else onLoggedIn.accept(svc);
                     }));
         });
@@ -101,8 +99,7 @@ public final class LoginView extends StackPane {
                                          Consumer<ChatService> onLoggedIn) {
         useLocal.setDisable(true);
         login.setDisable(true);
-        error.setVisible(false);
-        error.setManaged(false);
+        Nodes.show(error, false);
         Thread.ofVirtual().name("local-server-setup").start(() -> {
             try {
                 local.ensureRunning(msg -> Platform.runLater(() -> localStatus.setText(msg)));
@@ -116,7 +113,7 @@ public final class LoginView extends StackPane {
                     useLocal.setDisable(false);
                     login.setDisable(false);
                     localStatus.setText("");
-                    showError(error, AccountsPane.rootMessage(ex));
+                    showError(error, LoginTexts.rootMessage(ex));
                 });
             }
         });
@@ -139,7 +136,6 @@ public final class LoginView extends StackPane {
 
     private static void showError(Label l, String text) {
         l.setText(text);
-        l.setVisible(true);
-        l.setManaged(true);
+        Nodes.show(l, true);
     }
 }

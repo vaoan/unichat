@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.support.Threads;
 import app.unichat.support.Os;
 
 import java.io.OutputStream;
@@ -14,11 +15,7 @@ import java.util.concurrent.Executors;
  * so message content cannot inject arguments. Utterances are queued, one at a time.
  */
 public final class Speaker {
-    private static final ExecutorService QUEUE = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "speaker");
-        t.setDaemon(true);
-        return t;
-    });
+    private static final ExecutorService QUEUE = Executors.newSingleThreadExecutor(Threads.daemon("speaker"));
 
     private Speaker() {}
 

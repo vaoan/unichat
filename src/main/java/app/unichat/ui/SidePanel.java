@@ -41,15 +41,8 @@ public final class SidePanel extends VBox {
         javafx.scene.layout.FlowPane tabs = new javafx.scene.layout.FlowPane(4, 4);
         tabs.getStyleClass().add("side-panel-tabs");
         for (Tab t : Tab.values()) {
-            ToggleButton b = new ToggleButton(t.label);
-            b.getStyleClass().add("chip");
-            b.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
-            b.setToggleGroup(group);
+            ToggleButton b = Chips.sticky(t.label, group, false, () -> show(chat, t));
             b.setAccessibleText("Pestaña " + t.label);
-            b.setOnAction(e -> {
-                if (!b.isSelected()) b.setSelected(true);
-                show(chat, t);
-            });
             buttons.put(t, b);
             tabs.getChildren().add(b);
         }
@@ -94,9 +87,7 @@ public final class SidePanel extends VBox {
     }
 
     private static Node placeholder(String text) {
-        Label l = new Label(text);
-        l.setWrapText(true);
-        l.getStyleClass().add("settings-help");
+        Label l = Labels.help(text);
         StackPane p = new StackPane(l);
         p.getStyleClass().add("side-panel-placeholder");
         return p;

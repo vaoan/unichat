@@ -37,7 +37,7 @@ final class VoiceBar extends HBox {
         this.onNoSound = onNoSound;
         getStyleClass().add("voice-bar");
         setAlignment(Pos.CENTER_LEFT);
-        Button discard = Composer.iconButton(Icons.TRASH, "Descartar la grabación (Esc)", onDiscard);
+        Button discard = Icons.iconButton(Icons.TRASH, "Descartar la grabación (Esc)", onDiscard);
         Region dot = new Region();
         dot.getStyleClass().add("voice-dot");
         dot.setMinSize(10, 10);
@@ -49,7 +49,7 @@ final class VoiceBar extends HBox {
         level.setMaxWidth(Double.MAX_VALUE);
         level.setAccessibleText("Volumen del micrófono");
         HBox.setHgrow(level, Priority.ALWAYS);
-        Button send = Composer.iconButton(Icons.SEND, "Enviar la nota de voz", onSend);
+        Button send = Icons.iconButton(Icons.SEND, "Enviar la nota de voz", onSend);
         send.getStyleClass().add("send-button");
         getChildren().addAll(discard, dot, time, level, send);
         addEventFilter(KeyEvent.KEY_PRESSED, e -> {

@@ -5,10 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
-import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -89,16 +86,8 @@ public final class BridgeContacts {
     /** The response, or null when the bridge doesn't have this endpoint. */
     private JsonNode call(String method, String path, JsonNode body) throws IOException, InterruptedException {
         String q = "?user_id=" + enc(userId) + (loginId == null ? "" : "&login_id=" + enc(loginId));
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(base + path + q)).timeout(TIMEOUT)
-                .header("Authorization", "Bearer " + accessToken);
-        if (body != null) b.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(body.toString()));
-        else b.method(method, HttpRequest.BodyPublishers.noBody());
-        HttpResponse<String> r = HTTP.send(b.build(), HttpResponse.BodyHandlers.ofString());
-        JsonNode j = BridgeLogin.bodyOf(r);
-        if (r.statusCode() == 404 && "M_UNRECOGNIZED".equals(j.path("errcode").asText())) return null;
-        if (r.statusCode() >= 400) {
-            throw new BridgeLogin.BridgeLoginException(j.path("errcode").asText("M_UNKNOWN"), j.path("error").asText("HTTP " + r.statusCode()));
-        }
-        return j;
+        Provisioning.Answer a = Provisioning.call(HTTP, method, base + path + q, accessToken, body, TIMEOUT);
+        if (a.status() == 404 && "M_UNRECOGNIZED".equals(a.json().path("errcode").asText())) return null;
+        return a.orThrow();
     }
 }

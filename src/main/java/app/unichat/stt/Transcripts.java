@@ -1,15 +1,14 @@
 package app.unichat.stt;
 
+import app.unichat.support.Threads;
 import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
+import app.unichat.support.Hashes;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -41,11 +40,7 @@ public final class Transcripts {
     private final Engine engine;
     private final Map<String, State> states = new ConcurrentHashMap<>();
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
-    private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "transcriber");
-        t.setDaemon(true);
-        return t;
-    });
+    private final ExecutorService worker = Executors.newSingleThreadExecutor(Threads.daemon("transcriber"));
 
     Transcripts(Path dir, Engine engine) {
         this.dir = dir;
@@ -101,11 +96,6 @@ public final class Transcripts {
     }
 
     private Path file(String mediaUrl) {
-        try {
-            byte[] h = MessageDigest.getInstance("SHA-256").digest(mediaUrl.getBytes(StandardCharsets.UTF_8));
-            return dir.resolve(HexFormat.of().formatHex(h) + ".txt");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
+        return dir.resolve(Hashes.sha256(mediaUrl) + ".txt");
     }
 }

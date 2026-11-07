@@ -1,16 +1,13 @@
 package app.unichat.ui;
 
-import app.unichat.login.BrowserSession;
 import app.unichat.login.CookieLogin;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
-import app.unichat.model.Message;
 import app.unichat.model.Network;
 import app.unichat.server.TelegramKeys;
 import app.unichat.service.BridgeAccess;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
-import app.unichat.support.Errors;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
@@ -75,11 +72,11 @@ public final class AccountsPane extends VBox {
         setSpacing(14);
 
         title.getStyleClass().add("sheet-title");
-        back = Composer.iconButton(Icons.BACK, "Volver", () -> { if (onBack != null) onBack.run(); });
+        back = Icons.iconButton(Icons.BACK, "Volver", () -> { if (onBack != null) onBack.run(); });
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.ALWAYS);
         HBox head = new HBox(6, back, title, grow);
-        if (close != null) head.getChildren().add(Composer.iconButton(Icons.CLOSE, "Cerrar", this::closeSheet));
+        if (close != null) head.getChildren().add(Icons.iconButton(Icons.CLOSE, "Cerrar", this::closeSheet));
         head.setAlignment(Pos.CENTER_LEFT);
         VBox.setVgrow(body, Priority.ALWAYS);
         getChildren().addAll(head, body);
@@ -110,8 +107,7 @@ public final class AccountsPane extends VBox {
     private void setView(String heading, Node content, Runnable backAction) {
         title.setText(heading);
         onBack = backAction;
-        back.setVisible(backAction != null);
-        back.setManaged(backAction != null);
+        Nodes.show(back, backAction != null);
         body.getChildren().setAll(content);
     }
 
@@ -125,9 +121,7 @@ public final class AccountsPane extends VBox {
                 .sorted(java.util.Comparator.comparing((Account a) -> a.network().ordinal()).thenComparing(Accounts::name))
                 .toList();
         if (accounts.isEmpty()) {
-            Label empty = new Label("Aún no tienes cuentas conectadas. Agrega la primera: puedes conectar varias de cada red.");
-            empty.setWrapText(true);
-            empty.getStyleClass().add("settings-help");
+            Label empty = Labels.help("Aún no tienes cuentas conectadas. Agrega la primera: puedes conectar varias de cada red.");
             HBox row = new HBox(empty);
             row.getStyleClass().add("settings-row");
             rows.getChildren().add(row);
@@ -157,7 +151,7 @@ public final class AccountsPane extends VBox {
         VBox text = new VBox(2, name, detail);
         HBox.setHgrow(text, Priority.ALWAYS);
         Label status = statusPill(a.status());
-        Button more = Composer.iconButton(Icons.MORE, "Opciones de " + Accounts.name(a), null);
+        Button more = Icons.iconButton(Icons.MORE, "Opciones de " + Accounts.name(a), null);
         more.setOnAction(e -> accountMenu(a).show(more, Side.BOTTOM, 0, 4));
         HBox row = new HBox(12, icon, text, status, more);
         if (a.network() == Network.DISCORD && svc instanceof BridgeAccess m) {
@@ -207,12 +201,10 @@ public final class AccountsPane extends VBox {
         m.discordGuilds().whenComplete((guilds, err) -> Platform.runLater(() -> {
             if (err != null) {
                 spin.setVisible(false);
-                wait.setText("No se pudo leer la lista: " + rootMessage(err));
+                wait.setText("No se pudo leer la lista: " + LoginTexts.rootMessage(err));
                 return;
             }
-            Label help = new Label("Elige los servidores que quieres ver. Sus canales aparecen en Unichat a medida que alguien escribe en ellos. Los mensajes directos y grupos privados llegan siempre.");
-            help.setWrapText(true);
-            help.getStyleClass().add("settings-help");
+            Label help = Labels.help("Elige los servidores que quieres ver. Sus canales aparecen en Unichat a medida que alguien escribe en ellos. Los mensajes directos y grupos privados llegan siempre.");
             TextField search = new TextField();
             search.setPromptText("Buscar servidor");
             search.setAccessibleText("Buscar servidor de Discord");
@@ -247,7 +239,7 @@ public final class AccountsPane extends VBox {
                             sw.setDisable(false);
                             if (ex != null) {
                                 sw.setSelected(!want);
-                                toast.accept("No se pudo cambiar " + g.name() + ": " + rootMessage(ex));
+                                toast.accept("No se pudo cambiar " + g.name() + ": " + LoginTexts.rootMessage(ex));
                             } else {
                                 if (want) on.add(g.id()); else on.remove(g.id());
                                 count.setText(on.size() + " de " + sorted.size() + " servidores en Unichat");
@@ -296,11 +288,9 @@ public final class AccountsPane extends VBox {
         Label q = new Label("¿Desconectar " + a.network().displayName() + " · " + Accounts.name(a) + "?");
         q.getStyleClass().add("sheet-title");
         q.setWrapText(true);
-        Label info = new Label("Se cierra la sesión en el puente y dejarás de recibir mensajes de esta cuenta. "
+        Label info = Labels.help("Se cierra la sesión en el puente y dejarás de recibir mensajes de esta cuenta. "
                 + "Tus chats ya sincronizados se quedan. Para volver a conectarla tendrás que iniciar sesión de nuevo"
-                + (qrNetwork(a.network()) ? " (escanear el QR)." : "."));
-        info.setWrapText(true);
-        info.getStyleClass().add("settings-help");
+                + (LoginTexts.qrNetwork(a.network()) ? " (escanear el QR)." : "."));
         Button cancel = new Button("Cancelar");
         cancel.getStyleClass().add("secondary-button");
         cancel.setCancelButton(true);
@@ -310,7 +300,7 @@ public final class AccountsPane extends VBox {
         confirm.setOnAction(e -> {
             confirm.setDisable(true);
             svc.disconnectAccount(a).whenComplete((v, err) -> Platform.runLater(() -> {
-                toast.accept(err == null ? Accounts.name(a) + " desconectada" : "No se pudo desconectar: " + rootMessage(err));
+                toast.accept(err == null ? Accounts.name(a) + " desconectada" : "No se pudo desconectar: " + LoginTexts.rootMessage(err));
                 showList();
             }));
         });
@@ -324,10 +314,8 @@ public final class AccountsPane extends VBox {
         TextField field = new TextField(Settings.get().accountAlias(a.id()) == null ? "" : Settings.get().accountAlias(a.id()));
         field.setPromptText("Ej. Personal, Trabajo");
         field.setAccessibleText("Nombre de la cuenta");
-        Label hint = new Label("Solo se usa en Unichat para distinguir tus cuentas de " + a.network().displayName()
+        Label hint = Labels.help("Solo se usa en Unichat para distinguir tus cuentas de " + a.network().displayName()
                 + ". Déjalo vacío para usar " + a.label() + ".");
-        hint.setWrapText(true);
-        hint.getStyleClass().add("settings-help");
         Button save = new Button("Guardar");
         save.getStyleClass().add("primary-button");
         save.setDefaultButton(true);
@@ -354,7 +342,7 @@ public final class AccountsPane extends VBox {
             Label icon = networkIcon(n, 34);
             Label name = new Label(n.displayName());
             name.getStyleClass().add("settings-label");
-            Label method = new Label(ok ? method(n) : "Puente no instalado en tu servidor");
+            Label method = new Label(ok ? LoginTexts.method(n) : "Puente no instalado en tu servidor");
             method.getStyleClass().add("settings-help");
             VBox text = new VBox(2, name, method);
             HBox.setHgrow(text, Priority.ALWAYS);
@@ -388,45 +376,6 @@ public final class AccountsPane extends VBox {
         setView("Agregar cuenta", new VBox(12, sub, scroll), this::showList);
     }
 
-    static String method(Network n) {
-        return switch (n) {
-            case WHATSAPP, SIGNAL, TELEGRAM, DISCORD -> "Escanea un código QR con tu teléfono";
-            case INSTAGRAM, MESSENGER, X, LINKEDIN -> "Usa tu sesión del navegador o inicia sesión aquí";
-            case GOOGLE_MESSAGES -> "Tu sesión de Google + confirmación en el teléfono";
-            case SLACK -> "Tu correo y el código que te llega";
-            default -> "";
-        };
-    }
-
-    /** What to do on the phone / in the browser, in Spanish. */
-    static String instructions(Network n) {
-        return switch (n) {
-            case WHATSAPP -> "En tu teléfono abre WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo, y escanea el código.";
-            case SIGNAL -> "En tu teléfono abre Signal → Ajustes → Dispositivos vinculados → +, y escanea el código.";
-            case TELEGRAM -> "En tu teléfono abre Telegram → Ajustes → Dispositivos → Vincular dispositivo de escritorio, y escanea el código.";
-            case DISCORD -> "En la app de Discord del teléfono toca tu perfil → Escanear código QR.";
-            case INSTAGRAM, MESSENGER, X, LINKEDIN -> "1. Abre " + site(n) + " en tu navegador con tu sesión iniciada.\n"
-                    + "2. Abre las herramientas de desarrollador (F12) → pestaña Red, y recarga la página.\n"
-                    + "3. Clic derecho en cualquier petición a " + site(n) + " → Copiar → Copiar como cURL.\n"
-                    + "4. Pega el texto abajo y pulsa Enviar.";
-            case GOOGLE_MESSAGES -> "1. Abre messages.google.com en tu navegador con tu cuenta de Google.\n"
-                    + "2. F12 → Red → recarga → clic derecho en una petición → Copiar como cURL, pégalo abajo.\n"
-                    + "3. Después confirma el emoji que aparece en tu teléfono.";
-            case SLACK -> "Escribe abajo el correo de tu cuenta de Slack. Luego te llegará un código: pégalo aquí también.";
-            default -> "Sigue las indicaciones del puente.";
-        };
-    }
-
-    private static String site(Network n) {
-        return switch (n) {
-            case INSTAGRAM -> "instagram.com";
-            case MESSENGER -> "facebook.com";
-            case X -> "x.com";
-            case LINKEDIN -> "linkedin.com";
-            default -> n.displayName();
-        };
-    }
-
     // ------------------------------------------------------------------ 3. login wizard
 
     /** Opens the wizard for {@code n} directly (rail click on an unconnected network). */
@@ -448,9 +397,7 @@ public final class AccountsPane extends VBox {
     private void startBridgeLogin(BridgeAccess m, Network n) {
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(36, 36);
-        Label wait = new Label("Preparando " + n.displayName() + "… La primera vez se descarga su conector; tarda unos segundos.");
-        wait.setWrapText(true);
-        wait.getStyleClass().add("settings-help");
+        Label wait = Labels.help("Preparando " + n.displayName() + "… La primera vez se descarga su conector; tarda unos segundos.");
         VBox loading = new VBox(14, spin, wait);
         loading.setAlignment(Pos.CENTER);
         setView("Conectar " + n.displayName(), loading, this::showPicker);
@@ -478,7 +425,7 @@ public final class AccountsPane extends VBox {
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     spin.setVisible(false);
-                    wait.setText("No se pudo preparar " + n.displayName() + ": " + rootMessage(e));
+                    wait.setText("No se pudo preparar " + n.displayName() + ": " + LoginTexts.rootMessage(e));
                 });
             }
         });
@@ -495,7 +442,7 @@ public final class AccountsPane extends VBox {
         Instant since = Instant.now().minusSeconds(2);
         svc.addAccount(n).whenComplete((botChatId, err) -> Platform.runLater(() -> {
             if (err != null) {
-                wait.setText("No se pudo iniciar: " + rootMessage(err));
+                wait.setText("No se pudo iniciar: " + LoginTexts.rootMessage(err));
                 spin.setVisible(false);
                 return;
             }
@@ -514,37 +461,6 @@ public final class AccountsPane extends VBox {
         }));
     }
 
-    // ------------------------------------------------------------------ 3a. Discord
-
-    // ------------------------------------------------------------------ 3b. cookie-source chooser
-
-    /** Card caption for a browser session, e.g. "Usar tu sesión de Instagram de Firefox (default)". */
-    static String sessionLabel(String net, BrowserSession s) {
-        String profile = s.profile() == null || s.profile().isBlank() ? "" : " (" + s.profile() + ")";
-        return "Usar tu sesión de " + net + " de " + s.browser() + profile;
-    }
-
-    /** Message shown when a cookies.txt lacks required cookies. */
-    static String missingMessage(Network n, List<String> missing) {
-        return "Al archivo le falta: " + String.join(", ", missing)
-                + ". Exporta las cookies con la sesión de " + n.displayName() + " abierta.";
-    }
-
-    static boolean qrNetwork(Network n) {
-        return switch (n) {
-            case WHATSAPP, SIGNAL, TELEGRAM, DISCORD -> true;
-            default -> false;
-        };
-    }
-
-    static String promptFor(Network n) {
-        return switch (n) {
-            case SLACK -> "Correo o código de verificación";
-            case INSTAGRAM, MESSENGER, X, LINKEDIN, GOOGLE_MESSAGES -> "Pega aquí el cURL o las cookies";
-            default -> "Código o contraseña que pida el puente";
-        };
-    }
-
     static Label networkIcon(Network n, double size) {
         return NetworkIcons.tile(n, size, "network-tile-icon");
     }
@@ -560,11 +476,5 @@ public final class AccountsPane extends VBox {
         l.getStyleClass().addAll("status-pill", s == AccountStatus.CONNECTED ? "ok" : "warn");
         l.setMinWidth(Region.USE_PREF_SIZE);
         return l;
-    }
-
-    /** The deepest cause: what these screens show comes from a bridge's login step, wrapped in whatever carried it here. */
-    static String rootMessage(Throwable t) {
-        while (t.getCause() != null) t = t.getCause();
-        return Errors.message(t);
     }
 }

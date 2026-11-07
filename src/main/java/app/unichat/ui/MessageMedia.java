@@ -34,11 +34,11 @@ final class MessageMedia {
     private final MediaSource svc;
     private final Consumer<String> openLink;
     private final Consumer<String> toast;
-    private final Supplier<MediaLibrary> library;
+    private final MediaLibrary library;
     private final Supplier<Scene> scene;
     private final AudioPlayback audio;
 
-    MessageMedia(MediaSource svc, Consumer<String> openLink, Consumer<String> toast, Supplier<MediaLibrary> library, Supplier<Scene> scene, AudioPlayback audio) {
+    MessageMedia(MediaSource svc, Consumer<String> openLink, Consumer<String> toast, MediaLibrary library, Supplier<Scene> scene, AudioPlayback audio) {
         this.svc = svc;
         this.openLink = openLink;
         this.toast = toast;
@@ -47,7 +47,6 @@ final class MessageMedia {
         this.audio = audio;
     }
 
-    private static final double MAX_MEDIA = 320;
     private static final double DEFAULT_SHAPE = 16.0 / 9;
     private static final int MAX_LINKS_OPENED = 5;
     private static final int MAX_LINK_PLAYERS = 3;
@@ -55,16 +54,9 @@ final class MessageMedia {
     private final java.util.Map<String, Double> pictureShapes = new java.util.HashMap<>();
 
     Node imageNode(Message m) {
-        double w = m.width() > 0 ? m.width() : 240;
-        double h = m.height() > 0 ? m.height() : 180;
-        double dw = fittedWidth(m), dh = fittedHeight(m);
         boolean sticker = m.type() == MessageType.STICKER;
-        if (sticker) {
-            // Stickers are small and shown without a bubble, like on the phone.
-            double s = Math.min(1, Math.min(180 / w, 180 / h));
-            dw = Math.max(60, w * s);
-            dh = Math.max(60, h * s);
-        }
+        MediaSizes.Size size = sticker ? MediaSizes.sticker(m.width(), m.height()) : MediaSizes.media(m.width(), m.height());
+        double dw = size.width(), dh = size.height();
         StackPane box = mediaBox(dw, dh, sticker);
         ImageView view = new ImageView();
         view.setFitWidth(dw);
@@ -72,8 +64,8 @@ final class MessageMedia {
         view.setPreserveRatio(sticker);
         box.getChildren().add(view);
         if (m.mediaUrl() != null) {
-            loadInto(view, m, (int) (dw * 2), (int) (dh * 2));
-            if (library.get() != null && MessageActions.isStickerOrGif(m)) library.get().rememberSeen(MediaItems.of(m));
+            loadMedia(svc, view, m, (int) (dw * 2), (int) (dh * 2));
+            if (MessageActions.isStickerOrGif(m)) library.rememberSeen(MediaItems.of(m));
             if (m.isReelLink()) {
                 box.getChildren().add(playBadge());
                 clickable(box, "Reel, abrir en el navegador", () -> openLink.accept(m.externalUrl()));
@@ -176,12 +168,12 @@ final class MessageMedia {
     /** A video that plays by itself (Message.playsInline), and opens big like a picture. */
     Node inlineVideoNode(Message m) {
         boolean sticker = m.type() == MessageType.STICKER;
-        double dw = sticker ? stickerSize(m.width(), m.height(), m.width()) : fittedWidth(m);
-        double dh = sticker ? stickerSize(m.width(), m.height(), m.height()) : fittedHeight(m);
+        MediaSizes.Size size = sticker ? MediaSizes.sticker(m.width(), m.height()) : MediaSizes.media(m.width(), m.height());
+        double dw = size.width(), dh = size.height();
         StackPane box = mediaBox(dw, dh, sticker);
         if (isWebm(m)) showConverted(box, m, dw, dh);
         else box.getChildren().add(new InlineVideo(svc, m.mediaUrl(), dw, dh, () -> fileNode(m)));
-        if (library.get() != null && MessageActions.isStickerOrGif(m)) library.get().rememberSeen(MediaItems.of(m));
+        if (MessageActions.isStickerOrGif(m)) library.rememberSeen(MediaItems.of(m));
         clickable(box, (sticker ? "Sticker" : "Video") + ", abrir en grande", () -> openVideo(m));
         return box;
     }
@@ -240,28 +232,10 @@ final class MessageMedia {
 
     private static AnimatedImage.Frames decoded(java.nio.file.Path picture, int px) {
         try {
-            return AnimatedImage.isGif(picture) ? AnimatedImage.decodeGif(picture, px, px) : AnimatedImage.decodeWebp(picture, px, px);
+            return AnimatedImage.decode(picture, px, px);
         } catch (java.io.IOException e) {
             throw new java.io.UncheckedIOException(e);
         }
-    }
-
-    private static double stickerSize(int w, int h, int side) {
-        double fw = w > 0 ? w : 180, fh = h > 0 ? h : 180;
-        return Math.max(60, (side > 0 ? side : 180) * Math.min(1, Math.min(180 / fw, 180 / fh)));
-    }
-
-    private static double fitted(Message m) {
-        double w = m.width() > 0 ? m.width() : 240, h = m.height() > 0 ? m.height() : 180;
-        return Math.min(1, Math.min(MAX_MEDIA / w, MAX_MEDIA / h));
-    }
-
-    private static double fittedWidth(Message m) {
-        return Math.max(80, (m.width() > 0 ? m.width() : 240) * fitted(m));
-    }
-
-    private static double fittedHeight(Message m) {
-        return Math.max(60, (m.height() > 0 ? m.height() : 180) * fitted(m));
     }
 
     private static StackPane mediaBox(double w, double h, boolean sticker) {
@@ -312,10 +286,6 @@ final class MessageMedia {
         return m.type() == MessageType.STICKER || mime.equals("image/gif") || mime.equals("image/webp");
     }
 
-    private void loadInto(ImageView view, Message m, int pxW, int pxH) {
-        loadMedia(svc, view, m, pxW, pxH);
-    }
-
     /** Thumbnail first, then the (possibly animated) original; shared with the sticker and GIF grids. */
     static java.util.concurrent.CompletableFuture<java.nio.file.Path> loadMedia(MediaSource svc, ImageView view, Message m, int pxW, int pxH) {
         if (!mayBeAnimated(m)) {
@@ -336,10 +306,7 @@ final class MessageMedia {
         svc.media(m.mediaUrl(), pxW, pxH).thenAcceptAsync(p -> showStill(view, p, pxW, pxH, true), AnimatedImage.DECODER);
         original.thenAcceptAsync(p -> {
             try {
-                AnimatedImage.Frames frames;
-                if (AnimatedImage.isWebp(p)) frames = AnimatedImage.decodeWebp(p, pxW, pxH);
-                else if (AnimatedImage.isGif(p)) frames = AnimatedImage.decodeGif(p, pxW, pxH);
-                else frames = AnimatedImage.decodePlain(p, pxW, pxH); // labelled as a sticker, but a plain PNG/JPEG
+                AnimatedImage.Frames frames = AnimatedImage.decode(p, pxW, pxH); // labelled as a sticker, maybe a plain PNG/JPEG
                 Platform.runLater(() -> AnimatedImage.play(view, frames));
             } catch (Exception e) {
                 System.err.println("Could not decode " + m.mediaUrl() + ": " + e);

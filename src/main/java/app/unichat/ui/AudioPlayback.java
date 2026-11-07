@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.support.Threads;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.service.MediaSource;
@@ -25,11 +26,7 @@ final class AudioPlayback {
     enum State { LOADING, PLAYING, PAUSED }
 
     /** Decoding a voice note: not on the FX thread, one at a time. */
-    private static final ExecutorService DECODER = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "audio-decode");
-        t.setDaemon(true);
-        return t;
-    });
+    private static final ExecutorService DECODER = Executors.newSingleThreadExecutor(Threads.daemon("audio-decode"));
 
     private final MediaSource media;
     private final Consumer<String> toast;

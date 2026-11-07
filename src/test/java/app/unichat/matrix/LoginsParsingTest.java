@@ -1,9 +1,11 @@
 package app.unichat.matrix;
 
 import app.unichat.model.AccountStatus;
+import app.unichat.model.Message;
 import app.unichat.model.Network;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -11,6 +13,37 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LoginsParsingTest {
+    private static Message fromBot(String body) {
+        Message m = new Message("$" + body.hashCode(), "!bot:s", "@bot:s", "bot", false, Instant.EPOCH);
+        m.setBody(body);
+        return m;
+    }
+
+    @Test
+    void aBotChatsNewestLoginMessageDecides() {
+        BridgeProtocol.BotChatLogin in = BridgeProtocol.inferFromBotChat(
+                List.of(fromBot("You're not logged in"), fromBot("Successfully logged in as `+57 300`.")), 0, "WhatsApp");
+        assertEquals(new BridgeProtocol.BotChatLogin(AccountStatus.CONNECTED, "+57 300"), in);
+        assertEquals(new BridgeProtocol.BotChatLogin(AccountStatus.NEEDS_LOGIN, "WhatsApp"), BridgeProtocol.inferFromBotChat(
+                List.of(fromBot("Successfully logged in as yo"), fromBot("Logged out")), 5, "WhatsApp"));
+    }
+
+    @Test
+    void outgoingAndDeletedMessagesDontCount() {
+        Message mine = new Message("$m", "!bot:s", "@me:s", "yo", true, Instant.EPOCH);
+        mine.setBody("not logged in");
+        Message gone = fromBot("Logged out");
+        gone.markDeleted();
+        assertEquals(new BridgeProtocol.BotChatLogin(AccountStatus.CONNECTED, "Red"),
+                BridgeProtocol.inferFromBotChat(List.of(mine, gone, fromBot("hola")), 1, "Red"));
+    }
+
+    @Test
+    void withoutABotChatHavingChatsMeansConnected() {
+        assertEquals(AccountStatus.CONNECTED, BridgeProtocol.inferFromBotChat(List.of(), 2, "Red").status());
+        assertEquals(AccountStatus.NEEDS_LOGIN, BridgeProtocol.inferFromBotChat(List.of(), 0, "Red").status());
+    }
+
     @Test
     void parsesBridgev2ListLogins() {
         String reply = """

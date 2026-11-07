@@ -62,7 +62,7 @@ final class LoginWizard implements ChatService.Listener {
         this.network = network;
         this.botChatId = botChatId;
         this.since = since;
-        instructions.setText(AccountsPane.instructions(network));
+        instructions.setText(LoginTexts.instructions(network));
         instructions.setWrapText(true);
         instructions.setMinHeight(Region.USE_PREF_SIZE);
         instructions.getStyleClass().add("wizard-instructions");
@@ -74,18 +74,17 @@ final class LoginWizard implements ChatService.Listener {
         qrBox.getChildren().add(qr);
         qrBox.getStyleClass().add("qr-box");
         qrBox.setMaxSize(284, 284);
-        qrBox.setVisible(false);
-        qrBox.setManaged(false);
+        Nodes.show(qrBox, false);
         qrBox.setAccessibleText("Código QR para vincular " + network.displayName());
 
         botText.setWrapText(true);
         botText.setMinHeight(Region.USE_PREF_SIZE);
         botText.getStyleClass().add("wizard-bot");
 
-        input.setPromptText(AccountsPane.promptFor(network));
+        input.setPromptText(LoginTexts.promptFor(network));
         input.setWrapText(true);
         input.setPrefRowCount(3);
-        input.setAccessibleText(AccountsPane.promptFor(network));
+        input.setAccessibleText(LoginTexts.promptFor(network));
         HBox.setHgrow(input, Priority.ALWAYS);
         send.getStyleClass().add("primary-button");
         send.setOnAction(e -> submit());
@@ -95,17 +94,15 @@ final class LoginWizard implements ChatService.Listener {
         });
         inputRow = new HBox(8, input, send);
         inputRow.setAlignment(Pos.BOTTOM_LEFT);
-        boolean needsInput = !AccountsPane.qrNetwork(network);
-        inputRow.setVisible(needsInput);
-        inputRow.setManaged(needsInput);
+        boolean needsInput = !LoginTexts.qrNetwork(network);
+        Nodes.show(inputRow, needsInput);
 
         Button details = new Button("Ver el chat técnico del puente");
         details.getStyleClass().add("link-button");
         details.setOnAction(e -> {
             nav.openBotChat(botChatId);
         });
-        done.setVisible(false);
-        done.setManaged(false);
+        Nodes.show(done, false);
         done.setAlignment(Pos.CENTER);
 
         root.getChildren().addAll(instructions, qrBox, botText, inputRow, done, details);
@@ -120,17 +117,15 @@ final class LoginWizard implements ChatService.Listener {
         chooserActive = false;
         sentAt = Instant.now();
         instructions.setText("Enviamos tu sesión al puente. Esperando su confirmación…");
-        inputRow.setVisible(false);
-        inputRow.setManaged(false);
+        Nodes.show(inputRow, false);
     }
 
     /** Sending the session failed: back to the manual state. */
     void sessionFailed() {
         sent = false;
         chooserActive = true;
-        instructions.setText(AccountsPane.instructions(network));
-        inputRow.setVisible(true);
-        inputRow.setManaged(true);
+        instructions.setText(LoginTexts.instructions(network));
+        Nodes.show(inputRow, true);
     }
 
     void dispose() {
@@ -151,8 +146,8 @@ final class LoginWizard implements ChatService.Listener {
         String text = input.getText().strip();
         if (text.isEmpty()) return;
         input.clear();
-        svc.sendLoginInput(network, botChatId, text).exceptionally(err -> {
-            Platform.runLater(() -> toast.accept("No se pudo enviar: " + AccountsPane.rootMessage(err)));
+        svc.sendText(botChatId, text, null).exceptionally(err -> {
+            Platform.runLater(() -> toast.accept("No se pudo enviar: " + LoginTexts.rootMessage(err)));
             return null;
         });
     }
@@ -181,12 +176,11 @@ final class LoginWizard implements ChatService.Listener {
                 return;
             }
             botText.setText("Puente: " + lastText.body());
-            boolean asksInput = !AccountsPane.qrNetwork(network) || b.contains("password") || b.contains("contraseña")
+            boolean asksInput = !LoginTexts.qrNetwork(network) || b.contains("password") || b.contains("contraseña")
                     || ((b.contains("code") || b.contains("código")) && !b.contains("qr"));
             // after a session was sent, only a prompt newer than that send re-opens the input
             boolean showInput = asksInput && (!sent || lastText.timestamp().isAfter(sentAt));
-            inputRow.setVisible(showInput);
-            inputRow.setManaged(showInput);
+            Nodes.show(inputRow, showInput);
         }
         if (lastImage != null && !lastImage.mediaUrl().equals(shownQr)) {
             String url = lastImage.mediaUrl();
@@ -194,8 +188,7 @@ final class LoginWizard implements ChatService.Listener {
             svc.media(url, 0, 0).thenAccept(p -> Platform.runLater(() -> {
                 if (!url.equals(shownQr)) return;
                 qr.setImage(new Image(p.toUri().toString()));
-                qrBox.setVisible(true);
-                qrBox.setManaged(true);
+                Nodes.show(qrBox, true);
             }));
         }
     }
@@ -207,10 +200,8 @@ final class LoginWizard implements ChatService.Listener {
         ok.getStyleClass().add("jumbo-emoji");
         Label head = new Label(network.displayName() + " conectado");
         head.getStyleClass().add("sheet-title");
-        Label sub = new Label(botMessage.replaceAll("(?i)successfully logged in as", "Sesión iniciada como")
+        Label sub = Labels.help(botMessage.replaceAll("(?i)successfully logged in as", "Sesión iniciada como")
                 + "\nTus chats van a ir apareciendo en la bandeja en los próximos minutos.");
-        sub.setWrapText(true);
-        sub.getStyleClass().add("settings-help");
         Button another = new Button("Agregar otra cuenta");
         another.getStyleClass().add("secondary-button");
         another.setOnAction(e -> nav.showPicker());
@@ -231,9 +222,7 @@ final class LoginWizard implements ChatService.Listener {
         dispose();
         Label head = new Label("No se pudo conectar " + network.displayName());
         head.getStyleClass().add("sheet-title");
-        Label sub = new Label("El puente respondió: " + botMessage);
-        sub.setWrapText(true);
-        sub.getStyleClass().add("settings-help");
+        Label sub = Labels.help("El puente respondió: " + botMessage);
         Button retry = new Button("Intentar de nuevo");
         retry.getStyleClass().add("primary-button");
         retry.setOnAction(e -> nav.startLogin(network));
@@ -245,8 +234,7 @@ final class LoginWizard implements ChatService.Listener {
     private void show(Node only) {
         for (Node n : root.getChildren()) {
             boolean keep = n == only;
-            n.setVisible(keep);
-            n.setManaged(keep);
+            Nodes.show(n, keep);
         }
     }
 }

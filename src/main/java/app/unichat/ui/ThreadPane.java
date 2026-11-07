@@ -22,8 +22,6 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ToggleButton;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
@@ -52,7 +50,6 @@ public final class ThreadPane extends BorderPane {
     private final Button jumpDown;
     private final Consumer<String> openLink;
     private final Consumer<String> toast;
-    private MediaLibrary library;
     private final Runnable toggleInfo;
     private final ToggleButton infoButton = new ToggleButton();
     private final Avatar headerAvatar = new Avatar(34);
@@ -85,7 +82,7 @@ public final class ThreadPane extends BorderPane {
     private final FolderDialogs folderDialogs;
 
     public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast, AudioPlayback audio,
-                      FolderDialogs folderDialogs) {
+                      FolderDialogs folderDialogs, MediaLibrary library) {
         this.audio = audio;
         this.folderDialogs = folderDialogs;
         this.svc = svc;
@@ -95,16 +92,16 @@ public final class ThreadPane extends BorderPane {
         getStyleClass().add("thread-pane");
         composer = new Composer(svc, toast);
         composer.setBeforeRecording(audio::pause);
-        media = new MessageMedia(svc, openLink, toast, () -> library, this::getScene, audio);
-        messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, () -> library, this::getScene, this::member);
+        media = new MessageMedia(svc, openLink, toast, library, this::getScene, audio);
+        messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, library, this::getScene, this::member);
 
-        favButton = Composer.iconButton(Icons.STAR, "Favorito", () -> svc.setFavorite(chat.id(), !chat.favorite()));
-        archiveButton = Composer.iconButton(Icons.ARCHIVE, "Archivar (" + Shortcuts.key("E") + ")",
+        favButton = Icons.iconButton(Icons.STAR, "Favorito", () -> svc.setFavorite(chat.id(), !chat.favorite()));
+        archiveButton = Icons.iconButton(Icons.ARCHIVE, "Archivar (" + Shortcuts.key("E") + ")",
                 () -> svc.setArchived(chat.id(), !chat.archived()));
         Node header = buildHeader();
 
         configureTimeline();
-        jumpDown = Composer.iconButton(Icons.LOW, "Ir al final", this::scrollToBottom);
+        jumpDown = Icons.iconButton(Icons.LOW, "Ir al final", this::scrollToBottom);
         redrawOnTranscriptProgress();
         jumpDown.getStyleClass().add("jump-down");
         jumpDown.setVisible(false);
@@ -195,8 +192,7 @@ public final class ThreadPane extends BorderPane {
         headerTitle.getStyleClass().add("thread-title");
         headerSubtitle.getStyleClass().add("thread-subtitle");
         serverLink.getStyleClass().add("thread-server");
-        serverLink.setVisible(false);
-        serverLink.setManaged(false);
+        Nodes.show(serverLink, false);
         // Its own click: the title area underneath toggles the info panel.
         serverLink.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.event.Event::consume);
         serverLink.setOnAction(e -> {
@@ -214,7 +210,7 @@ public final class ThreadPane extends BorderPane {
         infoButton.setTooltip(new javafx.scene.control.Tooltip("Información del chat"));
         infoButton.setOnAction(e -> toggleInfo.run());
         infoButton.setAccessibleText("Información del chat");
-        Button more = Composer.iconButton(Icons.MORE, "Más opciones", null);
+        Button more = Icons.iconButton(Icons.MORE, "Más opciones", null);
         more.setOnAction(e -> ChatMenus.forChat(chat, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4));
         HBox header = new HBox(10, headerAvatar, titles, favButton, archiveButton, infoButton, more);
         header.getStyleClass().add("thread-header");
@@ -259,8 +255,6 @@ public final class ThreadPane extends BorderPane {
     public Chat chat() { return chat; }
     public Composer composer() { return composer; }
 
-    /** Favourites and recents shared by every chat (MainView owns it). */
-    public void setLibrary(MediaLibrary library) { this.library = library; }
     public void setInfoSelected(boolean selected) { infoButton.setSelected(selected); }
 
     public void open(Chat c) {
@@ -287,8 +281,7 @@ public final class ThreadPane extends BorderPane {
         headerAvatar.setNetwork(chat.network(), Settings.get().showNetworkBadges());
         headerTitle.setText(chat.title());
         Chat server = SpaceTree.serverOf(chat, svc.chats());
-        serverLink.setVisible(server != null);
-        serverLink.setManaged(server != null);
+        Nodes.show(serverLink, server != null);
         if (server != null) {
             serverLink.setText(server.title() + " ›");
             serverLink.setUserData(server.id());
@@ -301,13 +294,10 @@ public final class ThreadPane extends BorderPane {
         if (chat.group()) sub += " · " + chat.members().size() + " participantes";
         if (chat.muted()) sub += " · Silenciado";
         headerSubtitle.setText(sub);
-        favButton.getStyleClass().remove("active");
-        if (chat.favorite()) favButton.getStyleClass().add("active");
-        archiveButton.getStyleClass().remove("active");
-        if (chat.archived()) archiveButton.getStyleClass().add("active");
+        Nodes.style(favButton, "active", chat.favorite());
+        Nodes.style(archiveButton, "active", chat.archived());
         TypingDots.show(typing, chat.typing().isEmpty() ? null : Formats.typing(chat.typing()));
-        typing.setVisible(!chat.typing().isEmpty());
-        typing.setManaged(!chat.typing().isEmpty());
+        Nodes.show(typing, !chat.typing().isEmpty());
     }
 
     /** Re-reads the messages of the open chat. Keeps the viewport pinned to the bottom if it was there. */
@@ -526,9 +516,7 @@ public final class ThreadPane extends BorderPane {
         } else if (code == javafx.scene.input.KeyCode.E && !e.isShortcutDown() && messageActions.allows(m, MessageActions.Action.EDIT)) {
             composer.edit(m);
         } else if (code == javafx.scene.input.KeyCode.C && e.isShortcutDown() && !m.isMedia()) {
-            ClipboardContent cc = new ClipboardContent();
-            cc.putString(m.body());
-            Clipboard.getSystemClipboard().setContent(cc);
+            Clipboards.copy(m.body());
         } else if ((code == javafx.scene.input.KeyCode.ENTER || code == javafx.scene.input.KeyCode.SPACE
                 || code == javafx.scene.input.KeyCode.CONTEXT_MENU) && !m.deleted()) {
             var cell = list.lookupAll(".row-cell").stream()
@@ -585,7 +573,6 @@ public final class ThreadPane extends BorderPane {
         actions.setVisible(Settings.get().alwaysShowMessageActions());
         HBox line = new HBox(6);
         line.setFillHeight(false); // or the hover actions stretch to a tall message's whole height
-        line.setAlignment(Pos.CENTER_LEFT);
         if (out) {
             Region grow = new Region();
             HBox.setHgrow(grow, Priority.ALWAYS);
@@ -664,7 +651,6 @@ public final class ThreadPane extends BorderPane {
             bubble.getChildren().add(media.transcriptNode(m, maxWidth));
         } else if (m.isMedia()) {
             bubble.getChildren().add(media.fileNode(m));
-            if (m.type() == MessageType.AUDIO && m.mediaUrl() != null) bubble.getChildren().add(media.transcriptNode(m, maxWidth));
         } else if ((m.type() == MessageType.TEXT) && RichText.isJumboEmoji(m.body()) && m.replyToId() == null) {
             bubble.getStyleClass().add("jumbo");
             Label l = new Label(m.body().strip());

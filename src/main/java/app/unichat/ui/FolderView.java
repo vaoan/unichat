@@ -2,7 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.model.Chat;
 import app.unichat.service.ChatFolders;
-import app.unichat.service.PreferencesFile.Folder;
+import app.unichat.service.Folder;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -47,7 +47,7 @@ final class FolderView extends VBox {
     private final VBox namesView;
     private final VBox insideView;
     private final Map<String, Long> unread = new HashMap<>();
-    private FolderDialogs dialogs;
+    private final FolderDialogs dialogs;
     private Runnable onLeave;
     /** The folder whose chats are showing, or null for the names. */
     private String openId;
@@ -55,8 +55,9 @@ final class FolderView extends VBox {
     private boolean updating;
     private List<Chat> all = List.of();
 
-    FolderView(ChatFolders folders, Supplier<ListCell<Chat>> cells, Consumer<Chat> open) {
+    FolderView(ChatFolders folders, FolderDialogs dialogs, Supplier<ListCell<Chat>> cells, Consumer<Chat> open) {
         this.folders = folders;
+        this.dialogs = dialogs;
         this.open = open;
         getStyleClass().add("folder-view");
 
@@ -76,7 +77,7 @@ final class FolderView extends VBox {
             }
         });
 
-        Button back = Composer.iconButton(Icons.CHEVRON_LEFT, "Volver a carpetas", this::showNames);
+        Button back = Icons.iconButton(Icons.CHEVRON_LEFT, "Volver a carpetas", this::showNames);
         folderTitle.getStyleClass().addAll("space-title", "folder-title");
         folderTitle.setMinWidth(0);
         folderTitle.setMaxWidth(Double.MAX_VALUE);
@@ -92,7 +93,6 @@ final class FolderView extends VBox {
         showCurrent();
     }
 
-    void setDialogs(FolderDialogs dialogs) { this.dialogs = dialogs; }
 
     /** Esc on the names: out of folders. */
     void setOnLeave(Runnable onLeave) { this.onLeave = onLeave; }
@@ -287,10 +287,8 @@ final class FolderView extends VBox {
 
     private void showCurrent() {
         boolean inside = openId != null;
-        namesView.setVisible(!inside);
-        namesView.setManaged(!inside);
-        insideView.setVisible(inside);
-        insideView.setManaged(inside);
+        Nodes.show(namesView, !inside);
+        Nodes.show(insideView, inside);
     }
 
     private ContextMenu folderMenu(Folder f) {
@@ -339,9 +337,8 @@ final class FolderView extends VBox {
             }
             long n = Objects.requireNonNullElse(unread.get(f.id()), 0L);
             name.setText(f.name());
-            badge.setText(n > 99 ? "99+" : Long.toString(n));
-            badge.setVisible(n > 0);
-            badge.setManaged(n > 0);
+            badge.setText(Formats.badge(n));
+            Nodes.show(badge, n > 0);
             setGraphic(root);
             setAccessibleText(f.name() + (n == 0 ? "" : ", " + n + (n == 1 ? " chat sin leer" : " chats sin leer")));
         }

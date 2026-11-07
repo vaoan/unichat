@@ -11,21 +11,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static app.unichat.matrix.BridgeProtocol.*;
-import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.support.Urls.enc;
-import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** Contacts and new chats through the bridges' own API. */
 final class ContactActions {
     private final MatrixCore core;
-    private final MatrixClient client;
-    private final SyncProcessor proc;
     private final String userId;
 
     ContactActions(MatrixCore core) {
         this.core = core;
-        this.client = core.client;
-        this.proc = core.proc;
         this.userId = core.userId;
     }
 

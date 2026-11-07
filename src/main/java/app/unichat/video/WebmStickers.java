@@ -1,6 +1,7 @@
 package app.unichat.video;
 
-import app.unichat.support.Hashes;
+import app.unichat.support.ConvertedFiles;
+import app.unichat.support.Threads;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,11 +19,7 @@ import java.util.function.DoubleConsumer;
  */
 public final class WebmStickers {
     /** Conversions and the first install, one at a time: never on the FX thread. */
-    public static final ExecutorService WORKER = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "video-convert");
-        t.setDaemon(true);
-        return t;
-    });
+    public static final ExecutorService WORKER = Executors.newSingleThreadExecutor(Threads.daemon("video-convert"));
     private static final long TIMEOUT_SECONDS = 60;
     /** A sticker is seconds long and small: a file claiming more isn't one, and it shouldn't cost more than one. */
     private static final String MAX_SECONDS = "30";
@@ -41,10 +38,7 @@ public final class WebmStickers {
     public static Path animated(Path webm, DoubleConsumer installProgress) throws IOException, InterruptedException {
         for (String format : FORMATS) {
             Path done = convertedPath(webm, format);
-            if (Files.isRegularFile(done)) {
-                done.toFile().setLastModified(System.currentTimeMillis());
-                return done;
-            }
+            if (ConvertedFiles.reuse(done)) return done;
         }
         Path ffmpeg = Ffmpeg.whenNeeded(installProgress);
         if (ffmpeg == null) throw new NoConverter();
@@ -52,7 +46,7 @@ public final class WebmStickers {
     }
 
     static Path convertedPath(Path webm, String format) {
-        return webm.resolveSibling("converted-" + Hashes.sha256(webm.getFileName().toString()) + "." + format);
+        return ConvertedFiles.beside(webm, format);
     }
 
     /**

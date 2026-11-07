@@ -1,9 +1,9 @@
 package app.unichat.server;
 
+import app.unichat.support.Downloads;
 import app.unichat.support.Processes;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -11,11 +11,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.function.Function;
 
@@ -60,22 +56,7 @@ public final class BinaryStore {
         String want = Manifest.parseSha256Sums(get(base + "/sha256sums.txt")).get(asset);
         if (want == null) throw new IOException(asset + " is not in the release's sha256sums.txt");
 
-        Path part = bin.resolve(target.getFileName() + ".part");
-        try {
-            HttpResponse<InputStream> res = http.send(HttpRequest.newBuilder(URI.create(base + "/" + asset)).build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (res.statusCode() != 200) throw new IOException("HTTP " + res.statusCode() + " downloading " + asset);
-            MessageDigest md = sha256();
-            try (InputStream in = new DigestInputStream(res.body(), md)) {
-                Files.copy(in, part, StandardCopyOption.REPLACE_EXISTING);
-            }
-            String got = HexFormat.of().formatHex(md.digest());
-            if (!got.equals(want)) throw new IOException("Bad checksum for " + asset + ": " + got + " != " + want);
-            part.toFile().setExecutable(true, true);
-            Files.move(part, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } finally {
-            Files.deleteIfExists(part);
-        }
+        Downloads.fetch(base + "/" + asset, 0, want, target, asset, p -> { }, part -> part.toFile().setExecutable(true, true));
         clearQuarantine(target);
         Files.writeString(bin.resolve(c.name() + ".version"), c.tag());
         return target;
@@ -117,14 +98,6 @@ public final class BinaryStore {
             // Not fatal: the binary may still run.
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-        }
-    }
-
-    private static MessageDigest sha256() {
-        try {
-            return MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
         }
     }
 }

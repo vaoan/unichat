@@ -1,8 +1,8 @@
 package app.unichat.ui;
 
+import app.unichat.service.Folder;
 import app.unichat.model.Chat;
 import app.unichat.service.MockChatService;
-import app.unichat.service.PreferencesFile;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.AccessibleAttribute;
@@ -635,7 +635,7 @@ class FoldersUiTest {
                 .findFirst().orElseThrow();
     }
 
-    private PreferencesFile.Folder folder(String id) {
+    private Folder folder(String id) {
         return svc.folders().stream().filter(f -> f.id().equals(id)).findFirst().orElseThrow();
     }
 
@@ -702,8 +702,8 @@ class FoldersUiTest {
     }
 
     @SuppressWarnings("unchecked")
-    private ListView<PreferencesFile.Folder> folderList() {
-        return (ListView<PreferencesFile.Folder>) scene.getRoot().lookup(".folder-list");
+    private ListView<Folder> folderList() {
+        return (ListView<Folder>) scene.getRoot().lookup(".folder-list");
     }
 
     @SuppressWarnings("unchecked")

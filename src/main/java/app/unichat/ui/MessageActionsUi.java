@@ -13,8 +13,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.SeparatorMenuItem;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.stage.Popup;
 import java.time.Instant;
@@ -33,12 +31,12 @@ final class MessageActionsUi {
     private final Composer composer;
     private final MessageMedia media;
     private final Supplier<Chat> chat;
-    private final Supplier<MediaLibrary> library;
+    private final MediaLibrary library;
     private final Supplier<Scene> scene;
     private final Function<String, Member> member;
 
     MessageActionsUi(ChatService svc, Consumer<String> toast, Composer composer, MessageMedia media, Supplier<Chat> chat,
-                     Supplier<MediaLibrary> library, Supplier<Scene> scene, Function<String, Member> member) {
+                     MediaLibrary library, Supplier<Scene> scene, Function<String, Member> member) {
         this.svc = svc;
         this.toast = toast;
         this.composer = composer;
@@ -90,12 +88,12 @@ final class MessageActionsUi {
         box.setAlignment(Pos.CENTER);
         if (m.deleted()) return box;
         if (!chat.get().features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK)).isEmpty() || chat.get().features().anyReaction()) {
-            Button react = Composer.iconButton(Icons.EMOJI, "Reaccionar", null);
+            Button react = Icons.iconButton(Icons.EMOJI, "Reaccionar", null);
             react.setOnAction(e -> reactionPopup(m, react));
             box.getChildren().add(react);
         }
-        if (allows(m, MessageActions.Action.REPLY)) box.getChildren().add(Composer.iconButton(Icons.REPLY, "Responder", () -> composer.reply(m)));
-        Button more = Composer.iconButton(Icons.MORE, "Más", null);
+        if (allows(m, MessageActions.Action.REPLY)) box.getChildren().add(Icons.iconButton(Icons.REPLY, "Responder", () -> composer.reply(m)));
+        Button more = Icons.iconButton(Icons.MORE, "Más", null);
         more.setOnAction(e -> messageMenu(m).show(more, Side.BOTTOM, 0, 0));
         box.getChildren().add(more);
         // Reachable with the timeline keys instead; tabbing through every message would be unusable.
@@ -121,7 +119,7 @@ final class MessageActionsUi {
             row.getChildren().add(b);
         }
         if (chat.get().features().anyReaction()) {
-            Button plus = Composer.iconButton(Icons.PLUS, "Más emojis", null);
+            Button plus = Icons.iconButton(Icons.PLUS, "Más emojis", null);
             plus.setOnAction(ev -> {
                 p.hide();
                 EmojiPicker.show(anchor, e -> svc.toggleReaction(chat.get().id(), m.id(), e));
@@ -143,30 +141,22 @@ final class MessageActionsUi {
         java.util.Set<MessageActions.Action> a = MessageActions.of(m, chat.get().features(), Instant.now());
         if (a.isEmpty()) return menu;
         if (a.contains(MessageActions.Action.REPLY)) menu.getItems().add(ChatMenus.item("Responder", () -> composer.reply(m)));
-        if (a.contains(MessageActions.Action.COPY)) menu.getItems().add(ChatMenus.item("Copiar texto", () -> {
-            ClipboardContent cc = new ClipboardContent();
-            cc.putString(m.body());
-            Clipboard.getSystemClipboard().setContent(cc);
-        }));
+        if (a.contains(MessageActions.Action.COPY)) menu.getItems().add(ChatMenus.item("Copiar texto", () -> Clipboards.copy(m.body())));
         if (a.contains(MessageActions.Action.OPEN_FILE)) menu.getItems().add(ChatMenus.item("Abrir archivo", () -> media.openFile(m)));
         if (a.contains(MessageActions.Action.SAVE_AS)) menu.getItems().add(ChatMenus.item("Guardar como…", () -> {
             if (scene.get() != null) MediaSaver.save(scene.get().getWindow(), svc, m, toast);
         }));
         if (a.contains(MessageActions.Action.TRANSCRIBE)) {
             if (Transcripts.get().state(m.mediaUrl()) instanceof Transcripts.Done d) {
-                if (!d.text().isEmpty()) menu.getItems().add(ChatMenus.item("Copiar transcripción", () -> {
-                    ClipboardContent cc = new ClipboardContent();
-                    cc.putString(d.text());
-                    Clipboard.getSystemClipboard().setContent(cc);
-                }));
+                if (!d.text().isEmpty()) menu.getItems().add(ChatMenus.item("Copiar transcripción", () -> Clipboards.copy(d.text())));
             } else {
                 menu.getItems().add(ChatMenus.item("Transcribir", () -> media.transcribe(m)));
             }
         }
-        if (a.contains(MessageActions.Action.FAVORITE) && library.get() != null) {
-            boolean fav = library.get().isFavorite(MediaItems.of(m));
+        if (a.contains(MessageActions.Action.FAVORITE)) {
+            boolean fav = library.isFavorite(MediaItems.of(m));
             menu.getItems().add(ChatMenus.item(fav ? "Quitar de favoritos" : "Agregar a favoritos", () -> {
-                boolean now = library.get().toggleFavorite(MediaItems.of(m));
+                boolean now = library.toggleFavorite(MediaItems.of(m));
                 toast.accept(now ? "Agregado a favoritos" : "Quitado de favoritos");
             }));
         }

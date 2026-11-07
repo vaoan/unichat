@@ -16,15 +16,20 @@ public final class BundledTools {
         String exe = Os.windows() ? name + ".exe" : name;
         String o = System.getProperty(property);
         if (o != null) return Files.isExecutable(Path.of(o)) ? Path.of(o) : null;
+        Path f = appFile(subdir == null ? exe : subdir + "/" + exe);
+        return f != null && Files.isExecutable(f) ? f : onPath(exe);
+    }
+
+    /**
+     * Where a file shipped under {@code app/server/} is (Unichat.app/Contents/app/server on macOS, Unichat\\app\\server
+     * on Windows), whether or not it's there; null when this isn't a packaged app.
+     */
+    public static Path appFile(String relative) {
         String launcher = System.getProperty("jpackage.app-path");
-        if (launcher != null) {
-            Path l = Path.of(launcher);
-            Path app = Os.windows() ? l.getParent().resolve("app") : l.getParent().resolveSibling("app");
-            Path dir = app.resolve("server");
-            Path f = (subdir == null ? dir : dir.resolve(subdir)).resolve(exe);
-            if (Files.isExecutable(f)) return f;
-        }
-        return onPath(exe);
+        if (launcher == null) return null;
+        Path l = Path.of(launcher);
+        Path app = Os.windows() ? l.getParent().resolve("app") : l.getParent().resolveSibling("app");
+        return app.resolve("server").resolve(relative);
     }
 
     /** {@code exe} (exact file name) in a PATH folder, or null. */

@@ -34,7 +34,7 @@ final class RoomFields {
         boolean botRoom = isBridgeBotRoom(room);
         c.setBridgeBot(botRoom);
         c.setInvite(room.invite);
-        c.setNetwork(detectNetwork(room, botRoom));
+        c.setNetwork(detectNetwork(room));
         c.setFeatures(room.roomFeatures != null ? RoomFeatures.parse(room.roomFeatures)
                 : c.network() == Network.DISCORD ? RoomFeatures.discord() : RoomFeatures.UNKNOWN);
         c.setSpace(room.space);
@@ -113,7 +113,7 @@ final class RoomFields {
         return count <= 2;
     }
 
-    private Network detectNetwork(MatrixRoom room, boolean botRoom) {
+    private Network detectNetwork(MatrixRoom room) {
         Network n = Network.fromProtocolId(room.bridgeProtocol);
         if (n != null) return n;
         for (String u : otherUsers(room)) {

@@ -1,5 +1,6 @@
 package app.unichat.links;
 
+import app.unichat.support.Threads;
 import app.unichat.model.LinkMedia;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -46,11 +47,7 @@ public final class LinkInspector {
             "twitter:player:stream", "og:audio:secure_url", "og:audio:url", "og:audio");
 
     private final HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(TIMEOUT).build();
-    private final ExecutorService workers = Executors.newFixedThreadPool(AT_ONCE, r -> {
-        Thread t = new Thread(r, "link-inspector");
-        t.setDaemon(true);
-        return t;
-    });
+    private final ExecutorService workers = Executors.newFixedThreadPool(AT_ONCE, Threads.daemon("link-inspector"));
     private final Predicate<InetAddress> allowed;
     private final Map<String, CompletableFuture<Optional<LinkMedia>>> seen = new LinkedHashMap<>(64, 0.75f, true) {
         @Override protected boolean removeEldestEntry(Map.Entry<String, CompletableFuture<Optional<LinkMedia>>> eldest) {

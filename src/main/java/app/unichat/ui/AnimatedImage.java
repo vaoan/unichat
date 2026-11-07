@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.support.Threads;
 import app.unichat.gif.GifFrames;
 
 import com.twelvemonkeys.imageio.plugins.webp.WebPImageReaderSpi;
@@ -37,11 +38,7 @@ public final class AnimatedImage {
     private AnimatedImage() {}
 
     /** Decoding happens here, off the FX thread; two at a time is plenty for a chat screen. */
-    public static final java.util.concurrent.ExecutorService DECODER = java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
-        Thread t = new Thread(r, "image-decoder");
-        t.setDaemon(true);
-        return t;
-    });
+    public static final java.util.concurrent.ExecutorService DECODER = java.util.concurrent.Executors.newFixedThreadPool(2, Threads.daemon("image-decoder"));
 
     /** Decoded animation: equal-size frames and how long each one stays, in ms. */
     public record Frames(List<Image> images, List<Integer> durationsMs) {
@@ -158,6 +155,13 @@ public final class AnimatedImage {
         });
         if (images.isEmpty()) throw new IOException("GIF sin imágenes");
         return remember(key, new Frames(List.copyOf(images), sample(delays, step[0])));
+    }
+
+    /** All the frames of an animated WebP or GIF, or the one of a plain picture, whatever the file claims to be. Blocking. */
+    public static Frames decode(Path file, int maxW, int maxH) throws IOException {
+        if (isWebp(file)) return decodeWebp(file, maxW, maxH);
+        if (isGif(file)) return decodeGif(file, maxW, maxH);
+        return decodePlain(file, maxW, maxH);
     }
 
     /**

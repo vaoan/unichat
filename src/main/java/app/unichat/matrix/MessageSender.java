@@ -1,7 +1,6 @@
 package app.unichat.matrix;
 
 import app.unichat.bridge.BridgePorts;
-import app.unichat.model.RoomFeatures;
 import app.unichat.model.VoiceNote;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import app.unichat.model.Chat;
@@ -25,10 +24,8 @@ import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-import static app.unichat.matrix.BridgeProtocol.*;
 import static app.unichat.matrix.MatrixClient.CLIENT;
 import static app.unichat.support.Urls.enc;
-import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** Everything that goes out in a chat: text, stickers, files, edits, deletions, reactions and typing. */
 final class MessageSender {
@@ -50,8 +47,8 @@ final class MessageSender {
         if (text == null || text.isBlank()) return CompletableFuture.completedFuture(null);
         String txn = core.newTxnId();
         ObjectNode content = MatrixClient.JSON.createObjectNode();
-        boolean emote = text.startsWith("/me ");
-        String body = emote ? text.substring(4) : text;
+        boolean emote = Message.isEmoteCommand(text);
+        String body = Message.withoutEmoteCommand(text);
         content.put("msgtype", emote ? "m.emote" : "m.text");
         content.put("body", body);
         addReply(content, replyToId);
@@ -68,7 +65,7 @@ final class MessageSender {
 
     CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) {
         Chat c = core.chat(chatId);
-        return sendSticker(chatId, item, c == null ? RoomFeatures.UNKNOWN : c.features(),
+        return sendStickerAs(chatId, item, c == null ? RoomFeatures.UNKNOWN : c.features(),
                 c == null ? StickerMode.STICKER : StickerMode.of(c.network()), replyToId);
     }
 
@@ -76,10 +73,10 @@ final class MessageSender {
      * {@code mode} GIF/VIDEO (the network's choice in Ajustes → Redes): an animated GIF sticker goes out as an mp4,
      * flagged as a GIF (it loops, like WhatsApp's GIFs) or as a plain video.
      */
-    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item,
-                                        RoomFeatures features, StickerMode mode, String replyToId) {
+    CompletableFuture<Void> sendStickerAs(String chatId, MediaLibrary.Item item,
+                                          RoomFeatures features, StickerMode mode, String replyToId) {
         String mime = item.info() != null && item.info().hasNonNull("mimetype") ? item.info().path("mimetype").asText() : item.mime();
-        if (mode == StickerMode.STICKER || !"image/gif".equals(mime)) return sendSticker(chatId, item, features, replyToId);
+        if (mode == StickerMode.STICKER || !"image/gif".equals(mime)) return sendStickerFor(chatId, item, features, replyToId);
         return media.media(item.url(), 0, 0).thenApplyAsync(src -> {
             try {
                 return StickerConverter.toMp4(src, Settings.get().cacheDir().resolve("stickers"));
@@ -98,9 +95,9 @@ final class MessageSender {
     }
 
     /** Sends {@code item}; when the chat refuses its format (a GIF on WhatsApp) a converted copy is uploaded first. */
-    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features, String replyToId) {
+    CompletableFuture<Void> sendStickerFor(String chatId, MediaLibrary.Item item, RoomFeatures features, String replyToId) {
         Chat c = core.chat(chatId);
-        return sendSticker(chatId, item, features, c != null && needsCopy(item.url(), c.network()), replyToId);
+        return sendStickerEvent(chatId, item, features, c != null && needsCopy(item.url(), c.network()), replyToId);
     }
 
     /**
@@ -115,7 +112,8 @@ final class MessageSender {
         return bot == null || !server.equals(BridgePorts.mediaServerName(bot.replaceAll("bot$", "")));
     }
 
-    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features, boolean copy, String replyToId) {
+    /** {@code copy}: uploads the file to our server first, whatever the chat accepts ({@link #needsCopy}). */
+    CompletableFuture<Void> sendStickerEvent(String chatId, MediaLibrary.Item item, RoomFeatures features, boolean copy, String replyToId) {
         String txn = core.newTxnId();
         ObjectNode content = MatrixClient.JSON.createObjectNode();
         addReply(content, replyToId);
@@ -182,7 +180,7 @@ final class MessageSender {
     private CompletableFuture<Void> sendEvent(String chatId, String type, String txn, ObjectNode content) {
         return CompletableFuture.runAsync(() -> {
             try {
-                JsonNode resp = client.put(CLIENT + "/rooms/" + enc(chatId) + "/send/" + enc(type) + "/" + enc(txn), content);
+                JsonNode resp = client.sendEvent(chatId, type, txn, content);
                 synchronized (proc) {
                     proc.confirmLocalEcho(chatId, txn, resp.path("event_id").asText(null));
                 }
@@ -242,9 +240,7 @@ final class MessageSender {
                                               long durationMs, java.util.function.Consumer<ObjectNode> extra) {
         String txn = core.newTxnId();
         String name = file.getFileName().toString();
-        MessageType type = mime.startsWith("image/") ? MessageType.IMAGE
-                : mime.startsWith("video/") ? MessageType.VIDEO
-                : mime.startsWith("audio/") ? MessageType.AUDIO : MessageType.FILE;
+        MessageType type = MessageType.ofMime(mime);
         long size;
         try {
             size = Files.size(file);
@@ -346,7 +342,7 @@ final class MessageSender {
         content.put("body", "* " + newText);
         content.putObject("m.new_content").put("msgtype", msgtype).put("body", newText);
         content.putObject("m.relates_to").put("rel_type", "m.replace").put("event_id", messageId);
-        return core.run(() -> client.put(CLIENT + "/rooms/" + enc(chatId) + "/send/m.room.message/" + enc(core.newTxnId()), content));
+        return core.run(() -> client.sendEvent(chatId, "m.room.message", core.newTxnId(), content));
     }
 
     CompletableFuture<Void> deleteMessage(String chatId, String messageId) {
@@ -387,7 +383,7 @@ final class MessageSender {
             } else {
                 ObjectNode content = MatrixClient.JSON.createObjectNode();
                 content.putObject("m.relates_to").put("rel_type", "m.annotation").put("event_id", messageId).put("key", emoji);
-                JsonNode resp = client.put(CLIENT + "/rooms/" + enc(chatId) + "/send/m.reaction/" + enc(core.newTxnId()), content);
+                JsonNode resp = client.sendEvent(chatId, "m.reaction", core.newTxnId(), content);
                 synchronized (proc) {
                     proc.registerOwnReaction(chatId, resp.path("event_id").asText(null), messageId, emoji);
                 }

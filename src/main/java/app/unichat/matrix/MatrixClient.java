@@ -56,6 +56,15 @@ final class MatrixClient {
     JsonNode put(String path, Object body) throws IOException { return request("PUT", path, body, DEFAULT_TIMEOUT); }
     JsonNode delete(String path) throws IOException { return request("DELETE", path, null, DEFAULT_TIMEOUT); }
 
+    /** Sends one event to a room; the answer holds its {@code event_id}. */
+    JsonNode sendEvent(String roomId, String type, String txnId, Object content) throws IOException {
+        return put(CLIENT + "/rooms/" + Urls.enc(roomId) + "/send/" + Urls.enc(type) + "/" + Urls.enc(txnId), content);
+    }
+
+    JsonNode join(String roomId) throws IOException {
+        return post(CLIENT + "/join/" + Urls.enc(roomId), null);
+    }
+
     /** Sends a JSON request; {@code path} starts with {@code /_matrix/...}. Throws {@link MatrixException} on non-2xx. */
     JsonNode request(String method, String path, Object body, Duration timeout) throws IOException {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(baseUrl + path))

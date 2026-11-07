@@ -1,7 +1,8 @@
 package app.unichat.ui;
 
 import app.unichat.model.Chat;
-import app.unichat.service.ChatService;
+import app.unichat.service.ChatReader;
+import app.unichat.service.MediaSource;
 import app.unichat.settings.Settings;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -26,7 +27,8 @@ public final class CommandBar extends VBox {
 
     private record Item(String label, String hint, Chat chat, Runnable action) {}
 
-    private final ChatService svc;
+    private final ChatReader chats;
+    private final MediaSource media;
     private final TextField field = new TextField();
     private final ObservableList<Item> items = FXCollections.observableArrayList();
     private final ListView<Item> list = new ListView<>(items);
@@ -34,8 +36,9 @@ public final class CommandBar extends VBox {
     private final Consumer<Chat> openChat;
     private final Runnable close;
 
-    public CommandBar(ChatService svc, List<Command> commands, Consumer<Chat> openChat, Runnable close) {
-        this.svc = svc;
+    public CommandBar(ChatReader chats, MediaSource media, List<Command> commands, Consumer<Chat> openChat, Runnable close) {
+        this.chats = chats;
+        this.media = media;
         this.commands = commands;
         this.openChat = openChat;
         this.close = close;
@@ -56,7 +59,7 @@ public final class CommandBar extends VBox {
                 row.setAlignment(Pos.CENTER_LEFT);
                 if (it.chat() != null) {
                     Avatar a = new Avatar(26);
-                    a.set(it.chat().title(), it.chat().id(), it.chat().avatarUrl(), svc);
+                    a.set(it.chat().title(), it.chat().id(), it.chat().avatarUrl(), media);
                     a.setNetwork(it.chat().network(), Settings.get().showNetworkBadges());
                     row.getChildren().add(a);
                 }
@@ -103,8 +106,8 @@ public final class CommandBar extends VBox {
     private void filter(String q) {
         String nq = ChatFilter.normalize(q);
         List<Item> out = new ArrayList<>();
-        List<Chat> chats = chatsFor(svc.chats(), q);
-        for (Chat c : chats) {
+        List<Chat> found = chatsFor(chats.chats(), q);
+        for (Chat c : found) {
             out.add(new Item(c.title(), c.archived() ? "Archivado · " + c.network().displayName() : c.network().displayName(), c, null));
         }
         for (Command cmd : commands) {

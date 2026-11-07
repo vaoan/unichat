@@ -66,9 +66,6 @@ final class SyncProcessor {
 
     void refresh(MatrixRoom room) { fields.refresh(room); }
 
-    String nameOf(MatrixRoom room, String userId) { return fields.nameOf(room, userId); }
-
-    String myUserId() { return me; }
     Collection<MatrixRoom> rooms() { return rooms.values(); }
     MatrixRoom room(String id) { return id == null ? null : rooms.get(id); }
     MatrixRoom removeRoom(String id) { return rooms.remove(id); }
@@ -237,16 +234,12 @@ final class SyncProcessor {
                 room.createdByBridge = isBot(text(ev, "sender"));
             }
             case "m.space.child" -> {
-                String child = text(ev, "state_key");
-                if (child == null) break;
-                if (c.isEmpty() || !c.has("via")) room.spaceChildOrder.remove(child);
-                else room.spaceChildOrder.putIfAbsent(child, c.path("order").asText(""));
+                if (c.isEmpty() || !c.has("via")) room.spaceChildOrder.remove(key);
+                else room.spaceChildOrder.putIfAbsent(key, c.path("order").asText(""));
             }
             case "m.space.parent" -> {
-                String parent = text(ev, "state_key");
-                if (parent == null) break;
-                if (c.isEmpty() || !c.has("via")) room.spaceParents.remove(parent);
-                else room.spaceParents.add(parent);
+                if (c.isEmpty() || !c.has("via")) room.spaceParents.remove(key);
+                else room.spaceParents.add(key);
             }
             case "m.room.member" -> {
                 String membership = text(c, "membership");
@@ -483,9 +476,7 @@ final class SyncProcessor {
         }
         Message m = room.byId.get(targetId);
         if (m != null && !m.deleted()) {
-            m.setDeleted(true);
-            m.setBody("");
-            m.clearReactions();
+            m.markDeleted();
             r.messagesChanged.add(room.id);
             r.chatsChanged = true;
             fields.refresh(room);
@@ -583,10 +574,6 @@ final class SyncProcessor {
             r.chatsChanged = true;
         }
     }
-
-    // ---------------------------------------------------------------- derived chat fields
-
-    // ---------------------------------------------------------------- system messages
 
     // ---------------------------------------------------------------- local echo & helpers for the service
 

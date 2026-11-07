@@ -222,10 +222,8 @@ public final class LoginWebView {
     }
 
     private static HBox cancelBar(Network network, Button cancel) {
-        Label hint = new Label("Inicia sesión como en la web de " + network.displayName()
+        Label hint = Labels.help("Inicia sesión como en la web de " + network.displayName()
                 + ". Puede tardar unos segundos en cargar; la ventana se cerrará sola al terminar.");
-        hint.getStyleClass().add("settings-help");
-        hint.setWrapText(true);
         cancel.setAccessibleText("Cancelar el inicio de sesión en " + network.displayName());
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);

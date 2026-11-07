@@ -65,6 +65,10 @@ class VideoUiTest {
         return f;
     }
 
+    private static app.unichat.model.MediaLibrary library() throws Exception {
+        return new app.unichat.model.MediaLibrary(Files.createTempDirectory("unichat-library").resolve("media-library.json"));
+    }
+
     private static void await(Callable<Boolean> c, String what) throws Exception {
         for (int i = 0; i < 200; i++) {
             if (fx(c)) return;
@@ -169,7 +173,7 @@ class VideoUiTest {
         StackPane root = fx(StackPane::new);
         Stage stage = window(root);
         Node node = fx(() -> {
-            MessageMedia media = new MessageMedia(source, s -> { }, s -> { }, () -> null, stage::getScene, new AudioPlayback(source, s -> { }));
+            MessageMedia media = new MessageMedia(source, s -> { }, s -> { }, library(), stage::getScene, new AudioPlayback(source, s -> { }));
             Node n = media.inlineVideoNode(m);
             root.getChildren().add(n);
             return n;
@@ -202,7 +206,7 @@ class VideoUiTest {
             Stage stage = window(root);
             app.unichat.model.Message m = webmSticker();
             Node node = fx(() -> {
-                MessageMedia media = new MessageMedia(source, s -> { }, s -> { }, () -> null, stage::getScene, new AudioPlayback(source, s -> { }));
+                MessageMedia media = new MessageMedia(source, s -> { }, s -> { }, library(), stage::getScene, new AudioPlayback(source, s -> { }));
                 Node n = media.inlineVideoNode(m);
                 root.getChildren().add(n);
                 return n;

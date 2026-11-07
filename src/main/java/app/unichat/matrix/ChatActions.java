@@ -1,7 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.model.Chat;
-import app.unichat.service.ChatService;
+import app.unichat.service.ChatReader;
 import app.unichat.service.ChatService.Listener;
 import app.unichat.service.PreferencesFile;
 import app.unichat.service.PreferencesFile.Flag;
@@ -19,14 +19,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-import static app.unichat.matrix.BridgeProtocol.*;
 import static app.unichat.matrix.MatrixClient.CLIENT;
 import static app.unichat.support.Urls.enc;
-import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** What you change about a chat: read state, favourite, archive, mute, pin, reminder, join and leave. */
 final class ChatActions {
@@ -34,18 +31,18 @@ final class ChatActions {
     private final MatrixClient client;
     private final SyncProcessor proc;
     private final String userId;
-    private final ChatService service;
+    private final ChatReader chats;
     private final DiscordServers discord;
     private final PreferencesFile prefs;
     /** The last mute rule write queued; guarded by the processor's lock. */
     private CompletableFuture<Void> muteWrites = CompletableFuture.completedFuture(null);
 
-    ChatActions(MatrixCore core, ChatService service, DiscordServers discord, PreferencesFile prefs) {
+    ChatActions(MatrixCore core, ChatReader chats, DiscordServers discord, PreferencesFile prefs) {
         this.core = core;
         this.client = core.client;
         this.proc = core.proc;
         this.userId = core.userId;
-        this.service = service;
+        this.chats = chats;
         this.discord = discord;
         this.prefs = prefs;
     }
@@ -87,8 +84,25 @@ final class ChatActions {
     }
 
     CompletableFuture<Void> setMarkedUnread(String chatId, boolean unread) {
-        return optimistic(chatId, Chat::markedUnread, Chat::setMarkedUnread, unread,
-                () -> putRoomAccountData(chatId, "m.marked_unread", MatrixClient.JSON.createObjectNode().put("unread", unread)));
+        Chat c = core.chat(chatId);
+        if (c == null) return chatNotFound();
+        boolean old;
+        synchronized (proc) {
+            old = c.markedUnread();
+            c.setMarkedUnread(unread);
+        }
+        core.fire(Listener::chatsChanged);
+        return core.run(() -> {
+            try {
+                putRoomAccountData(chatId, "m.marked_unread", MatrixClient.JSON.createObjectNode().put("unread", unread));
+            } catch (Exception e) {
+                synchronized (proc) {
+                    c.setMarkedUnread(old);
+                }
+                core.fire(Listener::chatsChanged);
+                throw e;
+            }
+        });
     }
 
     CompletableFuture<Void> setFavorite(String chatId, boolean favorite) {
@@ -117,16 +131,13 @@ final class ChatActions {
      * retried from {@link #applyMutes}.
      */
     private CompletableFuture<Void> quiet(String chatId, boolean on) {
-        List<String> targets = QuietRule.targets(service, chatId);
+        List<String> targets = QuietRule.targets(chats, chatId);
         List<CompletableFuture<Void>> writes = new ArrayList<>();
         String guild;
         synchronized (proc) {
             prefs.batch(() -> {
                 for (String id : targets) {
-                    boolean found = changeNow(id, key -> {
-                        prefs.choose(key, Flag.ARCHIVED, on);
-                        prefs.choose(key, Flag.MUTED, on);
-                    });
+                    boolean found = changeNow(id, key -> prefs.chooseQuiet(key, on));
                     if (found) writes.add(queueMuteWrite(id, on));
                 }
             });
@@ -155,7 +166,7 @@ final class ChatActions {
     void followQuiet(List<String> chatIds) {
         if (chatIds.isEmpty()) return;
         Set<String> targets = new LinkedHashSet<>();
-        for (String id : chatIds) targets.addAll(QuietRule.targets(service, id));
+        for (String id : chatIds) targets.addAll(QuietRule.targets(chats, id));
         List<String> guilds = new ArrayList<>();
         synchronized (proc) {
             follow(targets, Flag.ARCHIVED, Flag.MUTED);
@@ -267,25 +278,21 @@ final class ChatActions {
     }
 
     CompletableFuture<Void> joinChat(String roomId) {
-        return core.run(() -> client.post(CLIENT + "/join/" + enc(roomId), null));
+        return core.run(() -> client.join(roomId));
     }
 
     CompletableFuture<Map<String, String>> spaceNames(String spaceId) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                JsonNode r = client.get("/_matrix/client/v1/rooms/" + enc(spaceId) + "/hierarchy?max_depth=1&limit=100");
-                Map<String, String> names = new java.util.LinkedHashMap<>();
-                for (JsonNode room : r.path("rooms")) {
-                    String id = room.path("room_id").asText("");
-                    String name = room.path("name").asText("");
-                    if (name.isBlank()) name = room.path("canonical_alias").asText("");
-                    if (!id.equals(spaceId) && !name.isBlank()) names.put(id, name);
-                }
-                return names;
-            } catch (Exception e) {
-                throw new CompletionException(e);
+        return core.call(() -> {
+            JsonNode r = client.get("/_matrix/client/v1/rooms/" + enc(spaceId) + "/hierarchy?max_depth=1&limit=100");
+            Map<String, String> names = new java.util.LinkedHashMap<>();
+            for (JsonNode room : r.path("rooms")) {
+                String id = room.path("room_id").asText("");
+                String name = room.path("name").asText("");
+                if (name.isBlank()) name = room.path("canonical_alias").asText("");
+                if (!id.equals(spaceId) && !name.isBlank()) names.put(id, name);
             }
-        }, core.io);
+            return names;
+        });
     }
 
     CompletableFuture<Void> leaveChat(String chatId) {
@@ -306,30 +313,6 @@ final class ChatActions {
 
     private void putRoomAccountData(String chatId, String type, ObjectNode content) throws IOException {
         client.put(CLIENT + "/user/" + enc(userId) + "/rooms/" + enc(chatId) + "/account_data/" + enc(type), content);
-    }
-
-    /** Applies a chat field change locally, sends it, and reverts on failure. */
-    private <T> CompletableFuture<Void> optimistic(String chatId, java.util.function.Function<Chat, T> getter,
-                                                   java.util.function.BiConsumer<Chat, T> setter, T value, MatrixCore.IoAction call) {
-        Chat c = core.chat(chatId);
-        if (c == null) return chatNotFound();
-        T old;
-        synchronized (proc) {
-            old = getter.apply(c);
-            setter.accept(c, value);
-        }
-        core.fire(Listener::chatsChanged);
-        return core.run(() -> {
-            try {
-                call.run();
-            } catch (Exception e) {
-                synchronized (proc) {
-                    setter.accept(c, old);
-                }
-                core.fire(Listener::chatsChanged);
-                throw e;
-            }
-        });
     }
 
     void checkReminders() {

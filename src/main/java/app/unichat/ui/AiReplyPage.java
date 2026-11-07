@@ -22,15 +22,11 @@ final class AiReplyPage {
                 + "borrador de respuesta y otro corrige la ortografía y la redacción de lo que escribiste, cambiando lo mínimo. "
                 + "El resultado queda en el cuadro para que lo leas y lo cambies: nunca se envía solo.");
         intro.setWrapText(true);
-        Label privacy = new Label("Al pulsar el botón de borrador, ese chat se envía al servicio de Claude Code o de Codex, con tu cuenta. "
+        Label privacy = Labels.help("Al pulsar el botón de borrador, ese chat se envía al servicio de Claude Code o de Codex, con tu cuenta. "
                 + "Solo se envían los mensajes cargados de ese chat, y solo cuando lo pulsas. Fotos y audios van como una mención, sin su contenido. "
                 + "Al corregir, solo se envía lo que escribiste en el cuadro.");
-        privacy.setWrapText(true);
-        privacy.getStyleClass().add("settings-help");
 
-        Label found = new Label();
-        found.getStyleClass().add("settings-help");
-        found.setWrapText(true);
+        Label found = Labels.help("");
         Runnable refresh = () -> {
             AiEngine e = AiSettings.engine();
             found.setText(e.find() == null ? e.label() + " no está instalado en este computador." : "Instalado.");

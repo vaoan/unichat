@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.support.Threads;
 import app.unichat.login.BridgeLogin;
 import app.unichat.model.Account;
 import app.unichat.model.Chat;
@@ -8,7 +9,6 @@ import app.unichat.model.Contact;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import app.unichat.model.Network;
-import app.unichat.model.RoomFeatures;
 import app.unichat.model.VoiceNote;
 import app.unichat.service.BridgeAccess;
 import app.unichat.service.ChatFolders;
@@ -17,7 +17,6 @@ import app.unichat.service.FolderActions;
 import app.unichat.service.FolderForwarding;
 import app.unichat.service.PreferencesFile;
 import app.unichat.service.QuietRule;
-import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
 import app.unichat.support.Hashes;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -62,11 +61,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private final NotifyGate notifyGate = new NotifyGate();
     /** Chats already seen in an earlier sync of this run (see QuietRule.toInherit). */
     private final Set<String> knownChats = new java.util.HashSet<>();
-    private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "matrix-timer");
-        t.setDaemon(true);
-        return t;
-    });
+    private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(Threads.daemon("matrix-timer"));
     private final Map<String, CompletableFuture<Boolean>> historyInFlight = new ConcurrentHashMap<>();
     private final Set<String> joinAttempted = ConcurrentHashMap.newKeySet();
     private volatile ConnectionState state = ConnectionState.CONNECTING;
@@ -87,9 +82,6 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private final String serverIdentity;
     private final PreferencesFile prefs;
     private final FolderActions folders;
-    private final String accessToken;
-    /** Distinguishes this sign-in's cache from earlier sessions of the same user (see syncCacheFile). */
-    private final String sessionKey;
 
     public MatrixChatService(String homeserver, String userId, String accessToken) {
         this(homeserver, userId, accessToken, new PreferencesFile(Settings.get().dir().resolve("preferences.json"),
@@ -100,8 +92,6 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         this.serverIdentity = serverIdentity(homeserver, deviceId, userId);
         this.prefs = prefs;
         this.client = new MatrixClient(homeserver, accessToken);
-        this.accessToken = accessToken;
-        this.sessionKey = Hashes.sha256(accessToken).substring(0, 8);
         this.userId = userId;
         this.serverName = userId.substring(userId.indexOf(':') + 1);
         this.proc = new SyncProcessor(userId);
@@ -110,7 +100,8 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         this.core = new MatrixCore(client, proc, userId, serverName, accessToken);
         this.io = core.io;
         this.folders = new FolderActions(prefs, () -> core.fire(Listener::chatsChanged));
-        this.cache = new SyncCache(proc, serverName, userId, sessionKey);
+        // The key distinguishes this sign-in's cache from earlier sessions of the same user.
+        this.cache = new SyncCache(proc, serverName, userId, Hashes.sha256(accessToken).substring(0, 8));
         this.media = new MediaDownloader(client, io);
         this.sender = new MessageSender(core, media);
         BotChat bots = new BotChat(core, sender);
@@ -393,7 +384,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         if (!joinAttempted.add(roomId)) return;
         io.execute(() -> {
             try {
-                client.post(CLIENT + "/join/" + enc(roomId), null);
+                client.join(roomId);
             } catch (Exception e) {
                 System.err.println("Could not join " + roomId + ": " + e);
             }
@@ -462,16 +453,6 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         return f;
     }
 
-    // ---------------------------------------------------------------- sending
-
-    // ---------------------------------------------------------------- chat state
-
-    // ---------------------------------------------------------------- archived Discord servers load nothing
-
-    // ---------------------------------------------------------------- bridges & accounts
-
-    // ---------------------------------------------------------------- Discord servers
-
     /** Chats muted at the last sync ({@link app.unichat.service.QuietRule#toArchive}). */
     private final Set<String> mutedSeen = new java.util.HashSet<>();
 
@@ -481,6 +462,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     SyncProcessor processor() { return proc; }
     MatrixCore core() { return core; }
     ChatActions actions() { return chatActions; }
+    MessageSender sender() { return sender; }
 
     public static void setBridgeProvisioner(BridgeProvisioner p) { BridgeAccounts.provisioner = p; }
 
@@ -494,9 +476,6 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
 
     @Override public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) { return sender.sendText(chatId, text, replyToId); }
     @Override public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) { return sender.sendSticker(chatId, item, replyToId); }
-    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features, StickerMode mode) { return sender.sendSticker(chatId, item, features, mode, null); }
-    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features) { return sender.sendSticker(chatId, item, features, null); }
-    CompletableFuture<Void> sendStickerCopy(String chatId, MediaLibrary.Item item, RoomFeatures features) { return sender.sendSticker(chatId, item, features, true, null); }
     @Override public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) { return sender.sendVoice(chatId, note, replyToId); }
     @Override public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId) { return sender.sendFile(chatId, file, replyToId); }
     @Override public CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, String replyToId) { return sender.sendGif(chatId, file, mime, width, height, replyToId); }

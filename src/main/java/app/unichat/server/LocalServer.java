@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import app.unichat.support.BundledTools;
 import app.unichat.settings.Settings;
 import app.unichat.bridge.BridgePorts;
 import app.unichat.bridge.BridgeStates;
@@ -45,7 +46,6 @@ public final class LocalServer {
     static final String DOMAIN = "localhost";
     static final String USER = "yo";
 
-    /** Appservice port of each bridge (same as server/setup.sh). */
     private static LocalServer instance;
 
     private final Platform platform;
@@ -91,7 +91,6 @@ public final class LocalServer {
     /** What the bridges report about their accounts (live; listeners run on a background thread). */
     public BridgeStates states() { return states; }
 
-    /** The processes that should be up: the server and the bridges in use. */
     private synchronized void restoreSession(String bridge) {
         try {
             if (!running || !usableBridges().contains(bridge)) return;
@@ -104,6 +103,7 @@ public final class LocalServer {
         }
     }
 
+    /** The processes that should be up: the server and the bridges in use. */
     private Iterable<String> watched() {
         java.util.List<String> out = new java.util.ArrayList<>();
         if (supervisor.isRunning("tuwunel") || running) out.add("tuwunel");
@@ -389,25 +389,17 @@ public final class LocalServer {
         return out;
     }
 
-    /** Folder of the app's own files: the homeserver shipped with it. -Dunichat.tuwunelBin wins (development). */
+    /** The homeserver shipped with the app. -Dunichat.tuwunelBin wins (development). */
     private Path bundledHomeserver() throws IOException {
         return bundled("tuwunel" + platform.exeSuffix(), "unichat.tuwunelBin");
     }
 
-    /**
-     * A file shipped inside the app under {@code app/server/} (Unichat.app/Contents/app/server on macOS,
-     * Unichat\app\server on Windows); {@code -D<override>} wins during development.
-     */
+    /** A file shipped inside the app ({@link BundledTools#appFile}); {@code -D<override>} wins during development. */
     private Path bundled(String file, String override) throws IOException {
         String o = System.getProperty(override);
         if (o != null) return Path.of(o);
-        String launcher = System.getProperty("jpackage.app-path");
-        if (launcher != null) {
-            Path l = Path.of(launcher);
-            Path app = platform == Platform.MAC_ARM64 ? l.getParent().resolveSibling("app") : l.getParent().resolve("app");
-            Path f = app.resolve("server").resolve(file);
-            if (Files.exists(f)) return f;
-        }
+        Path f = BundledTools.appFile(file);
+        if (f != null && Files.exists(f)) return f; // exists, not executable: libolm isn't
         throw new IOException("Esta copia de Unichat no trae " + file);
     }
 

@@ -10,7 +10,8 @@ import java.nio.file.Path;
 import java.util.Properties;
 
 /**
- * User preferences and session, stored as {@code settings.properties} in the per-OS app data folder:
+ * User preferences ({@code settings.properties}, which travels with the person) and session and per-machine state
+ * ({@code session.properties}, see {@link #staysOnThisMachine}), in the per-OS app data folder:
  * Windows {@code %APPDATA%\Unichat}, macOS {@code ~/Library/Application Support/Unichat},
  * Linux {@code $XDG_CONFIG_HOME/unichat}.
  */
@@ -131,6 +132,43 @@ public final class Settings {
 
     public void setBool(String key, boolean value) { set(key, Boolean.toString(value)); }
 
+    /** A number of at least {@code min}; {@code def} when missing or not a number. */
+    public int getInt(String key, int def, int min) {
+        try {
+            String v = getString(key, null);
+            return v == null ? def : Math.max(min, Integer.parseInt(v.strip()));
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    /** {@code def} when missing or not one of the enum's names. */
+    public <E extends Enum<E>> E getEnum(String key, E def) {
+        try {
+            return Enum.valueOf(def.getDeclaringClass(), getString(key, def.name()));
+        } catch (IllegalArgumentException e) {
+            return def;
+        }
+    }
+
+    /** The values of a comma-separated setting, in the order they were added; a copy. */
+    public synchronized java.util.Set<String> getSet(String key) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        for (String v : getString(key, "").split(",")) if (!v.isBlank()) out.add(v.strip());
+        return out;
+    }
+
+    public synchronized void addToSet(String key, String value) {
+        java.util.Set<String> now = getSet(key);
+        if (now.add(value)) set(key, String.join(",", now));
+    }
+
+    /** The key goes away with its last value. */
+    public synchronized void removeFromSet(String key, String value) {
+        java.util.Set<String> now = getSet(key);
+        if (now.remove(value)) set(key, now.isEmpty() ? null : String.join(",", now));
+    }
+
     public double getDouble(String key, double def) {
         try {
             String v = getString(key, null);
@@ -158,6 +196,15 @@ public final class Settings {
         save();
     }
 
+    /** All four at once: this runs on the UI thread and each save reaches the disk. */
+    public synchronized void setWindowGeometry(double width, double height, double x, double y) {
+        machine.setProperty("window.width", Double.toString(width));
+        machine.setProperty("window.height", Double.toString(height));
+        machine.setProperty("window.x", Double.toString(x));
+        machine.setProperty("window.y", Double.toString(y));
+        save();
+    }
+
     public synchronized void clearSession() {
         machine.stringPropertyNames().stream()
                 .filter(k -> k.startsWith("matrix.") || k.startsWith("session."))
@@ -166,13 +213,7 @@ public final class Settings {
     }
 
     // --- Appearance & behaviour ---
-    public Theme theme() {
-        try {
-            return Theme.valueOf(getString("ui.theme", "SYSTEM"));
-        } catch (IllegalArgumentException e) {
-            return Theme.SYSTEM;
-        }
-    }
+    public Theme theme() { return getEnum("ui.theme", Theme.SYSTEM); }
     public void setTheme(Theme theme) { set("ui.theme", theme.name()); }
     /** Accent color as CSS hex. */
     public String accent() { return getString("ui.accent", "#5B5BD6"); }
@@ -197,33 +238,14 @@ public final class Settings {
     public boolean notificationSound() { return getBool("notify.sound", true); }
     public void setNotificationSound(boolean v) { setBool("notify.sound", v); }
     /** Logs older than this are deleted (Ajustes → Privacidad). */
-    public int logRetentionDays() {
-        try {
-            return Math.max(1, Integer.parseInt(getString("logs.retentionDays", "7")));
-        } catch (NumberFormatException e) {
-            return 7;
-        }
-    }
+    public int logRetentionDays() { return getInt("logs.retentionDays", 7, 1); }
     public void setLogRetentionDays(int days) { set("logs.retentionDays", Integer.toString(days)); }
     /** Photos and videos of Discord channels older than this are deleted; 0 = never (Ajustes → Redes). */
-    public int discordMediaDays() {
-        try {
-            return Math.max(0, Integer.parseInt(getString("discord.mediaDays", "30")));
-        } catch (NumberFormatException e) {
-            return 30;
-        }
-    }
+    public int discordMediaDays() { return getInt("discord.mediaDays", 30, 0); }
     public void setDiscordMediaDays(int days) { set("discord.mediaDays", Integer.toString(days)); }
 
-        /** The session is on the server Unichat runs on this computer (app.unichat.server.LocalServer). */
     /** Size limit of the downloaded media (photos, videos, files) in MB; the least recently seen go first. */
-    public int mediaCacheMb() {
-        try {
-            return Math.max(100, Integer.parseInt(getString("cache.mediaMb", "1024").strip()));
-        } catch (NumberFormatException e) {
-            return 1024;
-        }
-    }
+    public int mediaCacheMb() { return getInt("cache.mediaMb", 1024, 100); }
     public void setMediaCacheMb(int mb) { set("cache.mediaMb", Integer.toString(mb)); }
 
     // Voice notes to text (engine and model: stt/SttSettings).
@@ -233,9 +255,10 @@ public final class Settings {
     public String sttCommand() { return getString("stt.command", ""); }
     public void setSttCommand(String cmd) { set("stt.command", cmd); }
 
+    /** The session is on the server Unichat runs on this computer (app.unichat.server.LocalServer). */
     public boolean localServer() { return getBool("server.local", false); }
     public void setLocalServer(boolean v) { setBool("server.local", v); }
-        /** Off by default: archiving a chat means it shouldn't interrupt you. */
+    /** Off by default: archiving a chat means it shouldn't interrupt you. */
     public boolean notifyArchived() { return getBool("notify.archived", false); }
     public void setNotifyArchived(boolean v) { setBool("notify.archived", v); }
     public boolean sendReadReceipts() { return getBool("privacy.readReceipts", true); }
@@ -250,16 +273,9 @@ public final class Settings {
     }
 
     // --- Accessibility ---
-    private Mode mode(String key) {
-        try {
-            return Mode.valueOf(getString(key, "SYSTEM"));
-        } catch (IllegalArgumentException e) {
-            return Mode.SYSTEM;
-        }
-    }
-    public Mode highContrast() { return mode("a11y.highContrast"); }
+    public Mode highContrast() { return getEnum("a11y.highContrast", Mode.SYSTEM); }
     public void setHighContrast(Mode m) { set("a11y.highContrast", m.name()); }
-    public Mode reduceMotion() { return mode("a11y.reduceMotion"); }
+    public Mode reduceMotion() { return getEnum("a11y.reduceMotion", Mode.SYSTEM); }
     public void setReduceMotion(Mode m) { set("a11y.reduceMotion", m.name()); }
     public boolean strongFocus() { return getBool("a11y.strongFocus", false); }
     public void setStrongFocus(boolean v) { setBool("a11y.strongFocus", v); }

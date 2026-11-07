@@ -158,8 +158,7 @@ final class NewChatPane extends VBox {
     private void chooseNetwork(Network n) {
         List<Account> accounts = svc.accounts().stream().filter(a -> a.network() == n && a.status() == AccountStatus.CONNECTED).toList();
         accountRow.getChildren().clear();
-        accountRow.setVisible(accounts.size() > 1);
-        accountRow.setManaged(accounts.size() > 1);
+        Nodes.show(accountRow, accounts.size() > 1);
         if (accounts.size() > 1) {
             ToggleGroup g = new ToggleGroup();
             for (Account a : accounts) {
@@ -267,8 +266,7 @@ final class NewChatPane extends VBox {
     private void show(List<Row> rows, String message) {
         list.getItems().setAll(rows);
         setStatus(message == null ? "" : message);
-        status.setVisible(message != null);
-        status.setManaged(message != null);
+        Nodes.show(status, message != null);
     }
 
     /** What the bridge gets for a typed phone/@user: no spaces, dashes, dots or parentheses around digits. */
@@ -287,8 +285,7 @@ final class NewChatPane extends VBox {
         Account a = account;
         if (a == null || pendingListener != null) return; // already opening one
         setStatus("Abriendo…");
-        status.setVisible(true);
-        status.setManaged(true);
+        Nodes.show(status, true);
         java.util.concurrent.CompletableFuture<Contact> contact = r.contact() != null
                 ? java.util.concurrent.CompletableFuture.completedFuture(r.contact()) : svc.resolveContact(a, normalizeIdentifier(r.typed()));
         contact.thenCompose(c -> {
@@ -371,8 +368,7 @@ final class NewChatPane extends VBox {
             avatar.set(r.label(), r.contact() == null ? r.typed() : r.contact().id(), null, null);
             name.setText(r.label());
             detail.setText(r.detail());
-            detail.setVisible(!r.detail().isEmpty());
-            detail.setManaged(!r.detail().isEmpty());
+            Nodes.show(detail, !r.detail().isEmpty());
             setGraphic(box);
             setAccessibleText(r.detail().isEmpty() ? r.label() : r.label() + ", " + r.detail());
         }

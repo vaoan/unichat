@@ -24,10 +24,6 @@ public final class Manifest {
         public String releaseUrl() {
             return "https://github.com/" + repo + "/releases/download/" + tag;
         }
-
-        public String assetUrl(Platform p) {
-            return releaseUrl() + "/" + asset(p);
-        }
     }
 
     private final Map<String, Component> bridges;

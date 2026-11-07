@@ -5,10 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
-import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -173,24 +170,6 @@ public final class BridgeLogin {
     // ---------------------------------------------------------------- http
 
     private JsonNode call(String method, String path, JsonNode body, Duration timeout) throws IOException, InterruptedException {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(base + path + "?user_id=" + enc(userId)))
-                .timeout(timeout)
-                .header("Authorization", "Bearer " + accessToken);
-        if (body != null) {
-            b.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(body.toString()));
-        } else {
-            b.method(method, HttpRequest.BodyPublishers.noBody());
-        }
-        HttpResponse<String> r = http.send(b.build(), HttpResponse.BodyHandlers.ofString());
-        JsonNode j = bodyOf(r);
-        if (r.statusCode() >= 400) {
-            throw new BridgeLoginException(j.path("errcode").asText("M_UNKNOWN"), j.path("error").asText("HTTP " + r.statusCode()));
-        }
-        return j;
-    }
-
-
-    static JsonNode bodyOf(HttpResponse<String> r) throws java.io.IOException {
-        return r.body() == null || r.body().isBlank() ? JSON.createObjectNode() : JSON.readTree(r.body());
+        return Provisioning.call(http, method, base + path + "?user_id=" + enc(userId), accessToken, body, timeout).orThrow();
     }
 }

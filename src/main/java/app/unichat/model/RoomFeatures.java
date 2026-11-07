@@ -122,11 +122,6 @@ public final class RoomFeatures {
         return acceptsMime("m.audio", OGG) ? new VoiceSend(OGG, false) : null;
     }
 
-    /** Largest file the network takes for {@code type}, in bytes; 0 when not stated. */
-    public long maxSize(String type) {
-        return files.getOrDefault(type, 0L);
-    }
-
     /** Edit offered for a message sent at {@code sent}, judged at {@code now} (limits count from the send time). */
     public boolean canEdit(Instant sent, Instant now) {
         return edit >= 1 && withinAge(sent, now, editMaxAgeSec);
@@ -138,7 +133,6 @@ public final class RoomFeatures {
 
     public boolean deleteForMe() { return deleteForMe; }
     public boolean replies() { return reply >= 1; }
-    public boolean oneReactionPerUser() { return reactionCount == 1; }
 
     /** The quick reactions this chat accepts (all when it doesn't restrict them; none without reactions). */
     public List<String> reactionsOffered(List<String> quick) {

@@ -14,9 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
-import static app.unichat.matrix.BridgeProtocol.*;
 import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.support.Urls.enc;
 import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** Signing in: finds the homeserver of a name or URL, logs in, and restores a stored session. */

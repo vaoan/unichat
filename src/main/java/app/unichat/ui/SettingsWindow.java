@@ -151,9 +151,7 @@ public final class SettingsWindow {
         l.getStyleClass().add("settings-label");
         VBox text = new VBox(2, l);
         if (help != null) {
-            Label h = new Label(help);
-            h.getStyleClass().add("settings-help");
-            h.setWrapText(true);
+            Label h = Labels.help(help);
             text.getChildren().add(h);
         }
         HBox.setHgrow(text, Priority.ALWAYS);
@@ -185,11 +183,9 @@ public final class SettingsWindow {
         name.getStyleClass().add("settings-title");
         Label id = new Label(svc.myUserId());
         id.getStyleClass().add("settings-help");
-        Label backend = new Label("demo".equals(Settings.get().backend())
+        Label backend = Labels.help("demo".equals(Settings.get().backend())
                 ? "Modo demo: los datos son de ejemplo y no salen de este equipo."
                 : "Servidor: " + Settings.get().homeserver());
-        backend.getStyleClass().add("settings-help");
-        backend.setWrapText(true);
         HBox who = new HBox(16, a, new VBox(4, name, id, backend));
         who.setAlignment(Pos.CENTER_LEFT);
         Button out = new Button("Cerrar sesión");
@@ -204,17 +200,12 @@ public final class SettingsWindow {
         ToggleGroup tg = new ToggleGroup();
         HBox themes = new HBox(6);
         for (Settings.Theme t : Settings.Theme.values()) {
-            ToggleButton b = new ToggleButton(switch (t) {
+            String text = switch (t) {
                 case SYSTEM -> "Sistema";
                 case LIGHT -> "Claro";
                 case DARK -> "Oscuro";
-            });
-            b.getStyleClass().add("chip");
-            b.setMinWidth(Region.USE_PREF_SIZE);
-            b.setToggleGroup(tg);
-            b.setSelected(s.theme() == t);
-            b.setOnAction(e -> {
-                if (!b.isSelected()) b.setSelected(true);
+            };
+            ToggleButton b = Chips.sticky(text, tg, s.theme() == t, () -> {
                 s.setTheme(t);
                 changed.run();
             });
@@ -281,19 +272,12 @@ public final class SettingsWindow {
         ToggleGroup tg = new ToggleGroup();
         HBox box = new HBox(6);
         for (Settings.Mode m : Settings.Mode.values()) {
-            ToggleButton b = new ToggleButton(switch (m) {
+            String text = switch (m) {
                 case SYSTEM -> "Sistema";
                 case ON -> "Activado";
                 case OFF -> "Desactivado";
-            });
-            b.getStyleClass().add("chip");
-            b.setMinWidth(Region.USE_PREF_SIZE);
-            b.setToggleGroup(tg);
-            b.setSelected(current == m);
-            b.setOnAction(e -> {
-                if (!b.isSelected()) b.setSelected(true);
-                save.accept(m);
-            });
+            };
+            ToggleButton b = Chips.sticky(text, tg, current == m, () -> save.accept(m));
             box.getChildren().add(b);
         }
         return box;
@@ -394,16 +378,8 @@ public final class SettingsWindow {
         HBox box = new HBox(6);
         box.setAccessibleText("Espacio en disco para fotos y videos descargados");
         for (int mb : new int[]{500, 1024, 5120}) {
-            ToggleButton b = new ToggleButton(mb < 1024 ? mb + " MB" : mb / 1024 + " GB");
-            b.getStyleClass().add("chip");
-            b.setMinWidth(Region.USE_PREF_SIZE);
-            b.setToggleGroup(tg);
-            b.setSelected(s.mediaCacheMb() == mb);
+            ToggleButton b = Chips.sticky(mb < 1024 ? mb + " MB" : mb / 1024 + " GB", tg, s.mediaCacheMb() == mb, () -> s.setMediaCacheMb(mb));
             b.setAccessibleText("Usar hasta " + b.getText() + " para fotos y videos descargados");
-            b.setOnAction(e -> {
-                if (!b.isSelected()) b.setSelected(true);
-                s.setMediaCacheMb(mb);
-            });
             box.getChildren().add(b);
         }
         return box;
@@ -414,18 +390,12 @@ public final class SettingsWindow {
         ToggleGroup tg = new ToggleGroup();
         HBox days = new HBox(6);
         for (int d : new int[]{1, 7, 30}) {
-            ToggleButton b = new ToggleButton(d == 1 ? "1 día" : d + " días");
-            b.getStyleClass().add("chip");
-            b.setMinWidth(Region.USE_PREF_SIZE);
-            b.setToggleGroup(tg);
-            b.setSelected(s.logRetentionDays() == d);
-            b.setAccessibleText("Borrar registros después de " + b.getText());
-            b.setOnAction(e -> {
-                if (!b.isSelected()) b.setSelected(true);
+            ToggleButton b = Chips.sticky(d == 1 ? "1 día" : d + " días", tg, s.logRetentionDays() == d, () -> {
                 s.setLogRetentionDays(d);
                 Thread.ofVirtual().start(() -> LogFiles.cleanOld(LogFiles.roots(),
                         java.time.Duration.ofDays(d), java.time.Instant.now()));
             });
+            b.setAccessibleText("Borrar registros después de " + b.getText());
             days.getChildren().add(b);
         }
         Button clear = new Button("Borrar registros ahora");
@@ -448,9 +418,7 @@ public final class SettingsWindow {
 
     /** ffmpeg, for the stickers that arrive as WebM: the person's own, or a download when they need it. */
     private static Node stickerVideoGroup() {
-        Label state = new Label();
-        state.getStyleClass().add("settings-help");
-        state.setWrapText(true);
+        Label state = Labels.help("");
         state.setMaxWidth(240);
         Button install = new Button("Instalar ahora");
         install.getStyleClass().add("secondary-button");
@@ -497,9 +465,7 @@ public final class SettingsWindow {
 
     /** Options that only make sense for one network; each network gets its own group. */
     private static Node networksPage() {
-        Label intro = new Label("Opciones que solo existen en una red.");
-        intro.setWrapText(true);
-        intro.getStyleClass().add("settings-help");
+        Label intro = Labels.help("Opciones que solo existen en una red.");
         return page("Redes", intro, telegramGroup(), stickerVideoGroup(), group("WhatsApp",
                 row("Stickers animados", "WhatsApp no acepta los stickers animados de otras redes tal cual. Sticker: se "
                         + "convierte en sticker animado. GIF: llega como un GIF que se repite. Video: llega como un video corto.",
@@ -541,17 +507,9 @@ public final class SettingsWindow {
         HBox box = new HBox(6);
         box.setAccessibleText("Cuándo borrar las fotos y videos de canales de Discord");
         for (int d : new int[]{7, 30, 90, 0}) {
-            ToggleButton b = new ToggleButton(d == 0 ? "Nunca" : d + " días");
-            b.getStyleClass().add("chip");
-            b.setMinWidth(Region.USE_PREF_SIZE);
-            b.setToggleGroup(tg);
-            b.setSelected(s.discordMediaDays() == d);
+            ToggleButton b = Chips.sticky(d == 0 ? "Nunca" : d + " días", tg, s.discordMediaDays() == d, () -> s.setDiscordMediaDays(d));
             b.setAccessibleText(d == 0 ? "No borrar nunca las fotos y videos de Discord"
                     : "Borrar fotos y videos de Discord después de " + b.getText());
-            b.setOnAction(e -> {
-                if (!b.isSelected()) b.setSelected(true);
-                s.setDiscordMediaDays(d);
-            });
             box.getChildren().add(b);
         }
         return box;
@@ -570,16 +528,8 @@ public final class SettingsWindow {
                 case GIF -> "GIF";
                 case VIDEO -> "Video";
             };
-            ToggleButton b = new ToggleButton(label);
-            b.getStyleClass().add("chip");
-            b.setMinWidth(Region.USE_PREF_SIZE);
-            b.setToggleGroup(tg);
-            b.setSelected(m == current);
+            ToggleButton b = Chips.sticky(label, tg, m == current, () -> s.set(key, m.name()));
             b.setAccessibleText("Enviar stickers animados de " + n.displayName() + " como " + label);
-            b.setOnAction(e -> {
-                if (!b.isSelected()) b.setSelected(true);
-                s.set(key, m.name());
-            });
             box.getChildren().add(b);
         }
         return box;
@@ -588,14 +538,10 @@ public final class SettingsWindow {
     /** Voice notes to text with what's on this computer: the bundled Whisper or the user's own command. */
     private static Node speechPage() {
         Settings s = Settings.get();
-        Label intro = new Label("Transcribe las notas de voz que recibes (menú del mensaje, \"Transcribir\" o la tecla T). "
+        Label intro = Labels.help("Transcribe las notas de voz que recibes (menú del mensaje, \"Transcribir\" o la tecla T). "
                 + "Todo ocurre en este computador: el audio no se envía a ningún servicio y no cuesta nada.");
-        intro.setWrapText(true);
-        intro.getStyleClass().add("settings-help");
 
-        Label modelState = new Label();
-        modelState.getStyleClass().add("settings-help");
-        modelState.setWrapText(true);
+        Label modelState = Labels.help("");
         modelState.setMaxWidth(240);
         Runnable refreshModel = () -> modelState.setText(SttSettings.model().isInstalled(Transcriber.modelsDir())
                 ? "Descargado." : "Se descarga la primera vez que transcribes.");
@@ -645,16 +591,8 @@ public final class SettingsWindow {
         box.setPrefWrapLength(240);
         box.setAccessibleText(accessible);
         for (T v : values) {
-            ToggleButton b = new ToggleButton(label.apply(v));
-            b.getStyleClass().add("chip");
-            b.setMinWidth(Region.USE_PREF_SIZE);
-            b.setToggleGroup(tg);
-            b.setSelected(v.equals(current));
+            ToggleButton b = Chips.sticky(label.apply(v), tg, v.equals(current), () -> save.accept(v));
             b.setAccessibleText(accessible + ": " + b.getText());
-            b.setOnAction(e -> {
-                if (!b.isSelected()) b.setSelected(true);
-                save.accept(v);
-            });
             box.getChildren().add(b);
         }
         return box;
@@ -667,10 +605,8 @@ public final class SettingsWindow {
     private static Node gifsPage() {
         Settings s = Settings.get();
         java.util.List<Node> groups = new java.util.ArrayList<>();
-        Label intro = new Label("Activa uno o más proveedores para buscar GIFs en el panel lateral. Cada uno necesita su propia "
+        Label intro = Labels.help("Activa uno o más proveedores para buscar GIFs en el panel lateral. Cada uno necesita su propia "
                 + "clave gratuita. Solo se les envía el texto que buscas.");
-        intro.setWrapText(true);
-        intro.getStyleClass().add("settings-help");
         groups.add(intro);
         for (GifProviders.Known k : GifProviders.known()) {
             String enabledKey = "gif." + k.id() + ".enabled", keyKey = "gif." + k.id() + ".key";
@@ -681,13 +617,7 @@ public final class SettingsWindow {
             key.textProperty().addListener((o, a, b) -> s.set(keyKey, b.strip()));
             javafx.scene.control.Hyperlink get = new javafx.scene.control.Hyperlink("Conseguir una clave gratis");
             get.setAccessibleText("Conseguir una clave gratis de " + k.name());
-            get.setOnAction(e -> java.awt.EventQueue.invokeLater(() -> {
-                try {
-                    java.awt.Desktop.getDesktop().browse(java.net.URI.create(k.keyUrl()));
-                } catch (Exception ignored) {
-                    // No browser: the address is in the tooltip.
-                }
-            }));
+            get.setOnAction(e -> Browser.open(k.keyUrl())); // the address is in the tooltip too
             get.setTooltip(new javafx.scene.control.Tooltip(k.keyUrl()));
             groups.add(group(k.name(),
                     row("Usar " + k.name(), null, toggle("true".equals(s.getString(enabledKey, "false")), v -> s.set(enabledKey, v.toString()))),
@@ -741,10 +671,8 @@ public final class SettingsWindow {
     }
 
     private static Node aboutPage() {
-        Label l = new Label("Unichat 1.0.0\nBandeja de mensajes unificada para escritorio (Java + JavaFX), "
+        Label l = Labels.help("Unichat 1.0.0\nBandeja de mensajes unificada para escritorio (Java + JavaFX), "
                 + "construida sobre Matrix y los puentes mautrix.\n\nInspirada en Beeper; no está afiliada ni comparte código con Beeper.");
-        l.setWrapText(true);
-        l.getStyleClass().add("settings-help");
         return page("Acerca de", l);
     }
 }

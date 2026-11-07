@@ -55,7 +55,7 @@ public final class InfoPane extends ScrollPane {
         if (chat == null) return;
         Chat c = chat;
 
-        Button x = Composer.iconButton(Icons.CLOSE, "Cerrar", close);
+        Button x = Icons.iconButton(Icons.CLOSE, "Cerrar", close);
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.ALWAYS);
         Label head = new Label("Información");

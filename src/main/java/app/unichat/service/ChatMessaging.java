@@ -1,6 +1,5 @@
 package app.unichat.service;
 
-import app.unichat.model.Network;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.VoiceNote;
 import java.nio.file.Path;
@@ -16,20 +15,12 @@ public interface ChatMessaging {
     CompletableFuture<Void> toggleReaction(String chatId, String messageId, String emoji);
     void sendTyping(String chatId, boolean typing);
     /** Sends a favourite/recent sticker; {@code item.info()} lets the bridge resend the native sticker. */
-    default CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException("Stickers no disponibles"));
-    }
-    /** Sends a GIF (mp4 or gif file) from the GIF tab. */
+    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId);
     /** A recorded voice note; a network without them gets it as an audio file. */
-    default CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) {
-        return sendFile(chatId, note.file(), replyToId);
-    }
+    CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId);
 
+    /** Sends a GIF (mp4 or gif file) from the GIF tab. */
     default CompletableFuture<Void> sendGif(String chatId, java.nio.file.Path file, String mime, int width, int height, String replyToId) {
         return sendFile(chatId, file, replyToId);
-    }
-    /** Answers the bridge's current login step (pasted cookies, e-mail, verification code…). */
-    default CompletableFuture<Void> sendLoginInput(Network network, String botChatId, String text) {
-        return sendText(botChatId, text, null);
     }
 }

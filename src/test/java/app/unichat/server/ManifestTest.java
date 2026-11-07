@@ -23,8 +23,8 @@ class ManifestTest {
         assertEquals("mautrix/whatsapp", wa.repo());
         assertEquals("v0.2610.0", wa.tag());
         assertEquals("mautrix-whatsapp-darwin-arm64", wa.asset(Platform.MAC_ARM64));
-        assertEquals("https://github.com/mautrix/meta/releases/download/v0.2607.0/mautrix-instagram-darwin-arm64",
-                m.bridge("instagram").assetUrl(Platform.MAC_ARM64));
+        assertEquals("https://github.com/mautrix/meta/releases/download/v0.2607.0", m.bridge("instagram").releaseUrl());
+        assertEquals("mautrix-instagram-darwin-arm64", m.bridge("instagram").asset(Platform.MAC_ARM64));
         assertEquals("v1.9.4", m.tuwunelVersion());
         assertNull(m.bridge("signal"));
         assertEquals(2, m.bridges().size());

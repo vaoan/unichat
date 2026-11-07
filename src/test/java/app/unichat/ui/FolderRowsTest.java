@@ -1,8 +1,8 @@
 package app.unichat.ui;
 
+import app.unichat.service.Folder;
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
-import app.unichat.service.PreferencesFile;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -25,8 +25,8 @@ class FolderRowsTest {
         return c;
     }
 
-    private static PreferencesFile.Folder folder(String... ids) {
-        return new PreferencesFile.Folder("f", "F", java.util.Arrays.stream(ids).map(i -> "key-" + i).toList());
+    private static Folder folder(String... ids) {
+        return new Folder("f", "F", java.util.Arrays.stream(ids).map(i -> "key-" + i).toList());
     }
 
     private static List<String> ids(List<Chat> chats) {

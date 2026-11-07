@@ -31,13 +31,7 @@ final class TelegramKeysForm extends VBox {
                 + "3. Copia aquí el \"App api_id\" y el \"App api_hash\".");
         Hyperlink open = new Hyperlink("Abrir my.telegram.org");
         open.setAccessibleText("Abrir my.telegram.org en el navegador");
-        open.setOnAction(e -> java.awt.EventQueue.invokeLater(() -> {
-            try {
-                java.awt.Desktop.getDesktop().browse(java.net.URI.create(TelegramKeys.URL));
-            } catch (Exception ignored) {
-                // No browser: the address is in the steps above.
-            }
-        }));
+        open.setOnAction(e -> Browser.open(TelegramKeys.URL)); // the address is in the steps above too
         hash.setText(TelegramKeys.apiHash());
         id.setPromptText("Por ejemplo 1234567");
         id.setAccessibleText("App api_id de Telegram");
@@ -74,10 +68,8 @@ final class TelegramKeysForm extends VBox {
     }
 
     private static Label help(String text) {
-        Label l = new Label(text);
-        l.setWrapText(true);
+        Label l = Labels.help(text);
         l.setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
-        l.getStyleClass().add("settings-help");
         return l;
     }
 }

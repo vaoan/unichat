@@ -1,8 +1,8 @@
 package app.unichat.ui;
 
+import app.unichat.service.Folder;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatFolders;
-import app.unichat.service.PreferencesFile;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.scene.Group;
@@ -42,11 +42,11 @@ final class FolderDialogs {
         askName("", "Crear", name -> folders.setInFolder(folders.createFolder(name), chat, true), () -> { });
     }
 
-    void rename(PreferencesFile.Folder folder, Runnable after) {
+    void rename(Folder folder, Runnable after) {
         askName(folder.name(), "Guardar", name -> folders.renameFolder(folder.id(), name), after);
     }
 
-    void delete(PreferencesFile.Folder folder, Runnable after) {
+    void delete(Folder folder, Runnable after) {
         Label question = new Label("¿Eliminar la carpeta «" + folder.name() + "»? Los chats no se borran.");
         question.getStyleClass().add("sheet-title");
         question.setWrapText(true);

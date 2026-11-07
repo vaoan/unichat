@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.support.Threads;
 import app.unichat.model.Network;
 
 import java.io.IOException;
@@ -13,11 +14,7 @@ import java.util.concurrent.Executors;
 
 /** Entry points for the cookie-based login sources (browser sessions, cookies.txt). */
 public final class CookieLogin {
-    private static final ExecutorService IO = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "cookie-login-io");
-        t.setDaemon(true);
-        return t;
-    });
+    private static final ExecutorService IO = Executors.newCachedThreadPool(Threads.daemon("cookie-login-io"));
 
     private CookieLogin() {}
 

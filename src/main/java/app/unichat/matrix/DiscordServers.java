@@ -15,24 +15,18 @@ import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 
 import static app.unichat.matrix.BridgeProtocol.*;
-import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.support.Urls.enc;
 import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** Discord servers: which are bridged, offering the rest, and archived servers bringing nothing. */
 final class DiscordServers {
     private final MatrixCore core;
-    private final MatrixClient client;
     private final SyncProcessor proc;
-    private final String userId;
     private final BotChat bots;
     private final Supplier<List<Account>> accounts;
 
     DiscordServers(MatrixCore core, BotChat bots, Supplier<List<Account>> accounts) {
         this.core = core;
-        this.client = core.client;
         this.proc = core.proc;
-        this.userId = core.userId;
         this.bots = bots;
         this.accounts = accounts;
     }
@@ -54,9 +48,7 @@ final class DiscordServers {
     }
 
     static Set<String> pausedGuilds() {
-        Set<String> out = new java.util.LinkedHashSet<>();
-        for (String id : Settings.get().getString(PAUSED_GUILDS_KEY, "").split(",")) if (!id.isBlank()) out.add(id.strip());
-        return out;
+        return Settings.get().getSet(PAUSED_GUILDS_KEY);
     }
 
     /**
@@ -71,11 +63,8 @@ final class DiscordServers {
         try {
             String reply = bots.query(Network.DISCORD, "guilds bridging-mode " + guildId + " " + (paused ? "nothing" : "create-on-message"));
             if (!reply.startsWith("Set guild bridging mode")) throw new MatrixException(0, null, reply);
-            synchronized (PAUSED_GUILDS_KEY) {
-                Set<String> now = pausedGuilds();
-                if (paused) now.add(guildId); else now.remove(guildId);
-                Settings.get().set(PAUSED_GUILDS_KEY, now.isEmpty() ? null : String.join(",", now));
-            }
+            if (paused) Settings.get().addToSet(PAUSED_GUILDS_KEY, guildId);
+            else Settings.get().removeFromSet(PAUSED_GUILDS_KEY, guildId);
         } catch (Exception e) {
             System.err.println("Discord server " + (paused ? "pause" : "resume") + " failed: " + e.getClass().getSimpleName());
         }
@@ -131,36 +120,14 @@ final class DiscordServers {
             MatrixRoom r = proc.room(spaceId);
             guild = r != null && r.space && r.chat.network() == Network.DISCORD ? r.bridgeChannelId : null;
         }
-        Set<String> done = new java.util.HashSet<>(java.util.Arrays.asList(Settings.get().getString(ENTIRE_GUILDS_KEY, "").split(",")));
-        if (guild == null || done.contains(guild)) return CompletableFuture.completedFuture(null);
-        return CompletableFuture.runAsync(() -> {
-            try {
-                String reply = bots.query(Network.DISCORD, "guilds bridge " + guild + " --entire", 600);
-                if (!reply.startsWith("Successfully")) throw new MatrixException(0, null, reply);
-                synchronized (ENTIRE_GUILDS_KEY) {
-                    Set<String> now = new java.util.LinkedHashSet<>(java.util.Arrays.asList(Settings.get().getString(ENTIRE_GUILDS_KEY, "").split(",")));
-                    now.remove("");
-                    now.add(guild);
-                    Settings.get().set(ENTIRE_GUILDS_KEY, String.join(",", now));
-                }
-            } catch (MatrixException e) {
-                throw new CompletionException(e);
-            } catch (Exception e) {
-                throw new CompletionException(new MatrixException(userMessage(e), e));
-            }
-        }, core.io);
+        if (guild == null || Settings.get().getSet(ENTIRE_GUILDS_KEY).contains(guild)) return CompletableFuture.completedFuture(null);
+        return guildCommand("guilds bridge " + guild + " --entire", 600, () -> Settings.get().addToSet(ENTIRE_GUILDS_KEY, guild));
     }
 
     private static final String ENTIRE_GUILDS_KEY = "discord.guilds.entire";
 
     CompletableFuture<List<DiscordGuild>> discordGuilds() {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                return parseGuilds(bots.query(Network.DISCORD, "guilds status"));
-            } catch (Exception e) {
-                throw new java.util.concurrent.CompletionException(e);
-            }
-        }, core.io);
+        return core.call(() -> parseGuilds(bots.query(Network.DISCORD, "guilds status")));
     }
 
     CompletableFuture<Void> setDiscordGuildBridged(String guildId, boolean bridged) {
@@ -194,11 +161,15 @@ final class DiscordServers {
 
     /** A guilds command that changes what's bridged, so the cached list no longer holds. */
     private CompletableFuture<Void> changeBridging(String command, int seconds) {
+        return guildCommand(command, seconds, () -> guildCache = null);
+    }
+
+    /** A guilds command that answers "Successfully…", then {@code after}; any other answer is the failure's message. */
+    private CompletableFuture<Void> guildCommand(String command, int seconds, Runnable after) {
         return CompletableFuture.runAsync(() -> {
             try {
-                String reply = bots.query(Network.DISCORD, command, seconds);
-                if (!reply.startsWith("Successfully")) throw new MatrixException(0, null, reply);
-                guildCache = null;
+                requireSuccess(bots.query(Network.DISCORD, command, seconds));
+                after.run();
             } catch (MatrixException e) {
                 throw new CompletionException(e);
             } catch (Exception e) {

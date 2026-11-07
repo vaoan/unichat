@@ -1,8 +1,8 @@
 package app.unichat.ui;
 
+import app.unichat.service.Folder;
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
-import app.unichat.service.PreferencesFile;
 
 import java.time.Instant;
 import java.util.EnumMap;
@@ -43,10 +43,10 @@ final class FolderRows {
         return c.prefKey() != null && !c.bridgeBot() && !c.personalSpace() && !c.invite();
     }
 
-    static List<Chat> chatsIn(PreferencesFile.Folder folder, List<Chat> all) { return chatsIn(folder, new Servers(all)); }
+    static List<Chat> chatsIn(Folder folder, List<Chat> all) { return chatsIn(folder, new Servers(all)); }
 
     /** Archived chats stay: if it's in a folder, the person wants it there. Same order as the inbox. */
-    static List<Chat> chatsIn(PreferencesFile.Folder folder, Servers servers) {
+    static List<Chat> chatsIn(Folder folder, Servers servers) {
         Set<String> keys = new HashSet<>(folder.chatKeys());
         Map<String, Instant> activity = new HashMap<>();
         List<Chat> in = servers.all.stream().filter(c -> canHold(c) && keys.contains(c.prefKey())).toList();
@@ -57,10 +57,10 @@ final class FolderRows {
         return in.stream().sorted(InboxRows.order(activity)).toList();
     }
 
-    static long unread(PreferencesFile.Folder folder, List<Chat> all) { return unread(folder, new Servers(all)); }
+    static long unread(Folder folder, List<Chat> all) { return unread(folder, new Servers(all)); }
 
     /** Chats with something unread, as the inbox counts them. A channel reached twice (alone and through its server) counts once. */
-    static long unread(PreferencesFile.Folder folder, Servers servers) {
+    static long unread(Folder folder, Servers servers) {
         Set<String> unread = new HashSet<>();
         for (Chat c : chatsIn(folder, servers)) {
             if (ChatFilter.inboxUnread(c)) unread.add(c.id());

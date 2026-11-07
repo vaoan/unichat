@@ -202,7 +202,6 @@ public final class UnichatApp extends Application {
     private void startLocalServer() {
         LocalServer local = LocalServer.get();
         if (local == null) return;
-        MatrixChatService.setBridgeProvisioner(provisioner(local));
         Thread.ofVirtual().name("local-server").start(() -> {
             try {
                 local.ensureRunning(msg -> { });
@@ -291,10 +290,7 @@ public final class UnichatApp extends Application {
     private void saveGeometry() {
         Settings s = Settings.get();
         if (stage.isIconified() || stage.isMaximized()) return;
-        s.set("window.width", Double.toString(stage.getWidth()));
-        s.set("window.height", Double.toString(stage.getHeight()));
-        s.set("window.x", Double.toString(stage.getX()));
-        s.set("window.y", Double.toString(stage.getY()));
+        s.setWindowGeometry(stage.getWidth(), stage.getHeight(), stage.getX(), stage.getY());
     }
 
     private void quit() {

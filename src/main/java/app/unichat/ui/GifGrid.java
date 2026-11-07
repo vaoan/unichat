@@ -11,14 +11,12 @@ import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
-import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.input.KeyCode;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -91,18 +89,18 @@ final class GifGrid extends VBox {
         int gen = ++generation;
         content.getChildren().clear();
         boolean accepted = accepts();
-        if (!accepted) content.getChildren().add(help("Esta red no acepta GIFs."));
+        if (!accepted) content.getChildren().add(Labels.help("Esta red no acepta GIFs."));
         GifSearch providers = new GifSearch(GifProviders.active(k -> Settings.get().getString(k, null)));
         String q = search.getText().strip();
         content.getChildren().add(libraryBox);
         refreshLibrary();
         if (providers.isEmpty()) {
-            content.getChildren().add(help("Para buscar GIFs, activa un proveedor en Ajustes → GIFs (Giphy o Klipy, con una clave gratis)."));
+            content.getChildren().add(Labels.help("Para buscar GIFs, activa un proveedor en Ajustes → GIFs (Giphy o Klipy, con una clave gratis)."));
             return;
         }
         Label title = section(q.isEmpty() ? "Tendencias" : "Resultados");
         FlowPane grid = new FlowPane(6, 6);
-        Label loading = help("Buscando…");
+        Label loading = Labels.help("Buscando…");
         content.getChildren().addAll(title, loading, grid);
         CompletableFuture.supplyAsync(() -> q.isEmpty() ? providers.trending(LIMIT) : providers.search(q, LIMIT))
                 .thenAccept(gifs -> Platform.runLater(() -> {
@@ -112,7 +110,7 @@ final class GifGrid extends VBox {
                         resultsFor = shownFor;
                         resultsAt = System.currentTimeMillis();
                     }
-                    if (gifs.isEmpty()) content.getChildren().add(help("No se encontraron GIFs."));
+                    if (gifs.isEmpty()) content.getChildren().add(Labels.help("No se encontraron GIFs."));
                     for (Gif g : gifs) {
                         Node tile = tile(new Image(g.previewUrl(), TILE_W * 2, 0, true, true, true),
                                 g.title().isBlank() ? "GIF" : g.title(), accepted, () -> sendFromProvider(g));
@@ -174,32 +172,11 @@ final class GifGrid extends VBox {
     }
 
     private Node tile(ImageView view, String what, boolean accepted, Runnable send) {
-        view.setFitWidth(TILE_W);
-        view.setFitHeight(TILE_H);
-        view.setPreserveRatio(true);
-        StackPane tile = new StackPane(view);
-        tile.getStyleClass().add("gif-tile");
-        tile.setMinSize(TILE_W, TILE_H);
-        tile.setMaxSize(TILE_W, TILE_H);
-        tile.setFocusTraversable(true);
-        tile.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
-        tile.setAccessibleText(what + (accepted ? ", enviar" : ", esta red no acepta GIFs"));
-        tile.setOpacity(accepted ? 1 : 0.4);
-        tile.setCursor(accepted ? Cursor.HAND : Cursor.DEFAULT);
         Runnable act = () -> {
             if (!accepted) toast.accept("Esta red no acepta GIFs");
             else send.run();
         };
-        tile.setOnMouseClicked(e -> {
-            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) act.run();
-        });
-        tile.setOnKeyPressed(e -> {
-            if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
-                e.consume();
-                act.run();
-            }
-        });
-        return tile;
+        return MediaTile.of(view, TILE_W, TILE_H, "gif-tile", what + (accepted ? ", enviar" : ", esta red no acepta GIFs"), accepted, act);
     }
 
     /** Downloads the provider's file (mp4 when available, smaller and accepted by every bridge) and sends it. */
@@ -240,13 +217,6 @@ final class GifGrid extends VBox {
     private static Label section(String text) {
         Label l = new Label(text);
         l.getStyleClass().add("emoji-category");
-        return l;
-    }
-
-    private static Label help(String text) {
-        Label l = new Label(text);
-        l.setWrapText(true);
-        l.getStyleClass().add("settings-help");
         return l;
     }
 }

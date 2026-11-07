@@ -73,7 +73,7 @@ class SendStickerTest {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
         JsonNode info = MatrixClient.JSON.readTree("""
                 {"mimetype":"image/webp","w":512,"h":512,"fi.mau.bridged_sticker":{"network":"telegram","id":"123","emoji":"😂"}}""");
-        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/abc", "image/webp", 512, 512, info), (String) null)
+        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/abc", "image/webp", 512, 512, info), null)
                 .get(10, TimeUnit.SECONDS);
         assertTrue(path.contains("/send/m.sticker/"), path);
         JsonNode sent = MatrixClient.JSON.readTree(body);
@@ -85,7 +85,7 @@ class SendStickerTest {
     @Test
     void withoutInfoItStillDescribesTheImage() throws Exception {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
-        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/x", "image/png", 160, 120, null), (String) null)
+        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/x", "image/png", 160, 120, null), null)
                 .get(10, TimeUnit.SECONDS);
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("image/png", sent.path("info").path("mimetype").asText());
@@ -99,7 +99,7 @@ class SendStickerTest {
                 "{\"id\":\"wa\",\"file\":{\"m.sticker\":{\"mime_types\":{\"image/webp\":2,\"image/png\":1}}}}"));
         JsonNode info = MatrixClient.JSON.readTree("""
                 {"mimetype":"image/gif","w":256,"h":256,"size":999,"fi.mau.bridged_sticker":{"network":"telegram","id":"1"}}""");
-        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/gif", "image/gif", 256, 256, info), wa)
+        svc.sender().sendStickerFor("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/gif", "image/gif", 256, 256, info), wa, null)
                 .get(30, TimeUnit.SECONDS);
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("mxc://s/converted", sent.path("url").asText());
@@ -114,7 +114,7 @@ class SendStickerTest {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
         app.unichat.model.RoomFeatures wa = app.unichat.model.RoomFeatures.parse(MatrixClient.JSON.readTree(
                 "{\"id\":\"wa\",\"file\":{\"m.sticker\":{\"mime_types\":{\"image/webp\":2}},\"m.video\":{\"mime_types\":{\"video/mp4\":2}}}}"));
-        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/gif", "image/gif", 16, 16, null), wa, mode)
+        svc.sender().sendStickerAs("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/gif", "image/gif", 16, 16, null), wa, mode, null)
                 .get(30, TimeUnit.SECONDS);
         assertTrue(path.contains("/send/m.room.message/"), path);
         assertEquals("video/mp4", uploadedType);
@@ -155,8 +155,8 @@ class SendStickerTest {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
         JsonNode info = MatrixClient.JSON.readTree("""
                 {"mimetype":"image/webp","w":512,"h":512,"thumbnail_url":"mxc://s/t","fi.mau.bridged_sticker":{"network":"telegram","id":"123"}}""");
-        svc.sendStickerCopy("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/abc", "image/webp", 512, 512, info),
-                app.unichat.model.RoomFeatures.UNKNOWN).get(10, TimeUnit.SECONDS);
+        svc.sender().sendStickerEvent("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/abc", "image/webp", 512, 512, info),
+                app.unichat.model.RoomFeatures.UNKNOWN, true, null).get(10, TimeUnit.SECONDS);
         assertEquals("image/webp", uploadedType);
         assertTrue(path.contains("/send/m.sticker/"), path);
         JsonNode sent = MatrixClient.JSON.readTree(body);

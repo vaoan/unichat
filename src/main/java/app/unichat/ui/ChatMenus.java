@@ -1,8 +1,8 @@
 package app.unichat.ui;
 
+import app.unichat.service.Folder;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatPreferences;
-import app.unichat.service.PreferencesFile;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.ListView;
@@ -62,7 +62,7 @@ public final class ChatMenus {
     private static void addFoldersMenu(ContextMenu menu, Chat c, FolderDialogs dialogs) {
         if (!FolderRows.canHold(c)) return;
         Menu m = new Menu("Carpetas");
-        for (PreferencesFile.Folder f : dialogs.folders().folders()) {
+        for (Folder f : dialogs.folders().folders()) {
             CheckMenuItem i = new CheckMenuItem(shortName(f.name()));
             i.setMnemonicParsing(false); // a name is text: "a_b" keeps its underscore
             i.setSelected(f.chatKeys().contains(c.prefKey()));

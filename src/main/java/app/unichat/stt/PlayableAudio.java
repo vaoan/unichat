@@ -1,6 +1,6 @@
 package app.unichat.stt;
 
-import app.unichat.support.Hashes;
+import app.unichat.support.ConvertedFiles;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,11 +17,8 @@ public final class PlayableAudio {
     /** Blocking: decoding takes a moment on long notes. */
     public static Path of(Path audio) throws IOException {
         if (!OggOpus.isOggOpus(audio)) return audio;
-        Path wav = audio.resolveSibling("converted-" + Hashes.sha256(audio.getFileName().toString()) + ".wav");
-        if (Files.isRegularFile(wav)) {
-            wav.toFile().setLastModified(System.currentTimeMillis());
-            return wav;
-        }
+        Path wav = ConvertedFiles.beside(audio, "wav");
+        if (ConvertedFiles.reuse(wav)) return wav;
         Path tmp = wav.resolveSibling(wav.getFileName() + ".part");
         try {
             OggOpus.toPlayableWav(audio, tmp);

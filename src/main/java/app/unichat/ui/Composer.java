@@ -79,12 +79,11 @@ public final class Composer extends VBox {
         bannerText.getStyleClass().add("banner-text");
         VBox bannerBody = new VBox(1, bannerTitle, bannerText);
         HBox.setHgrow(bannerBody, Priority.ALWAYS);
-        Button close = iconButton(Icons.CLOSE, "Cancelar (Esc)", this::cancelMode);
+        Button close = Icons.iconButton(Icons.CLOSE, "Cancelar (Esc)", this::cancelMode);
         banner.getChildren().addAll(bannerBody, close);
         banner.getStyleClass().add("composer-banner");
         banner.setAlignment(Pos.CENTER_LEFT);
-        banner.setVisible(false);
-        banner.setManaged(false);
+        Nodes.show(banner, false);
 
         input.setPromptText("Escribe un mensaje");
         input.setAccessibleText("Escribe un mensaje");
@@ -99,8 +98,8 @@ public final class Composer extends VBox {
         });
         HBox.setHgrow(input, Priority.ALWAYS);
 
-        Button attach = iconButton(Icons.ATTACH, "Adjuntar archivo", this::chooseFile);
-        Button emoji = iconButton(Icons.EMOJI, "Emojis", null);
+        Button attach = Icons.iconButton(Icons.ATTACH, "Adjuntar archivo", this::chooseFile);
+        Button emoji = Icons.iconButton(Icons.EMOJI, "Emojis", null);
         emoji.setOnAction(e -> {
             if (onPanel != null) onPanel.accept(SidePanel.Tab.EMOJIS);
             else EmojiPicker.show(emoji, this::insert);
@@ -111,12 +110,12 @@ public final class Composer extends VBox {
         stickers.setAccessibleText("Stickers y GIFs");
         stickers.setTooltip(new javafx.scene.control.Tooltip("Stickers y GIFs"));
         stickers.setOnAction(e -> { if (onPanel != null) onPanel.accept(SidePanel.Tab.STICKERS); });
-        Button send = iconButton(Icons.SEND, "Enviar", this::send);
+        Button send = Icons.iconButton(Icons.SEND, "Enviar", this::send);
         send.getStyleClass().add("send-button");
         send.disableProperty().bind(input.textProperty().map(t -> t.isBlank()));
 
         this.send = send;
-        mic = iconButton(Icons.MIC, "Grabar una nota de voz", this::startRecording);
+        mic = Icons.iconButton(Icons.MIC, "Grabar una nota de voz", this::startRecording);
         mic.getStyleClass().add("mic-button");
         ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, this::aiDone, AiReplyButton::replyWriter);
         fix = new AiReplyButton(AiReplyButton.FIX, this::fixRequest, this::fixed, onError, this::aiDone, AiReplyButton::fixWriter);
@@ -140,16 +139,6 @@ public final class Composer extends VBox {
         typingStop.setOnFinished(e -> stopTyping());
     }
 
-    static Button iconButton(String icon, String tooltip, Runnable action) {
-        Button b = new Button();
-        b.setGraphic(Icons.icon(icon, 18));
-        b.getStyleClass().add("icon-button");
-        b.setTooltip(new javafx.scene.control.Tooltip(tooltip));
-        b.setAccessibleText(tooltip);
-        if (action != null) b.setOnAction(e -> action.run());
-        return b;
-    }
-
     public void setChat(String newChatId) {
         if (chatId != null) {
             stopTyping();
@@ -170,10 +159,8 @@ public final class Composer extends VBox {
     void refreshVoice() {
         Chat c = chatId == null ? null : svc.chat(chatId);
         boolean offer = c != null && c.features().voiceSend() != null && input.getText().isBlank() && editing == null;
-        mic.setVisible(offer);
-        mic.setManaged(offer);
-        send.setVisible(!offer);
-        send.setManaged(!offer);
+        Nodes.show(mic, offer);
+        Nodes.show(send, !offer);
     }
 
     /** Runs before a recording starts: what's playing shouldn't end up in it. */
@@ -453,8 +440,7 @@ public final class Composer extends VBox {
 
     private void updateBanner() {
         boolean show = replyTo != null || editing != null;
-        banner.setVisible(show);
-        banner.setManaged(show);
+        Nodes.show(banner, show);
         if (replyTo != null) {
             bannerTitle.setText("Respondiendo a " + (replyTo.outgoing() ? "ti mismo" : replyTo.senderName()));
             bannerText.setText(replyTo.preview());

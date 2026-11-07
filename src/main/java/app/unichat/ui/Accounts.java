@@ -29,10 +29,6 @@ final class Accounts {
         return accounts.stream().filter(a -> a.network() == n && a.status() != AccountStatus.NEEDS_LOGIN).toList();
     }
 
-    static boolean multi(NetworkAccounts svc, Network n) {
-        return of(svc, n).size() > 1;
-    }
-
     /** Name of the account a chat belongs to, only when its network has several accounts; else null. */
     static String forChat(NetworkAccounts svc, Chat c) {
         return c.accountId() == null ? null : forChat(svc.accounts(), c);

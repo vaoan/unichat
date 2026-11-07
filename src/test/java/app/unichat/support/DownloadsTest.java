@@ -52,6 +52,23 @@ class DownloadsTest {
     }
 
     @Test
+    void withoutASizeThereIsNoProgressAndTheHookSeesTheWholeFile() throws Exception {
+        Path target = dir.resolve("archivo");
+        List<Double> progress = new ArrayList<>();
+        List<String> seen = new ArrayList<>();
+        Downloads.fetch(url, 0, Hashes.sha256("contenido"), target, "el archivo", progress::add, part -> {
+            try {
+                seen.add(Files.readString(part));
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        });
+        assertEquals(List.of(), progress);
+        assertEquals(List.of("contenido"), seen);
+        assertEquals("contenido", Files.readString(target));
+    }
+
+    @Test
     void aFileThatDoesntMatchLeavesNothing() {
         Path target = dir.resolve("archivo");
         assertThrows(IOException.class, () -> Downloads.fetch(url, BODY.length, Hashes.sha256("otra cosa"), target, "el archivo", p -> { }));
