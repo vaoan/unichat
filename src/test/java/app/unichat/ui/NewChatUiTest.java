@@ -64,11 +64,11 @@ class NewChatUiTest {
         assertEquals(6, rows(scene).size(), rows(scene).toString());
 
         type(scene, "ana");
-        Thread.sleep(700); // 300 ms debounce + search
+        until(() -> names(scene).equals(List.of("Ana Restrepo", "Ana María")));
         assertEquals(List.of("Ana Restrepo", "Ana María"), names(scene));
 
         type(scene, "Mamá");
-        Thread.sleep(700);
+        until(() -> names(scene).equals(List.of("Mamá")));
         enter(scene);
         assertEquals("!mama:demo", fx(() -> thread(scene).chat().id()), "an existing chat just opens");
         assertNull(fx(() -> pane(scene)), "and the pane closes");
@@ -76,15 +76,15 @@ class NewChatUiTest {
         shortcutN(scene);
         chooseNetwork(scene, "WhatsApp");
         type(scene, "Carlos");
-        Thread.sleep(700);
+        until(() -> names(scene).equals(List.of("Carlos Peña")));
         enter(scene);
-        Thread.sleep(300);
+        until(() -> fx(() -> thread(scene).chat().id()).equals("!dm-c-carlos:demo"));
         assertEquals("!dm-c-carlos:demo", fx(() -> thread(scene).chat().id()), "a chat is created and opened");
 
         shortcutN(scene);
         chooseNetwork(scene, "WhatsApp");
         type(scene, "+57 300 111 2222");
-        Thread.sleep(700);
+        until(() -> rows(scene).stream().anyMatch(r -> r.startsWith("Escribir a +57 300 111 2222")));
         assertTrue(rows(scene).stream().anyMatch(r -> r.startsWith("Escribir a +57 300 111 2222")), rows(scene).toString());
 
         chooseNetwork(scene, "Discord");
@@ -140,9 +140,8 @@ class NewChatUiTest {
                 .findFirst().orElseThrow().openChatId("!familia:demo"); return null; });
         shortcutN(scene);
         chooseNetwork(scene, "WhatsApp");
-        Thread.sleep(1200);
         type(scene, "Pedro");
-        Thread.sleep(1500);
+        until(() -> names(scene).equals(List.of("Pedro")));
         enter(scene);
         awaitSearch(scene);
         fx(() -> {
@@ -173,7 +172,7 @@ class NewChatUiTest {
         assertTrue(help != null && help.contains("Grupos"), String.valueOf(help));
         chooseNetwork(scene, "WhatsApp");
         type(scene, "zzzz");
-        Thread.sleep(700);
+        until(() -> "Sin resultados".equals(fx(() -> search(scene).getAccessibleHelp())));
         assertEquals("Sin resultados", fx(() -> search(scene).getAccessibleHelp()));
         svc.stop();
     }
@@ -190,6 +189,12 @@ class NewChatUiTest {
     /** The search field, waiting up to 5 s for the pane to show it (fixed sleeps made this test flaky). */
     private static TextField search(Scene s) {
         return (TextField) s.getRoot().lookup(".new-chat-search");
+    }
+
+    /** Searches wait 300 ms and run on another thread: how long they take depends on the machine's load. */
+    private static void until(Callable<Boolean> done) throws Exception {
+        long end = System.currentTimeMillis() + 15_000;
+        while (!done.call() && System.currentTimeMillis() < end) Thread.sleep(50);
     }
 
     private static void awaitSearch(Scene s) throws Exception {

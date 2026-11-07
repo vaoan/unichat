@@ -75,7 +75,7 @@ class AutoScrollUiTest {
         Scene scene = start();
         String firstId = fx(() -> svc.messages(CHAT).get(0).id());
         svc.sendText(CHAT, "te respondo", firstId);
-        Thread.sleep(900);
+        untilAtBottom(scene);
         assertTrue("bottom".equals(bottomState(scene)), "starts at the bottom: " + bottomState(scene));
 
         fx(() -> {
@@ -162,9 +162,15 @@ class AutoScrollUiTest {
         Thread.sleep(400);
         assertTrue(!"bottom".equals(bottomState(scene)), "precondition: scrolled up");
         svc.sendText(CHAT, "lo que acabo de escribir", null);
-        Thread.sleep(700);
+        untilAtBottom(scene);
         assertTrue("bottom".equals(bottomState(scene)), bottomState(scene));
         svc.stop();
+    }
+
+    /** The list settles over several layout passes, which take longer on a loaded machine. */
+    private static void untilAtBottom(Scene scene) throws Exception {
+        long end = System.currentTimeMillis() + 15_000;
+        while (!"bottom".equals(bottomState(scene)) && System.currentTimeMillis() < end) Thread.sleep(50);
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
