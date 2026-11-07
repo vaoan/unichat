@@ -79,7 +79,7 @@ public final class SettingsWindow {
         BorderPane content = new BorderPane();
         content.getStyleClass().add("settings-content");
         ListView<String> nav = new ListView<>();
-        nav.getItems().addAll("Cuentas", "Perfil", "Apariencia", "Accesibilidad", "Notificaciones", "Privacidad", "Redes", "Voz a texto", "Responder con IA", "GIFs", "Atajos de teclado", "Acerca de");
+        nav.getItems().addAll("Cuentas", "Perfil", "Apariencia", "Accesibilidad", "Notificaciones", "Privacidad", "Redes", "Voz a texto", "Escribir con IA", "GIFs", "Atajos de teclado", "Acerca de");
         nav.getStyleClass().add("settings-nav");
         nav.setPrefWidth(200);
         nav.getSelectionModel().selectedItemProperty().addListener((o, a, s) -> {
@@ -101,7 +101,7 @@ public final class SettingsWindow {
                 case "Privacidad" -> privacyPage();
                 case "Redes" -> networksPage();
                 case "Voz a texto" -> speechPage();
-                case "Responder con IA" -> AiReplyPage.build();
+                case "Escribir con IA" -> AiReplyPage.build();
                 case "GIFs" -> gifsPage();
                 case "Atajos de teclado" -> shortcutsPage();
                 case "Acerca de" -> aboutPage();

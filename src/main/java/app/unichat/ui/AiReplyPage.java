@@ -13,16 +13,18 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 
-/** Ajustes → Responder con IA. */
+/** Ajustes → Escribir con IA. */
 final class AiReplyPage {
     private AiReplyPage() {}
 
     static Node build() {
-        Label intro = new Label("Agrega un botón junto al cuadro de texto que escribe un borrador de respuesta con el programa de IA "
-                + "que tengas instalado. El borrador queda en el cuadro para que lo leas y lo cambies: nunca se envía solo.");
+        Label intro = new Label("Agrega dos botones junto al cuadro de texto, con el programa de IA que tengas instalado: uno escribe un "
+                + "borrador de respuesta y otro corrige la ortografía y la redacción de lo que escribiste, cambiando lo mínimo. "
+                + "El resultado queda en el cuadro para que lo leas y lo cambies: nunca se envía solo.");
         intro.setWrapText(true);
-        Label privacy = new Label("Al pulsar el botón, ese chat se envía al servicio de Claude Code o de Codex, con tu cuenta. "
-                + "Solo se envían los mensajes cargados de ese chat, y solo cuando lo pulsas. Fotos y audios van como una mención, sin su contenido.");
+        Label privacy = new Label("Al pulsar el botón de borrador, ese chat se envía al servicio de Claude Code o de Codex, con tu cuenta. "
+                + "Solo se envían los mensajes cargados de ese chat, y solo cuando lo pulsas. Fotos y audios van como una mención, sin su contenido. "
+                + "Al corregir, solo se envía lo que escribiste en el cuadro.");
         privacy.setWrapText(true);
         privacy.getStyleClass().add("settings-help");
 
@@ -44,12 +46,12 @@ final class AiReplyPage {
         instructions.setPrefRowCount(6);
         instructions.setAccessibleText("Instrucciones para la IA");
         instructions.textProperty().addListener((o, a, t) -> AiSettings.setInstructions(t));
-        Label instructionsHelp = new Label("Se envían siempre, antes de la conversación.");
+        Label instructionsHelp = new Label("Se envían con cada borrador, antes de la conversación. Al corregir no se usan.");
         instructionsHelp.getStyleClass().add("settings-help");
 
-        return SettingsWindow.page("Responder con IA", intro, privacy,
+        return SettingsWindow.page("Escribir con IA", intro, privacy,
                 SettingsWindow.group("General",
-                        SettingsWindow.row("Mostrar el botón", "Aparece en todos los chats.", SettingsWindow.toggle(AiSettings.enabled(), on -> {
+                        SettingsWindow.row("Mostrar los botones", "Aparecen en todos los chats.", SettingsWindow.toggle(AiSettings.enabled(), on -> {
                             AiSettings.setEnabled(on);
                             AiReplyButton.SHOWN.set(on);
                         })),

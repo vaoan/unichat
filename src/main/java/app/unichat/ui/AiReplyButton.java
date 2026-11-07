@@ -13,10 +13,18 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
 
 /**
- * The composer's button that asks the AI program for a draft. Only ever a draft: it lands in the text box for the person to
- * read, and nothing here can send it. Pressed again while working, it cancels.
+ * A composer button that asks the AI program for text: a draft of a reply, or what's written, corrected. It only ever lands
+ * in the text box for the person to read, and nothing here can send it. Pressed again while working, it cancels.
  */
 final class AiReplyButton {
+    /** What each button says; {@code nothing}: when there's nothing to work on. */
+    record Look(String icon, String idle, String cancel, String styleClass, String nothing) {}
+
+    static final Look REPLY = new Look(Icons.SPARKLE, "Escribir un borrador con IA", "Cancelar el borrador con IA", "ai-button",
+            "Este chat todavía no tiene mensajes que responder");
+    static final Look FIX = new Look(Icons.SPELLCHECK, "Corregir la ortografía y la redacción con IA", "Cancelar la corrección con IA",
+            "ai-fix-button", "Escribe primero el texto que quieres corregir");
+
     /** What to answer; the prompt is built on the UI thread, from live messages. */
     record Request(String chatId, String prompt) {}
 
@@ -30,6 +38,7 @@ final class AiReplyButton {
     /** Ajustes turns it on or off for the open window. */
     static final BooleanProperty SHOWN = new SimpleBooleanProperty(AiSettings.enabled());
 
+    private final Look look;
     private final Button button;
     private final Supplier<Request> request;
     private final java.util.function.BiConsumer<String, String> onDraft;
@@ -37,17 +46,14 @@ final class AiReplyButton {
     private final Supplier<Writer> writers;
     private Writer working;
 
-    AiReplyButton(Supplier<Request> request, java.util.function.BiConsumer<String, String> onDraft, Consumer<String> onError) {
-        this(request, onDraft, onError, AiReplyButton::realWriter);
-    }
-
-    AiReplyButton(Supplier<Request> request, java.util.function.BiConsumer<String, String> onDraft, Consumer<String> onError, Supplier<Writer> writers) {
+    AiReplyButton(Look look, Supplier<Request> request, java.util.function.BiConsumer<String, String> onDraft, Consumer<String> onError, Supplier<Writer> writers) {
+        this.look = look;
         this.request = request;
         this.onDraft = onDraft;
         this.onError = onError;
         this.writers = writers;
-        button = Composer.iconButton(Icons.SPARKLE, "", this::pressed);
-        button.getStyleClass().add("ai-button");
+        button = Composer.iconButton(look.icon(), "", this::pressed);
+        button.getStyleClass().add(look.styleClass());
         button.visibleProperty().bind(SHOWN);
         button.managedProperty().bind(SHOWN);
         idle();
@@ -62,12 +68,12 @@ final class AiReplyButton {
         }
         Request r = request.get();
         if (r == null) {
-            onError.accept("Este chat todavía no tiene mensajes que responder");
+            onError.accept(look.nothing());
             return;
         }
         Writer w = writers.get();
         working = w;
-        look(Icons.CLOSE, "Cancelar el borrador con IA");
+        show(Icons.CLOSE, look.cancel());
         Thread.ofPlatform().daemon().name("ai-reply").start(() -> {
             String text = null;
             String failure = null;
@@ -87,18 +93,26 @@ final class AiReplyButton {
         });
     }
 
-    private void idle() { look(Icons.SPARKLE, "Escribir un borrador con IA"); }
+    private void idle() { show(look.icon(), look.idle()); }
 
-    private void look(String icon, String text) {
+    private void show(String icon, String text) {
         button.setGraphic(Icons.icon(icon, 18));
         button.setAccessibleText(text);
         button.setTooltip(new Tooltip(text));
     }
 
-    private static Writer realWriter() {
+    static Writer replyWriter() {
+        return realWriter(AiSettings.folder());
+    }
+
+    /** Correcting needs no files. */
+    static Writer fixWriter() {
+        return realWriter(null);
+    }
+
+    private static Writer realWriter(java.nio.file.Path folder) {
         ReplyWriter writer = new ReplyWriter();
         AiEngine engine = AiSettings.engine();
-        java.nio.file.Path folder = AiSettings.folder();
         return new Writer() {
             @Override public String write(String prompt) throws ReplyWriter.Failure { return writer.write(engine, folder, prompt); }
 

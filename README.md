@@ -36,9 +36,10 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   de canales. Al abrir una notificación de un canal, la lista muestra su servidor con el canal marcado.
 - **Favoritos**: clic derecho (o la tecla de menú) sobre un emoji, sticker o GIF, en el chat o en el panel lateral,
   para agregarlo o quitarlo de favoritos o de recientes. La pestaña **Favoritos** del panel los junta todos.
-- **Responder con IA**: en Ajustes → Responder con IA puedes activar un botón que escribe un borrador con Claude Code o
-  Codex, si tienes alguno instalado, siguiendo tus instrucciones y con el chat como contexto. El borrador queda en el
-  cuadro de texto para que lo revises: nunca se envía solo. Al pulsarlo, ese chat va al servicio de ese programa.
+- **Escribir con IA**: en Ajustes → Escribir con IA puedes activar dos botones que usan Claude Code o Codex, si tienes
+  alguno instalado. Uno escribe un borrador siguiendo tus instrucciones y con el chat como contexto; al pulsarlo, ese chat
+  va al servicio de ese programa. El otro corrige la ortografía, las tildes y la redacción de lo que escribiste, cambiando
+  lo mínimo; solo envía ese texto. El resultado queda en el cuadro de texto para que lo revises: nunca se envía solo.
 - **Notas de voz a texto**: "Transcribir" bajo cada audio (o la tecla T). Usa Whisper, que viene con Unichat y
   corre en tu computador, gratis y sin enviar el audio a ningún servicio; el modelo (60 o 190 MB) se descarga
   la primera vez. En Ajustes → Voz a texto puedes elegir modelo e idioma, o poner tu propio comando

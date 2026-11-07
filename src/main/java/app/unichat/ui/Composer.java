@@ -59,6 +59,8 @@ public final class Composer extends VBox {
     private final Button send;
     private final Button mic;
     private AiReplyButton ai;
+    private AiReplyButton fix;
+    private String fixing;
     private VoiceBar voiceBar;
     private VoiceRecorder recorder;
     private Runnable beforeRecording = () -> { };
@@ -112,8 +114,9 @@ public final class Composer extends VBox {
         this.send = send;
         mic = iconButton(Icons.MIC, "Grabar una nota de voz", this::startRecording);
         mic.getStyleClass().add("mic-button");
-        ai = new AiReplyButton(this::aiRequest, this::aiDraft, onError);
-        row = new HBox(4, attach, input, ai.node(), stickers, emoji, mic, send);
+        ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, AiReplyButton::replyWriter);
+        fix = new AiReplyButton(AiReplyButton.FIX, this::fixRequest, this::fixed, onError, AiReplyButton::fixWriter);
+        row = new HBox(4, attach, input, ai.node(), fix.node(), stickers, emoji, mic, send);
         row.setAlignment(Pos.BOTTOM_CENTER);
         row.getStyleClass().add("composer-row");
         getChildren().addAll(banner, row);
@@ -260,8 +263,38 @@ public final class Composer extends VBox {
     void useAiWriter(java.util.function.Supplier<AiReplyButton.Writer> writers) {
         HBox parent = row;
         int at = parent.getChildren().indexOf(ai.node());
-        ai = new AiReplyButton(this::aiRequest, this::aiDraft, onError, writers);
+        ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, writers);
         parent.getChildren().set(at, ai.node());
+    }
+
+    /** Tests: a stand-in for the AI program that corrects. */
+    void useFixWriter(java.util.function.Supplier<AiReplyButton.Writer> writers) {
+        int at = row.getChildren().indexOf(fix.node());
+        fix = new AiReplyButton(AiReplyButton.FIX, this::fixRequest, this::fixed, onError, writers);
+        row.getChildren().set(at, fix.node());
+    }
+
+    /** Only what's written goes: not the chat, nor the instructions for replies. Null with nothing written. */
+    private AiReplyButton.Request fixRequest() {
+        if (chatId == null || input.getText().isBlank()) return null;
+        fixing = input.getText();
+        return new AiReplyButton.Request(chatId, app.unichat.assist.FixPrompt.build(fixing));
+    }
+
+    /** Replaces the text only if it's still what was sent: the person may have kept writing. ⌘Z brings it back. */
+    private void fixed(String forChat, String result) {
+        String corrected = app.unichat.assist.FixPrompt.keepWrapping(fixing, result);
+        if (!forChat.equals(chatId)) {
+            if (fixing.equals(drafts.get(forChat))) drafts.put(forChat, corrected);
+        } else if (!input.getText().equals(fixing)) {
+            onError.accept("El texto cambió mientras se corregía: quedó como lo dejaste");
+        } else if (corrected.equals(fixing.strip())) {
+            onError.accept("El texto ya estaba bien");
+        } else {
+            input.replaceText(0, input.getLength(), corrected);
+            input.positionCaret(input.getLength());
+            focus();
+        }
     }
 
     /** The chat so far, the message chosen with "Responder" if any, and what's written as the idea. Null with nothing to answer. */

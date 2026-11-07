@@ -69,7 +69,7 @@ public final class ReplyPrompt {
         return r;
     }
 
-    private static boolean isQuote(char c) { return c == '"' || c == '“' || c == '”' || c == '«' || c == '»'; }
+    static boolean isQuote(char c) { return c == '"' || c == '“' || c == '”' || c == '«' || c == '»'; }
 
     private static boolean containsQuote(String s) { return s.chars().anyMatch(c -> isQuote((char) c)); }
 }

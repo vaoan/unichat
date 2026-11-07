@@ -47,6 +47,7 @@ public final class ReplyWriter {
             ProcessBuilder b = new ProcessBuilder(engine.command(bin, folder, workDir, reply))
                     .directory(workDir.toFile()).redirectOutput(out.toFile()).redirectError(err.toFile());
             b.environment().put("PATH", searchPath(bin));
+            b.environment().putIfAbsent("LC_CTYPE", "en_US.UTF-8"); // a Mac app opened from Finder has no locale: accents would break
             Process p = b.start();
             running = p;
             if (cancelled) stop(p);

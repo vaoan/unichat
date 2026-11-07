@@ -3,7 +3,7 @@ package app.unichat.assist;
 import app.unichat.settings.Settings;
 import java.nio.file.Path;
 
-/** Ajustes → Responder con IA. Off until the person turns it on: it sends their chats to another company's service. */
+/** Ajustes → Escribir con IA. Off until the person turns it on: it sends their chats to another company's service. */
 public final class AiSettings {
     public static final String DEFAULT_INSTRUCTIONS = "Asegúrate de que el idioma coincida con el del mensaje que llega. "
             + "Usa toda la conversación como contexto para responder. Usa un tono amigable, profesional y al grano, "

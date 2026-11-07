@@ -105,6 +105,79 @@ class AiReplyUiTest {
         assertTrue(prompts.get(0).contains("dile que sí"), "what was written, as the idea");
     }
 
+    private Button fixButton() { return (Button) composer.lookup(".ai-fix-button"); }
+
+    private void pressFix(AiReplyButton.Writer w) throws Exception {
+        fx(() -> { composer.useFixWriter(() -> w); fixButton().fire(); return null; });
+    }
+
+    private void write(String text) throws Exception {
+        fx(() -> { ((TextArea) composer.lookup(".text-area")).setText(text); return null; });
+    }
+
+    @Test
+    void correctingSendsOnlyTheTextAndCanBeUndone() throws Exception {
+        int before = svc.messages(CHAT).size();
+        write("como estas 5€ 😀");
+        pressFix(p -> { prompts.add(p); return "¿Cómo estás? 5€ 😀"; });
+        await(() -> text().equals("¿Cómo estás? 5€ 😀"));
+        assertEquals(before, svc.messages(CHAT).size(), "never sent");
+        assertTrue(prompts.get(0).contains("como estas 5€ 😀"));
+        assertFalse(prompts.get(0).contains(svc.messages(CHAT).get(before - 1).preview()), "the chat stays here");
+        fx(() -> { ((TextArea) composer.lookup(".text-area")).undo(); return null; });
+        assertEquals("como estas 5€ 😀", text());
+    }
+
+    @Test
+    void whatWasWrittenMeanwhileIsNotLost() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        write("hola");
+        pressFix(p -> {
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                return null;
+            }
+            return "Hola.";
+        });
+        write("hola, y otra cosa");
+        release.countDown();
+        await(() -> !errors.isEmpty());
+        assertEquals("hola, y otra cosa", text());
+    }
+
+    @Test
+    void correctingNothingAsksForTextAndRightTextIsSaid() throws Exception {
+        pressFix(p -> "no debería correr");
+        await(() -> !errors.isEmpty());
+        assertEquals(AiReplyButton.FIX.nothing(), errors.get(0));
+        errors.clear();
+        write("Todo bien.");
+        pressFix(p -> "Todo bien.");
+        await(() -> !errors.isEmpty());
+        assertEquals("El texto ya estaba bien", errors.get(0));
+    }
+
+    @Test
+    void aCorrectionFollowsItsChat() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        write("ola");
+        pressFix(p -> {
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                return null;
+            }
+            return "Hola";
+        });
+        fx(() -> { composer.setChat("!otro:demo"); return null; });
+        release.countDown();
+        Thread.sleep(300);
+        assertEquals("", text());
+        fx(() -> { composer.setChat(CHAT); return null; });
+        assertEquals("Hola", text());
+    }
+
     @Test
     void itStaysInItsChatIfThePersonMoved() throws Exception {
         CountDownLatch release = new CountDownLatch(1);
