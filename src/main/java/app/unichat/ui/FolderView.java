@@ -142,7 +142,10 @@ final class FolderView extends VBox {
         });
         // Arrowing onto a chat opens it; a server waits for Enter or a click, as in the inbox.
         chatList.getSelectionModel().selectedItemProperty().addListener((o, a, c) -> {
-            if (!updating && c != null && chatList.isFocused() && !c.space()) open.accept(c);
+            // After the list has finished selecting (see ChatListPane).
+            if (!updating && c != null && chatList.isFocused() && !c.space()) Platform.runLater(() -> {
+                if (chatList.getSelectionModel().getSelectedItem() == c) open.accept(c);
+            });
         });
         VBox.setVgrow(chatList, Priority.ALWAYS);
     }

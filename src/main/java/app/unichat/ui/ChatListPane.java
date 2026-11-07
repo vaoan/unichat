@@ -13,6 +13,7 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -168,7 +169,11 @@ public final class ChatListPane extends VBox {
         list.getSelectionModel().selectedItemProperty().addListener((o, a, c) -> {
             if (updating) return;
             arrowedRow = c != null && !channels.actsLikeChat(c) ? c.id() : null;
-            if (c != null && list.isFocused() && channels.actsLikeChat(c)) open(c);
+            // After the list has finished selecting: opening redraws and reselects it, and doing that while the
+            // list is still telling its own listeners about the click made JavaFX fail (IndexOutOfBoundsException).
+            if (c != null && list.isFocused() && channels.actsLikeChat(c)) Platform.runLater(() -> {
+                if (list.getSelectionModel().getSelectedItem() == c) open(c);
+            });
         });
         empty.getStyleClass().add("empty-label");
         empty.setWrapText(true);

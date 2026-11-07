@@ -5,6 +5,7 @@ import app.unichat.service.ChatService;
 import app.unichat.support.I18n;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
@@ -75,7 +76,10 @@ final class SpaceChannelsView extends VBox {
             }
         });
         list.getSelectionModel().selectedItemProperty().addListener((o, a, c) -> {
-            if (!updating && c != null && list.isFocused() && actsLikeChat(c)) open.accept(c);
+            // After the list has finished selecting (see ChatListPane).
+            if (!updating && c != null && list.isFocused() && actsLikeChat(c)) Platform.runLater(() -> {
+                if (list.getSelectionModel().getSelectedItem() == c) open.accept(c);
+            });
         });
         VBox.setVgrow(list, Priority.ALWAYS);
     }
