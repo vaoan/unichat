@@ -62,4 +62,16 @@ class AccountAlertsTest {
                 acc(Network.DISCORD, "yo", AccountStatus.CONNECTING),
                 acc(Network.SLACK, "yo", AccountStatus.CONNECTING)), ALL)));
     }
+
+    @Test
+    void reconnectingNetworksAreSyncingAtTheTopAndNothingElseIs() {
+        List<AccountAlerts.Alert> a = AccountAlerts.of(List.of(
+                acc(Network.TELEGRAM, "yo", AccountStatus.CONNECTING),
+                acc(Network.DISCORD, "yo", AccountStatus.CONNECTING),
+                acc(Network.WHATSAPP, "+57", AccountStatus.NEEDS_LOGIN)), ALL);
+        assertEquals("Sincronizando Telegram y Discord…", AccountAlerts.syncingLine(a));
+        assertEquals(null, AccountAlerts.syncingLine(AccountAlerts.of(List.of(
+                acc(Network.TELEGRAM, "yo", AccountStatus.CONNECTED),
+                acc(Network.WHATSAPP, "+57", AccountStatus.NEEDS_LOGIN)), ALL)), "a closed session isn't syncing");
+    }
 }

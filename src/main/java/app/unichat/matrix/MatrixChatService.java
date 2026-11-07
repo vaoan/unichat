@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.support.Threads;
+import app.unichat.support.WakeWatch;
 import app.unichat.login.BridgeLogin;
 import app.unichat.model.Account;
 import app.unichat.model.Chat;
@@ -68,6 +69,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private volatile String nextBatch;
     private volatile String displayName;
     private Thread syncThread;
+    /** The computer just woke: the open long poll is dropped and the next sync answers at once ({@link #wake}). */
+    private volatile boolean woke;
+    private final Runnable onWake = this::wake;
 
     private final MatrixCore core;
     private final ExecutorService io;
@@ -128,6 +132,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         syncThread = new Thread(this::syncLoop, "matrix-sync");
         syncThread.setDaemon(true);
         syncThread.start();
+        WakeWatch.onWake(onWake);
         io.execute(this::loadProfile);
         io.execute(bridges::checkBridges);
         timer.scheduleWithFixedDelay(chatActions::checkReminders, 10, 10, TimeUnit.SECONDS);
@@ -138,6 +143,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     public void stop() {
         synchronized (this) {
             bridges.unwatchLiveStates();
+            WakeWatch.removeListener(onWake);
             core.running = false;
             if (syncThread != null) syncThread.interrupt();
             timer.shutdownNow();
@@ -213,16 +219,29 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         });
     }
 
+    /**
+     * After sleeping, the long poll that was open waits out its timeout on a dead connection: drop it and catch up at
+     * once, showing "Conectando…" until the answer is in.
+     */
+    void wake() {
+        Thread t = syncThread;
+        if (!core.running || t == null || !core.initialSyncDone) return;
+        woke = true;
+        setState(ConnectionState.CONNECTING);
+        t.interrupt();
+    }
+
     private void syncLoop() {
         int failures = 0;
         setState(ConnectionState.CONNECTING);
         boolean catchUp = loadSyncCache();
+        boolean quick = false;
         while (core.running) {
             try {
                 boolean initial = nextBatch == null;
                 if (initial) setState(ConnectionState.SYNCING);
-                // A catch-up from the cached token must return at once, not long-poll for 30 s.
-                int timeout = initial || catchUp ? 0 : 30000;
+                // A catch-up (from the cached token, or after waking) must return at once, not long-poll for 30 s.
+                int timeout = initial || catchUp || quick ? 0 : 30000;
                 String path = CLIENT + "/sync?filter=" + enc(SYNC_FILTER) + "&timeout=" + timeout
                         + (initial ? "" : "&since=" + enc(nextBatch));
                 JsonNode resp;
@@ -253,6 +272,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 else if (catchUp) refreshSyncCache();
                 boolean firstRound = !core.initialSyncDone;
                 catchUp = false;
+                quick = false;
                 core.initialSyncDone = true;
                 failures = 0;
                 setState(ConnectionState.ONLINE);
@@ -268,6 +288,12 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 failures = backoff(++failures, e);
             } catch (InterruptedIOException e) {
                 if (!core.running) return;
+                if (woke) {
+                    woke = false;
+                    Thread.interrupted();
+                    quick = true;
+                    continue;
+                }
                 failures = backoff(++failures, e);
             } catch (Exception e) {
                 failures = backoff(++failures, e);

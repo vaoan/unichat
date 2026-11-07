@@ -42,6 +42,9 @@ public final class MainView extends StackPane {
     private final StackPane overlay = new StackPane();
     private final Label toast = new Label();
     private final Label connection = new Label();
+    private ConnectionState state = ConnectionState.CONNECTING;
+    /** What the top bar says once the server is connected, while networks reconnect (null: nothing). */
+    private String syncingNetworks;
     private final AccountAlertBar accountAlerts = new AccountAlertBar(this::addAccount);
     private final Runnable onLogout;
     /** The one audio playing, whichever chat is open. */
@@ -291,11 +294,17 @@ public final class MainView extends StackPane {
     private void showAccountAlerts() {
         java.util.Set<Network> inUse = java.util.EnumSet.noneOf(Network.class);
         for (Chat c : svc.chats()) if (!c.bridgeBot() && !c.space()) inUse.add(c.network());
-        accountAlerts.show(AccountAlerts.of(svc.accounts(), inUse));
+        List<AccountAlerts.Alert> alerts = AccountAlerts.of(svc.accounts(), inUse);
+        // Reconnecting is "Sincronizando…" at the top, with the connection; the foot keeps what needs a hand.
+        accountAlerts.show(alerts.stream().filter(a -> !a.syncing()).toList());
+        syncingNetworks = AccountAlerts.syncingLine(alerts);
+        showConnection(state);
     }
 
+    /** Chats are up to date only when both the server and every network are: until then the top bar says what's behind. */
     private void showConnection(ConnectionState s) {
-        String text = switch (s) {
+        state = s;
+        String text = s == ConnectionState.ONLINE ? syncingNetworks : switch (s) {
             case CONNECTING -> I18n.t("main.connecting");
             case SYNCING -> I18n.t("main.syncing");
             case OFFLINE -> I18n.t("main.offline");

@@ -20,7 +20,8 @@ final class AccountAlerts {
      * @param text   the whole explanation (tooltip, screen readers)
      * @param relink only a new login fixes it (button shown); otherwise Unichat is recovering it by itself
      */
-    record Alert(Network network, String who, String text, boolean relink) {}
+    /** {@code syncing}: the account is reconnecting to its network, so its chats are still catching up (top bar). */
+    record Alert(Network network, String who, String text, boolean relink, boolean syncing) {}
 
     /**
      * @param inUse networks with chats: a closed session only matters there (a bridge installed but never signed
@@ -37,9 +38,9 @@ final class AccountAlerts {
             if (worst == null) continue;
             String who = n.displayName() + (many ? " (" + worst.label() + ")" : "");
             switch (worst.status()) {
-                case NEEDS_LOGIN -> out.add(new Alert(n, who, I18n.t("alerts.needsLogin", who), true));
-                case ERROR -> out.add(new Alert(n, who, I18n.t("alerts.error", who), false));
-                case CONNECTING -> out.add(new Alert(n, who, I18n.t("alerts.offline", who), false));
+                case NEEDS_LOGIN -> out.add(new Alert(n, who, I18n.t("alerts.needsLogin", who), true, false));
+                case ERROR -> out.add(new Alert(n, who, I18n.t("alerts.error", who), false, false));
+                case CONNECTING -> out.add(new Alert(n, who, I18n.t("alerts.offline", who), false, true));
                 default -> { }
             }
         }
@@ -49,11 +50,21 @@ final class AccountAlerts {
 
     /** One short line for everything that's fixing itself: its size mustn't grow with the number of networks. */
     static String recoveringLine(List<Alert> recovering) {
-        List<String> names = recovering.stream().map(Alert::who).toList();
+        return line(recovering, "alerts.reconnecting");
+    }
+
+    /** "Sincronizando Telegram y Discord…" while those reconnect, for the top bar; null when every network is up to date. */
+    static String syncingLine(List<Alert> alerts) {
+        List<Alert> syncing = alerts.stream().filter(Alert::syncing).toList();
+        return syncing.isEmpty() ? null : line(syncing, "main.syncingNetworks");
+    }
+
+    private static String line(List<Alert> alerts, String key) {
+        List<String> names = alerts.stream().map(Alert::who).toList();
         return switch (names.size()) {
-            case 1 -> I18n.t("alerts.reconnecting.one", names.get(0));
-            case 2 -> I18n.t("alerts.reconnecting.two", names.get(0), names.get(1));
-            default -> I18n.t("alerts.reconnecting.many", names.size());
+            case 1 -> I18n.t(key + ".one", names.get(0));
+            case 2 -> I18n.t(key + ".two", names.get(0), names.get(1));
+            default -> I18n.t(key + ".many", names.size());
         };
     }
 
