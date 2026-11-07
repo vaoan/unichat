@@ -94,20 +94,17 @@ final class MessageSender {
         }));
     }
 
-    /**
-     * Sends {@code item}; when the chat refuses its format (a GIF on WhatsApp) a converted copy is uploaded first. A sticker
-     * from the chat's own network goes as it is, whatever its format: the bridge sends the original ({@link #ownSticker}).
-     */
+    /** Sends {@code item}; when the chat refuses its format (a GIF on WhatsApp) a converted copy is uploaded first. */
     CompletableFuture<Void> sendStickerFor(String chatId, MediaLibrary.Item item, RoomFeatures features, String replyToId) {
         Chat c = core.chat(chatId);
-        boolean own = c != null && ownSticker(item.info(), c.network());
-        return sendStickerEvent(chatId, item, own ? RoomFeatures.UNKNOWN : features, c != null && needsCopy(item.url(), c.network()), replyToId);
+        return sendStickerEvent(chatId, item, features, c != null && needsCopy(item.url(), c.network()), replyToId);
     }
 
     /**
-     * Whether {@code info} names a sticker of {@code network}'s own packs. Telegram's bridge then sends the sticker from
-     * the pack, animated, and ignores the file; a converted copy loses that name and goes through the bridge's ffmpeg,
-     * which can fail (one without a WebP encoder, like Homebrew's, refuses every sticker that isn't PNG, JPEG or WebM).
+     * Whether {@code info} names a sticker of {@code network}'s own packs: a converted copy keeps that name, so Telegram's
+     * bridge sends the original from the pack, animated. Without it the bridge passes the file through its ffmpeg, and one
+     * without a WebP encoder (Homebrew's) fails. The format still has to be one the chat takes: the bridge checks the
+     * declared type before looking for the original.
      */
     static boolean ownSticker(JsonNode info, Network network) {
         JsonNode s = info == null ? null : info.get("fi.mau.bridged_sticker");
@@ -166,7 +163,8 @@ final class MessageSender {
                     info.put("size", Files.size(r.file()));
                     Files.deleteIfExists(r.file());
                 }
-                info.remove("fi.mau.bridged_sticker"); // no longer that network's own sticker
+                Chat chat = core.chat(chatId);
+                if (chat == null || !ownSticker(info, chat.network())) info.remove("fi.mau.bridged_sticker"); // no longer that network's own sticker
                 return content;
             } catch (IOException e) {
                 throw new CompletionException(e);
