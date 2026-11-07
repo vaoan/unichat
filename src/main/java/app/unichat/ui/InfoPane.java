@@ -163,7 +163,9 @@ public final class InfoPane extends ScrollPane {
             }
         }, AnimatedImage.DECODER);
         v.setOnMouseClicked(e -> {
-            if (getScene() != null) MediaViewer.show(getScene().getWindow(), svc.media(m.mediaUrl(), 0, 0), m.fileName());
+            if (getScene() == null) return;
+            javafx.stage.Window owner = getScene().getWindow();
+            MediaViewer.show(owner, svc.media(m.mediaUrl(), 0, 0), m.fileName(), () -> MediaSaver.save(owner, svc, m, toast));
         });
         v.setCursor(javafx.scene.Cursor.HAND);
         return v;

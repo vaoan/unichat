@@ -46,6 +46,8 @@ public final class Icons {
     public static final String ERROR = "M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm-1 5v7h2V7h-2Zm0 9v2h2v-2h-2Z";
     public static final String LOGOUT = "M10 3h9a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-9v-2h9V5h-9V3Zm1.6 4.4L13 6l6 6-6 6-1.4-1.4L15.2 13H3v-2h12.2l-3.6-3.6Z";
     public static final String PEOPLE = "M9 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm7.5 0a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7ZM1 20c0-3.3 3.6-6 8-6s8 2.7 8 6v1h-2v-1c0-2-2.7-4-6-4s-6 2-6 4v1H1v-1Zm16.7-5.9c3 .4 5.3 2.3 5.3 4.9v2h-2v-2c0-1.4-1.3-2.6-3.3-3.1v-1.8Z";
+    public static final String MINUS = "M5 11h14v2H5v-2Z";
+    public static final String ROTATE = "M12 5V1l5 5-5 5V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8Z";
     public static final String BACK = "M15.4 6 14 4.6 6.6 12l7.4 7.4 1.4-1.4-6-6 6-6Z";
 
     /** The app logo at {@code size} px (rendered from the bundled 256 px PNG). */

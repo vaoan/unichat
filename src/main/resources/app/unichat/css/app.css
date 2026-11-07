@@ -516,6 +516,8 @@
 .root.contrast .account-alert { -fx-border-color: -text; -fx-border-radius: 8; }
 
 .media-viewer { -fx-background-color: rgba(0, 0, 0, 0.92); }
+.media-viewer-bar { -fx-background-color: -surface; -fx-padding: 6 10; }
+.media-viewer-percent { -fx-text-fill: -text; -fx-padding: 0 4; }
 .audio-bar { -fx-padding: 4 12; -fx-background-color: -surface-2; -fx-border-color: transparent transparent -border transparent; }
 .audio-who { -fx-font-weight: bold; -fx-font-size: 0.9em; -fx-text-fill: -text; -fx-padding: 0; }
 .audio-time { -fx-font-size: 0.8em; -fx-text-fill: -text-2; }

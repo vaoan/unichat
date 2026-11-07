@@ -1,89 +1,151 @@
 package app.unichat.ui;
 
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Full-size image viewer window; Esc or click closes it. It opens at once with a spinner while the full image
- * downloads (a click that showed nothing for seconds looked like it didn't work), and plays animated WebP too.
+ * Full-size image viewer window with zoom, turn and save controls; Esc or a click beside the picture closes it. It
+ * opens at once with a spinner while the full image downloads (a click that showed nothing for seconds looked like
+ * it didn't work), and plays animated WebP too.
  */
 public final class MediaViewer {
+    private static final double ARROW_STEP = 60;
+
     private MediaViewer() {}
 
-    public static void show(Window owner, CompletableFuture<Path> file, String title) {
-        show(owner, file, title, null);
-    }
-
-    /** {@code onSave}: "Guardar como…" button in the corner (null: none). */
+    /** {@code onSave}: the "Guardar como…" button. */
     public static void show(Window owner, CompletableFuture<Path> file, String title, Runnable onSave) {
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(40, 40);
-        StackPane root = new StackPane(spin);
-        javafx.scene.control.Button save = null;
-        if (onSave != null) {
-            save = new javafx.scene.control.Button("Guardar como…");
-            save.getStyleClass().add("secondary-button");
-            save.setOnAction(e -> onSave.run());
-            StackPane.setAlignment(save, javafx.geometry.Pos.TOP_RIGHT);
-            StackPane.setMargin(save, new javafx.geometry.Insets(10));
-        }
-        javafx.scene.control.Button saveButton = save;
-        root.getStyleClass().add("media-viewer");
+        StackPane area = new StackPane(spin);
         Stage stage = new Stage();
+        String name = title == null ? "Imagen" : title;
+        PhotoPane photo = new PhotoPane(name, stage::close);
+        FlowPane bar = bar(photo, onSave);
+        bar.setVisible(false);
+        bar.setManaged(false);
+        BorderPane root = new BorderPane(area);
+        root.setBottom(bar);
+        root.getStyleClass().add("media-viewer");
         stage.initOwner(owner);
-        stage.setTitle(title == null ? "Imagen" : title);
+        stage.setTitle(name);
         Scene scene = new Scene(root, Math.min(900, owner.getWidth() * 0.8), Math.min(700, owner.getHeight() * 0.8));
         Theme.register(scene);
-        scene.setOnKeyPressed(e -> { if (e.getCode() == KeyCode.ESCAPE) stage.close(); });
-        root.setOnMouseClicked(e -> { if (e.getClickCount() == 1 && e.getTarget() == root) stage.close(); });
+        // A filter: the arrows would otherwise move the focus between the buttons.
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            if (e.getCode() == KeyCode.ESCAPE) stage.close();
+            else if (bar.isVisible() && key(photo, e)) e.consume();
+        });
+        area.setOnMouseClicked(e -> { if (e.getClickCount() == 1 && e.getTarget() == area) stage.close(); });
         stage.setScene(scene);
         stage.show();
 
         file.whenComplete((p, err) -> {
-            if (err != null || p == null) {
+            try {
+                if (err != null || p == null) throw new IOException("no file", err);
+                load(p, () -> {
+                    area.getChildren().setAll(photo);
+                    bar.setManaged(true);
+                    bar.setVisible(true);
+                }, photo);
+            } catch (Exception e) {
                 Platform.runLater(() -> {
                     Label l = new Label("No se pudo abrir la imagen.");
                     l.getStyleClass().add("settings-help");
-                    root.getChildren().setAll(l);
+                    area.getChildren().setAll(l);
                 });
-                return;
-            }
-            try {
-                ImageView view = new ImageView();
-                view.setPreserveRatio(true);
-                view.fitWidthProperty().bind(root.widthProperty().subtract(40));
-                view.fitHeightProperty().bind(root.heightProperty().subtract(40));
-                if (AnimatedImage.isWebp(p) || AnimatedImage.isGif(p)) {
-                    // WebP JavaFX can't read; GIFs it animates forever, leaking every frame (AnimatedImage).
-                    AnimatedImage.Frames frames = AnimatedImage.isGif(p) ? AnimatedImage.decodeGif(p, 1600, 1600)
-                            : AnimatedImage.decodeWebp(p, 1600, 1600);
-                    Platform.runLater(() -> {
-                        root.getChildren().setAll(view);
-                        if (saveButton != null) root.getChildren().add(saveButton);
-                        AnimatedImage.play(view, frames);
-                    });
-                } else {
-                    Image img = new Image(p.toUri().toString());
-                    Platform.runLater(() -> {
-                        view.setImage(img);
-                        root.getChildren().setAll(view);
-                        if (saveButton != null) root.getChildren().add(saveButton);
-                    });
-                }
-            } catch (Exception e) {
-                Platform.runLater(() -> root.getChildren().setAll(new Label("No se pudo abrir la imagen.")));
             }
         });
+    }
+
+    /** Decodes here, off the UI thread, then shows it. */
+    private static void load(Path p, Runnable reveal, PhotoPane photo) throws IOException {
+        if (AnimatedImage.isWebp(p) || AnimatedImage.isGif(p)) {
+            // WebP JavaFX can't read; GIFs it animates forever, leaking every frame (AnimatedImage).
+            AnimatedImage.Frames frames = AnimatedImage.isGif(p) ? AnimatedImage.decodeGif(p, 1600, 1600)
+                    : AnimatedImage.decodeWebp(p, 1600, 1600);
+            Platform.runLater(() -> {
+                reveal.run();
+                AnimatedImage.play(photo.view(), frames);
+            });
+        } else {
+            Image img = new Image(p.toUri().toString());
+            if (img.isError()) throw new IOException("unreadable image", img.getException());
+            Platform.runLater(() -> {
+                reveal.run();
+                photo.view().setImage(img);
+            });
+        }
+    }
+
+    private static FlowPane bar(PhotoPane photo, Runnable onSave) {
+        Label percent = new Label();
+        percent.getStyleClass().add("media-viewer-percent");
+        percent.textProperty().bind(Bindings.format("%d %%", photo.percentProperty()));
+        Button save = new Button("Guardar como…");
+        save.getStyleClass().add("secondary-button");
+        save.setOnAction(e -> onSave.run());
+        FlowPane bar = new FlowPane(6, 6,
+                Composer.iconButton(Icons.MINUS, "Alejar (-)", () -> photo.change(z -> z.zoomBy(1 / PhotoPane.STEP))),
+                percent,
+                Composer.iconButton(Icons.PLUS, "Acercar (+)", () -> photo.change(z -> z.zoomBy(PhotoPane.STEP))),
+                textButton("Ajustar", "Ver la imagen completa (0)", () -> photo.change(PhotoZoom::fit)),
+                textButton("100 %", "Tamaño real (1)", () -> photo.change(PhotoZoom::actualSize)),
+                Composer.iconButton(Icons.ROTATE, "Girar 90° (R)", () -> photo.change(PhotoZoom::rotate)),
+                save);
+        bar.setAlignment(Pos.CENTER);
+        bar.setRowValignment(javafx.geometry.VPos.CENTER);
+        bar.getStyleClass().add("media-viewer-bar");
+        return bar;
+    }
+
+    private static Button textButton(String text, String help, Runnable action) {
+        Button b = new Button(text);
+        b.getStyleClass().add("secondary-button");
+        b.setTooltip(new Tooltip(help));
+        b.setAccessibleText(help);
+        b.setOnAction(e -> action.run());
+        return b;
+    }
+
+    /** True if the key was one of the viewer's. By character for + and -, which move around between keyboards. */
+    private static boolean key(PhotoPane photo, KeyEvent e) {
+        switch (e.getCode()) {
+            case LEFT -> photo.change(z -> z.pan(ARROW_STEP, 0));
+            case RIGHT -> photo.change(z -> z.pan(-ARROW_STEP, 0));
+            case UP -> photo.change(z -> z.pan(0, ARROW_STEP));
+            case DOWN -> photo.change(z -> z.pan(0, -ARROW_STEP));
+            case ADD -> photo.change(z -> z.zoomBy(PhotoPane.STEP));
+            case SUBTRACT -> photo.change(z -> z.zoomBy(1 / PhotoPane.STEP));
+            default -> {
+                switch (e.getText().toLowerCase()) {
+                    case "+", "=" -> photo.change(z -> z.zoomBy(PhotoPane.STEP));
+                    case "-" -> photo.change(z -> z.zoomBy(1 / PhotoPane.STEP));
+                    case "0" -> photo.change(PhotoZoom::fit);
+                    case "1" -> photo.change(PhotoZoom::actualSize);
+                    case "r" -> photo.change(PhotoZoom::rotate);
+                    default -> { return false; }
+                }
+            }
+        }
+        return true;
     }
 }
