@@ -393,7 +393,7 @@ public final class MainView extends StackPane {
         toast("Abriendo el chat…");
     }
 
-    /** ⓘ button / ⌘I: the side panel on its Perfil tab. */
+    /** ⓘ button / ⌘⇧I: the side panel on its Perfil tab. */
     public void toggleInfo() {
         togglePanel(SidePanel.Tab.PROFILE);
     }
@@ -556,7 +556,7 @@ public final class MainView extends StackPane {
             toast(c.archived() ? "Chat desarchivado" : "Chat archivado");
         } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.U && c != null) {
             if (c.isUnread()) svc.markRead(c.id()); else svc.setMarkedUnread(c.id(), true);
-        } else if (mod && e.getCode() == KeyCode.I && c != null) {
+        } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.I && c != null) {
             toggleInfo();
         } else if (e.getCode() == KeyCode.F6) {
             cycleFocus(e.isShiftDown() ? -1 : 1);

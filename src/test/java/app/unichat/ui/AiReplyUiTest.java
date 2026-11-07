@@ -129,6 +129,91 @@ class AiReplyUiTest {
     }
 
     @Test
+    void itSaysItsWorkingAndThenHowItWent() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        write("ola");
+        pressFix(p -> {
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                return null;
+            }
+            return "Hola";
+        });
+        assertTrue(fx(() -> composer.lookupAll(".ai-status").stream().anyMatch(javafx.scene.Node::isVisible)), "working");
+        assertTrue(fx(() -> composer.lookupAll(".ai-status .label").stream()
+                .anyMatch(n -> ((javafx.scene.control.Label) n).getText().startsWith("Corrigiendo el texto con "))));
+        release.countDown();
+        await(() -> text().equals("Hola"));
+        assertFalse(fx(() -> composer.lookupAll(".ai-status").stream().anyMatch(javafx.scene.Node::isVisible)), "done");
+        assertTrue(errors.get(0).startsWith("Texto corregido"), errors.toString());
+    }
+
+    private void keyO(javafx.event.EventType<javafx.scene.input.KeyEvent> type, javafx.event.EventTarget target) throws Exception {
+        fx(() -> {
+            javafx.event.Event.fireEvent(target, new javafx.scene.input.KeyEvent(type, "", "", javafx.scene.input.KeyCode.O,
+                    false, true, false, true));
+            return null;
+        });
+    }
+
+    @Test
+    void theShortcutCorrectsOnlyFromTheTextBox() throws Exception {
+        write("ola");
+        fx(() -> { composer.useFixWriter(() -> p -> "Hola"); return null; });
+        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, fx(() -> button()));
+        Thread.sleep(200);
+        assertEquals("ola", text(), "not from another control");
+        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, fx(() -> composer.lookup(".text-area")));
+        await(() -> text().equals("Hola"));
+    }
+
+    @Test
+    void holdingTheShortcutDoesNotCancelWhatItStarted() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        List<Boolean> cancelled = new ArrayList<>();
+        write("ola");
+        fx(() -> {
+            composer.useFixWriter(() -> new AiReplyButton.Writer() {
+                @Override public String write(String p) {
+                    try {
+                        release.await(10, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        return null;
+                    }
+                    return "Hola";
+                }
+
+                @Override public void cancel() {
+                    cancelled.add(true);
+                    release.countDown();
+                }
+            });
+            return null;
+        });
+        javafx.scene.Node box = fx(() -> composer.lookup(".text-area"));
+        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, box);
+        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, box);
+        assertTrue(cancelled.isEmpty(), "a repeat of the same press");
+        keyO(javafx.scene.input.KeyEvent.KEY_RELEASED, box);
+        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, box);
+        assertEquals(1, cancelled.size(), "a new press cancels, as the button does");
+    }
+
+    @Test
+    void theShortcutDoesNothingWithTheButtonsOff() throws Exception {
+        write("ola");
+        fx(() -> {
+            composer.useFixWriter(() -> p -> "Hola");
+            AiReplyButton.SHOWN.set(false);
+            return null;
+        });
+        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, fx(() -> composer.lookup(".text-area")));
+        Thread.sleep(200);
+        assertEquals("ola", text());
+    }
+
+    @Test
     void whatWasWrittenMeanwhileIsNotLost() throws Exception {
         CountDownLatch release = new CountDownLatch(1);
         write("hola");
@@ -216,7 +301,7 @@ class AiReplyUiTest {
         press();
         assertEquals("Cancelar el borrador con IA", fx(() -> button().getAccessibleText()));
         press();
-        await(() -> button().getAccessibleText().equals("Escribir un borrador con IA"));
+        await(() -> button().getAccessibleText().equals(AiReplyButton.REPLY.idle()));
         assertEquals("", text());
         assertTrue(errors.isEmpty());
 

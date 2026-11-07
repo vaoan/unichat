@@ -516,6 +516,7 @@
 .root.contrast .account-alert { -fx-border-color: -text; -fx-border-radius: 8; }
 
 .media-viewer { -fx-background-color: rgba(0, 0, 0, 0.92); }
+.ai-status { -fx-padding: 2 8 4 8; }
 .media-viewer-bar { -fx-background-color: -surface; -fx-padding: 6 10; }
 .media-viewer-percent { -fx-text-fill: -text; -fx-padding: 0 4; }
 .audio-bar { -fx-padding: 4 12; -fx-background-color: -surface-2; -fx-border-color: transparent transparent -border transparent; }
