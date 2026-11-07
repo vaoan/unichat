@@ -112,6 +112,18 @@ public final class Message {
     public void setStatus(MessageStatus status) { this.status = status; }
     public Map<String, Set<String>> reactions() { return reactions; }
 
+    /** Changes when anything drawn from this message does. Rows ask it for every message each time one arrives, so it stays cheap. */
+    public int revision() {
+        int reacted;
+        try {
+            reacted = reactions.hashCode();
+        } catch (java.util.ConcurrentModificationException changing) {
+            reacted = System.identityHashCode(new Object()); // the sync thread is changing them: it will say so again
+        }
+        return java.util.Objects.hash(type, body, senderName, mediaUrl, fileName, mimeType, fileSize, width, height, replyToId, edited,
+                deleted, status, reacted, html, previewHtml, htmlText, externalUrl, mediaInfo);
+    }
+
     private final Map<String, String> reactionNames = new java.util.HashMap<>();
 
     /** Custom emoji reactions have a picture's address for a key, and maybe a name (Discord's ":orclove:"). */

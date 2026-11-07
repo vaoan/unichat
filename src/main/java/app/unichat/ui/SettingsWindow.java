@@ -715,6 +715,7 @@ public final class SettingsWindow {
                 {m + ",", "Ajustes"},
                 {m + "I", "Escribir un borrador con IA, si los botones de IA están activos"},
                 {m + "O", "Corregir la ortografía y la redacción con IA, si los botones de IA están activos"},
+                {"Shift+↑ / Shift+↓ (campo de texto)", "Seleccionar desde el cursor hasta el principio / el final"},
                 {"↑ (campo vacío)", "Editar tu último mensaje"},
                 {"Esc", "Cancelar respuesta o edición"},
                 {"Doble clic en un mensaje", "Reaccionar con ❤️"},

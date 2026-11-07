@@ -403,6 +403,11 @@ public final class Composer extends VBox {
                 e.consume();
                 input.insertText(input.getCaretPosition(), "\n");
             }
+        } else if ((e.getCode() == KeyCode.UP || e.getCode() == KeyCode.DOWN) && e.isShiftDown()
+                && !e.isShortcutDown() && !e.isAltDown()) {
+            // The anchor stays: the other arrow then runs from the same place to the other end.
+            e.consume();
+            input.selectRange(input.getAnchor(), e.getCode() == KeyCode.UP ? 0 : input.getLength());
         } else if (e.getCode() == KeyCode.ESCAPE && (replyTo != null || editing != null)) {
             e.consume();
             cancelMode();

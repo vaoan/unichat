@@ -209,19 +209,34 @@ public final class MainView extends StackPane {
             if (!dirtyThreads.add(chatId)) return;
         }
         Platform.runLater(() -> {
-            synchronized (dirtyThreads) { dirtyThreads.remove(chatId); }
-            Chat open = thread.chat();
-            if (open != null && open.id().equals(chatId)) {
-                if (!stage.isShowing()) {
-                    threadStale = true;
-                    return;
-                }
-                thread.rebuild(false);
-                thread.refreshHeader();
-                if (stage.isFocused() && open.isUnread()) svc.markRead(chatId);
-                if (infoVisible) panel.refresh();
+            // Same as the inbox: a chat where many people write gets at most a few updates a second, however many messages.
+            long wait = REFRESH_GAP_MS - (System.currentTimeMillis() - lastThreadAt);
+            if (wait <= 0) {
+                refreshThread(chatId);
+            } else {
+                javafx.animation.PauseTransition later = new javafx.animation.PauseTransition(javafx.util.Duration.millis(wait));
+                later.setOnFinished(e -> refreshThread(chatId));
+                later.play();
             }
         });
+    }
+
+    private long lastThreadAt;
+
+    private void refreshThread(String chatId) {
+        synchronized (dirtyThreads) { dirtyThreads.remove(chatId); }
+        Chat open = thread.chat();
+        if (open != null && open.id().equals(chatId)) {
+            if (!stage.isShowing()) {
+                threadStale = true;
+                return;
+            }
+            lastThreadAt = System.currentTimeMillis();
+            thread.rebuild(false);
+            thread.refreshHeader();
+            if (stage.isFocused() && open.isUnread()) svc.markRead(chatId);
+            if (infoVisible) panel.refresh();
+        }
     }
 
     private boolean avatarsPreloaded;
@@ -500,7 +515,7 @@ public final class MainView extends StackPane {
         SettingsWindow.show(stage, svc, () -> {
             Theme.applyAll();
             refreshAll();
-            thread.rebuild(false);
+            thread.redraw();
         }, onLogout, this::openChatId, this::toast);
     }
 
@@ -510,7 +525,7 @@ public final class MainView extends StackPane {
         s.setFontScale(delta == 0 ? 1.0 : s.fontScale() + delta);
         Theme.applyAll();
         listPane.refresh();
-        thread.rebuild(false);
+        thread.redraw();
         toast("Tamaño de texto: " + Math.round(s.fontScale() * 100) + " %");
     }
 

@@ -74,6 +74,9 @@ public final class ThreadPane extends BorderPane {
      * the scrollbar also moves when a photo or sticker finishes loading and a bubble grows, which isn't "scrolled up".
      */
     private boolean pinnedBottom = true;
+    private final java.util.Map<String, Message> loaded = new java.util.HashMap<>();
+    private final java.util.Map<String, Integer> mediaAt = new java.util.HashMap<>();
+    private int drawnWith;
     /** When the person last scrolled by hand (ms); scrollbar moves shortly after count as theirs. */
     private long userScrollAt;
     /** Newest message shown, to notice your own new message (always jumps to it). */
@@ -323,9 +326,39 @@ public final class ThreadPane extends BorderPane {
         }
         lastMessageId = newest == null ? null : newest.id();
         composer.refreshVoice(); // what the chat takes can arrive after it was opened
-        rows.setAll(ThreadRows.build(msgs, ZoneId.systemDefault()));
+        index(msgs);
+        List<ThreadRows.Row> next = ThreadRows.build(msgs, ZoneId.systemDefault());
+        if (forceBottom) rows.setAll(next); else ThreadRows.update(rows, next);
+        // Drawn from elsewhere than the messages: photos of who's in the chat, and "Hoy" on the day separators.
+        int surroundings = java.util.Objects.hash(chat.id(), chat.members(), java.time.LocalDate.now());
+        if (surroundings != drawnWith && !forceBottom) list.refresh();
+        drawnWith = surroundings;
         if (selected != null && !forceBottom) select(selected);
         if (wasAtBottom && !(list.isFocused() && selected != null)) scrollToBottom();
+    }
+
+    /** The same messages after a change of appearance (text size, settings): they all look different. */
+    public void redraw() {
+        rebuild(false);
+        list.refresh();
+    }
+
+    /** Asked while drawing each row, so it can't walk the whole chat for each of them. */
+    private void index(List<Message> msgs) {
+        loaded.clear();
+        mediaAt.clear();
+        for (Message m : msgs) {
+            loaded.put(m.id(), m);
+            if (isOwnMedia(m)) mediaAt.merge(mediaKey(m), 1, Integer::sum);
+        }
+    }
+
+    private static boolean isOwnMedia(Message m) {
+        return m.type() == MessageType.VIDEO || m.type() == MessageType.AUDIO;
+    }
+
+    private static String mediaKey(Message m) {
+        return m.timestamp() + "|" + m.senderId();
     }
 
     private void scrollToBottom() {
@@ -358,7 +391,9 @@ public final class ThreadPane extends BorderPane {
             loadingOlder = false;
             if (chat == null || !chat.id().equals(id)) return;
             if (err != null || Boolean.FALSE.equals(more)) reachedStart = true;
-            rows.setAll(ThreadRows.build(svc.messages(id), ZoneId.systemDefault()));
+            List<Message> all = svc.messages(id);
+            index(all);
+            rows.setAll(ThreadRows.build(all, ZoneId.systemDefault()));
             if (followBottom && pinnedBottom) {
                 scrollToBottom();
             } else if (firstBefore != null) {
@@ -373,9 +408,7 @@ public final class ThreadPane extends BorderPane {
     }
 
     private Message findLoaded(String id) {
-        if (id == null || chat == null) return null;
-        for (ThreadRows.Row r : rows) if (r instanceof ThreadRows.MessageRow mr && mr.message().id().equals(id)) return mr.message();
-        return null;
+        return id == null || chat == null ? null : loaded.get(id);
     }
 
     private Member member(String userId) {
@@ -694,13 +727,7 @@ public final class ThreadPane extends BorderPane {
 
     /** A bridge sends the video it could get as a message of its own right after, at the same moment: no second player. */
     private boolean followedByItsOwnMedia(Message m) {
-        for (Object row : rows) {
-            if (row instanceof ThreadRows.MessageRow r && r.message() != m && r.message().timestamp().equals(m.timestamp())
-                    && r.message().senderId().equals(m.senderId()) && (r.message().type() == MessageType.VIDEO || r.message().type() == MessageType.AUDIO)) {
-                return true;
-            }
-        }
-        return false;
+        return mediaAt.getOrDefault(mediaKey(m), 0) > (isOwnMedia(m) ? 1 : 0);
     }
 
     private Node statusIcon(MessageStatus s) {

@@ -24,6 +24,7 @@ Package rules: `docs/ARQUITECTURA.md`, enforced by `ArchitectureTest` (no cycles
 - `ui/` — `MainView` (rail | `ChatListPane` | `ThreadPane` + `InfoPane`, overlays, shortcuts), `Composer`,
   `CommandBar`, `AddAccountPane`, `SettingsWindow`, `Notifier` (AWT tray), `Theme`. Pure logic with tests:
   `ChatFilter`, `ThreadRows`, `RichText`, `Formats`.
+- Timeline updates: `ThreadRows.update` touches only rows that differ (`MessageRow.revision`, from `Message.revision()`: a new drawn field must go in there), since replacing the whole list redraws all that's on screen; `ThreadPane.redraw` is for changes of appearance; `MainView` updates the open chat at most every 250 ms. `ScrollPerfUiTest` (`-Dunichat.perfTests=true`, real display, ffmpeg) prints before/after numbers for a giant chat; compare with the Mac under similar load, which moves them a lot.
 - `css/app.css` — single stylesheet; light palette on `.root`, dark on `.root.dark`; `-accent` and font size
   set inline by `Theme`.
 - `server/` — Synapse + Postgres + bridges docker-compose, `setup.sh` / `setup.ps1`. `docs/BRIDGES.md`.
