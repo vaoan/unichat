@@ -87,6 +87,8 @@ public final class BridgeConfig {
             obj(c, "/logging").put("min_level", "info").set("writers", writers);
             // Media stays on the network until opened (the server_key the bridge generated is kept).
             obj(c, "/direct_media").put("enabled", true).put("server_name", BridgePorts.mediaServerName(b));
+            // Whether each message reached the network: one that didn't shows as failed in Unichat, and the notice says why.
+            obj(c, "/matrix").put("message_status_events", true).put("message_error_notices", true);
             switch (b) {
                 case "instagram" -> {
                     set(c, "/network/mode", "instagram");
@@ -130,6 +132,7 @@ public final class BridgeConfig {
             // Big public servers: no missed-message backfill at all (only new messages come in).
             setExisting(c, "/bridge/backfill/max_guild_members", 1000);
             obj(c, "/bridge/direct_media").put("enabled", true).put("server_name", BridgePorts.mediaServerName(b));
+            obj(c, "/bridge").put("message_status_events", true).put("message_error_notices", true);
             obj(c, "/logging").put("min_level", "info").set("writers", writers);
         }
         return c;

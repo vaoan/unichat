@@ -77,6 +77,16 @@ class BridgeConfigTest {
     }
 
     @Test
+    void bridgesSayWhetherEachMessageReachedTheNetwork() throws Exception {
+        ObjectNode v2 = BridgeConfig.apply(BridgeConfig.read(V2), settings("telegram"));
+        assertTrue(v2.at("/matrix/message_status_events").asBoolean());
+        assertTrue(v2.at("/matrix/message_error_notices").asBoolean(), "the notice says why, in any client");
+        ObjectNode legacy = BridgeConfig.apply(BridgeConfig.read(LEGACY), settings("discord"));
+        assertTrue(legacy.at("/bridge/message_status_events").asBoolean());
+        assertTrue(legacy.at("/bridge/message_error_notices").asBoolean());
+    }
+
+    @Test
     void whatsappSyncsArchivedChats() throws Exception {
         ObjectNode c = BridgeConfig.apply(BridgeConfig.read(V2), settings("whatsapp"));
         assertEquals("u.archived", c.at("/network/archive_tag").asText());

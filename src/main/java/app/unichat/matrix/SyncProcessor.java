@@ -357,6 +357,7 @@ final class SyncProcessor {
                 if (!redacted) applyReaction(room, ev, r);
             }
             case "m.room.redaction" -> applyRedaction(room, ev, r);
+            case SEND_STATUS -> applySendStatus(room, ev, r);
             default -> {
                 if (!ev.has("state_key") || redacted) return;
                 String text = systemMessages.of(room, ev);
@@ -399,8 +400,37 @@ final class SyncProcessor {
         List<JsonNode> list = room.pending.remove(targetId);
         if (list == null) return;
         for (JsonNode ev : list) {
-            if ("m.reaction".equals(text(ev, "type"))) applyReaction(room, ev, r); else applyEdit(room, ev, r);
+            switch (String.valueOf(text(ev, "type"))) {
+                case "m.reaction" -> applyReaction(room, ev, r);
+                case SEND_STATUS -> applySendStatus(room, ev, r);
+                default -> applyEdit(room, ev, r);
+            }
         }
+    }
+
+    /** What a bridge says about a message it was given (matrix.message_status_events). */
+    static final String SEND_STATUS = "com.beeper.message_send_status";
+
+    /**
+     * A message of ours the bridge couldn't pass on to the network shows as failed (the bridge's notice says why); a later
+     * success, after a retry, undoes it. Nothing else changes: delivery and reading come from receipts.
+     */
+    private void applySendStatus(MatrixRoom room, JsonNode ev, Result r) {
+        JsonNode content = ev.path("content");
+        String target = text(content.path("m.relates_to"), "event_id");
+        if (target == null) return;
+        Message t = room.byId.get(target);
+        if (t == null) {
+            addPending(room, target, ev);
+            return;
+        }
+        if (!t.outgoing()) return;
+        String status = String.valueOf(text(content, "status"));
+        MessageStatus next = status.startsWith("FAIL") ? MessageStatus.FAILED
+                : "SUCCESS".equals(status) && t.status() == MessageStatus.FAILED ? MessageStatus.SENT : null;
+        if (next == null || next == t.status()) return;
+        t.setStatus(next);
+        r.messagesChanged.add(room.id);
     }
 
     private void addPending(MatrixRoom room, String targetId, JsonNode ev) {
