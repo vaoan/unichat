@@ -316,7 +316,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
     }
 
     @Override
-    public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item) {
+    public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) {
         Chat chat = chats.get(chatId);
         if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Chat no encontrado"));
         Message m = outgoing(chatId);
@@ -325,6 +325,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
         m.setMimeType(item.mime());
         m.setSize(item.width(), item.height());
         m.setMediaInfo(item.info());
+        m.setReplyToId(replyToId);
         append(chat, m);
         deliver(chat, m);
         return CompletableFuture.completedFuture(null);

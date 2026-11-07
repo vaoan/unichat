@@ -57,7 +57,7 @@ class SendGifTest {
         Path f = dir.resolve("gato.mp4");
         Files.write(f, new byte[]{0, 0, 0, 24, 'f', 't', 'y', 'p'});
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
-        svc.sendGif("!c:example.org", f, "video/mp4", 480, 360).get(10, TimeUnit.SECONDS);
+        svc.sendGif("!c:example.org", f, "video/mp4", 480, 360, "$original").get(10, TimeUnit.SECONDS);
         assertTrue(sendPath.contains("/send/m.room.message/"), sendPath);
         JsonNode c = MatrixClient.JSON.readTree(sendBody);
         assertEquals("m.video", c.path("msgtype").asText());
@@ -65,6 +65,7 @@ class SendGifTest {
         assertTrue(c.path("info").path("fi.mau.gif").asBoolean(), sendBody);
         assertEquals("video/mp4", c.path("info").path("mimetype").asText());
         assertEquals(480, c.path("info").path("w").asInt());
+        assertEquals("$original", c.path("m.relates_to").path("m.in_reply_to").path("event_id").asText(), "in reply mode it answers");
     }
 
     @Test
@@ -72,7 +73,7 @@ class SendGifTest {
         Path f = dir.resolve("gato.gif");
         Files.write(f, "GIF89a".getBytes(StandardCharsets.US_ASCII));
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
-        svc.sendGif("!c:example.org", f, "image/gif", 200, 150).get(10, TimeUnit.SECONDS);
+        svc.sendGif("!c:example.org", f, "image/gif", 200, 150, null).get(10, TimeUnit.SECONDS);
         JsonNode c = MatrixClient.JSON.readTree(sendBody);
         assertEquals("m.image", c.path("msgtype").asText());
         assertTrue(c.path("info").path("fi.mau.gif").asBoolean());

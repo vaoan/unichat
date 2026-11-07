@@ -73,7 +73,7 @@ class SendStickerTest {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
         JsonNode info = MatrixClient.JSON.readTree("""
                 {"mimetype":"image/webp","w":512,"h":512,"fi.mau.bridged_sticker":{"network":"telegram","id":"123","emoji":"😂"}}""");
-        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/abc", "image/webp", 512, 512, info))
+        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/abc", "image/webp", 512, 512, info), (String) null)
                 .get(10, TimeUnit.SECONDS);
         assertTrue(path.contains("/send/m.sticker/"), path);
         JsonNode sent = MatrixClient.JSON.readTree(body);
@@ -85,7 +85,7 @@ class SendStickerTest {
     @Test
     void withoutInfoItStillDescribesTheImage() throws Exception {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
-        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/x", "image/png", 160, 120, null))
+        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/x", "image/png", 160, 120, null), (String) null)
                 .get(10, TimeUnit.SECONDS);
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("image/png", sent.path("info").path("mimetype").asText());
@@ -165,5 +165,14 @@ class SendStickerTest {
         assertTrue(sent.path("info").path("fi.mau.bridged_sticker").isMissingNode(), "no longer that network's own sticker");
         assertTrue(sent.path("info").path("thumbnail_url").isMissingNode(), "the other bridge couldn't read it either");
         assertEquals(512, sent.path("info").path("w").asInt());
+    }
+
+    @Test
+    void inReplyModeTheStickerAnswers() throws Exception {
+        MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
+        svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/abc", "image/webp", 512, 512, null), "$original")
+                .get(10, TimeUnit.SECONDS);
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("$original", sent.path("m.relates_to").path("m.in_reply_to").path("event_id").asText());
     }
 }

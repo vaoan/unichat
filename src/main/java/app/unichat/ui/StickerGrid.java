@@ -26,6 +26,7 @@ import java.util.function.Supplier;
 final class StickerGrid extends ScrollPane {
     private static final int TILE = 76;
 
+    private final Supplier<String> takeReply;
     private final ChatService svc;
     private final MediaLibrary library;
     private final Supplier<Chat> chat;
@@ -33,7 +34,8 @@ final class StickerGrid extends ScrollPane {
     private final VBox content = new VBox(10);
     private final TileCache tiles = new TileCache();
 
-    StickerGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Consumer<String> toast) {
+    StickerGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Supplier<String> takeReply, Consumer<String> toast) {
+        this.takeReply = takeReply;
         this.svc = svc;
         this.library = library;
         this.chat = chat;
@@ -123,7 +125,7 @@ final class StickerGrid extends ScrollPane {
             toast.accept("Esta red no acepta stickers");
             return;
         }
-        svc.sendSticker(c.id(), item).whenComplete((v, err) -> Platform.runLater(() -> {
+        svc.sendSticker(c.id(), item, takeReply.get()).whenComplete((v, err) -> Platform.runLater(() -> {
             if (err != null) {
                 toast.accept("No se pudo enviar el sticker");
                 return;

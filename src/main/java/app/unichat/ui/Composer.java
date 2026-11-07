@@ -289,6 +289,14 @@ public final class Composer extends VBox {
         focus();
     }
 
+    /** What a sticker or GIF sent now answers, and the composer leaves reply mode as a sent text would; null if none. */
+    String takeReply() {
+        if (replyTo == null) return null;
+        String id = replyTo.id();
+        cancelMode();
+        return id;
+    }
+
     public void edit(Message m) {
         replyTo = null;
         editing = m;

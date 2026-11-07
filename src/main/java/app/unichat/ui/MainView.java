@@ -104,11 +104,11 @@ public final class MainView extends StackPane {
             listPane.showSpace(id);
             listPane.setSelected(thread.chat() == null ? null : thread.chat().id());
         });
-        StickerGrid stickers = new StickerGrid(svc, library, thread::chat, this::toast);
+        StickerGrid stickers = new StickerGrid(svc, library, thread::chat, thread::takeReply, this::toast);
         MediaItems.keepCached(svc, library);
         library.addListener(() -> MediaItems.keepCached(svc, library));
         panel.setContent(SidePanel.Tab.STICKERS, stickers, stickers::refresh);
-        GifGrid gifs = new GifGrid(svc, library, thread::chat, this::toast);
+        GifGrid gifs = new GifGrid(svc, library, thread::chat, thread::takeReply, this::toast);
         panel.setContent(SidePanel.Tab.GIFS, gifs, gifs::refresh);
         javafx.scene.control.ScrollPane emojis = new javafx.scene.control.ScrollPane(
                 EmojiPicker.grid(text -> thread.composer().insert(text), 280, library, this::toast));

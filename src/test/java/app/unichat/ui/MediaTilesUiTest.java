@@ -71,7 +71,7 @@ class MediaTilesUiTest {
                     return m.invoke(mock, args);
                 });
         fx(() -> {
-            grid = new StickerGrid(svc, library, () -> null, t -> { });
+            grid = new StickerGrid(svc, library, () -> null, () -> null, t -> { });
             stage = new Stage();
             stage.setScene(new Scene(grid, 400, 400));
             stage.show();

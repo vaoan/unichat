@@ -681,6 +681,11 @@ public final class ThreadPane extends BorderPane {
         return bubble;
     }
 
+    /** The reply a sticker or GIF sent now answers: {@link Composer#takeReply}. */
+    String takeReply() {
+        return composer.takeReply();
+    }
+
     private static java.util.List<String> links(Message m) {
         java.util.Set<String> out = new java.util.LinkedHashSet<>(m.html() != null ? HtmlView.links(m.html()) : RichText.addresses(m.body()));
         if (m.previewHtml() != null) out.addAll(HtmlView.links(m.previewHtml()));

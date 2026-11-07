@@ -66,10 +66,10 @@ final class MessageSender {
         return sendEvent(chatId, "m.room.message", txn, content);
     }
 
-    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item) {
+    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) {
         Chat c = core.chat(chatId);
         return sendSticker(chatId, item, c == null ? RoomFeatures.UNKNOWN : c.features(),
-                c == null ? StickerMode.STICKER : StickerMode.of(c.network()));
+                c == null ? StickerMode.STICKER : StickerMode.of(c.network()), replyToId);
     }
 
     /**
@@ -77,16 +77,16 @@ final class MessageSender {
      * flagged as a GIF (it loops, like WhatsApp's GIFs) or as a plain video.
      */
     CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item,
-                                        RoomFeatures features, StickerMode mode) {
+                                        RoomFeatures features, StickerMode mode, String replyToId) {
         String mime = item.info() != null && item.info().hasNonNull("mimetype") ? item.info().path("mimetype").asText() : item.mime();
-        if (mode == StickerMode.STICKER || !"image/gif".equals(mime)) return sendSticker(chatId, item, features);
+        if (mode == StickerMode.STICKER || !"image/gif".equals(mime)) return sendSticker(chatId, item, features, replyToId);
         return media.media(item.url(), 0, 0).thenApplyAsync(src -> {
             try {
                 return StickerConverter.toMp4(src, Settings.get().cacheDir().resolve("stickers"));
             } catch (IOException e) {
                 throw new CompletionException(e);
             }
-        }, core.io).thenCompose(r -> sendMedia(chatId, r.file(), null, r.mime(), item.width(), item.height(),
+        }, core.io).thenCompose(r -> sendMedia(chatId, r.file(), replyToId, r.mime(), item.width(), item.height(),
                 mode == StickerMode.GIF).whenComplete((v, err) -> {
             try {
                 Files.deleteIfExists(r.file());
@@ -98,9 +98,9 @@ final class MessageSender {
     }
 
     /** Sends {@code item}; when the chat refuses its format (a GIF on WhatsApp) a converted copy is uploaded first. */
-    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features) {
+    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features, String replyToId) {
         Chat c = core.chat(chatId);
-        return sendSticker(chatId, item, features, c != null && needsCopy(item.url(), c.network()));
+        return sendSticker(chatId, item, features, c != null && needsCopy(item.url(), c.network()), replyToId);
     }
 
     /**
@@ -115,9 +115,10 @@ final class MessageSender {
         return bot == null || !server.equals(BridgePorts.mediaServerName(bot.replaceAll("bot$", "")));
     }
 
-    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features, boolean copy) {
+    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, RoomFeatures features, boolean copy, String replyToId) {
         String txn = core.newTxnId();
         ObjectNode content = MatrixClient.JSON.createObjectNode();
+        addReply(content, replyToId);
         content.put("body", "sticker");
         content.put("url", item.url());
         ObjectNode info = item.info() instanceof ObjectNode o ? o.deepCopy() : MatrixClient.JSON.createObjectNode();
@@ -132,6 +133,7 @@ final class MessageSender {
                 m.setMimeType(item.mime());
                 m.setSize(item.width(), item.height());
                 m.setMediaInfo(info.deepCopy());
+                m.setReplyToId(replyToId);
             });
         }
         fireLocal(chatId);
@@ -205,8 +207,8 @@ final class MessageSender {
     }
 
     /** A GIF from the GIF tab: m.video (mp4) or m.image (gif) flagged {@code fi.mau.gif}, so bridges send a GIF. */
-    CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height) {
-        return sendMedia(chatId, file, null, mime, width, height, true);
+    CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, String replyToId) {
+        return sendMedia(chatId, file, replyToId, mime, width, height, true);
     }
 
     /**

@@ -37,6 +37,7 @@ import java.util.function.Supplier;
 final class GifGrid extends VBox {
     private static final int TILE_W = 132, TILE_H = 100, LIMIT = 24;
 
+    private final Supplier<String> takeReply;
     private final ChatService svc;
     private final MediaLibrary library;
     private final Supplier<Chat> chat;
@@ -53,8 +54,9 @@ final class GifGrid extends VBox {
     private long resultsAt;
     private static final long RESULTS_LAST_MS = 10 * 60_000;
 
-    GifGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Consumer<String> toast) {
+    GifGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Supplier<String> takeReply, Consumer<String> toast) {
         super(8);
+        this.takeReply = takeReply;
         this.svc = svc;
         this.library = library;
         this.chat = chat;
@@ -214,7 +216,8 @@ final class GifGrid extends VBox {
         Chat c = chat.get();
         if (c == null) return;
         toast.accept("Enviando GIF…");
-        file.thenCompose(p -> svc.sendGif(c.id(), p, item.mime() == null ? "image/gif" : item.mime(), item.width(), item.height()))
+        String reply = takeReply.get();
+        file.thenCompose(p -> svc.sendGif(c.id(), p, item.mime() == null ? "image/gif" : item.mime(), item.width(), item.height(), reply))
                 .whenComplete((v, err) -> Platform.runLater(() -> {
                     if (err != null) {
                         toast.accept("No se pudo enviar el GIF");
