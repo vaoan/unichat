@@ -67,6 +67,17 @@ class WakeSyncTest {
         assertTrue(syncs.get(before).contains("since="), "a catch-up, not a full sync: " + syncs.get(before));
     }
 
+    @Test
+    void aServerStillStartingIsConnectingNotOffline() throws Exception {
+        java.net.ServerSocket closed = new java.net.ServerSocket(0);
+        int port = closed.getLocalPort();
+        closed.close(); // nothing listens: refused, like the local server a second before it's up
+        svc = new MatrixChatService("http://127.0.0.1:" + port, "@starting:example.org", "t");
+        svc.start();
+        Thread.sleep(1500); // the first refusals and their retries
+        assertEquals(ConnectionState.CONNECTING, svc.connectionState());
+    }
+
     private static void until(java.util.concurrent.Callable<Boolean> done) throws Exception {
         for (int i = 0; i < 100 && !done.call(); i++) Thread.sleep(50);
         assertTrue(done.call(), "within 5 s");

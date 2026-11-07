@@ -71,6 +71,8 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private Thread syncThread;
     /** The computer just woke: the open long poll is dropped and the next sync answers at once ({@link #wake}). */
     private volatile boolean woke;
+    /** From starting or waking until the first answer: a refused connection then is the server still starting, not "offline". */
+    private volatile boolean reconnecting = true;
     private final Runnable onWake = this::wake;
 
     private final MatrixCore core;
@@ -227,6 +229,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         Thread t = syncThread;
         if (!core.running || t == null || !core.initialSyncDone) return;
         woke = true;
+        reconnecting = true;
         setState(ConnectionState.CONNECTING);
         t.interrupt();
     }
@@ -273,6 +276,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 boolean firstRound = !core.initialSyncDone;
                 catchUp = false;
                 quick = false;
+                reconnecting = false;
                 core.initialSyncDone = true;
                 failures = 0;
                 setState(ConnectionState.ONLINE);
@@ -328,10 +332,14 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         return homeserver + "|" + (deviceId == null || deviceId.isBlank() ? userId : deviceId);
     }
 
+    /** Retries (1 + 2 + 4 + 8 + 16 s) shown as "Conectando…" after starting or waking, before "Sin conexión". */
+    static final int STILL_CONNECTING = 5;
+
     private int backoff(int failures, Exception e) {
         if (!core.running) return failures;
         System.err.println("Matrix sync failed (" + failures + "): " + e);
-        setState(ConnectionState.OFFLINE);
+        // The local server takes a few seconds to start, and the network a moment to come back after waking.
+        setState(reconnecting && failures <= STILL_CONNECTING ? ConnectionState.CONNECTING : ConnectionState.OFFLINE);
         long seconds = Math.min(30, 1L << Math.min(failures - 1, 5));
         try {
             Thread.sleep(seconds * 1000);
