@@ -152,6 +152,7 @@ public final class MainView extends StackPane {
 
         getChildren().addAll(main, overlay, toast);
         addEventFilter(KeyEvent.KEY_PRESSED, this::onKey);
+        addEventFilter(KeyEvent.KEY_RELEASED, e -> thread.composer().aiKeyReleased(e.getCode()));
         stage.showingProperty().addListener((o, a, showing) -> {
             if (showing) Platform.runLater(this::catchUp);
         });
@@ -558,6 +559,8 @@ public final class MainView extends StackPane {
             if (c.isUnread()) svc.markRead(c.id()); else svc.setMarkedUnread(c.id(), true);
         } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.I && c != null) {
             toggleInfo();
+        } else if (mod && !e.isShiftDown() && c != null && thread.composer().aiKeyPressed(e.getCode())) {
+            e.consume();
         } else if (e.getCode() == KeyCode.F6) {
             cycleFocus(e.isShiftDown() ? -1 : 1);
         } else if (mod && (e.getCode() == KeyCode.EQUALS || e.getCode() == KeyCode.PLUS || e.getCode() == KeyCode.ADD)) {

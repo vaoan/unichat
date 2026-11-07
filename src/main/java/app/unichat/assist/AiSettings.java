@@ -7,7 +7,9 @@ import java.nio.file.Path;
 public final class AiSettings {
     public static final String DEFAULT_INSTRUCTIONS = "Asegúrate de que el idioma coincida con el del mensaje que llega. "
             + "Usa toda la conversación como contexto para responder. Usa un tono amigable, profesional y al grano, "
-            + "sin ningún símbolo típico de IA, para que se vea lo más humano posible.";
+            + "sin ningún símbolo típico de IA, para que se vea lo más humano posible. "
+            + "Para sentimientos cortos, como una risa o un poco de pena, puedes usar un emoji, "
+            + "pero muy de vez en cuando: casi nunca más de uno por mensaje, y ninguno si el mensaje no lleva esa emoción.";
 
     private AiSettings() {}
 

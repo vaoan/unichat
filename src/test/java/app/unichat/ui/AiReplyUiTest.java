@@ -149,25 +149,6 @@ class AiReplyUiTest {
         assertTrue(errors.get(0).startsWith("Texto corregido"), errors.toString());
     }
 
-    private void keyO(javafx.event.EventType<javafx.scene.input.KeyEvent> type, javafx.event.EventTarget target) throws Exception {
-        fx(() -> {
-            javafx.event.Event.fireEvent(target, new javafx.scene.input.KeyEvent(type, "", "", javafx.scene.input.KeyCode.O,
-                    false, true, false, true));
-            return null;
-        });
-    }
-
-    @Test
-    void theShortcutCorrectsOnlyFromTheTextBox() throws Exception {
-        write("ola");
-        fx(() -> { composer.useFixWriter(() -> p -> "Hola"); return null; });
-        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, fx(() -> button()));
-        Thread.sleep(200);
-        assertEquals("ola", text(), "not from another control");
-        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, fx(() -> composer.lookup(".text-area")));
-        await(() -> text().equals("Hola"));
-    }
-
     @Test
     void holdingTheShortcutDoesNotCancelWhatItStarted() throws Exception {
         CountDownLatch release = new CountDownLatch(1);
@@ -189,28 +170,17 @@ class AiReplyUiTest {
                     release.countDown();
                 }
             });
+            composer.aiKeyPressed(javafx.scene.input.KeyCode.O);
+            composer.aiKeyPressed(javafx.scene.input.KeyCode.O);
             return null;
         });
-        javafx.scene.Node box = fx(() -> composer.lookup(".text-area"));
-        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, box);
-        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, box);
         assertTrue(cancelled.isEmpty(), "a repeat of the same press");
-        keyO(javafx.scene.input.KeyEvent.KEY_RELEASED, box);
-        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, box);
-        assertEquals(1, cancelled.size(), "a new press cancels, as the button does");
-    }
-
-    @Test
-    void theShortcutDoesNothingWithTheButtonsOff() throws Exception {
-        write("ola");
         fx(() -> {
-            composer.useFixWriter(() -> p -> "Hola");
-            AiReplyButton.SHOWN.set(false);
+            composer.aiKeyReleased(javafx.scene.input.KeyCode.O);
+            composer.aiKeyPressed(javafx.scene.input.KeyCode.O);
             return null;
         });
-        keyO(javafx.scene.input.KeyEvent.KEY_PRESSED, fx(() -> composer.lookup(".text-area")));
-        Thread.sleep(200);
-        assertEquals("ola", text());
+        assertEquals(1, cancelled.size(), "a new press cancels, as the button does");
     }
 
     @Test

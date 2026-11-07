@@ -53,14 +53,16 @@ final class AiReplyButton {
     private final Supplier<Request> request;
     private final java.util.function.BiConsumer<String, String> onDraft;
     private final Consumer<String> onError;
+    private final Consumer<String> onDone;
     private final Supplier<Writer> writers;
     private Writer working;
 
-    AiReplyButton(Look look, Supplier<Request> request, java.util.function.BiConsumer<String, String> onDraft, Consumer<String> onError, Supplier<Writer> writers) {
+    AiReplyButton(Look look, Supplier<Request> request, java.util.function.BiConsumer<String, String> onDraft, Consumer<String> onError, Consumer<String> onDone, Supplier<Writer> writers) {
         this.look = look;
         this.request = request;
         this.onDraft = onDraft;
         this.onError = onError;
+        this.onDone = onDone;
         this.writers = writers;
         button = Composer.iconButton(look.icon(), "", this::pressed);
         button.getStyleClass().add(look.styleClass());
@@ -106,6 +108,7 @@ final class AiReplyButton {
         Request r = request.get();
         if (r == null) {
             onError.accept(look.nothing());
+            onDone.accept(null);
             return;
         }
         Writer w = writers.get();
@@ -128,6 +131,7 @@ final class AiReplyButton {
                 showWorking(false);
                 if (error != null) onError.accept(error);
                 else if (draft != null) onDraft.accept(r.chatId(), draft);
+                onDone.accept(r.chatId());
             });
         });
     }

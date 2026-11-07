@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** ⌘I writes a draft only from the text box; the info panel has ⌘⇧I everywhere. */
+/** ⌘I writes a draft from anywhere in the window and leaves the focus in the text box; the info panel has ⌘⇧I. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class AiShortcutUiTest {
     private static <T> T fx(Callable<T> c) throws Exception {
@@ -79,14 +79,15 @@ class AiShortcutUiTest {
         TextArea box = fx(() -> (TextArea) scene.getRoot().lookup(".composer-row .text-area"));
         assertFalse(infoOpen(scene));
 
-        press(box, false);
-        assertTrue(wrote.await(5, TimeUnit.SECONDS), "the draft button ran");
+        Node elsewhere = fx(() -> scene.getRoot().lookup(".chat-cell"));
+        fx(() -> { elsewhere.requestFocus(); return null; });
+        press(elsewhere, false);
+        assertTrue(wrote.await(5, TimeUnit.SECONDS), "from anywhere in the window");
         assertFalse(infoOpen(scene), "the info panel stays as it was");
         for (int i = 0; i < 100 && !"Borrador".equals(fx(box::getText)); i++) Thread.sleep(50);
         assertEquals("Borrador", fx(box::getText));
-
-        press(scene.getRoot(), false);
-        assertFalse(infoOpen(scene), "outside the box the key does nothing");
+        for (int i = 0; i < 100 && !fx(box::isFocused); i++) Thread.sleep(50);
+        assertTrue(fx(box::isFocused) || fx(() -> scene.getFocusOwner() == box), "ready for Enter");
 
         press(scene.getRoot(), true);
         assertTrue(infoOpen(scene), "the info panel has its own key");

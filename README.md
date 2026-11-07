@@ -127,8 +127,8 @@ UNICHAT_IT_HOMESERVER=http://localhost:8008 ./mvnw test -Dtest=MatrixLiveIT
 | ⌘⇧U / Ctrl+Shift+U | Marcar leído / no leído |
 | ⌘1…4 / Ctrl+1…4 | Todos · No leídos · Favoritos · Prioridad baja |
 | ⌘⇧I / Ctrl+Shift+I | Panel de información |
-| ⌘I / Ctrl+I (en el cuadro de texto) | Borrador con IA |
-| ⌘O / Ctrl+O (en el cuadro de texto) | Corregir ortografía y redacción con IA |
+| ⌘I / Ctrl+I | Borrador con IA |
+| ⌘O / Ctrl+O | Corregir ortografía y redacción con IA |
 | ⌘, / Ctrl+, | Ajustes |
 
 ## Datos locales

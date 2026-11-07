@@ -92,7 +92,6 @@ public final class Composer extends VBox {
         input.setPrefRowCount(1);
         input.getStyleClass().add("composer-input");
         input.addEventFilter(KeyEvent.KEY_PRESSED, this::onKey);
-        input.addEventFilter(KeyEvent.KEY_RELEASED, e -> { if (e.getCode() == aiKeyHeld) aiKeyHeld = null; });
         input.textProperty().addListener((o, a, t) -> {
             autoGrow();
             onTyped(t);
@@ -118,8 +117,8 @@ public final class Composer extends VBox {
         this.send = send;
         mic = iconButton(Icons.MIC, "Grabar una nota de voz", this::startRecording);
         mic.getStyleClass().add("mic-button");
-        ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, AiReplyButton::replyWriter);
-        fix = new AiReplyButton(AiReplyButton.FIX, this::fixRequest, this::fixed, onError, AiReplyButton::fixWriter);
+        ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, this::aiDone, AiReplyButton::replyWriter);
+        fix = new AiReplyButton(AiReplyButton.FIX, this::fixRequest, this::fixed, onError, this::aiDone, AiReplyButton::fixWriter);
         row = new HBox(4, attach, input, ai.node(), fix.node(), stickers, emoji, mic, send);
         row.setAlignment(Pos.BOTTOM_CENTER);
         row.getStyleClass().add("composer-row");
@@ -268,7 +267,7 @@ public final class Composer extends VBox {
     void useAiWriter(java.util.function.Supplier<AiReplyButton.Writer> writers) {
         HBox parent = row;
         int at = parent.getChildren().indexOf(ai.node());
-        ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, writers);
+        ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, this::aiDone, writers);
         parent.getChildren().set(at, ai.node());
         aiStatus.getChildren().set(0, ai.status());
     }
@@ -276,7 +275,7 @@ public final class Composer extends VBox {
     /** Tests: a stand-in for the AI program that corrects. */
     void useFixWriter(java.util.function.Supplier<AiReplyButton.Writer> writers) {
         int at = row.getChildren().indexOf(fix.node());
-        fix = new AiReplyButton(AiReplyButton.FIX, this::fixRequest, this::fixed, onError, writers);
+        fix = new AiReplyButton(AiReplyButton.FIX, this::fixRequest, this::fixed, onError, this::aiDone, writers);
         row.getChildren().set(at, fix.node());
         aiStatus.getChildren().set(1, fix.status());
     }
@@ -303,7 +302,6 @@ public final class Composer extends VBox {
         } else {
             input.replaceText(0, input.getLength(), corrected);
             input.positionCaret(input.getLength());
-            focus();
             onError.accept("Texto corregido. " + (app.unichat.support.Os.windows() ? "Ctrl+Z" : "⌘Z") + " lo deja como estaba");
         }
     }
@@ -324,7 +322,6 @@ public final class Composer extends VBox {
         }
         input.setText(draft);
         input.positionCaret(input.getLength());
-        focus();
         onError.accept("Borrador listo: revísalo antes de enviarlo");
     }
 
@@ -378,8 +375,21 @@ public final class Composer extends VBox {
         if (files != null) sendFiles(files);
     }
 
-    private static boolean isAiKey(KeyEvent e) {
-        return (e.getCode() == KeyCode.O || e.getCode() == KeyCode.I) && e.isShortcutDown() && !e.isShiftDown() && AiReplyButton.SHOWN.get();
+    /** ⌘I writes and ⌘O corrects, from anywhere in the window. True if it's one of them, with the AI buttons on. */
+    boolean aiKeyPressed(KeyCode key) {
+        if ((key != KeyCode.O && key != KeyCode.I) || !AiReplyButton.SHOWN.get()) return false;
+        if (aiKeyHeld != key) (key == KeyCode.O ? fix : ai).node().fire();
+        aiKeyHeld = key;
+        return true;
+    }
+
+    void aiKeyReleased(KeyCode key) {
+        if (key == aiKeyHeld) aiKeyHeld = null;
+    }
+
+    /** It finished, so the text box gets the keys: Enter sends. Unless the person moved to another chat meanwhile. */
+    private void aiDone(String forChat) {
+        if (forChat == null || forChat.equals(chatId)) focus();
     }
 
     private void onKey(KeyEvent e) {
@@ -393,10 +403,6 @@ public final class Composer extends VBox {
                 e.consume();
                 input.insertText(input.getCaretPosition(), "\n");
             }
-        } else if (isAiKey(e)) {
-            e.consume();
-            if (aiKeyHeld != e.getCode()) (e.getCode() == KeyCode.O ? fix : ai).node().fire();
-            aiKeyHeld = e.getCode();
         } else if (e.getCode() == KeyCode.ESCAPE && (replyTo != null || editing != null)) {
             e.consume();
             cancelMode();
