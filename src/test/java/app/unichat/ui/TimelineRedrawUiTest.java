@@ -83,6 +83,8 @@ class TimelineRedrawUiTest {
             return sc;
         });
         until(() -> fx(() -> bubble(scene, "primero de la prueba") != null));
+        // The demo marks a sent message read 4–8 s later, and that rightly draws it again: wait until it has.
+        until(() -> svc.messages(CHAT).stream().filter(Message::outgoing).allMatch(m -> m.status() == app.unichat.model.MessageStatus.READ));
         Thread.sleep(500);
         Node before = fx(() -> bubble(scene, "primero de la prueba"));
 
