@@ -317,17 +317,18 @@ final class MessageMedia {
     }
 
     /** Thumbnail first, then the (possibly animated) original; shared with the sticker and GIF grids. */
-    static void loadMedia(MediaSource svc, ImageView view, Message m, int pxW, int pxH) {
+    static java.util.concurrent.CompletableFuture<java.nio.file.Path> loadMedia(MediaSource svc, ImageView view, Message m, int pxW, int pxH) {
         if (!mayBeAnimated(m)) {
-            svc.media(m.mediaUrl(), pxW, pxH).thenAcceptAsync(p -> showStill(view, p, pxW, pxH, false), AnimatedImage.DECODER);
-            return;
+            java.util.concurrent.CompletableFuture<java.nio.file.Path> still = svc.media(m.mediaUrl(), pxW, pxH);
+            still.thenAcceptAsync(p -> showStill(view, p, pxW, pxH, false), AnimatedImage.DECODER);
+            return still;
         }
         java.util.concurrent.CompletableFuture<java.nio.file.Path> original = svc.media(m.mediaUrl(), 0, 0);
         if (Platform.isFxApplicationThread() && original.isDone() && !original.isCompletedExceptionally()) {
             AnimatedImage.Frames ready = AnimatedImage.decoded(original.join(), pxW, pxH);
             if (ready != null) {
                 AnimatedImage.play(view, ready);
-                return;
+                return original;
             }
         }
         // Placeholder: a still picture shows at once; decoding a long animation takes seconds. (With direct media
@@ -344,6 +345,7 @@ final class MessageMedia {
                 System.err.println("Could not decode " + m.mediaUrl() + ": " + e);
             }
         }, AnimatedImage.DECODER);
+        return original;
     }
 
     /** Decodes {@code p} as a still picture (off the FX thread) and shows it; {@code ifEmpty}: only if nothing's shown. */

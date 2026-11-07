@@ -68,7 +68,19 @@ class HtmlViewUiTest {
     }
 
     private Node bubbleWith(Scene scene, String text) {
-        return scene.getRoot().lookupAll(".bubble").stream().filter(n -> texts(n).contains(text)).findFirst().orElseThrow();
+        return scene.getRoot().lookupAll(".bubble").stream().filter(n -> shown(n) && texts(n).contains(text)).findFirst().orElseThrow();
+    }
+
+    /** A list keeps spare cells that are hidden, and they can still hold an earlier drawing of the same message. */
+    private static boolean shown(Node n) {
+        for (Node p = n; p != null; p = p.getParent()) if (!p.isVisible()) return false;
+        return true;
+    }
+
+    /** Links are opened on another thread, and the row can be drawn again before they answer. */
+    private boolean chipShown(Scene scene) {
+        return scene.getRoot().lookupAll(".bubble").stream().filter(n -> shown(n) && texts(n).contains("Hola "))
+                .findFirst().map(b -> !b.lookupAll(".file-chip").isEmpty()).orElse(false);
     }
 
     @Test
@@ -95,7 +107,7 @@ class HtmlViewUiTest {
             view.openChatId(CHAT);
             return sc;
         });
-        for (int i = 0; i < 150 && !fx(() -> !scene.getRoot().lookupAll(".file-chip").isEmpty()); i++) Thread.sleep(100);
+        for (int i = 0; i < 150 && !fx(() -> chipShown(scene)); i++) Thread.sleep(100);
         fx(() -> {
             Node bubble = bubbleWith(scene, "Hola ");
             String all = texts(bubble);

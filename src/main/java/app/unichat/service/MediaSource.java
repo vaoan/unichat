@@ -20,4 +20,7 @@ public interface MediaSource {
 
     /** Media that must stay on disk whatever the cache's limit: the person's saved stickers and GIFs. Replaces the last list. */
     default void keepCached(java.util.Collection<String> urls) { }
+
+    /** The person's favourites, which get a copy of their own in the data folder. Replaces the last list. */
+    default void keepSaved(java.util.Collection<String> urls) { }
 }

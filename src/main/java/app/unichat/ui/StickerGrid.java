@@ -94,7 +94,7 @@ final class StickerGrid extends ScrollPane {
         view.setFitWidth(TILE);
         view.setFitHeight(TILE);
         view.setPreserveRatio(true);
-        MessageMedia.loadMedia(svc, view, MediaItems.message(item), TILE * 2, TILE * 2);
+        var loading = MessageMedia.loadMedia(svc, view, MediaItems.message(item), TILE * 2, TILE * 2);
         StackPane tile = new StackPane(view);
         tile.getStyleClass().add("sticker-tile");
         tile.setMinSize(TILE, TILE);
@@ -109,6 +109,7 @@ final class StickerGrid extends ScrollPane {
             if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) send.run();
         });
         LibraryMenu.attach(tile, library, item, accepted ? send : null, toast);
+        MediaItems.markIfLost(loading, tile);
         tile.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
                 e.consume();

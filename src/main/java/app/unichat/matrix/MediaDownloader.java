@@ -18,7 +18,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
-/** Downloads media on demand into {@code cache/media} and keeps that folder under its limit ({@link MediaCache}). */
+/** Downloads media on demand into {@code cache/media} and keeps that folder under its limit ({@link MediaCache}); favourites have their own copy ({@link SavedMedia}). */
 final class MediaDownloader {
     private final MatrixClient client;
     private final LinkInspector links = new LinkInspector();
@@ -27,16 +27,21 @@ final class MediaDownloader {
     private final java.util.concurrent.atomic.AtomicLong lastCacheTrim = new java.util.concurrent.atomic.AtomicLong();
 
     private volatile java.util.Set<String> pinned = java.util.Set.of();
+    private final SavedMedia saved;
 
     MediaDownloader(MatrixClient client, ExecutorService io) {
         this.client = client;
         this.io = io;
+        saved = new SavedMedia(Settings.dataDir().resolve("media-library"), url -> media(url, 0, 0),
+                url -> Hashes.sha256(cacheKey(url, 0, 0)), io, 60);
     }
 
     /** The local file of {@code url}: from the cache, or downloaded once however many ask at the same time. */
     CompletableFuture<Path> media(String url, int width, int height) {
         if (url == null || url.isBlank()) return CompletableFuture.failedFuture(new MatrixException(0, null, "Sin URL"));
         if (url.startsWith("file:")) return CompletableFuture.completedFuture(Path.of(URI.create(url)));
+        Path own = saved.find(url);
+        if (own != null) return CompletableFuture.completedFuture(own);
         String key = cacheKey(url, width, height);
         Path dir = Settings.get().cacheDir().resolve("media");
         String hash = Hashes.sha256(key);
@@ -68,6 +73,11 @@ final class MediaDownloader {
     /** Pinned in the cache from now on: {@link MediaCache}. */
     void keep(java.util.Collection<String> urls) {
         pinned = urls.stream().map(u -> Hashes.sha256(cacheKey(u, 0, 0))).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    /** The favourites from now on, each with its own copy. */
+    void save(java.util.Collection<String> urls) {
+        saved.keep(urls);
     }
 
     /**
@@ -136,7 +146,7 @@ final class MediaDownloader {
         }
     }
 
-    private static Path findCached(Path dir, String hash) {
+    static Path findCached(Path dir, String hash) {
         if (!Files.isDirectory(dir)) return null;
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, hash + "*")) {
             for (Path p : ds) {

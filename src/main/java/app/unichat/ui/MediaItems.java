@@ -24,6 +24,25 @@ final class MediaItems {
             for (MediaLibrary.Item i : library.recents(k)) add(urls, i);
         }
         svc.keepCached(urls);
+        java.util.Set<String> favorites = new java.util.HashSet<>();
+        for (MediaLibrary.Kind k : java.util.List.of(MediaLibrary.Kind.STICKER, MediaLibrary.Kind.GIF)) {
+            for (MediaLibrary.Item i : library.favorites(k)) add(favorites, i);
+        }
+        svc.keepSaved(favorites);
+    }
+
+    /** Marks a tile whose file can't be had: not on disk, and whoever held it no longer gives it. */
+    static void markIfLost(java.util.concurrent.CompletableFuture<java.nio.file.Path> loading, javafx.scene.layout.StackPane tile) {
+        loading.whenComplete((file, err) -> {
+            if (err == null) return;
+            javafx.application.Platform.runLater(() -> {
+                javafx.scene.Node mark = Icons.icon(Icons.ERROR, 16);
+                javafx.scene.layout.StackPane.setAlignment(mark, javafx.geometry.Pos.BOTTOM_RIGHT);
+                tile.getChildren().add(mark);
+                tile.setAccessibleText(tile.getAccessibleText() + ", no se pudo recuperar el archivo");
+                javafx.scene.control.Tooltip.install(tile, new javafx.scene.control.Tooltip("No se pudo recuperar el archivo"));
+            });
+        });
     }
 
     private static void add(java.util.Set<String> urls, MediaLibrary.Item i) {

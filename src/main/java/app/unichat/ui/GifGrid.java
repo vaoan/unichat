@@ -158,12 +158,14 @@ final class GifGrid extends VBox {
         ImageView probe = new ImageView();
         String preview = GifFiles.preview(i);
         // A provider's preview, through the media service too, so it's on disk from then on.
+        java.util.concurrent.CompletableFuture<java.nio.file.Path> loading;
         if (preview != null && preview.startsWith("http")) {
-            MessageMedia.loadMedia(svc, probe, MediaItems.message(new MediaLibrary.Item(MediaLibrary.Kind.STICKER, preview, "image/gif", i.width(), i.height(), null)),
+            loading = MessageMedia.loadMedia(svc, probe, MediaItems.message(new MediaLibrary.Item(MediaLibrary.Kind.STICKER, preview, "image/gif", i.width(), i.height(), null)),
                     TILE_W * 2, TILE_H * 2);
-        } else MessageMedia.loadMedia(svc, probe, MediaItems.message(i), TILE_W * 2, TILE_H * 2);
+        } else loading = MessageMedia.loadMedia(svc, probe, MediaItems.message(i), TILE_W * 2, TILE_H * 2);
         Node tile = tile(probe, what, accepted, () -> sendFromLibrary(i));
         LibraryMenu.attach(tile, library, i, accepted ? () -> sendFromLibrary(i) : null, toast);
+        if (tile instanceof javafx.scene.layout.StackPane box) MediaItems.markIfLost(loading, box);
         return tile;
     }
 
