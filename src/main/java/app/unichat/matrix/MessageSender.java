@@ -94,10 +94,25 @@ final class MessageSender {
         }));
     }
 
-    /** Sends {@code item}; when the chat refuses its format (a GIF on WhatsApp) a converted copy is uploaded first. */
+    /**
+     * Sends {@code item}; when the chat refuses its format (a GIF on WhatsApp) a converted copy is uploaded first. A sticker
+     * from the chat's own network goes as it is, whatever its format: the bridge sends the original ({@link #ownSticker}).
+     */
     CompletableFuture<Void> sendStickerFor(String chatId, MediaLibrary.Item item, RoomFeatures features, String replyToId) {
         Chat c = core.chat(chatId);
-        return sendStickerEvent(chatId, item, features, c != null && needsCopy(item.url(), c.network()), replyToId);
+        boolean own = c != null && ownSticker(item.info(), c.network());
+        return sendStickerEvent(chatId, item, own ? RoomFeatures.UNKNOWN : features, c != null && needsCopy(item.url(), c.network()), replyToId);
+    }
+
+    /**
+     * Whether {@code info} names a sticker of {@code network}'s own packs. Telegram's bridge then sends the sticker from
+     * the pack, animated, and ignores the file; a converted copy loses that name and goes through the bridge's ffmpeg,
+     * which can fail (one without a WebP encoder, like Homebrew's, refuses every sticker that isn't PNG, JPEG or WebM).
+     */
+    static boolean ownSticker(JsonNode info, Network network) {
+        JsonNode s = info == null ? null : info.get("fi.mau.bridged_sticker");
+        return s != null && network.protocolId() != null && network.protocolId().equals(s.path("network").asText())
+                && !s.path("pack_url").asText().isEmpty();
     }
 
     /**

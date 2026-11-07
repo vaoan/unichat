@@ -151,6 +151,27 @@ class SendStickerTest {
     }
 
     @Test
+    void aTelegramStickerGoesBackToTelegramAsItIsSoTheBridgeSendsTheOriginal() throws Exception {
+        MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
+        svc.processor().process(MatrixClient.JSON.readTree("""
+                {"rooms":{"join":{"!c:example.org":{"state":{"events":[
+                  {"type":"m.bridge","state_key":"x","sender":"@telegrambot:example.org","event_id":"$b","origin_server_ts":1,
+                   "content":{"protocol":{"id":"telegram"},"com.beeper.room_type":"dm"}}]}}}}}"""), false);
+        app.unichat.model.RoomFeatures tg = app.unichat.model.RoomFeatures.parse(MatrixClient.JSON.readTree(
+                "{\"id\":\"tg\",\"file\":{\"m.sticker\":{\"mime_types\":{\"image/webp\":2,\"video/webm\":2}}}}"));
+        JsonNode info = MatrixClient.JSON.readTree("""
+                {"mimetype":"image/gif","w":256,"h":256,"duration":1300,
+                 "fi.mau.bridged_sticker":{"network":"telegram","id":"55","pack_url":"https://t.me/addstickers/Cats"}}""");
+        svc.sender().sendStickerFor("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER,
+                "mxc://media-telegram.localhost/gif", "image/gif", 256, 256, info), tg, "$q").get(10, TimeUnit.SECONDS);
+        assertEquals(null, uploadedType, "nothing converted: a re-encoded copy is what the bridge failed to pass on");
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("mxc://media-telegram.localhost/gif", sent.path("url").asText());
+        assertEquals("55", sent.path("info").path("fi.mau.bridged_sticker").path("id").asText(), "how the bridge finds the original");
+        assertEquals("$q", sent.path("m.relates_to").path("m.in_reply_to").path("event_id").asText());
+    }
+
+    @Test
     void aStickerFromAnotherBridgeGoesAsACopyOnOurServer() throws Exception {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
         JsonNode info = MatrixClient.JSON.readTree("""
