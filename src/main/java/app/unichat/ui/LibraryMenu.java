@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.MediaLibrary;
+import app.unichat.support.I18n;
 import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.SeparatorMenuItem;
@@ -25,19 +26,19 @@ final class LibraryMenu {
     static ContextMenu menu(MediaLibrary library, MediaLibrary.Item item, Runnable use, Consumer<String> toast) {
         ContextMenu menu = new ContextMenu();
         String what = switch (item.kind()) {
-            case EMOJI -> "Emoji";
-            case STICKER -> "Sticker";
-            case GIF -> "GIF";
+            case EMOJI -> I18n.t("library.kind.emoji");
+            case STICKER -> I18n.t("library.kind.sticker");
+            case GIF -> I18n.t("library.kind.gif");
         };
-        if (use != null) menu.getItems().add(ChatMenus.item(item.kind() == MediaLibrary.Kind.EMOJI ? "Insertar" : "Enviar", use));
+        if (use != null) menu.getItems().add(ChatMenus.item(I18n.t(item.kind() == MediaLibrary.Kind.EMOJI ? "library.insert" : "library.send"), use));
         boolean fav = library.isFavorite(item);
-        menu.getItems().add(ChatMenus.item(fav ? "Quitar de favoritos" : "Agregar a favoritos", () -> {
+        menu.getItems().add(ChatMenus.item(I18n.t(fav ? "message.removeFavorite" : "message.addFavorite"), () -> {
             boolean now = library.toggleFavorite(item);
-            toast.accept(what + (now ? " agregado a favoritos" : " quitado de favoritos"));
+            toast.accept(I18n.t(now ? "library.added" : "library.removed", what));
         }));
         if (library.isRecent(item)) {
             menu.getItems().add(new SeparatorMenuItem());
-            menu.getItems().add(ChatMenus.item("Quitar de recientes", () -> library.removeRecent(item)));
+            menu.getItems().add(ChatMenus.item(I18n.t("library.removeRecent"), () -> library.removeRecent(item)));
         }
         return menu;
     }

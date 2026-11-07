@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import app.unichat.support.Os;
 
 import javax.imageio.ImageIO;
@@ -39,9 +40,9 @@ public final class Notifier {
             return;
         }
         PopupMenu menu = new PopupMenu();
-        MenuItem open = new MenuItem("Abrir Unichat");
+        MenuItem open = new MenuItem(I18n.t("notifier.open"));
         open.addActionListener(e -> onShow.run());
-        MenuItem quit = new MenuItem("Salir");
+        MenuItem quit = new MenuItem(I18n.t("notifier.quit"));
         quit.addActionListener(e -> onQuit.run());
         menu.add(open);
         menu.addSeparator();
@@ -63,6 +64,17 @@ public final class Notifier {
     private volatile int unread;
     private BufferedImage trayIcon;
     private volatile boolean disposed;
+
+    /** The tray and menu-bar menu in the current language. Any thread. */
+    public void relabel() {
+        if (menu == null) return;
+        EventQueue.invokeLater(() -> {
+            menu.getItem(0).setLabel(I18n.t("notifier.open"));
+            menu.getItem(2).setLabel(I18n.t("notifier.quit"));
+            NativeBar b = bar;
+            if (b != null) b.syncMenu();
+        });
+    }
 
     private boolean startNativeBar() {
         NativeBar b = NativeBar.start(barHelper(), menu, () -> EventQueue.invokeLater(() -> {
@@ -138,7 +150,7 @@ public final class Notifier {
         if (!s.notificationsEnabled()) return;
         lastChatId = chat.id();
         String title = chat.group() ? m.senderName() + " · " + chat.title() : chat.title();
-        String body = s.notificationPreview() ? m.preview() : "Mensaje nuevo · " + chat.network().displayName();
+        String body = s.notificationPreview() ? m.preview() : I18n.t("notifier.newMessage", chat.network().displayName());
         NativeBar b = bar;
         if (b != null && Boolean.TRUE.equals(b.notificationsAllowed())) {
             // macOS's own notification: never takes the keyboard, follows Do Not Disturb and Focus.
@@ -153,10 +165,10 @@ public final class Notifier {
         lastChatId = chat.id();
         NativeBar b = bar;
         if (b != null && Boolean.TRUE.equals(b.notificationsAllowed())) {
-            b.notify(chat.id(), "Recordatorio", chat.title(), Settings.get().notificationSound());
+            b.notify(chat.id(), I18n.t("notifier.reminder"), chat.title(), Settings.get().notificationSound());
             return;
         }
-        show("Recordatorio", chat.title(), chat.id(), TrayIcon.MessageType.INFO);
+        show(I18n.t("notifier.reminder"), chat.title(), chat.id(), TrayIcon.MessageType.INFO);
     }
 
     /** {@code chatId} was read: its notifications leave Notification Center (macOS). */
@@ -183,7 +195,7 @@ public final class Notifier {
     private void setUnreadNow(int count) {
         boolean changed = count != unread;
         unread = count;
-        tooltip = count > 0 ? "Unichat — " + count + " sin leer" : "Unichat";
+        tooltip = count > 0 ? I18n.t("notifier.tooltipUnread", count) : "Unichat";
         if (tray != null) {
             tray.setToolTip(tooltip);
             if (changed) tray.setImage(withCount(trayIcon, count));

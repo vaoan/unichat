@@ -7,6 +7,7 @@ import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
 import app.unichat.stt.Transcripts;
+import app.unichat.support.I18n;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -146,9 +147,9 @@ final class MessageRowView {
         if (m.replyToId() != null) {
             VBox quote = new VBox(1);
             quote.getStyleClass().add("reply-quote");
-            Label who = new Label(replied == null ? "Mensaje original" : replied.outgoing() ? "Tú" : replied.senderName());
+            Label who = new Label(replied == null ? I18n.t("message.original") : replied.outgoing() ? I18n.t("common.you") : replied.senderName());
             who.getStyleClass().add("reply-sender");
-            Label text = new Label(replied == null ? "No cargado" : replied.preview());
+            Label text = new Label(replied == null ? I18n.t("message.notLoaded") : replied.preview());
             text.getStyleClass().add("reply-text");
             text.setMaxWidth(maxWidth - 30);
             quote.getChildren().addAll(who, text);
@@ -157,7 +158,7 @@ final class MessageRowView {
         }
 
         if (m.deleted()) {
-            Label l = new Label("Mensaje eliminado");
+            Label l = new Label(I18n.t("message.deleted"));
             l.getStyleClass().add("deleted-text");
             bubble.getChildren().add(l);
         } else if (m.playsInline()) {
@@ -198,7 +199,7 @@ final class MessageRowView {
         meta.getStyleClass().add("bubble-meta");
         meta.setAlignment(Pos.CENTER_RIGHT);
         if (m.edited() && !m.deleted()) {
-            Label ed = new Label("editado");
+            Label ed = new Label(I18n.t("message.edited"));
             meta.getChildren().add(ed);
         }
         meta.getChildren().add(new Label(Formats.time(m.timestamp(), ZoneId.systemDefault())));

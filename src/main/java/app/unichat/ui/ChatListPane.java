@@ -6,6 +6,7 @@ import app.unichat.model.Chat;
 import app.unichat.model.Network;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -79,10 +80,10 @@ public final class ChatListPane extends VBox {
         Node searchBox = buildSearchBox();
 
         chipRow = new FlowPane(6, 6,
-                chip("Todos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.INBOX)),
-                chip("No leídos", f -> f.withUnreadOnly(true).withView(ChatFilter.View.INBOX)),
-                chip("Favoritos", f -> f.withUnreadOnly(false).withView(ChatFilter.View.FAVORITES)),
-                chip("Prioridad baja", f -> f.withUnreadOnly(false).withView(ChatFilter.View.LOW_PRIORITY)));
+                chip(I18n.t("chatList.chip.all"), f -> f.withUnreadOnly(false).withView(ChatFilter.View.INBOX)),
+                chip(I18n.t("chatList.chip.unread"), f -> f.withUnreadOnly(true).withView(ChatFilter.View.INBOX)),
+                chip(I18n.t("chatList.chip.favorites"), f -> f.withUnreadOnly(false).withView(ChatFilter.View.FAVORITES)),
+                chip(I18n.t("chatList.chip.lowPriority"), f -> f.withUnreadOnly(false).withView(ChatFilter.View.LOW_PRIORITY)));
         chipRow.getStyleClass().add("chip-row");
         chips.getToggles().get(0).setSelected(true);
         chips.selectedToggleProperty().addListener((o, a, b) -> { if (b == null) a.setSelected(true); });
@@ -94,7 +95,7 @@ public final class ChatListPane extends VBox {
         configureList();
 
         accountRow.getStyleClass().addAll("chip-row", "account-row");
-        accountRow.setAccessibleText("Cuentas");
+        accountRow.setAccessibleText(I18n.t("chatList.accounts"));
         channels = new SpaceChannelsView(svc, spaces, this::newCell, this::open, this::rowMenu, this::closeSpace);
         folderView = new FolderView(svc, folderDialogs, this::newCell, this::open);
         folderView.setOnLeave(() -> {
@@ -120,8 +121,8 @@ public final class ChatListPane extends VBox {
         title.getStyleClass().add("pane-title");
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-        newChat = Icons.iconButton(Icons.PLUS, "Nuevo chat", () -> { if (onNewChat != null) onNewChat.run(); });
-        newChat.setTooltip(new javafx.scene.control.Tooltip("Nuevo chat (" + Shortcuts.key("N") + ")"));
+        newChat = Icons.iconButton(Icons.PLUS, I18n.t("chatList.newChat"), () -> { if (onNewChat != null) onNewChat.run(); });
+        newChat.setTooltip(new javafx.scene.control.Tooltip(I18n.t("chatList.newChatTip", Shortcuts.key("N"))));
         HBox header = new HBox(6, title, headerSpacer, newChat);
         header.getStyleClass().add("chat-list-header");
         header.setAlignment(Pos.CENTER_LEFT);
@@ -129,10 +130,10 @@ public final class ChatListPane extends VBox {
     }
 
     private Node buildSearchBox() {
-        search.setPromptText("Buscar   " + Shortcuts.key("K"));
+        search.setPromptText(I18n.t("chatList.searchPrompt", Shortcuts.key("K")));
         search.getStyleClass().add("search-field");
-        search.setAccessibleText("Buscar chats");
-        search.setAccessibleHelp("Flecha abajo para ir a los resultados, Enter abre el primero");
+        search.setAccessibleText(I18n.t("chatList.searchLabel"));
+        search.setAccessibleHelp(I18n.t("chatList.searchHelp"));
         search.textProperty().addListener((o, a, q) -> filter.set(filter.get().withQuery(q)));
         search.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ESCAPE) search.clear();
@@ -154,7 +155,7 @@ public final class ChatListPane extends VBox {
 
     private void configureList() {
         list.getStyleClass().add("chat-list");
-        list.setAccessibleText("Chats");
+        list.setAccessibleText(I18n.t("chatList.chats"));
         list.setCellFactory(v -> newCell());
         list.setOnKeyPressed(e -> {
             Chat sel = list.getSelectionModel().getSelectedItem();
@@ -262,21 +263,21 @@ public final class ChatListPane extends VBox {
         channels.redraw();
 
         String base = switch (f.view()) {
-            case INBOX -> f.unreadOnly() ? "No leídos" : "Bandeja";
-            case FAVORITES -> "Favoritos";
-            case LOW_PRIORITY -> "Prioridad baja";
-            case ARCHIVE -> "Archivados";
+            case INBOX -> f.unreadOnly() ? I18n.t("chatList.title.unread") : I18n.t("chatList.title.inbox");
+            case FAVORITES -> I18n.t("chatList.title.favorites");
+            case LOW_PRIORITY -> I18n.t("chatList.title.lowPriority");
+            case ARCHIVE -> I18n.t("chatList.title.archived");
         };
         newChat.setVisible(!foldersOpen()); // beside the title Carpetas, + would read as a new folder
-        title.setText(foldersOpen() ? "Carpetas" : f.network() == null ? base : f.network().displayName());
+        title.setText(foldersOpen() ? I18n.t("chatList.title.folders") : f.network() == null ? base : f.network().displayName());
         refreshAccountRow(f);
         refreshView(f);
-        empty.setText(f.searching() ? "Sin resultados para «" + f.query() + "»"
-                : f.view() == ChatFilter.View.ARCHIVE ? "No hay chats archivados"
-                : f.unreadOnly() ? "¡Todo al día! No tienes mensajes sin leer 🎉"
+        empty.setText(f.searching() ? I18n.t("chatList.empty.noResults", f.query())
+                : f.view() == ChatFilter.View.ARCHIVE ? I18n.t("chatList.empty.noArchived")
+                : f.unreadOnly() ? I18n.t("chatList.empty.allRead")
                 : svc.accounts().stream().noneMatch(a -> a.status() == AccountStatus.CONNECTED)
-                    ? "Aún no conectaste ninguna red.\nHaz clic en una red de la izquierda (o en +) para iniciar sesión."
-                : "No hay chats aquí todavía");
+                    ? I18n.t("chatList.empty.noNetwork")
+                : I18n.t("chatList.empty.none"));
 
         boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && !channels.isOpen() && !foldersOpen();
         List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.personalSpace() && !c.archived() && !c.bridgeBot()
@@ -314,7 +315,7 @@ public final class ChatListPane extends VBox {
             Nodes.show(x, !space && !folders);
         }
         Nodes.show(folderView, folders);
-        channels.setBackText(foldersOpen() ? "Volver a la carpeta" : "Volver a la bandeja");
+        channels.setBackText(foldersOpen() ? I18n.t("chatList.backToFolder") : I18n.t("chatList.backToInbox"));
         if (space) {
             Nodes.show(accountRow, false);
         }
@@ -333,7 +334,7 @@ public final class ChatListPane extends VBox {
         accountRow.getChildren().clear();
         if (!show) return;
         ToggleGroup group = new ToggleGroup();
-        accountRow.getChildren().add(accountChip("Todas las cuentas", f.accountId() == null, group,
+        accountRow.getChildren().add(accountChip(I18n.t("chatList.allAccounts"), f.accountId() == null, group,
                 () -> filter.set(filter.get().withAccount(f.network(), null))));
         for (Account a : accounts) {
             accountRow.getChildren().add(accountChip(Accounts.name(a), a.id().equals(f.accountId()), group,
@@ -393,7 +394,7 @@ public final class ChatListPane extends VBox {
         });
         tile.setFocusTraversable(true);
         tile.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
-        tile.setAccessibleText("Favorito: " + A11yText.chat(c, Accounts.forChat(accounts, c), Instant.now(), ZoneId.systemDefault()));
+        tile.setAccessibleText(I18n.t("chatList.favoriteA11y", A11yText.chat(c, Accounts.forChat(accounts, c), Instant.now(), ZoneId.systemDefault())));
         tile.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) open(c);
         });

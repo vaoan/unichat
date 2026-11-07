@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.support.I18n;
 import app.unichat.support.Os;
 import app.unichat.model.Network;
 import app.unichat.support.Folders;
@@ -184,7 +185,7 @@ public final class ChromeLogin {
             socket = blankTabSocketIn(get(port, "/json/list"));
             if (socket == null) Thread.sleep(100);
         }
-        if (socket == null) throw new IOException("Chrome no arrancó");
+        if (socket == null) throw new IOException(I18n.t("login.chrome.noStart"));
         DevTools tab = new DevTools(socket);
         siteTab = tab;
         String agent = params.userAgent();
@@ -225,7 +226,7 @@ public final class ChromeLogin {
             }
         }
         if (cancelled) throw new InterruptedException();
-        throw new IOException("Chrome no arrancó");
+        throw new IOException(I18n.t("login.chrome.noStart"));
     }
 
     private String get(int port, String path) throws IOException, InterruptedException {
@@ -280,7 +281,7 @@ public final class ChromeLogin {
             try {
                 socket = http.newWebSocketBuilder().buildAsync(URI.create(url), this).get(5, TimeUnit.SECONDS);
             } catch (ExecutionException | TimeoutException e) {
-                throw new IOException("No se pudo conectar con Chrome");
+                throw new IOException(I18n.t("login.chrome.noConnect"));
             }
         }
 
@@ -290,7 +291,7 @@ public final class ChromeLogin {
             try {
                 return answer.get(10, TimeUnit.SECONDS);
             } catch (ExecutionException | TimeoutException e) {
-                throw new IOException("Chrome no respondió");
+                throw new IOException(I18n.t("login.chrome.noAnswer"));
             }
         }
 

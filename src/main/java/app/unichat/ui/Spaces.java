@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
 import app.unichat.service.ChatService;
+import app.unichat.support.I18n;
 import javafx.application.Platform;
 
 import java.util.HashSet;
@@ -104,15 +105,15 @@ final class Spaces {
     /** Brings a server into Unichat; a big one takes minutes (the bridge makes a room per channel). */
     void add(Network n, String offerId, String name) {
         if (!adding.add(offerId)) return;
-        toast.accept("Agregando " + name + "… si es grande puede tardar unos minutos");
+        toast.accept(I18n.t("spaces.adding", name));
         onChanged.run();
         svc.addGroup(n, offerId).whenComplete((v, err) -> Platform.runLater(() -> {
             adding.remove(offerId);
             if (err != null) {
-                toast.accept("No se pudo agregar " + name + ". Prueba de nuevo en un momento.");
+                toast.accept(I18n.t("spaces.addFailed", name));
             } else {
                 offers.computeIfPresent(n, (k, l) -> l.stream().filter(o -> !o.id().equals(offerId)).toList());
-                toast.accept(name + " ya está en Unichat");
+                toast.accept(I18n.t("spaces.alreadyIn", name));
             }
             onChanged.run();
         }));
@@ -133,11 +134,11 @@ final class Spaces {
     void join(String id, String name) {
         if (pendingOpen != null) return;
         pendingOpen = id;
-        toast.accept("Uniéndote a " + name + "…");
+        toast.accept(I18n.t("spaces.joining", name));
         svc.joinChat(id).whenComplete((v, err) -> Platform.runLater(() -> {
             if (err != null) {
                 if (id.equals(pendingOpen)) pendingOpen = null;
-                toast.accept("No se pudo unir a " + name + ". Puede que ya no tengas acceso.");
+                toast.accept(I18n.t("spaces.joinFailed", name));
                 return;
             }
             onChanged.run();
@@ -148,7 +149,7 @@ final class Spaces {
         pendingTimeout.setOnFinished(e -> {
             if (!id.equals(pendingOpen)) return;
             pendingOpen = null;
-            toast.accept("Te uniste a " + name + "; aparecerá en la lista en un momento");
+            toast.accept(I18n.t("spaces.joined", name));
         });
         pendingTimeout.play();
     }

@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.model.Chat;
 import app.unichat.model.VoiceNote;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import app.unichat.voice.Microphone;
 import app.unichat.voice.VoiceEnhancer;
 import app.unichat.voice.PcmSource;
@@ -79,15 +80,15 @@ public final class Composer extends VBox {
         bannerText.getStyleClass().add("banner-text");
         VBox bannerBody = new VBox(1, bannerTitle, bannerText);
         HBox.setHgrow(bannerBody, Priority.ALWAYS);
-        Button close = Icons.iconButton(Icons.CLOSE, "Cancelar (Esc)", this::cancelMode);
+        Button close = Icons.iconButton(Icons.CLOSE, I18n.t("composer.cancelEsc"), this::cancelMode);
         banner.getChildren().addAll(bannerBody, close);
         banner.getStyleClass().add("composer-banner");
         banner.setAlignment(Pos.CENTER_LEFT);
         Nodes.show(banner, false);
 
-        input.setPromptText("Escribe un mensaje");
-        input.setAccessibleText("Escribe un mensaje");
-        input.setAccessibleHelp("Enter envía, Shift+Enter nueva línea, flecha arriba edita tu último mensaje, Esc cancela");
+        input.setPromptText(I18n.t("composer.placeholder"));
+        input.setAccessibleText(I18n.t("composer.placeholder"));
+        input.setAccessibleHelp(I18n.t("composer.help"));
         input.setWrapText(true);
         input.setPrefRowCount(1);
         input.getStyleClass().add("composer-input");
@@ -98,8 +99,8 @@ public final class Composer extends VBox {
         });
         HBox.setHgrow(input, Priority.ALWAYS);
 
-        Button attach = Icons.iconButton(Icons.ATTACH, "Adjuntar archivo", this::chooseFile);
-        Button emoji = Icons.iconButton(Icons.EMOJI, "Emojis", null);
+        Button attach = Icons.iconButton(Icons.ATTACH, I18n.t("composer.attach"), this::chooseFile);
+        Button emoji = Icons.iconButton(Icons.EMOJI, I18n.t("composer.emojis"), null);
         emoji.setOnAction(e -> {
             if (onPanel != null) onPanel.accept(SidePanel.Tab.EMOJIS);
             else EmojiPicker.show(emoji, this::insert);
@@ -107,15 +108,15 @@ public final class Composer extends VBox {
         Button stickers = new Button("GIF");
         stickers.getStyleClass().addAll("icon-button", "gif-button");
         stickers.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE); // 160 % text: "GIF", not "…"
-        stickers.setAccessibleText("Stickers y GIFs");
-        stickers.setTooltip(new javafx.scene.control.Tooltip("Stickers y GIFs"));
+        stickers.setAccessibleText(I18n.t("composer.stickersGifs"));
+        stickers.setTooltip(new javafx.scene.control.Tooltip(I18n.t("composer.stickersGifs")));
         stickers.setOnAction(e -> { if (onPanel != null) onPanel.accept(SidePanel.Tab.STICKERS); });
-        Button send = Icons.iconButton(Icons.SEND, "Enviar", this::send);
+        Button send = Icons.iconButton(Icons.SEND, I18n.t("composer.send"), this::send);
         send.getStyleClass().add("send-button");
         send.disableProperty().bind(input.textProperty().map(t -> t.isBlank()));
 
         this.send = send;
-        mic = Icons.iconButton(Icons.MIC, "Grabar una nota de voz", this::startRecording);
+        mic = Icons.iconButton(Icons.MIC, I18n.t("composer.record"), this::startRecording);
         mic.getStyleClass().add("mic-button");
         ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, this::aiDone, AiReplyButton::replyWriter);
         fix = new AiReplyButton(AiReplyButton.FIX, this::fixRequest, this::fixed, onError, this::aiDone, AiReplyButton::fixWriter);
@@ -144,7 +145,7 @@ public final class Composer extends VBox {
             stopTyping();
             drafts.put(chatId, editing == null ? input.getText() : "");
         }
-        if (recorder != null) discardRecording("Grabación descartada al cambiar de chat");
+        if (recorder != null) discardRecording(I18n.t("composer.recordingDiscarded"));
         chatId = newChatId;
         replyTo = null;
         editing = null;
@@ -181,7 +182,7 @@ public final class Composer extends VBox {
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     mic.setDisable(false);
-                    onError.accept(e.getMessage() != null ? e.getMessage() : "No se pudo usar el micrófono");
+                    onError.accept(e.getMessage() != null ? e.getMessage() : I18n.t("composer.micFailed"));
                 });
             }
         });
@@ -231,22 +232,22 @@ public final class Composer extends VBox {
                 if (note.durationMs() < MIN_VOICE_MS) {
                     r.deleteRaw();
                     Files.deleteIfExists(note.file());
-                    Platform.runLater(() -> onError.accept("La nota de voz es demasiado corta"));
+                    Platform.runLater(() -> onError.accept(I18n.t("composer.voiceTooShort")));
                     return;
                 }
                 boolean[] told = {false};
                 VoiceNote improved = VoiceEnhancer.improve(note, r.raw(), r.rate(), done -> {
                     if (told[0]) return;
                     told[0] = true;
-                    Platform.runLater(() -> onError.accept("Instalando la mejora de audio; solo pasa la primera vez…"));
+                    Platform.runLater(() -> onError.accept(I18n.t("composer.installingEnhancer")));
                 });
                 r.deleteRaw();
                 svc.sendVoice(toChat, improved, reply).exceptionally(err -> {
-                    Platform.runLater(() -> onError.accept("No se pudo enviar la nota de voz"));
+                    Platform.runLater(() -> onError.accept(I18n.t("composer.voiceSendFailed")));
                     return null;
                 });
             } catch (Exception e) {
-                Platform.runLater(() -> onError.accept("No se pudo guardar la nota de voz"));
+                Platform.runLater(() -> onError.accept(I18n.t("composer.voiceSaveFailed")));
             }
         });
     }
@@ -281,16 +282,16 @@ public final class Composer extends VBox {
         if (!forChat.equals(chatId)) {
             if (fixing.equals(drafts.get(forChat))) {
                 drafts.put(forChat, corrected);
-                onError.accept("Texto corregido, en el chat donde lo escribiste");
+                onError.accept(I18n.t("composer.fixedElsewhere"));
             }
         } else if (!input.getText().equals(fixing)) {
-            onError.accept("El texto cambió mientras se corregía: quedó como lo dejaste");
+            onError.accept(I18n.t("composer.fixChanged"));
         } else if (corrected.equals(fixing.strip())) {
-            onError.accept("El texto ya estaba bien");
+            onError.accept(I18n.t("composer.fixNothing"));
         } else {
             input.replaceText(0, input.getLength(), corrected);
             input.positionCaret(input.getLength());
-            onError.accept("Texto corregido. " + Shortcuts.key("Z") + " lo deja como estaba");
+            onError.accept(I18n.t("composer.fixed", Shortcuts.key("Z")));
         }
     }
 
@@ -305,12 +306,12 @@ public final class Composer extends VBox {
     private void aiDraft(String forChat, String draft) {
         if (!forChat.equals(chatId)) {
             drafts.put(forChat, draft);
-            onError.accept("Borrador listo en el chat donde lo pediste");
+            onError.accept(I18n.t("composer.draftElsewhere"));
             return;
         }
         input.setText(draft);
         input.positionCaret(input.getLength());
-        onError.accept("Borrador listo: revísalo antes de enviarlo");
+        onError.accept(I18n.t("composer.draftReady"));
     }
 
     public void reply(Message m) {
@@ -358,7 +359,7 @@ public final class Composer extends VBox {
 
     private void chooseFile() {
         FileChooser fc = new FileChooser();
-        fc.setTitle("Adjuntar archivo");
+        fc.setTitle(I18n.t("composer.attach"));
         List<File> files = fc.showOpenMultipleDialog(getScene().getWindow());
         if (files != null) sendFiles(files);
     }
@@ -427,7 +428,7 @@ public final class Composer extends VBox {
     }
 
     private Void fail(Throwable t) {
-        Platform.runLater(() -> onError.accept("No se pudo enviar: " + Errors.message(t)));
+        Platform.runLater(() -> onError.accept(I18n.t("composer.sendFailed", Errors.message(t))));
         return null;
     }
 
@@ -442,10 +443,10 @@ public final class Composer extends VBox {
         boolean show = replyTo != null || editing != null;
         Nodes.show(banner, show);
         if (replyTo != null) {
-            bannerTitle.setText("Respondiendo a " + (replyTo.outgoing() ? "ti mismo" : replyTo.senderName()));
+            bannerTitle.setText(replyTo.outgoing() ? I18n.t("composer.replyingSelf") : I18n.t("composer.replying", replyTo.senderName()));
             bannerText.setText(replyTo.preview());
         } else if (editing != null) {
-            bannerTitle.setText("Editando mensaje");
+            bannerTitle.setText(I18n.t("composer.editing"));
             bannerText.setText(editing.preview());
         }
     }

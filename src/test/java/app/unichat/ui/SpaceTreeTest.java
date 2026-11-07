@@ -53,7 +53,7 @@ class SpaceTreeTest {
         chat("!d1", Network.TELEGRAM);
         chat("!t1", Network.TELEGRAM);
         List<SpaceTree.Node> roots = SpaceTree.build(chats, Network.TELEGRAM, Map.of());
-        assertEquals(List.of("grp", SpaceTree.LOOSE), names(roots));
+        assertEquals(List.of("grp", SpaceTree.loose()), names(roots));
         assertEquals(List.of("d1"), names(roots.get(1).children()));
     }
 
@@ -63,7 +63,7 @@ class SpaceTreeTest {
         chat("!c1", Network.DISCORD);
         assertEquals(List.of("srv"), names(SpaceTree.build(chats, Network.DISCORD, Map.of())));
         chat("!d2", Network.DISCORD);
-        assertEquals(List.of("srv", SpaceTree.LOOSE), names(SpaceTree.build(chats, Network.DISCORD, Map.of())));
+        assertEquals(List.of("srv", SpaceTree.loose()), names(SpaceTree.build(chats, Network.DISCORD, Map.of())));
     }
 
     @Test
@@ -125,8 +125,8 @@ class SpaceTreeTest {
         chat("!h1", Network.TELEGRAM).setAccountId("telegram:home");
         chat("!h2", Network.TELEGRAM).setAccountId("telegram:home");
         assertEquals(List.of("work"), names(SpaceTree.build(chats, Network.TELEGRAM, "telegram:work", Map.of())));
-        assertEquals(List.of("home", SpaceTree.LOOSE), names(SpaceTree.build(chats, Network.TELEGRAM, "telegram:home", Map.of())));
-        assertEquals(List.of("home", "work", SpaceTree.LOOSE), names(SpaceTree.build(chats, Network.TELEGRAM, null, Map.of())));
+        assertEquals(List.of("home", SpaceTree.loose()), names(SpaceTree.build(chats, Network.TELEGRAM, "telegram:home", Map.of())));
+        assertEquals(List.of("home", "work", SpaceTree.loose()), names(SpaceTree.build(chats, Network.TELEGRAM, null, Map.of())));
     }
 
     @Test

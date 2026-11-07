@@ -1,6 +1,7 @@
 package app.unichat.video;
 
 import app.unichat.support.ConvertedFiles;
+import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 
 import java.io.IOException;
@@ -31,7 +32,7 @@ public final class WebmStickers {
 
     /** Thrown when there's no ffmpeg to convert with (none installed, and installing isn't possible or is off). */
     public static final class NoConverter extends IOException {
-        NoConverter() { super("No hay conversor de video"); }
+        NoConverter() { super(I18n.t("video.noConverter")); }
     }
 
     /** The animated picture of {@code webm}: a WebP, or a GIF when this ffmpeg can't write those. Blocking. */
@@ -68,7 +69,7 @@ public final class WebmStickers {
                 }
             }
         }
-        throw new IOException("No se pudo convertir el sticker");
+        throw new IOException(I18n.t("video.stickerFailed"));
     }
 
     static List<String> command(Path ffmpeg, Path webm, Path out, String format, boolean libvpx) {

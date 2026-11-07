@@ -11,9 +11,11 @@ import app.unichat.service.ChatService;
 import app.unichat.service.MockChatService;
 import app.unichat.service.PreferencesFile;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import app.unichat.ui.DockIcon;
 import app.unichat.ui.TrayReopen;
 import app.unichat.ui.LoginView;
+import app.unichat.ui.SettingsWindow;
 import app.unichat.ui.MacQuit;
 import app.unichat.ui.MainView;
 import app.unichat.ui.Notifier;
@@ -42,6 +44,8 @@ public final class UnichatApp extends Application {
     @Override
     public void start(Stage primary) {
         stage = primary;
+        // -Dunichat.language (tests, snapshots) wins over what was chosen in Ajustes.
+        I18n.use(System.getProperty("unichat.language", Settings.get().language()));
         stage.setTitle("Unichat");
         stage.setMinWidth(760);
         stage.setMinHeight(480);
@@ -74,6 +78,8 @@ public final class UnichatApp extends Application {
         MacQuit.install(this::quit, () -> {
             if (TrayReopen.shouldShow(stage.isShowing(), System.currentTimeMillis() - hiddenAt)) showWindow();
         });
+
+        I18n.onChange(() -> Platform.runLater(this::relocalize));
 
         scene = new Scene(new javafx.scene.layout.StackPane(), stage.getWidth(), stage.getHeight());
         Theme.register(scene);
@@ -187,6 +193,27 @@ public final class UnichatApp extends Application {
         scene.setRoot(mainView);
         Theme.applyAll();
         svc.start();
+    }
+
+    /**
+     * Rebuilds the window in the language just chosen: the same chat stays open, and the settings window, where the
+     * change was made, reopens on the same page. Texts already built (open viewers, the demo's chats) keep the old one.
+     */
+    private void relocalize() {
+        notifier.relabel();
+        if (mainView == null || service == null) return;
+        String chat = mainView.currentChatId();
+        String page = SettingsWindow.currentPage();
+        if (SettingsWindow.current() != null) SettingsWindow.current().close();
+        mainView.dispose();
+        mainView = new MainView(service, stage, notifier, this::logout, this::openLink);
+        scene.setRoot(mainView);
+        Theme.applyAll();
+        if (chat != null) mainView.openChatId(chat);
+        if (page != null) {
+            mainView.showSettings();
+            SettingsWindow.select(page);
+        }
     }
 
     private void logout() {

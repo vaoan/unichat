@@ -1,5 +1,6 @@
 package app.unichat.links;
 
+import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 import app.unichat.model.LinkMedia;
 import org.jsoup.Jsoup;
@@ -86,7 +87,7 @@ public final class LinkInspector {
             try (InputStream in = a.response().body()) {
                 if (a.response().statusCode() != 200) throw new IOException("HTTP " + a.response().statusCode());
                 Files.deleteIfExists(target);
-                if (Files.copy(new Capped(in), target) > MAX_DOWNLOAD_BYTES) throw new IOException("Demasiado grande");
+                if (Files.copy(new Capped(in), target) > MAX_DOWNLOAD_BYTES) throw new IOException(I18n.t("link.tooBig"));
             }
             return a.response().headers().firstValue("Content-Type").orElse(null);
         } catch (InterruptedException e) {
@@ -156,17 +157,17 @@ public final class LinkInspector {
             response.body().close();
             uri = uri.resolve(next.get());
         }
-        throw new IOException("Demasiadas redirecciones");
+        throw new IOException(I18n.t("link.tooManyRedirects"));
     }
 
     private void check(URI uri) throws IOException {
         String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
         if (!(scheme.equals("http") || scheme.equals("https")) || uri.getHost() == null || uri.getUserInfo() != null) {
-            throw new IOException("Enlace no permitido");
+            throw new IOException(I18n.t("link.notAllowed"));
         }
         try {
             for (InetAddress a : InetAddress.getAllByName(uri.getHost())) {
-                if (!allowed.test(a)) throw new IOException("Dirección no permitida");
+                if (!allowed.test(a)) throw new IOException(I18n.t("link.addressNotAllowed"));
             }
         } catch (UnknownHostException e) {
             throw new IOException(e);
@@ -204,7 +205,7 @@ public final class LinkInspector {
 
         private void count(int n) throws IOException {
             total += n;
-            if (total > MAX_DOWNLOAD_BYTES) throw new IOException("Demasiado grande");
+            if (total > MAX_DOWNLOAD_BYTES) throw new IOException(I18n.t("link.tooBig"));
         }
     }
 }

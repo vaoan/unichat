@@ -3,6 +3,7 @@ package app.unichat.voice;
 import app.unichat.model.VoiceNote;
 import app.unichat.settings.Settings;
 import app.unichat.support.Downloads;
+import app.unichat.support.I18n;
 import app.unichat.video.Ffmpeg;
 
 import java.io.BufferedInputStream;
@@ -83,7 +84,7 @@ public final class VoiceEnhancer {
         if (Files.isRegularFile(f)) return f;
         if (!Ffmpeg.autoInstall()) return null;
         try {
-            Downloads.fetch(MODEL_URL, MODEL_SIZE, MODEL_SHA256, f, "el modelo de ruido", installing);
+            Downloads.fetch(MODEL_URL, MODEL_SIZE, MODEL_SHA256, f, I18n.t("download.what.noiseModel"), installing);
             return f;
         } catch (IOException e) {
             System.err.println("No noise model: " + e.getClass().getSimpleName());

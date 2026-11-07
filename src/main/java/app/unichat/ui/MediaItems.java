@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import app.unichat.support.I18n;
 
 import java.time.Instant;
 
@@ -39,8 +40,8 @@ final class MediaItems {
                 javafx.scene.Node mark = Icons.icon(Icons.ERROR, 16);
                 javafx.scene.layout.StackPane.setAlignment(mark, javafx.geometry.Pos.BOTTOM_RIGHT);
                 tile.getChildren().add(mark);
-                tile.setAccessibleText(tile.getAccessibleText() + ", no se pudo recuperar el archivo");
-                javafx.scene.control.Tooltip.install(tile, new javafx.scene.control.Tooltip("No se pudo recuperar el archivo"));
+                tile.setAccessibleText(I18n.t("media.lostA11y", tile.getAccessibleText()));
+                javafx.scene.control.Tooltip.install(tile, new javafx.scene.control.Tooltip(I18n.t("media.lost")));
             });
         });
     }

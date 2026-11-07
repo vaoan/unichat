@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.model.Chat;
 import app.unichat.service.ChatService;
+import app.unichat.support.I18n;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Pos;
@@ -30,7 +31,7 @@ final class SpaceChannelsView extends VBox {
     private final ObservableList<Chat> items = FXCollections.observableArrayList();
     private final ListView<Chat> list = new ListView<>(items);
     private final Label title = new Label();
-    private final Button markRead = Icons.iconButton(Icons.CHECK_DOUBLE, "Marcar todo como leído", this::markRead);
+    private final Button markRead = Icons.iconButton(Icons.CHECK_DOUBLE, I18n.t("spaceChannels.markAllRead"), this::markRead);
     private final Button back;
     private final Set<String> channelsAsked = new HashSet<>();
     /** The server showing, or null. */
@@ -43,7 +44,7 @@ final class SpaceChannelsView extends VBox {
         this.svc = svc;
         this.spaces = spaces;
         this.open = open;
-        back = Icons.iconButton(Icons.CHEVRON_LEFT, "Volver a la bandeja", onBack);
+        back = Icons.iconButton(Icons.CHEVRON_LEFT, I18n.t("spaceChannels.back"), onBack);
         title.getStyleClass().add("space-title");
         title.setMinWidth(0);
         title.setMaxWidth(Double.MAX_VALUE);
@@ -62,7 +63,7 @@ final class SpaceChannelsView extends VBox {
     private void configureList(Supplier<ListCell<Chat>> cells, Function<Chat, ContextMenu> rowMenu, Runnable onBack) {
         list.getStyleClass().addAll("chat-list", "space-list");
         list.setCellFactory(v -> cells.get());
-        Label noChannels = new Label("Trayendo los canales…");
+        Label noChannels = new Label(I18n.t("spaceChannels.loading"));
         noChannels.getStyleClass().add("empty-label");
         list.setPlaceholder(noChannels);
         ChatMenus.onMenuKey(list, rowMenu);
@@ -112,7 +113,7 @@ final class SpaceChannelsView extends VBox {
             Chat s = svc.chat(openId);
             title.setText(s.title());
             rows = InboxRows.channels(all, openId, f.accountId(), spaces.names());
-            list.setAccessibleText("Canales de " + s.title());
+            list.setAccessibleText(I18n.t("spaceChannels.listLabel", s.title()));
         }
     }
 

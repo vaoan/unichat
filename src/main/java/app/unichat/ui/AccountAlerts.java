@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Network;
+import app.unichat.support.I18n;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,9 +37,9 @@ final class AccountAlerts {
             if (worst == null) continue;
             String who = n.displayName() + (many ? " (" + worst.label() + ")" : "");
             switch (worst.status()) {
-                case NEEDS_LOGIN -> out.add(new Alert(n, who, who + ": se cerró la sesión. No llegan mensajes hasta que la vuelvas a vincular.", true));
-                case ERROR -> out.add(new Alert(n, who, who + ": tiene errores. Unichat lo está reiniciando…", false));
-                case CONNECTING -> out.add(new Alert(n, who, who + ": sin conexión. Reconectando solo…", false));
+                case NEEDS_LOGIN -> out.add(new Alert(n, who, I18n.t("alerts.needsLogin", who), true));
+                case ERROR -> out.add(new Alert(n, who, I18n.t("alerts.error", who), false));
+                case CONNECTING -> out.add(new Alert(n, who, I18n.t("alerts.offline", who), false));
                 default -> { }
             }
         }
@@ -50,9 +51,9 @@ final class AccountAlerts {
     static String recoveringLine(List<Alert> recovering) {
         List<String> names = recovering.stream().map(Alert::who).toList();
         return switch (names.size()) {
-            case 1 -> "Reconectando " + names.get(0) + "…";
-            case 2 -> "Reconectando " + names.get(0) + " y " + names.get(1) + "…";
-            default -> "Reconectando " + names.size() + " redes…";
+            case 1 -> I18n.t("alerts.reconnecting.one", names.get(0));
+            case 2 -> I18n.t("alerts.reconnecting.two", names.get(0), names.get(1));
+            default -> I18n.t("alerts.reconnecting.many", names.size());
         };
     }
 

@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.server.TelegramKeys;
+import app.unichat.support.I18n;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
@@ -24,24 +25,21 @@ final class TelegramKeysForm extends VBox {
     TelegramKeysForm(String saveText, Runnable onSaved) {
         super(10);
         getStyleClass().add("telegram-keys");
-        Label intro = help("Telegram pide que cada persona use sus propias claves. Son gratis, se sacan una sola vez y se "
-                + "quedan guardadas solo en este computador. No las compartas con nadie.");
-        Label steps = help("1. Entra a my.telegram.org con tu número de Telegram.\n"
-                + "2. Abre \"API development tools\" y crea una aplicación (el nombre no importa).\n"
-                + "3. Copia aquí el \"App api_id\" y el \"App api_hash\".");
-        Hyperlink open = new Hyperlink("Abrir my.telegram.org");
-        open.setAccessibleText("Abrir my.telegram.org en el navegador");
+        Label intro = help(I18n.t("settings.telegram.intro"));
+        Label steps = help(I18n.t("settings.telegram.steps"));
+        Hyperlink open = new Hyperlink(I18n.t("settings.telegram.open"));
+        open.setAccessibleText(I18n.t("settings.telegram.openAccessible"));
         open.setOnAction(e -> Browser.open(TelegramKeys.URL)); // the address is in the steps above too
         hash.setText(TelegramKeys.apiHash());
-        id.setPromptText("Por ejemplo 1234567");
-        id.setAccessibleText("App api_id de Telegram");
+        id.setPromptText(I18n.t("settings.telegram.idPrompt"));
+        id.setAccessibleText(I18n.t("settings.telegram.idAccessible"));
         id.getStyleClass().add("telegram-api-id");
-        hash.setPromptText("32 caracteres");
-        hash.setAccessibleText("App api_hash de Telegram");
+        hash.setPromptText(I18n.t("settings.telegram.hashPrompt"));
+        hash.setAccessibleText(I18n.t("settings.telegram.hashAccessible"));
         hash.getStyleClass().add("telegram-api-hash");
-        Label idLabel = new Label("App api_id");
+        Label idLabel = new Label(I18n.t("settings.telegram.idLabel"));
         idLabel.setLabelFor(id);
-        Label hashLabel = new Label("App api_hash");
+        Label hashLabel = new Label(I18n.t("settings.telegram.hashLabel"));
         hashLabel.setLabelFor(hash);
         error.getStyleClass().add("login-error");
         error.setWrapText(true);

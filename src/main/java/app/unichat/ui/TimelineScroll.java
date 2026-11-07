@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.Message;
+import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.scene.Node;
@@ -32,7 +33,7 @@ final class TimelineScroll {
         this.rows = rows;
         this.chatOpen = chatOpen;
         this.atTop = atTop;
-        jumpDown = Icons.iconButton(Icons.LOW, "Ir al final", this::scrollToBottom);
+        jumpDown = Icons.iconButton(Icons.LOW, I18n.t("timeline.jumpDown"), this::scrollToBottom);
         jumpDown.getStyleClass().add("jump-down");
         jumpDown.setVisible(false);
         list.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> userScrolled());

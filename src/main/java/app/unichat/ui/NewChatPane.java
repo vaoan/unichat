@@ -6,6 +6,7 @@ import app.unichat.model.Contact;
 import app.unichat.model.Network;
 import app.unichat.service.ChatService;
 import app.unichat.support.Errors;
+import app.unichat.support.I18n;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.scene.control.Label;
@@ -37,7 +38,7 @@ final class NewChatPane extends VBox {
 
     /** A list row: a contact, or "Escribir a <what you typed>" (resolved when chosen). */
     private record Row(Contact contact, String typed) {
-        String label() { return contact != null ? contact.name() : "Escribir a " + typed; }
+        String label() { return contact != null ? contact.name() : I18n.t("newChat.writeTo", typed); }
 
         String detail() {
             if (contact == null) return "";
@@ -73,11 +74,11 @@ final class NewChatPane extends VBox {
         this.toast = toast;
         getStyleClass().addAll("new-chat-pane", "card");
         setMaxWidth(520);
-        Label title = new Label("Nuevo chat");
+        Label title = new Label(I18n.t("newChat.title"));
         title.getStyleClass().add("settings-title");
 
         search.getStyleClass().addAll("search-field", "new-chat-search");
-        search.setPromptText("Nombre, número o @usuario");
+        search.setPromptText(I18n.t("newChat.searchPrompt"));
         search.textProperty().addListener((o, a, b) -> debounce.playFromStart());
         debounce.setOnFinished(e -> runQuery());
         search.setOnKeyPressed(e -> {
@@ -105,7 +106,7 @@ final class NewChatPane extends VBox {
         status.getStyleClass().add("settings-help");
         status.setWrapText(true);
         list.getStyleClass().add("new-chat-list");
-        list.setAccessibleText("Contactos");
+        list.setAccessibleText(I18n.t("newChat.contacts"));
         list.setCellFactory(v -> new Cell());
         list.setPrefHeight(320);
         list.setOnKeyPressed(e -> {
@@ -117,8 +118,8 @@ final class NewChatPane extends VBox {
             }
         });
         VBox.setVgrow(list, Priority.ALWAYS);
-        networks.setAccessibleText("Red");
-        accountRow.setAccessibleText("Cuenta");
+        networks.setAccessibleText(I18n.t("newChat.network"));
+        accountRow.setAccessibleText(I18n.t("newChat.account"));
         getChildren().addAll(title, networks, accountRow, search, status, list);
         // Closed (Esc, another overlay): a chat still being created must not take over the screen later.
         sceneProperty().addListener((o, a, b) -> { if (b == null) cancelPending(); });
@@ -138,7 +139,7 @@ final class NewChatPane extends VBox {
             if (first == null || n == preferred) first = b;
         }
         if (first == null) {
-            setStatus("Primero conecta una red en Ajustes → Cuentas.");
+            setStatus(I18n.t("newChat.connectFirst"));
             search.setDisable(true);
         } else {
             first.fire();
@@ -184,9 +185,9 @@ final class NewChatPane extends VBox {
         support = new ChatService.ContactSupport(false, false);
         all = List.of();
         list.getItems().clear();
-        search.setAccessibleText("Buscar contacto en " + a.network().displayName());
+        search.setAccessibleText(I18n.t("newChat.searchA11y", a.network().displayName()));
         search.setDisable(false);
-        setStatus("Cargando…");
+        setStatus(I18n.t("common.loading"));
         ChatService.ContactSupport[] found = new ChatService.ContactSupport[1];
         svc.contactSupport(a).thenCompose(s -> {
             found[0] = s;
@@ -201,15 +202,15 @@ final class NewChatPane extends VBox {
     }
 
     private static String unavailable(Network n) {
-        if (n == Network.DISCORD) return "En Discord encuentras a la gente en sus servidores: usa la vista Grupos de la lista de chats.";
-        return n.displayName() + " no permite buscar contactos desde Unichat. Escríbele desde tu teléfono y el chat aparecerá aquí.";
+        if (n == Network.DISCORD) return I18n.t("newChat.discordHint");
+        return I18n.t("newChat.noSearch", n.displayName());
     }
 
     private void runQuery() {
         if (account == null) return;
         if (loading) {
             ++generation;
-            show(List.of(), "Cargando…");
+            show(List.of(), I18n.t("common.loading"));
             return;
         }
         if (!support.list() && !support.search()) {
@@ -223,15 +224,15 @@ final class NewChatPane extends VBox {
         if (looksLikeIdentifier(q)) rows.add(new Row(null, q));
         if (q.isEmpty()) {
             all.forEach(c -> rows.add(new Row(c, null)));
-            show(rows, all.isEmpty() && support.search() ? "Escribe un nombre para buscar en " + account.network().displayName() + "." : null);
+            show(rows, all.isEmpty() && support.search() ? I18n.t("newChat.typeToSearch", account.network().displayName()) : null);
             return;
         }
         if (!support.search()) {
             filterLocally(q).forEach(c -> rows.add(new Row(c, null)));
-            show(rows, rows.isEmpty() ? "Sin resultados" : null);
+            show(rows, rows.isEmpty() ? I18n.t("newChat.noResults") : null);
             return;
         }
-        setStatus("Buscando…");
+        setStatus(I18n.t("newChat.searching"));
         svc.searchContacts(account, q).whenComplete((found, err) -> Platform.runLater(() -> {
             if (gen != generation) return;
             if (err != null) {
@@ -239,14 +240,14 @@ final class NewChatPane extends VBox {
                 if (cause instanceof UnsupportedOperationException) {
                     support = new ChatService.ContactSupport(support.list(), false);
                     filterLocally(q).forEach(c -> rows.add(new Row(c, null)));
-                    show(rows, rows.isEmpty() ? account.network().displayName() + " no permite buscar contactos desde Unichat." : null);
+                    show(rows, rows.isEmpty() ? I18n.t("newChat.noSearchShort", account.network().displayName()) : null);
                 } else {
-                    show(rows, "No se pudo buscar ahora. Intenta de nuevo.");
+                    show(rows, I18n.t("newChat.searchFailed"));
                 }
                 return;
             }
             found.forEach(c -> rows.add(new Row(c, null)));
-            show(rows, rows.isEmpty() ? "Sin resultados" : null);
+            show(rows, rows.isEmpty() ? I18n.t("newChat.noResults") : null);
         }));
     }
 
@@ -284,7 +285,7 @@ final class NewChatPane extends VBox {
     private void choose(Row r) {
         Account a = account;
         if (a == null || pendingListener != null) return; // already opening one
-        setStatus("Abriendo…");
+        setStatus(I18n.t("newChat.opening"));
         Nodes.show(status, true);
         java.util.concurrent.CompletableFuture<Contact> contact = r.contact() != null
                 ? java.util.concurrent.CompletableFuture.completedFuture(r.contact()) : svc.resolveContact(a, normalizeIdentifier(r.typed()));
@@ -295,8 +296,8 @@ final class NewChatPane extends VBox {
             if (err != null) {
                 Throwable cause = Errors.unwrap(err);
                 setStatus(cause instanceof IllegalArgumentException
-                        ? "No se encontró a " + r.typed() + " en " + a.network().displayName() + "."
-                        : "No se pudo abrir el chat. Intenta de nuevo.");
+                        ? I18n.t("newChat.notFound", r.typed(), a.network().displayName())
+                        : I18n.t("newChat.openFailed"));
                 return;
             }
             if (getScene() != null) openWhenReady(roomId);
@@ -311,7 +312,7 @@ final class NewChatPane extends VBox {
             return;
         }
         if (getScene() == null) return; // closed while the bridge answered
-        setStatus("Creando el chat…");
+        setStatus(I18n.t("newChat.creating"));
         ChatService.Listener l = new ChatService.Listener() {
             @Override
             public void chatsChanged() {
@@ -330,7 +331,7 @@ final class NewChatPane extends VBox {
             if (pendingListener != l) return;
             cancelPending();
             close.run();
-            toast.accept("El chat se está creando; aparecerá en la bandeja");
+            toast.accept(I18n.t("newChat.creatingToast"));
         });
         pendingTimeout.play();
     }

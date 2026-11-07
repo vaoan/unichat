@@ -3,6 +3,7 @@ package app.unichat.matrix;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.Network;
+import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -52,7 +53,7 @@ final class SyncEvents {
         String url = text(content, "url");
         if (url == null && content.has("file")) {
             m.setType(MessageType.TEXT);
-            m.setBody("🔒 Archivo cifrado no compatible");
+            m.setBody(I18n.t("sync.encryptedFile"));
             return;
         }
         m.setMediaUrl(url);
@@ -114,7 +115,7 @@ final class SyncEvents {
         if (n == null || n.puppetPrefix() == null || !local.startsWith(n.puppetPrefix())) return local;
         String rest = local.substring(n.puppetPrefix().length());
         if (rest.matches("\\d{6,15}")) return "+" + rest;
-        return "Contacto de " + n.displayName();
+        return I18n.t("sync.contactOf", n.displayName());
     }
 
     static String localpart(String userId) {

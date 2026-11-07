@@ -4,6 +4,7 @@ import app.unichat.login.BridgeContacts;
 import app.unichat.model.Account;
 import app.unichat.model.Contact;
 import app.unichat.service.ChatService.ContactSupport;
+import app.unichat.support.I18n;
 
 import java.util.List;
 import java.util.Set;
@@ -72,7 +73,7 @@ final class ContactActions {
         if (contact.dmRoomId() != null) return CompletableFuture.completedFuture(contact.dmRoomId());
         return core.call(() -> {
             BridgeContacts b = bridgeContacts(a);
-            if (b == null) throw new IllegalStateException("Esta red no permite abrir chats nuevos desde Unichat");
+            if (b == null) throw new IllegalStateException(I18n.t("contact.newChatUnsupported"));
             return b.createDm(contact.id());
         });
     }

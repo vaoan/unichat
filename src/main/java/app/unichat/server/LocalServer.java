@@ -4,6 +4,7 @@ import app.unichat.support.BundledTools;
 import app.unichat.settings.Settings;
 import app.unichat.bridge.BridgePorts;
 import app.unichat.bridge.BridgeStates;
+import app.unichat.support.I18n;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -147,7 +148,7 @@ public final class LocalServer {
         Properties secrets = secretsFile.load();
         if (!running) supervisor.reapOrphans();
         Files.createDirectories(dir.resolve("appservices"));
-        progress.accept("Preparando el servidor…");
+        progress.accept(I18n.t("server.preparing"));
         store.installBundled("tuwunel", bundledHomeserver(), manifest.tuwunelVersion());
         installLibolm();
         writeDoublePuppet(secrets);
@@ -171,7 +172,7 @@ public final class LocalServer {
      * it with the server (a restart of a few seconds) and starts it. Blocking.
      */
     public synchronized void ensureBridge(String bridge, Consumer<String> progress) throws IOException, InterruptedException {
-        if (!BridgePorts.BRIDGE_PORTS.containsKey(bridge)) throw new IOException("Red no disponible en el servidor local: " + bridge);
+        if (!BridgePorts.BRIDGE_PORTS.containsKey(bridge)) throw new IOException(I18n.t("server.networkUnavailable", bridge));
         if (!running) ensureRunning(progress);
         Set<String> active = activeBridges();
         if (!active.contains(bridge)) {
@@ -179,7 +180,7 @@ public final class LocalServer {
             active.add(bridge);
             Files.writeString(dir.resolve("bridges.active"), String.join(" ", active));
             // tuwunel reads appservice registrations at startup.
-            progress.accept("Reiniciando el servidor…");
+            progress.accept(I18n.t("server.restarting"));
             supervisor.stop("tuwunel");
             startHomeserver(progress);
         }
@@ -188,7 +189,7 @@ public final class LocalServer {
             prepareBridge(bridge, secretsFile.load(), progress);
             startBridge(bridge);
         }
-        progress.accept("Esperando al puente…");
+        progress.accept(I18n.t("server.waitingBridge"));
         awaitPort(BridgePorts.BRIDGE_PORTS.get(bridge), 60);
     }
 
@@ -208,7 +209,7 @@ public final class LocalServer {
     }
 
     private void startHomeserver(Consumer<String> progress) throws IOException, InterruptedException {
-        progress.accept("Iniciando el servidor…");
+        progress.accept(I18n.t("server.starting"));
         Path hs = dir.resolve("tuwunel");
         List<String> command = new ArrayList<>(List.of(store.path("tuwunel").toString(), "-c", hs.resolve("tuwunel.toml").toString()));
         // Old Discord attachments go before the bridge starts (it must not be using its database meanwhile).
@@ -227,7 +228,7 @@ public final class LocalServer {
             if (answers()) return;
             Thread.sleep(500);
         }
-        throw new IOException("El servidor no respondió; revisa " + hs.resolve("tuwunel.log"));
+        throw new IOException(I18n.t("server.noAnswer", hs.resolve("tuwunel.log")));
     }
 
     private boolean answers() {
@@ -258,7 +259,7 @@ public final class LocalServer {
                 Thread.sleep(500);
             }
         }
-        throw new IOException("El puente no arrancó (puerto " + port + ")");
+        throw new IOException(I18n.t("server.bridgeNoStart", port));
     }
 
     private void writeHomeserverConfig(Properties secrets) throws IOException {
@@ -302,7 +303,7 @@ public final class LocalServer {
                 .put("token", secrets.getProperty("registration_token"))
                 .put("session", first.path("session").asText(""));
         JsonNode done = postJson("/_matrix/client/v3/register", body);
-        if (!done.has("user_id")) throw new IOException("No se pudo crear la cuenta: " + done);
+        if (!done.has("user_id")) throw new IOException(I18n.t("server.accountFailed", done));
         markAccountCreated(secrets);
     }
 
@@ -357,7 +358,7 @@ public final class LocalServer {
         if (o != null) return Path.of(o);
         Path f = BundledTools.appFile(file);
         if (f != null && Files.exists(f)) return f; // exists, not executable: libolm isn't
-        throw new IOException("Esta copia de Unichat no trae " + file);
+        throw new IOException(I18n.t("server.missingFile", file));
     }
 
     /**

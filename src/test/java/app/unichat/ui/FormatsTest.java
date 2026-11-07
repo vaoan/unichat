@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.support.I18n;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -44,5 +45,21 @@ class FormatsTest {
         assertEquals("AP", Formats.accountShort("Ana Pérez"));
         assertEquals("H", Formats.accountShort("@hector"));
         assertEquals("?", Formats.accountShort(null));
+    }
+
+    @Test
+    void englishDatesAndTyping() {
+        I18n.use("en");
+        try {
+            assertEquals("Today", Formats.daySeparator(NOW, NOW, ZoneOffset.UTC));
+            assertEquals("Yesterday", Formats.daySeparator(Instant.parse("2026-10-25T09:00:00Z"), NOW, ZoneOffset.UTC));
+            assertEquals("Yesterday", Formats.listStamp(Instant.parse("2026-10-25T09:00:00Z"), NOW, ZoneOffset.UTC));
+            assertEquals("Thu", Formats.listStamp(Instant.parse("2026-10-22T09:00:00Z"), NOW, ZoneOffset.UTC));
+            assertEquals("Tuesday, February 3", Formats.daySeparator(Instant.parse("2026-02-03T09:00:00Z"), NOW, ZoneOffset.UTC));
+            assertEquals("Wednesday, December 3, 2025", Formats.daySeparator(Instant.parse("2025-12-03T09:00:00Z"), NOW, ZoneOffset.UTC));
+            assertEquals("Ana and Luis are typing…", Formats.typing(List.of("Ana", "Luis")));
+        } finally {
+            I18n.use("es");
+        }
     }
 }

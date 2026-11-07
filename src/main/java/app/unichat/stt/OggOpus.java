@@ -1,5 +1,6 @@
 package app.unichat.stt;
 
+import app.unichat.support.I18n;
 import io.github.jaredmdobson.concentus.OpusDecoder;
 import io.github.jaredmdobson.concentus.OpusException;
 
@@ -70,7 +71,7 @@ public final class OggOpus {
 
     private static Decoded decode(Path in) throws IOException {
         List<byte[]> packets = packets(Files.readAllBytes(in));
-        if (packets.size() < 2 || !startsWith(packets.get(0), "OpusHead")) throw new IOException("No es un audio Opus");
+        if (packets.size() < 2 || !startsWith(packets.get(0), "OpusHead")) throw new IOException(I18n.t("stt.notOpus"));
         byte[] head = packets.get(0);
         // Samples to drop at the start (encoder delay), always in 48 kHz units.
         int preSkip = (head[10] & 0xFF) | (head[11] & 0xFF) << 8;
@@ -144,7 +145,7 @@ public final class OggOpus {
         Integer serial = null;
         while (pos + 27 <= ogg.length) {
             if (ogg[pos] != 'O' || ogg[pos + 1] != 'g' || ogg[pos + 2] != 'g' || ogg[pos + 3] != 'S') {
-                throw new IOException("Página Ogg dañada");
+                throw new IOException(I18n.t("stt.badOgg"));
             }
             int pageSerial = ByteBuffer.wrap(ogg, pos + 14, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
             int segments = ogg[pos + 26] & 0xFF;

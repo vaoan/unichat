@@ -1,6 +1,7 @@
 package app.unichat.service;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;
@@ -24,7 +25,7 @@ final class DemoMedia {
         Path file = dir.resolve(name);
         if (Files.exists(file)) return file;
         try (var in = DemoMedia.class.getResourceAsStream("/app/unichat/demo/" + name)) {
-            if (in == null) throw new IOException("Falta el audio de demostración " + name);
+            if (in == null) throw new IOException(I18n.t("demo.missingAudio", name));
             Files.copy(in, file);
         }
         return file;

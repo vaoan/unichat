@@ -2,6 +2,7 @@ package app.unichat.matrix;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
+import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -43,34 +44,34 @@ public final class MatrixLogin {
         return new MatrixChatService(s.homeserver(), s.userId(), s.accessToken());
     }
 
-    /** Short Spanish message for an error coming out of this service's futures. */
+    /** Short translated message for an error coming out of this service's futures. */
     public static String userMessage(Throwable t) {
         t = Errors.unwrap(t);
         if (t instanceof MatrixException me) {
             if (me.errcode() == null) return me.getMessage();
             return switch (me.errcode()) {
-                case "M_FORBIDDEN" -> "No tienes permiso para hacer esto";
-                case "M_LIMIT_EXCEEDED" -> "Demasiados intentos, espera un momento";
-                case "M_UNKNOWN_TOKEN" -> "La sesión expiró, vuelve a iniciar sesión";
-                case "M_USER_DEACTIVATED" -> "La cuenta está desactivada";
-                case "M_TOO_LARGE" -> "El archivo es demasiado grande para el servidor";
-                case "M_NOT_FOUND" -> "No encontrado en el servidor";
-                default -> "Error del servidor: " + me.getMessage();
+                case "M_FORBIDDEN" -> I18n.t("matrix.err.forbidden");
+                case "M_LIMIT_EXCEEDED" -> I18n.t("matrix.err.limit");
+                case "M_UNKNOWN_TOKEN" -> I18n.t("matrix.err.unknownToken");
+                case "M_USER_DEACTIVATED" -> I18n.t("matrix.err.deactivated");
+                case "M_TOO_LARGE" -> I18n.t("matrix.err.tooLarge");
+                case "M_NOT_FOUND" -> I18n.t("matrix.err.notFound");
+                default -> I18n.t("matrix.err.server", me.getMessage());
             };
         }
         if (t instanceof ConnectException || t instanceof HttpConnectTimeoutException
                 || t instanceof java.net.UnknownHostException || t instanceof java.nio.channels.UnresolvedAddressException) {
-            return "No se pudo conectar con el servidor";
+            return I18n.t("matrix.err.noConnect");
         }
-        if (t instanceof IOException) return "Error de red: " + Errors.message(t);
-        return t.getMessage() == null ? "Error inesperado" : t.getMessage();
+        if (t instanceof IOException) return I18n.t("matrix.err.network", Errors.message(t));
+        return t.getMessage() == null ? I18n.t("matrix.err.unexpected") : t.getMessage();
     }
 
     private static MatrixChatService doLogin(String homeserverOrDomain, String user, String password) throws IOException {
         String u = user == null ? "" : user.trim();
         String hs = homeserverOrDomain == null ? "" : homeserverOrDomain.trim();
         if (hs.isEmpty() && u.startsWith("@") && u.contains(":")) hs = u.substring(u.indexOf(':') + 1);
-        if (hs.isEmpty() || u.isEmpty()) throw new MatrixException(0, null, "Indica el servidor y el usuario");
+        if (hs.isEmpty() || u.isEmpty()) throw new MatrixException(0, null, I18n.t("matrix.login.needServerUser"));
         HttpClient http = MatrixClient.newHttpClient();
         String base = resolveHomeserver(http, hs);
 
@@ -84,17 +85,17 @@ public final class MatrixLogin {
             resp = new MatrixClient(http, base, null).post(CLIENT + "/login", body);
         } catch (MatrixException e) {
             String msg = switch (e.errcode() == null ? "" : e.errcode()) {
-                case "M_FORBIDDEN" -> "Usuario o contraseña incorrectos";
-                case "M_USER_DEACTIVATED" -> "La cuenta está desactivada";
-                case "M_LIMIT_EXCEEDED" -> "Demasiados intentos, espera un momento";
-                case "M_UNKNOWN", "M_BAD_JSON", "M_INVALID_USERNAME" -> "Usuario no válido";
-                default -> "No se pudo iniciar sesión: " + e.getMessage();
+                case "M_FORBIDDEN" -> I18n.t("matrix.login.badCredentials");
+                case "M_USER_DEACTIVATED" -> I18n.t("matrix.err.deactivated");
+                case "M_LIMIT_EXCEEDED" -> I18n.t("matrix.err.limit");
+                case "M_UNKNOWN", "M_BAD_JSON", "M_INVALID_USERNAME" -> I18n.t("matrix.login.badUser");
+                default -> I18n.t("matrix.login.failed", e.getMessage());
             };
             throw new MatrixException(e.status(), e.errcode(), msg);
         }
         String token = resp.path("access_token").asText(null);
         String uid = resp.path("user_id").asText(null);
-        if (token == null || uid == null) throw new MatrixException(0, null, "Respuesta de inicio de sesión no válida");
+        if (token == null || uid == null) throw new MatrixException(0, null, I18n.t("matrix.login.badResponse"));
         String wkBase = resp.path("well_known").path("m.homeserver").path("base_url").asText(null);
         if (wkBase != null && !wkBase.isBlank()) base = MatrixClient.stripSlash(wkBase);
         SyncCache.drop();
@@ -122,7 +123,7 @@ public final class MatrixLogin {
             }
             if (isHomeserver(http, c)) return c;
         }
-        throw new MatrixException(0, null, "No se pudo conectar con el servidor");
+        throw new MatrixException(0, null, I18n.t("matrix.err.noConnect"));
     }
 
     private static boolean isHomeserver(HttpClient http, String base) {

@@ -4,6 +4,7 @@ import app.unichat.model.Message;
 import app.unichat.model.Network;
 import app.unichat.service.ChatService.Listener;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -51,7 +52,7 @@ final class BotChat {
         body.put("preset", "trusted_private_chat");
         body.putArray("invite").add(bot);
         roomId = client.post(CLIENT + "/createRoom", body).path("room_id").asText(null);
-        if (roomId == null) throw new MatrixException(0, null, "No se pudo crear el chat con el bot");
+        if (roomId == null) throw new MatrixException(0, null, I18n.t("bot.createFailed"));
         addDirect(bot, roomId);
         waitForJoin(roomId, bot);
         return roomId;
@@ -122,7 +123,7 @@ final class BotChat {
             String reply = replyAfter(roomId, before);
             if (reply != null) return reply;
         }
-        throw new MatrixException(0, null, "El puente de " + n.displayName() + " no respondió");
+        throw new MatrixException(0, null, I18n.t("bot.noReply", n.displayName()));
     }
 
     String find(Network n) {

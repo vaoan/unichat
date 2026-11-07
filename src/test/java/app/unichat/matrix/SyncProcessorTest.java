@@ -253,7 +253,7 @@ class SyncProcessorTest {
         assertEquals("doc.pdf", file.fileName());
         assertEquals("mira esto", file.body());
         assertEquals(MessageType.SYSTEM, ms.get(2).type());
-        assertEquals(SyncProcessor.ENCRYPTED_TEXT, ms.get(2).body());
+        assertEquals(SyncProcessor.encryptedText(), ms.get(2).body());
     }
 
     @Test

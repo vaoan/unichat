@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.ContextMenu;
@@ -114,7 +115,7 @@ final class ChatRowCell extends ListCell<Chat> {
         // Several accounts on this network: a tiny avatar says which one (full name on hover / screen reader).
         accountTag.setText(account == null ? "" : Formats.accountShort(account));
         accountTag.setStyle(account == null ? "" : "-fx-background-color: " + Avatar.colorFor(account) + ";");
-        accountTag.setTooltip(account == null ? null : new javafx.scene.control.Tooltip("Cuenta: " + account));
+        accountTag.setTooltip(account == null ? null : new javafx.scene.control.Tooltip(I18n.t("chatRow.account", account)));
         Nodes.show(accountTag, account != null);
         stamp.setText(Formats.listStamp(c.lastActivity(), Instant.now(), ZoneId.systemDefault()));
         boolean unread = c.isUnread();
@@ -122,9 +123,9 @@ final class ChatRowCell extends ListCell<Chat> {
         Nodes.style(stamp, "unread", unread && !c.muted());
         Nodes.style(preview, "typing", !c.typing().isEmpty());
         if (!c.typing().isEmpty()) {
-            TypingDots.show(preview, c.group() ? Formats.typing(c.typing()) : "escribiendo…");
+            TypingDots.show(preview, c.group() ? Formats.typing(c.typing()) : I18n.t("chatRow.typing"));
         } else {
-            String who = c.lastOutgoing() ? "Tú: " : c.group() && c.lastSenderName() != null
+            String who = c.lastOutgoing() ? I18n.t("chatRow.you") : c.group() && c.lastSenderName() != null
                     ? c.lastSenderName().split(" ")[0] + ": " : "";
             TypingDots.show(preview, null); // cells are recycled: this one may have been someone typing
             preview.setText(who + c.lastPreview());
@@ -146,7 +147,7 @@ final class ChatRowCell extends ListCell<Chat> {
         boolean busy = spaces.adding(Spaces.offerId(c));
         stamp.setText("");
         TypingDots.show(preview, null);
-        preview.setText(busy ? "Agregando…" : "Servidor sin agregar · toca para traer sus canales");
+        preview.setText(busy ? I18n.t("chatRow.adding") : I18n.t("chatRow.offer"));
         Nodes.show(badge, false);
         return A11yText.offer(c, busy);
     }
@@ -156,7 +157,7 @@ final class ChatRowCell extends ListCell<Chat> {
         int u = pane.rows().unread().getOrDefault(c.id(), 0);
         stamp.setText(latest == null ? "" : Formats.listStamp(latest.lastActivity(), Instant.now(), ZoneId.systemDefault()));
         TypingDots.show(preview, null);
-        preview.setText(latest == null ? "Sin mensajes" : latest.title() + ": " + latest.lastPreview());
+        preview.setText(latest == null ? I18n.t("chatRow.noMessages") : latest.title() + ": " + latest.lastPreview());
         boolean un = u > 0;
         Nodes.style(name, "unread", un);
         Nodes.style(stamp, "unread", un && !c.muted());
@@ -170,7 +171,7 @@ final class ChatRowCell extends ListCell<Chat> {
     private String drawUnjoined(Chat c) {
         stamp.setText("");
         TypingDots.show(preview, null);
-        preview.setText("Toca para unirte");
+        preview.setText(I18n.t("chatRow.tapToJoin"));
         Nodes.show(badge, false);
         return A11yText.unjoined(c);
     }

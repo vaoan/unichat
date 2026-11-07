@@ -1,5 +1,7 @@
 package app.unichat.model;
 
+import app.unichat.support.I18n;
+
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -176,7 +178,7 @@ public final class Message {
     /** What to call a reaction in words; never its address. */
     public String reactionLabel(String key) {
         if (!isCustomReaction(key)) return key;
-        return reactionNames.getOrDefault(key, "emoji personalizado");
+        return reactionNames.getOrDefault(key, I18n.t("message.customEmoji"));
     }
 
     public static boolean isCustomReaction(String key) { return key != null && key.startsWith("mxc://"); }
@@ -230,13 +232,13 @@ public final class Message {
 
     /** One-line text for chat list previews and notifications. */
     public String preview() {
-        if (deleted) return "Mensaje eliminado";
+        if (deleted) return I18n.t("message.deleted");
         return switch (type) {
-            case IMAGE -> "📷 Foto";
-            case VIDEO -> "🎬 Video";
-            case AUDIO -> "🎤 Audio";
-            case FILE -> "📎 " + (fileName == null ? "Archivo" : fileName);
-            case STICKER -> "Sticker";
+            case IMAGE -> I18n.t("message.previewPhoto");
+            case VIDEO -> I18n.t("message.previewVideo");
+            case AUDIO -> I18n.t("message.previewAudio");
+            case FILE -> I18n.t("message.previewFile", fileName == null ? I18n.t("message.previewFileDefault") : fileName);
+            case STICKER -> I18n.t("media.sticker");
             case EMOTE -> "* " + senderName() + " " + body;
             default -> body.isBlank() && htmlText != null ? htmlText : body.replace('\n', ' ');
         };

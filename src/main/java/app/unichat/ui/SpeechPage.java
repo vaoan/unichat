@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import app.unichat.stt.SttSettings;
 import app.unichat.stt.Transcriber;
 import app.unichat.stt.WhisperModel;
@@ -23,47 +24,43 @@ final class SpeechPage {
     /** Voice notes to text with what's on this computer: the bundled Whisper or the user's own command. */
     static Node build() {
         Settings s = Settings.get();
-        Label intro = Labels.help("Transcribe las notas de voz que recibes (menú del mensaje, \"Transcribir\" o la tecla T). "
-                + "Todo ocurre en este computador: el audio no se envía a ningún servicio y no cuesta nada.");
+        Label intro = Labels.help(I18n.t("settings.speech.intro"));
 
         Label modelState = Labels.help("");
         modelState.setMaxWidth(240);
         Runnable refreshModel = () -> modelState.setText(SttSettings.model().isInstalled(Transcriber.modelsDir())
-                ? "Descargado." : "Se descarga la primera vez que transcribes.");
+                ? I18n.t("settings.speech.downloaded") : I18n.t("settings.speech.downloadsFirst"));
         refreshModel.run();
-        Node models = chips("Modelo de Whisper", List.of(WhisperModel.values()),
-                m -> m == WhisperModel.BASE ? "Rápido · 60 MB" : "Preciso · 190 MB",
+        Node models = chips(I18n.t("settings.speech.model"), List.of(WhisperModel.values()),
+                m -> m == WhisperModel.BASE ? I18n.t("settings.speech.modelFast") : I18n.t("settings.speech.modelAccurate"),
                 SttSettings.model(), m -> {
                     SttSettings.setModel(m);
                     refreshModel.run();
                 });
-        Node languages = chips("Idioma de las notas de voz", List.of("auto", "es", "en", "pt"),
+        Node languages = chips(I18n.t("settings.speech.language"), List.of("auto", "es", "en", "pt"),
                 l -> switch (l) {
-                    case "es" -> "Español";
-                    case "en" -> "English";
-                    case "pt" -> "Português";
-                    default -> "Detectar";
+                    case "es" -> I18n.t("settings.speech.langEs");
+                    case "en" -> I18n.t("settings.speech.langEn");
+                    case "pt" -> I18n.t("settings.speech.langPt");
+                    default -> I18n.t("settings.speech.langAuto");
                 }, s.sttLanguage(), s::setSttLanguage);
 
         TextField command = new TextField(s.sttCommand());
         command.setPromptText(Transcriber.EXAMPLE_COMMAND);
         command.setPrefColumnCount(16);
-        command.setAccessibleText("Comando propio para transcribir");
+        command.setAccessibleText(I18n.t("settings.speech.ownCommand"));
         command.textProperty().addListener((o, a, b) -> s.setSttCommand(b.strip()));
-        Node engines = chips("Cómo transcribir", List.of(Transcriber.Engine.values()),
-                e -> e == Transcriber.Engine.WHISPER ? "Whisper (incluido)" : "Comando propio",
+        Node engines = chips(I18n.t("settings.speech.how"), List.of(Transcriber.Engine.values()),
+                e -> e == Transcriber.Engine.WHISPER ? I18n.t("settings.speech.engineWhisper") : I18n.t("settings.speech.engineCommand"),
                 SttSettings.engine(), SttSettings::setEngine);
         boolean bundled = Transcriber.whisperBinary() != null;
-        return page("Voz a texto", intro,
-                group("Motor", row("Cómo transcribir", bundled ? "Whisper viene con Unichat y funciona sin internet una vez "
-                        + "descargado el modelo." : "Esta instalación no trae Whisper: usa un comando propio.", engines)),
+        return page(I18n.t("settings.nav.speech"), intro,
+                group(I18n.t("settings.speech.groupEngine"), row(I18n.t("settings.speech.how"),
+                        I18n.t(bundled ? "settings.speech.bundled" : "settings.speech.notBundled"), engines)),
                 group("Whisper",
-                        row("Modelo", "El preciso entiende bastante mejor el español y tarda más o menos el doble. "
-                                + "El rápido sirve en computadores lentos.", new VBox(4, models, modelState)),
-                        row("Idioma", "Fijarlo evita errores en notas cortas; \"Detectar\" sirve si recibes varios.", languages)),
-                group("Comando propio",
-                        row("Comando", "Cualquier programa que reciba el audio y escriba el texto en su salida. {archivo}: "
-                                + "el audio (WAV, MP3 o FLAC). {idioma}: es, en… o auto. Claude Code y Codex no "
-                                + "transcriben audio; sirven, por ejemplo, whisper, mlx_whisper o faster-whisper.", command)));
+                        row(I18n.t("settings.speech.modelRow"), I18n.t("settings.speech.modelHelp"), new VBox(4, models, modelState)),
+                        row(I18n.t("settings.speech.languageRow"), I18n.t("settings.speech.languageHelp"), languages)),
+                group(I18n.t("settings.speech.groupCommand"),
+                        row(I18n.t("settings.speech.command"), I18n.t("settings.speech.commandHelp"), command)));
     }
 }

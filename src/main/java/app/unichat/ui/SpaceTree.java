@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
+import app.unichat.support.I18n;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -18,7 +19,11 @@ import java.util.Set;
  * Pure (no JavaFX) so it's unit tested.
  */
 public final class SpaceTree {
-    public static final String LOOSE = "Chats directos y otros";
+    /** The name of the root that holds what no server contains. */
+    public static String loose() {
+        return I18n.t("spaceTree.loose");
+    }
+
     static final String LOOSE_ID = "loose";
 
     private SpaceTree() {}
@@ -68,7 +73,7 @@ public final class SpaceTree {
                 .filter(c -> !c.space() && !c.archived() && !placed.contains(c.id()))
                 .sorted(ChatFilter.ORDER)
                 .map(c -> new Node(c.id(), c, c.title(), List.of())).toList();
-        if (!loose.isEmpty()) roots.add(new Node(LOOSE_ID, null, LOOSE, loose));
+        if (!loose.isEmpty()) roots.add(new Node(LOOSE_ID, null, loose(), loose));
         return roots;
     }
 
@@ -101,7 +106,7 @@ public final class SpaceTree {
             if (path.contains(id)) continue; // a cycle: don't walk back up
             Chat c = byId.get(id);
             if (c == null) {
-                children.add(new Node(id, null, names.getOrDefault(id, "Chat sin unirte"), List.of()));
+                children.add(new Node(id, null, names.getOrDefault(id, I18n.t("spaceTree.notJoined")), List.of()));
             } else if (c.space()) {
                 if (!c.personalSpace()) children.add(node(c, byId, declared, names, new LinkedHashSet<>(path), placed));
             } else if (!c.archived()) {

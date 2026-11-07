@@ -7,6 +7,7 @@ import app.unichat.service.PreferencesFile;
 import app.unichat.service.PreferencesFile.Flag;
 import app.unichat.service.QuietRule;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -274,7 +275,7 @@ final class ChatActions {
     }
 
     private static CompletableFuture<Void> chatNotFound() {
-        return CompletableFuture.failedFuture(new MatrixException(0, null, "Chat no encontrado"));
+        return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.chatNotFound")));
     }
 
     CompletableFuture<Void> joinChat(String roomId) {

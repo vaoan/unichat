@@ -2,6 +2,7 @@ package app.unichat.stt;
 
 import app.unichat.support.BundledTools;
 import app.unichat.support.Folders;
+import app.unichat.support.I18n;
 import app.unichat.support.Os;
 import app.unichat.settings.Settings;
 import app.unichat.video.Ffmpeg;
@@ -48,23 +49,23 @@ public final class Transcriber {
             List<String> cmd;
             if (SttSettings.engine() == Engine.CUSTOM) {
                 String template = s.sttCommand();
-                if (template.isBlank()) throw new IOException("Escribe tu comando en Ajustes → Voz a texto");
+                if (template.isBlank()) throw new IOException(I18n.t("stt.writeCommand"));
                 cmd = CommandLine.expand(template, Map.of("archivo", input.toString(), "original", audio.toString(), "idioma", lang));
             } else {
                 Path bin = whisperBinary();
-                if (bin == null) throw new IOException("Whisper no viene en esta instalación; usa un comando propio en Ajustes → Voz a texto");
+                if (bin == null) throw new IOException(I18n.t("stt.noWhisper"));
                 WhisperModel model = SttSettings.model();
-                if (!model.isInstalled(modelsDir())) status.accept("Descargando el modelo de voz (solo la primera vez)…");
+                if (!model.isInstalled(modelsDir())) status.accept(I18n.t("stt.downloadingFirst"));
                 int[] shown = {-1};
                 Path m = model.ensure(modelsDir(), p -> {
                     int pct = (int) Math.round(p * 100);
-                    if (pct != shown[0]) status.accept("Descargando el modelo de voz… " + (shown[0] = pct) + " %");
+                    if (pct != shown[0]) status.accept(I18n.t("stt.downloadingPct", shown[0] = pct));
                 });
                 int threads = Math.max(1, Math.min(8, Runtime.getRuntime().availableProcessors() / 2));
                 cmd = List.of(bin.toString(), "-m", m.toString(), "-f", input.toString(), "-l", lang,
                         "-t", Integer.toString(threads), "-nt", "-np");
             }
-            status.accept("Transcribiendo…");
+            status.accept(I18n.t("stt.transcribing"));
             return clean(run(cmd, work));
         } finally {
             Folders.deleteQuietly(work); // temp folder: what stays is cleaned up with the cache
@@ -92,7 +93,7 @@ public final class Transcriber {
         } else if (Os.mac()) {
             cmd = List.of("/usr/bin/afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", audio.toString(), wav.toString());
         } else {
-            throw new IOException("Este formato de audio necesita ffmpeg instalado");
+            throw new IOException(I18n.t("stt.needsFfmpeg"));
         }
         run(cmd, work);
         return wav;
@@ -119,17 +120,17 @@ public final class Transcriber {
             p = new ProcessBuilder(cmd).directory(work.toFile())
                     .redirectOutput(out.toFile()).redirectError(err.toFile()).start();
         } catch (IOException e) {
-            throw new IOException("No se pudo ejecutar " + Path.of(cmd.get(0)).getFileName() + ": " + e.getMessage());
+            throw new IOException(I18n.t("stt.runFailed", Path.of(cmd.get(0)).getFileName(), e.getMessage()));
         }
         if (!p.waitFor(15, TimeUnit.MINUTES)) {
             p.destroyForcibly();
-            throw new IOException("La transcripción tardó demasiado");
+            throw new IOException(I18n.t("stt.tooLong"));
         }
         if (p.exitValue() != 0) {
             List<String> lines = new ArrayList<>(Files.readAllLines(err, StandardCharsets.UTF_8));
             lines.removeIf(String::isBlank);
-            String last = lines.isEmpty() ? "código " + p.exitValue() : lines.get(lines.size() - 1).strip();
-            throw new IOException(Path.of(cmd.get(0)).getFileName() + " falló: " + last);
+            String last = lines.isEmpty() ? I18n.t("stt.exitCode", p.exitValue()) : lines.get(lines.size() - 1).strip();
+            throw new IOException(I18n.t("stt.failed", Path.of(cmd.get(0)).getFileName(), last));
         }
         return Files.readString(out, StandardCharsets.UTF_8);
     }

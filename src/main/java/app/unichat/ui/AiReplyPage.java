@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.assist.AiEngine;
 import app.unichat.assist.AiSettings;
+import app.unichat.support.I18n;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
@@ -18,21 +19,17 @@ final class AiReplyPage {
     private AiReplyPage() {}
 
     static Node build() {
-        Label intro = new Label("Agrega dos botones junto al cuadro de texto, con el programa de IA que tengas instalado: uno escribe un "
-                + "borrador de respuesta y otro corrige la ortografía y la redacción de lo que escribiste, cambiando lo mínimo. "
-                + "El resultado queda en el cuadro para que lo leas y lo cambies: nunca se envía solo.");
+        Label intro = new Label(I18n.t("settings.ai.intro"));
         intro.setWrapText(true);
-        Label privacy = Labels.help("Al pulsar el botón de borrador, ese chat se envía al servicio de Claude Code o de Codex, con tu cuenta. "
-                + "Solo se envían los mensajes cargados de ese chat, y solo cuando lo pulsas. Fotos y audios van como una mención, sin su contenido. "
-                + "Al corregir, solo se envía lo que escribiste en el cuadro.");
+        Label privacy = Labels.help(I18n.t("settings.ai.privacy"));
 
         Label found = Labels.help("");
         Runnable refresh = () -> {
             AiEngine e = AiSettings.engine();
-            found.setText(e.find() == null ? e.label() + " no está instalado en este computador." : "Instalado.");
+            found.setText(e.find() == null ? I18n.t("settings.ai.notInstalled", e.label()) : I18n.t("settings.ai.installed"));
         };
         refresh.run();
-        Node engines = SettingsForm.chips("Programa de IA", List.of(AiEngine.values()), AiEngine::label, AiSettings.engine(), e -> {
+        Node engines = SettingsForm.chips(I18n.t("settings.ai.program"), List.of(AiEngine.values()), AiEngine::label, AiSettings.engine(), e -> {
             AiSettings.setEngine(e);
             refresh.run();
         });
@@ -40,36 +37,35 @@ final class AiReplyPage {
         TextArea instructions = new TextArea(AiSettings.instructions());
         instructions.setWrapText(true);
         instructions.setPrefRowCount(6);
-        instructions.setAccessibleText("Instrucciones para la IA");
+        instructions.setAccessibleText(I18n.t("settings.ai.instructionsAccessible"));
         instructions.textProperty().addListener((o, a, t) -> AiSettings.setInstructions(t));
-        Label instructionsHelp = new Label("Se envían con cada borrador, antes de la conversación. Al corregir no se usan.");
+        Label instructionsHelp = new Label(I18n.t("settings.ai.instructionsHelp"));
         instructionsHelp.getStyleClass().add("settings-help");
 
-        return SettingsForm.page("Escribir con IA", intro, privacy,
-                SettingsForm.group("General",
-                        SettingsForm.row("Mostrar los botones", "Aparecen en todos los chats.", SettingsForm.toggle(AiSettings.enabled(), on -> {
+        return SettingsForm.page(I18n.t("settings.nav.ai"), intro, privacy,
+                SettingsForm.group(I18n.t("settings.ai.groupGeneral"),
+                        SettingsForm.row(I18n.t("settings.ai.show"), I18n.t("settings.ai.showHelp"), SettingsForm.toggle(AiSettings.enabled(), on -> {
                             AiSettings.setEnabled(on);
                             AiReplyButton.SHOWN.set(on);
                         })),
-                        SettingsForm.row("Programa", "Usa tu propia sesión y tu plan.", new VBox(4, engines, found)),
-                        SettingsForm.row("Carpeta que puede leer", "Por ejemplo la de tu hoja de vida. Claude Code solo puede leer esta carpeta. "
-                                + "Codex no puede escribir, pero sí leer el resto del disco.", folderControl())),
-                new VBox(6, new Label("Instrucciones"), instructions, instructionsHelp));
+                        SettingsForm.row(I18n.t("settings.ai.programRow"), I18n.t("settings.ai.programHelp"), new VBox(4, engines, found)),
+                        SettingsForm.row(I18n.t("settings.ai.folder"), I18n.t("settings.ai.folderHelp"), folderControl())),
+                new VBox(6, new Label(I18n.t("settings.ai.instructions")), instructions, instructionsHelp));
     }
 
     private static Node folderControl() {
         Label name = new Label();
-        Button remove = new Button("Quitar");
+        Button remove = new Button(I18n.t("settings.ai.remove"));
         Runnable show = () -> {
             Path f = AiSettings.folder();
-            name.setText(f == null ? "Ninguna" : f.toString());
+            name.setText(f == null ? I18n.t("settings.ai.none") : f.toString());
             remove.setDisable(f == null);
         };
         show.run();
-        Button choose = new Button("Elegir…");
+        Button choose = new Button(I18n.t("settings.ai.choose"));
         choose.setOnAction(e -> {
             DirectoryChooser chooser = new DirectoryChooser();
-            chooser.setTitle("Carpeta que la IA puede leer");
+            chooser.setTitle(I18n.t("settings.ai.chooserTitle"));
             Path current = AiSettings.folder();
             if (current != null && current.toFile().isDirectory()) chooser.setInitialDirectory(current.toFile());
             File picked = chooser.showDialog(choose.getScene().getWindow());

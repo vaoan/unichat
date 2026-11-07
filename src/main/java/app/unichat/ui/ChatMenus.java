@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.service.Folder;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatPreferences;
+import app.unichat.support.I18n;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.ListView;
@@ -29,17 +30,17 @@ public final class ChatMenus {
         String id = c.id();
         ContextMenu menu = new ContextMenu();
         menu.getItems().addAll(
-                item(c.isUnread() ? "Marcar como leído" : "Marcar como no leído",
+                item(c.isUnread() ? I18n.t("chatMenu.markRead") : I18n.t("chatMenu.markUnread"),
                         () -> { if (c.isUnread()) svc.markRead(id); else svc.setMarkedUnread(id, true); }),
                 favoriteItem(c, svc), pinItem(c, svc), muteItem(c, svc),
                 reminderMenu(c, svc),
                 new SeparatorMenuItem(),
-                item(c.lowPriority() ? "Mover a la bandeja" : "Mover a prioridad baja", () -> svc.setLowPriority(id, !c.lowPriority())),
-                item(c.archived() ? "Desarchivar" : "Archivar", () -> svc.setArchived(id, !c.archived())));
+                item(c.lowPriority() ? I18n.t("chatMenu.toInbox") : I18n.t("chatMenu.toLowPriority"), () -> svc.setLowPriority(id, !c.lowPriority())),
+                item(c.archived() ? I18n.t("chatMenu.unarchive") : I18n.t("chatMenu.archive"), () -> svc.setArchived(id, !c.archived())));
         addFoldersMenu(menu, c, folders);
         menu.getItems().addAll(
                 new SeparatorMenuItem(),
-                danger(item(c.group() ? "Salir del grupo" : "Eliminar chat", () -> {
+                danger(item(c.group() ? I18n.t("chatMenu.leaveGroup") : I18n.t("chatMenu.deleteChat"), () -> {
                     svc.leaveChat(id);
                     if (afterLeave != null) afterLeave.run();
                 })));
@@ -53,7 +54,7 @@ public final class ChatMenus {
         menu.getItems().addAll(
                 favoriteItem(c, svc), pinItem(c, svc), muteItem(c, svc),
                 new SeparatorMenuItem(),
-                item(c.archived() ? "Desarchivar" : "Archivar", () -> svc.setArchived(id, !c.archived())));
+                item(c.archived() ? I18n.t("chatMenu.unarchive") : I18n.t("chatMenu.archive"), () -> svc.setArchived(id, !c.archived())));
         addFoldersMenu(menu, c, folders);
         return menu;
     }
@@ -61,7 +62,7 @@ public final class ChatMenus {
     /** One tick per folder, so a chat can be in several; only for what a folder can hold. */
     private static void addFoldersMenu(ContextMenu menu, Chat c, FolderDialogs dialogs) {
         if (!FolderRows.canHold(c)) return;
-        Menu m = new Menu("Carpetas");
+        Menu m = new Menu(I18n.t("chatMenu.folders"));
         for (Folder f : dialogs.folders().folders()) {
             CheckMenuItem i = new CheckMenuItem(shortName(f.name()));
             i.setMnemonicParsing(false); // a name is text: "a_b" keeps its underscore
@@ -70,7 +71,7 @@ public final class ChatMenus {
             m.getItems().add(i);
         }
         if (!m.getItems().isEmpty()) m.getItems().add(new SeparatorMenuItem());
-        m.getItems().add(item("Nueva carpeta…", () -> dialogs.createWith(c)));
+        m.getItems().add(item(I18n.t("chatMenu.newFolder"), () -> dialogs.createWith(c)));
         menu.getItems().add(m);
     }
 
@@ -89,31 +90,31 @@ public final class ChatMenus {
     }
 
     private static MenuItem favoriteItem(Chat c, ChatPreferences svc) {
-        return item(c.favorite() ? "Quitar de favoritos" : "Añadir a favoritos", () -> svc.setFavorite(c.id(), !c.favorite()));
+        return item(c.favorite() ? I18n.t("chatMenu.unfavorite") : I18n.t("chatMenu.favorite"), () -> svc.setFavorite(c.id(), !c.favorite()));
     }
 
     private static MenuItem pinItem(Chat c, ChatPreferences svc) {
-        return item(c.pinned() ? "Desfijar" : "Fijar arriba", () -> svc.setPinned(c.id(), !c.pinned()));
+        return item(c.pinned() ? I18n.t("chatMenu.unpin") : I18n.t("chatMenu.pin"), () -> svc.setPinned(c.id(), !c.pinned()));
     }
 
     private static MenuItem muteItem(Chat c, ChatPreferences svc) {
-        return item(c.muted() ? "Activar notificaciones" : "Silenciar", () -> svc.setMuted(c.id(), !c.muted()));
+        return item(c.muted() ? I18n.t("chatMenu.unmute") : I18n.t("chatMenu.mute"), () -> svc.setMuted(c.id(), !c.muted()));
     }
 
     static Menu reminderMenu(Chat c, ChatPreferences svc) {
-        Menu m = new Menu("Recordarme");
+        Menu m = new Menu(I18n.t("chatMenu.remind"));
         ZoneId zone = ZoneId.systemDefault();
         Instant now = Instant.now();
         m.getItems().addAll(
-                item("En 1 hora", () -> svc.setReminder(c.id(), now.plus(1, ChronoUnit.HOURS))),
-                item("En 3 horas", () -> svc.setReminder(c.id(), now.plus(3, ChronoUnit.HOURS))),
-                item("Mañana a las 9:00", () -> svc.setReminder(c.id(),
+                item(I18n.t("chatMenu.in1h"), () -> svc.setReminder(c.id(), now.plus(1, ChronoUnit.HOURS))),
+                item(I18n.t("chatMenu.in3h"), () -> svc.setReminder(c.id(), now.plus(3, ChronoUnit.HOURS))),
+                item(I18n.t("chatMenu.tomorrow9"), () -> svc.setReminder(c.id(),
                         LocalDate.now(zone).plusDays(1).atTime(LocalTime.of(9, 0)).atZone(zone).toInstant())),
-                item("El próximo lunes", () -> svc.setReminder(c.id(),
+                item(I18n.t("chatMenu.nextMonday"), () -> svc.setReminder(c.id(),
                         LocalDate.now(zone).with(TemporalAdjusters.next(DayOfWeek.MONDAY)).atTime(9, 0).atZone(zone).toInstant())));
         if (c.reminderAt() != null) {
             m.getItems().add(new SeparatorMenuItem());
-            m.getItems().add(item("Quitar recordatorio (" + Formats.listStamp(c.reminderAt(), now, zone) + ")",
+            m.getItems().add(item(I18n.t("chatMenu.clearReminder", Formats.listStamp(c.reminderAt(), now, zone)),
                     () -> svc.setReminder(c.id(), null)));
         }
         return m;

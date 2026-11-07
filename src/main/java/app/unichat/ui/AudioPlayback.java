@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
@@ -152,7 +153,7 @@ final class AudioPlayback {
 
     private void failed() {
         stop();
-        toast.accept("No se pudo reproducir el audio");
+        toast.accept(I18n.t("audio.playFailed"));
     }
 
     private void fire() {

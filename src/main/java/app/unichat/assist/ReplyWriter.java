@@ -1,6 +1,7 @@
 package app.unichat.assist;
 
 import app.unichat.support.Folders;
+import app.unichat.support.I18n;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,8 +34,8 @@ public final class ReplyWriter {
     /** Blocks until it answers. Null if {@link #cancel} stopped it. */
     public String write(AiEngine engine, Path folder, String prompt) throws Failure {
         Path bin = engine.find();
-        if (bin == null) throw new Failure(engine.label() + " no está instalado en este computador");
-        if (folder != null && !Files.isDirectory(folder)) throw new Failure("No existe la carpeta " + folder);
+        if (bin == null) throw new Failure(I18n.t("ai.failure.notInstalled", engine.label()));
+        if (folder != null && !Files.isDirectory(folder)) throw new Failure(I18n.t("ai.failure.noFolder", folder));
         return run(engine, bin, folder, prompt);
     }
 
@@ -56,15 +57,15 @@ public final class ReplyWriter {
             Thread.ofPlatform().daemon().name("ai-prompt").start(() -> feed(p, prompt));
             if (!p.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
                 stop(p);
-                throw new Failure(engine.label() + " tardó demasiado en responder");
+                throw new Failure(I18n.t("ai.failure.timeout", engine.label()));
             }
             if (cancelled) return null;
-            if (p.exitValue() != 0) throw new Failure(engine.label() + " no pudo responder: " + lastLine(err, out));
+            if (p.exitValue() != 0) throw new Failure(I18n.t("ai.failure.failed", engine.label(), lastLine(err, out)));
             String text = ReplyPrompt.clean(Files.readString(Files.exists(reply) ? reply : out, StandardCharsets.UTF_8));
-            if (text.isEmpty()) throw new Failure(engine.label() + " no devolvió ningún texto");
+            if (text.isEmpty()) throw new Failure(I18n.t("ai.failure.empty", engine.label()));
             return text;
         } catch (IOException e) {
-            throw new Failure("No se pudo abrir " + engine.label());
+            throw new Failure(I18n.t("ai.failure.open", engine.label()));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return null;
@@ -114,6 +115,6 @@ public final class ReplyWriter {
                 return l.length() > 200 ? l.substring(0, 200) + "…" : l;
             }
         }
-        return "no dijo por qué";
+        return I18n.t("ai.failure.noReason");
     }
 }

@@ -1,5 +1,6 @@
 package app.unichat.support;
 
+import app.unichat.support.I18n;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -31,7 +32,7 @@ public final class Downloads {
      * Blocking.
      *
      * @param size       in bytes; 0 when unknown, and {@code progress} isn't told
-     * @param what       for error messages, in Spanish ("el modelo de voz")
+     * @param what       for error messages, already in the language in use ({@code I18n.t("download.what.voiceModel")})
      * @param progress   gets 0..1
      * @param beforeMove gets the whole, checked file just before it takes {@code target}'s name
      */
@@ -44,7 +45,7 @@ public final class Downloads {
         try {
             HttpResponse<InputStream> res = http.send(HttpRequest.newBuilder(URI.create(url)).build(),
                     HttpResponse.BodyHandlers.ofInputStream());
-            if (res.statusCode() != 200) throw new IOException("HTTP " + res.statusCode() + " descargando " + what);
+            if (res.statusCode() != 200) throw new IOException(I18n.t("download.http", res.statusCode(), what));
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             try (InputStream in = new DigestInputStream(res.body(), md);
                  var out = Files.newOutputStream(part)) {
@@ -57,7 +58,7 @@ public final class Downloads {
                 }
             }
             String got = HexFormat.of().formatHex(md.digest());
-            if (!got.equals(sha256)) throw new IOException(what + " descargado está dañado; se intentará de nuevo");
+            if (!got.equals(sha256)) throw new IOException(I18n.t("download.corrupt", what));
             beforeMove.accept(part);
             Files.move(part, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (NoSuchAlgorithmException e) {

@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import javafx.application.Platform;
 import javafx.geometry.Pos;
+import app.unichat.support.I18n;
 import app.unichat.video.VideoTranscoder;
 import app.unichat.video.WebmStickers;
 import javafx.scene.Scene;
@@ -57,7 +58,7 @@ final class VideoViewer {
         v.open(owner, title, onSave);
         file.whenComplete((p, err) -> Platform.runLater(() -> {
             if (!v.stage.isShowing()) return;
-            if (err != null || p == null) v.fail("No se pudo descargar el video.", null);
+            if (err != null || p == null) v.fail(I18n.t("video.downloadFailed"), null);
             else v.play(p);
         }));
         return v.stage;
@@ -78,7 +79,7 @@ final class VideoViewer {
         BorderPane root = new BorderPane(screen);
         root.getStyleClass().add("media-viewer");
         if (onSave != null) {
-            Button save = new Button("Guardar como…");
+            Button save = new Button(I18n.t("message.saveAs"));
             save.getStyleClass().add("secondary-button");
             save.setOnAction(e -> onSave.run());
             HBox top = new HBox(save);
@@ -87,7 +88,7 @@ final class VideoViewer {
             root.setTop(top);
         }
         stage.initOwner(owner);
-        stage.setTitle(title == null ? "Video" : title);
+        stage.setTitle(title == null ? I18n.t("video.title") : title);
         Scene scene = new Scene(root, Math.min(900, owner.getWidth() * 0.8), Math.min(700, owner.getHeight() * 0.8));
         Theme.register(scene);
         scene.addEventFilter(KeyEvent.KEY_PRESSED, this::onKey);
@@ -123,7 +124,7 @@ final class VideoViewer {
                 AnimatedImage.play(view, frames);
             });
         } catch (IOException e) {
-            fail("No se pudo abrir el archivo.", file);
+            fail(I18n.t("video.openFailed"), file);
         }
     }
 
@@ -133,7 +134,7 @@ final class VideoViewer {
             if (!stage.isShowing()) return;
             release();
             if (mayConvert) convertAndPlay(file);
-            else fail("Este formato de video no se puede reproducir aquí.", file);
+            else fail(I18n.t("video.unsupported"), file);
         });
         if (player == null) return;
         stage.getProperties().put(PLAYER, player);
@@ -141,7 +142,7 @@ final class VideoViewer {
         view.setPreserveRatio(true);
         view.fitWidthProperty().bind(screen.widthProperty());
         view.fitHeightProperty().bind(screen.heightProperty());
-        view.setAccessibleText("Video");
+        view.setAccessibleText(I18n.t("video.title"));
         screen.getChildren().setAll(view);
         ((BorderPane) stage.getScene().getRoot()).setBottom(controls(player));
         player.setAutoPlay(true);
@@ -150,7 +151,7 @@ final class VideoViewer {
     private void convertAndPlay(Path file) {
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(40, 40);
-        Label what = new Label("Preparando el video…");
+        Label what = new Label(I18n.t("video.preparing"));
         what.getStyleClass().add("video-message");
         VBox box = new VBox(12, spin, what);
         box.setAlignment(Pos.CENTER);
@@ -159,27 +160,27 @@ final class VideoViewer {
         WebmStickers.WORKER.execute(() -> {
             try {
                 Path playable = VideoTranscoder.toPlayable(file, done ->
-                        Platform.runLater(() -> what.setText("Instalando el conversor… " + (int) (done * 100) + " %")));
+                        Platform.runLater(() -> what.setText(I18n.t("video.installingConverter", (int) (done * 100)))));
                 Platform.runLater(() -> {
                     if (stage.isShowing()) playVideo(playable, false);
                 });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (IOException e) {
-                fail("Este formato de video no se puede reproducir aquí.", file);
+                fail(I18n.t("video.unsupported"), file);
             }
         });
     }
 
     private HBox controls(MediaPlayer p) {
-        Button toggle = Icons.iconButton(Icons.PAUSE, "Pausar", this::togglePlay);
+        Button toggle = Icons.iconButton(Icons.PAUSE, I18n.t("video.pause"), this::togglePlay);
         p.statusProperty().addListener((o, a, st) -> {
             boolean playing = st == MediaPlayer.Status.PLAYING;
             toggle.setGraphic(Icons.icon(playing ? Icons.PAUSE : Icons.PLAY, 18));
-            toggle.setAccessibleText(playing ? "Pausar" : "Reproducir");
+            toggle.setAccessibleText(I18n.t(playing ? "video.pause" : "video.play"));
         });
         Slider position = new Slider(0, 1, 0);
-        position.setAccessibleText("Posición del video");
+        position.setAccessibleText(I18n.t("video.position"));
         position.setFocusTraversable(true);
         HBox.setHgrow(position, Priority.ALWAYS);
         Label time = new Label(clock(0));
@@ -193,7 +194,7 @@ final class VideoViewer {
         position.valueChangingProperty().addListener((o, a, moving) -> {
             if (!moving) p.seek(p.getTotalDuration().multiply(position.getValue()));
         });
-        Button mute = Icons.iconButton(Icons.VOLUME, "Silenciar", null);
+        Button mute = Icons.iconButton(Icons.VOLUME, I18n.t("video.mute"), null);
         mute.setOnAction(e -> toggleMute(mute));
         HBox bar = new HBox(10, toggle, position, time, mute);
         bar.setAlignment(Pos.CENTER);
@@ -214,7 +215,7 @@ final class VideoViewer {
     private void toggleMute(Button mute) {
         player.setMute(!player.isMute());
         mute.setGraphic(Icons.icon(player.isMute() ? Icons.VOLUME_OFF : Icons.VOLUME, 18));
-        mute.setAccessibleText(player.isMute() ? "Activar sonido" : "Silenciar");
+        mute.setAccessibleText(I18n.t(player.isMute() ? "video.unmute" : "video.mute"));
     }
 
     private void onKey(KeyEvent e) {
@@ -247,7 +248,7 @@ final class VideoViewer {
         VBox box = new VBox(12, l);
         box.setAlignment(Pos.CENTER);
         if (file != null) {
-            Button elsewhere = new Button("Abrir con otra app");
+            Button elsewhere = new Button(I18n.t("video.openElsewhere"));
             elsewhere.getStyleClass().add("primary-button");
             elsewhere.setOnAction(e -> {
                 openElsewhere.accept(file);

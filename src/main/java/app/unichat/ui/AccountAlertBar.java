@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.Network;
+import app.unichat.support.I18n;
 import javafx.geometry.Pos;
 import javafx.scene.AccessibleAttribute;
 import javafx.scene.AccessibleRole;
@@ -51,11 +52,11 @@ final class AccountAlertBar extends VBox {
     }
 
     private HBox relinkRow(AccountAlerts.Alert a) {
-        Label text = line(a.who() + ": sesión cerrada", a.text());
-        Button fix = new Button("Vincular");
+        Label text = line(I18n.t("alerts.sessionClosed", a.who()), a.text());
+        Button fix = new Button(I18n.t("alerts.link"));
         fix.getStyleClass().add("alert-action");
         fix.setMinWidth(Region.USE_PREF_SIZE);
-        fix.setAccessibleText("Volver a vincular " + a.network().displayName());
+        fix.setAccessibleText(I18n.t("alerts.relinkA11y", a.network().displayName()));
         fix.setOnAction(e -> relink.accept(a.network()));
         return row("relink", NetworkIcons.tile(a.network(), 16, "alert-network"), text, fix);
     }

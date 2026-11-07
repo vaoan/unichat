@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.login.CookieLogin;
 import app.unichat.login.SessionCookies;
 import app.unichat.model.Network;
+import app.unichat.support.I18n;
 import javafx.scene.control.Button;
 import javafx.stage.FileChooser;
 
@@ -21,14 +22,14 @@ final class CookieFileButton {
      * @param onProblem gets what to tell the person when it hasn't
      */
     static Button create(Network network, Function<Path, CookieLogin.TxtResult> read, Consumer<SessionCookies> onCookies, Consumer<String> onProblem) {
-        Button file = new Button("Elegir archivo cookies.txt…");
+        Button file = new Button(I18n.t("login.cookieFile.choose"));
         file.getStyleClass().add("secondary-button");
         file.setMaxWidth(Double.MAX_VALUE);
         file.setOnAction(e -> {
             FileChooser fc = new FileChooser();
-            fc.setTitle("Elige tu archivo cookies.txt");
+            fc.setTitle(I18n.t("login.cookieFile.title"));
             fc.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("cookies.txt", "*.txt"),
-                    new FileChooser.ExtensionFilter("Todos los archivos", "*.*"));
+                    new FileChooser.ExtensionFilter(I18n.t("common.allFiles"), "*.*"));
             File f = fc.showOpenDialog(file.getScene().getWindow());
             if (f == null) return;
             CookieLogin.TxtResult r = read.apply(f.toPath());

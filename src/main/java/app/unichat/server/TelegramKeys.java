@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 
 /**
  * Each person's own Telegram API keys (my.telegram.org): Telegram requires them, and they aren't shareable, so
@@ -15,14 +16,14 @@ public final class TelegramKeys {
     /** What's wrong with these values, for the person to read; null when they look right. */
     public static String problem(String apiId, String apiHash) {
         String id = apiId == null ? "" : apiId.strip(), hash = apiHash == null ? "" : apiHash.strip();
-        if (id.isEmpty()) return "Falta el api_id.";
+        if (id.isEmpty()) return I18n.t("telegramKeys.noId");
         try {
-            if (Integer.parseInt(id) <= 0) return "El api_id debe ser un número, por ejemplo 1234567.";
+            if (Integer.parseInt(id) <= 0) return I18n.t("telegramKeys.badId");
         } catch (NumberFormatException e) {
-            return "El api_id debe ser un número, por ejemplo 1234567.";
+            return I18n.t("telegramKeys.badId");
         }
-        if (hash.isEmpty()) return "Falta el api_hash.";
-        if (!hash.matches("[0-9a-fA-F]{32}")) return "El api_hash debe tener 32 caracteres, solo números y letras de la a a la f.";
+        if (hash.isEmpty()) return I18n.t("telegramKeys.noHash");
+        if (!hash.matches("[0-9a-fA-F]{32}")) return I18n.t("telegramKeys.badHash");
         return null;
     }
 

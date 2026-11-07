@@ -4,6 +4,7 @@ import app.unichat.assist.AiEngine;
 import app.unichat.assist.AiSettings;
 import app.unichat.assist.ReplyPrompt;
 import app.unichat.assist.ReplyWriter;
+import app.unichat.support.I18n;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javafx.animation.KeyFrame;
@@ -24,13 +25,24 @@ import javafx.util.Duration;
  * in the text box for the person to read, and nothing here can send it. Pressed again while working, it cancels.
  */
 final class AiReplyButton {
-    /** What each button says; {@code nothing}: when there's nothing to work on; {@code working}: the line while it does. */
-    record Look(String icon, String idle, String cancel, String styleClass, String nothing, String working) {}
+    /**
+     * What each button says, as keys looked up each time they're shown ({@code nothing}: when there's nothing to work on;
+     * {@code working}: the line while it does, with the program's name).
+     */
+    record Look(String icon, String idleKey, String shortcut, String cancelKey, String styleClass, String nothingKey, String workingKey) {
+        String idle() { return I18n.t(idleKey, Shortcuts.key(shortcut)); }
 
-    static final Look REPLY = new Look(Icons.SPARKLE, "Escribir un borrador con IA (" + Shortcuts.key("I") + ")", "Cancelar el borrador con IA", "ai-button",
-            "Este chat todavía no tiene mensajes que responder", "Escribiendo el borrador");
-    static final Look FIX = new Look(Icons.SPELLCHECK, "Corregir la ortografía y la redacción con IA (" + Shortcuts.key("O") + ")", "Cancelar la corrección con IA",
-            "ai-fix-button", "Escribe primero el texto que quieres corregir", "Corrigiendo el texto");
+        String cancel() { return I18n.t(cancelKey); }
+
+        String nothing() { return I18n.t(nothingKey); }
+
+        String working(String engine) { return I18n.t(workingKey, engine); }
+    }
+
+    static final Look REPLY = new Look(Icons.SPARKLE, "aiButton.draft", "I", "aiButton.draftCancel", "ai-button",
+            "aiButton.draftNothing", "aiButton.draftWorking");
+    static final Look FIX = new Look(Icons.SPELLCHECK, "aiButton.fix", "O", "aiButton.fixCancel",
+            "ai-fix-button", "aiButton.fixNothing", "aiButton.fixWorking");
 
     /** What to answer; the prompt is built on the UI thread, from live messages. */
     record Request(String chatId, String prompt) {}
@@ -88,7 +100,7 @@ final class AiReplyButton {
         if (ticking != null) ticking.stop();
         Nodes.show(status, on);
         if (!on) return;
-        String what = look.working() + " con " + AiSettings.engine().label();
+        String what = look.working(AiSettings.engine().label());
         long start = System.currentTimeMillis();
         statusText.setText(what + "…");
         ticking = new Timeline(new KeyFrame(Duration.seconds(1),

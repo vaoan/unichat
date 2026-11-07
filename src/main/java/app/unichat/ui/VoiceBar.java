@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.support.I18n;
 import app.unichat.support.Os;
 import app.unichat.voice.VoiceRecorder;
 import javafx.animation.KeyFrame;
@@ -37,19 +38,19 @@ final class VoiceBar extends HBox {
         this.onNoSound = onNoSound;
         getStyleClass().add("voice-bar");
         setAlignment(Pos.CENTER_LEFT);
-        Button discard = Icons.iconButton(Icons.TRASH, "Descartar la grabación (Esc)", onDiscard);
+        Button discard = Icons.iconButton(Icons.TRASH, I18n.t("voiceBar.discard"), onDiscard);
         Region dot = new Region();
         dot.getStyleClass().add("voice-dot");
         dot.setMinSize(10, 10);
         dot.setMaxSize(10, 10);
         time.getStyleClass().add("voice-time");
         time.setMinWidth(Region.USE_PREF_SIZE);
-        time.setAccessibleText("Grabando");
+        time.setAccessibleText(I18n.t("voiceBar.recording"));
         level.getStyleClass().add("voice-level");
         level.setMaxWidth(Double.MAX_VALUE);
-        level.setAccessibleText("Volumen del micrófono");
+        level.setAccessibleText(I18n.t("voiceBar.level"));
         HBox.setHgrow(level, Priority.ALWAYS);
-        Button send = Icons.iconButton(Icons.SEND, "Enviar la nota de voz", onSend);
+        Button send = Icons.iconButton(Icons.SEND, I18n.t("voiceBar.send"), onSend);
         send.getStyleClass().add("send-button");
         getChildren().addAll(discard, dot, time, level, send);
         addEventFilter(KeyEvent.KEY_PRESSED, e -> {
@@ -73,9 +74,7 @@ final class VoiceBar extends HBox {
         level.setProgress(Math.min(1, recorder.level() * 2));
         if (recorder.durationMs() >= SILENT_MS && !recorder.anySound()) {
             ticks.stop();
-            onNoSound.accept(Os.mac()
-                    ? "El micrófono no da sonido. Revisa el permiso en Ajustes del Sistema → Privacidad y seguridad → Micrófono."
-                    : "El micrófono no da sonido. Revisa que esté conectado y que Unichat tenga permiso para usarlo.");
+            onNoSound.accept(I18n.t(Os.mac() ? "voiceBar.silentMac" : "voiceBar.silent"));
         }
     }
 }

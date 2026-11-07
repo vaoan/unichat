@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.service.Folder;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatFolders;
+import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.scene.Group;
@@ -34,25 +35,25 @@ final class FolderDialogs {
 
     /** {@code after} runs however the sheet closes (also Esc or a click outside): it's where the focus goes back. */
     void create(Runnable after) {
-        askName("", "Crear", folders::createFolder, after);
+        askName("", I18n.t("folders.dialog.create"), folders::createFolder, after);
     }
 
     /** "Nueva carpeta…" in a chat's menu: the new folder starts with that chat. */
     void createWith(Chat chat) {
-        askName("", "Crear", name -> folders.setInFolder(folders.createFolder(name), chat, true), () -> { });
+        askName("", I18n.t("folders.dialog.create"), name -> folders.setInFolder(folders.createFolder(name), chat, true), () -> { });
     }
 
     void rename(Folder folder, Runnable after) {
-        askName(folder.name(), "Guardar", name -> folders.renameFolder(folder.id(), name), after);
+        askName(folder.name(), I18n.t("folders.dialog.save"), name -> folders.renameFolder(folder.id(), name), after);
     }
 
     void delete(Folder folder, Runnable after) {
-        Label question = new Label("¿Eliminar la carpeta «" + folder.name() + "»? Los chats no se borran.");
+        Label question = new Label(I18n.t("folders.dialog.confirmDelete", folder.name()));
         question.getStyleClass().add("sheet-title");
         question.setWrapText(true);
         Button cancel = cancelButton();
         cancel.setAccessibleHelp(question.getText()); // the focus starts here, so a screen reader says what's being asked
-        Button delete = new Button("Eliminar");
+        Button delete = new Button(I18n.t("folders.delete"));
         delete.getStyleClass().add("danger-button");
         delete.setOnAction(e -> {
             folders.deleteFolder(folder.id());
@@ -62,10 +63,10 @@ final class FolderDialogs {
     }
 
     private void askName(String current, String action, Consumer<String> done, Runnable after) {
-        Label title = new Label("Nombre de la carpeta");
+        Label title = new Label(I18n.t("folders.dialog.name"));
         title.getStyleClass().add("sheet-title");
         TextField field = new TextField(current);
-        field.setAccessibleText("Nombre de la carpeta");
+        field.setAccessibleText(I18n.t("folders.dialog.name"));
         Button save = new Button(action);
         save.getStyleClass().add("primary-button");
         save.setDefaultButton(true);
@@ -79,7 +80,7 @@ final class FolderDialogs {
     }
 
     private Button cancelButton() {
-        Button cancel = new Button("Cancelar");
+        Button cancel = new Button(I18n.t("folders.dialog.cancel"));
         cancel.getStyleClass().add("secondary-button");
         cancel.setCancelButton(true);
         cancel.setOnAction(e -> hide.run());

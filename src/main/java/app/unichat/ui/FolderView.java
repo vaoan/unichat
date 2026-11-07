@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatFolders;
 import app.unichat.service.Folder;
+import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -35,7 +36,6 @@ import java.util.function.Supplier;
  * one, the list is replaced by its chats (not an accordion).
  */
 final class FolderView extends VBox {
-    private static final String NO_FOLDERS = "Aún no tienes carpetas. Crea una y añade chats con clic derecho.";
     private final ChatFolders folders;
     private final Consumer<Chat> open;
     private final ObservableList<Folder> names = FXCollections.observableArrayList();
@@ -61,7 +61,7 @@ final class FolderView extends VBox {
         this.open = open;
         getStyleClass().add("folder-view");
 
-        create = new Button("Nueva carpeta");
+        create = new Button(I18n.t("folders.new"));
         create.setGraphic(Icons.icon(Icons.PLUS, 16));
         create.getStyleClass().addAll("secondary-button", "folder-new");
         create.setMaxWidth(Double.MAX_VALUE);
@@ -77,7 +77,7 @@ final class FolderView extends VBox {
             }
         });
 
-        Button back = Icons.iconButton(Icons.CHEVRON_LEFT, "Volver a carpetas", this::showNames);
+        Button back = Icons.iconButton(Icons.CHEVRON_LEFT, I18n.t("folders.back"), this::showNames);
         folderTitle.getStyleClass().addAll("space-title", "folder-title");
         folderTitle.setMinWidth(0);
         folderTitle.setMaxWidth(Double.MAX_VALUE);
@@ -101,10 +101,10 @@ final class FolderView extends VBox {
 
     private void configureNames() {
         nameList.getStyleClass().addAll("chat-list", "folder-list");
-        nameList.setAccessibleText("Carpetas");
-        nameList.setAccessibleHelp("Enter abre la carpeta, F2 la renombra y Suprimir la elimina");
+        nameList.setAccessibleText(I18n.t("folders.title"));
+        nameList.setAccessibleHelp(I18n.t("folders.listHelp"));
         nameList.setCellFactory(v -> new FolderCell());
-        Label none = new Label(NO_FOLDERS);
+        Label none = new Label(I18n.t("folders.none"));
         none.getStyleClass().add("empty-label");
         none.setWrapText(true);
         nameList.setPlaceholder(none);
@@ -126,7 +126,7 @@ final class FolderView extends VBox {
     private void configureChats(Supplier<ListCell<Chat>> cells) {
         chatList.getStyleClass().addAll("chat-list", "folder-chats");
         chatList.setCellFactory(v -> cells.get());
-        Label none = new Label("Esta carpeta está vacía. Añade chats con clic derecho.");
+        Label none = new Label(I18n.t("folders.empty"));
         none.getStyleClass().add("empty-label");
         none.setWrapText(true);
         chatList.setPlaceholder(none);
@@ -196,7 +196,7 @@ final class FolderView extends VBox {
         boolean hadFocus = chatList.isFocused();
         if (lost) openId = null;
         // Focus on a button doesn't read the list's placeholder, so the button says it.
-        create.setAccessibleHelp(now.isEmpty() ? NO_FOLDERS : null);
+        create.setAccessibleHelp(now.isEmpty() ? I18n.t("folders.none") : null);
         unread.clear();
         FolderRows.Servers servers = new FolderRows.Servers(all);
         if (current == null) for (Folder f : now) unread.put(f.id(), FolderRows.unread(f, servers));
@@ -219,7 +219,7 @@ final class FolderView extends VBox {
         }
         if (current != null) {
             folderTitle.setText(current.name());
-            chatList.setAccessibleText("Chats de " + current.name());
+            chatList.setAccessibleText(I18n.t("folders.chatsOf", current.name()));
         }
         nameList.refresh();
         chatList.refresh();
@@ -282,7 +282,7 @@ final class FolderView extends VBox {
         if (current == null || !current.chatKeys().contains(c.prefKey())) return;
         int at = 0;
         for (int i = 0; i < menu.getItems().size(); i++) if (menu.getItems().get(i) instanceof Menu) at = i + 1;
-        menu.getItems().add(at, ChatMenus.item("Quitar de esta carpeta", () -> folders.setInFolder(current.id(), c, false)));
+        menu.getItems().add(at, ChatMenus.item(I18n.t("folders.removeFromThis"), () -> folders.setInFolder(current.id(), c, false)));
     }
 
     private void showCurrent() {
@@ -294,9 +294,9 @@ final class FolderView extends VBox {
     private ContextMenu folderMenu(Folder f) {
         ContextMenu menu = new ContextMenu();
         menu.getItems().addAll(
-                ChatMenus.item("Renombrar", () -> dialogs.rename(f, this::focus)),
+                ChatMenus.item(I18n.t("folders.rename"), () -> dialogs.rename(f, this::focus)),
                 new SeparatorMenuItem(),
-                ChatMenus.danger(ChatMenus.item("Eliminar", () -> dialogs.delete(f, this::focus))));
+                ChatMenus.danger(ChatMenus.item(I18n.t("folders.delete"), () -> dialogs.delete(f, this::focus))));
         return menu;
     }
 
@@ -340,7 +340,7 @@ final class FolderView extends VBox {
             badge.setText(Formats.badge(n));
             Nodes.show(badge, n > 0);
             setGraphic(root);
-            setAccessibleText(f.name() + (n == 0 ? "" : ", " + n + (n == 1 ? " chat sin leer" : " chats sin leer")));
+            setAccessibleText(f.name() + (n == 0 ? "" : ", " + I18n.n("rail.unread", n)));
         }
     }
 }

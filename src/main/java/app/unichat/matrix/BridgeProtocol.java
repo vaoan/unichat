@@ -6,6 +6,7 @@ import app.unichat.model.Message;
 import app.unichat.model.Network;
 import app.unichat.service.BridgeAccess.DiscordGuild;
 import app.unichat.service.ChatService.GroupOffer;
+import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -159,11 +160,11 @@ final class BridgeProtocol {
     /** What to tell the person about a live state (Spanish, short). */
     static String liveDetail(AccountStatus status) {
         return switch (status) {
-            case CONNECTED -> "Conectado";
-            case CONNECTING -> "Reconectando… (se arregla solo)";
-            case ERROR -> "Con errores; se reinicia solo";
-            case NEEDS_LOGIN -> "Se cerró la sesión: vuelve a vincular la cuenta";
-            case NOT_AVAILABLE -> "No disponible";
+            case CONNECTED -> I18n.t("account.state.connected");
+            case CONNECTING -> I18n.t("account.state.connecting");
+            case ERROR -> I18n.t("account.state.error");
+            case NEEDS_LOGIN -> I18n.t("account.state.needsLogin");
+            case NOT_AVAILABLE -> I18n.t("account.state.notAvailable");
         };
     }
 

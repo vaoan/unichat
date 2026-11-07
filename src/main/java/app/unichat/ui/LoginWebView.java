@@ -6,6 +6,7 @@ import app.unichat.login.CookieSpec;
 import app.unichat.login.SessionCookies;
 import app.unichat.model.Network;
 import app.unichat.support.Folders;
+import app.unichat.support.I18n;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -222,9 +223,8 @@ public final class LoginWebView {
     }
 
     private static HBox cancelBar(Network network, Button cancel) {
-        Label hint = Labels.help("Inicia sesión como en la web de " + network.displayName()
-                + ". Puede tardar unos segundos en cargar; la ventana se cerrará sola al terminar.");
-        cancel.setAccessibleText("Cancelar el inicio de sesión en " + network.displayName());
+        Label hint = Labels.help(I18n.t("login.web.hint", network.displayName()));
+        cancel.setAccessibleText(I18n.t("login.web.cancelA11y", network.displayName()));
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox bar = new HBox(10, hint, spacer, cancel);
@@ -249,14 +249,14 @@ public final class LoginWebView {
         WebEngine engine = web.getEngine();
         engine.setUserAgent(userAgent);
         Path storageDir = freshStorage(engine);
-        web.setAccessibleText("Página de inicio de sesión de " + network.displayName());
+        web.setAccessibleText(I18n.t("login.web.pageA11y", network.displayName()));
 
         Stage stage = new Stage();
         if (owner != null) stage.initOwner(owner);
         stage.initModality(Modality.WINDOW_MODAL);
-        stage.setTitle("Iniciar sesión en " + network.displayName());
+        stage.setTitle(I18n.t("login.web.title", network.displayName()));
 
-        Button cancel = new Button("Cancelar");
+        Button cancel = new Button(I18n.t("common.cancel"));
         HBox bar = cancelBar(network, cancel);
 
         BorderPane root = new BorderPane(web);

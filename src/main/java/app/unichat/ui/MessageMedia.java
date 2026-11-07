@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.Chat;
+import app.unichat.support.I18n;
 import app.unichat.video.WebmStickers;
 import javafx.scene.control.ProgressIndicator;
 import app.unichat.service.MediaSource;
@@ -68,13 +69,13 @@ final class MessageMedia {
             if (MessageActions.isStickerOrGif(m)) library.rememberSeen(MediaItems.of(m));
             if (m.isReelLink()) {
                 box.getChildren().add(playBadge());
-                clickable(box, "Reel, abrir en el navegador", () -> openLink.accept(m.externalUrl()));
+                clickable(box, I18n.t("media.reelOpen"), () -> openLink.accept(m.externalUrl()));
                 return box;
             }
-            clickable(box, (sticker ? "Sticker" : "Imagen") + (m.fileName() == null || sticker ? "" : " " + m.fileName())
-                    + ", abrir en grande", () -> {
+            clickable(box, sticker ? I18n.t("media.stickerOpen")
+                    : m.fileName() == null ? I18n.t("media.imageOpen") : I18n.t("media.imageFileOpen", m.fileName()), () -> {
                 Window owner = scene.get().getWindow();
-                MediaViewer.show(owner, svc.media(m.mediaUrl(), 0, 0), sticker ? "Sticker" : m.fileName(),
+                MediaViewer.show(owner, svc.media(m.mediaUrl(), 0, 0), sticker ? I18n.t("media.sticker") : m.fileName(),
                         () -> MediaSaver.save(owner, svc, m, toast));
             });
         }
@@ -102,12 +103,12 @@ final class MessageMedia {
             box.setMaxHeight(h);
             ((Rectangle) box.getClip()).setHeight(h);
         });
-        clickable(box, "Imagen, abrir en grande", () -> {
+        clickable(box, I18n.t("media.imageOpen"), () -> {
             Window owner = scene.get().getWindow();
             Message holder = new Message(url, "", "", null, false, java.time.Instant.now());
             holder.setType(MessageType.IMAGE);
             holder.setMediaUrl(url);
-            MediaViewer.show(owner, svc.media(url, 0, 0), "Imagen", () -> MediaSaver.save(owner, svc, holder, toast));
+            MediaViewer.show(owner, svc.media(url, 0, 0), I18n.t("media.image"), () -> MediaSaver.save(owner, svc, holder, toast));
         });
         return box;
     }
@@ -174,7 +175,7 @@ final class MessageMedia {
         if (isWebm(m)) showConverted(box, m, dw, dh);
         else box.getChildren().add(new InlineVideo(svc, m.mediaUrl(), dw, dh, () -> fileNode(m)));
         if (MessageActions.isStickerOrGif(m)) library.rememberSeen(MediaItems.of(m));
-        clickable(box, (sticker ? "Sticker" : "Video") + ", abrir en grande", () -> openVideo(m));
+        clickable(box, I18n.t(sticker ? "media.stickerOpen" : "media.videoOpen"), () -> openVideo(m));
         return box;
     }
 
@@ -193,7 +194,7 @@ final class MessageMedia {
         view.setPreserveRatio(true);
         ProgressIndicator wait = new ProgressIndicator();
         wait.setMaxSize(28, 28);
-        wait.setAccessibleText("Preparando el sticker");
+        wait.setAccessibleText(I18n.t("media.preparingSticker"));
         box.getChildren().addAll(view, wait);
         int px = (int) (Math.max(width, height) * 2);
         svc.media(m.mediaUrl(), 0, 0)
@@ -336,8 +337,8 @@ final class MessageMedia {
         ic.getStyleClass().add("file-icon");
         Label name = new Label(m.fileName() == null ? m.body() : m.fileName());
         name.getStyleClass().add("file-name");
-        Label size = new Label((m.type() == MessageType.AUDIO ? "Audio" : m.type() == MessageType.VIDEO ? "Video"
-                : m.type() == MessageType.STICKER ? "Sticker en video" : "Archivo")
+        Label size = new Label(I18n.t(m.type() == MessageType.AUDIO ? "media.kind.audio" : m.type() == MessageType.VIDEO ? "media.kind.video"
+                : m.type() == MessageType.STICKER ? "media.kind.videoSticker" : "media.kind.file")
                 + (m.fileSize() > 0 ? " · " + Formats.fileSize(m.fileSize()) : ""));
         size.getStyleClass().add("file-size");
         VBox text = new VBox(1, name, size);
@@ -350,7 +351,7 @@ final class MessageMedia {
             else openFile(m);
         });
         box.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
-        box.setAccessibleText(size.getText() + " " + name.getText() + ", abrir");
+        box.setAccessibleText(I18n.t("media.fileOpen", size.getText(), name.getText()));
         return box;
     }
 
@@ -374,7 +375,7 @@ final class MessageMedia {
     Node transcriptNode(Message m, double maxWidth) {
         Transcripts.State st = Transcripts.get().state(m.mediaUrl());
         if (st instanceof Transcripts.Done d) {
-            Label text = new Label(d.text().isEmpty() ? "Sin voz" : d.text());
+            Label text = new Label(d.text().isEmpty() ? I18n.t("media.noSpeech") : d.text());
             text.getStyleClass().add("transcript");
             if (d.text().isEmpty()) text.getStyleClass().add("empty");
             text.setWrapText(true);
@@ -386,14 +387,14 @@ final class MessageMedia {
             l.getStyleClass().add("transcript-status");
             return l;
         }
-        Hyperlink action = new Hyperlink(st instanceof Transcripts.Failed ? "Reintentar" : "Transcribir");
+        Hyperlink action = new Hyperlink(I18n.t(st instanceof Transcripts.Failed ? "media.retry" : "media.transcribe"));
         action.getStyleClass().add("transcript-action");
         // Keyboard: T or the message's menu (rows are navigated as a whole, like reactions).
         action.setFocusTraversable(false);
-        action.setAccessibleText("Transcribir la nota de voz");
+        action.setAccessibleText(I18n.t("media.transcribeVoice"));
         action.setOnAction(e -> transcribe(m));
         if (st instanceof Transcripts.Failed f) {
-            Label err = new Label("No se pudo transcribir: " + f.error());
+            Label err = new Label(I18n.t("media.transcribeFailed", f.error()));
             err.getStyleClass().add("transcript-status");
             err.setWrapText(true);
             err.setMaxWidth(maxWidth - 24);
@@ -405,7 +406,7 @@ final class MessageMedia {
     void openFile(Message m) {
         if (m.mediaUrl() == null) return;
         svc.media(m.mediaUrl(), 0, 0).whenComplete((p, err) -> {
-            if (err != null) Platform.runLater(() -> toast.accept("No se pudo descargar el archivo"));
+            if (err != null) Platform.runLater(() -> toast.accept(I18n.t("media.downloadFailed")));
             else openWithSystem(p);
         });
     }

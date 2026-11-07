@@ -1,6 +1,7 @@
 package app.unichat.login;
 
 import app.unichat.model.Contact;
+import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -60,9 +61,9 @@ public final class BridgeContacts {
     /** Opens (creating if needed) the DM with {@code contactId}; returns its room id. */
     public String createDm(String contactId) throws IOException, InterruptedException {
         JsonNode j = call("POST", "/v3/create_dm/" + enc(contactId), JSON.createObjectNode());
-        if (j == null) throw new BridgeLogin.BridgeLoginException("M_UNRECOGNIZED", "Esta red no permite abrir chats nuevos desde Unichat");
+        if (j == null) throw new BridgeLogin.BridgeLoginException("M_UNRECOGNIZED", I18n.t("login.contacts.unsupported"));
         String room = j.path("dm_room_mxid").asText("");
-        if (room.isEmpty()) throw new BridgeLogin.BridgeLoginException("M_UNKNOWN", "El puente no devolvió el chat");
+        if (room.isEmpty()) throw new BridgeLogin.BridgeLoginException("M_UNKNOWN", I18n.t("login.contacts.noChat"));
         return room;
     }
 

@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import javafx.event.EventHandler;
 import javafx.scene.Node;
 import javafx.scene.input.KeyCode;
@@ -33,7 +34,7 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
         Theme.applyAll();
         listPane.refresh();
         thread.redraw();
-        view.toast("Tamaño de texto: " + Math.round(s.fontScale() * 100) + " %");
+        view.toast(I18n.t("windowShortcuts.textSize", Math.round(s.fontScale() * 100)));
     }
 
     /** F6 / Shift+F6: rail → chat list → messages → message input (→ side panel when open). */
@@ -76,7 +77,7 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
             listPane.move(e.getCode() == KeyCode.DOWN ? 1 : -1, e.isShiftDown());
         } else if (mod && e.getCode() == KeyCode.E && c != null) {
             svc.setArchived(c.id(), !c.archived());
-            view.toast(c.archived() ? "Chat desarchivado" : "Chat archivado");
+            view.toast(c.archived() ? I18n.t("windowShortcuts.unarchived") : I18n.t("windowShortcuts.archived"));
         } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.U && c != null) {
             if (c.isUnread()) svc.markRead(c.id()); else svc.setMarkedUnread(c.id(), true);
         } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.I && c != null) {

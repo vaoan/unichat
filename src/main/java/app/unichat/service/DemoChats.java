@@ -8,6 +8,7 @@ import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
 import app.unichat.model.Network;
+import app.unichat.support.I18n;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -57,105 +58,104 @@ final class DemoChats {
     }
 
     private static void whatsAppChats(MockChatService svc) {
-        ChatBuilder.dm(svc, "andrea", Network.WHATSAPP, "Andrea (cliente)")
-                .in(-1500, "Buenas tardes, ¿me confirma la cotización?")
-                .out(-1400, "Hola Andrea, se la envío hoy antes de las 5")
-                .in(-240, "Perfecto, quedo atenta 🙌")
+        ChatBuilder.dm(svc, "andrea", Network.WHATSAPP, I18n.t("demo.title.andrea"))
+                .in(-1500, I18n.t("demo.andrea.1"))
+                .out(-1400, I18n.t("demo.andrea.2"))
+                .in(-240, I18n.t("demo.andrea.3"))
                 .account(WA_WORK).unread(1).done();
 
-        ChatBuilder.dm(svc, "mama", Network.WHATSAPP, "Mamá")
-                .in(-2900, "Hola mijo, ¿cómo estás?")
-                .out(-2850, "Bien ma, trabajando")
-                .in(-2800, "¿Vienes el domingo a almorzar?")
-                .out(-2700, "Sí claro, llevo el postre 🍰")
-                .in(-180, "Perfecto, te espero a la 1")
-                .in(-120, "No olvides traer el cargador que dejaste")
+        ChatBuilder.dm(svc, "mama", Network.WHATSAPP, I18n.t("demo.title.mom"))
+                .in(-2900, I18n.t("demo.mom.1"))
+                .out(-2850, I18n.t("demo.mom.2"))
+                .in(-2800, I18n.t("demo.mom.3"))
+                .out(-2700, I18n.t("demo.mom.4"))
+                .in(-180, I18n.t("demo.mom.5"))
+                .in(-120, I18n.t("demo.mom.6"))
                 .unread(2).favorite().done();
 
-        ChatBuilder.group(svc, "familia", Network.WHATSAPP, "Familia 🏡", "Papá", "Laura", "Tío Jorge")
-                .in(-7200, "Papá", "Buenos días familia ☀️")
-                .in(-7100, "Laura", "Buenos días!!")
-                .photo(-7000, "Tío Jorge", "Paseo-al-lago")
-                .in(-6900, "Tío Jorge", "Así quedó el paseo del sábado")
-                .out(-6800, "Qué bonito, ¡la próxima voy!")
-                .react(-7000, "❤️", "Papá", "Laura")
-                .voice(-6700, "Papá")
-                .in(-600, "Laura", "¿Quién trae qué el domingo?")
+        ChatBuilder.group(svc, "familia", Network.WHATSAPP, I18n.t("demo.title.family"), I18n.t("demo.name.dad"), "Laura", I18n.t("demo.name.uncleJorge"))
+                .in(-7200, I18n.t("demo.name.dad"), I18n.t("demo.family.1"))
+                .in(-7100, "Laura", I18n.t("demo.family.2"))
+                .photo(-7000, I18n.t("demo.name.uncleJorge"), I18n.t("demo.family.photo"))
+                .in(-6900, I18n.t("demo.name.uncleJorge"), I18n.t("demo.family.3"))
+                .out(-6800, I18n.t("demo.family.4"))
+                .react(-7000, "❤️", I18n.t("demo.name.dad"), "Laura")
+                .voice(-6700, I18n.t("demo.name.dad"))
+                .in(-600, "Laura", I18n.t("demo.family.5"))
                 .unread(1).done();
     }
 
     private static void otherChats(MockChatService svc) {
         ChatBuilder.dm(svc, "andres", Network.TELEGRAM, "Andrés Mejía")
-                .out(-90000, "¿Pudiste revisar el PR?")
-                .in(-89000, "Sí, dejé unos comentarios")
-                .in(-88900, "Lo demás está perfecto 👍")
-                .out(-3600, "Ya corregí lo que dijiste")
-                .reply(-3500, "Genial, lo apruebo ahora", -3600)
+                .out(-90000, I18n.t("demo.andres.1"))
+                .in(-89000, I18n.t("demo.andres.2"))
+                .in(-88900, I18n.t("demo.andres.3"))
+                .out(-3600, I18n.t("demo.andres.4"))
+                .reply(-3500, I18n.t("demo.andres.5"), -3600)
                 .favorite().done();
 
-        ChatBuilder.group(svc, "devs", Network.SLACK, "#desarrollo", "Camila Rojas", "Santiago", "Bot de CI")
-                .in(-5400, "Bot de CI", "✅ Build #482 pasó en main")
-                .in(-5000, "Camila Rojas", "Hoy hacemos deploy a las 4pm")
-                .in(-4900, "Santiago", "Ok, congelo merges desde las 3")
-                .out(-4800, "Listo, yo reviso los logs después")
-                .in(-300, "Camila Rojas", "@Yo ¿puedes revisar el ticket 1234?")
+        ChatBuilder.group(svc, "devs", Network.SLACK, I18n.t("demo.title.dev"), "Camila Rojas", "Santiago", I18n.t("demo.name.ciBot"))
+                .in(-5400, I18n.t("demo.name.ciBot"), I18n.t("demo.dev.1"))
+                .in(-5000, "Camila Rojas", I18n.t("demo.dev.2"))
+                .in(-4900, "Santiago", I18n.t("demo.dev.3"))
+                .out(-4800, I18n.t("demo.dev.4"))
+                .in(-300, "Camila Rojas", I18n.t("demo.dev.5"))
                 .unread(3).mention().done();
 
         ChatBuilder.dm(svc, "valen", Network.INSTAGRAM, "valentina.gomez")
-                .in(-14000, "jajaja viste la historia que subí?")
-                .out(-13900, "Sí 😂 qué buena")
-                .photo(-13800, "valentina.gomez", "Atardecer")
-                .in(-13700, "mira este atardecer")
-                .react(-13800, "🔥", "Yo")
+                .in(-14000, I18n.t("demo.valen.1"))
+                .out(-13900, I18n.t("demo.valen.2"))
+                .photo(-13800, "valentina.gomez", I18n.t("demo.valen.photo"))
+                .in(-13700, I18n.t("demo.valen.3"))
+                .react(-13800, "🔥", I18n.t("demo.me"))
                 .done();
 
         ChatBuilder.dm(svc, "sofia", Network.SIGNAL, "Sofía")
-                .in(-40000, "¿Me pasas la dirección?")
-                .out(-39900, "Calle 72 #10-34, apto 501")
-                .in(-39800, "Gracias 🙏")
+                .in(-40000, I18n.t("demo.sofia.1"))
+                .out(-39900, I18n.t("demo.sofia.2"))
+                .in(-39800, I18n.t("demo.sofia.3"))
                 .done();
 
         ChatBuilder.group(svc, "gaming", Network.DISCORD, "Gaming • #general", "xNico", "Mafe", "Pipe")
-                .in(-20000, "xNico", "¿Partida hoy a las 9?")
-                .in(-19900, "Mafe", "Yo me apunto")
-                .in(-19800, "Pipe", "Llego un poco tarde")
-                .out(-19700, "Dale, yo creo la sala")
-                .in(-900, "xNico", "Ya estamos en el canal de voz")
+                .in(-20000, "xNico", I18n.t("demo.gaming.1"))
+                .in(-19900, "Mafe", I18n.t("demo.gaming.2"))
+                .in(-19800, "Pipe", I18n.t("demo.gaming.3"))
+                .out(-19700, I18n.t("demo.gaming.4"))
+                .in(-900, "xNico", I18n.t("demo.gaming.5"))
                 .unread(4).muted().done();
 
         // A Discord server (a Matrix space) with two joined channels and one not joined yet.
 
-        ChatBuilder.dm(svc, "banco", Network.GOOGLE_MESSAGES, "Banco 85432")
-                .in(-30000, "Tu código de verificación es 482913. No lo compartas.")
+        ChatBuilder.dm(svc, "banco", Network.GOOGLE_MESSAGES, I18n.t("demo.title.bank"))
+                .in(-30000, I18n.t("demo.bank.1"))
                 .lowPriority().done();
 
         ChatBuilder.dm(svc, "carlos", Network.MESSENGER, "Carlos Pérez")
-                .in(-250000, "Feliz cumpleaños!! 🎉🎂")
-                .out(-249000, "Gracias Carlos!!")
+                .in(-250000, I18n.t("demo.carlos.1"))
+                .out(-249000, I18n.t("demo.carlos.2"))
                 .archived().done();
 
-        ChatBuilder.dm(svc, "notas", Network.MATRIX, "Notas personales")
-                .out(-500000, "Lista de compras: café, pan, huevos")
-                .out(-400000, "Idea: app de chats unificada en Java ☕")
+        ChatBuilder.dm(svc, "notas", Network.MATRIX, I18n.t("demo.title.notes"))
+                .out(-500000, I18n.t("demo.notes.1"))
+                .out(-400000, I18n.t("demo.notes.2"))
                 .pinned().done();
     }
 
     private static void discordServer(MockChatService svc) {
         Chat server = new Chat("!servidor:demo");
         server.setNetwork(Network.DISCORD);
-        server.setTitle("Servidor Unichat");
+        server.setTitle(I18n.t("demo.title.server"));
         server.setSpace(true);
         server.setSpaceChildren(List.of("!srv-general:demo", "!srv-memes:demo", MockChatService.UNJOINED_CHANNEL_ID));
         svc.adopt(server);
         svc.chats.put(server.id(), server);
         ChatBuilder.group(svc, "srv-general", Network.DISCORD, "#general", "xNico", "Mafe", "Pipe")
-                .in(-5000, "xNico", "Bienvenidos al servidor")
-                .html(-4000, "Pipe", "<h2>Novedades</h2><p>Una <strong>lista</strong> con <em>formato</em> y <code>código</code>:</p><ul><li>uno</li><li>dos</li></ul>"
-                        + "<table><tr><th>Equipo</th><th>Puntos</th></tr><tr><td>Rojo</td><td>12</td></tr></table>")
+                .in(-5000, "xNico", I18n.t("demo.srv.1"))
+                .html(-4000, "Pipe", I18n.t("demo.srv.html"))
                 .html(-3000, "Mafe", "https://fixupx.com/mafe/status/1234567890123456789012345678901234567890\n"
                         + "<blockquote class=\"discord-embed\" background-color=\"#6364FF\"><p class=\"discord-embed-author\">"
                         + "<img data-mx-emoticon height=\"24\" src=\"demo://avatar\" alt=\"\">&nbsp;<a href=\"https://x.com/mafe/status/1\">Mafe (@mafe)</a></p>"
-                        + "<p class=\"discord-embed-description\"><p>Foto del torneo ❤️<br><a href=\"https://x.com/hashtag/torneo\">#torneo</a></p></p>"
+                        + "<p class=\"discord-embed-description\"><p>" + I18n.t("demo.srv.embed") + "<br><a href=\"https://x.com/hashtag/torneo\">#" + I18n.t("demo.srv.embedTag") + "</a></p></p>"
                         + "<p class=\"discord-embed-image\"><img src=\"demo://torneo\" alt=\"\"></p><p class=\"discord-embed-footer\"><sub>FixupX</sub></p></blockquote>")
                 .unread(2).done();
         ChatBuilder.group(svc, "srv-memes", Network.DISCORD, "#memes", "Mafe")
@@ -177,7 +177,7 @@ final class DemoChats {
             chat.setNetwork(network);
             chat.setTitle(title);
             chat.setGroup(group);
-            List<Member> members = new ArrayList<>(List.of(new Member(ME, "Yo", null)));
+            List<Member> members = new ArrayList<>(List.of(new Member(ME, I18n.t("demo.me"), null)));
             for (String n : names) {
                 Member m = new Member("@" + network.protocolId() + "_" + n.toLowerCase().replaceAll("[^a-z0-9]", "") + ":demo.unichat", n, null);
                 people.put(n, m);
@@ -199,7 +199,7 @@ final class DemoChats {
         ChatBuilder in(long secs, String text) { return in(secs, single().name(), text); }
 
         ChatBuilder in(long secs, String who, String text) {
-            Member m = who.equals("Yo") ? new Member(ME, "Yo", null) : people.get(who);
+            Member m = who.equals(I18n.t("demo.me")) ? new Member(ME, I18n.t("demo.me"), null) : people.get(who);
             Message msg = new Message(UUID.randomUUID().toString(), chat.id(), m.id(), m.name(), m.id().equals(ME), now.plusSeconds(secs));
             msg.setBody(text);
             list.add(msg);
@@ -207,7 +207,7 @@ final class DemoChats {
         }
 
         ChatBuilder out(long secs, String text) {
-            Message msg = new Message(UUID.randomUUID().toString(), chat.id(), ME, "Yo", true, now.plusSeconds(secs));
+            Message msg = new Message(UUID.randomUUID().toString(), chat.id(), ME, I18n.t("demo.me"), true, now.plusSeconds(secs));
             msg.setBody(text);
             msg.setStatus(MessageStatus.READ);
             list.add(msg);
@@ -235,7 +235,7 @@ final class DemoChats {
             Message msg = list.get(list.size() - 1);
             msg.setType(MessageType.AUDIO);
             msg.setMediaUrl("demo://nota-de-voz.ogg");
-            msg.setFileName("Nota de voz.ogg");
+            msg.setFileName(I18n.t("demo.voiceNoteFile"));
             msg.setMimeType("audio/ogg");
             msg.setFileSize(18_400);
             return this;
@@ -249,7 +249,7 @@ final class DemoChats {
 
         ChatBuilder react(long secs, String emoji, String... who) {
             Message target = at(secs);
-            for (String w : who) target.toggleReaction(emoji, w.equals("Yo") ? ME : people.get(w).id());
+            for (String w : who) target.toggleReaction(emoji, w.equals(I18n.t("demo.me")) ? ME : people.get(w).id());
             return this;
         }
 

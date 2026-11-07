@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.Message;
+import app.unichat.support.I18n;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -32,9 +33,9 @@ final class AudioControls extends HBox {
         this.message = message;
         getStyleClass().add("audio-controls");
         setAlignment(Pos.CENTER_LEFT);
-        toggle = Icons.iconButton(Icons.PLAY, "Reproducir", onToggle);
+        toggle = Icons.iconButton(Icons.PLAY, I18n.t("audio.play"), onToggle);
         toggle.getStyleClass().add("audio-toggle");
-        position.setAccessibleText("Posición del audio");
+        position.setAccessibleText(I18n.t("audio.position"));
         position.setBlockIncrement(0.05);
         position.setMinWidth(60);
         HBox.setHgrow(position, Priority.ALWAYS);
@@ -71,11 +72,11 @@ final class AudioControls extends HBox {
             ProgressIndicator spin = new ProgressIndicator();
             spin.setMaxSize(18, 18);
             toggle.setGraphic(spin);
-            toggle.setAccessibleText("Cargando el audio");
+            toggle.setAccessibleText(I18n.t("audio.loading"));
         } else {
             boolean playing = st == AudioPlayback.State.PLAYING;
             toggle.setGraphic(Icons.icon(playing ? Icons.PAUSE : Icons.PLAY, 18));
-            toggle.setAccessibleText(playing ? "Pausar el audio" : "Reproducir el audio");
+            toggle.setAccessibleText(I18n.t(playing ? "audio.pause" : "audio.playAudio"));
         }
         position.setDisable(!mine);
         double total = mine ? playback.duration() : m == null ? 0 : m.durationMs() / 1000.0;

@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.support.I18n;
+
 import javafx.scene.Node;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.text.Text;
@@ -103,7 +105,7 @@ public final class RichText {
         h.setOnAction(e -> openLink.accept(url));
         if (!h.getText().equals(url)) {
             h.setTooltip(new javafx.scene.control.Tooltip(url));
-            h.setAccessibleText(h.getText() + ", enlace a " + url);
+            h.setAccessibleText(I18n.t("richText.linkTo", h.getText(), url));
         }
         return h;
     }

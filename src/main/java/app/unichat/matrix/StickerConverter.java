@@ -3,6 +3,7 @@ package app.unichat.matrix;
 import app.unichat.gif.GifFrames;
 import app.unichat.model.RoomFeatures;
 import app.unichat.support.BundledTools;
+import app.unichat.support.I18n;
 import app.unichat.support.Processes;
 
 import javax.imageio.ImageIO;
@@ -32,7 +33,7 @@ public final class StickerConverter {
      */
     static Result toMp4(Path gif, Path dir) throws IOException {
         java.util.List<GifFrames.Frame> frames = GifFrames.read(gif);
-        if (frames.isEmpty()) throw new IOException("El GIF no tiene cuadros");
+        if (frames.isEmpty()) throw new IOException(I18n.t("sticker.noFrames"));
         int w = frames.get(0).image().getWidth(), h = frames.get(0).image().getHeight();
         int ew = w + (w & 1), eh = h + (h & 1);
         Files.createDirectories(dir);
@@ -89,12 +90,12 @@ public final class StickerConverter {
                 System.err.println("gif2webp failed (exit " + (r.finished() ? r.exit() : "timeout") + "); sending a still sticker");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IOException("Conversión interrumpida", e);
+                throw new IOException(I18n.t("sticker.interrupted"), e);
             }
             Files.deleteIfExists(out);
         }
         BufferedImage first = ImageIO.read(in.toFile());
-        if (first == null) throw new IOException("No se pudo leer el sticker");
+        if (first == null) throw new IOException(I18n.t("sticker.unreadable"));
         Path out = Files.createTempFile(dir, "sticker", ".png");
         ImageIO.write(first, "png", out.toFile());
         return new Result(out, PNG);

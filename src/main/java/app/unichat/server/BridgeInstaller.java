@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import app.unichat.bridge.BridgePorts;
 import app.unichat.support.Folders;
+import app.unichat.support.I18n;
 import app.unichat.support.Processes;
 import app.unichat.support.Redactor;
 
@@ -47,9 +48,9 @@ final class BridgeInstaller {
     void prepare(String b, String doublePuppetToken, String statusUrl, TelegramApi telegram, Consumer<String> progress)
             throws IOException, InterruptedException {
         Manifest.Component c = manifest.bridge(b);
-        if (c == null) throw new IOException("Sin versión fijada para " + b);
+        if (c == null) throw new IOException(I18n.t("bridge.noPinnedVersion", b));
         if (!store.isInstalled(c)) {
-            progress.accept("Descargando el puente de " + b + "…");
+            progress.accept(I18n.t("bridge.downloading", b));
             store.install(c);
         }
         Path bd = dir.resolve(b);
@@ -57,7 +58,7 @@ final class BridgeInstaller {
         Path config = bd.resolve("config.yaml");
         if (!Files.exists(config)) generateConfig(b, bd, config);
         boolean isTelegram = b.equals("telegram");
-        if (isTelegram && telegram == null) throw new IOException("Telegram necesita tu api_id y api_hash de my.telegram.org");
+        if (isTelegram && telegram == null) throw new IOException(I18n.t("bridge.telegramKeys"));
         BridgeConfig.rewrite(config, new BridgeConfig.Settings(b, BridgePorts.BRIDGE_PORTS.get(b), LocalServer.DOMAIN,
                 "@" + LocalServer.USER + ":" + LocalServer.DOMAIN, LocalServer.URL, bd, doublePuppetToken,
                 isTelegram ? telegram.id() : null, isTelegram ? telegram.hash() : null, statusUrl));
@@ -72,7 +73,7 @@ final class BridgeInstaller {
             // the homeserver (expected: the non-zero exit is ignored, the filled file is what we want).
             Files.writeString(config, "{}\n");
             runIgnoringExit(bd, command(b, "-c", "config.yaml"));
-            if (Files.size(config) < 100) throw new IOException(b + " no generó su configuración");
+            if (Files.size(config) < 100) throw new IOException(I18n.t("bridge.noConfig", b));
             // That run logged to its default file (unfiltered); from now on it logs to stdout (Redactor).
             Folders.delete(bd.resolve("logs"));
         } else {
@@ -87,18 +88,18 @@ final class BridgeInstaller {
     }
 
     private static void runIgnoringExit(Path workDir, List<String> cmd) throws IOException, InterruptedException {
-        if (!Processes.quiet(cmd, workDir, 60).finished()) throw new IOException("Tiempo agotado: " + name(cmd));
+        if (!Processes.quiet(cmd, workDir, 60).finished()) throw new IOException(I18n.t("bridge.timeout", name(cmd)));
     }
 
     /** Runs a bridge setup command; on failure its (redacted) output goes to the log and the error message. */
     private static void run(Path workDir, List<String> cmd) throws IOException, InterruptedException {
         Processes.Result r = Processes.capture(new ProcessBuilder(cmd).directory(workDir.toFile()).redirectErrorStream(true), 60);
-        if (!r.finished()) throw new IOException("Tiempo agotado: " + name(cmd));
+        if (!r.finished()) throw new IOException(I18n.t("bridge.timeout", name(cmd)));
         if (r.exit() != 0) {
             String text = Redactor.redact(r.out().strip());
             System.err.println("Bridge setup failed (" + name(cmd) + ", exit " + r.exit() + "): " + text);
-            String last = text.lines().reduce((a, b) -> b).orElse("sin detalles");
-            throw new IOException(name(cmd) + " no pudo prepararse: " + last);
+            String last = text.lines().reduce((a, b) -> b).orElse(I18n.t("bridge.noDetails"));
+            throw new IOException(I18n.t("bridge.setupFailed", name(cmd), last));
         }
     }
 

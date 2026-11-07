@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
+import app.unichat.support.I18n;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
@@ -32,7 +33,7 @@ final class AudioBar extends HBox {
         HBox.setHgrow(controls, Priority.ALWAYS);
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.SOMETIMES);
-        Button close = Icons.iconButton(Icons.CLOSE, "Cerrar el reproductor", playback::stop);
+        Button close = Icons.iconButton(Icons.CLOSE, I18n.t("audioBar.close"), playback::stop);
         getChildren().addAll(who, controls, grow, close);
         playback.addListener(this::refresh);
         refresh();
@@ -44,12 +45,12 @@ final class AudioBar extends HBox {
         setVisible(showing);
         setManaged(showing);
         if (!showing) return;
-        String sender = m.outgoing() ? "Tú" : m.senderName();
+        String sender = m.outgoing() ? I18n.t("common.you") : m.senderName();
         Chat c = playback.chat();
         String title = c == null || c.title() == null || c.title().equals(sender) ? sender : sender + " · " + c.title();
         if (!title.equals(who.getText())) {
             who.setText(title);
-            who.setAccessibleText("Audio de " + title + ", ir al chat");
+            who.setAccessibleText(I18n.t("audioBar.goToChat", title));
         }
     }
 }

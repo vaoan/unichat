@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.model.Chat;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToggleButton;
@@ -19,11 +20,14 @@ import java.util.Map;
  */
 public final class SidePanel extends VBox {
     public enum Tab {
-        PROFILE("Perfil"), FAVORITES("Favoritos"), EMOJIS("Emojis"), STICKERS("Stickers"), GIFS("GIFs");
+        PROFILE("sidePanel.tab.profile"), FAVORITES("sidePanel.tab.favorites"), EMOJIS("sidePanel.tab.emojis"),
+        STICKERS("sidePanel.tab.stickers"), GIFS("sidePanel.tab.gifs");
 
-        final String label;
+        private final String key;
 
-        Tab(String label) { this.label = label; }
+        Tab(String key) { this.key = key; }
+
+        String label() { return I18n.t(key); }
     }
 
     private final InfoPane info;
@@ -41,15 +45,15 @@ public final class SidePanel extends VBox {
         javafx.scene.layout.FlowPane tabs = new javafx.scene.layout.FlowPane(4, 4);
         tabs.getStyleClass().add("side-panel-tabs");
         for (Tab t : Tab.values()) {
-            ToggleButton b = Chips.sticky(t.label, group, false, () -> show(chat, t));
-            b.setAccessibleText("Pestaña " + t.label);
+            ToggleButton b = Chips.sticky(t.label(), group, false, () -> show(chat, t));
+            b.setAccessibleText(I18n.t("sidePanel.tabA11y", t.label()));
             buttons.put(t, b);
             tabs.getChildren().add(b);
         }
         content.put(Tab.PROFILE, info);
-        content.put(Tab.STICKERS, placeholder("Tus stickers favoritos y recientes aparecerán aquí."));
-        content.put(Tab.GIFS, placeholder("Busca GIFs y guarda tus favoritos aquí."));
-        content.put(Tab.FAVORITES, placeholder("Tus emojis, stickers y GIFs favoritos aparecerán aquí."));
+        content.put(Tab.STICKERS, placeholder(I18n.t("sidePanel.stickersEmpty")));
+        content.put(Tab.GIFS, placeholder(I18n.t("sidePanel.gifsEmpty")));
+        content.put(Tab.FAVORITES, placeholder(I18n.t("sidePanel.favoritesEmpty")));
         VBox.setVgrow(body, Priority.ALWAYS);
         getChildren().addAll(tabs, body);
         try {

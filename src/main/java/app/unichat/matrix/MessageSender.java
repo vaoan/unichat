@@ -12,6 +12,7 @@ import app.unichat.model.RoomFeatures;
 import app.unichat.service.ChatService.Listener;
 import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -229,7 +230,7 @@ final class MessageSender {
     CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) {
         Chat c = core.chat(chatId);
         RoomFeatures.VoiceSend how = (c == null ? RoomFeatures.UNKNOWN : c.features()).voiceSend();
-        if (how == null) return CompletableFuture.failedFuture(new MatrixException(0, null, "Este chat no acepta notas de voz"));
+        if (how == null) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("send.noVoice")));
         return sendMedia(chatId, note.file(), replyToId, how.mime(), 0, 0, note.durationMs(), content -> {
             content.with("info").put("duration", note.durationMs());
             if (!how.voice()) return;
@@ -258,7 +259,7 @@ final class MessageSender {
         try {
             size = Files.size(file);
         } catch (IOException e) {
-            return CompletableFuture.failedFuture(new MatrixException(0, null, "No se pudo leer el archivo"));
+            return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("send.unreadableFile")));
         }
         int[] wh = width > 0 ? new int[]{width, height} : type == MessageType.IMAGE ? imageSize(file) : new int[]{0, 0};
         synchronized (proc) {
@@ -406,7 +407,7 @@ final class MessageSender {
     }
 
     private static CompletableFuture<Void> notSentYet() {
-        return CompletableFuture.failedFuture(new MatrixException(0, null, "El mensaje aún no se ha enviado"));
+        return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("send.notSentYet")));
     }
 
     void sendTyping(String chatId, boolean typing) {

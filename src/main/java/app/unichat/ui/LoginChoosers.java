@@ -7,6 +7,7 @@ import app.unichat.login.DiscordToken;
 import app.unichat.login.SessionCookies;
 import app.unichat.model.Network;
 import app.unichat.service.ChatMessaging;
+import app.unichat.support.I18n;
 import app.unichat.support.Os;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
@@ -52,16 +53,16 @@ final class LoginChoosers {
      */
     void showDiscordChoice(Network n, String botChatId, Runnable cancel) {
         LoginWizard w = wizard.get();
-        Label heading = new Label("Conecta tu cuenta de Discord");
+        Label heading = new Label(I18n.t("login.discord.connect"));
         heading.getStyleClass().add("wizard-instructions");
         heading.setWrapText(true);
 
-        Button web = new Button("Iniciar sesión en Discord");
+        Button web = new Button(I18n.t("login.discord.signIn"));
         web.getStyleClass().add("primary-button");
         web.setMaxWidth(Double.MAX_VALUE);
-        web.setAccessibleText("Iniciar sesión en Discord en una ventana de Unichat");
+        web.setAccessibleText(I18n.t("login.discord.signInA11y"));
         // The bridge's own QR login always ended in a captcha it can't show; the web page's QR (inside this window) works.
-        Label webHelp = Labels.help("Se abre Discord aquí mismo. Entra con tu correo y contraseña o escanea el QR de la página con la app de Discord; si te pide un captcha, lo resuelves ahí.");
+        Label webHelp = Labels.help(I18n.t("login.discord.help"));
 
 
         Label status = Labels.help("");
@@ -72,14 +73,14 @@ final class LoginChoosers {
         scroll.getStyleClass().add("sheet-scroll");
 
         Consumer<String> send = command -> {
-            views.show("Conectar " + n.displayName(), w.root, cancel);
+            views.show(I18n.t("login.connectTitle", n.displayName()), w.root, cancel);
             w.sessionSent();
             svc.sendText(botChatId, command, null).exceptionally(err -> {
                 Platform.runLater(() -> {
                     if (wizard.get() != w || w.finished) return;
                     w.sessionFailed();
-                    views.show("Conectar " + n.displayName(), scroll, cancel);
-                    status.setText("No se pudo enviar: " + LoginTexts.rootMessage(err));
+                    views.show(I18n.t("login.connectTitle", n.displayName()), scroll, cancel);
+                    status.setText(I18n.t("login.sendFailed", LoginTexts.rootMessage(err)));
                 });
                 return null;
             });
@@ -91,7 +92,7 @@ final class LoginChoosers {
                     token -> send.accept("!" + n.protocolId() + " login-token user " + token), () -> { });
         });
         w.chooserActive = true;
-        views.show("Conectar " + n.displayName(), scroll, cancel);
+        views.show(I18n.t("login.connectTitle", n.displayName()), scroll, cancel);
     }
 
     /**
@@ -101,7 +102,7 @@ final class LoginChoosers {
     void showCookieSources(Network n, String botChatId, Runnable cancel) {
         LoginWizard w = wizard.get();
         String net = n.displayName();
-        Label searching = Labels.help("Buscando tu sesión de " + net + " en tus navegadores…");
+        Label searching = Labels.help(I18n.t("login.cookies.searching", net));
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(22, 22);
         HBox searchRow = new HBox(10, spin, searching);
@@ -109,7 +110,7 @@ final class LoginChoosers {
         VBox found = new VBox(10);
         VBox top = new VBox(8, searchRow);
         if (Os.mac()) {
-            Label notice = Labels.help("macOS puede pedirte permiso para usar tu sesión del navegador.");
+            Label notice = Labels.help(I18n.t("login.cookies.macNotice"));
             top.getChildren().add(notice);
         }
 
@@ -121,33 +122,33 @@ final class LoginChoosers {
 
         ScrollPane[] chooser = new ScrollPane[1];
         Consumer<SessionCookies> sendSession = cookies -> {
-            views.show("Conectar " + net, w.root, cancel);
+            views.show(I18n.t("login.connectTitle", net), w.root, cancel);
             w.sessionSent();
             svc.sendText(botChatId, cookies.toBridgeJson(), null).exceptionally(err -> {
                 Platform.runLater(() -> {
-                    toast.accept("No se pudo enviar: " + LoginTexts.rootMessage(err));
+                    toast.accept(I18n.t("login.sendFailed", LoginTexts.rootMessage(err)));
                     // undo the waiting state so the user can retry from the chooser
                     if (wizard.get() == w && !w.finished) {
                         w.sessionFailed();
-                        views.show("Conectar " + net, chooser[0], cancel);
+                        views.show(I18n.t("login.connectTitle", net), chooser[0], cancel);
                     }
                 });
                 return null;
             });
         };
 
-        Label heading = new Label("Elige cómo conectar tu cuenta de " + net);
+        Label heading = new Label(I18n.t("login.cookies.choose", net));
         heading.setWrapText(true);
         heading.getStyleClass().add("wizard-instructions");
 
         Button other = otherAccountButton(n, sendSession);
         Button file = CookieFileButton.create(n, path -> CookieLogin.fromCookieTxt(path, n), sendSession, text -> showStatus(status, text));
 
-        Button paste = new Button("Pegar cookies manualmente");
+        Button paste = new Button(I18n.t("login.cookies.paste"));
         paste.getStyleClass().add("link-button");
         paste.setOnAction(e -> {
             w.chooserActive = false;
-            views.show("Conectar " + net, w.root, cancel);
+            views.show(I18n.t("login.connectTitle", net), w.root, cancel);
             w.update();
         });
 
@@ -157,7 +158,7 @@ final class LoginChoosers {
         scroll.getStyleClass().add("sheet-scroll");
         chooser[0] = scroll;
         w.chooserActive = true;
-        views.show("Conectar " + net, scroll, cancel);
+        views.show(I18n.t("login.connectTitle", net), scroll, cancel);
 
         CookieLogin.findBrowserSessions(n).whenComplete((sessions, err) -> Platform.runLater(() -> {
             if (wizard.get() != w) return; // user left the screen meanwhile
@@ -167,7 +168,7 @@ final class LoginChoosers {
     }
 
     private Button otherAccountButton(Network n, Consumer<SessionCookies> sendSession) {
-        Button other = new Button("Iniciar sesión con otra cuenta");
+        Button other = new Button(I18n.t("login.cookies.otherAccount"));
         other.getStyleClass().add("secondary-button");
         other.setMaxWidth(Double.MAX_VALUE);
         other.setOnAction(e -> {
@@ -180,7 +181,7 @@ final class LoginChoosers {
 
     private static void showSessions(String net, List<BrowserSession> list, VBox found, Consumer<SessionCookies> sendSession) {
         if (list.isEmpty()) {
-            Label none = Labels.help("No encontramos una sesión en tus navegadores.");
+            Label none = Labels.help(I18n.t("login.cookies.noneFound"));
             found.getChildren().add(none);
         }
         for (BrowserSession s : list) {
@@ -190,7 +191,7 @@ final class LoginChoosers {
             l.getStyleClass().add("settings-label");
             HBox.setHgrow(l, Priority.ALWAYS);
             l.setMaxWidth(Double.MAX_VALUE);
-            Button use = new Button("Usar esta sesión");
+            Button use = new Button(I18n.t("login.cookies.useSession"));
             use.getStyleClass().add("primary-button");
             use.setAccessibleText(label);
             use.setOnAction(e -> sendSession.accept(s.cookies()));

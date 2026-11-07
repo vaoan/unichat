@@ -4,6 +4,7 @@ import app.unichat.matrix.MatrixLogin;
 import app.unichat.server.LocalServer;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -23,18 +24,18 @@ public final class LoginView extends StackPane {
         getStyleClass().add("login-root");
 
         javafx.scene.Node logo = Icons.logo(84);
-        Label title = new Label("Bienvenido a Unichat");
+        Label title = new Label(I18n.t("login.welcome"));
         title.getStyleClass().add("login-title");
-        Label sub = new Label("Todos tus chats —WhatsApp, Telegram, Signal, Instagram, Messenger, Discord, Slack y más— en una sola bandeja.");
+        Label sub = new Label(I18n.t("login.subtitle"));
         sub.setWrapText(true);
         sub.getStyleClass().add("login-subtitle");
 
         TextField server = new TextField();
-        server.setPromptText("Servidor (ej. matrix.midominio.com o http://localhost:8008)");
+        server.setPromptText(I18n.t("login.server.prompt"));
         TextField user = new TextField();
-        user.setPromptText("Usuario");
+        user.setPromptText(I18n.t("login.user.prompt"));
         PasswordField pass = new PasswordField();
-        pass.setPromptText("Contraseña");
+        pass.setPromptText(I18n.t("login.password.prompt"));
         for (TextField f : new TextField[]{server, user, pass}) f.getStyleClass().add("login-field");
 
         Label error = new Label();
@@ -45,13 +46,13 @@ public final class LoginView extends StackPane {
         ProgressIndicator spin = new ProgressIndicator();
         spin.setPrefSize(18, 18);
         spin.setVisible(false);
-        Button login = new Button("Iniciar sesión");
+        Button login = new Button(I18n.t("login.signIn"));
         login.getStyleClass().add("primary-button");
         login.setDefaultButton(true);
         login.setMaxWidth(Double.MAX_VALUE);
         login.setOnAction(e -> {
             if (server.getText().isBlank() || user.getText().isBlank() || pass.getText().isEmpty()) {
-                showError(error, "Completa servidor, usuario y contraseña.");
+                showError(error, I18n.t("login.fillAll"));
                 return;
             }
             login.setDisable(true);
@@ -68,10 +69,10 @@ public final class LoginView extends StackPane {
 
         // Recommended path: Unichat installs and runs its own server on this computer (no Docker, no passwords).
         LocalServer local = LocalServer.get();
-        Button useLocal = new Button("Usar este equipo (recomendado)");
+        Button useLocal = new Button(I18n.t("login.useLocal"));
         useLocal.getStyleClass().add("primary-button");
         useLocal.setMaxWidth(Double.MAX_VALUE);
-        Label localStatus = new Label("Unichat instala y mantiene su propio servidor. No necesitas Docker ni contraseñas.");
+        Label localStatus = new Label(I18n.t("login.localInfo"));
         localStatus.getStyleClass().add("login-subtitle");
         localStatus.setWrapText(true);
         useLocal.setOnAction(e -> startLocalServer(local, useLocal, login, localStatus, error, onLoggedIn));
@@ -87,8 +88,8 @@ public final class LoginView extends StackPane {
         StackPane loginRow = new StackPane(login, spin);
         StackPane.setAlignment(spin, Pos.CENTER_RIGHT);
         VBox card = new VBox(12, logo, title, sub);
-        if (local != null) card.getChildren().addAll(useLocal, localStatus, new Label("o con tu propio servidor"));
-        card.getChildren().addAll(server, user, pass, error, loginRow, new Label("o"), demo, help);
+        if (local != null) card.getChildren().addAll(useLocal, localStatus, new Label(I18n.t("login.orOwnServer")));
+        card.getChildren().addAll(server, user, pass, error, loginRow, new Label(I18n.t("login.or")), demo, help);
         card.setAlignment(Pos.CENTER);
         card.getStyleClass().addAll("login-card", "card");
         card.setMaxSize(420, VBox.USE_PREF_SIZE);
@@ -104,7 +105,7 @@ public final class LoginView extends StackPane {
             try {
                 local.ensureRunning(msg -> Platform.runLater(() -> localStatus.setText(msg)));
                 String[] cred = local.credentials();
-                Platform.runLater(() -> localStatus.setText("Iniciando sesión…"));
+                Platform.runLater(() -> localStatus.setText(I18n.t("login.signingIn")));
                 ChatService svc = MatrixLogin.login(LocalServer.URL, cred[0], cred[1]).join();
                 Settings.get().setLocalServer(true);
                 Platform.runLater(() -> onLoggedIn.accept(svc));
@@ -120,7 +121,7 @@ public final class LoginView extends StackPane {
     }
 
     private static Button demoButton(Runnable onDemo) {
-        Button demo = new Button("Probar el modo demo");
+        Button demo = new Button(I18n.t("login.tryDemo"));
         demo.getStyleClass().add("secondary-button");
         demo.setMaxWidth(Double.MAX_VALUE);
         demo.setOnAction(e -> onDemo.run());
@@ -128,7 +129,7 @@ public final class LoginView extends StackPane {
     }
 
     private static Hyperlink helpLink(Consumer<String> openLink) {
-        Hyperlink help = new Hyperlink("¿No tienes servidor? Mira docs/BRIDGES.md para montarlo con Docker.");
+        Hyperlink help = new Hyperlink(I18n.t("login.noServerHelp"));
         help.getStyleClass().add("login-help");
         help.setOnAction(e -> openLink.accept("https://github.com/vaoan/unichat/blob/main/docs/BRIDGES.md"));
         return help;

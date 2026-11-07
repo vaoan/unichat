@@ -5,6 +5,7 @@ import app.unichat.model.Member;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
+import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -55,10 +56,10 @@ public final class InfoPane extends ScrollPane {
         if (chat == null) return;
         Chat c = chat;
 
-        Button x = Icons.iconButton(Icons.CLOSE, "Cerrar", close);
+        Button x = Icons.iconButton(Icons.CLOSE, I18n.t("info.close"), close);
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.ALWAYS);
-        Label head = new Label("Información");
+        Label head = new Label(I18n.t("info.heading"));
         head.getStyleClass().add("info-heading");
         HBox top = new HBox(head, grow, x);
         top.setAlignment(Pos.CENTER_LEFT);
@@ -69,7 +70,7 @@ public final class InfoPane extends ScrollPane {
         Label title = new Label(c.title());
         title.getStyleClass().add("info-title");
         title.setWrapText(true);
-        Label net = new Label(c.network().displayName() + (c.group() ? " · Grupo" : " · Chat directo"));
+        Label net = new Label(c.network().displayName() + (c.group() ? I18n.t("info.group") : I18n.t("info.direct")));
         net.getStyleClass().add("info-subtitle");
         VBox ident = new VBox(8, a, title, net);
         ident.setAlignment(Pos.CENTER);
@@ -81,17 +82,17 @@ public final class InfoPane extends ScrollPane {
         }
 
         HBox actions = new HBox(8,
-                action(Icons.BELL_OFF, c.muted() ? "Activar" : "Silenciar", c.muted(), () -> svc.setMuted(c.id(), !c.muted())),
-                action(Icons.STAR, c.favorite() ? "Favorito" : "Favorito", c.favorite(), () -> svc.setFavorite(c.id(), !c.favorite())),
-                action(Icons.PIN, "Fijar", c.pinned(), () -> svc.setPinned(c.id(), !c.pinned())),
-                action(Icons.ARCHIVE, c.archived() ? "Archivado" : "Archivar", c.archived(), () -> svc.setArchived(c.id(), !c.archived())));
+                action(Icons.BELL_OFF, c.muted() ? I18n.t("info.unmute") : I18n.t("info.mute"), c.muted(), () -> svc.setMuted(c.id(), !c.muted())),
+                action(Icons.STAR, I18n.t("info.favorite"), c.favorite(), () -> svc.setFavorite(c.id(), !c.favorite())),
+                action(Icons.PIN, I18n.t("info.pin"), c.pinned(), () -> svc.setPinned(c.id(), !c.pinned())),
+                action(Icons.ARCHIVE, c.archived() ? I18n.t("info.archived") : I18n.t("info.archive"), c.archived(), () -> svc.setArchived(c.id(), !c.archived())));
         actions.setAlignment(Pos.CENTER);
 
         box.getChildren().addAll(top, ident, actions);
 
         if (c.reminderAt() != null) {
-            Label rem = new Label("⏰ Recordatorio: " + Formats.listStamp(c.reminderAt(), Instant.now(), ZoneId.systemDefault())
-                    + " " + Formats.time(c.reminderAt(), ZoneId.systemDefault()));
+            Label rem = new Label(I18n.t("info.reminder", Formats.listStamp(c.reminderAt(), Instant.now(), ZoneId.systemDefault()),
+                    Formats.time(c.reminderAt(), ZoneId.systemDefault())));
             rem.getStyleClass().add("info-reminder");
             box.getChildren().add(rem);
         }
@@ -99,19 +100,19 @@ public final class InfoPane extends ScrollPane {
         List<Message> media = svc.messages(c.id()).stream()
                 .filter(m -> !m.deleted() && m.type() == MessageType.IMAGE && m.mediaUrl() != null).toList();
         if (!media.isEmpty()) {
-            box.getChildren().add(section("Multimedia (" + media.size() + ")"));
+            box.getChildren().add(section(I18n.t("info.media", media.size())));
             FlowPane grid = new FlowPane(4, 4);
             for (Message m : media.subList(Math.max(0, media.size() - 9), media.size())) grid.getChildren().add(thumb(m));
             box.getChildren().add(grid);
         }
 
         if (c.group() || c.members().size() > 2) {
-            box.getChildren().add(section("Participantes (" + c.members().size() + ")"));
+            box.getChildren().add(section(I18n.t("info.members", c.members().size())));
             VBox people = new VBox(2);
             for (Member m : c.members().stream().limit(100).toList()) {
                 Avatar pa = new Avatar(30);
                 pa.set(m.displayName(), m.id(), m.avatarUrl(), svc);
-                Label n = new Label(m.id().equals(svc.myUserId()) ? m.displayName() + " (tú)" : m.displayName());
+                Label n = new Label(m.id().equals(svc.myUserId()) ? I18n.t("info.you", m.displayName()) : m.displayName());
                 n.getStyleClass().add("member-name");
                 HBox row = new HBox(10, pa, n);
                 row.setAlignment(Pos.CENTER_LEFT);
@@ -121,11 +122,11 @@ public final class InfoPane extends ScrollPane {
             box.getChildren().add(people);
         }
 
-        Button leave = new Button(c.group() ? "Salir del grupo" : "Eliminar chat");
+        Button leave = new Button(c.group() ? I18n.t("info.leaveGroup") : I18n.t("info.deleteChat"));
         leave.getStyleClass().add("danger-button");
         leave.setMaxWidth(Double.MAX_VALUE);
-        leave.setOnAction(e -> svc.leaveChat(c.id()).thenRun(() -> Platform.runLater(() -> toast.accept("Saliste de " + c.title()))));
-        Button lowPrio = new Button(c.lowPriority() ? "Mover a la bandeja" : "Mover a prioridad baja");
+        leave.setOnAction(e -> svc.leaveChat(c.id()).thenRun(() -> Platform.runLater(() -> toast.accept(I18n.t("info.left", c.title())))));
+        Button lowPrio = new Button(c.lowPriority() ? I18n.t("info.toInbox") : I18n.t("info.toLowPriority"));
         lowPrio.getStyleClass().add("secondary-button");
         lowPrio.setMaxWidth(Double.MAX_VALUE);
         lowPrio.setOnAction(e -> svc.setLowPriority(c.id(), !c.lowPriority()));
@@ -145,7 +146,7 @@ public final class InfoPane extends ScrollPane {
         b.getStyleClass().add("info-action");
         if (active) b.getStyleClass().add("active");
         b.setOnAction(e -> run.run());
-        b.setAccessibleText(text + (active ? ", activado" : ""));
+        b.setAccessibleText(active ? I18n.t("info.activated", text) : text);
         return b;
     }
 

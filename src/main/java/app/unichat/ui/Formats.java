@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.support.I18n;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -8,15 +10,12 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.Locale;
 
-/** Spanish date/size formatting used across the UI. Pure functions, unit-tested. */
+/** Date/size formatting used across the UI, in the chosen language. Pure functions, unit-tested. */
 public final class Formats {
     private Formats() {}
 
-    public static final Locale ES = Locale.forLanguageTag("es");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("d/M/yy");
-    private static final DateTimeFormatter LONG_DATE = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", ES);
-    private static final DateTimeFormatter LONG_DATE_YEAR = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyyy", ES);
 
     public static String time(Instant t, ZoneId zone) {
         return TIME.format(t.atZone(zone));
@@ -28,19 +27,20 @@ public final class Formats {
         LocalDate d = t.atZone(zone).toLocalDate();
         LocalDate today = now.atZone(zone).toLocalDate();
         if (d.equals(today)) return time(t, zone);
-        if (d.equals(today.minusDays(1))) return "Ayer";
-        if (d.isAfter(today.minusDays(7))) return d.getDayOfWeek().getDisplayName(TextStyle.SHORT, ES).replace(".", "");
+        if (d.equals(today.minusDays(1))) return I18n.t("formats.yesterday");
+        if (d.isAfter(today.minusDays(7))) return d.getDayOfWeek().getDisplayName(TextStyle.SHORT, I18n.locale()).replace(".", "");
         return SHORT_DATE.format(d);
     }
 
-    /** Thread day separator: "Hoy", "Ayer", "Lunes, 3 de febrero", with year when not current. */
+    /** Thread day separator: "Today", "Yesterday", "Monday, February 3", with year when not current. */
     public static String daySeparator(Instant t, Instant now, ZoneId zone) {
         ZonedDateTime z = t.atZone(zone);
         LocalDate d = z.toLocalDate();
         LocalDate today = now.atZone(zone).toLocalDate();
-        if (d.equals(today)) return "Hoy";
-        if (d.equals(today.minusDays(1))) return "Ayer";
-        String s = (d.getYear() == today.getYear() ? LONG_DATE : LONG_DATE_YEAR).format(z);
+        if (d.equals(today)) return I18n.t("formats.today");
+        if (d.equals(today.minusDays(1))) return I18n.t("formats.yesterday");
+        String pattern = I18n.t(d.getYear() == today.getYear() ? "formats.longDate" : "formats.longDateYear");
+        String s = DateTimeFormatter.ofPattern(pattern, I18n.locale()).format(z);
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
@@ -66,9 +66,9 @@ public final class Formats {
         if (clean.isEmpty()) return "?";
         String[] parts = clean.split("\\s+");
         String first = parts[0].substring(0, parts[0].offsetByCodePoints(0, 1));
-        if (parts.length == 1) return first.toUpperCase(ES);
+        if (parts.length == 1) return first.toUpperCase(I18n.locale());
         String last = parts[parts.length - 1];
-        return (first + last.substring(0, last.offsetByCodePoints(0, 1))).toUpperCase(ES);
+        return (first + last.substring(0, last.offsetByCodePoints(0, 1))).toUpperCase(I18n.locale());
     }
 
     /**
@@ -87,9 +87,9 @@ public final class Formats {
         java.util.List<String> list = java.util.List.copyOf(names);
         return switch (list.size()) {
             case 0 -> "";
-            case 1 -> list.get(0) + " está escribiendo…";
-            case 2 -> list.get(0) + " y " + list.get(1) + " están escribiendo…";
-            default -> list.size() + " personas están escribiendo…";
+            case 1 -> I18n.t("formats.typing.one", list.get(0));
+            case 2 -> I18n.t("formats.typing.two", list.get(0), list.get(1));
+            default -> I18n.t("formats.typing.many", list.size());
         };
     }
 }

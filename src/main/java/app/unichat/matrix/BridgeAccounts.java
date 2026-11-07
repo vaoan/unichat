@@ -8,6 +8,7 @@ import app.unichat.bridge.BridgePorts;
 import app.unichat.bridge.BridgeStates;
 import app.unichat.service.ChatService.Listener;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -167,8 +168,8 @@ final class BridgeAccounts {
                 if (portals == 0 && botRoom == null) continue;
                 BotChatLogin login = inferFromBotChat(botRoom == null ? List.of() : botRoom.timeline, portals, n.displayName());
                 String detail = login.status() == AccountStatus.CONNECTED
-                        ? portals + (portals == 1 ? " chat" : " chats")
-                        : "Inicia sesión desde el chat del bot";
+                        ? I18n.n("account.chats", portals)
+                        : I18n.t("account.loginFromBot");
                 AccountStatus status = cachedLogins != null && portals == 0 ? AccountStatus.NEEDS_LOGIN : login.status();
                 out.add(new Account(n, login.label(), status, detail));
             }
@@ -194,7 +195,7 @@ final class BridgeAccounts {
     static volatile BridgeProvisioner provisioner;
 
     CompletableFuture<String> connectNetwork(Network network) {
-        if (!network.isBridged()) return CompletableFuture.failedFuture(new MatrixException(0, null, "Red no compatible"));
+        if (!network.isBridged()) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.networkUnsupported")));
         return CompletableFuture.supplyAsync(() -> {
             try {
                 BridgeProvisioner p = provisioner;

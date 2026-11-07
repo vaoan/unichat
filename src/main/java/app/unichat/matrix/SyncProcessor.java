@@ -6,6 +6,7 @@ import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
 import app.unichat.service.PreferencesFile;
+import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -31,7 +32,7 @@ import static app.unichat.matrix.SyncEvents.*;
  */
 final class SyncProcessor {
     static final String LOCAL_PREFIX = "local:";
-    static final String ENCRYPTED_TEXT = "🔒 Mensaje cifrado no compatible";
+    static String encryptedText() { return I18n.t("sync.encryptedMessage"); }
     static final String REMINDER_TYPE = "app.unichat.reminder";
     static final String TAG_ARCHIVED = "u.archived";
     static final String TAG_PINNED = "u.pinned";
@@ -349,7 +350,7 @@ final class SyncProcessor {
             case "m.room.encrypted" -> {
                 Message m = newMessage(room, ev);
                 m.setType(MessageType.SYSTEM);
-                m.setBody(ENCRYPTED_TEXT);
+                m.setBody(encryptedText());
                 if (redacted) m.setDeleted(true);
                 addMessage(room, m, ev, older, live, r);
             }

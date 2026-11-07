@@ -7,6 +7,7 @@ import app.unichat.model.Message;
 import app.unichat.model.Network;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import app.unichat.support.Os;
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
@@ -55,6 +56,9 @@ public final class MainView extends StackPane {
             new MediaLibrary(Settings.dataDir().resolve("media-library.json"));
 
     public MediaLibrary library() { return library; }
+
+    /** The chat open on the right, or null. */
+    public String currentChatId() { return thread.chat() == null ? null : thread.chat().id(); }
     /**
      * A busy account (big Discord servers) changes chats many times a second: rebuild at most every REFRESH_GAP_MS, so the UI
      * thread isn't redrawing the whole inbox nonstop. Same for a chat where many people write: a few updates a second at most.
@@ -78,7 +82,7 @@ public final class MainView extends StackPane {
         @Override public void reminderDue(Chat chat) {
             Platform.runLater(() -> {
                 notifier.reminder(chat);
-                if (Settings.get().speakMessages()) Speaker.say("Recordatorio: " + chat.title());
+                if (Settings.get().speakMessages()) Speaker.say(I18n.t("main.reminderSpoken", chat.title()));
             });
         }
     };
@@ -172,6 +176,7 @@ public final class MainView extends StackPane {
     }
 
     public void dispose() {
+        audio.stop();
         svc.removeListener(listener);
         svc.onSaveFailure(null);
     }
@@ -250,7 +255,7 @@ public final class MainView extends StackPane {
                 openChat(pending);
             } else if (System.currentTimeMillis() > pendingOpenUntil) {
                 pendingOpenId = null;
-                toast("El chat tarda en aparecer. Prueba de nuevo en unos segundos.");
+                toast(I18n.t("main.chatSlow"));
             }
         }
         listPane.refresh();
@@ -291,10 +296,10 @@ public final class MainView extends StackPane {
 
     private void showConnection(ConnectionState s) {
         String text = switch (s) {
-            case CONNECTING -> "Conectando…";
-            case SYNCING -> "Sincronizando chats…";
-            case OFFLINE -> "Sin conexión con el servidor. Reintentando…";
-            case LOGGED_OUT -> "La sesión expiró. Vuelve a iniciar sesión.";
+            case CONNECTING -> I18n.t("main.connecting");
+            case SYNCING -> I18n.t("main.syncing");
+            case OFFLINE -> I18n.t("main.offline");
+            case LOGGED_OUT -> I18n.t("main.loggedOut");
             case ONLINE -> null;
         };
         connection.setText(text);
@@ -363,7 +368,7 @@ public final class MainView extends StackPane {
         // The room (e.g. a just-created bridge-bot chat) hasn't arrived through sync yet: open it when it does.
         pendingOpenId = id;
         pendingOpenUntil = System.currentTimeMillis() + 20_000;
-        toast("Abriendo el chat…");
+        toast(I18n.t("main.openingChat"));
     }
 
     /** ⓘ button / ⌘⇧I: the side panel on its Perfil tab. */
@@ -434,17 +439,17 @@ public final class MainView extends StackPane {
 
     public void showCommandBar() {
         CommandBar bar = new CommandBar(svc, svc, List.of(
-                new CommandBar.Command("Ir a la bandeja", "", () -> setView(ChatFilter.View.INBOX, false)),
-                new CommandBar.Command("Ver no leídos", Shortcuts.key("2"), () -> setView(ChatFilter.View.INBOX, true)),
-                new CommandBar.Command("Ver favoritos", Shortcuts.key("3"), () -> setView(ChatFilter.View.FAVORITES, false)),
-                new CommandBar.Command("Ver prioridad baja", Shortcuts.key("4"), () -> setView(ChatFilter.View.LOW_PRIORITY, false)),
-                new CommandBar.Command("Ver archivados", "", () -> setView(ChatFilter.View.ARCHIVE, false)),
-                new CommandBar.Command("Ver carpetas", "", listPane::showFolders),
-                new CommandBar.Command("Nuevo chat", Shortcuts.key("N"), this::showNewChat),
-                new CommandBar.Command("Cuentas", "", this::showAccounts),
-                new CommandBar.Command("Agregar cuenta", "", () -> showAccounts().showPicker()),
-                new CommandBar.Command("Ajustes", Shortcuts.key(","), this::showSettings),
-                new CommandBar.Command("Cerrar sesión", "", onLogout)
+                new CommandBar.Command(I18n.t("main.cmd.inbox"), "", () -> setView(ChatFilter.View.INBOX, false)),
+                new CommandBar.Command(I18n.t("main.cmd.unread"), Shortcuts.key("2"), () -> setView(ChatFilter.View.INBOX, true)),
+                new CommandBar.Command(I18n.t("main.cmd.favorites"), Shortcuts.key("3"), () -> setView(ChatFilter.View.FAVORITES, false)),
+                new CommandBar.Command(I18n.t("main.cmd.lowPriority"), Shortcuts.key("4"), () -> setView(ChatFilter.View.LOW_PRIORITY, false)),
+                new CommandBar.Command(I18n.t("main.cmd.archived"), "", () -> setView(ChatFilter.View.ARCHIVE, false)),
+                new CommandBar.Command(I18n.t("main.cmd.folders"), "", listPane::showFolders),
+                new CommandBar.Command(I18n.t("main.cmd.newChat"), Shortcuts.key("N"), this::showNewChat),
+                new CommandBar.Command(I18n.t("main.cmd.accounts"), "", this::showAccounts),
+                new CommandBar.Command(I18n.t("main.cmd.addAccount"), "", () -> showAccounts().showPicker()),
+                new CommandBar.Command(I18n.t("main.cmd.settings"), Shortcuts.key(","), this::showSettings),
+                new CommandBar.Command(I18n.t("main.cmd.logout"), "", onLogout)
         ), this::openChat, this::hideOverlay);
         showOverlay(bar);
         Platform.runLater(bar::focus);

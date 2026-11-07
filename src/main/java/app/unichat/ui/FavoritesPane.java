@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.MediaLibrary;
+import app.unichat.support.I18n;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -36,13 +37,12 @@ final class FavoritesPane extends ScrollPane {
     void refresh() {
         tiles.next();
         content.getChildren().clear();
-        section("Emojis", library.favorites(MediaLibrary.Kind.EMOJI), 2,
+        section(I18n.t("favorites.emojis"), library.favorites(MediaLibrary.Kind.EMOJI), 2,
                 i -> EmojiPicker.button(i.url(), insertEmoji, library, toast));
-        section("Stickers", library.favorites(MediaLibrary.Kind.STICKER), 6, i -> stickers.tile(i, "Sticker favorito"));
-        section("GIFs", library.favorites(MediaLibrary.Kind.GIF), 6, i -> gifs.libraryTile(i, "GIF favorito"));
+        section(I18n.t("favorites.stickers"), library.favorites(MediaLibrary.Kind.STICKER), 6, i -> stickers.tile(i, I18n.t("library.stickerFavorite")));
+        section(I18n.t("favorites.gifs"), library.favorites(MediaLibrary.Kind.GIF), 6, i -> gifs.libraryTile(i, I18n.t("library.gifFavorite")));
         if (content.getChildren().isEmpty()) {
-            Label l = Labels.help("Aquí tendrás juntos tus emojis, stickers y GIFs favoritos. Agrégalos con clic derecho → "
-                    + "Agregar a favoritos, en un mensaje del chat o en las pestañas Emojis, Stickers y GIFs.");
+            Label l = Labels.help(I18n.t("favorites.none"));
             content.getChildren().add(l);
         }
     }

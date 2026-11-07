@@ -213,6 +213,10 @@ public final class Settings {
     }
 
     // --- Appearance & behaviour ---
+    /** The language chosen in Ajustes, or {@link app.unichat.support.I18n#AUTO} (the system's). */
+    public String language() { return getString("ui.language", app.unichat.support.I18n.AUTO); }
+    public void setLanguage(String code) { set("ui.language", code); }
+
     public Theme theme() { return getEnum("ui.theme", Theme.SYSTEM); }
     public void setTheme(Theme theme) { set("ui.theme", theme.name()); }
     /** Accent color as CSS hex. */

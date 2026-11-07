@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.support.I18n;
+
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.geometry.Pos;
@@ -37,7 +39,7 @@ public final class MediaViewer {
         spin.setMaxSize(40, 40);
         StackPane area = new StackPane(spin);
         Stage stage = new Stage();
-        String name = title == null ? "Imagen" : title;
+        String name = title == null ? I18n.t("media.image") : title;
         PhotoPane photo = new PhotoPane(name, stage::close);
         FlowPane bar = bar(photo, onSave);
         Nodes.show(bar, false);
@@ -66,7 +68,7 @@ public final class MediaViewer {
                 }, photo);
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    Label l = new Label("No se pudo abrir la imagen.");
+                    Label l = new Label(I18n.t("viewer.openFailed"));
                     l.getStyleClass().add("settings-help");
                     area.getChildren().setAll(l);
                 });
@@ -97,16 +99,16 @@ public final class MediaViewer {
         Label percent = new Label();
         percent.getStyleClass().add("media-viewer-percent");
         percent.textProperty().bind(Bindings.format("%d %%", photo.percentProperty()));
-        Button save = new Button("Guardar como…");
+        Button save = new Button(I18n.t("message.saveAs"));
         save.getStyleClass().add("secondary-button");
         save.setOnAction(e -> onSave.run());
         FlowPane bar = new FlowPane(6, 6,
-                Icons.iconButton(Icons.MINUS, "Alejar (-)", () -> photo.change(z -> z.zoomBy(1 / PhotoPane.STEP))),
+                Icons.iconButton(Icons.MINUS, I18n.t("viewer.zoomOut"), () -> photo.change(z -> z.zoomBy(1 / PhotoPane.STEP))),
                 percent,
-                Icons.iconButton(Icons.PLUS, "Acercar (+)", () -> photo.change(z -> z.zoomBy(PhotoPane.STEP))),
-                textButton("Ajustar", "Ver la imagen completa (0)", () -> photo.change(PhotoZoom::fit)),
-                textButton("100 %", "Tamaño real (1)", () -> photo.change(PhotoZoom::actualSize)),
-                Icons.iconButton(Icons.ROTATE, "Girar 90° (R)", () -> photo.change(PhotoZoom::rotate)),
+                Icons.iconButton(Icons.PLUS, I18n.t("viewer.zoomIn"), () -> photo.change(z -> z.zoomBy(PhotoPane.STEP))),
+                textButton(I18n.t("viewer.fit"), I18n.t("viewer.fitHelp"), () -> photo.change(PhotoZoom::fit)),
+                textButton("100 %", I18n.t("viewer.actualSize"), () -> photo.change(PhotoZoom::actualSize)),
+                Icons.iconButton(Icons.ROTATE, I18n.t("viewer.rotate"), () -> photo.change(PhotoZoom::rotate)),
                 save);
         bar.setAlignment(Pos.CENTER);
         bar.setRowValignment(javafx.geometry.VPos.CENTER);

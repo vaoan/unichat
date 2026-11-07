@@ -4,6 +4,7 @@ import app.unichat.model.Network;
 import app.unichat.server.LocalServer;
 import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import app.unichat.video.Ffmpeg;
 import app.unichat.video.WebmStickers;
 import app.unichat.voice.VoiceEnhancer;
@@ -30,25 +31,26 @@ final class NetworksPage {
     private static Node stickerVideoGroup() {
         Label state = Labels.help("");
         state.setMaxWidth(240);
-        Button install = new Button("Instalar ahora");
+        Button install = new Button(I18n.t("settings.networks.install"));
         install.getStyleClass().add("secondary-button");
         install.setMinWidth(Region.USE_PREF_SIZE);
         Runnable refresh = () -> {
             boolean found = Ffmpeg.find() != null;
-            state.setText(found ? "Instalado." : !Ffmpeg.canInstall() ? "No hay una descarga para este computador: instala ffmpeg."
-                    : Ffmpeg.autoInstall() ? "Se descarga la primera vez que llegue uno · " + Formats.fileSize(Ffmpeg.downloadSize())
-                    : "Sin instalar: esos stickers se ven como archivo.");
+            state.setText(found ? I18n.t("settings.networks.ffmpegInstalled")
+                    : !Ffmpeg.canInstall() ? I18n.t("settings.networks.ffmpegNoDownload")
+                    : Ffmpeg.autoInstall() ? I18n.t("settings.networks.ffmpegAuto", Formats.fileSize(Ffmpeg.downloadSize()))
+                    : I18n.t("settings.networks.ffmpegMissing"));
             install.setVisible(!found && Ffmpeg.canInstall());
             install.setManaged(install.isVisible());
         };
         refresh.run();
         install.setOnAction(e -> {
             install.setDisable(true);
-            state.setText("Descargando…");
+            state.setText(I18n.t("settings.networks.downloading"));
             WebmStickers.WORKER.execute(() -> {
                 String error = null;
                 try {
-                    Ffmpeg.install(done -> javafx.application.Platform.runLater(() -> state.setText("Descargando… " + (int) (done * 100) + " %")));
+                    Ffmpeg.install(done -> javafx.application.Platform.runLater(() -> state.setText(I18n.t("settings.networks.downloadingPercent", (int) (done * 100)))));
                 } catch (Exception ex) {
                     error = ex.getMessage();
                 }
@@ -56,34 +58,29 @@ final class NetworksPage {
                 javafx.application.Platform.runLater(() -> {
                     install.setDisable(false);
                     refresh.run();
-                    if (failed != null) state.setText("No se pudo instalar: " + failed);
+                    if (failed != null) state.setText(I18n.t("settings.networks.installFailed", failed));
                 });
             });
         });
-        return group("Stickers, videos y notas de voz",
-                row("Mejorar el audio de tus notas de voz", "Quita el ruido de fondo y empareja el volumen antes de enviar, "
-                        + "en este computador: el audio no pasa por ningún servicio. Si no se puede, se envía tal como se grabó.",
+        return group(I18n.t("settings.networks.groupMedia"),
+                row(I18n.t("settings.networks.enhance"), I18n.t("settings.networks.enhanceHelp"),
                         toggle(VoiceEnhancer.enabled(), VoiceEnhancer::setEnabled)),
-                row("Instalar el conversor automáticamente", "Algunos stickers y videos llegan en formatos que Unichat no reproduce "
-                        + "por sí solo, y mejorar el audio también lo necesita. ffmpeg lo hace en este computador; se usa el tuyo si ya lo tienes.",
+                row(I18n.t("settings.networks.autoInstall"), I18n.t("settings.networks.autoInstallHelp"),
                         toggle(Ffmpeg.autoInstall(), v -> {
                             Ffmpeg.setAutoInstall(v);
                             refresh.run();
                         })),
-                row("Conversor", null, new VBox(6, state, install)));
+                row(I18n.t("settings.networks.converter"), null, new VBox(6, state, install)));
     }
 
     /** Options that only make sense for one network; each network gets its own group. */
     static Node build() {
-        Label intro = Labels.help("Opciones que solo existen en una red.");
-        return page("Redes", intro, telegramGroup(), stickerVideoGroup(), group("WhatsApp",
-                row("Stickers animados", "WhatsApp no acepta los stickers animados de otras redes tal cual. Sticker: se "
-                        + "convierte en sticker animado. GIF: llega como un GIF que se repite. Video: llega como un video corto.",
+        Label intro = Labels.help(I18n.t("settings.networks.intro"));
+        return page(I18n.t("settings.nav.networks"), intro, telegramGroup(), stickerVideoGroup(), group("WhatsApp",
+                row(I18n.t("settings.networks.animated"), I18n.t("settings.networks.animatedHelp"),
                         stickerModeChoice(Network.WHATSAPP))),
                 group("Discord",
-                        row("Borrar fotos y videos de canales después de", "Discord guarda en tu disco una copia de cada "
-                                + "imagen y video de los canales de servidores. Los avatares, emojis y los demás chats no "
-                                + "se borran nunca.", discordMediaChoice())));
+                        row(I18n.t("settings.networks.discordDelete"), I18n.t("settings.networks.discordDeleteHelp"), discordMediaChoice())));
     }
 
     /** The person's own Telegram keys; only the local server uses them (other servers keep theirs in their setup). */
@@ -91,8 +88,8 @@ final class NetworksPage {
         if (!Settings.get().localServer()) return new javafx.scene.layout.Region();
         Label done = new Label();
         done.getStyleClass().add("settings-help");
-        TelegramKeysForm form = new TelegramKeysForm("Guardar claves", () -> {
-            done.setText("Guardadas.");
+        TelegramKeysForm form = new TelegramKeysForm(I18n.t("settings.networks.telegramSave"), () -> {
+            done.setText(I18n.t("settings.networks.telegramSaved"));
             LocalServer local = LocalServer.get();
             if (local == null) return;
             Thread t = new Thread(() -> {
@@ -101,7 +98,7 @@ final class NetworksPage {
                     local.restartBridge("telegram", msg -> { });
                 } catch (Exception e) {
                     System.err.println("Telegram restart failed: " + e);
-                    javafx.application.Platform.runLater(() -> done.setText("No se pudo reiniciar Telegram; se aplican al abrir Unichat de nuevo."));
+                    javafx.application.Platform.runLater(() -> done.setText(I18n.t("settings.networks.telegramRestartFailed")));
                 }
             }, "telegram-keys");
             t.setDaemon(true);
@@ -113,9 +110,10 @@ final class NetworksPage {
 
     private static Node discordMediaChoice() {
         Settings s = Settings.get();
-        return chips("Cuándo borrar las fotos y videos de canales de Discord", List.of(7, 30, 90, 0), d -> d == 0 ? "Nunca" : d + " días",
-                d -> d == 0 ? "No borrar nunca las fotos y videos de Discord"
-                        : "Borrar fotos y videos de Discord después de " + d + " días",
+        return chips(I18n.t("settings.networks.discordWhen"), List.of(7, 30, 90, 0),
+                d -> d == 0 ? I18n.t("common.never") : I18n.n("common.days", d),
+                d -> d == 0 ? I18n.t("settings.networks.discordNever")
+                        : I18n.t("settings.networks.discordAfter", I18n.n("common.days", d)),
                 s.discordMediaDays(), s::setDiscordMediaDays);
     }
 
@@ -123,12 +121,12 @@ final class NetworksPage {
         Settings s = Settings.get();
         String key = StickerMode.key(n);
         Function<StickerMode, String> label = m -> switch (m) {
-            case STICKER -> "Sticker";
-            case GIF -> "GIF";
-            case VIDEO -> "Video";
+            case STICKER -> I18n.t("settings.networks.modeSticker");
+            case GIF -> I18n.t("settings.networks.modeGif");
+            case VIDEO -> I18n.t("settings.networks.modeVideo");
         };
-        return chips("Cómo enviar stickers animados a " + n.displayName(), List.of(StickerMode.values()), label,
-                m -> "Enviar stickers animados de " + n.displayName() + " como " + label.apply(m),
+        return chips(I18n.t("settings.networks.stickerHow", n.displayName()), List.of(StickerMode.values()), label,
+                m -> I18n.t("settings.networks.stickerAs", n.displayName(), label.apply(m)),
                 StickerMode.of(n), m -> s.set(key, m.name()));
     }
 }

@@ -6,6 +6,7 @@ import app.unichat.bridge.BridgePorts;
 import app.unichat.settings.Settings;
 import app.unichat.support.Hashes;
 import app.unichat.model.MimeTypes;
+import app.unichat.support.I18n;
 import app.unichat.support.Urls;
 
 import java.io.IOException;
@@ -39,7 +40,7 @@ final class MediaDownloader {
 
     /** The local file of {@code url}: from the cache, or downloaded once however many ask at the same time. */
     CompletableFuture<Path> media(String url, int width, int height) {
-        if (url == null || url.isBlank()) return CompletableFuture.failedFuture(new MatrixException(0, null, "Sin URL"));
+        if (url == null || url.isBlank()) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
         if (url.startsWith("file:")) return CompletableFuture.completedFuture(Path.of(URI.create(url)));
         Path own = saved.find(url);
         if (own != null) return CompletableFuture.completedFuture(own);
@@ -110,7 +111,7 @@ final class MediaDownloader {
         if (url.startsWith("mxc://")) {
             String rest = url.substring("mxc://".length());
             int slash = rest.indexOf('/');
-            if (slash <= 0) throw new MatrixException(0, null, "URL de medio no válida");
+            if (slash <= 0) throw new MatrixException(0, null, I18n.t("media.badUrl"));
             String sm = Urls.enc(rest.substring(0, slash)) + "/" + Urls.enc(rest.substring(slash + 1));
             contentType = null;
             String bridge = BridgePorts.directMediaBase(rest.substring(0, slash));
@@ -130,7 +131,7 @@ final class MediaDownloader {
             // Web addresses come from messages: never to this machine or its network.
             contentType = links.download(url, tmp);
         } else {
-            throw new MatrixException(0, null, "URL de medio no compatible");
+            throw new MatrixException(0, null, I18n.t("media.unsupportedUrl"));
         }
         Path target = dir.resolve(hash + extension(contentType));
         Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);

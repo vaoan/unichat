@@ -3,6 +3,7 @@ package app.unichat.video;
 import app.unichat.settings.Settings;
 import app.unichat.support.BundledTools;
 import app.unichat.support.Downloads;
+import app.unichat.support.I18n;
 import app.unichat.support.Os;
 import app.unichat.support.Processes;
 
@@ -89,7 +90,7 @@ public final class Ffmpeg {
     static Path install(Build b, Path target, DoubleConsumer progress) throws IOException, InterruptedException {
         Path zip = target.resolveSibling("ffmpeg-download.zip");
         try {
-            Downloads.fetch(b.url(), b.size(), b.sha256(), zip, "el conversor de video", progress);
+            Downloads.fetch(b.url(), b.size(), b.sha256(), zip, I18n.t("download.what.videoConverter"), progress);
             extract(zip, b.entry(), target);
         } finally {
             Files.deleteIfExists(zip);
@@ -97,7 +98,7 @@ public final class Ffmpeg {
         target.toFile().setExecutable(true);
         if (!Processes.quiet(List.of(target.toString(), "-version"), null, 15).ok()) {
             Files.deleteIfExists(target);
-            throw new IOException("El conversor de video descargado no funciona en este computador");
+            throw new IOException(I18n.t("video.badConverter"));
         }
         return target;
     }
@@ -111,7 +112,7 @@ public final class Ffmpeg {
                 return;
             }
         }
-        throw new IOException("La descarga del conversor de video no trae el programa");
+        throw new IOException(I18n.t("video.noProgram"));
     }
 
     private static void copy(InputStream in, Path target) throws IOException {

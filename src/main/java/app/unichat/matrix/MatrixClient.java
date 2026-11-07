@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.support.I18n;
 import app.unichat.support.Urls;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -92,7 +93,7 @@ final class MatrixClient {
                 .build();
         HttpResponse<byte[]> resp = send(req, HttpResponse.BodyHandlers.ofByteArray());
         String uri = parse(resp.statusCode(), resp.body()).path("content_uri").asText(null);
-        if (uri == null) throw new MatrixException(resp.statusCode(), null, "El servidor no devolvió la URL del archivo");
+        if (uri == null) throw new MatrixException(resp.statusCode(), null, I18n.t("media.noFileUrl"));
         return uri;
     }
 

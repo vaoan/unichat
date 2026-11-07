@@ -4,6 +4,7 @@ import app.unichat.model.Chat;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.RoomFeatures;
 import app.unichat.service.ChatService;
+import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -58,12 +59,11 @@ final class StickerGrid extends ScrollPane {
         content.getChildren().clear();
         Chat c = chat.get();
         boolean accepted = c == null || c.features().accepts(RoomFeatures.STICKER);
-        if (!accepted) content.getChildren().add(Labels.help("Esta red no acepta stickers."));
-        section("Favoritos", library.favorites(MediaLibrary.Kind.STICKER), "Sticker favorito", accepted);
-        section("Recientes", library.recents(MediaLibrary.Kind.STICKER), "Sticker reciente", accepted);
+        if (!accepted) content.getChildren().add(Labels.help(I18n.t("sticker.networkRefuses")));
+        section(I18n.t("library.favorites"), library.favorites(MediaLibrary.Kind.STICKER), I18n.t("library.stickerFavorite"), accepted);
+        section(I18n.t("library.recents"), library.recents(MediaLibrary.Kind.STICKER), I18n.t("library.stickerRecent"), accepted);
         if (library.favorites(MediaLibrary.Kind.STICKER).isEmpty() && library.recents(MediaLibrary.Kind.STICKER).isEmpty()) {
-            content.getChildren().add(Labels.help("Aún no tienes stickers. Los que te manden aparecerán aquí; guárdalos con clic "
-                    + "derecho → Agregar a favoritos, aquí o en el chat."));
+            content.getChildren().add(Labels.help(I18n.t("sticker.none")));
         }
     }
 
@@ -92,7 +92,7 @@ final class StickerGrid extends ScrollPane {
         var loading = MessageMedia.loadMedia(svc, view, MediaItems.message(item), TILE * 2, TILE * 2);
         Runnable send = () -> send(item, accepted);
         StackPane tile = MediaTile.of(view, TILE, TILE, "sticker-tile",
-                what + (accepted ? ", enviar" : ", esta red no acepta stickers"), accepted, send);
+                I18n.t(accepted ? "library.tileSend" : "library.stickerTileRefused", what), accepted, send);
         LibraryMenu.attach(tile, library, item, accepted ? send : null, toast);
         MediaItems.markIfLost(loading, tile);
         return tile;
@@ -102,12 +102,12 @@ final class StickerGrid extends ScrollPane {
         Chat c = chat.get();
         if (c == null) return;
         if (!accepted) {
-            toast.accept("Esta red no acepta stickers");
+            toast.accept(I18n.t("library.stickerNotAccepted"));
             return;
         }
         svc.sendSticker(c.id(), item, takeReply.get()).whenComplete((v, err) -> Platform.runLater(() -> {
             if (err != null) {
-                toast.accept("No se pudo enviar el sticker");
+                toast.accept(I18n.t("sticker.sendFailed"));
                 return;
             }
             library.addRecent(item);

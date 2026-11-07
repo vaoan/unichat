@@ -5,6 +5,7 @@ import app.unichat.model.AccountStatus;
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
 import app.unichat.service.ChatService;
+import app.unichat.support.I18n;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -42,16 +43,16 @@ public final class Rail extends VBox {
         setAlignment(Pos.TOP_CENTER);
         setSpacing(6);
 
-        inbox = railButton(Icons.icon(Icons.INBOX, 20), "Bandeja unificada", () ->
+        inbox = railButton(Icons.icon(Icons.INBOX, 20), I18n.t("rail.inbox"), () ->
                 listPane.goTo(listPane.filterProperty().get().switchTo(null, null)));
         // Every network's archived chats; dimmed so it doesn't compete with the networks. Search still finds them.
-        archive = railButton(Icons.icon(Icons.ARCHIVE, 18), "Archivados", () ->
+        archive = railButton(Icons.icon(Icons.ARCHIVE, 18), I18n.t("rail.archived"), () ->
                 listPane.goTo(listPane.filterProperty().get().withNetwork(null).withView(ChatFilter.View.ARCHIVE)));
         archive.getStyleClass().add("rail-archive");
-        Button add = railButton(Icons.icon(Icons.PLUS, 20), "Agregar o administrar cuentas (Ajustes)", onConnect);
+        Button add = railButton(Icons.icon(Icons.PLUS, 20), I18n.t("rail.addAccounts"), onConnect);
         add.getStyleClass().add("rail-add");
-        folders = railButton(Icons.icon(Icons.FOLDER, 20), "Carpetas", listPane::showFolders);
-        Button settings = railButton(Icons.icon(Icons.SETTINGS, 20), "Ajustes", onSettings);
+        folders = railButton(Icons.icon(Icons.FOLDER, 20), I18n.t("rail.folders"), listPane::showFolders);
+        Button settings = railButton(Icons.icon(Icons.SETTINGS, 20), I18n.t("rail.settings"), onSettings);
 
         Region grow = new Region();
         VBox.setVgrow(grow, Priority.ALWAYS);
@@ -103,13 +104,13 @@ public final class Rail extends VBox {
             if (!shown) continue;
             String status = acc == null ? "" : switch (acc.status()) {
                 case CONNECTED -> "";
-                case CONNECTING -> " (sin conexión, reconectando)";
-                case NEEDS_LOGIN -> " (sesión cerrada: vuelve a vincular)";
-                case ERROR -> " (con errores, reiniciando)";
-                case NOT_AVAILABLE -> " (no disponible)";
+                case CONNECTING -> I18n.t("rail.status.connecting");
+                case NEEDS_LOGIN -> I18n.t("rail.status.needsLogin");
+                case ERROR -> I18n.t("rail.status.error");
+                case NOT_AVAILABLE -> I18n.t("rail.status.notAvailable");
             };
             List<Account> netAccounts = Accounts.of(accounts, n);
-            String count = netAccounts.size() > 1 ? " (" + netAccounts.size() + " cuentas)" : "";
+            String count = netAccounts.size() > 1 ? I18n.n("rail.accounts", netAccounts.size()) : "";
             Button b = networkButtons.computeIfAbsent(n, x -> railButton(NetworkIcons.tile(x, 26, "rail-network"), "", () ->
                     listPane.goTo(listPane.filterProperty().get().switchTo(x, null))));
             b.getTooltip().setText(n.displayName() + count + status);
@@ -126,7 +127,7 @@ public final class Rail extends VBox {
     /** Right-click on a network: pick one of its accounts or add another. */
     private javafx.scene.control.ContextMenu networkMenu(Network n, List<Account> accounts) {
         javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
-        menu.getItems().add(ChatMenus.item("Todas las cuentas de " + n.displayName(), () ->
+        menu.getItems().add(ChatMenus.item(I18n.t("rail.allAccounts", n.displayName()), () ->
                 listPane.goTo(listPane.filterProperty().get().switchTo(n, null))));
         if (accounts.size() > 1) {
             for (Account a : accounts) {
@@ -135,7 +136,7 @@ public final class Rail extends VBox {
             }
         }
         menu.getItems().add(new javafx.scene.control.SeparatorMenuItem());
-        menu.getItems().add(ChatMenus.item("Agregar otra cuenta de " + n.displayName(), () -> onAddAccount.accept(n)));
+        menu.getItems().add(ChatMenus.item(I18n.t("rail.addAnother", n.displayName()), () -> onAddAccount.accept(n)));
         return menu;
     }
 
@@ -163,7 +164,7 @@ public final class Rail extends VBox {
         }
         wrap.getChildren().removeIf(n -> n.getStyleClass().contains("rail-badge"));
         String tip = b.getTooltip() == null ? "" : b.getTooltip().getText();
-        b.setAccessibleText(count > 0 ? tip + ", " + count + (count == 1 ? " chat sin leer" : " chats sin leer") : tip);
+        b.setAccessibleText(count > 0 ? tip + ", " + I18n.n("rail.unread", count) : tip);
         if (count > 0) {
             Label badge = new Label(Formats.badge(count));
             badge.getStyleClass().add("rail-badge");

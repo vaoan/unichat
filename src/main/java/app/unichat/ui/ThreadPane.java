@@ -8,6 +8,7 @@ import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
 import app.unichat.stt.Transcripts;
+import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -77,8 +78,8 @@ public final class ThreadPane extends BorderPane {
         media = new MessageMedia(svc, openLink, toast, library, this::getScene, audio);
         messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, library, this::getScene, this::member);
 
-        favButton = Icons.iconButton(Icons.STAR, "Favorito", () -> svc.setFavorite(chat.id(), !chat.favorite()));
-        archiveButton = Icons.iconButton(Icons.ARCHIVE, "Archivar (" + Shortcuts.key("E") + ")",
+        favButton = Icons.iconButton(Icons.STAR, I18n.t("thread.favorite"), () -> svc.setFavorite(chat.id(), !chat.favorite()));
+        archiveButton = Icons.iconButton(Icons.ARCHIVE, I18n.t("thread.archive", Shortcuts.key("E")),
                 () -> svc.setArchived(chat.id(), !chat.archived()));
         Node header = buildHeader();
 
@@ -106,9 +107,9 @@ public final class ThreadPane extends BorderPane {
 
         // Nothing selected
         Node logo = Icons.logo(88);
-        Label hint = new Label("Todos tus chats, en un solo lugar");
+        Label hint = new Label(I18n.t("thread.emptyHint"));
         hint.getStyleClass().add("empty-title");
-        Label keys = new Label(Shortcuts.key("K") + " buscar   ·   Alt+↑/↓ cambiar de chat   ·   " + Shortcuts.key("E") + " archivar   ·   " + Shortcuts.key(",") + " ajustes");
+        Label keys = new Label(I18n.t("thread.emptyKeys", Shortcuts.key("K"), Shortcuts.key("E"), Shortcuts.key(",")));
         keys.getStyleClass().add("empty-hint");
         emptyState = new VBox(14, logo, hint, keys);
         emptyState.setAlignment(Pos.CENTER);
@@ -143,10 +144,10 @@ public final class ThreadPane extends BorderPane {
         titles.setMinWidth(0);
         infoButton.setGraphic(Icons.icon(Icons.INFO, 18));
         infoButton.getStyleClass().add("icon-button");
-        infoButton.setTooltip(new javafx.scene.control.Tooltip("Información del chat"));
+        infoButton.setTooltip(new javafx.scene.control.Tooltip(I18n.t("thread.chatInfo")));
         infoButton.setOnAction(e -> toggleInfo.run());
-        infoButton.setAccessibleText("Información del chat");
-        Button more = Icons.iconButton(Icons.MORE, "Más opciones", null);
+        infoButton.setAccessibleText(I18n.t("thread.chatInfo"));
+        Button more = Icons.iconButton(Icons.MORE, I18n.t("thread.moreOptions"), null);
         more.setOnAction(e -> ChatMenus.forChat(chat, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4));
         HBox header = new HBox(10, headerAvatar, titles, favButton, archiveButton, infoButton, more);
         header.getStyleClass().add("thread-header");
@@ -158,10 +159,8 @@ public final class ThreadPane extends BorderPane {
     private void configureTimeline() {
         list.getStyleClass().add("timeline");
         list.setCellFactory(v -> new RowCell());
-        list.setAccessibleText("Mensajes");
-        list.setAccessibleHelp("Flechas para recorrer mensajes. R responder, E editar, Enter o Espacio abre las acciones, "
-                + "1 a 6 reacciones rápidas, P reproducir un audio, T transcribir una nota de voz, " + Shortcuts.key("C") + " copiar, "
-                + "Esc vuelve al campo de texto.");
+        list.setAccessibleText(I18n.t("thread.messages"));
+        list.setAccessibleHelp(I18n.t("thread.messagesHelp", Shortcuts.key("C")));
         list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, this::onTimelineKey);
         list.focusedProperty().addListener((o, a, focused) -> {
             if (focused && list.getSelectionModel().isEmpty() && !rows.isEmpty()) {
@@ -214,14 +213,14 @@ public final class ThreadPane extends BorderPane {
         if (server != null) {
             serverLink.setText(server.title() + " ›");
             serverLink.setUserData(server.id());
-            serverLink.setAccessibleText("Ver los canales de " + server.title());
-            serverLink.setTooltip(new javafx.scene.control.Tooltip("Ver los canales de " + server.title()));
+            serverLink.setAccessibleText(I18n.t("thread.viewChannels", server.title()));
+            serverLink.setTooltip(new javafx.scene.control.Tooltip(I18n.t("thread.viewChannels", server.title())));
         }
         String sub = chat.network().displayName();
         String account = Accounts.forChat(svc, chat);
         if (account != null) sub += " · " + account;
-        if (chat.group()) sub += " · " + chat.members().size() + " participantes";
-        if (chat.muted()) sub += " · Silenciado";
+        if (chat.group()) sub += " · " + I18n.t("thread.participants", chat.members().size());
+        if (chat.muted()) sub += " · " + I18n.t("thread.muted");
         headerSubtitle.setText(sub);
         Nodes.style(favButton, "active", chat.favorite());
         Nodes.style(archiveButton, "active", chat.archived());

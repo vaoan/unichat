@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.MediaLibrary;
+import app.unichat.support.I18n;
 
 import javafx.geometry.Insets;
 import javafx.scene.Node;
@@ -23,13 +24,13 @@ public final class EmojiPicker {
 
     static final Map<String, String> CATEGORIES = new LinkedHashMap<>();
     static {
-        CATEGORIES.put("Caras", "😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 🤐 🤨 😐 😑 😶 😏 😒 🙄 😬 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 🥴 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 🙁 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 💀 💩 🤡 👻 👽 🤖");
-        CATEGORIES.put("Gestos", "👋 🤚 ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 👐 🤲 🤝 🙏 💪 🫶 👀 🧠");
-        CATEGORIES.put("Corazones", "❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💯 💢 💥 💫 💦 💨 🔥 ✨ ⭐ 🌟");
-        CATEGORIES.put("Animales", "🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🙈 🙉 🙊 🐔 🐧 🐦 🦆 🦅 🦉 🐺 🐴 🦄 🐝 🦋 🐌 🐞 🐢 🐍 🐙 🐬 🐳 🦈");
-        CATEGORIES.put("Comida", "🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🍒 🍑 🥭 🍍 🥥 🥑 🍅 🌽 🥕 🍞 🧀 🍳 🥓 🍔 🍟 🍕 🌭 🌮 🌯 🍝 🍜 🍣 🍰 🎂 🍫 🍿 🍩 🍪 ☕ 🍺 🍻 🥂 🍷");
-        CATEGORIES.put("Actividades", "⚽ 🏀 🏈 ⚾ 🎾 🏐 🎱 🏓 🎮 🎲 🎯 🎳 🎸 🎹 🎤 🎧 🎬 🎨 🎉 🎊 🎁 🏆 🥇");
-        CATEGORIES.put("Objetos", "📱 💻 ⌨️ 🖥️ 📷 📞 ⏰ 💡 💸 💰 💳 📎 📌 ✏️ 📝 📅 📦 ✉️ 🔒 🔑 🔔 🚗 ✈️ 🏠 ⏳ ✅ ❌ ❓ ❗ ⚠️ 🚀");
+        CATEGORIES.put("emoji.faces", "😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 🤐 🤨 😐 😑 😶 😏 😒 🙄 😬 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 🥴 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 🙁 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 💀 💩 🤡 👻 👽 🤖");
+        CATEGORIES.put("emoji.gestures", "👋 🤚 ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 👐 🤲 🤝 🙏 💪 🫶 👀 🧠");
+        CATEGORIES.put("emoji.hearts", "❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💯 💢 💥 💫 💦 💨 🔥 ✨ ⭐ 🌟");
+        CATEGORIES.put("emoji.animals", "🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🙈 🙉 🙊 🐔 🐧 🐦 🦆 🦅 🦉 🐺 🐴 🦄 🐝 🦋 🐌 🐞 🐢 🐍 🐙 🐬 🐳 🦈");
+        CATEGORIES.put("emoji.food", "🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🍒 🍑 🥭 🍍 🥥 🥑 🍅 🌽 🥕 🍞 🧀 🍳 🥓 🍔 🍟 🍕 🌭 🌮 🌯 🍝 🍜 🍣 🍰 🎂 🍫 🍿 🍩 🍪 ☕ 🍺 🍻 🥂 🍷");
+        CATEGORIES.put("emoji.activities", "⚽ 🏀 🏈 ⚾ 🎾 🏐 🎱 🏓 🎮 🎲 🎯 🎳 🎸 🎹 🎤 🎧 🎬 🎨 🎉 🎊 🎁 🏆 🥇");
+        CATEGORIES.put("emoji.objects", "📱 💻 ⌨️ 🖥️ 📷 📞 ⏰ 💡 💸 💰 💳 📎 📌 ✏️ 📝 📅 📦 ✉️ 🔒 🔑 🔔 🚗 ✈️ 🏠 ⏳ ✅ ❌ ❓ ❗ ⚠️ 🚀");
     }
 
     /** Every category as a grid of emoji buttons ({@code onPick} gets the emoji); used by the popup and the side panel. */
@@ -42,7 +43,7 @@ public final class EmojiPicker {
         VBox content = new VBox(6);
         content.setPadding(new Insets(10));
         for (Map.Entry<String, String> cat : CATEGORIES.entrySet()) {
-            Label title = new Label(cat.getKey());
+            Label title = new Label(I18n.t(cat.getKey()));
             title.getStyleClass().add("emoji-category");
             FlowPane grid = new FlowPane(2, 2);
             grid.setPrefWrapLength(wrap);
@@ -56,7 +57,7 @@ public final class EmojiPicker {
     static Button button(String e, Consumer<String> onPick, MediaLibrary library, Consumer<String> toast) {
         Button b = new Button(e);
         b.getStyleClass().add("emoji-button");
-        b.setAccessibleText("Emoji " + e);
+        b.setAccessibleText(I18n.t("emoji.named", e));
         Runnable use = () -> {
             onPick.accept(e);
             if (library != null) library.addRecent(MediaLibrary.emoji(e));

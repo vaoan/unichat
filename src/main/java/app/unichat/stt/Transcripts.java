@@ -1,5 +1,6 @@
 package app.unichat.stt;
 
+import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
@@ -75,10 +76,10 @@ public final class Transcripts {
     public void request(String mediaUrl, Supplier<CompletableFuture<Path>> audio) {
         State cur = state(mediaUrl);
         if (cur instanceof Done || cur instanceof Working) return;
-        set(mediaUrl, new Working("En cola…"));
+        set(mediaUrl, new Working(I18n.t("stt.queued")));
         worker.execute(() -> {
             try {
-                set(mediaUrl, new Working("Descargando el audio…"));
+                set(mediaUrl, new Working(I18n.t("stt.downloadingAudio")));
                 Path p = audio.get().get();
                 String text = engine.transcribe(p, what -> set(mediaUrl, new Working(what)));
                 Files.createDirectories(dir);

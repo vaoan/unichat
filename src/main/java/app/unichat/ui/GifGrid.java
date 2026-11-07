@@ -9,6 +9,7 @@ import app.unichat.model.MediaLibrary;
 import app.unichat.model.RoomFeatures;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.scene.Node;
@@ -60,9 +61,9 @@ final class GifGrid extends VBox {
         this.chat = chat;
         this.toast = toast;
         getStyleClass().add("gif-grid");
-        search.setPromptText("Buscar GIFs");
+        search.setPromptText(I18n.t("gif.search"));
         search.getStyleClass().addAll("search-field", "gif-search");
-        search.setAccessibleText("Buscar GIFs");
+        search.setAccessibleText(I18n.t("gif.search"));
         search.setOnAction(e -> refresh());
         debounce.setOnFinished(e -> refresh());
         library.addListener(() -> javafx.application.Platform.runLater(() -> {
@@ -89,18 +90,18 @@ final class GifGrid extends VBox {
         int gen = ++generation;
         content.getChildren().clear();
         boolean accepted = accepts();
-        if (!accepted) content.getChildren().add(Labels.help("Esta red no acepta GIFs."));
+        if (!accepted) content.getChildren().add(Labels.help(I18n.t("gif.networkRefuses")));
         GifSearch providers = new GifSearch(GifProviders.active(k -> Settings.get().getString(k, null)));
         String q = search.getText().strip();
         content.getChildren().add(libraryBox);
         refreshLibrary();
         if (providers.isEmpty()) {
-            content.getChildren().add(Labels.help("Para buscar GIFs, activa un proveedor en Ajustes → GIFs (Giphy o Klipy, con una clave gratis)."));
+            content.getChildren().add(Labels.help(I18n.t("gif.needProvider")));
             return;
         }
-        Label title = section(q.isEmpty() ? "Tendencias" : "Resultados");
+        Label title = section(I18n.t(q.isEmpty() ? "gif.trending" : "gif.results"));
         FlowPane grid = new FlowPane(6, 6);
-        Label loading = Labels.help("Buscando…");
+        Label loading = Labels.help(I18n.t("gif.searching"));
         content.getChildren().addAll(title, loading, grid);
         CompletableFuture.supplyAsync(() -> q.isEmpty() ? providers.trending(LIMIT) : providers.search(q, LIMIT))
                 .thenAccept(gifs -> Platform.runLater(() -> {
@@ -110,7 +111,7 @@ final class GifGrid extends VBox {
                         resultsFor = shownFor;
                         resultsAt = System.currentTimeMillis();
                     }
-                    if (gifs.isEmpty()) content.getChildren().add(Labels.help("No se encontraron GIFs."));
+                    if (gifs.isEmpty()) content.getChildren().add(Labels.help(I18n.t("gif.noneFound")));
                     for (Gif g : gifs) {
                         Node tile = tile(new Image(g.previewUrl(), TILE_W * 2, 0, true, true, true),
                                 g.title().isBlank() ? "GIF" : g.title(), accepted, () -> sendFromProvider(g));
@@ -132,18 +133,18 @@ final class GifGrid extends VBox {
         if (!search.getText().strip().isEmpty()) return;
         Chat c = chat.get();
         boolean accepted = c == null || c.features().accepts(RoomFeatures.GIF);
-        libraryRow("Favoritos", library.favorites(MediaLibrary.Kind.GIF), accepted);
-        libraryRow("Recientes", library.recents(MediaLibrary.Kind.GIF), accepted);
+        libraryRow(true, library.favorites(MediaLibrary.Kind.GIF), accepted);
+        libraryRow(false, library.recents(MediaLibrary.Kind.GIF), accepted);
     }
 
-    private void libraryRow(String title, List<MediaLibrary.Item> items, boolean accepted) {
+    private void libraryRow(boolean favorites, List<MediaLibrary.Item> items, boolean accepted) {
         if (items.isEmpty()) return;
         FlowPane grid = new FlowPane(6, 6);
         for (MediaLibrary.Item i : items) {
-            String what = title.equals("Favoritos") ? "GIF favorito" : "GIF reciente";
+            String what = I18n.t(favorites ? "library.gifFavorite" : "library.gifRecent");
             grid.getChildren().add(libraryTiles.get(what + accepted + i.url(), () -> libraryTile(i, what, accepted)));
         }
-        libraryBox.getChildren().addAll(section(title), grid);
+        libraryBox.getChildren().addAll(section(I18n.t(favorites ? "library.favorites" : "library.recents")), grid);
     }
 
     /** A saved GIF's tile for the open chat (also used by the Favoritos tab). */
@@ -173,10 +174,10 @@ final class GifGrid extends VBox {
 
     private Node tile(ImageView view, String what, boolean accepted, Runnable send) {
         Runnable act = () -> {
-            if (!accepted) toast.accept("Esta red no acepta GIFs");
+            if (!accepted) toast.accept(I18n.t("library.gifNotAccepted"));
             else send.run();
         };
-        return MediaTile.of(view, TILE_W, TILE_H, "gif-tile", what + (accepted ? ", enviar" : ", esta red no acepta GIFs"), accepted, act);
+        return MediaTile.of(view, TILE_W, TILE_H, "gif-tile", I18n.t(accepted ? "library.tileSend" : "library.gifTileRefused", what), accepted, act);
     }
 
     /** Downloads the provider's file (mp4 when available, smaller and accepted by every bridge) and sends it. */
@@ -194,12 +195,12 @@ final class GifGrid extends VBox {
     private void send(MediaLibrary.Item item, CompletableFuture<Path> file) {
         Chat c = chat.get();
         if (c == null) return;
-        toast.accept("Enviando GIF…");
+        toast.accept(I18n.t("gif.sending"));
         String reply = takeReply.get();
         file.thenCompose(p -> svc.sendGif(c.id(), p, item.mime() == null ? "image/gif" : item.mime(), item.width(), item.height(), reply))
                 .whenComplete((v, err) -> Platform.runLater(() -> {
                     if (err != null) {
-                        toast.accept("No se pudo enviar el GIF");
+                        toast.accept(I18n.t("gif.sendFailed"));
                         return;
                     }
                     library.addRecent(item);

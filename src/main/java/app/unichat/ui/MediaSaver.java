@@ -4,6 +4,7 @@ import app.unichat.service.MediaSource;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.MimeTypes;
+import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
@@ -31,11 +32,11 @@ final class MediaSaver {
         String ext = MimeTypes.extension(m.mimeType());
         if (name.isEmpty() || name.equals(".") || name.equals("..") || m.type() == MessageType.STICKER) {
             String kind = switch (m.type()) {
-                case IMAGE -> "imagen";
-                case VIDEO -> "video";
-                case AUDIO -> "audio";
-                case STICKER -> "sticker";
-                default -> "archivo";
+                case IMAGE -> I18n.t("saver.kind.image");
+                case VIDEO -> I18n.t("saver.kind.video");
+                case AUDIO -> I18n.t("saver.kind.audio");
+                case STICKER -> I18n.t("saver.kind.sticker");
+                default -> I18n.t("saver.kind.file");
             };
             return kind + "-" + STAMP.format(m.timestamp().atZone(zone)) + ext;
         }
@@ -63,7 +64,7 @@ final class MediaSaver {
     /** Asks where to save, then copies the downloaded file there. */
     static void save(Window owner, MediaSource svc, Message m, Consumer<String> toast) {
         FileChooser fc = new FileChooser();
-        fc.setTitle("Guardar como");
+        fc.setTitle(I18n.t("saver.title"));
         fc.setInitialFileName(suggestedName(m, ZoneId.systemDefault()));
         File target = fc.showSaveDialog(owner);
         if (target == null) return;
@@ -72,9 +73,9 @@ final class MediaSaver {
             try {
                 if (err != null) throw err;
                 Files.copy(p, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                msg = "Guardado: " + target.getName();
+                msg = I18n.t("saver.saved", target.getName());
             } catch (Throwable e) {
-                msg = "No se pudo guardar el archivo";
+                msg = I18n.t("saver.failed");
             }
             String text = msg;
             Platform.runLater(() -> toast.accept(text));

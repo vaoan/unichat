@@ -1,6 +1,7 @@
 package app.unichat.video;
 
 import app.unichat.support.ConvertedFiles;
+import app.unichat.support.I18n;
 import app.unichat.support.Os;
 
 import java.io.IOException;
@@ -37,7 +38,7 @@ public final class VideoTranscoder {
         } finally {
             Files.deleteIfExists(tmp);
         }
-        throw new IOException("No se pudo convertir el video");
+        throw new IOException(I18n.t("video.convertFailed"));
     }
 
     /** The Mac's hardware encoder is much faster, and every full ffmpeg has libx264. */

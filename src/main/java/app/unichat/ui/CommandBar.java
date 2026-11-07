@@ -4,6 +4,7 @@ import app.unichat.model.Chat;
 import app.unichat.service.ChatReader;
 import app.unichat.service.MediaSource;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Pos;
@@ -44,7 +45,7 @@ public final class CommandBar extends VBox {
         this.close = close;
         getStyleClass().addAll("command-bar", "card");
         setMaxSize(560, 440);
-        field.setPromptText("Buscar chats o escribir un comando…");
+        field.setPromptText(I18n.t("commandBar.prompt"));
         field.getStyleClass().add("command-field");
         list.getStyleClass().add("command-list");
         list.setCellFactory(v -> new ListCell<>() {
@@ -108,7 +109,7 @@ public final class CommandBar extends VBox {
         List<Item> out = new ArrayList<>();
         List<Chat> found = chatsFor(chats.chats(), q);
         for (Chat c : found) {
-            out.add(new Item(c.title(), c.archived() ? "Archivado · " + c.network().displayName() : c.network().displayName(), c, null));
+            out.add(new Item(c.title(), c.archived() ? I18n.t("commandBar.archivedIn", c.network().displayName()) : c.network().displayName(), c, null));
         }
         for (Command cmd : commands) {
             if (nq.isEmpty() || ChatFilter.normalize(cmd.label()).contains(nq)) out.add(new Item(cmd.label(), cmd.hint(), null, cmd.action()));

@@ -10,6 +10,7 @@ import app.unichat.login.CookieSpec;
 import app.unichat.login.LoginCopy;
 import app.unichat.login.SessionCookies;
 import app.unichat.model.Network;
+import app.unichat.support.I18n;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.common.BitMatrix;
@@ -44,7 +45,7 @@ import java.util.regex.Pattern;
 
 /**
  * Dynamic login: asks the network's bridge which login methods and steps it has (BridgeLogin) and shows each step
- * with its own screen (QR, code, emoji, form, cookies) and Spanish copy (LoginCopy). Nothing per network is
+ * with its own screen (QR, code, emoji, form, cookies) and translated copy (LoginCopy). Nothing per network is
  * hardcoded here, so new or changed bridge login methods show up by themselves.
  */
 final class BridgeLoginPane extends StackPane {
@@ -85,12 +86,12 @@ final class BridgeLoginPane extends StackPane {
     // ---------------------------------------------------------------- choosing a method
 
     private void loadFlows() {
-        show(waiting("Buscando las formas de conectar " + network.displayName() + "…"));
+        show(waiting(I18n.t("login.pane.findingFlows", network.displayName())));
         background(() -> {
             List<LoginCopy.Choice> choices = LoginCopy.choices(network, api.flows());
             Platform.runLater(() -> {
                 if (closed) return;
-                if (choices.isEmpty()) error("Este puente no ofrece ninguna forma de iniciar sesión.", null);
+                if (choices.isEmpty()) error(I18n.t("login.pane.noFlows"), null);
                 else if (choices.size() == 1) begin(choices.get(0).flow()); // nothing to choose: straight in
                 else showChoices(choices);
             });
@@ -98,7 +99,7 @@ final class BridgeLoginPane extends StackPane {
     }
 
     private void showChoices(List<LoginCopy.Choice> choices) {
-        Label heading = new Label("¿Cómo quieres conectar " + network.displayName() + "?");
+        Label heading = new Label(I18n.t("login.pane.howToConnect", network.displayName()));
         heading.getStyleClass().add("wizard-instructions");
         heading.setWrapText(true);
         VBox list = new VBox(8, heading);
@@ -106,12 +107,12 @@ final class BridgeLoginPane extends StackPane {
         for (LoginCopy.Choice c : choices) (c.advanced() ? more : list).getChildren().add(choiceCard(c));
         if (!more.getChildren().isEmpty()) {
             Nodes.show(more, false);
-            Button toggle = new Button("Más opciones");
+            Button toggle = new Button(I18n.t("login.pane.moreOptions"));
             toggle.getStyleClass().add("link-button");
             toggle.setOnAction(e -> {
                 boolean open = !more.isVisible();
                 Nodes.show(more, open);
-                toggle.setText(open ? "Menos opciones" : "Más opciones");
+                toggle.setText(open ? I18n.t("login.pane.fewerOptions") : I18n.t("login.pane.moreOptions"));
             });
             list.getChildren().addAll(toggle, more);
         }
@@ -150,7 +151,7 @@ final class BridgeLoginPane extends StackPane {
     }
 
     private void begin(BridgeLogin.Flow flow) {
-        show(waiting("Preparando…"));
+        show(waiting(I18n.t("login.pane.preparing")));
         stepNumber = 0;
         lastStepId = null;
         background(() -> {
@@ -177,7 +178,7 @@ final class BridgeLoginPane extends StackPane {
             case "cookies" -> cookies(s);
             default -> unsupported();
         };
-        Label step = new Label("Paso " + stepNumber);
+        Label step = new Label(I18n.t("login.pane.step", stepNumber));
         step.getStyleClass().add("settings-help");
         Label title = new Label(text.title());
         title.getStyleClass().add("wizard-instructions");
@@ -193,33 +194,33 @@ final class BridgeLoginPane extends StackPane {
         Node shown;
         if (d != null && "qr".equals(d.type()) && d.data() != null) {
             ImageView qr = new ImageView(qr(d.data(), 260));
-            qr.setAccessibleText("Código QR para vincular " + network.displayName());
+            qr.setAccessibleText(I18n.t("login.wizard.qrA11y", network.displayName()));
             StackPane boxed = new StackPane(qr);
             boxed.getStyleClass().add("qr-box");
             boxed.setMaxWidth(Region.USE_PREF_SIZE);
-            Label renew = new Label("El código se renueva solo si vence.");
+            Label renew = new Label(I18n.t("login.pane.qrRenews"));
             renew.getStyleClass().add("settings-help");
             shown = new VBox(8, boxed, renew);
         } else if (d != null && ("code".equals(d.type()) || "emoji".equals(d.type())) && d.data() != null) {
             Label code = new Label(d.data());
             code.getStyleClass().add("emoji".equals(d.type()) ? "login-emoji" : "login-code");
-            code.setAccessibleText(("emoji".equals(d.type()) ? "Emoji: " : "Código: ") + d.data());
+            code.setAccessibleText("emoji".equals(d.type()) ? I18n.t("login.pane.emojiA11y", d.data()) : I18n.t("login.pane.codeA11y", d.data()));
             HBox row = new HBox(12, code);
             row.setAlignment(Pos.CENTER_LEFT);
             if ("code".equals(d.type())) {
-                Button copy = new Button("Copiar");
+                Button copy = new Button(I18n.t("common.copy"));
                 copy.getStyleClass().add("secondary-button");
                 copy.setOnAction(e -> {
                     Clipboards.copy(d.data());
-                    copy.setText("Copiado");
+                    copy.setText(I18n.t("common.copied"));
                 });
                 row.getChildren().add(copy);
             }
             shown = row;
         } else {
-            shown = waiting("Esperando a " + network.displayName() + "…");
+            shown = waiting(I18n.t("login.pane.waitingFor", network.displayName()));
         }
-        HBox waitingRow = new HBox(8, spinner(16), Labels.help("Esperando a que lo hagas en tu teléfono…"));
+        HBox waitingRow = new HBox(8, spinner(16), Labels.help(I18n.t("login.pane.waitingPhone")));
         waitingRow.setAlignment(Pos.CENTER_LEFT);
         background(() -> {
             BridgeLogin.Step next = api.await(s);
@@ -232,7 +233,7 @@ final class BridgeLoginPane extends StackPane {
         VBox box = new VBox(10);
         Map<BridgeLogin.Field, Object> inputs = new LinkedHashMap<>();
         for (BridgeLogin.Field f : s.fields()) {
-            Label l = new Label(LoginCopy.fieldLabel(f) + (f.optional() ? " (opcional)" : ""));
+            Label l = new Label(f.optional() ? I18n.t("login.field.optional", LoginCopy.fieldLabel(f)) : LoginCopy.fieldLabel(f));
             l.getStyleClass().add("settings-label");
             Node input;
             if ("select".equals(f.type()) && !f.options().isEmpty()) {
@@ -249,7 +250,7 @@ final class BridgeLoginPane extends StackPane {
                 t.setPromptText(switch (f.type()) {
                     case "phone_number" -> "+57 300 123 4567";
                     case "2fa_code" -> sampleDigits(f.pattern());
-                    case "email" -> "tu@correo.com";
+                    case "email" -> I18n.t("login.field.emailExample");
                     default -> "";
                 });
                 t.setAccessibleText(LoginCopy.fieldLabel(f));
@@ -264,7 +265,7 @@ final class BridgeLoginPane extends StackPane {
         Label problem = Labels.help("");
         problem.getStyleClass().setAll("label", "login-error");
         Nodes.show(problem, false);
-        Button next = new Button("Continuar");
+        Button next = new Button(I18n.t("common.continue"));
         next.getStyleClass().add("primary-button");
         next.setDefaultButton(true);
         next.setOnAction(e -> {
@@ -285,7 +286,7 @@ final class BridgeLoginPane extends StackPane {
                 values.put(f.id(), v);
             }
             next.setDisable(true);
-            next.setText("Enviando…");
+            next.setText(I18n.t("login.pane.sending"));
             submit(s, values);
         });
         box.getChildren().addAll(problem, next);
@@ -299,15 +300,15 @@ final class BridgeLoginPane extends StackPane {
         return "1234567890".repeat(2).substring(0, Math.max(1, Math.min(n, 12)));
     }
 
-    /** Spanish reason a value isn't accepted, or null. */
+    /** Translated reason a value isn't accepted, or null. */
     static String invalid(BridgeLogin.Field f, String v) {
-        if (v.isEmpty()) return "Completa «" + LoginCopy.fieldLabel(f) + "».";
+        if (v.isEmpty()) return I18n.t("login.pane.fillField", LoginCopy.fieldLabel(f));
         if ("phone_number".equals(f.type()) && !v.matches("\\+\\d{6,15}")) {
-            return "Escribe el número con el código de país, por ejemplo +57 300 123 4567.";
+            return I18n.t("login.pane.phoneFormat");
         }
         if (f.pattern() != null) {
             try {
-                if (!Pattern.compile(f.pattern()).matcher(v).find()) return "«" + LoginCopy.fieldLabel(f) + "» no tiene el formato esperado.";
+                if (!Pattern.compile(f.pattern()).matcher(v).find()) return I18n.t("login.pane.badFormat", LoginCopy.fieldLabel(f));
             } catch (RuntimeException ignored) {
                 // A pattern Java can't read: let the bridge validate.
             }
@@ -319,17 +320,17 @@ final class BridgeLoginPane extends StackPane {
         if (BridgeCookies.needsWindowCapture(s.cookies())) return capture(s);
         if (!BridgeCookies.canCollect(s.cookies())) return unsupported();
         CookieSpec spec = BridgeCookies.spec(network, s.cookies());
-        VBox found = new VBox(8, new HBox(8, spinner(16), Labels.help("Buscando tu sesión en tus navegadores…")));
+        VBox found = new VBox(8, new HBox(8, spinner(16), Labels.help(I18n.t("login.pane.searchingSessions"))));
         Label status = Labels.help("");
         Nodes.show(status, false);
         java.util.function.Consumer<SessionCookies> send = cookies -> {
-            show(waiting("Conectando…"));
+            show(waiting(I18n.t("login.pane.connecting")));
             submit(s, BridgeCookies.values(s.cookies(), cookies));
         };
-        Button here = new Button("Iniciar sesión aquí");
+        Button here = new Button(I18n.t("login.pane.signInHere"));
         here.getStyleClass().add("secondary-button");
         here.setMaxWidth(Double.MAX_VALUE);
-        here.setAccessibleText("Abrir " + network.displayName() + " en una ventana de Unichat para iniciar sesión");
+        here.setAccessibleText(I18n.t("login.pane.openWindowA11y", network.displayName()));
         here.setOnAction(e -> LoginWebView.open(owner.get(), network, spec, send, () -> { }));
         Button file = CookieFileButton.create(network, path -> CookieLogin.fromCookieTxt(path, spec), send, text -> {
             status.setText(text);
@@ -339,9 +340,10 @@ final class BridgeLoginPane extends StackPane {
             if (closed) return;
             found.getChildren().clear();
             List<BrowserSession> list = err != null || sessions == null ? List.of() : sessions;
-            if (list.isEmpty()) found.getChildren().add(Labels.help("No encontramos una sesión abierta en tus navegadores."));
+            if (list.isEmpty()) found.getChildren().add(Labels.help(I18n.t("login.pane.noOpenSession")));
             for (BrowserSession bs : list) {
-                Button use = new Button("Usar mi sesión de " + bs.browser() + (bs.profile() == null ? "" : " (" + bs.profile() + ")"));
+                Button use = new Button(bs.profile() == null ? I18n.t("login.pane.useMySession", bs.browser())
+                        : I18n.t("login.pane.useMySessionProfile", bs.browser(), bs.profile()));
                 use.getStyleClass().add("primary-button");
                 use.setMaxWidth(Double.MAX_VALUE);
                 use.setOnAction(e -> send.accept(bs.cookies()));
@@ -353,23 +355,21 @@ final class BridgeLoginPane extends StackPane {
 
     /** This network needs what its page sends while you use it: only signing in here can get that. */
     private Node capture(BridgeLogin.Step s) {
-        Label why = Labels.help("Inicia sesión en la ventana que se abre. Cuando veas tu página de inicio de " + network.displayName()
-                + ", se cierra sola. Unichat no ve tu contraseña.");
-        Button here = new Button("Iniciar sesión en " + network.displayName());
+        Label why = Labels.help(I18n.t("login.pane.captureWhy", network.displayName()));
+        Button here = new Button(I18n.t("login.pane.signInTo", network.displayName()));
         here.getStyleClass().add("primary-button");
         here.setMaxWidth(Double.MAX_VALUE);
-        here.setAccessibleText("Abrir " + network.displayName() + " en una ventana de Unichat para iniciar sesión");
+        here.setAccessibleText(I18n.t("login.pane.openWindowA11y", network.displayName()));
         here.setOnAction(e -> openCapture(s));
         java.nio.file.Path browser = ChromeLogin.usefulFor(network) ? ChromeLogin.findChrome() : null;
         if (browser == null) return new VBox(10, why, here);
-        why.setText("Se abre Chrome, aparte del tuyo y sin tocar tu sesión. Inicia sesión como siempre, también con Google. "
-                + "Cuando veas tu página de inicio de " + network.displayName() + ", se cierra solo y se borra lo que quedó ahí.");
-        Button chrome = new Button("Iniciar sesión en Chrome");
+        why.setText(I18n.t("login.pane.chromeWhy", network.displayName()));
+        Button chrome = new Button(I18n.t("login.pane.signInChrome"));
         chrome.getStyleClass().add("primary-button");
         chrome.setMaxWidth(Double.MAX_VALUE);
-        chrome.setAccessibleText("Abrir " + network.displayName() + " en Chrome para iniciar sesión, también con Google");
+        chrome.setAccessibleText(I18n.t("login.pane.chromeA11y", network.displayName()));
         chrome.setOnAction(e -> signInWithChrome(s, browser));
-        here.setText("Usar correo y contraseña aquí");
+        here.setText(I18n.t("login.pane.emailPasswordHere"));
         here.getStyleClass().setAll("button", "secondary-button");
         return new VBox(10, why, chrome, here);
     }
@@ -377,8 +377,8 @@ final class BridgeLoginPane extends StackPane {
     private void signInWithChrome(BridgeLogin.Step s, java.nio.file.Path browser) {
         ChromeLogin login = new ChromeLogin(network, s.cookies(), browser, Settings.get().cacheDir().resolve("login-chrome"));
         chromeLogin = login;
-        Label wait = Labels.help("Inicia sesión en la ventana de Chrome. Unichat sigue aquí cuando termines.");
-        Button cancel = new Button("Cancelar");
+        Label wait = Labels.help(I18n.t("login.pane.chromeWait"));
+        Button cancel = new Button(I18n.t("common.cancel"));
         cancel.getStyleClass().add("secondary-button");
         cancel.setOnAction(e -> login.cancel());
         show(new VBox(10, new HBox(8, spinner(16), wait), cancel));
@@ -393,14 +393,14 @@ final class BridgeLoginPane extends StackPane {
                 if (!closed) Platform.runLater(() -> render(s)); // closed or cancelled: the same choice again
                 return;
             }
-            Platform.runLater(() -> show(waiting("Conectando…")));
+            Platform.runLater(() -> show(waiting(I18n.t("login.pane.connecting"))));
             submit(s, values);
         });
     }
 
     private void openCapture(BridgeLogin.Step s) {
         LoginWebView.openCapturing(owner.get(), network, s.cookies(), values -> {
-            show(waiting("Conectando…"));
+            show(waiting(I18n.t("login.pane.connecting")));
             submit(s, values);
         }, () -> { });
     }
@@ -414,8 +414,8 @@ final class BridgeLoginPane extends StackPane {
     }
 
     private Node unsupported() {
-        Label why = Labels.help("Esta forma de conectar necesita un paso que Unichat todavía no sabe mostrar.");
-        Button bot = new Button("Conectar por chat con el puente");
+        Label why = Labels.help(I18n.t("login.pane.unsupported"));
+        Button bot = new Button(I18n.t("login.pane.useBotChat"));
         bot.getStyleClass().add("primary-button");
         bot.setOnAction(e -> onUseBotChat.run());
         return new VBox(10, why, bot);
@@ -426,8 +426,8 @@ final class BridgeLoginPane extends StackPane {
         check.getStyleClass().add("login-done");
         Label title = new Label(text.title());
         title.getStyleClass().add("wizard-instructions");
-        Label sub = Labels.help("Tus chats van a ir apareciendo en la bandeja en unos minutos.");
-        Button done = new Button("Listo");
+        Label sub = Labels.help(I18n.t("login.pane.chatsComing"));
+        Button done = new Button(I18n.t("common.done"));
         done.getStyleClass().add("primary-button");
         done.setDefaultButton(true);
         done.setOnAction(e -> onConnected.run());
@@ -448,10 +448,10 @@ final class BridgeLoginPane extends StackPane {
         what.setWrapText(true);
         VBox box = new VBox(10, what);
         if (detail != null && !detail.isBlank()) {
-            Label d = Labels.help("Detalle: " + detail);
+            Label d = Labels.help(I18n.t("login.pane.detail", detail));
             box.getChildren().add(d);
         }
-        Button retry = new Button("Intentar de nuevo");
+        Button retry = new Button(I18n.t("login.wizard.retry"));
         retry.getStyleClass().add("primary-button");
         retry.setOnAction(e -> loadFlows());
         box.getChildren().add(retry);
@@ -465,7 +465,7 @@ final class BridgeLoginPane extends StackPane {
                 r.run();
             } catch (Exception e) {
                 if (closed) return;
-                Platform.runLater(() -> error("No se pudo continuar con " + network.displayName() + ".", e));
+                Platform.runLater(() -> error(I18n.t("login.pane.failed", network.displayName()), e));
             }
         });
     }

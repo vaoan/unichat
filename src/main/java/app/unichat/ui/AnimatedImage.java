@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 import app.unichat.gif.GifFrames;
 
@@ -91,7 +92,7 @@ public final class AnimatedImage {
         Frames hit = decoded(file, maxW, maxH);
         if (hit != null) return hit;
         Image img = new Image(file.toUri().toString(), maxW, maxH, true, true, false);
-        if (img.isError()) throw new IOException("Imagen no válida");
+        if (img.isError()) throw new IOException(I18n.t("image.invalid"));
         return remember(file + "|" + maxW + "x" + maxH, new Frames(List.of(img), List.of(0)));
     }
 
@@ -153,7 +154,7 @@ public final class AnimatedImage {
             if (i == 0) step[0] = step(count, scaled.getWidth(), scaled.getHeight());
             if (scaled != null) images.add(toFx(scaled));
         });
-        if (images.isEmpty()) throw new IOException("GIF sin imágenes");
+        if (images.isEmpty()) throw new IOException(I18n.t("image.gifEmpty"));
         return remember(key, new Frames(List.copyOf(images), sample(delays, step[0])));
     }
 
@@ -171,7 +172,7 @@ public final class AnimatedImage {
     public static Image still(Path file, int maxW, int maxH) throws IOException {
         if (isGif(file)) {
             BufferedImage first = ImageIO.read(file.toFile());
-            if (first == null) throw new IOException("GIF sin imágenes");
+            if (first == null) throw new IOException(I18n.t("image.gifEmpty"));
             return toFx(scale(first, maxW, maxH));
         }
         return new Image(file.toUri().toString(), maxW, maxH, true, true, false);

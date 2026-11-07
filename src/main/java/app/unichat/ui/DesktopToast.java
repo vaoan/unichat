@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.support.I18n;
+
 import javafx.animation.PauseTransition;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Cursor;
@@ -44,7 +46,7 @@ final class DesktopToast {
         if (stage == null) stage = build();
         title.setText(titleText);
         body.setText(bodyText);
-        card.setAccessibleText("Notificación de Unichat: " + titleText + ". " + bodyText);
+        card.setAccessibleText(I18n.t("toast.a11y", titleText, bodyText));
         Rectangle2D area = Screen.getPrimary().getVisualBounds();
         stage.setX(area.getMaxX() - WIDTH - MARGIN);
         stage.setY(area.getMinY() + MARGIN);
@@ -92,7 +94,7 @@ final class DesktopToast {
         Stage s = new Stage(StageStyle.TRANSPARENT);
         s.setAlwaysOnTop(true);
         s.setResizable(false);
-        s.setTitle("Notificación de Unichat");
+        s.setTitle(I18n.t("toast.windowTitle"));
         s.setScene(scene);
         return s;
     }

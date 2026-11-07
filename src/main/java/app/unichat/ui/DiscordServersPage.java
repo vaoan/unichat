@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.service.BridgeAccess;
+import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -36,18 +37,18 @@ final class DiscordServersPage extends StackPane {
     DiscordServersPage(BridgeAccess bridge, Consumer<String> toast) {
         this.bridge = bridge;
         this.toast = toast;
-        LoadingView loading = new LoadingView("Buscando tus servidores de Discord…");
+        LoadingView loading = new LoadingView(I18n.t("discord.servers.loading"));
         getChildren().setAll(loading);
         bridge.discordGuilds().whenComplete((guilds, err) -> Platform.runLater(() -> {
-            if (err != null) loading.fail("No se pudo leer la lista: " + LoginTexts.rootMessage(err));
+            if (err != null) loading.fail(I18n.t("discord.servers.readFailed", LoginTexts.rootMessage(err)));
             else show(guilds);
         }));
     }
 
     private void show(List<BridgeAccess.DiscordGuild> guilds) {
-        Label help = Labels.help("Elige los servidores que quieres ver. Sus canales aparecen en Unichat a medida que alguien escribe en ellos. Los mensajes directos y grupos privados llegan siempre.");
-        search.setPromptText("Buscar servidor");
-        search.setAccessibleText("Buscar servidor de Discord");
+        Label help = Labels.help(I18n.t("discord.servers.help"));
+        search.setPromptText(I18n.t("discord.servers.search"));
+        search.setAccessibleText(I18n.t("discord.servers.searchA11y"));
         count.getStyleClass().add("settings-help");
         rows.getStyleClass().add("settings-group");
         for (var g : guilds) if (g.bridged()) on.add(g.id());
@@ -67,7 +68,7 @@ final class DiscordServersPage extends StackPane {
     }
 
     private void showCount() {
-        count.setText(on.size() + " de " + sorted.size() + " servidores en Unichat");
+        count.setText(I18n.t("discord.servers.count", on.size(), sorted.size()));
     }
 
     private void render() {
@@ -77,7 +78,7 @@ final class DiscordServersPage extends StackPane {
             if (q.isEmpty() || ChatFilter.normalize(g.name()).contains(q)) rows.getChildren().add(serverRow(g));
         }
         if (rows.getChildren().isEmpty()) {
-            Label none = new Label(sorted.isEmpty() ? "Tu cuenta no está en ningún servidor." : "Ningún servidor coincide.");
+            Label none = new Label(sorted.isEmpty() ? I18n.t("discord.servers.none") : I18n.t("discord.servers.noMatch"));
             none.getStyleClass().add("settings-help");
             HBox row = new HBox(none);
             row.getStyleClass().add("settings-row");
@@ -94,7 +95,7 @@ final class DiscordServersPage extends StackPane {
         CheckBox sw = new CheckBox();
         sw.getStyleClass().add("switch");
         sw.setSelected(on.contains(g.id()));
-        sw.setAccessibleText("Ver " + g.name() + " en Unichat");
+        sw.setAccessibleText(I18n.t("discord.servers.viewA11y", g.name()));
         sw.setOnAction(e -> {
             boolean want = sw.isSelected();
             sw.setDisable(true);
@@ -102,11 +103,11 @@ final class DiscordServersPage extends StackPane {
                 sw.setDisable(false);
                 if (ex != null) {
                     sw.setSelected(!want);
-                    toast.accept("No se pudo cambiar " + g.name() + ": " + LoginTexts.rootMessage(ex));
+                    toast.accept(I18n.t("discord.servers.changeFailed", g.name(), LoginTexts.rootMessage(ex)));
                 } else {
                     if (want) on.add(g.id()); else on.remove(g.id());
                     showCount();
-                    toast.accept(want ? g.name() + ": sus canales irán apareciendo" : g.name() + " ya no se traerá");
+                    toast.accept(want ? I18n.t("discord.servers.on", g.name()) : I18n.t("discord.servers.off", g.name()));
                 }
             }));
         });

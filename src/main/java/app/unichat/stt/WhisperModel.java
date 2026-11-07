@@ -1,6 +1,7 @@
 package app.unichat.stt;
 
 import app.unichat.support.Downloads;
+import app.unichat.support.I18n;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -44,7 +45,7 @@ public enum WhisperModel {
     public Path ensure(Path modelsDir, DoubleConsumer progress) throws IOException, InterruptedException {
         Path target = path(modelsDir);
         if (isInstalled(modelsDir)) return target;
-        Downloads.fetch(REPO + file, size, sha256, target, "el modelo de voz", progress);
+        Downloads.fetch(REPO + file, size, sha256, target, I18n.t("download.what.voiceModel"), progress);
         return target;
     }
 }

@@ -6,6 +6,7 @@ import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
+import app.unichat.support.I18n;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -52,7 +53,7 @@ final class RoomFields {
         if (title == null && counterpart != null) title = nameOf(room, counterpart);
         if (title == null) title = heroesTitle(room);
         if (title == null) title = blankToNull(room.canonicalAlias);
-        if (title == null) title = room.invite ? "Invitación" : "Chat vacío";
+        if (title == null) title = room.invite ? I18n.t("room.invitation") : I18n.t("room.empty");
         c.setTitle(title);
 
         String avatar = room.avatar;
@@ -84,7 +85,7 @@ final class RoomFields {
         } else if (room.invite) {
             String inviter = room.inviter;
             c.setLastActivity(room.invitedAt);
-            c.setLastPreview(inviter != null ? "Invitación de " + nameOf(room, inviter) : "Te invitaron a este chat");
+            c.setLastPreview(inviter != null ? I18n.t("room.invitationFrom", nameOf(room, inviter)) : I18n.t("room.invitedYou"));
         } else {
             // Joined but no messages loaded yet: no stale invite text, and don't jump to the top of the
             // inbox just because the bridge created the room now (bridges create hundreds after a login).

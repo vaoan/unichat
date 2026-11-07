@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.support.I18n;
+
 import javafx.scene.Node;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
@@ -287,7 +289,7 @@ final class HtmlView {
     /** Hidden until asked for, as whoever wrote it wanted. */
     private void spoiler(Element e, Blocks b, Look look) {
         String reason = e.attr("data-mx-spoiler");
-        Hyperlink veil = new Hyperlink(reason.isBlank() ? "Spoiler: mostrar" : "Spoiler (" + reason + "): mostrar");
+        Hyperlink veil = new Hyperlink(reason.isBlank() ? I18n.t("html.spoiler") : I18n.t("html.spoilerReason", reason));
         veil.getStyleClass().addAll("msg-link", "html-spoiler");
         b.inline(veil);
         TextFlow flow = b.run;

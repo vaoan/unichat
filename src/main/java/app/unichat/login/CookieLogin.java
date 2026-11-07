@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 import app.unichat.model.Network;
 
@@ -79,7 +80,7 @@ public final class CookieLogin {
     /** Reads {@code file} as cookies.txt for {@code network}. Never throws. */
     public static TxtResult fromCookieTxt(Path file, Network network) {
         if (!isCookieNetwork(network)) {
-            return TxtResult.error("Esta red no usa inicio de sesión con cookies.");
+            return TxtResult.error(I18n.t("login.cookies.notCookieNetwork"));
         }
         return fromCookieTxt(file, CookieSpec.forNetwork(network));
     }
@@ -90,7 +91,7 @@ public final class CookieLogin {
         try {
             cookies = CookieTxt.read(file, spec, Instant.now());
         } catch (IOException | RuntimeException e) {
-            return TxtResult.error("No se pudo leer el archivo. Comprueba que sea un cookies.txt válido.");
+            return TxtResult.error(I18n.t("login.cookies.unreadable"));
         }
         List<String> missing = spec.required().stream()
                 .filter(n -> {

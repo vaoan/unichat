@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.server.LogFiles;
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -21,14 +22,13 @@ final class PrivacyPage {
 
     static Node build() {
         Settings s = Settings.get();
-        return page("Privacidad", group("Indicadores",
-                row("Confirmaciones de lectura", "Los demás ven cuándo leíste sus mensajes (si la red lo permite).",
+        return page(I18n.t("settings.nav.privacy"), group(I18n.t("settings.privacy.groupIndicators"),
+                row(I18n.t("settings.privacy.readReceipts"), I18n.t("settings.privacy.readReceiptsHelp"),
                         toggle(s.sendReadReceipts(), s::setSendReadReceipts)),
-                row("Indicador de escritura", "Los demás ven cuando estás escribiendo.",
+                row(I18n.t("settings.privacy.typing"), I18n.t("settings.privacy.typingHelp"),
                         toggle(s.sendTypingNotifications(), s::setSendTypingNotifications))),
-                group("Datos locales", row("Carpeta de datos", s.dir().toString(), new Label()),
-                        row("Espacio para fotos y videos", "Los medios se descargan solo cuando los abres. Al llenarse se borra primero lo más pesado y lo que llevas "
-                                + "más tiempo sin ver; se puede volver a bajar. Tus stickers y GIFs guardados se conservan siempre.",
+                group(I18n.t("settings.privacy.groupLocal"), row(I18n.t("settings.privacy.dataFolder"), s.dir().toString(), new Label()),
+                        row(I18n.t("settings.privacy.mediaSpace"), I18n.t("settings.privacy.mediaSpaceHelp"),
                                 mediaCacheChoice())),
                 logsGroup(s));
     }
@@ -36,34 +36,33 @@ final class PrivacyPage {
     private static Node mediaCacheChoice() {
         Settings s = Settings.get();
         Function<Integer, String> label = mb -> mb < 1024 ? mb + " MB" : mb / 1024 + " GB";
-        return chips("Espacio en disco para fotos y videos descargados", List.of(500, 1024, 5120), label,
-                mb -> "Usar hasta " + label.apply(mb) + " para fotos y videos descargados", s.mediaCacheMb(), s::setMediaCacheMb);
+        return chips(I18n.t("settings.privacy.mediaSpaceAccessible"), List.of(500, 1024, 5120), label,
+                mb -> I18n.t("settings.privacy.mediaSpaceUse", label.apply(mb)), s.mediaCacheMb(), s::setMediaCacheMb);
     }
 
     /** Logs never hold personal data (Redactor) and are deleted after the chosen days (LogFiles). */
     private static Node logsGroup(Settings s) {
-        Function<Integer, String> label = d -> d == 1 ? "1 día" : d + " días";
-        Node days = chips("Borrar registros después de", List.of(1, 7, 30), label,
-                d -> "Borrar registros después de " + label.apply(d), s.logRetentionDays(), d -> {
+        Function<Integer, String> label = d -> I18n.n("common.days", d);
+        Node days = chips(I18n.t("settings.privacy.logsAfter"), List.of(1, 7, 30), label,
+                d -> I18n.t("settings.privacy.logsAfterDays", label.apply(d)), s.logRetentionDays(), d -> {
                     s.setLogRetentionDays(d);
                     Thread.ofVirtual().start(() -> LogFiles.cleanOld(LogFiles.roots(),
                             java.time.Duration.ofDays(d), java.time.Instant.now()));
                 });
-        Button clear = new Button("Borrar registros ahora");
+        Button clear = new Button(I18n.t("settings.privacy.clearButton"));
         clear.getStyleClass().add("secondary-button");
         clear.setOnAction(e -> {
             clear.setDisable(true);
             Thread.ofVirtual().start(() -> {
                 LogFiles.clearAll(LogFiles.roots());
                 javafx.application.Platform.runLater(() -> {
-                    clear.setText("Registros borrados");
+                    clear.setText(I18n.t("settings.privacy.cleared"));
                     clear.setDisable(false);
                 });
             });
         });
-        return group("Registros (logs)",
-                row("Borrar registros después de", "Sirven para diagnosticar errores. No guardan nombres, números, "
-                        + "mensajes ni contraseñas.", days),
-                row("Borrar ahora", "De Unichat, del servidor y de los puentes.", clear));
+        return group(I18n.t("settings.privacy.groupLogs"),
+                row(I18n.t("settings.privacy.logsAfter"), I18n.t("settings.privacy.logsAfterHelp"), days),
+                row(I18n.t("settings.privacy.clearNow"), I18n.t("settings.privacy.clearNowHelp"), clear));
     }
 }

@@ -1,5 +1,6 @@
 package app.unichat.voice;
 
+import app.unichat.support.I18n;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
@@ -36,7 +37,7 @@ public final class Microphone implements PcmSource {
                 // Try the next rate; the error below covers having none.
             }
         }
-        throw new IOException("No se encontró un micrófono disponible");
+        throw new IOException(I18n.t("voice.noMic"));
     }
 
     @Override public int rate() { return rate; }

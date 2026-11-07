@@ -1,5 +1,6 @@
 package app.unichat.gif;
 
+import app.unichat.support.I18n;
 import org.w3c.dom.Node;
 
 import javax.imageio.ImageIO;
@@ -36,7 +37,7 @@ public final class GifFrames {
     /** Frame count without decoding any frame. */
     public static int count(Path gif) throws IOException {
         try (ImageInputStream in = ImageIO.createImageInputStream(gif.toFile())) {
-            if (in == null) throw new IOException("No se pudo leer el GIF");
+            if (in == null) throw new IOException(I18n.t("gif.unreadable"));
             ImageReader r = ImageIO.getImageReadersByFormatName("gif").next();
             try {
                 r.setInput(in, false);
@@ -53,9 +54,9 @@ public final class GifFrames {
      */
     public static void read(Path gif, java.util.function.Consumer<Frame> each) throws IOException {
         try (ImageInputStream in = ImageIO.createImageInputStream(gif.toFile())) {
-            if (in == null) throw new IOException("No se pudo leer el GIF");
+            if (in == null) throw new IOException(I18n.t("gif.unreadable"));
             Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("gif");
-            if (!readers.hasNext()) throw new IOException("Sin lector de GIF");
+            if (!readers.hasNext()) throw new IOException(I18n.t("gif.noReader"));
             ImageReader r = readers.next();
             try {
                 r.setInput(in, false);

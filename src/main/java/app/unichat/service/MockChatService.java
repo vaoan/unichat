@@ -12,6 +12,7 @@ import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
 import app.unichat.model.Network;
 import app.unichat.model.VoiceNote;
+import app.unichat.support.I18n;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -45,10 +46,8 @@ public final class MockChatService implements ChatService, FolderForwarding {
     private static final List<Network> AVAILABLE = List.of(Network.WHATSAPP, Network.TELEGRAM, Network.SIGNAL,
             Network.INSTAGRAM, Network.MESSENGER, Network.DISCORD, Network.SLACK, Network.GOOGLE_MESSAGES,
             Network.X, Network.LINKEDIN);
-    private static final String[] AUTO_REPLIES = {
-            "Jaja de acuerdo", "Dale, te aviso", "¿Viste lo que pasó hoy?", "Perfecto 👌", "Ahora no puedo, luego te escribo",
-            "Listo!", "Me parece bien", "😂😂", "¿A qué hora nos vemos?", "Gracias!"
-    };
+    private static String autoReply(int i) { return I18n.t("demo.reply." + (i + 1)); }
+    private static final int AUTO_REPLY_COUNT = 10;
 
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
     final Map<String, Chat> chats = new ConcurrentHashMap<>();
@@ -114,7 +113,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
 
     @Override public ConnectionState connectionState() { return state; }
     @Override public String myUserId() { return ME; }
-    @Override public String myDisplayName() { return "Yo"; }
+    @Override public String myDisplayName() { return I18n.t("demo.me"); }
 
     private void setState(ConnectionState s) {
         state = s;
@@ -130,8 +129,8 @@ public final class MockChatService implements ChatService, FolderForwarding {
         if (failJoins) return CompletableFuture.failedFuture(new IllegalStateException("join refused"));
         Runnable arrive = () -> {
             if (UNJOINED_CHANNEL_ID.equals(roomId) && !chats.containsKey(roomId)) {
-                DemoChats.ChatBuilder.group(this, "srv-anuncios", Network.DISCORD, "#anuncios", "Mafe")
-                        .in(-100, "Mafe", "Nuevo evento el sábado").done();
+                DemoChats.ChatBuilder.group(this, "srv-anuncios", Network.DISCORD, I18n.t("demo.title.announcements"), "Mafe")
+                        .in(-100, "Mafe", I18n.t("demo.announcements.1")).done();
                 fireChats();
             }
         };
@@ -161,7 +160,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
     @Override
     public CompletableFuture<List<GroupOffer>> groupOffers(Network network) {
         return later(() -> network == Network.DISCORD && !offerAdded
-                ? List.of(new GroupOffer(OFFERED_GUILD_ID, "Servidor de juegos")) : List.of());
+                ? List.of(new GroupOffer(OFFERED_GUILD_ID, I18n.t("demo.title.games"))) : List.of());
     }
 
     @Override
@@ -173,13 +172,13 @@ public final class MockChatService implements ChatService, FolderForwarding {
             offerAdded = true;
             Chat space = new Chat("!juegos:demo");
             space.setNetwork(Network.DISCORD);
-            space.setTitle("Servidor de juegos");
+            space.setTitle(I18n.t("demo.title.games"));
             space.setSpace(true);
             space.setSpaceChildren(List.of("!juegos-general:demo"));
             adopt(space);
             chats.put(space.id(), space);
             DemoChats.ChatBuilder.group(this, "juegos-general", Network.DISCORD, "#general", "xNico")
-                    .in(-100, "xNico", "¿Quién juega hoy?").done();
+                    .in(-100, "xNico", I18n.t("demo.games.1")).done();
             fireChats();
             return null;
         });
@@ -207,16 +206,18 @@ public final class MockChatService implements ChatService, FolderForwarding {
 
     @Override
     public CompletableFuture<Map<String, String>> spaceNames(String spaceId) {
-        return CompletableFuture.completedFuture("!servidor:demo".equals(spaceId) ? Map.of(UNJOINED_CHANNEL_ID, "#anuncios") : Map.of());
+        return CompletableFuture.completedFuture("!servidor:demo".equals(spaceId) ? Map.of(UNJOINED_CHANNEL_ID, I18n.t("demo.title.announcements")) : Map.of());
     }
 
-    private static final List<Contact> DEMO_CONTACTS = List.of(
-            new Contact("c-mama", "Mamá", List.of("tel:+573001110001"), null, "!mama:demo"),
-            new Contact("c-ana", "Ana Restrepo", List.of("tel:+573001110002"), null, null),
-            new Contact("c-anamaria", "Ana María", List.of("tel:+573001110003"), null, null),
-            new Contact("c-carlos", "Carlos Peña", List.of("tel:+573001110004"), null, null),
-            new Contact("c-dentista", "Consultorio dental", List.of("tel:+573001110005"), null, null),
-            new Contact("c-pedro", "Pedro", List.of("tel:+573001110006"), null, null));
+    private static List<Contact> demoContacts() {
+        return List.of(
+                new Contact("c-mama", I18n.t("demo.title.mom"), List.of("tel:+573001110001"), null, "!mama:demo"),
+                new Contact("c-ana", "Ana Restrepo", List.of("tel:+573001110002"), null, null),
+                new Contact("c-anamaria", "Ana María", List.of("tel:+573001110003"), null, null),
+                new Contact("c-carlos", "Carlos Peña", List.of("tel:+573001110004"), null, null),
+                new Contact("c-dentista", I18n.t("demo.contact.dentist"), List.of("tel:+573001110005"), null, null),
+                new Contact("c-pedro", "Pedro", List.of("tel:+573001110006"), null, null));
+    }
 
     private volatile long bridgeDelayMs;
 
@@ -241,7 +242,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
 
     @Override
     public CompletableFuture<List<Contact>> contacts(Account account) {
-        return CompletableFuture.completedFuture(account.network() == Network.WHATSAPP ? DEMO_CONTACTS : List.of());
+        return CompletableFuture.completedFuture(account.network() == Network.WHATSAPP ? demoContacts() : List.of());
     }
 
     @Override
@@ -249,7 +250,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
         if (account.network() != Network.WHATSAPP && account.network() != Network.TELEGRAM
                 && account.network() != Network.INSTAGRAM && account.network() != Network.MESSENGER) return CompletableFuture.failedFuture(new UnsupportedOperationException("search"));
         String q = query.toLowerCase(java.util.Locale.ROOT);
-        return CompletableFuture.completedFuture(DEMO_CONTACTS.stream()
+        return CompletableFuture.completedFuture(demoContacts().stream()
                 .filter(c -> c.name().toLowerCase(java.util.Locale.ROOT).contains(q)).toList());
     }
 
@@ -353,7 +354,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
     /** What sending anything has in common: a new outgoing message that {@code fill} completes, then its delivery. */
     private CompletableFuture<Void> sendLocal(String chatId, String replyToId, Consumer<Message> fill) {
         Chat chat = chats.get(chatId);
-        if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Chat no encontrado"));
+        if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException(I18n.t("error.chatNotFound")));
         Message m = outgoing(chatId);
         m.setReplyToId(replyToId);
         fill.accept(m);
@@ -475,7 +476,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
 
     @Override
     public CompletableFuture<Path> media(String url, int width, int height) {
-        if (url == null) return CompletableFuture.failedFuture(new IllegalArgumentException("Sin URL"));
+        if (url == null) return CompletableFuture.failedFuture(new IllegalArgumentException(I18n.t("error.noUrl")));
         if (url.startsWith("file:")) return CompletableFuture.completedFuture(Path.of(java.net.URI.create(url)));
         if (url.startsWith("demo://") || url.startsWith("mxc://demo/")) {
             return CompletableFuture.supplyAsync(() -> {
@@ -487,7 +488,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
                 }
             });
         }
-        return CompletableFuture.failedFuture(new IllegalArgumentException("URL no soportada en demo: " + url));
+        return CompletableFuture.failedFuture(new IllegalArgumentException(I18n.t("demo.unsupportedUrl", url)));
     }
 
     // ---------------------------------------------------------------- accounts
@@ -525,7 +526,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
     public CompletableFuture<String> addAccount(Network network) {
         Chat chat = botChat(network);
         synchronized (accounts) {
-            accounts.put(pendingId(network), new Account(pendingId(network), network, "Nueva cuenta", AccountStatus.NEEDS_LOGIN, null));
+            accounts.put(pendingId(network), new Account(pendingId(network), network, I18n.t("demo.newAccount"), AccountStatus.NEEDS_LOGIN, null));
         }
         answerBridgeBot(chat, "login");
         listeners.forEach(Listener::accountsChanged);
@@ -612,13 +613,13 @@ public final class MockChatService implements ChatService, FolderForwarding {
                 }
                 listeners.forEach(Listener::accountsChanged);
             } else if (command.equalsIgnoreCase("logout")) {
-                incoming(chat, bot, "Sesión cerrada.", false);
+                incoming(chat, bot, I18n.t("demo.loggedOut"), false);
                 synchronized (accounts) {
                     accounts.values().removeIf(a -> a.network() == n);
                 }
                 listeners.forEach(Listener::accountsChanged);
             } else {
-                incoming(chat, bot, "Comando desconocido. Comandos: login, logout, help.", false);
+                incoming(chat, bot, I18n.t("demo.unknownCommand"), false);
             }
         }, 900, TimeUnit.MILLISECONDS);
     }
@@ -631,7 +632,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
     }
 
     private Message outgoing(String chatId) {
-        Message m = new Message("local-" + UUID.randomUUID(), chatId, ME, "Yo", true, Instant.now());
+        Message m = new Message("local-" + UUID.randomUUID(), chatId, ME, I18n.t("demo.me"), true, Instant.now());
         m.setStatus(MessageStatus.SENDING);
         return m;
     }
@@ -659,7 +660,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
         s.schedule(() -> setTyping(chat, who, true), 1, TimeUnit.SECONDS);
         s.schedule(() -> {
             setTyping(chat, who, false);
-            incoming(chat, who, AUTO_REPLIES[random.nextInt(AUTO_REPLIES.length)], true);
+            incoming(chat, who, autoReply(random.nextInt(AUTO_REPLY_COUNT)), true);
         }, seconds, TimeUnit.SECONDS);
     }
 

@@ -6,6 +6,7 @@ import app.unichat.model.Member;
 import app.unichat.model.Message;
 import app.unichat.service.ChatService;
 import app.unichat.stt.Transcripts;
+import app.unichat.support.I18n;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Node;
@@ -69,15 +70,15 @@ final class MessageActionsUi {
             b.setOnAction(e -> svc.toggleReaction(chat.get().id(), m.id(), r.getKey()));
             b.setFocusTraversable(false);
             boolean mine = r.getValue().contains(svc.myUserId());
-            b.setAccessibleText("Reacción " + m.reactionLabel(r.getKey()) + ", " + r.getValue().size()
-                    + (mine ? ", incluida la tuya. Pulsa para quitarla" : ". Pulsa para reaccionar igual"));
+            b.setAccessibleText(I18n.t(mine ? "message.reactionMine" : "message.reactionOther",
+                    m.reactionLabel(r.getKey()), r.getValue().size()));
             box.getChildren().add(b);
         }
         return box;
     }
 
     private String nameOf(String userId) {
-        if (userId.equals(svc.myUserId())) return "Tú";
+        if (userId.equals(svc.myUserId())) return I18n.t("common.you");
         Member mem = member.apply(userId);
         return mem == null ? userId : mem.displayName();
     }
@@ -88,12 +89,12 @@ final class MessageActionsUi {
         box.setAlignment(Pos.CENTER);
         if (m.deleted()) return box;
         if (!chat.get().features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK)).isEmpty() || chat.get().features().anyReaction()) {
-            Button react = Icons.iconButton(Icons.EMOJI, "Reaccionar", null);
+            Button react = Icons.iconButton(Icons.EMOJI, I18n.t("message.react"), null);
             react.setOnAction(e -> reactionPopup(m, react));
             box.getChildren().add(react);
         }
-        if (allows(m, MessageActions.Action.REPLY)) box.getChildren().add(Icons.iconButton(Icons.REPLY, "Responder", () -> composer.reply(m)));
-        Button more = Icons.iconButton(Icons.MORE, "Más", null);
+        if (allows(m, MessageActions.Action.REPLY)) box.getChildren().add(Icons.iconButton(Icons.REPLY, I18n.t("message.reply"), () -> composer.reply(m)));
+        Button more = Icons.iconButton(Icons.MORE, I18n.t("message.more"), null);
         more.setOnAction(e -> messageMenu(m).show(more, Side.BOTTOM, 0, 0));
         box.getChildren().add(more);
         // Reachable with the timeline keys instead; tabbing through every message would be unusable.
@@ -119,7 +120,7 @@ final class MessageActionsUi {
             row.getChildren().add(b);
         }
         if (chat.get().features().anyReaction()) {
-            Button plus = Icons.iconButton(Icons.PLUS, "Más emojis", null);
+            Button plus = Icons.iconButton(Icons.PLUS, I18n.t("message.moreEmojis"), null);
             plus.setOnAction(ev -> {
                 p.hide();
                 EmojiPicker.show(anchor, e -> svc.toggleReaction(chat.get().id(), m.id(), e));
@@ -140,35 +141,35 @@ final class MessageActionsUi {
         ContextMenu menu = new ContextMenu();
         java.util.Set<MessageActions.Action> a = MessageActions.of(m, chat.get().features(), Instant.now());
         if (a.isEmpty()) return menu;
-        if (a.contains(MessageActions.Action.REPLY)) menu.getItems().add(ChatMenus.item("Responder", () -> composer.reply(m)));
-        if (a.contains(MessageActions.Action.COPY)) menu.getItems().add(ChatMenus.item("Copiar texto", () -> Clipboards.copy(m.body())));
-        if (a.contains(MessageActions.Action.OPEN_FILE)) menu.getItems().add(ChatMenus.item("Abrir archivo", () -> media.openFile(m)));
-        if (a.contains(MessageActions.Action.SAVE_AS)) menu.getItems().add(ChatMenus.item("Guardar como…", () -> {
+        if (a.contains(MessageActions.Action.REPLY)) menu.getItems().add(ChatMenus.item(I18n.t("message.reply"), () -> composer.reply(m)));
+        if (a.contains(MessageActions.Action.COPY)) menu.getItems().add(ChatMenus.item(I18n.t("message.copyText"), () -> Clipboards.copy(m.body())));
+        if (a.contains(MessageActions.Action.OPEN_FILE)) menu.getItems().add(ChatMenus.item(I18n.t("message.openFile"), () -> media.openFile(m)));
+        if (a.contains(MessageActions.Action.SAVE_AS)) menu.getItems().add(ChatMenus.item(I18n.t("message.saveAs"), () -> {
             if (scene.get() != null) MediaSaver.save(scene.get().getWindow(), svc, m, toast);
         }));
         if (a.contains(MessageActions.Action.TRANSCRIBE)) {
             if (Transcripts.get().state(m.mediaUrl()) instanceof Transcripts.Done d) {
-                if (!d.text().isEmpty()) menu.getItems().add(ChatMenus.item("Copiar transcripción", () -> Clipboards.copy(d.text())));
+                if (!d.text().isEmpty()) menu.getItems().add(ChatMenus.item(I18n.t("message.copyTranscript"), () -> Clipboards.copy(d.text())));
             } else {
-                menu.getItems().add(ChatMenus.item("Transcribir", () -> media.transcribe(m)));
+                menu.getItems().add(ChatMenus.item(I18n.t("message.transcribe"), () -> media.transcribe(m)));
             }
         }
         if (a.contains(MessageActions.Action.FAVORITE)) {
             boolean fav = library.isFavorite(MediaItems.of(m));
-            menu.getItems().add(ChatMenus.item(fav ? "Quitar de favoritos" : "Agregar a favoritos", () -> {
+            menu.getItems().add(ChatMenus.item(I18n.t(fav ? "message.removeFavorite" : "message.addFavorite"), () -> {
                 boolean now = library.toggleFavorite(MediaItems.of(m));
-                toast.accept(now ? "Agregado a favoritos" : "Quitado de favoritos");
+                toast.accept(I18n.t(now ? "message.favoriteAdded" : "message.favoriteRemoved"));
             }));
         }
-        if (a.contains(MessageActions.Action.EDIT)) menu.getItems().add(ChatMenus.item("Editar", () -> composer.edit(m)));
+        if (a.contains(MessageActions.Action.EDIT)) menu.getItems().add(ChatMenus.item(I18n.t("message.edit"), () -> composer.edit(m)));
         java.util.List<String> reactions = chat.get().features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK));
         if (!reactions.isEmpty()) {
             menu.getItems().add(new SeparatorMenuItem());
-            for (String e : reactions) menu.getItems().add(ChatMenus.item("Reaccionar " + e, () -> svc.toggleReaction(chat.get().id(), m.id(), e)));
+            for (String e : reactions) menu.getItems().add(ChatMenus.item(I18n.t("message.reactWith", e), () -> svc.toggleReaction(chat.get().id(), m.id(), e)));
         }
         if (a.contains(MessageActions.Action.DELETE_FOR_EVERYONE)) {
             menu.getItems().add(new SeparatorMenuItem());
-            menu.getItems().add(ChatMenus.danger(ChatMenus.item("Eliminar para todos", () -> svc.deleteMessage(chat.get().id(), m.id()))));
+            menu.getItems().add(ChatMenus.danger(ChatMenus.item(I18n.t("message.deleteForAll"), () -> svc.deleteMessage(chat.get().id(), m.id()))));
         }
         return menu;
     }

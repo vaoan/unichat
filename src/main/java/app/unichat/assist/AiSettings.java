@@ -1,17 +1,15 @@
 package app.unichat.assist;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import java.nio.file.Path;
 
 /** Ajustes → Escribir con IA. Off until the person turns it on: it sends their chats to another company's service. */
 public final class AiSettings {
-    public static final String DEFAULT_INSTRUCTIONS = "Asegúrate de que el idioma coincida con el del mensaje que llega. "
-            + "Usa toda la conversación como contexto para responder. Usa un tono amigable, profesional y al grano, "
-            + "sin ningún símbolo típico de IA, para que se vea lo más humano posible. "
-            + "Para sentimientos cortos, como una risa o un poco de pena, puedes usar un emoji, "
-            + "pero muy de vez en cuando: casi nunca más de uno por mensaje, y ninguno si el mensaje no lleva esa emoción.";
-
     private AiSettings() {}
+
+    /** What the instructions are until the person writes their own: in the language in use now. */
+    public static String defaultInstructions() { return I18n.t("ai.defaultInstructions"); }
 
     public static boolean enabled() { return Settings.get().getBool("ai.enabled", false); }
 
@@ -28,7 +26,10 @@ public final class AiSettings {
 
     public static void setEngine(AiEngine e) { Settings.get().set("ai.engine", e.name()); }
 
-    public static String instructions() { return Settings.get().getString("ai.instructions", DEFAULT_INSTRUCTIONS); }
+    public static String instructions() {
+        String saved = Settings.get().getString("ai.instructions", null);
+        return saved != null ? saved : defaultInstructions();
+    }
 
     public static void setInstructions(String text) { Settings.get().set("ai.instructions", text); }
 
