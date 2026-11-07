@@ -95,8 +95,8 @@ class FoldersUiTest {
     }
 
     @Test
-    void theFoldersButtonSitsRightAboveSettings() throws Exception {
-        assertEquals(railIndex("Ajustes") - 1, railIndex("Carpetas"));
+    void theFoldersButtonSitsRightBelowTheInbox() throws Exception {
+        assertEquals(1, railIndex("Carpetas"), "the inbox is the first child");
     }
 
     @Test

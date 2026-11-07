@@ -19,7 +19,7 @@ import javafx.scene.layout.VBox;
 import java.util.List;
 
 /**
- * Narrow far-left column: unified inbox, one button per connected network (filters the list),
+ * Narrow far-left column: unified inbox and folders, one button per connected network (filters the list),
  * then archive (dimmed) and connect-network, and settings at the bottom.
  */
 public final class Rail extends VBox {
@@ -59,7 +59,7 @@ public final class Rail extends VBox {
         networks.setAlignment(Pos.TOP_CENTER);
         Region sep = new Region();
         sep.getStyleClass().add("rail-separator");
-        getChildren().addAll(new StackPane(inbox), sep, networks, archive, add, grow, folders, settings);
+        getChildren().addAll(new StackPane(inbox), folders, sep, networks, archive, add, grow, settings);
         listPane.filterProperty().addListener((o, a, b) -> refresh());
         listPane.foldersOpenProperty().addListener((o, a, b) -> refresh());
         refresh();
