@@ -46,6 +46,18 @@ class MediaSaverTest {
     }
 
     @Test
+    void theMimeParametersDontHideTheExtension() {
+        assertEquals("nota.ogg", MediaSaver.suggestedName(media(MessageType.AUDIO, "nota", "audio/ogg; codecs=opus"), BOGOTA));
+        assertEquals("audio-20261026-100405.ogg", MediaSaver.suggestedName(media(MessageType.AUDIO, null, "AUDIO/OGG;codecs=opus"), BOGOTA));
+    }
+
+    @Test
+    void knowsWhatTheDownloaderKnows() {
+        assertEquals("grabacion.wav", MediaSaver.suggestedName(media(MessageType.AUDIO, "grabacion", "audio/wav"), BOGOTA));
+        assertEquals("clip.mov", MediaSaver.suggestedName(media(MessageType.VIDEO, "clip", "video/quicktime"), BOGOTA), "a saved file keeps its real type");
+    }
+
+    @Test
     void namesWindowsWouldMisreadAreCleaned() {
         assertEquals("C_evil.exe", MediaSaver.suggestedName(media(MessageType.FILE, "C:evil.exe", null), BOGOTA));
         assertEquals("foo.txt_ads", MediaSaver.suggestedName(media(MessageType.FILE, "foo.txt:ads", null), BOGOTA));

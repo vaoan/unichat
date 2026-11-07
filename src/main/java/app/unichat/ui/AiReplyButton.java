@@ -27,9 +27,9 @@ final class AiReplyButton {
     /** What each button says; {@code nothing}: when there's nothing to work on; {@code working}: the line while it does. */
     record Look(String icon, String idle, String cancel, String styleClass, String nothing, String working) {}
 
-    static final Look REPLY = new Look(Icons.SPARKLE, "Escribir un borrador con IA (" + (MainView.MAC ? "⌘I" : "Ctrl+I") + ")", "Cancelar el borrador con IA", "ai-button",
+    static final Look REPLY = new Look(Icons.SPARKLE, "Escribir un borrador con IA (" + Shortcuts.key("I") + ")", "Cancelar el borrador con IA", "ai-button",
             "Este chat todavía no tiene mensajes que responder", "Escribiendo el borrador");
-    static final Look FIX = new Look(Icons.SPELLCHECK, "Corregir la ortografía y la redacción con IA (" + (MainView.MAC ? "⌘O" : "Ctrl+O") + ")", "Cancelar la corrección con IA",
+    static final Look FIX = new Look(Icons.SPELLCHECK, "Corregir la ortografía y la redacción con IA (" + Shortcuts.key("O") + ")", "Cancelar la corrección con IA",
             "ai-fix-button", "Escribe primero el texto que quieres corregir", "Corrigiendo el texto");
 
     /** What to answer; the prompt is built on the UI thread, from live messages. */

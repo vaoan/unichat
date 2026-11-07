@@ -41,7 +41,7 @@ import java.util.concurrent.TimeUnit;
 
 import static app.unichat.matrix.BridgeProtocol.*;
 import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.matrix.MatrixClient.enc;
+import static app.unichat.support.Urls.enc;
 
 /**
  * {@link ChatService} backed by a Matrix homeserver whose mautrix bridges provide the networks.

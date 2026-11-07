@@ -13,6 +13,7 @@ import java.util.concurrent.Callable;
 import app.unichat.model.Message;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
+import app.unichat.support.Errors;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
@@ -302,7 +303,7 @@ public final class Composer extends VBox {
         } else {
             input.replaceText(0, input.getLength(), corrected);
             input.positionCaret(input.getLength());
-            onError.accept("Texto corregido. " + (app.unichat.support.Os.windows() ? "Ctrl+Z" : "⌘Z") + " lo deja como estaba");
+            onError.accept("Texto corregido. " + Shortcuts.key("Z") + " lo deja como estaba");
         }
     }
 
@@ -439,8 +440,7 @@ public final class Composer extends VBox {
     }
 
     private Void fail(Throwable t) {
-        Throwable cause = t.getCause() != null ? t.getCause() : t;
-        Platform.runLater(() -> onError.accept("No se pudo enviar: " + cause.getMessage()));
+        Platform.runLater(() -> onError.accept("No se pudo enviar: " + Errors.message(t)));
         return null;
     }
 

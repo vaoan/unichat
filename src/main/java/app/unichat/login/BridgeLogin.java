@@ -6,15 +6,15 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static app.unichat.support.Urls.enc;
 
 /**
  * A bridge's own login API (mautrix bridgev2 provisioning, {@code /_matrix/provision/v3/login/...}): the bridge says
@@ -189,9 +189,6 @@ public final class BridgeLogin {
         return j;
     }
 
-    private static String enc(String s) {
-        return URLEncoder.encode(s, StandardCharsets.UTF_8);
-    }
 
     static JsonNode bodyOf(HttpResponse<String> r) throws java.io.IOException {
         return r.body() == null || r.body().isBlank() ? JSON.createObjectNode() : JSON.readTree(r.body());

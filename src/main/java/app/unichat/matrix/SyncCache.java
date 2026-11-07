@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.settings.Settings;
+import app.unichat.settings.SyncedFile;
 import app.unichat.support.Hashes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -12,7 +13,7 @@ import java.util.Set;
 
 import static app.unichat.matrix.BridgeProtocol.*;
 import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.matrix.MatrixClient.enc;
+import static app.unichat.support.Urls.enc;
 import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** The last full /sync on disk, shown instantly on the next start. Bot chats' messages never reach it ({@link #redact}). */
@@ -90,13 +91,11 @@ final class SyncCache {
         try {
             Path f = file();
             Files.createDirectories(f.getParent());
-            Path tmp = f.resolveSibling(f.getFileName() + ".tmp");
             Set<String> botRoomIds = new java.util.HashSet<>();
             synchronized (proc) {
                 for (MatrixRoom r : proc.rooms()) if (r.chat.bridgeBot()) botRoomIds.add(r.id);
             }
-            MatrixClient.JSON.writeValue(tmp.toFile(), redact(fullSync, botRoomIds));
-            Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            SyncedFile.replace(f, MatrixClient.JSON.writeValueAsBytes(redact(fullSync, botRoomIds)), true);
         } catch (Exception e) {
             System.err.println("Could not save sync cache: " + e);
         }

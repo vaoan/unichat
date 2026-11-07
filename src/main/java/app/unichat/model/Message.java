@@ -1,6 +1,7 @@
 package app.unichat.model;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -29,8 +30,8 @@ public final class Message {
     private boolean edited;
     private boolean deleted;
     private MessageStatus status = MessageStatus.SENT;
-    /** emoji -> user ids that reacted with it, in insertion order. */
-    private final Map<String, Set<String>> reactions = new LinkedHashMap<>();
+    /** emoji -> user ids that reacted with it, in insertion order. Never changed: replaced whole, so the UI can read it while the sync thread writes. */
+    private volatile Map<String, Set<String>> reactions = Map.of();
 
     public Message(String id, String chatId, String senderId, String senderName, boolean outgoing, Instant timestamp) {
         this.id = id;
@@ -110,24 +111,48 @@ public final class Message {
     public void setDeleted(boolean deleted) { this.deleted = deleted; }
     public MessageStatus status() { return status; }
     public void setStatus(MessageStatus status) { this.status = status; }
+    /** A snapshot: later reactions don't change it. */
     public Map<String, Set<String>> reactions() { return reactions; }
 
     /** Changes when anything drawn from this message does. Rows ask it for every message each time one arrives, so it stays cheap. */
     public int revision() {
-        int reacted;
-        try {
-            reacted = reactions.hashCode();
-        } catch (java.util.ConcurrentModificationException changing) {
-            reacted = System.identityHashCode(new Object()); // the sync thread is changing them: it will say so again
-        }
         return java.util.Objects.hash(type, body, senderName, mediaUrl, fileName, mimeType, fileSize, width, height, replyToId, edited,
-                deleted, status, reacted, html, previewHtml, htmlText, externalUrl, mediaInfo);
+                deleted, status, reactions, html, previewHtml, htmlText, externalUrl, mediaInfo);
     }
 
-    private final Map<String, String> reactionNames = new java.util.HashMap<>();
+    /** The same message under another id, the way a local echo becomes the event the server gave it. */
+    public Message withId(String newId) {
+        Message m = new Message(newId, chatId, senderId, senderName, outgoing, timestamp);
+        m.type = type;
+        m.body = body;
+        m.mediaUrl = mediaUrl;
+        m.externalUrl = externalUrl;
+        m.mediaInfo = mediaInfo;
+        m.fileName = fileName;
+        m.mimeType = mimeType;
+        m.fileSize = fileSize;
+        m.width = width;
+        m.height = height;
+        m.replyToId = replyToId;
+        m.edited = edited;
+        m.deleted = deleted;
+        m.status = status;
+        m.reactions = reactions;
+        m.reactionNames = reactionNames;
+        m.html = html;
+        m.previewHtml = previewHtml;
+        m.htmlText = htmlText;
+        return m;
+    }
+
+    private volatile Map<String, String> reactionNames = Map.of();
 
     /** Custom emoji reactions have a picture's address for a key, and maybe a name (Discord's ":orclove:"). */
-    public void setReactionName(String key, String name) { reactionNames.put(key, name); }
+    public void setReactionName(String key, String name) {
+        Map<String, String> names = new java.util.HashMap<>(reactionNames);
+        names.put(key, name);
+        reactionNames = names;
+    }
 
     /** What to call a reaction in words; never its address. */
     public String reactionLabel(String key) {
@@ -155,13 +180,33 @@ public final class Message {
                 || type == MessageType.FILE || type == MessageType.STICKER;
     }
 
+    /** Adds {@code userId}'s reaction, if it isn't there. */
+    public void addReaction(String emoji, String userId) {
+        Map<String, Set<String>> all = new LinkedHashMap<>(reactions);
+        Set<String> users = new LinkedHashSet<>(all.getOrDefault(emoji, Set.of()));
+        users.add(userId);
+        all.put(emoji, Collections.unmodifiableSet(users));
+        reactions = Collections.unmodifiableMap(all);
+    }
+
+    /** Takes back {@code userId}'s reaction; an emoji nobody uses any more goes with it. */
+    public void removeReaction(String emoji, String userId) {
+        Set<String> had = reactions.get(emoji);
+        if (had == null || !had.contains(userId)) return;
+        Map<String, Set<String>> all = new LinkedHashMap<>(reactions);
+        Set<String> users = new LinkedHashSet<>(had);
+        users.remove(userId);
+        if (users.isEmpty()) all.remove(emoji); else all.put(emoji, Collections.unmodifiableSet(users));
+        reactions = Collections.unmodifiableMap(all);
+    }
+
+    public void clearReactions() { reactions = Map.of(); }
+
     /** Adds or removes {@code userId}'s reaction; returns true if it is now present. */
     public boolean toggleReaction(String emoji, String userId) {
-        Set<String> users = reactions.computeIfAbsent(emoji, k -> new LinkedHashSet<>());
-        boolean added = users.add(userId);
-        if (!added) users.remove(userId);
-        if (users.isEmpty()) reactions.remove(emoji);
-        return added;
+        boolean add = !reactions.getOrDefault(emoji, Set.of()).contains(userId);
+        if (add) addReaction(emoji, userId); else removeReaction(emoji, userId);
+        return add;
     }
 
     /** One-line text for chat list previews and notifications. */

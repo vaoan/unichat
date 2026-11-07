@@ -297,6 +297,29 @@ class SyncProcessorTest {
     }
 
     @Test
+    void confirmedEchoKeepsWhatOnlyTheEchoKnows() throws Exception {
+        String room = "!e:example.org";
+        sync(room, "{'timeline':{'events':[]}}", false);
+        JsonNode info = json("{'duration':4200}");
+        proc.addLocalEcho(room, "t2", m -> {
+            m.setType(MessageType.AUDIO);
+            m.setMediaUrl("mxc://s/note");
+            m.setMimeType("audio/ogg; codecs=opus");
+            m.setMediaInfo(info);
+            m.setExternalUrl("https://www.instagram.com/reel/1/");
+            m.setReactionName("mxc://s/e", ":orclove:");
+        });
+        proc.confirmLocalEcho(room, "t2", "$sent");
+        Message real = messages(room).get(0);
+        assertEquals("$sent", real.id());
+        assertEquals(MessageStatus.SENT, real.status());
+        assertEquals("audio/ogg; codecs=opus", real.mimeType());
+        assertEquals(4200, real.durationMs(), "a sent voice note keeps its duration");
+        assertEquals("https://www.instagram.com/reel/1/", real.externalUrl());
+        assertEquals(":orclove:", real.reactionLabel("mxc://s/e"));
+    }
+
+    @Test
     void liveIncomingMessagesAreReported() {
         String room = "!n:example.org";
         SyncProcessor.Result r = sync(room, "{'timeline':{'events':[%s]}}".formatted(text("$1", "@bob:example.org", 1, "a")), true);

@@ -2,13 +2,12 @@ package app.unichat.assist;
 
 import app.unichat.support.BundledTools;
 import app.unichat.support.Os;
+import app.unichat.support.Processes;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The AI command-line programs a reply can come from, already installed and signed in by the person.
@@ -85,13 +84,9 @@ public enum AiEngine {
 
     private Path fromLoginShell() {
         try {
-            Process p = new ProcessBuilder(System.getenv().getOrDefault("SHELL", "/bin/sh"), "-lc", "command -v " + exe)
-                    .redirectError(ProcessBuilder.Redirect.DISCARD).redirectInput(ProcessBuilder.Redirect.from(new java.io.File("/dev/null"))).start();
-            if (!p.waitFor(5, TimeUnit.SECONDS)) {
-                p.destroyForcibly();
-                return null;
-            }
-            String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+            Processes.Result r = Processes.capture(List.of(System.getenv().getOrDefault("SHELL", "/bin/sh"), "-lc", "command -v " + exe), 5);
+            if (!r.finished()) return null;
+            String out = r.out().strip();
             return out.startsWith("/") && Files.isExecutable(Path.of(out)) ? Path.of(out) : null;
         } catch (IOException e) {
             return null;

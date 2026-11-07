@@ -14,15 +14,15 @@ Cada paquete solo puede depender de los que están debajo. `ArchitectureTest` lo
 | `matrix` | `ChatService` sobre Matrix | `service`, `bridge`, `gif`, `links`, `login`, `model`, `settings`, `support` |
 | `service` | La API que usa la UI (`ChatService`, `BridgeAccess`) y el modo demo | `login`, `model`, `settings` |
 | `server` | Servidor local: instala, arranca y vigila tuwunel y los puentes | `bridge`, `settings`, `support` |
-| `stt` | Voz a texto | `settings`, `support` |
+| `stt` | Voz a texto | `settings`, `support`, `video` |
 | `assist` | Borradores de respuesta con el CLI de IA de la persona | `model`, `settings`, `support` |
 | `video` | ffmpeg y la conversión de stickers WebM | `settings`, `support` |
 | `voice` | Grabar notas de voz, limpiarlas y codificarlas | `model`, `settings`, `support`, `video` |
 | `links` | Abre los enlaces de los mensajes para saber si tienen video o audio, sin llegar nunca a esta máquina ni a su red | `model` |
-| `gif` | Buscadores de GIF y lectura de cuadros | `model`, `settings` |
-| `login` | Inicio de sesión en los puentes y cookies del navegador | `model` |
+| `gif` | Buscadores de GIF y lectura de cuadros | `model`, `settings`, `support` |
+| `login` | Inicio de sesión en los puentes y cookies del navegador | `model`, `support` |
 | `settings` | Preferencias | `support` |
-| `model`, `support`, `bridge` | Datos del dominio; utilidades (`Os`, `Hashes`, `Redactor`, `BundledTools`); lo que `matrix` y `server` comparten de los puentes (`BridgeStates`, `BridgePorts`) | nada del proyecto |
+| `model`, `support`, `bridge` | Datos del dominio; utilidades (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Urls`, `Errors`, `Folders`, `Processes`); lo que `matrix` y `server` comparten de los puentes (`BridgeStates`, `BridgePorts`) | nada del proyecto |
 
 Excepciones aceptadas:
 

@@ -472,18 +472,17 @@ public final class MainView extends StackPane {
     }
 
     public void showCommandBar() {
-        String m = MAC ? "⌘" : "Ctrl+";
         CommandBar bar = new CommandBar(svc, List.of(
                 new CommandBar.Command("Ir a la bandeja", "", () -> setView(ChatFilter.View.INBOX, false)),
-                new CommandBar.Command("Ver no leídos", m + "2", () -> setView(ChatFilter.View.INBOX, true)),
-                new CommandBar.Command("Ver favoritos", m + "3", () -> setView(ChatFilter.View.FAVORITES, false)),
-                new CommandBar.Command("Ver prioridad baja", m + "4", () -> setView(ChatFilter.View.LOW_PRIORITY, false)),
+                new CommandBar.Command("Ver no leídos", Shortcuts.key("2"), () -> setView(ChatFilter.View.INBOX, true)),
+                new CommandBar.Command("Ver favoritos", Shortcuts.key("3"), () -> setView(ChatFilter.View.FAVORITES, false)),
+                new CommandBar.Command("Ver prioridad baja", Shortcuts.key("4"), () -> setView(ChatFilter.View.LOW_PRIORITY, false)),
                 new CommandBar.Command("Ver archivados", "", () -> setView(ChatFilter.View.ARCHIVE, false)),
                 new CommandBar.Command("Ver carpetas", "", listPane::showFolders),
-                new CommandBar.Command("Nuevo chat", m + "N", this::showNewChat),
+                new CommandBar.Command("Nuevo chat", Shortcuts.key("N"), this::showNewChat),
                 new CommandBar.Command("Cuentas", "", this::showAccounts),
                 new CommandBar.Command("Agregar cuenta", "", () -> showAccounts().showPicker()),
-                new CommandBar.Command("Ajustes", m + ",", this::showSettings),
+                new CommandBar.Command("Ajustes", Shortcuts.key(","), this::showSettings),
                 new CommandBar.Command("Cerrar sesión", "", onLogout)
         ), this::openChat, this::hideOverlay);
         showOverlay(bar);

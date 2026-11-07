@@ -459,8 +459,7 @@ final class SyncProcessor {
         }
         String shortcode = text(ev.path("content"), "com.beeper.reaction.shortcode");
         if (shortcode != null) t.setReactionName(key, shortcode);
-        Set<String> users = t.reactions().get(key);
-        if (users == null || !users.contains(sender)) t.toggleReaction(key, sender);
+        t.addReaction(key, sender);
         r.messagesChanged.add(room.id);
     }
 
@@ -477,8 +476,7 @@ final class SyncProcessor {
             Message t = room.byId.get(re.targetId());
             boolean stillReacted = room.reactionEvents.values().stream().anyMatch(o -> o.equals(re));
             if (t != null && !stillReacted) {
-                Set<String> users = t.reactions().get(re.key());
-                if (users != null && users.contains(re.sender())) t.toggleReaction(re.key(), re.sender());
+                t.removeReaction(re.key(), re.sender());
                 r.messagesChanged.add(room.id);
             }
             return;
@@ -487,7 +485,7 @@ final class SyncProcessor {
         if (m != null && !m.deleted()) {
             m.setDeleted(true);
             m.setBody("");
-            m.reactions().clear();
+            m.clearReactions();
             r.messagesChanged.add(room.id);
             r.chatsChanged = true;
             fields.refresh(room);
@@ -500,11 +498,12 @@ final class SyncProcessor {
         String type = text(ev, "type");
         JsonNode c = ev.path("content");
         if ("m.typing".equals(type)) {
-            room.chat.typing().clear();
+            Set<String> typing = new java.util.LinkedHashSet<>();
             for (JsonNode u : c.path("user_ids")) {
                 String uid = u.asText();
-                if (!uid.equals(me)) room.chat.typing().add(fields.nameOf(room, uid));
+                if (!uid.equals(me)) typing.add(fields.nameOf(room, uid));
             }
+            room.chat.setTyping(typing);
             r.chatsChanged = true;
         } else if ("m.receipt".equals(type)) {
             for (Iterator<Map.Entry<String, JsonNode>> it = c.fields(); it.hasNext(); ) {
@@ -616,7 +615,7 @@ final class SyncProcessor {
             if (idx >= 0) room.timeline.remove(idx);
             return;
         }
-        Message real = copy(local, eventId);
+        Message real = local.withId(eventId);
         real.setStatus(MessageStatus.SENT);
         if (idx >= 0) room.timeline.set(idx, real); else room.timeline.add(real);
         room.byId.put(eventId, real);
@@ -647,10 +646,7 @@ final class SyncProcessor {
         if (room == null || eventId == null) return;
         room.reactionEvents.put(eventId, new MatrixRoom.Reaction(targetId, key, me));
         Message t = room.byId.get(targetId);
-        if (t != null) {
-            Set<String> users = t.reactions().get(key);
-            if (users == null || !users.contains(me)) t.toggleReaction(key, me);
-        }
+        if (t != null) t.addReaction(key, me);
     }
 
     /** Event id of my reaction {@code key} on {@code targetId}, or null. */

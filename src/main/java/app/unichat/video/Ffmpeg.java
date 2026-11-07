@@ -4,6 +4,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.BundledTools;
 import app.unichat.support.Downloads;
 import app.unichat.support.Os;
+import app.unichat.support.Processes;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,7 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.function.DoubleConsumer;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -59,12 +59,7 @@ public final class Ffmpeg {
 
     /** @param folder where it runs; null: wherever Unichat does */
     public static boolean run(List<String> command, long timeoutSeconds, Path folder) throws IOException, InterruptedException {
-        ProcessBuilder b = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
-        if (folder != null) b.directory(folder.toFile());
-        Process p = b.start();
-        if (p.waitFor(timeoutSeconds, TimeUnit.SECONDS)) return p.exitValue() == 0;
-        p.destroyForcibly();
-        return false;
+        return Processes.quiet(command, folder, timeoutSeconds).ok();
     }
 
     /** Whether there's a build to download for this computer. */
@@ -100,11 +95,7 @@ public final class Ffmpeg {
             Files.deleteIfExists(zip);
         }
         target.toFile().setExecutable(true);
-        Process p = new ProcessBuilder(target.toString(), "-version").redirectErrorStream(true)
-                .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-        boolean finished = p.waitFor(15, TimeUnit.SECONDS);
-        if (!finished) p.destroyForcibly();
-        if (!finished || p.exitValue() != 0) {
+        if (!Processes.quiet(List.of(target.toString(), "-version"), null, 15).ok()) {
             Files.deleteIfExists(target);
             throw new IOException("El conversor de video descargado no funciona en este computador");
         }

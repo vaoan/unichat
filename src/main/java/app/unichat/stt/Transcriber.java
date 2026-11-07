@@ -1,8 +1,10 @@
 package app.unichat.stt;
 
 import app.unichat.support.BundledTools;
+import app.unichat.support.Folders;
 import app.unichat.support.Os;
 import app.unichat.settings.Settings;
+import app.unichat.video.Ffmpeg;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -10,12 +12,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 /**
  * Speech to text with what the user already has, no paid service: whisper.cpp shipped with the app (model
@@ -67,13 +67,13 @@ public final class Transcriber {
             status.accept("Transcribiendo…");
             return clean(run(cmd, work));
         } finally {
-            deleteTree(work);
+            Folders.deleteQuietly(work); // temp folder: what stays is cleaned up with the cache
         }
     }
 
     /**
      * A file Whisper reads (WAV, MP3, FLAC, Ogg Vorbis): Ogg/Opus voice notes are decoded here; anything else (AAC
-     * from Signal or Instagram…) goes through afconvert (macOS) or an ffmpeg on the PATH.
+     * from Signal or Instagram…) goes through the app's ffmpeg or afconvert (macOS).
      */
     static Path prepare(Path audio, Path work) throws IOException, InterruptedException {
         if (OggOpus.isOggOpus(audio)) {
@@ -83,10 +83,12 @@ public final class Transcriber {
         }
         if (whisperReads(audio)) return audio;
         Path wav = work.resolve("audio.wav");
-        Path ffmpeg = BundledTools.onPath(Os.windows() ? "ffmpeg.exe" : "ffmpeg");
+        Path ffmpeg = Ffmpeg.find();
         List<String> cmd;
         if (ffmpeg != null) {
-            cmd = List.of(ffmpeg.toString(), "-loglevel", "error", "-y", "-i", audio.toString(), "-ar", "16000", "-ac", "1", wav.toString());
+            cmd = List.of(ffmpeg.toString(), "-nostdin", "-loglevel", "error", "-y",
+                    // The file comes from other people: nothing but itself may be read.
+                    "-protocol_whitelist", "file", "-i", audio.toString(), "-ar", "16000", "-ac", "1", wav.toString());
         } else if (Os.mac()) {
             cmd = List.of("/usr/bin/afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", audio.toString(), wav.toString());
         } else {
@@ -136,19 +138,5 @@ public final class Transcriber {
     static String clean(String stdout) {
         String t = stdout.replaceAll("\\[[^\\]]*]", " ").replaceAll("\\s+", " ").strip();
         return t.matches("[\\p{Punct}\\s]*") ? "" : t;
-    }
-
-    private static void deleteTree(Path dir) {
-        try (Stream<Path> files = Files.walk(dir)) {
-            files.sorted(Comparator.reverseOrder()).forEach(f -> {
-                try {
-                    Files.deleteIfExists(f);
-                } catch (IOException ignored) {
-                    // temp folder: cleaned up with the cache
-                }
-            });
-        } catch (IOException ignored) {
-            // nothing to clean
-        }
     }
 }

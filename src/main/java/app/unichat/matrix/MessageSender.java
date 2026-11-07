@@ -27,7 +27,7 @@ import java.util.concurrent.CompletionException;
 
 import static app.unichat.matrix.BridgeProtocol.*;
 import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.matrix.MatrixClient.enc;
+import static app.unichat.support.Urls.enc;
 import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** Everything that goes out in a chat: text, stickers, files, edits, deletions, reactions and typing. */

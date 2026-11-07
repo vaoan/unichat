@@ -240,12 +240,12 @@ public final class SettingsWindow {
                 group("Tema", row("Modo", "Sigue al sistema o fuerza claro/oscuro.", themes),
                         row("Color de acento", null, accents)),
                 group("Lista de chats",
-                        row("Tamaño de texto", "También con " + (MainView.MAC ? "⌘" : "Ctrl") + " + / − / 0.", font),
+                        row("Tamaño de texto", "También con " + zoomKeys() + ".", font),
                         row("Lista compacta", "Filas más bajas para ver más chats.", toggle(s.compactList(), v -> { s.setCompactList(v); changed.run(); })),
                         row("Insignias de red", "Muestra la red de cada chat sobre su avatar.", toggle(s.showNetworkBadges(), v -> { s.setShowNetworkBadges(v); changed.run(); }))),
                 group("Escritura",
                         row("Enter envía el mensaje", "Desactívalo para que Enter cree una línea nueva y "
-                                + (MainView.MAC ? "⌘" : "Ctrl") + "+Enter envíe.", toggle(s.sendOnEnter(), s::setSendOnEnter))));
+                                + Shortcuts.key("Enter") + " envíe.", toggle(s.sendOnEnter(), s::setSendOnEnter))));
     }
 
     private static Slider fontSlider(Runnable changed) {
@@ -310,7 +310,7 @@ public final class SettingsWindow {
         speak.getChildren().get(1).setAccessibleText("Leer en voz alta los mensajes nuevos");
         return page("Accesibilidad",
                 group("Visión",
-                        row("Tamaño de texto", "De 85 % a 160 %. Atajo: " + (MainView.MAC ? "⌘" : "Ctrl") + " + / − / 0.", fontSlider(changed)),
+                        row("Tamaño de texto", "De 85 % a 160 %. Atajo: " + zoomKeys() + ".", fontSlider(changed)),
                         row("Alto contraste", "Colores sólidos, bordes marcados y burbujas delimitadas." + sys
                                 + (Theme.systemHighContrast() ? "activado." : "desactivado."),
                                 modeChips(s.highContrast(), m -> { s.setHighContrast(m); changed.run(); })),
@@ -697,24 +697,27 @@ public final class SettingsWindow {
         return page("GIFs", groups.toArray(new Node[0]));
     }
 
+    private static String zoomKeys() {
+        return Shortcuts.key("+") + " / " + Shortcuts.key("−") + " / " + Shortcuts.key("0");
+    }
+
     private static Node shortcutsPage() {
-        String m = MainView.MAC ? "⌘" : "Ctrl+";
         String[][] keys = {
-                {m + "K", "Buscar chats y comandos"},
+                {Shortcuts.key("K"), "Buscar chats y comandos"},
                 {"F6 / Shift+F6", "Saltar entre barra lateral, lista, mensajes y campo de texto"},
                 {"↑ / ↓ (en mensajes)", "Recorrer mensajes"},
                 {"R · E · Enter (en mensajes)", "Responder · Editar · Más acciones"},
                 {"1 … 6 (en mensajes)", "Reacciones rápidas ❤️ 👍 😂 😮 😢 🙏"},
-                {m + "+ / " + m + "− / " + m + "0", "Agrandar · Achicar · Restablecer texto"},
+                {zoomKeys(), "Agrandar · Achicar · Restablecer texto"},
                 {"Alt+↑ / Alt+↓", "Chat anterior / siguiente"},
                 {"Alt+Shift+↑ / ↓", "Anterior / siguiente sin leer"},
-                {m + "E", "Archivar o desarchivar el chat"},
-                {m + "Shift+U", "Marcar como leído / no leído"},
-                {m + "1 … " + m + "4", "Todos / No leídos / Favoritos / Prioridad baja"},
-                {m + "Shift+I", "Mostrar u ocultar la información del chat"},
-                {m + ",", "Ajustes"},
-                {m + "I", "Escribir un borrador con IA, si los botones de IA están activos"},
-                {m + "O", "Corregir la ortografía y la redacción con IA, si los botones de IA están activos"},
+                {Shortcuts.key("E"), "Archivar o desarchivar el chat"},
+                {Shortcuts.key("Shift+U"), "Marcar como leído / no leído"},
+                {Shortcuts.key("1") + " … " + Shortcuts.key("4"), "Todos / No leídos / Favoritos / Prioridad baja"},
+                {Shortcuts.key("Shift+I"), "Mostrar u ocultar la información del chat"},
+                {Shortcuts.key(","), "Ajustes"},
+                {Shortcuts.key("I"), "Escribir un borrador con IA, si los botones de IA están activos"},
+                {Shortcuts.key("O"), "Corregir la ortografía y la redacción con IA, si los botones de IA están activos"},
                 {"Shift+↑ / Shift+↓ (campo de texto)", "Seleccionar desde el cursor hasta el principio / el final"},
                 {"↑ (campo vacío)", "Editar tu último mensaje"},
                 {"Esc", "Cancelar respuesta o edición"},
@@ -730,6 +733,7 @@ public final class SettingsWindow {
         for (int i = 0; i < keys.length; i++) {
             Label k = new Label(keys[i][0]);
             k.getStyleClass().add("kbd");
+            k.setMinWidth(Region.USE_PREF_SIZE);
             grid.add(k, 0, i);
             grid.add(new Label(keys[i][1]), 1, i);
         }

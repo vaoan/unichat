@@ -5,6 +5,7 @@ import app.unichat.login.BridgeLogin;
 import app.unichat.login.CookieSpec;
 import app.unichat.login.SessionCookies;
 import app.unichat.model.Network;
+import app.unichat.support.Folders;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -32,7 +33,6 @@ import java.net.CookiePolicy;
 import java.net.HttpCookie;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -299,7 +299,7 @@ public final class LoginWebView {
             engine.load("about:blank");
             stopCookies(manager, previous);
             openStage = null;
-            deleteQuietly(storageDir);
+            Folders.deleteQuietly(storageDir);
             if (!finished[0]) {
                 finished[0] = true; // closed with the window button
                 Platform.runLater(onCancel);
@@ -321,15 +321,6 @@ public final class LoginWebView {
             stopCookies(manager, previous);
             openStage = null;
             throw ex;
-        }
-    }
-
-    private static void deleteQuietly(Path dir) {
-        if (dir == null) return;
-        try (var walk = Files.walk(dir)) {
-            for (Path f : walk.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(f);
-        } catch (IOException ignored) {
-            // Temp folder: the OS cleans it eventually.
         }
     }
 }

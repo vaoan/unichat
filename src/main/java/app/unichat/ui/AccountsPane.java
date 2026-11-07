@@ -10,6 +10,7 @@ import app.unichat.server.TelegramKeys;
 import app.unichat.service.BridgeAccess;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
+import app.unichat.support.Errors;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
@@ -561,8 +562,9 @@ public final class AccountsPane extends VBox {
         return l;
     }
 
+    /** The deepest cause: what these screens show comes from a bridge's login step, wrapped in whatever carried it here. */
     static String rootMessage(Throwable t) {
         while (t.getCause() != null) t = t.getCause();
-        return t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
+        return Errors.message(t);
     }
 }

@@ -1,6 +1,7 @@
 package app.unichat.stt;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.Errors;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -89,8 +90,7 @@ public final class Transcripts {
                 Files.writeString(file(mediaUrl), text, StandardCharsets.UTF_8);
                 set(mediaUrl, new Done(text));
             } catch (Exception e) {
-                Throwable c = e instanceof java.util.concurrent.ExecutionException && e.getCause() != null ? e.getCause() : e;
-                set(mediaUrl, new Failed(c.getMessage() == null ? c.getClass().getSimpleName() : c.getMessage()));
+                set(mediaUrl, new Failed(Errors.message(e)));
             }
         });
     }

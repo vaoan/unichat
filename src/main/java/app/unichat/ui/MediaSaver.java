@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.service.MediaSource;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import app.unichat.model.MimeTypes;
 import javafx.application.Platform;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
@@ -12,7 +13,6 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Map;
 import java.util.function.Consumer;
 
 /** "Guardar como…" for any received or sent media: photos, videos, audio, files and stickers. */
@@ -20,10 +20,6 @@ final class MediaSaver {
     private MediaSaver() {}
 
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
-    private static final Map<String, String> EXT = Map.of(
-            "image/jpeg", ".jpg", "image/png", ".png", "image/gif", ".gif", "image/webp", ".webp",
-            "video/mp4", ".mp4", "video/webm", ".webm", "audio/ogg", ".ogg", "audio/mpeg", ".mp3", "audio/mp4", ".m4a",
-            "application/pdf", ".pdf");
 
     /**
      * A safe file name: the original one without any folder part (never a path outside the chosen folder), or one
@@ -32,7 +28,7 @@ final class MediaSaver {
     static String suggestedName(Message m, ZoneId zone) {
         String name = m.fileName() == null ? "" : m.fileName().replace('\\', '/');
         name = windowsSafe(name.substring(name.lastIndexOf('/') + 1).strip());
-        String ext = m.mimeType() == null ? "" : EXT.getOrDefault(m.mimeType().toLowerCase(), "");
+        String ext = MimeTypes.extension(m.mimeType());
         if (name.isEmpty() || name.equals(".") || name.equals("..") || m.type() == MessageType.STICKER) {
             String kind = switch (m.type()) {
                 case IMAGE -> "imagen";

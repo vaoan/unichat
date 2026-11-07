@@ -177,12 +177,13 @@ final class DemoChats {
             chat.setNetwork(network);
             chat.setTitle(title);
             chat.setGroup(group);
-            chat.members().add(new Member(ME, "Yo", null));
+            List<Member> members = new ArrayList<>(List.of(new Member(ME, "Yo", null)));
             for (String n : names) {
                 Member m = new Member("@" + network.protocolId() + "_" + n.toLowerCase().replaceAll("[^a-z0-9]", "") + ":demo.unichat", n, null);
                 people.put(n, m);
-                chat.members().add(m);
+                members.add(m);
             }
+            chat.setMembers(members);
         }
 
         static ChatBuilder dm(MockChatService svc, String key, Network network, String name) {

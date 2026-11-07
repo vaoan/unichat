@@ -1,5 +1,7 @@
 package app.unichat.server;
 
+import app.unichat.support.Processes;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -14,6 +16,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.function.Function;
 
 /**
@@ -109,7 +112,7 @@ public final class BinaryStore {
     private void clearQuarantine(Path file) {
         if (platform != Platform.MAC_ARM64) return;
         try {
-            new ProcessBuilder("xattr", "-c", file.toString()).start().waitFor();
+            Processes.quiet(List.of("xattr", "-c", file.toString()), null, 30);
         } catch (IOException e) {
             // Not fatal: the binary may still run.
         } catch (InterruptedException e) {

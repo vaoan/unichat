@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgeStates;
+import app.unichat.settings.SyncedFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -12,8 +13,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.PosixFilePermission;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -23,7 +22,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -198,16 +196,6 @@ final class MetaSessions implements Watchdog.SessionKeeper {
 
     /** As private as the database it comes from; written whole, so a crash can't leave half a session. */
     private void write(String bridge, Map<String, JsonNode> copy) throws IOException {
-        Path f = backupFile(bridge);
-        Path tmp = f.resolveSibling(f.getFileName() + ".part");
-        Files.deleteIfExists(tmp);
-        Files.createFile(tmp);
-        try {
-            Files.setPosixFilePermissions(tmp, Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
-        } catch (UnsupportedOperationException windows) {
-            // %LOCALAPPDATA% is already the person's own.
-        }
-        Files.writeString(tmp, JSON.writeValueAsString(copy));
-        Files.move(tmp, f, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        SyncedFile.replace(backupFile(bridge), JSON.writeValueAsBytes(copy), true);
     }
 }

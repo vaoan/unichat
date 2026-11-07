@@ -16,7 +16,7 @@ import java.util.function.Supplier;
 
 import static app.unichat.matrix.BridgeProtocol.*;
 import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.matrix.MatrixClient.enc;
+import static app.unichat.support.Urls.enc;
 import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** Discord servers: which are bridged, offering the rest, and archived servers bringing nothing. */

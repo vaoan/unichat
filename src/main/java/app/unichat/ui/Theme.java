@@ -2,16 +2,13 @@ package app.unichat.ui;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.Os;
+import app.unichat.support.Processes;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 /** Applies the stylesheet, light/dark palette, accent color and font scale to every app scene. */
 public final class Theme {
@@ -174,13 +171,6 @@ public final class Theme {
     }
 
     private static String run(String... cmd) throws Exception {
-        Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = r.readLine()) != null) sb.append(line).append('\n');
-        }
-        p.waitFor(3, TimeUnit.SECONDS);
-        return sb.toString();
+        return Processes.capture(List.of(cmd), 3).out();
     }
 }

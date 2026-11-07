@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.Errors;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -12,11 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 
 import static app.unichat.matrix.BridgeProtocol.*;
 import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.matrix.MatrixClient.enc;
+import static app.unichat.support.Urls.enc;
 import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** Signing in: finds the homeserver of a name or URL, logs in, and restores a stored session. */
@@ -47,10 +47,7 @@ public final class MatrixLogin {
 
     /** Short Spanish message for an error coming out of this service's futures. */
     public static String userMessage(Throwable t) {
-        while ((t instanceof CompletionException || t instanceof java.util.concurrent.ExecutionException)
-                && t.getCause() != null) {
-            t = t.getCause();
-        }
+        t = Errors.unwrap(t);
         if (t instanceof MatrixException me) {
             if (me.errcode() == null) return me.getMessage();
             return switch (me.errcode()) {
@@ -67,7 +64,7 @@ public final class MatrixLogin {
                 || t instanceof java.net.UnknownHostException || t instanceof java.nio.channels.UnresolvedAddressException) {
             return "No se pudo conectar con el servidor";
         }
-        if (t instanceof IOException) return "Error de red: " + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+        if (t instanceof IOException) return "Error de red: " + Errors.message(t);
         return t.getMessage() == null ? "Error inesperado" : t.getMessage();
     }
 

@@ -1,7 +1,7 @@
 package app.unichat.model;
 
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -46,8 +46,9 @@ public final class Chat {
     private boolean personalSpace;
     private List<String> spaceChildren = List.of();
     private Set<String> spaceParents = Set.of();
-    private final List<Member> members = new ArrayList<>();
-    private final Set<String> typing = new LinkedHashSet<>();
+    /** Never changed: replaced whole, so the UI can read them while the sync thread writes. */
+    private volatile List<Member> members = List.of();
+    private volatile Set<String> typing = Set.of();
 
     public Chat(String id) { this.id = id; }
 
@@ -97,8 +98,11 @@ public final class Chat {
     public boolean bridgeBot() { return bridgeBot; }
     public void setBridgeBot(boolean bridgeBot) { this.bridgeBot = bridgeBot; }
     public List<Member> members() { return members; }
+    public void setMembers(List<Member> members) { this.members = List.copyOf(members); }
     /** Display names of members currently typing. */
     public Set<String> typing() { return typing; }
+    /** In the order given: that's how they're named on screen. */
+    public void setTyping(Set<String> names) { this.typing = Collections.unmodifiableSet(new LinkedHashSet<>(names)); }
 
     public boolean isUnread() { return unreadCount > 0 || markedUnread; }
 

@@ -5,11 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
 /** GET + JSON for the provider adapters. */
@@ -27,9 +25,6 @@ final class HttpJson {
         return JSON.readTree(r.body());
     }
 
-    static String enc(String s) {
-        return URLEncoder.encode(s, StandardCharsets.UTF_8);
-    }
 
     static String text(JsonNode n) {
         return n == null || n.isMissingNode() || n.isNull() || n.asText().isEmpty() ? null : n.asText();

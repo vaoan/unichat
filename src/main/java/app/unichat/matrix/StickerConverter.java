@@ -3,13 +3,14 @@ package app.unichat.matrix;
 import app.unichat.gif.GifFrames;
 import app.unichat.model.RoomFeatures;
 import app.unichat.support.BundledTools;
+import app.unichat.support.Processes;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.TimeUnit;
+import java.util.List;
 
 /**
  * Stickers in a format the chat refuses (Telegram's animated stickers arrive as GIF; WhatsApp only takes WebP/PNG):
@@ -83,11 +84,9 @@ public final class StickerConverter {
         if (WEBP.equals(target) && tool != null) {
             Path out = Files.createTempFile(dir, "sticker", ".webp");
             try {
-                Process p = new ProcessBuilder(tool.toString(), "-mixed", "-q", "80", "-m", "4", in.toString(), "-o", out.toString())
-                        .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-                if (!p.waitFor(60, TimeUnit.SECONDS)) p.destroyForcibly();
-                else if (p.exitValue() == 0 && Files.size(out) > 0) return new Result(out, WEBP);
-                System.err.println("gif2webp failed (exit " + (p.isAlive() ? "timeout" : p.exitValue()) + "); sending a still sticker");
+                Processes.Result r = Processes.quiet(List.of(tool.toString(), "-mixed", "-q", "80", "-m", "4", in.toString(), "-o", out.toString()), null, 60);
+                if (r.ok() && Files.size(out) > 0) return new Result(out, WEBP);
+                System.err.println("gif2webp failed (exit " + (r.finished() ? r.exit() : "timeout") + "); sending a still sticker");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new IOException("Conversión interrumpida", e);

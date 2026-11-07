@@ -1,6 +1,7 @@
 package app.unichat.login;
 
 import app.unichat.model.Network;
+import app.unichat.support.Folders;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -17,7 +18,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +28,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * Signing in through the person's real Chrome, for what doesn't work in an embedded window: Google refuses those.
@@ -144,7 +143,7 @@ public final class ChromeLogin {
 
     /** Blocks until signed in: the step's values, or null if the person closed Chrome or {@link #cancel cancelled}. */
     public Map<String, String> run() throws IOException, InterruptedException {
-        delete(profile);
+        Folders.deleteQuietly(profile);
         Files.createDirectories(profile);
         try {
             int port = freePort();
@@ -337,16 +336,7 @@ public final class ChromeLogin {
                 p.waitFor(5, TimeUnit.SECONDS);
             }
         }
-        delete(profile);
-    }
-
-    /** The session lives there: gone even if a file resists at first, and again at the next login if the program was killed. */
-    private static void delete(Path dir) {
-        if (!Files.exists(dir)) return;
-        try (Stream<Path> all = Files.walk(dir)) {
-            for (Path f : (Iterable<Path>) all.sorted(Comparator.reverseOrder())::iterator) Files.deleteIfExists(f);
-        } catch (IOException ignored) {
-            // Chrome still closing a file: removed by the next login.
-        }
+        // The session lives there: gone even if a file resists at first (Chrome still closing it), and again at the next login.
+        Folders.deleteQuietly(profile);
     }
 }

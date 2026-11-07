@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static app.unichat.gif.HttpJson.enc;
+import static app.unichat.support.Urls.enc;
 import static app.unichat.gif.HttpJson.text;
 
 /**

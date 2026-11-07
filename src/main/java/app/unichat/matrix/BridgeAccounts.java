@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 
 import static app.unichat.matrix.BridgeProtocol.*;
 import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.matrix.MatrixClient.enc;
+import static app.unichat.support.Urls.enc;
 import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** The bridges and their accounts: what's available, logins, and connecting or disconnecting. */
@@ -251,13 +251,7 @@ final class BridgeAccounts {
         return core.run(() -> {
             String roomId = bots.find(network);
             if (roomId == null) return;
-            int before = bots.messageCount(roomId);
-            bots.send(roomId, botCommand(network, "list-logins"));
-            String reply = null;
-            for (int i = 0; i < 20 && reply == null; i++) {
-                Thread.sleep(500);
-                reply = bots.replyAfter(roomId, before);
-            }
+            String reply = bots.ask(network, "list-logins");
             List<String> ids = new ArrayList<>();
             if (reply != null) {
                 Matcher m = LOGIN_ID.matcher(reply);
@@ -310,15 +304,7 @@ final class BridgeAccounts {
             parsed = new ArrayList<>();
             for (BridgeLogin.Account a : api.accounts()) parsed.add(new Login(a.id(), a.name(), a.state()));
         } else {
-            String roomId = bots.find(n);
-            if (roomId == null) return;
-            int before = bots.messageCount(roomId);
-            bots.send(roomId, botCommand(n, statusCommand(n)));
-            String reply = null;
-            for (int i = 0; i < 20 && reply == null; i++) {
-                Thread.sleep(500);
-                reply = bots.replyAfter(roomId, before);
-            }
+            String reply = bots.ask(n, statusCommand(n));
             if (reply == null) return;
             parsed = n == Network.DISCORD ? parseDiscordPing(reply) : parseLogins(reply);
         }

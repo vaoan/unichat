@@ -8,7 +8,7 @@ Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix
 Package rules: `docs/ARQUITECTURA.md`, enforced by `ArchitectureTest` (no cycles, JavaFX only in `ui`, `ui` talks to `service`). Read it before adding a dependency between packages.
 - `model/` — mutable `Chat`, `Message`, records `Member`, `Account`; `Network` maps each network to its bridge
   bot localpart / puppet prefix / protocol id (must match `server/setup.*`).
-- `support/` — leaf utilities (`Os`, `Hashes`, `Redactor`, `BundledTools`).
+- `support/` — leaf utilities (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Processes`, `Folders`, `Urls`, `Errors`). Use them instead of writing another: process timeouts, folder deletion and URL encoding had each drifted apart.
 - `bridge/` — what `matrix` and `server` share about bridges (`BridgeStates`, `BridgePorts`).
 - `service/ChatService` — the only API the UI uses (made of small role interfaces; take the narrowest one). Live model objects, listeners on any thread (UI marshals with
   `Platform.runLater`, coalesced in `MainView`). `MockChatService` = demo mode. `BridgeAccess` = what only bridge-backed services add.

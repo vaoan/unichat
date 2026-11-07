@@ -1,5 +1,7 @@
 package app.unichat.login;
 
+import app.unichat.support.Processes;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -9,7 +11,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKeyFactory;
@@ -158,23 +159,17 @@ public final class ChromiumCookies {
 
     /** Asks the macOS keychain (native prompt) for the Safe Storage password; null if denied/absent. */
     private static byte[] keychainKey(String service) {
-        Process p = null;
         try {
-            p = new ProcessBuilder("security", "find-generic-password", "-wa", service)
-                    .redirectErrorStream(false).start();
-            p.getOutputStream().close();
             // The user may need time to answer the native prompt.
-            byte[] outBytes = p.getInputStream().readAllBytes();
-            if (!p.waitFor(60, TimeUnit.SECONDS) || p.exitValue() != 0) return null;
-            String password = new String(outBytes, StandardCharsets.UTF_8).strip();
+            Processes.Result r = Processes.capture(List.of("security", "find-generic-password", "-wa", service), 60);
+            if (!r.ok()) return null;
+            String password = r.out().strip();
             return password.isEmpty() ? null : deriveKey(password);
         } catch (IOException | RuntimeException e) {
             return null;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return null;
-        } finally {
-            if (p != null) p.destroy();
         }
     }
 

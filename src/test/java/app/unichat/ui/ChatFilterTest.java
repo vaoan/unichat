@@ -74,7 +74,7 @@ class ChatFilterTest {
         Chat mama = chat("Mamá", Network.WHATSAPP, 10);
         mama.setArchived(true);
         Chat grupo = chat("Grupo", Network.TELEGRAM, 20);
-        grupo.members().add(new Member("@x", "José Pérez", null));
+        grupo.setMembers(java.util.List.of(new Member("@x", "José Pérez", null)));
         List<Chat> all = List.of(mama, grupo);
         assertEquals(List.of("Mamá"), ids(ChatFilter.DEFAULT.withQuery("mama").apply(all)));
         assertEquals(List.of("Grupo"), ids(ChatFilter.DEFAULT.withQuery("jose").apply(all)));

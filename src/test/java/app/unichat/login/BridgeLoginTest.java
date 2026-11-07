@@ -123,6 +123,12 @@ class BridgeLoginTest {
     }
 
     @Test
+    void aSpaceInAFlowIdStaysASpaceInThePath() throws Exception {
+        api().start("con espacio");
+        assertTrue(requests.get(0).contains("/v3/login/start/con espacio?"), requests.get(0));
+    }
+
+    @Test
     void cookieStepListsWhatTheBridgeNeeds() throws Exception {
         BridgeLogin.Step s = api().start("cookie");
         assertEquals("https://www.instagram.com/", s.cookies().url());

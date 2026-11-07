@@ -5,6 +5,8 @@ import app.unichat.model.LinkMedia;
 import app.unichat.bridge.BridgePorts;
 import app.unichat.settings.Settings;
 import app.unichat.support.Hashes;
+import app.unichat.model.MimeTypes;
+import app.unichat.support.Urls;
 
 import java.io.IOException;
 import java.net.URI;
@@ -12,7 +14,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -110,7 +111,7 @@ final class MediaDownloader {
             String rest = url.substring("mxc://".length());
             int slash = rest.indexOf('/');
             if (slash <= 0) throw new MatrixException(0, null, "URL de medio no válida");
-            String sm = MatrixClient.enc(rest.substring(0, slash)) + "/" + MatrixClient.enc(rest.substring(slash + 1));
+            String sm = Urls.enc(rest.substring(0, slash)) + "/" + Urls.enc(rest.substring(slash + 1));
             contentType = null;
             String bridge = BridgePorts.directMediaBase(rest.substring(0, slash));
             if (bridge != null) {
@@ -160,25 +161,8 @@ final class MediaDownloader {
     }
 
     static String extension(String contentType) {
-        if (contentType == null) return "";
-        String ct = contentType.split(";")[0].trim().toLowerCase(Locale.ROOT);
-        return switch (ct) {
-            case "image/jpeg" -> ".jpg";
-            case "image/png" -> ".png";
-            case "image/gif" -> ".gif";
-            case "image/webp" -> ".webp";
-            case "image/svg+xml" -> ".svg";
-            case "video/mp4" -> ".mp4";
-            case "video/webm" -> ".webm";
-            // JavaFX refuses a ".mov" by its name, but plays the same file as ".mp4".
-            case "video/quicktime" -> ".mp4";
-            case "video/x-m4v" -> ".m4v";
-            case "audio/ogg" -> ".ogg";
-            case "audio/mpeg" -> ".mp3";
-            case "audio/mp4", "audio/x-m4a" -> ".m4a";
-            case "audio/wav", "audio/x-wav" -> ".wav";
-            case "application/pdf" -> ".pdf";
-            default -> "";
-        };
+        String ext = MimeTypes.extension(contentType);
+        // JavaFX refuses a ".mov" by its name, but plays the same file as ".mp4".
+        return ext.equals(".mov") ? ".mp4" : ext;
     }
 }

@@ -68,10 +68,7 @@ final class RoomFields {
             Member m = room.members.get(e.getKey());
             members.add(m != null ? m : new Member(e.getKey(), null, null));
         }
-        if (!members.equals(c.members())) {
-            c.members().clear();
-            c.members().addAll(members);
-        }
+        if (!members.equals(c.members())) c.setMembers(members);
 
         Message last = null;
         for (int i = room.timeline.size() - 1; i >= 0; i--) {

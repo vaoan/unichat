@@ -9,7 +9,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -517,33 +516,26 @@ public final class PreferencesFile {
         return root;
     }
 
-    /** Temp file on disk, then atomic move: a failure or a power cut leaves the old file whole. */
+    /** A failure or a power cut leaves the old file whole. */
     private static boolean write(Path target, ObjectNode content, boolean keepPrevious) {
-        Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
         try {
             Files.createDirectories(target.getParent());
-            SyncedFile.write(tmp, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(content));
+            byte[] bytes = JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(content);
             if (keepPrevious) keepPrevious(target);
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            SyncedFile.replace(target, bytes, false);
             return true;
         } catch (IOException | RuntimeException e) {
             System.err.println("Could not save " + target.getFileName() + ": " + e);
-            deleteQuietly(tmp);
             return false;
         }
     }
 
     /** A backup that can't be made (Windows may hold the file) only costs the backup: the save goes on. */
     private static void keepPrevious(Path target) {
-        Path backup = backupOf(target);
-        Path tmp = backup.resolveSibling(backup.getFileName() + ".tmp");
         try {
-            if (!Files.exists(target)) return;
-            SyncedFile.write(tmp, Files.readAllBytes(target));
-            Files.move(tmp, backup, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            if (Files.exists(target)) SyncedFile.replace(backupOf(target), Files.readAllBytes(target), false);
         } catch (IOException | RuntimeException e) {
             System.err.println("Could not back up " + target.getFileName() + ": " + e);
-            deleteQuietly(tmp);
         }
     }
 

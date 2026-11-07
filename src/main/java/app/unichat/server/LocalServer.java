@@ -4,14 +4,17 @@ import app.unichat.settings.Settings;
 import app.unichat.bridge.BridgePorts;
 import app.unichat.bridge.BridgeStates;
 import app.unichat.support.Redactor;
+import app.unichat.support.Folders;
+import app.unichat.support.Processes;
+import app.unichat.settings.SyncedFile;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URI;
@@ -29,8 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
@@ -229,7 +230,7 @@ public final class LocalServer {
                 runIgnoringExit(bd, store.path(b).toString(), "-c", "config.yaml");
                 if (Files.size(config) < 100) throw new IOException(b + " no generó su configuración");
                 // That run logged to its default file (unfiltered); from now on it logs to stdout (Redactor).
-                deleteTree(bd.resolve("logs"));
+                Folders.delete(bd.resolve("logs"));
             } else {
                 run(bd, store.path(b).toString(), "-e", "-c", "config.yaml");
             }
@@ -443,14 +444,12 @@ public final class LocalServer {
         return p;
     }
 
+    /** Whole or not at all: an empty file after a crash would mean a new password for an account that already exists. */
     private void saveSecrets(Properties p) throws IOException {
         Files.createDirectories(dir);
-        Path f = dir.resolve("secrets.properties");
-        try (OutputStream out = Files.newOutputStream(f)) {
-            p.store(out, "Unichat local server - private");
-        }
-        f.toFile().setReadable(false, false);
-        f.toFile().setReadable(true, true);
+        ByteArrayOutputStream content = new ByteArrayOutputStream();
+        p.store(content, "Unichat local server - private");
+        SyncedFile.replace(dir.resolve("secrets.properties"), content.toByteArray(), true);
     }
 
     private static String random(int n) {
@@ -461,40 +460,17 @@ public final class LocalServer {
         return sb.toString();
     }
 
-    private static void deleteTree(Path p) throws IOException {
-        if (!Files.exists(p)) return;
-        try (var walk = Files.walk(p)) {
-            for (Path f : walk.sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(f);
-        }
-    }
-
     private static void runIgnoringExit(Path workDir, String... cmd) throws IOException, InterruptedException {
-        Process p = new ProcessBuilder(new ArrayList<>(List.of(cmd))).directory(workDir.toFile())
-                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-        if (!p.waitFor(60, TimeUnit.SECONDS)) {
-            p.destroyForcibly();
-            throw new IOException("Tiempo agotado: " + Path.of(cmd[0]).getFileName());
-        }
+        if (!Processes.quiet(List.of(cmd), workDir, 60).finished()) throw new IOException("Tiempo agotado: " + Path.of(cmd[0]).getFileName());
     }
 
     /** Runs a bridge setup command; on failure its (redacted) output goes to the log and the error message. */
     private static void run(Path workDir, String... cmd) throws IOException, InterruptedException {
-        Process p = new ProcessBuilder(new ArrayList<>(List.of(cmd))).directory(workDir.toFile())
-                .redirectErrorStream(true).start();
-        CompletableFuture<String> out = CompletableFuture.supplyAsync(() -> {
-            try {
-                return new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            } catch (IOException e) {
-                return "";
-            }
-        });
-        if (!p.waitFor(60, TimeUnit.SECONDS)) {
-            p.destroyForcibly();
-            throw new IOException("Tiempo agotado: " + Path.of(cmd[0]).getFileName());
-        }
-        if (p.exitValue() != 0) {
-            String text = Redactor.redact(out.getNow("").strip());
-            System.err.println("Bridge setup failed (" + Path.of(cmd[0]).getFileName() + ", exit " + p.exitValue() + "): " + text);
+        Processes.Result r = Processes.capture(new ProcessBuilder(cmd).directory(workDir.toFile()).redirectErrorStream(true), 60);
+        if (!r.finished()) throw new IOException("Tiempo agotado: " + Path.of(cmd[0]).getFileName());
+        if (r.exit() != 0) {
+            String text = Redactor.redact(r.out().strip());
+            System.err.println("Bridge setup failed (" + Path.of(cmd[0]).getFileName() + ", exit " + r.exit() + "): " + text);
             String last = text.lines().reduce((a, b) -> b).orElse("sin detalles");
             throw new IOException(Path.of(cmd[0]).getFileName() + " no pudo prepararse: " + last);
         }

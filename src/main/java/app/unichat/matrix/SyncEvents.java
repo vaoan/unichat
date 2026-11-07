@@ -6,7 +6,6 @@ import app.unichat.model.Network;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -106,25 +105,6 @@ final class SyncEvents {
         if (!actions.isArray() || actions.isEmpty()) return true;
         for (JsonNode a : actions) if ("dont_notify".equals(a.asText())) return true;
         return false;
-    }
-
-    static Message copy(Message src, String newId) {
-        Message m = new Message(newId, src.chatId(), src.senderId(), src.senderName(), src.outgoing(), src.timestamp());
-        m.setType(src.type());
-        m.setBody(src.body());
-        m.setHtml(src.html());
-        m.setPreviewHtml(src.previewHtml());
-        m.setHtmlText(src.htmlText());
-        m.setMediaUrl(src.mediaUrl());
-        m.setFileName(src.fileName());
-        m.setFileSize(src.fileSize());
-        m.setSize(src.width(), src.height());
-        m.setReplyToId(src.replyToId());
-        m.setEdited(src.edited());
-        m.setDeleted(src.deleted());
-        m.setStatus(src.status());
-        src.reactions().forEach((k, v) -> m.reactions().put(k, new LinkedHashSet<>(v)));
-        return m;
     }
 
     /** Name for a user whose profile isn't known yet: "+57300…" for phone puppets, else "Contacto de WhatsApp". */

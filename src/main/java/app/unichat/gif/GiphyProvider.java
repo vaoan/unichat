@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static app.unichat.gif.HttpJson.enc;
+import static app.unichat.support.Urls.enc;
 import static app.unichat.gif.HttpJson.text;
 
 /** Giphy (developers.giphy.com): {@code /v1/gifs/search} and {@code /v1/gifs/trending}, rating pg-13. */

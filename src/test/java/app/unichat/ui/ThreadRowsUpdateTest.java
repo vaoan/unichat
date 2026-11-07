@@ -66,7 +66,7 @@ class ThreadRowsUpdateTest {
         List<Message> msgs = three();
         ObservableList<ThreadRows.Row> rows = shown(msgs);
         msgs.get(1).setStatus(MessageStatus.READ);
-        msgs.get(1).reactions().computeIfAbsent("❤️", k -> new java.util.LinkedHashSet<>()).add("@a");
+        msgs.get(1).addReaction("❤️", "@a");
         List<ThreadRows.Row> next = ThreadRows.build(msgs, ZONE);
         ThreadRows.update(rows, next);
         assertEquals(next, rows);

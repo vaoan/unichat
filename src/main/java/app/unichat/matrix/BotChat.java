@@ -16,6 +16,7 @@ import static app.unichat.matrix.BridgeProtocol.botCommand;
 import static app.unichat.matrix.BridgeProtocol.brokenRoom;
 import static app.unichat.matrix.BridgeProtocol.mergeDirect;
 import static app.unichat.matrix.MatrixClient.CLIENT;
+import static app.unichat.support.Urls.enc;
 
 /** The chat with each bridge's bot: finds or creates it, sends commands and waits for their replies. */
 final class BotChat {
@@ -58,7 +59,7 @@ final class BotChat {
     private void abandon(String roomId) {
         for (String step : List.of("/leave", "/forget")) {
             try {
-                client.post(CLIENT + "/rooms/" + MatrixClient.enc(roomId) + step, null);
+                client.post(CLIENT + "/rooms/" + enc(roomId) + step, null);
             } catch (Exception ignored) {
                 // A broken room may refuse even this; dropping it locally is what matters.
             }
@@ -82,6 +83,26 @@ final class BotChat {
     String query(Network n, String command, int seconds) throws IOException, InterruptedException {
         synchronized (botLocks.computeIfAbsent(n, k -> new Object())) {
             return queryLocked(n, command, seconds);
+        }
+    }
+
+    /** Sends a command through the existing bot chat and returns its next reply; null with no chat, or no reply in 10 s. */
+    String ask(Network n, String command) throws IOException, InterruptedException {
+        return ask(n, command, 10);
+    }
+
+    String ask(Network n, String command, int seconds) throws IOException, InterruptedException {
+        synchronized (botLocks.computeIfAbsent(n, k -> new Object())) {
+            String roomId = find(n);
+            if (roomId == null) return null;
+            int before = messageCount(roomId);
+            send(roomId, botCommand(n, command));
+            for (int i = 0; i < seconds * 2; i++) {
+                Thread.sleep(500);
+                String reply = replyAfter(roomId, before);
+                if (reply != null) return reply;
+            }
+            return null;
         }
     }
 
@@ -142,7 +163,7 @@ final class BotChat {
         if (known) {
             sender.sendText(roomId, text, null).join();
         } else {
-            client.put(CLIENT + "/rooms/" + MatrixClient.enc(roomId) + "/send/m.room.message/" + MatrixClient.enc(txn), content);
+            client.put(CLIENT + "/rooms/" + enc(roomId) + "/send/m.room.message/" + enc(txn), content);
         }
     }
 
@@ -151,7 +172,7 @@ final class BotChat {
         synchronized (proc) {
             cached = proc.directContentCopy();
         }
-        String path = CLIENT + "/user/" + MatrixClient.enc(userId) + "/account_data/m.direct";
+        String path = CLIENT + "/user/" + enc(userId) + "/account_data/m.direct";
         JsonNode server = null;
         try {
             server = client.get(path);
@@ -164,7 +185,7 @@ final class BotChat {
     private void waitForJoin(String roomId, String user) throws InterruptedException {
         for (int i = 0; i < 20; i++) {
             try {
-                JsonNode m = client.get(CLIENT + "/rooms/" + MatrixClient.enc(roomId) + "/state/m.room.member/" + MatrixClient.enc(user));
+                JsonNode m = client.get(CLIENT + "/rooms/" + enc(roomId) + "/state/m.room.member/" + enc(user));
                 if ("join".equals(m.path("membership").asText())) return;
             } catch (Exception ignored) {
                 // not yet

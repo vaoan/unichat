@@ -7,8 +7,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Properties;
 
 /**
@@ -114,15 +112,9 @@ public final class Settings {
     }
 
     private void write(Path target, Properties from, String comment, boolean ownerOnly) throws IOException {
-        Path tmp = dir.resolve(target.getFileName() + ".tmp");
         ByteArrayOutputStream content = new ByteArrayOutputStream();
         from.store(content, comment);
-        if (ownerOnly && tmp.getFileSystem().supportedFileAttributeViews().contains("posix")) {
-            SyncedFile.write(tmp, content.toByteArray(), PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
-        } else {
-            SyncedFile.write(tmp, content.toByteArray());
-        }
-        Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        SyncedFile.replace(target, content.toByteArray(), ownerOnly);
     }
 
     public synchronized String getString(String key, String def) { return holder(key).getProperty(key, def); }

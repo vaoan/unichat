@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.support.Urls;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -7,11 +8,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -46,11 +45,6 @@ final class MatrixClient {
 
     String baseUrl() { return baseUrl; }
 
-    /** Percent-encodes a path segment or query value (room ids contain '!' and ':'). */
-    static String enc(String s) {
-        return URLEncoder.encode(s, StandardCharsets.UTF_8).replace("+", "%20");
-    }
-
     static String stripSlash(String url) {
         String u = url.trim();
         while (u.endsWith("/")) u = u.substring(0, u.length() - 1);
@@ -81,7 +75,7 @@ final class MatrixClient {
 
     /** Uploads raw bytes to the media repository; returns the mxc:// content URI. */
     String upload(Path file, String contentType, String fileName) throws IOException {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(baseUrl + "/_matrix/media/v3/upload?filename=" + enc(fileName)))
+        HttpRequest req = HttpRequest.newBuilder(URI.create(baseUrl + "/_matrix/media/v3/upload?filename=" + Urls.enc(fileName)))
                 .timeout(Duration.ofMinutes(10))
                 .header("Authorization", "Bearer " + accessToken)
                 .header("Content-Type", contentType)

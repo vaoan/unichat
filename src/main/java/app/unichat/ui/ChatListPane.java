@@ -140,7 +140,7 @@ public final class ChatListPane extends VBox {
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
         newChat = Composer.iconButton(Icons.PLUS, "Nuevo chat", () -> { if (onNewChat != null) onNewChat.run(); });
-        newChat.setTooltip(new javafx.scene.control.Tooltip("Nuevo chat (" + (MainView.MAC ? "⌘N" : "Ctrl+N") + ")"));
+        newChat.setTooltip(new javafx.scene.control.Tooltip("Nuevo chat (" + Shortcuts.key("N") + ")"));
         HBox header = new HBox(6, title, headerSpacer, newChat);
         header.getStyleClass().add("chat-list-header");
         header.setAlignment(Pos.CENTER_LEFT);
@@ -148,7 +148,7 @@ public final class ChatListPane extends VBox {
     }
 
     private Node buildSearchBox() {
-        search.setPromptText("Buscar   " + (MainView.MAC ? "⌘K" : "Ctrl+K"));
+        search.setPromptText("Buscar   " + Shortcuts.key("K"));
         search.getStyleClass().add("search-field");
         search.setAccessibleText("Buscar chats");
         search.setAccessibleHelp("Flecha abajo para ir a los resultados, Enter abre el primero");

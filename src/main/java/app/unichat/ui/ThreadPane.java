@@ -99,7 +99,7 @@ public final class ThreadPane extends BorderPane {
         messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, () -> library, this::getScene, this::member);
 
         favButton = Composer.iconButton(Icons.STAR, "Favorito", () -> svc.setFavorite(chat.id(), !chat.favorite()));
-        archiveButton = Composer.iconButton(Icons.ARCHIVE, "Archivar (" + (MainView.MAC ? "⌘E" : "Ctrl+E") + ")",
+        archiveButton = Composer.iconButton(Icons.ARCHIVE, "Archivar (" + Shortcuts.key("E") + ")",
                 () -> svc.setArchived(chat.id(), !chat.archived()));
         Node header = buildHeader();
 
@@ -130,8 +130,7 @@ public final class ThreadPane extends BorderPane {
         Node logo = Icons.logo(88);
         Label hint = new Label("Todos tus chats, en un solo lugar");
         hint.getStyleClass().add("empty-title");
-        String mod = MainView.MAC ? "⌘" : "Ctrl+";
-        Label keys = new Label(mod + "K buscar   ·   Alt+↑/↓ cambiar de chat   ·   " + mod + "E archivar   ·   " + mod + ", ajustes");
+        Label keys = new Label(Shortcuts.key("K") + " buscar   ·   Alt+↑/↓ cambiar de chat   ·   " + Shortcuts.key("E") + " archivar   ·   " + Shortcuts.key(",") + " ajustes");
         keys.getStyleClass().add("empty-hint");
         emptyState = new VBox(14, logo, hint, keys);
         emptyState.setAlignment(Pos.CENTER);
@@ -229,7 +228,7 @@ public final class ThreadPane extends BorderPane {
         list.setCellFactory(v -> new RowCell());
         list.setAccessibleText("Mensajes");
         list.setAccessibleHelp("Flechas para recorrer mensajes. R responder, E editar, Enter o Espacio abre las acciones, "
-                + "1 a 6 reacciones rápidas, P reproducir un audio, T transcribir una nota de voz, " + (MainView.MAC ? "⌘" : "Ctrl+") + "C copiar, "
+                + "1 a 6 reacciones rápidas, P reproducir un audio, T transcribir una nota de voz, " + Shortcuts.key("C") + " copiar, "
                 + "Esc vuelve al campo de texto.");
         list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, this::onTimelineKey);
         list.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> userScrolled());

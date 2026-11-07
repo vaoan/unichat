@@ -25,7 +25,7 @@ import java.util.function.Consumer;
 
 import static app.unichat.matrix.BridgeProtocol.*;
 import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.matrix.MatrixClient.enc;
+import static app.unichat.support.Urls.enc;
 import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** What you change about a chat: read state, favourite, archive, mute, pin, reminder, join and leave. */

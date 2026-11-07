@@ -1,5 +1,7 @@
 package app.unichat.assist;
 
+import app.unichat.support.Folders;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -68,7 +70,7 @@ public final class ReplyWriter {
             return null;
         } finally {
             running = null;
-            delete(temp);
+            Folders.deleteQuietly(temp);
         }
     }
 
@@ -113,14 +115,5 @@ public final class ReplyWriter {
             }
         }
         return "no dijo por qué";
-    }
-
-    private static void delete(Path temp) {
-        if (temp == null) return;
-        File[] files = temp.toFile().listFiles();
-        if (files != null) {
-            for (File f : files) f.delete();
-        }
-        temp.toFile().delete();
     }
 }

@@ -5,6 +5,7 @@ import app.unichat.model.AccountStatus;
 import app.unichat.model.Contact;
 import app.unichat.model.Network;
 import app.unichat.service.ChatService;
+import app.unichat.support.Errors;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.scene.control.Label;
@@ -235,7 +236,7 @@ final class NewChatPane extends VBox {
         svc.searchContacts(account, q).whenComplete((found, err) -> Platform.runLater(() -> {
             if (gen != generation) return;
             if (err != null) {
-                Throwable cause = err instanceof java.util.concurrent.CompletionException && err.getCause() != null ? err.getCause() : err;
+                Throwable cause = Errors.unwrap(err);
                 if (cause instanceof UnsupportedOperationException) {
                     support = new ChatService.ContactSupport(support.list(), false);
                     filterLocally(q).forEach(c -> rows.add(new Row(c, null)));
@@ -295,7 +296,7 @@ final class NewChatPane extends VBox {
             return svc.openDm(a, c);
         }).whenComplete((roomId, err) -> Platform.runLater(() -> {
             if (err != null) {
-                Throwable cause = err.getCause() != null ? err.getCause() : err;
+                Throwable cause = Errors.unwrap(err);
                 setStatus(cause instanceof IllegalArgumentException
                         ? "No se encontró a " + r.typed() + " en " + a.network().displayName() + "."
                         : "No se pudo abrir el chat. Intenta de nuevo.");

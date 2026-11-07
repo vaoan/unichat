@@ -397,7 +397,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
         if (m != null) {
             m.setDeleted(true);
             m.setBody("");
-            m.reactions().clear();
+            m.clearReactions();
             refreshPreview(chats.get(chatId));
             fireMessages(chatId);
         }
@@ -641,7 +641,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
             bot.setNetwork(network);
             bot.setTitle(network.displayName() + " bridge bot");
             bot.setBridgeBot(true);
-            bot.members().add(botMember(network));
+            bot.setMembers(List.of(botMember(network)));
             adopt(bot);
             messages.put(k, new ArrayList<>());
             return bot;
@@ -727,7 +727,9 @@ public final class MockChatService implements ChatService, FolderForwarding {
     }
 
     private void setTyping(Chat chat, Member who, boolean typing) {
-        if (typing) chat.typing().add(who.displayName()); else chat.typing().remove(who.displayName());
+        java.util.Set<String> names = new java.util.LinkedHashSet<>(chat.typing());
+        if (typing) names.add(who.displayName()); else names.remove(who.displayName());
+        chat.setTyping(names);
         fireChats();
         fireMessages(chat.id());
     }

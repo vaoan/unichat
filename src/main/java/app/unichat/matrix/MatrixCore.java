@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static app.unichat.matrix.BridgeProtocol.*;
 import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.matrix.MatrixClient.enc;
+import static app.unichat.support.Urls.enc;
 import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** What every part of the Matrix service shares: the connection, the rooms, the background threads and the listeners. */
