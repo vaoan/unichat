@@ -118,6 +118,12 @@ public final class Notifier {
             tray = new TrayIcon(withCount(img, unread), tooltip, menu);
             tray.setImageAutoSize(true);
             tray.addActionListener(e -> onOpen.accept(lastChatId));
+            tray.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override public void mouseClicked(java.awt.event.MouseEvent e) {
+                    // Windows opens the menu with the right button, and on a plain click would do nothing.
+                    if (e.getButton() == java.awt.event.MouseEvent.BUTTON1 && e.getClickCount() == 1) onShow.run();
+                }
+            });
             SystemTray.getSystemTray().add(tray);
         } catch (Exception e) {
             tray = null;

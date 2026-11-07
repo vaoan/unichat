@@ -44,15 +44,16 @@ final class NativeBar {
 
     /**
      * Starts the helper; null if it is not there or cannot run. onExit runs (once, any thread) if it dies later;
-     * {@code onOpenChat} gets the chat id of a clicked notification (any thread).
+     * {@code onOpenChat} gets the chat id of a clicked notification, {@code onShow} runs on a left click of the icon
+     * or the global shortcut (any thread).
      */
-    static NativeBar start(Path helper, PopupMenu menu, Runnable onExit, java.util.function.Consumer<String> onOpenChat, Runnable onHotkey) {
+    static NativeBar start(Path helper, PopupMenu menu, Runnable onExit, java.util.function.Consumer<String> onOpenChat, Runnable onShow) {
         if (helper == null || !Files.isExecutable(helper)) return null;
         try {
             NativeBar bar = new NativeBar(new ProcessBuilder(helper.toString())
                     .redirectError(ProcessBuilder.Redirect.DISCARD).start(), menu);
             bar.onOpenChat = onOpenChat;
-            bar.onHotkey = onHotkey;
+            bar.onShow = onShow;
             current = bar;
             Thread reader = new Thread(() -> bar.readClicks(onExit), "native-bar");
             reader.setDaemon(true);
@@ -84,7 +85,7 @@ final class NativeBar {
     }
 
     private volatile java.util.function.Consumer<String> onOpenChat = id -> { };
-    private volatile Runnable onHotkey = () -> { };
+    private volatile Runnable onShow = () -> { };
     /** The one running, for Ajustes to reach; null when there's none. */
     private static volatile NativeBar current;
 
@@ -122,7 +123,7 @@ final class NativeBar {
         send("icon\t" + Base64.getEncoder().encodeToString(png.toByteArray()) + "\n");
     }
 
-    /** Opens the menu as a click would, or closes it if open (control channel "menu", for tests). */
+    /** Opens the menu as a right click would, or closes it if open (control channel "menu", for tests). */
     void open() {
         send("open\n");
     }
@@ -178,8 +179,8 @@ final class NativeBar {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = in.readLine()) != null) {
-                if (line.equals("hotkey")) {
-                    onHotkey.run();
+                if (line.equals("hotkey") || line.equals("show")) {
+                    onShow.run();
                     continue;
                 }
                 if (line.startsWith("hotkey-error\t")) {

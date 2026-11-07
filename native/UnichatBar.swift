@@ -4,11 +4,13 @@
 //   tip <text>            tooltip
 //   count <text>          beside the icon, the unread count; empty shows the icon alone
 //   menu <n>              followed by n lines, each "item <tag> <enabled 0|1> <checked -1|0|1> <label>" or "sep"
-//   open                  opens the menu as a click would, or closes it if it is open (for tests)
+//   open                  opens the menu as a right click would, or closes it if it is open (for tests)
+//   press                 acts as a left click (for tests)
 //   notify <chat id> <sound 0|1> <title> <body>   a system notification (Notification Center, Do Not Disturb…)
 //   clear <chat id>       removes that chat's notifications (it was read)
 //   hotkey <0|1>          turns the global shortcut (⌃⌥U) off or on
-// It writes to stdout: "click <tag>" when a menu item is chosen, "open <chat id>" when a notification is clicked,
+// It writes to stdout: "click <tag>" when a menu item is chosen, "show" on a left click of the icon (a right click, or
+// Control and click, opens the menu), "open <chat id>" when a notification is clicked,
 // "hotkey" when the global shortcut is pressed,
 // "notify-auth <1|0>" when notifications become allowed or not (also later), and exits when stdin closes (the app quit or died).
 // Notifications need it to run from its bundle (UnichatBar.app, built by native/build-bar.sh): that's what macOS
@@ -133,8 +135,25 @@ final class Bar: NSObject, NSMenuDelegate {
         super.init()
         menu.autoenablesItems = false
         menu.delegate = self
-        item.menu = menu
         item.button?.imagePosition = .imageOnly
+        item.button?.target = self
+        item.button?.action = #selector(clicked)
+        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    }
+
+    /** A status item with a menu opens it on any click: it only has one while it's showing. */
+    @objc private func clicked() {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+            showMenu()
+        } else {
+            emit("show")
+        }
+    }
+
+    private func showMenu() {
+        item.menu = menu
+        item.button?.performClick(nil)
     }
 
     func handle(_ line: String) {
@@ -144,8 +163,10 @@ final class Bar: NSObject, NSMenuDelegate {
             guard parts.count > 1, let data = Data(base64Encoded: parts[1]), let image = NSImage(data: data) else { return }
             image.size = NSSize(width: Bar.size, height: Bar.size)
             item.button?.image = image
-        case "open": // as if clicked, or closes it if open (lets tests capture the highlight and the open menu)
-            if isOpen { menu.cancelTracking() } else { item.button?.performClick(nil) }
+        case "open": // as if right clicked, or closes it if open (lets tests capture the highlight and the open menu)
+            if isOpen { menu.cancelTracking() } else { showMenu() }
+        case "press":
+            item.button?.performClick(nil)
         case "count":
             let text = parts.count > 1 ? parts[1] : ""
             item.button?.title = text
@@ -194,7 +215,10 @@ final class Bar: NSObject, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) { isOpen = true }
-    func menuDidClose(_ menu: NSMenu) { isOpen = false }
+    func menuDidClose(_ menu: NSMenu) {
+        isOpen = false
+        item.menu = nil
+    }
 
     @objc func pick(_ sender: NSMenuItem) {
         emit("click\t\(sender.tag)")

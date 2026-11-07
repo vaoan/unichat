@@ -33,4 +33,17 @@ class NativeBarHotkeyTest {
             bar.close();
         }
     }
+
+    @Test
+    void aLeftClickOnTheIconBringsTheWindow() throws Exception {
+        Path helper = Files.writeString(dir.resolve("helper"), "#!/bin/sh\necho show\ncat >/dev/null\n");
+        assertTrue(helper.toFile().setExecutable(true));
+        CountDownLatch shown = new CountDownLatch(1);
+        NativeBar bar = NativeBar.start(helper, null, () -> { }, id -> { }, shown::countDown);
+        try {
+            assertTrue(shown.await(5, TimeUnit.SECONDS));
+        } finally {
+            bar.close();
+        }
+    }
 }
