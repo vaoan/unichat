@@ -11,7 +11,7 @@ Cada paquete solo puede depender de los que están debajo. `ArchitectureTest` lo
 |---|---|---|
 | raíz (`app.unichat`) | Arranque: crea y conecta todo. Nadie depende de ella | todo |
 | `ui` | Pantallas JavaFX. Único paquete (además de la raíz) que usa JavaFX | lo de abajo, salvo `matrix` |
-| `matrix` | `ChatService` sobre Matrix | `service`, `bridge`, `gif`, `links`, `login`, `model`, `settings`, `support` |
+| `matrix` | `ChatService` sobre Matrix | `service`, `bridge`, `gif`, `links`, `login`, `model`, `settings`, `support`, `video` (convertir una foto antes de enviarla) |
 | `service` | La API que usa la UI (`ChatService`, `BridgeAccess`) y el modo demo | `login`, `model`, `settings` |
 | `server` | Servidor local: instala, arranca y vigila tuwunel y los puentes | `bridge`, `settings`, `support` |
 | `stt` | Voz a texto | `settings`, `support`, `video` |

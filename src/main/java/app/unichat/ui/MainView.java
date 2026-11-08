@@ -382,8 +382,8 @@ public final class MainView extends StackPane {
     }
 
     /** As if dropped on the open chat. */
-    public void sendFiles(java.util.List<java.io.File> files, boolean asDocument) {
-        thread.composer().sendFiles(files, asDocument);
+    public void sendFiles(java.util.List<java.io.File> files, app.unichat.service.SendAs as) {
+        thread.composer().sendFiles(files, as);
     }
 
     public void openChatId(String id) {

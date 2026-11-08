@@ -333,7 +333,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
 
     /** Shows at once like the real one; the "upload" takes half a second, so the upload bar can be seen. */
     @Override
-    public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, boolean asDocument,
+    public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, SendAs as,
                                             java.util.function.DoubleConsumer progress) {
         CompletableFuture<Void> shown = sendLocal(chatId, replyToId, m -> {
             String name = file.getFileName().toString();
@@ -343,7 +343,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
             try {
                 m.setFileSize(Files.size(file));
                 m.setType(MessageType.ofMime(Files.probeContentType(file)));
-                if (asDocument) m.setType(MessageType.FILE);
+                if (as == SendAs.DOCUMENT) m.setType(MessageType.FILE);
                 if (m.type() == MessageType.IMAGE) {
                     BufferedImage img = ImageIO.read(file.toFile());
                     if (img != null) m.setSize(img.getWidth(), img.getHeight());

@@ -58,7 +58,9 @@ final class SnapshotRun {
         if (draft != null) mainView.type(draft);
         String upload = System.getProperty("unichat.upload"); // files sent as a batch to the open chat: the upload bar
         if (upload != null) mainView.sendFiles(java.util.Arrays.stream(upload.split(",")).map(File::new).toList(),
-                Boolean.getBoolean("unichat.uploadAsDocument"));
+                // -Dunichat.uploadAs=PHOTO|DOCUMENT (-Dunichat.uploadAsDocument=true, as before, is DOCUMENT)
+                Boolean.getBoolean("unichat.uploadAsDocument") ? app.unichat.service.SendAs.DOCUMENT
+                        : app.unichat.service.SendAs.valueOf(System.getProperty("unichat.uploadAs", "AS_IS")));
         String overlay = System.getProperty("unichat.overlay", "");
         if (overlay.equals("command")) mainView.showCommandBar();
         if (overlay.equals("newchat")) mainView.showNewChat();

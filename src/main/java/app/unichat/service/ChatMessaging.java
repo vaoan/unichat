@@ -9,13 +9,13 @@ import java.util.concurrent.CompletableFuture;
 public interface ChatMessaging {
     CompletableFuture<Void> sendText(String chatId, String text, String replyToId);
     default CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId) {
-        return sendFile(chatId, file, replyToId, false, p -> { });
+        return sendFile(chatId, file, replyToId, SendAs.AS_IS, p -> { });
     }
     /**
-     * {@code asDocument}: the file as it is, never shown as a photo or video (WhatsApp's and Telegram's "document");
-     * {@code progress} gets how much of it went up, 0 to 1, on any thread.
+     * {@code as}: as it is, as a photo or as a document ({@link SendAs}); {@code progress} gets how much of it went up,
+     * 0 to 1, on any thread.
      */
-    CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, boolean asDocument,
+    CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, SendAs as,
                                      java.util.function.DoubleConsumer progress);
     CompletableFuture<Void> editMessage(String chatId, String messageId, String newText);
     CompletableFuture<Void> deleteMessage(String chatId, String messageId);

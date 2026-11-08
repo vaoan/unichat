@@ -10,14 +10,15 @@ import app.unichat.model.MessageType;
 import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
 import app.unichat.service.ChatService.Listener;
+import app.unichat.service.SendAs;
 import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import app.unichat.support.ImageHeaders;
+import app.unichat.video.SendablePhotos;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -222,9 +223,16 @@ final class MessageSender {
         core.fire(Listener::chatsChanged);
     }
 
-    /** {@code asDocument}: as m.file whatever it is, so the network sends the original (a document) instead of a photo. */
-    CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, boolean asDocument, DoubleConsumer progress) {
-        CompletableFuture<String> sent = sendMedia(chatId, file, replyToId, new Kind(probeMime(file), 0, 0, 0, asDocument, progress), content -> { });
+    /**
+     * {@code as}: DOCUMENT sends m.file whatever it is, so the network sends the original instead of a photo; PHOTO
+     * makes a picture one the network shows as a photo first ({@link OutgoingPhotos}).
+     */
+    CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, SendAs as, DoubleConsumer progress) {
+        String mime = probeMime(file);
+        CompletableFuture<String> sent = as == SendAs.PHOTO && SendablePhotos.convertible(mime)
+                ? CompletableFuture.supplyAsync(() -> OutgoingPhotos.prepare(file, mime), core.io).thenCompose(p ->
+                        sendMedia(chatId, p.file(), replyToId, new Kind(p.mime(), p.width(), p.height(), 0, false, progress), content -> { }))
+                : sendMedia(chatId, file, replyToId, new Kind(mime, 0, 0, 0, as == SendAs.DOCUMENT, progress), content -> { });
         Chat c = core.chat(chatId);
         if (c == null || c.network() == app.unichat.model.Network.MATRIX) return sent.thenApply(id -> null);
         // Bridged: done when the network has it (a batch sends the next file only then), or failed if it refused it.
@@ -354,14 +362,9 @@ final class MessageSender {
         return "application/octet-stream";
     }
 
+    /** From the header: decoding a phone's photo only to learn its size took 600 MB and more. */
     private static int[] imageSize(Path file) {
-        try {
-            BufferedImage img = ImageIO.read(file.toFile());
-            if (img != null) return new int[]{img.getWidth(), img.getHeight()};
-        } catch (Exception ignored) {
-            // unsupported format
-        }
-        return new int[]{0, 0};
+        return ImageHeaders.size(file);
     }
 
     CompletableFuture<Void> editMessage(String chatId, String messageId, String newText) {

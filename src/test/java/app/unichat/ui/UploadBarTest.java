@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** What the upload bar says about the file going up and the batch (the tests run in Spanish). */
 class UploadBarTest {
-    private static final UploadQueue.Upload FILE = new UploadQueue.Upload("!c", Path.of("IMG_0019.webp"), null, true);
+    private static final UploadQueue.Upload FILE = new UploadQueue.Upload("!c", Path.of("IMG_0019.webp"), null, app.unichat.service.SendAs.DOCUMENT);
 
     private static UploadQueue.Status status(double progress, int retries, UploadQueue.Phase phase, long retryAt) {
         return new UploadQueue.Status(FILE, 32, 0, 1288, progress, retries, phase, retryAt, -1);

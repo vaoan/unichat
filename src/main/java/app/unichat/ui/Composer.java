@@ -31,6 +31,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.Node;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
+import app.unichat.service.SendAs;
 import app.unichat.service.UploadQueue;
 import javafx.util.Duration;
 
@@ -407,35 +408,38 @@ public final class Composer extends VBox {
 
     /** Dropped files: one goes as it is, several as a batch (one at a time, with the upload bar). */
     public void sendFiles(List<File> files) {
-        sendFiles(files, false);
+        sendFiles(files, SendAs.AS_IS);
     }
 
-    /** {@code asDocument}: each as the original file, never as a photo or video. */
-    public void sendFiles(List<File> files, boolean asDocument) {
-        send(files, asDocument, false);
+    /** {@code as}: as they are, as photos or as documents. */
+    public void sendFiles(List<File> files, SendAs as) {
+        send(files, as, false);
     }
 
     /** {@code batch}: through the upload queue even if it's a single file. Only the first file answers the reply. */
-    private void send(List<File> files, boolean asDocument, boolean batch) {
+    private void send(List<File> files, SendAs as, boolean batch) {
         if (chatId == null || files == null || files.isEmpty()) return;
         String reply = replyTo == null ? null : replyTo.id();
         if (files.size() == 1 && !batch) {
-            svc.sendFile(chatId, files.get(0).toPath(), reply, asDocument, p -> { }).exceptionally(this::fail);
+            svc.sendFile(chatId, files.get(0).toPath(), reply, as, p -> { }).exceptionally(this::fail);
         } else {
             List<UploadQueue.Upload> uploads = new java.util.ArrayList<>();
-            for (File f : files) uploads.add(new UploadQueue.Upload(chatId, f.toPath(), uploads.isEmpty() ? reply : null, asDocument));
+            for (File f : files) uploads.add(new UploadQueue.Upload(chatId, f.toPath(), uploads.isEmpty() ? reply : null, as));
             UploadQueue.of(svc).addAll(uploads);
         }
         cancelMode();
     }
 
-    /** As in WhatsApp and Telegram: a file, a photo or video, a document (the original, never a photo) or many at once. */
+    /**
+     * As in WhatsApp and Telegram: a file as it is, photos and videos (pictures made into photos the network shows as
+     * such, several at once), a document (the original, never a photo) or many files at once.
+     */
     private javafx.scene.control.ContextMenu attachMenu() {
         javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu(
-                attachItem("composer.attach.file", Icons.ATTACH, () -> choose(false, false, false)),
-                attachItem("composer.attach.photo", Icons.IMAGE, () -> choose(true, false, false)),
-                attachItem("composer.attach.document", Icons.FILE, () -> choose(false, true, false)),
-                attachItem("composer.attach.batch", Icons.UPLOAD, () -> choose(false, false, true)));
+                attachItem("composer.attach.file", Icons.ATTACH, () -> choose(false, SendAs.AS_IS, false)),
+                attachItem("composer.attach.photo", Icons.IMAGE, () -> choose(true, SendAs.PHOTO, false)),
+                attachItem("composer.attach.document", Icons.FILE, () -> choose(false, SendAs.DOCUMENT, false)),
+                attachItem("composer.attach.batch", Icons.UPLOAD, () -> choose(false, SendAs.AS_IS, true)));
         menu.getStyleClass().add("attach-menu");
         return menu;
     }
@@ -447,17 +451,17 @@ public final class Composer extends VBox {
     }
 
     /** {@code photos}: only pictures and videos, several allowed; {@code batch}: as many as wanted, one at a time. */
-    private void choose(boolean photos, boolean asDocument, boolean batch) {
+    private void choose(boolean photos, SendAs as, boolean batch) {
         FileChooser fc = new FileChooser();
         fc.setTitle(I18n.t(batch ? "composer.attach.batch" : photos ? "composer.attach.photo" : "composer.attach"));
         if (photos) fc.getExtensionFilters().add(new FileChooser.ExtensionFilter(I18n.t("composer.attach.photos"),
                 "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp", "*.heic", "*.bmp", "*.mp4", "*.mov", "*.m4v", "*.webm", "*.mkv"));
         javafx.stage.Window w = getScene().getWindow();
         if (batch || photos) {
-            send(fc.showOpenMultipleDialog(w), asDocument, batch);
+            send(fc.showOpenMultipleDialog(w), as, batch);
         } else {
             File f = fc.showOpenDialog(w);
-            if (f != null) send(List.of(f), asDocument, false);
+            if (f != null) send(List.of(f), as, false);
         }
     }
 

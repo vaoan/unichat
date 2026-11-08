@@ -36,7 +36,7 @@ class UploadQueueTest {
                             };
                         }
                         if (!method.getName().equals("sendFile") || args.length != 5) throw new UnsupportedOperationException();
-                        calls.add(new UploadQueue.Upload((String) args[0], (Path) args[1], (String) args[2], (Boolean) args[3]));
+                        calls.add(new UploadQueue.Upload((String) args[0], (Path) args[1], (String) args[2], (SendAs) args[3]));
                         progress.add((DoubleConsumer) args[4]);
                         CompletableFuture<Void> f = new CompletableFuture<>();
                         futures.add(f);
@@ -52,7 +52,7 @@ class UploadQueueTest {
     private UploadQueue.Upload up(String name) throws Exception {
         Path f = dir.resolve(name);
         if (!Files.exists(f)) Files.writeString(f, name);
-        return new UploadQueue.Upload("!chat", f, null, false);
+        return new UploadQueue.Upload("!chat", f, null, SendAs.AS_IS);
     }
 
     private static UploadQueue now(FakeSender fake) {
@@ -150,6 +150,29 @@ class UploadQueueTest {
         second.futures.get(1).complete(null);
         assertTrue(again.status().finished());
         assertFalse(Files.exists(store), "nothing left to keep");
+    }
+
+    @Test
+    void aBatchSavedBeforeSendAsStillKnowsItsDocuments() throws Exception {
+        Path store = dir.resolve("uploads.json");
+        Files.writeString(store, "[{\"chatId\":\"!chat\",\"file\":\"" + up("a.jpg").file().toString().replace("\\", "\\\\")
+                + "\",\"replyToId\":null,\"asDocument\":true}]");
+        FakeSender fake = new FakeSender();
+        new UploadQueue(fake.messaging(), (ms, r) -> r.run(), store);
+        assertEquals(SendAs.DOCUMENT, fake.calls.get(0).as());
+    }
+
+    @Test
+    void theWayEachFileGoesIsKept() throws Exception {
+        Path store = dir.resolve("uploads.json");
+        FakeSender first = new FakeSender();
+        UploadQueue q = new UploadQueue(first.messaging(), (ms, r) -> r.run(), store);
+        q.addAll(List.of(new UploadQueue.Upload("!chat", up("a.webp").file(), null, SendAs.PHOTO)));
+        assertTrue(Files.readString(store).contains("\"as\":\"PHOTO\""));
+        assertFalse(Files.readString(store).contains("asDocument"));
+        FakeSender second = new FakeSender();
+        new UploadQueue(second.messaging(), (ms, r) -> r.run(), store);
+        assertEquals(SendAs.PHOTO, second.calls.get(0).as());
     }
 
     @Test

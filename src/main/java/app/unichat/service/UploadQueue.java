@@ -36,7 +36,7 @@ public final class UploadQueue {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     /** One file to send to one chat. */
-    public record Upload(String chatId, Path file, String replyToId, boolean asDocument) {}
+    public record Upload(String chatId, Path file, String replyToId, SendAs as) {}
 
     /** Runs {@code r} after {@code ms} (tests run it at once, or keep it). */
     interface Later {
@@ -207,7 +207,7 @@ public final class UploadQueue {
     private void attempt(Upload u) {
         CompletableFuture<Void> sending;
         try {
-            sending = svc.sendFile(u.chatId(), u.file(), u.replyToId(), u.asDocument(), p -> progress(u, p));
+            sending = svc.sendFile(u.chatId(), u.file(), u.replyToId(), u.as(), p -> progress(u, p));
         } catch (RuntimeException e) {
             sending = CompletableFuture.failedFuture(e);
         }
@@ -316,14 +316,19 @@ public final class UploadQueue {
         }
     }
 
-    /** As kept on disk: plain strings, so a path reads the same on any computer it's copied to. */
-    record Saved(String chatId, String file, String replyToId, boolean asDocument) {
+    /**
+     * As kept on disk: plain strings, so a path reads the same on any computer it's copied to. {@code asDocument} is
+     * how a batch saved before {@link SendAs} said it; null in new files.
+     */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    record Saved(String chatId, String file, String replyToId, SendAs as, Boolean asDocument) {
         static Saved of(Upload u) {
-            return new Saved(u.chatId(), u.file().toString(), u.replyToId(), u.asDocument());
+            return new Saved(u.chatId(), u.file().toString(), u.replyToId(), u.as(), null);
         }
 
         Upload upload() {
-            return new Upload(chatId, Path.of(file), replyToId, asDocument);
+            SendAs how = as != null ? as : Boolean.TRUE.equals(asDocument) ? SendAs.DOCUMENT : SendAs.AS_IS;
+            return new Upload(chatId, Path.of(file), replyToId, how);
         }
     }
 }
