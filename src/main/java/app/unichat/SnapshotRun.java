@@ -54,6 +54,11 @@ final class SnapshotRun {
         if (space != null) mainView.showSpace(space);
         String folder = System.getProperty("unichat.openFolder");
         if (folder != null || Boolean.getBoolean("unichat.openFolders")) mainView.showFolders(folder);
+        String draft = System.getProperty("unichat.draft"); // text in the message box: the send button shows
+        if (draft != null) mainView.type(draft);
+        String upload = System.getProperty("unichat.upload"); // files sent as a batch to the open chat: the upload bar
+        if (upload != null) mainView.sendFiles(java.util.Arrays.stream(upload.split(",")).map(File::new).toList(),
+                Boolean.getBoolean("unichat.uploadAsDocument"));
         String overlay = System.getProperty("unichat.overlay", "");
         if (overlay.equals("command")) mainView.showCommandBar();
         if (overlay.equals("newchat")) mainView.showNewChat();
@@ -70,7 +75,12 @@ final class SnapshotRun {
     private void shoot(String out) {
         try {
             var settings = SettingsWindow.current();
-            var img = (settings != null ? settings.getScene() : scene).snapshot(null);
+            // -Dunichat.snapshotScale=2: as a Retina screen draws it, to check alignment pixel by pixel.
+            double k = Double.parseDouble(System.getProperty("unichat.snapshotScale", "1"));
+            var params = new javafx.scene.SnapshotParameters();
+            params.setTransform(javafx.scene.transform.Transform.scale(k, k));
+            var shot = settings != null ? settings.getScene() : scene;
+            var img = shot.getRoot().snapshot(params, null);
             javax.imageio.ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", new File(out));
         } catch (Exception ex) {
             ex.printStackTrace();

@@ -46,7 +46,7 @@ class GroupsUiTest {
         Scene scene = fx(() -> {
             Stage stage = new Stage();
             stage.setOpacity(0);
-            view = new MainView(svc, stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             Scene sc = new Scene(view, 1100, 760);
             Theme.register(sc);
             stage.setScene(sc);

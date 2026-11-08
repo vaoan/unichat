@@ -49,6 +49,8 @@ public final class MainView extends StackPane {
     private final Runnable onLogout;
     /** The one audio playing, whichever chat is open. */
     private final AudioPlayback audio;
+    /** The batch going up, whichever chat is open. */
+    private final UploadBar uploads;
     private final Consumer<String> openLink;
     private String pendingOpenId;
     private long pendingOpenUntil;
@@ -145,7 +147,10 @@ public final class MainView extends StackPane {
 
         BorderPane main = new BorderPane(split);
         main.setLeft(rail);
-        main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true))));
+        // On disk (this computer's paths, so it stays here like session.properties): a batch survives a restart.
+        java.nio.file.Path pendingUploads = Settings.dataDir().resolve(svc instanceof app.unichat.service.MockChatService ? "uploads-demo.json" : "uploads.json");
+        uploads = new UploadBar(app.unichat.service.UploadQueue.of(svc, pendingUploads), svc, this::openChatId);
+        main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true)), uploads));
 
         overlay.getStyleClass().add("overlay");
         overlay.setVisible(false);
@@ -160,7 +165,9 @@ public final class MainView extends StackPane {
         toast.setTranslateY(-90);
 
         getChildren().addAll(main, overlay, toast);
-        addEventFilter(KeyEvent.KEY_PRESSED, new WindowShortcuts(this, svc, rail, listPane, thread, panel));
+        WindowShortcuts shortcuts = new WindowShortcuts(this, svc, rail, listPane, thread, panel);
+        addEventFilter(KeyEvent.KEY_PRESSED, shortcuts);
+        addEventHandler(KeyEvent.KEY_PRESSED, shortcuts::typeIntoComposer); // a handler: after anything that used the key
         addEventFilter(KeyEvent.KEY_RELEASED, e -> thread.composer().aiKeyReleased(e.getCode()));
         stage.showingProperty().addListener((o, a, showing) -> {
             if (showing) Platform.runLater(this::catchUp);
@@ -180,6 +187,7 @@ public final class MainView extends StackPane {
 
     public void dispose() {
         audio.stop();
+        uploads.dispose();
         svc.removeListener(listener);
         svc.onSaveFailure(null);
     }
@@ -361,6 +369,16 @@ public final class MainView extends StackPane {
     /** Shows a server's channels over the chat list (snapshot diagnostics). */
     public void showSpace(String id) {
         listPane.showSpace(id);
+    }
+
+    /** As if typed in the open chat's message box. */
+    public void type(String text) {
+        thread.composer().insert(text);
+    }
+
+    /** As if dropped on the open chat. */
+    public void sendFiles(java.util.List<java.io.File> files, boolean asDocument) {
+        thread.composer().sendFiles(files, asDocument);
     }
 
     public void openChatId(String id) {

@@ -85,11 +85,16 @@ final class MatrixClient {
 
     /** Uploads raw bytes to the media repository; returns the mxc:// content URI. */
     String upload(Path file, String contentType, String fileName) throws IOException {
+        return upload(file, contentType, fileName, p -> { });
+    }
+
+    /** As {@link #upload(Path, String, String)}, telling {@code progress} how much has gone out (0 to 1). */
+    String upload(Path file, String contentType, String fileName, java.util.function.DoubleConsumer progress) throws IOException {
         HttpRequest req = HttpRequest.newBuilder(URI.create(baseUrl + "/_matrix/media/v3/upload?filename=" + Urls.enc(fileName)))
                 .timeout(Duration.ofMinutes(10))
                 .header("Authorization", "Bearer " + accessToken)
                 .header("Content-Type", contentType)
-                .POST(HttpRequest.BodyPublishers.ofFile(file))
+                .POST(UploadProgress.counting(HttpRequest.BodyPublishers.ofFile(file), progress))
                 .build();
         HttpResponse<byte[]> resp = send(req, HttpResponse.BodyHandlers.ofByteArray());
         String uri = parse(resp.statusCode(), resp.body()).path("content_uri").asText(null);

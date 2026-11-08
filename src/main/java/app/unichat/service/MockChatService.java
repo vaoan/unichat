@@ -331,9 +331,11 @@ public final class MockChatService implements ChatService, FolderForwarding {
         });
     }
 
+    /** Shows at once like the real one; the "upload" takes half a second, so the upload bar can be seen. */
     @Override
-    public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId) {
-        return sendLocal(chatId, replyToId, m -> {
+    public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, boolean asDocument,
+                                            java.util.function.DoubleConsumer progress) {
+        CompletableFuture<Void> shown = sendLocal(chatId, replyToId, m -> {
             String name = file.getFileName().toString();
             m.setFileName(name);
             m.setBody(name);
@@ -341,6 +343,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
             try {
                 m.setFileSize(Files.size(file));
                 m.setType(MessageType.ofMime(Files.probeContentType(file)));
+                if (asDocument) m.setType(MessageType.FILE);
                 if (m.type() == MessageType.IMAGE) {
                     BufferedImage img = ImageIO.read(file.toFile());
                     if (img != null) m.setSize(img.getWidth(), img.getHeight());
@@ -349,6 +352,15 @@ public final class MockChatService implements ChatService, FolderForwarding {
                 m.setType(MessageType.FILE);
             }
         });
+        if (shown.isCompletedExceptionally()) return shown;
+        CompletableFuture<Void> sent = new CompletableFuture<>();
+        ScheduledExecutorService s = scheduler();
+        for (int i = 1; i <= 5; i++) {
+            double p = i / 5.0;
+            s.schedule(() -> progress.accept(p), i * 100L, TimeUnit.MILLISECONDS);
+        }
+        s.schedule(() -> sent.complete(null), 550, TimeUnit.MILLISECONDS);
+        return sent;
     }
 
     /** What sending anything has in common: a new outgoing message that {@code fill} completes, then its delivery. */

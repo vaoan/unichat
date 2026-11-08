@@ -44,7 +44,7 @@ class SaveFailureToastUiTest {
         Scene scene = fx(() -> {
             Stage stage = new Stage();
             stage.setOpacity(0);
-            Scene sc = new Scene(new MainView(svc, stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { }), 1100, 760);
+            Scene sc = new Scene(new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { }), 1100, 760);
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();

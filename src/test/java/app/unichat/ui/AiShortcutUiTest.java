@@ -62,7 +62,7 @@ class AiShortcutUiTest {
         Scene scene = fx(() -> {
             AiReplyButton.SHOWN.set(true);
             Stage stage = new Stage();
-            MainView view = new MainView(new MockChatService(), stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            MainView view = new MainView(new MockChatService(), stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             Scene sc = new Scene(view, 1100, 700);
             Theme.register(sc);
             stage.setScene(sc);

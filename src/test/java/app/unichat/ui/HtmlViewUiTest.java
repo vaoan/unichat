@@ -99,7 +99,7 @@ class HtmlViewUiTest {
         Scene scene = fx(() -> {
             Stage stage = new Stage();
             stage.setOpacity(0);
-            MainView view = new MainView(svc, stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            MainView view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             Scene sc = new Scene(view, 1000, 1000);
             Theme.register(sc);
             stage.setScene(sc);

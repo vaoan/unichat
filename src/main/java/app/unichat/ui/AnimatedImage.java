@@ -170,12 +170,59 @@ public final class AnimatedImage {
      * own animation, which leaks). For thumbnails and avatars; blocking, call off the FX thread.
      */
     public static Image still(Path file, int maxW, int maxH) throws IOException {
-        if (isGif(file)) {
+        if (isBigWebp(file)) return new Image(shrunk(file).toUri().toString(), maxW, maxH, true, true, false);
+        if (isGif(file) || isWebp(file)) { // JavaFX can't read WebP; ImageIO can (TwelveMonkeys), its first frame if animated
             BufferedImage first = ImageIO.read(file.toFile());
             if (first == null) throw new IOException(I18n.t("image.gifEmpty"));
             return toFx(scale(first, maxW, maxH));
         }
         return new Image(file.toUri().toString(), maxW, maxH, true, true, false);
+    }
+
+    /**
+     * Above this a WebP is decoded in another process: TwelveMonkeys takes about 25 bytes per pixel (600 MB for a
+     * 24-megapixel photo), against Unichat's 1 GB. Stickers and ordinary pictures are far below.
+     */
+    static final long MAX_WEBP_PIXELS = 3_000_000;
+
+    /** A still WebP too big to decode here; the size comes from the header, nothing is decoded. */
+    static boolean isBigWebp(Path file) throws IOException {
+        int[] wh = webpSize(file);
+        return wh != null && (long) wh[0] * wh[1] > MAX_WEBP_PIXELS && !webpAnimated(file);
+    }
+
+    /** Width and height from a WebP's first chunk (VP8X, VP8 or VP8L), or null if it isn't one. */
+    static int[] webpSize(Path file) throws IOException {
+        byte[] d;
+        try (var in = Files.newInputStream(file)) {
+            d = in.readNBytes(30);
+        }
+        if (d.length < 30 || d[0] != 'R' || d[1] != 'I' || d[8] != 'W' || d[9] != 'E') return null;
+        String chunk = new String(d, 12, 4, java.nio.charset.StandardCharsets.US_ASCII);
+        return switch (chunk) {
+            case "VP8X" -> new int[]{1 + u24(d, 24), 1 + u24(d, 27)};
+            case "VP8 " -> new int[]{((d[26] & 0xFF) | (d[27] & 0xFF) << 8) & 0x3FFF, ((d[28] & 0xFF) | (d[29] & 0xFF) << 8) & 0x3FFF};
+            case "VP8L" -> new int[]{1 + (((d[22] & 0x3F) << 8) | (d[21] & 0xFF)),
+                    1 + (((d[24] & 0x0F) << 10) | ((d[23] & 0xFF) << 2) | ((d[22] & 0xC0) >> 6))};
+            default -> null;
+        };
+    }
+
+    /** The animation flag of a VP8X header. */
+    private static boolean webpAnimated(Path file) throws IOException {
+        try (var in = Files.newInputStream(file)) {
+            byte[] d = in.readNBytes(21);
+            return d.length == 21 && d[12] == 'V' && d[15] == 'X' && (d[20] & 0x02) != 0;
+        }
+    }
+
+    private static Path shrunk(Path file) throws IOException {
+        try {
+            return app.unichat.video.BigPictures.shrunk(file);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(e);
+        }
     }
 
     public static boolean isGif(Path file) throws IOException {
@@ -238,6 +285,11 @@ public final class AnimatedImage {
     }
 
     static RawFrames composeWebp(Path file, int maxW, int maxH) throws IOException {
+        if (isBigWebp(file)) { // a phone's photo, not a sticker: never decoded here (see BigPictures)
+            BufferedImage small = ImageIO.read(shrunk(file).toFile());
+            if (small == null) throw new IOException(I18n.t("image.invalid"));
+            return new RawFrames(List.of(scale(small, maxW, maxH)), List.of(0));
+        }
         WebpLayout layout = parseLayout(Files.readAllBytes(file));
         ImageReader reader = new WebPImageReaderSpi().createReaderInstance();
         try (ImageInputStream in = ImageIO.createImageInputStream(file.toFile())) {

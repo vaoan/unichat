@@ -128,6 +128,11 @@ final class NativeBar {
         send("open\n");
     }
 
+    /** True while the window is open: a left click then opens the menu instead of bringing the window. */
+    void setLeftClickMenu(boolean on) {
+        send("leftmenu\t" + (on ? 1 : 0) + "\n");
+    }
+
     /** The count beside the icon; 0 shows none. */
     void setCount(int count) {
         send("count\t" + (count > 0 ? Formats.badge(count) : "") + "\n");

@@ -212,7 +212,7 @@
 .chat-list-header { -fx-padding: 0 8; }
 .pane-title { -fx-font-size: 1.45em; -fx-font-weight: bold; }
 .search-box { -fx-padding: 0 4; }
-.search-field { -fx-padding: 8 12 8 32; -fx-background-color: -surface-2; }
+.search-field { -fx-padding: 8 12 8 2.5em; /* room for the lupa, which grows with the text */ -fx-background-color: -surface-2; }
 .chip-row { -fx-padding: 0 4; }
 .favorites { -fx-padding: 4 4 6 4; }
 .favorite-tile { -fx-padding: 6 4; -fx-background-radius: 12; -fx-pref-width: 72; -fx-cursor: hand; }
@@ -349,6 +349,8 @@
 .file-icon { -fx-background-color: rgba(0, 0, 0, 0.08); -fx-background-radius: 10; -fx-min-width: 38; -fx-min-height: 38; }
 .bubble.out .file-icon { -fx-background-color: rgba(255, 255, 255, 0.2); }
 .bubble.out .file-chip .icon { -fx-background-color: white; }
+.file-icon.has-preview { -fx-background-color: transparent; }
+.file-icon.has-preview .icon { -fx-background-color: white; -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 4, 0, 0, 0); }
 .file-name { -fx-font-weight: bold; }
 .file-size { -fx-font-size: 0.84em; -fx-text-fill: -text-3; }
 .bubble.out .file-name, .bubble.out .file-size { -fx-text-fill: white; }
@@ -431,7 +433,7 @@
 .info-subtitle, .info-topic { -fx-text-fill: -text-3; -fx-text-alignment: center; }
 .info-reminder { -fx-background-color: -surface-2; -fx-background-radius: 10; -fx-padding: 8 12; }
 .info-section { -fx-font-weight: bold; -fx-text-fill: -text-2; -fx-font-size: 0.9em; }
-.info-action { -fx-background-color: -surface-2; -fx-background-radius: 12; -fx-font-size: 0.8em; -fx-text-fill: -text-2; -fx-pref-width: 62; -fx-padding: 8 4; -fx-graphic-text-gap: 4; }
+.info-action { -fx-background-color: -surface-2; -fx-background-radius: 12; -fx-font-size: 0.8em; -fx-text-fill: -text-2; -fx-padding: 8 6; -fx-graphic-text-gap: 4; }
 .info-action.active .icon { -fx-background-color: -accent; }
 .member-row { -fx-padding: 4 6; -fx-background-radius: 10; }
 .member-row:hover { -fx-background-color: -hover; }
@@ -520,6 +522,9 @@
 .media-viewer-bar { -fx-background-color: -surface; -fx-padding: 6 10; }
 .media-viewer-percent { -fx-text-fill: -text; -fx-padding: 0 4; }
 .audio-bar { -fx-padding: 4 12; -fx-background-color: -surface-2; -fx-border-color: transparent transparent -border transparent; }
+.upload-thumb { -fx-background-color: -selected; -fx-background-radius: 6; }
+.upload-where { -fx-padding: 0; -fx-font-size: 0.8em; }
+.upload-percent { -fx-text-fill: -text; -fx-font-weight: bold; -fx-font-size: 0.9em; }
 .audio-who { -fx-font-weight: bold; -fx-font-size: 0.9em; -fx-text-fill: -text; -fx-padding: 0; }
 .audio-time { -fx-font-size: 0.8em; -fx-text-fill: -text-2; }
 .bubble.out .audio-time { -fx-text-fill: white; }
@@ -530,6 +535,15 @@
 .video-top { -fx-padding: 10; }
 .video-controls { -fx-padding: 8 14 12 14; }
 .video-controls .icon { -fx-background-color: white; }
+.video-controls .icon-button.active { -fx-background-color: rgba(255, 255, 255, 0.18); }
+.video-controls .icon-button.active .icon { -fx-background-color: white; }
+.video-speed { -fx-background-color: transparent; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 4 8; }
+.video-speed .label { -fx-text-fill: white; }
+.video-speed .arrow { -fx-background-color: white; }
+.video-replay { -fx-background-color: rgba(0, 0, 0, 0.6); -fx-background-radius: 24; -fx-text-fill: white; -fx-font-size: 1.2em;
+    -fx-padding: 12 22; -fx-graphic-text-gap: 10; -fx-cursor: hand; }
+.video-replay .icon { -fx-background-color: white; }
+.video-replay:hover { -fx-background-color: rgba(0, 0, 0, 0.8); }
 .video-time, .video-message { -fx-text-fill: white; }
 .video-badge { -fx-background-color: rgba(0, 0, 0, 0.55); -fx-background-radius: 24; }
 .video-badge .icon { -fx-background-color: white; }
@@ -548,7 +562,7 @@
 /* ---------------------------------------------------------------- settings */
 
 .settings-root { -fx-background-color: -bg; }
-.settings-nav { -fx-background-color: -bg-list; -fx-padding: 14 8; -fx-border-color: transparent -border transparent transparent; }
+.settings-nav { -fx-pref-width: 13em; -fx-min-width: 13em; -fx-background-color: -bg-list; -fx-padding: 14 8; -fx-border-color: transparent -border transparent transparent; }
 .settings-nav .list-cell { -fx-padding: 8 12; -fx-background-radius: 10; -fx-cursor: hand; }
 .settings-nav .list-cell:hover { -fx-background-color: -hover; }
 .settings-nav .list-cell:selected { -fx-background-color: -selected; -fx-font-weight: bold; }
@@ -703,7 +717,8 @@
     -fx-background-color: -surface-2;
     -fx-background-radius: 999;
     -fx-alignment: center;
-    -fx-min-width: 18; -fx-min-height: 18; -fx-max-width: 18; -fx-max-height: 18;
+    /* In em of its own (small) text, so the initials still fit at 160 %. */
+    -fx-min-width: 2.25em; -fx-min-height: 2.25em; -fx-max-width: 2.25em; -fx-max-height: 2.25em;
     -fx-padding: 0;
 }
 .root.contrast .account-tag { -fx-border-color: -text; -fx-border-width: 1; -fx-border-radius: 999; }
@@ -785,7 +800,6 @@
 .side-panel-scroll > .viewport { -fx-background-color: transparent; }
 .side-panel-placeholder { -fx-padding: 24; }
 .side-panel .info-pane { -fx-border-width: 0; }
-.gif-button { -fx-font-size: 0.78em; -fx-font-weight: bold; -fx-text-fill: -text-3; -fx-padding: 0; -fx-pref-width: 3.2em; -fx-min-width: 3.2em; -fx-max-width: 3.2em; }
 .sticker-grid { -fx-padding: 10; }
 .sticker-tile { -fx-background-radius: 10; -fx-padding: 2; }
 .sticker-tile:hover, .sticker-tile:focused { -fx-background-color: -hover; }

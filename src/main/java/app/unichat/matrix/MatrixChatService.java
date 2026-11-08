@@ -350,6 +350,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     }
 
     private void dispatch(SyncProcessor.Result r, boolean notify) {
+        r.sendStatuses.forEach(core.statuses::heard);
         if (r.chatsChanged) core.fire(Listener::chatsChanged);
         for (String id : r.messagesChanged) core.fire(l -> l.messagesChanged(id));
         // Read elsewhere (the phone, another client): nothing up to there is news any more.
@@ -514,7 +515,10 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) { return sender.sendText(chatId, text, replyToId); }
     @Override public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) { return sender.sendSticker(chatId, item, replyToId); }
     @Override public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) { return sender.sendVoice(chatId, note, replyToId); }
-    @Override public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId) { return sender.sendFile(chatId, file, replyToId); }
+    @Override public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, boolean asDocument,
+                                                      java.util.function.DoubleConsumer progress) {
+        return sender.sendFile(chatId, file, replyToId, asDocument, progress);
+    }
     @Override public CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, String replyToId) { return sender.sendGif(chatId, file, mime, width, height, replyToId); }
     @Override public CompletableFuture<Void> editMessage(String chatId, String messageId, String newText) { return sender.editMessage(chatId, messageId, newText); }
     @Override public CompletableFuture<Void> deleteMessage(String chatId, String messageId) { return sender.deleteMessage(chatId, messageId); }

@@ -84,7 +84,7 @@ class TypingDotsUiTest {
         Stage[] stage = new Stage[1];
         MainView view = fx(() -> {
             stage[0] = new Stage();
-            MainView v = new MainView(svc, stage[0], new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            MainView v = new MainView(svc, stage[0], new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             Scene sc = new Scene(v, 1100, 760);
             Theme.register(sc);
             stage[0].setScene(sc);

@@ -102,7 +102,6 @@ public final class SettingsWindow {
         ListView<String> nav = new ListView<>();
         PAGES.forEach(p -> nav.getItems().add(p.title()));
         nav.getStyleClass().add("settings-nav");
-        nav.setPrefWidth(200);
         nav.getSelectionModel().selectedIndexProperty().addListener((o, a, idx) -> {
             if (accounts != null) accounts.dispose();
             accounts = null;
@@ -173,7 +172,10 @@ public final class SettingsWindow {
         Settings s = Settings.get();
         Node[] rows = {
                 row(I18n.t("settings.nav.notifications"), I18n.t("settings.notifications.help"),
-                        toggle(s.notificationsEnabled(), s::setNotificationsEnabled)),
+                        toggle(s.notificationsEnabled(), v -> {
+                            s.setNotificationsEnabled(v);
+                            Notifier.notificationsChanged();
+                        })),
                 row(I18n.t("settings.notifications.preview"), I18n.t("settings.notifications.previewHelp"), toggle(s.notificationPreview(), s::setNotificationPreview)),
                 row(I18n.t("settings.notifications.sound"), null, toggle(s.notificationSound(), s::setNotificationSound)),
                 row(I18n.t("settings.notifications.archived"), I18n.t("settings.notifications.archivedHelp"),

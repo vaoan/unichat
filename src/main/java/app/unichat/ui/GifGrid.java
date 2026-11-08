@@ -116,7 +116,7 @@ final class GifGrid extends VBox {
                         Node tile = tile(new Image(g.previewUrl(), TILE_W * 2, 0, true, true, true),
                                 g.title().isBlank() ? "GIF" : g.title(), accepted, () -> sendFromProvider(g));
                         // Favourites keep the provider's address; sending one later downloads it again.
-                        LibraryMenu.attach(tile, library, GifFiles.item(g), accepted ? () -> sendFromProvider(g) : null, toast);
+                        LibraryMenu.attach(tile, library, GifFiles.item(g), accepted ? () -> sendFromProvider(g) : null, toast, svc);
                         grid.getChildren().add(tile);
                     }
                 }));
@@ -163,7 +163,7 @@ final class GifGrid extends VBox {
                     TILE_W * 2, TILE_H * 2);
         } else loading = MessageMedia.loadMedia(svc, probe, MediaItems.message(i), TILE_W * 2, TILE_H * 2);
         Node tile = tile(probe, what, accepted, () -> sendFromLibrary(i));
-        LibraryMenu.attach(tile, library, i, accepted ? () -> sendFromLibrary(i) : null, toast);
+        LibraryMenu.attach(tile, library, i, accepted ? () -> sendFromLibrary(i) : null, toast, svc);
         if (tile instanceof javafx.scene.layout.StackPane box) MediaItems.markIfLost(loading, box);
         return tile;
     }

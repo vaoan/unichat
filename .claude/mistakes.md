@@ -73,3 +73,8 @@
   the fallback card hands focus back and ignores keys.
 - **JavaFX's WebView keeps the first CookieHandler it saw for the whole process** (`HTTP2Loader.HTTP_CLIENT`): changing the
   default later does nothing, so a second login window never saw its cookies. `LoginWebView.CurrentCookies` stays installed and forwards.
+- **An OutOfMemoryError in the render thread freezes the window for good**: the FX thread waits for a frame that will
+  never finish (`PaintCollector.waitForRenderingToComplete`), while the sync and the server keep going. The cause was a
+  batch of iPhone photos as WebP (24 MP): TwelveMonkeys needs 600–900 MB to decode one, and subsampling doesn't help.
+  Big still WebPs are shrunk in another process (`video/BigPictures`). Measure peak heap with real files
+  (`-Xmx256m` and a folder of them) before trusting a decoder with someone else's pictures.

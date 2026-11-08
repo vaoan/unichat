@@ -335,6 +335,8 @@ final class MessageMedia {
         };
         StackPane ic = new StackPane(Icons.icon(icon, 18));
         ic.getStyleClass().add("file-icon");
+        String preview = FilePreview.url(m);
+        if (preview != null) showFilePreview(ic, preview, FilePreview.key(m), m.type() == MessageType.VIDEO);
         Label name = new Label(m.fileName() == null ? m.body() : m.fileName());
         name.getStyleClass().add("file-name");
         Label size = new Label(I18n.t(m.type() == MessageType.AUDIO ? "media.kind.audio" : m.type() == MessageType.VIDEO ? "media.kind.video"
@@ -353,6 +355,56 @@ final class MessageMedia {
         box.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
         box.setAccessibleText(I18n.t("media.fileOpen", size.getText(), name.getText()));
         return box;
+    }
+
+    private static final int FILE_THUMB = 38; // the icon's size, so names line up whether there is a picture or not
+
+    /**
+     * Previews already made, by file (name and size): the message we send shows first as our own copy, then as the
+     * server's, and without this its picture vanished and came back each time (downloading the file again to make it).
+     */
+    private static final java.util.Map<String, Image> FILE_PREVIEWS = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(64, 0.75f, true) {
+                @Override protected boolean removeEldestEntry(java.util.Map.Entry<String, Image> eldest) {
+                    return size() > 300; // 300 of 152 px: about 30 MB at most
+                }
+            });
+
+    /** The picture in place of the icon once it's here (a video keeps its play mark on top); the icon if it never comes. */
+    private void showFilePreview(StackPane ic, String url, String key, boolean video) {
+        Image known = FILE_PREVIEWS.get(key);
+        if (known != null) {
+            setFilePreview(ic, known, video);
+            return;
+        }
+        int px = FILE_THUMB * 2;
+        svc.media(url, px, px).thenAcceptAsync(p -> {
+            Image img;
+            try {
+                img = AnimatedImage.still(p, px * 2, px * 2);
+            } catch (Exception e) {
+                return;
+            }
+            if (img.isError() || img.getWidth() <= 0) return;
+            FILE_PREVIEWS.put(key, img);
+            Platform.runLater(() -> setFilePreview(ic, img, video));
+        }, AnimatedImage.DECODER);
+    }
+
+    private static void setFilePreview(StackPane ic, Image img, boolean video) {
+        ImageView view = new ImageView(img);
+        double side = Math.min(img.getWidth(), img.getHeight()); // the middle square, as Telegram crops it
+        view.setViewport(new javafx.geometry.Rectangle2D((img.getWidth() - side) / 2, (img.getHeight() - side) / 2, side, side));
+        view.setFitWidth(FILE_THUMB);
+        view.setFitHeight(FILE_THUMB);
+        view.setSmooth(true);
+        javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle(FILE_THUMB, FILE_THUMB);
+        clip.setArcWidth(16);
+        clip.setArcHeight(16);
+        view.setClip(clip);
+        ic.getChildren().setAll(view);
+        if (video) ic.getChildren().add(Icons.icon(Icons.PLAY, 18));
+        ic.getStyleClass().add("has-preview");
     }
 
     void transcribe(Message m) {

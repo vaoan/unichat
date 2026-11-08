@@ -74,7 +74,7 @@ class TimelineRedrawUiTest {
         svc.sendText(CHAT, "intermedio", null).get(5, TimeUnit.SECONDS);
         Scene scene = fx(() -> {
             Stage stage = new Stage();
-            MainView view = new MainView(svc, stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, u -> { });
+            MainView view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, u -> { });
             Scene sc = new Scene(view, 1000, 800);
             Theme.register(sc);
             stage.setScene(sc);

@@ -36,7 +36,7 @@ class SidePanelUiTest {
             Stage stage = new Stage();
             stage.setOpacity(0);
             stage.setX(-10000);
-            view[0] = new MainView(new MockChatService(), stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            view[0] = new MainView(new MockChatService(), stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             Scene sc = new Scene(view[0], 1200, 800);
             Theme.register(sc);
             stage.setScene(sc);
@@ -65,6 +65,19 @@ class SidePanelUiTest {
 
         fx(() -> { view[0].togglePanel(SidePanel.Tab.EMOJIS); return null; });
         assertFalse(fx(() -> panel(scene) != null), "same button closes it");
+
+        // The composer's one button (the face) opens the media tab used last; Perfil doesn't count.
+        fx(() -> { view[0].showPanel(SidePanel.Tab.STICKERS); view[0].showPanel(SidePanel.Tab.PROFILE); return null; });
+        fx(() -> { view[0].togglePanel(SidePanel.Tab.PROFILE); return null; });
+        assertEquals(SidePanel.Tab.STICKERS, SidePanel.lastMediaTab());
+        fx(() -> {
+            scene.getRoot().lookupAll(".icon-button").stream()
+                    .filter(n -> "Emojis, stickers y GIFs".equals(n.getAccessibleText())).findFirst()
+                    .map(Button.class::cast).orElseThrow().fire();
+            return null;
+        });
+        assertEquals(SidePanel.Tab.STICKERS, fx(() -> panel(scene).current()), "opens where it was left");
+        assertTrue(fx(() -> scene.getRoot().lookupAll(".gif-button").isEmpty()), "no separate GIF button any more");
     }
 
     @Test
@@ -83,7 +96,7 @@ class SidePanelUiTest {
             Stage stage = new Stage();
             stage.setOpacity(0);
             stage.setX(-10000);
-            view[0] = new MainView(svc, stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            view[0] = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             Scene sc = new Scene(view[0], 1200, 800);
             Theme.register(sc);
             stage.setScene(sc);
@@ -109,6 +122,28 @@ class SidePanelUiTest {
         Thread.sleep(300);
         assertEquals("Sticker", fx(() -> svc.chat("!familia:demo").lastPreview()), "sent to the open chat");
         assertTrue(before >= 0);
+
+        // Right-click offers to see it big, and that opens it in its own window.
+        fx(() -> {
+            Node tile = panel(scene).lookup(".sticker-tile");
+            var b = tile.localToScreen(tile.getBoundsInLocal());
+            tile.fireEvent(new javafx.scene.input.ContextMenuEvent(javafx.scene.input.ContextMenuEvent.CONTEXT_MENU_REQUESTED,
+                    5, 5, b.getMinX() + 5, b.getMinY() + 5, false, null));
+            return null;
+        });
+        Thread.sleep(200);
+        javafx.scene.control.MenuItem enlarge = fx(() -> javafx.stage.Window.getWindows().stream()
+                .filter(w -> w instanceof javafx.scene.control.ContextMenu).map(w -> (javafx.scene.control.ContextMenu) w)
+                .flatMap(m -> m.getItems().stream()).filter(i -> "Ver en grande".equals(i.getText())).findFirst().orElse(null));
+        assertTrue(enlarge != null, "the menu offers Ver en grande");
+        long windows = fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage).count());
+        fx(() -> { enlarge.fire(); return null; });
+        Thread.sleep(300);
+        Stage big = fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage s && "Sticker".equals(s.getTitle()))
+                .map(Stage.class::cast).findFirst().orElse(null));
+        assertTrue(big != null && fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage).count()) > windows,
+                "a window shows the sticker");
+        fx(() -> { big.close(); return null; });
 
         // A network that rejects stickers: shown dimmed, with the reason, and nothing is sent.
         fx(() -> {
@@ -139,7 +174,7 @@ class SidePanelUiTest {
             Stage stage = new Stage();
             stage.setOpacity(0);
             stage.setX(-10000);
-            view[0] = new MainView(new MockChatService(), stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            view[0] = new MainView(new MockChatService(), stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             Scene sc = new Scene(view[0], 1200, 800);
             Theme.register(sc);
             stage.setScene(sc);

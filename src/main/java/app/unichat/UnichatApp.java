@@ -66,13 +66,19 @@ public final class UnichatApp extends Application {
         }
 
         // Tray/balloon clicks arrive on the AWT thread; the macOS card on the FX thread.
-        notifier = new Notifier(this::showWindow, id -> {
+        notifier = new Notifier(this::showWindow, () -> Platform.runLater(() -> {
+            saveGeometry();
+            hideToTray();
+        }), id -> {
             showWindow();
             Platform.runLater(() -> {
                 if (mainView != null) mainView.openChatId(id);
             });
         }, this::quit);
         Platform.setImplicitExit(!notifier.hasTray());
+        javafx.beans.InvalidationListener shown = o -> notifier.setWindowShown(stage.isShowing() && !stage.isIconified());
+        stage.showingProperty().addListener(shown);
+        stage.iconifiedProperty().addListener(shown);
         DockIcon.setTrayAvailable(notifier.hasTray());
         // macOS "Salir" (⌘Q, app menu, Dock, logout) quits for real; closing the window only hides it in the tray.
         MacQuit.install(this::quit, () -> {

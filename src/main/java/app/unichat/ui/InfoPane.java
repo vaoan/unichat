@@ -81,14 +81,26 @@ public final class InfoPane extends ScrollPane {
             ident.getChildren().add(topic);
         }
 
-        HBox actions = new HBox(8,
+        // Tiles as wide as the longest label (never cut to "Fav…"); four in a row, or two by two when four don't fit,
+        // never three and one left over. Decided at layout time, when the labels have their real (CSS) size.
+        javafx.scene.layout.TilePane actions = new javafx.scene.layout.TilePane(8, 8) {
+            @Override protected void layoutChildren() {
+                double tile = getChildren().stream().mapToDouble(n -> n.prefWidth(-1)).max().orElse(0);
+                double room = getParent() instanceof Region r ? r.getWidth() - r.getInsets().getLeft() - r.getInsets().getRight() : 0;
+                double max = room <= 0 || room >= 4 * tile + 3 * getHgap() ? Double.MAX_VALUE : 2 * tile + getHgap();
+                if (max != getMaxWidth()) setMaxWidth(max);
+                super.layoutChildren();
+            }
+        };
+        actions.getChildren().addAll(
                 action(Icons.BELL_OFF, c.muted() ? I18n.t("info.unmute") : I18n.t("info.mute"), c.muted(), () -> svc.setMuted(c.id(), !c.muted())),
                 action(Icons.STAR, I18n.t("info.favorite"), c.favorite(), () -> svc.setFavorite(c.id(), !c.favorite())),
                 action(Icons.PIN, I18n.t("info.pin"), c.pinned(), () -> svc.setPinned(c.id(), !c.pinned())),
                 action(Icons.ARCHIVE, c.archived() ? I18n.t("info.archived") : I18n.t("info.archive"), c.archived(), () -> svc.setArchived(c.id(), !c.archived())));
         actions.setAlignment(Pos.CENTER);
+        actions.setPrefColumns(4);
 
-        box.getChildren().addAll(top, ident, actions);
+        box.getChildren().addAll(top, ident, new javafx.scene.layout.StackPane(actions)); // centred when two by two
 
         if (c.reminderAt() != null) {
             Label rem = new Label(I18n.t("info.reminder", Formats.listStamp(c.reminderAt(), Instant.now(), ZoneId.systemDefault()),
@@ -144,6 +156,7 @@ public final class InfoPane extends ScrollPane {
         b.setGraphic(Icons.icon(icon, 18));
         b.setContentDisplay(javafx.scene.control.ContentDisplay.TOP);
         b.getStyleClass().add("info-action");
+        b.setMaxWidth(Double.MAX_VALUE); // fills its tile, so all four are the same width
         if (active) b.getStyleClass().add("active");
         b.setOnAction(e -> run.run());
         b.setAccessibleText(active ? I18n.t("info.activated", text) : text);

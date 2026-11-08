@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.function.DoubleConsumer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
@@ -192,13 +193,20 @@ final class MessageSender {
     }
 
     private CompletableFuture<Void> sendEvent(String chatId, String type, String txn, ObjectNode content) {
-        return CompletableFuture.runAsync(() -> {
+        return sendEventId(chatId, type, txn, content).thenApply(id -> null);
+    }
+
+    /** As {@link #sendEvent}, giving the event's id. */
+    private CompletableFuture<String> sendEventId(String chatId, String type, String txn, ObjectNode content) {
+        return CompletableFuture.supplyAsync(() -> {
             try {
                 JsonNode resp = client.sendEvent(chatId, type, txn, content);
+                String id = resp.path("event_id").asText(null);
                 synchronized (proc) {
-                    proc.confirmLocalEcho(chatId, txn, resp.path("event_id").asText(null));
+                    proc.confirmLocalEcho(chatId, txn, id);
                 }
                 fireLocal(chatId);
+                return id;
             } catch (Exception e) {
                 synchronized (proc) {
                     proc.failLocalEcho(chatId, txn);
@@ -214,9 +222,17 @@ final class MessageSender {
         core.fire(Listener::chatsChanged);
     }
 
-    CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId) {
-        return sendMedia(chatId, file, replyToId, probeMime(file), 0, 0, false);
+    /** {@code asDocument}: as m.file whatever it is, so the network sends the original (a document) instead of a photo. */
+    CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, boolean asDocument, DoubleConsumer progress) {
+        CompletableFuture<String> sent = sendMedia(chatId, file, replyToId, new Kind(probeMime(file), 0, 0, 0, asDocument, progress), content -> { });
+        Chat c = core.chat(chatId);
+        if (c == null || c.network() == app.unichat.model.Network.MATRIX) return sent.thenApply(id -> null);
+        // Bridged: done when the network has it (a batch sends the next file only then), or failed if it refused it.
+        return sent.thenCompose(id -> id == null ? CompletableFuture.completedFuture(null) : core.statuses.await(id, NETWORK_PATIENCE));
     }
+
+    /** How long a file may take to reach the network before it's taken as sent anyway (a bridge that doesn't report). */
+    private static final java.time.Duration NETWORK_PATIENCE = java.time.Duration.ofMinutes(5);
 
     /** A GIF from the GIF tab: m.video (mp4) or m.image (gif) flagged {@code fi.mau.gif}, so bridges send a GIF. */
     CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, String replyToId) {
@@ -231,7 +247,7 @@ final class MessageSender {
         Chat c = core.chat(chatId);
         RoomFeatures.VoiceSend how = (c == null ? RoomFeatures.UNKNOWN : c.features()).voiceSend();
         if (how == null) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("send.noVoice")));
-        return sendMedia(chatId, note.file(), replyToId, how.mime(), 0, 0, note.durationMs(), content -> {
+        return sendMedia(chatId, note.file(), replyToId, new Kind(how.mime(), 0, 0, note.durationMs(), false, p -> { }), content -> {
             content.with("info").put("duration", note.durationMs());
             if (!how.voice()) return;
             content.putObject("org.matrix.msc3245.voice");
@@ -239,29 +255,39 @@ final class MessageSender {
             audio.put("duration", note.durationMs());
             ArrayNode wave = audio.putArray("waveform");
             note.waveform().forEach(wave::add);
-        });
+        }).thenApply(id -> null);
     }
 
     private CompletableFuture<Void> sendMedia(String chatId, Path file, String replyToId, String mime, int width, int height,
                                               boolean gif) {
-        return sendMedia(chatId, file, replyToId, mime, width, height, 0, content -> {
+        return sendMedia(chatId, file, replyToId, new Kind(mime, width, height, 0, false, p -> { }), content -> {
             if (gif) content.with("info").put("fi.mau.gif", true);
-        });
+        }).thenApply(id -> null);
+    }
+
+    /** What a file is sent as: its MIME, size and length if known, whether as a plain document, and who hears the upload. */
+    private record Kind(String mime, int width, int height, long durationMs, boolean document, DoubleConsumer progress) {
+        MessageType type() {
+            return document ? MessageType.FILE : MessageType.ofMime(mime);
+        }
     }
 
     /** @param extra adds what's particular to this kind of media to the event's content */
-    private CompletableFuture<Void> sendMedia(String chatId, Path file, String replyToId, String mime, int width, int height,
-                                              long durationMs, java.util.function.Consumer<ObjectNode> extra) {
+    /** @return the event's id once our server has it */
+    private CompletableFuture<String> sendMedia(String chatId, Path file, String replyToId, Kind kind,
+                                                java.util.function.Consumer<ObjectNode> extra) {
+        String mime = kind.mime();
+        long durationMs = kind.durationMs();
         String txn = core.newTxnId();
         String name = file.getFileName().toString();
-        MessageType type = MessageType.ofMime(mime);
+        MessageType type = kind.type();
         long size;
         try {
             size = Files.size(file);
         } catch (IOException e) {
             return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("send.unreadableFile")));
         }
-        int[] wh = width > 0 ? new int[]{width, height} : type == MessageType.IMAGE ? imageSize(file) : new int[]{0, 0};
+        int[] wh = kind.width() > 0 ? new int[]{kind.width(), kind.height()} : type == MessageType.IMAGE ? imageSize(file) : new int[]{0, 0};
         synchronized (proc) {
             proc.addLocalEcho(chatId, txn, m -> {
                 m.setType(type);
@@ -277,7 +303,7 @@ final class MessageSender {
         fireLocal(chatId);
         return CompletableFuture.supplyAsync(() -> {
             try {
-                return client.upload(file, mime, name);
+                return client.upload(file, mime, name, kind.progress());
             } catch (Exception e) {
                 synchronized (proc) {
                     proc.failLocalEcho(chatId, txn);
@@ -305,7 +331,7 @@ final class MessageSender {
             }
             extra.accept(content);
             addReply(content, replyToId);
-            return sendEvent(chatId, "m.room.message", txn, content);
+            return sendEventId(chatId, "m.room.message", txn, content);
         });
     }
 

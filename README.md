@@ -48,7 +48,9 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   máximo lo que elijas en Ajustes → Privacidad (1 GB por defecto).
 - Estados de entrega (enviando → enviado → entregado → leído) e indicador de "escribiendo…".
 - Compositor: Enter envía (configurable), adjuntar o arrastrar archivos, selector de emojis,
-  ↑ edita tu último mensaje, borradores por chat.
+  ↑ edita tu último mensaje, borradores por chat. El clip ofrece archivo, foto o video, documento (el original,
+  sin comprimir) o **muchos archivos**: van uno por uno, en orden, con una barra arriba (como la del audio) que dice
+  cuál va, a qué chat, cuánto falta y muestra la foto; se puede cancelar lo que falta.
 - Acciones por chat: marcar leído/no leído, favorito, fijar, silenciar, prioridad baja, archivar,
   **recordatorios** (1 h, 3 h, mañana, el lunes), salir.
 - Panel de información: participantes, multimedia compartida, descripción.

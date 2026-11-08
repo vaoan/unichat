@@ -60,6 +60,36 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
         }
     }
 
+    /**
+     * A plain key that nothing used (the timeline's R, T, P and E are consumed before this), pressed outside a text box
+     * with a chat open: the message box takes the focus, and the character that follows lands there.
+     */
+    void typeIntoComposer(KeyEvent e) {
+        if (e.isConsumed() || e.isShortcutDown() || e.isControlDown() || e.isMetaDown() || thread.chat() == null) return;
+        if (!isTypedText(e.getText()) || view.overlayOpen()) return;
+        Node owner = view.getScene() == null ? null : view.getScene().getFocusOwner();
+        if (owner instanceof javafx.scene.control.TextInputControl) return;
+        if (inTimeline(owner) && isTimelineKey(e.getCode())) return; // a shortcut this message doesn't allow: nothing
+        thread.composer().takeTyping();
+    }
+
+    /** The message keys (ThreadPane.onTimelineKey): reply, transcribe, play, edit, and the digits that react. */
+    static boolean isTimelineKey(KeyCode code) {
+        return code == KeyCode.R || code == KeyCode.T || code == KeyCode.P || code == KeyCode.E || code.isDigitKey();
+    }
+
+    private static boolean inTimeline(Node n) {
+        for (; n != null; n = n.getParent()) {
+            if (n instanceof javafx.scene.control.ListView<?> lv && lv.getStyleClass().contains("timeline")) return true;
+        }
+        return false;
+    }
+
+    /** Letters, digits and signs; not space or Enter (they press the focused button or open a message's menu). */
+    static boolean isTypedText(String text) {
+        return text != null && !text.isEmpty() && !text.isBlank() && text.codePoints().noneMatch(Character::isISOControl);
+    }
+
     @Override public void handle(KeyEvent e) {
         boolean mod = e.isShortcutDown();
         Chat c = thread.chat();

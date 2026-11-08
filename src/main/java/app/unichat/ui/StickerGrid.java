@@ -93,7 +93,7 @@ final class StickerGrid extends ScrollPane {
         Runnable send = () -> send(item, accepted);
         StackPane tile = MediaTile.of(view, TILE, TILE, "sticker-tile",
                 I18n.t(accepted ? "library.tileSend" : "library.stickerTileRefused", what), accepted, send);
-        LibraryMenu.attach(tile, library, item, accepted ? send : null, toast);
+        LibraryMenu.attach(tile, library, item, accepted ? send : null, toast, svc);
         MediaItems.markIfLost(loading, tile);
         return tile;
     }

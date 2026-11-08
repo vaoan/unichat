@@ -6,11 +6,12 @@
 //   menu <n>              followed by n lines, each "item <tag> <enabled 0|1> <checked -1|0|1> <label>" or "sep"
 //   open                  opens the menu as a right click would, or closes it if it is open (for tests)
 //   press                 acts as a left click (for tests)
+//   leftmenu <0|1>        1: a left click opens the menu too (the window is open); 0: it brings the window ("show")
 //   notify <chat id> <sound 0|1> <title> <body>   a system notification (Notification Center, Do Not Disturb…)
 //   clear <chat id>       removes that chat's notifications (it was read)
 //   hotkey <0|1>          turns the global shortcut (⌃⌥U) off or on
-// It writes to stdout: "click <tag>" when a menu item is chosen, "show" on a left click of the icon (a right click, or
-// Control and click, opens the menu), "open <chat id>" when a notification is clicked,
+// It writes to stdout: "click <tag>" when a menu item is chosen, "show" on a left click of the icon while leftmenu is 0
+// (a right click, or Control and click, always opens the menu), "open <chat id>" when a notification is clicked,
 // "hotkey" when the global shortcut is pressed,
 // "notify-auth <1|0>" when notifications become allowed or not (also later), and exits when stdin closes (the app quit or died).
 // Notifications need it to run from its bundle (UnichatBar.app, built by native/build-bar.sh): that's what macOS
@@ -130,6 +131,8 @@ final class Bar: NSObject, NSMenuDelegate {
     private var expected = 0
     private var incoming: [[String]] = []
     private var isOpen = false
+    /** Like Telegram: while the window is open there's nothing to bring, so a left click opens the menu as well. */
+    private var leftOpensMenu = false
 
     override init() {
         super.init()
@@ -144,7 +147,7 @@ final class Bar: NSObject, NSMenuDelegate {
     /** A status item with a menu opens it on any click: it only has one while it's showing. */
     @objc private func clicked() {
         let event = NSApp.currentEvent
-        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+        if leftOpensMenu || event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
             showMenu()
         } else {
             emit("show")
@@ -167,6 +170,8 @@ final class Bar: NSObject, NSMenuDelegate {
             if isOpen { menu.cancelTracking() } else { showMenu() }
         case "press":
             item.button?.performClick(nil)
+        case "leftmenu":
+            leftOpensMenu = parts.count > 1 && parts[1] == "1"
         case "count":
             let text = parts.count > 1 ? parts[1] : ""
             item.button?.title = text

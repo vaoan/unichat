@@ -314,7 +314,7 @@ class ScrollPerfUiTest {
         Thread ui = fx(Thread::currentThread);
         fx(() -> {
             Stage stage = new Stage();
-            view[0] = new MainView(svc, stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, u -> { });
+            view[0] = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, u -> { });
             scene[0] = new Scene(view[0], 1280, 860);
             Theme.register(scene[0]);
             stage.setScene(scene[0]);

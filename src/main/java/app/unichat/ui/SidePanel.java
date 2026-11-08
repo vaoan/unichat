@@ -30,6 +30,9 @@ public final class SidePanel extends VBox {
         String label() { return I18n.t(key); }
     }
 
+    /** Kept in settings.properties: it travels with the person and outlives a restart. */
+    private static final String MEDIA_TAB = "panel.mediaTab";
+
     private final InfoPane info;
     private final StackPane body = new StackPane();
     private final Map<Tab, ToggleButton> buttons = new EnumMap<>(Tab.class);
@@ -81,6 +84,17 @@ public final class SidePanel extends VBox {
         if (r != null) r.run();
         body.getChildren().setAll(content.get(t));
         Settings.get().set("panel.tab", t.name());
+        if (t != Tab.PROFILE) Settings.get().set(MEDIA_TAB, t.name());
+    }
+
+    /** Where the composer's emoji button opens: the media tab used last (Favoritos, Emojis, Stickers or GIFs), else Emojis. */
+    static Tab lastMediaTab() {
+        try {
+            Tab t = Tab.valueOf(Settings.get().getString(MEDIA_TAB, Tab.EMOJIS.name()));
+            return t == Tab.PROFILE ? Tab.EMOJIS : t;
+        } catch (IllegalArgumentException e) {
+            return Tab.EMOJIS;
+        }
     }
 
     public Tab current() { return current; }

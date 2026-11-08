@@ -63,7 +63,7 @@ public final class EmojiPicker {
             if (library != null) library.addRecent(MediaLibrary.emoji(e));
         };
         b.setOnAction(ev -> use.run());
-        if (library != null) LibraryMenu.attach(b, library, MediaLibrary.emoji(e), use, toast);
+        if (library != null) LibraryMenu.attach(b, library, MediaLibrary.emoji(e), use, toast, null);
         return b;
     }
 

@@ -147,6 +147,38 @@ class VideoUiTest {
     }
 
     @Test
+    void theViewerKeysChangeSpeedJumpToTheEndAndPlayAgain() throws Exception {
+        Path clip = mp4();
+        StackPane root = fx(StackPane::new);
+        Stage owner = window(root);
+        Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(clip), "clip", () -> { }, p -> { }));
+        await(() -> viewer.getProperties().get(VideoViewer.PLAYER) instanceof MediaPlayer p && p.getStatus() == MediaPlayer.Status.PLAYING, "viewer plays");
+        MediaPlayer player = (MediaPlayer) viewer.getProperties().get(VideoViewer.PLAYER);
+        double rate = fx(player::getRate);
+        key(viewer, javafx.scene.input.KeyCode.PERIOD, ">");
+        assertEquals(VideoControls.nextRate(rate, 1), fx(player::getRate), 0.001, "> speeds up");
+        key(viewer, javafx.scene.input.KeyCode.COMMA, "<");
+        key(viewer, javafx.scene.input.KeyCode.END, "");
+        await(() -> viewer.getScene().getRoot().lookup(".video-replay") != null, "watch again shows at the end");
+        key(viewer, javafx.scene.input.KeyCode.K, "k");
+        await(() -> viewer.getScene().getRoot().lookup(".video-replay") == null && player.getStatus() == MediaPlayer.Status.PLAYING,
+                "K plays it again");
+        assertTrue(fx(() -> viewer.getScene().getRoot().lookupAll(".icon-button").stream()
+                .anyMatch(n -> "Pantalla completa (F)".equals(n.getAccessibleText()))), "full screen button");
+        fx(() -> { viewer.close(); owner.close(); return null; });
+    }
+
+    private static void key(Stage stage, javafx.scene.input.KeyCode code, String text) throws Exception {
+        fx(() -> {
+            javafx.scene.Node target = stage.getScene().getFocusOwner() != null ? stage.getScene().getFocusOwner() : stage.getScene().getRoot();
+            javafx.event.Event.fireEvent(target, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,
+                    "", text, code, false, false, false, false));
+            return null;
+        });
+        Thread.sleep(200);
+    }
+
+    @Test
     void theViewerOffersTheSystemPlayerForWhatItCantPlay() throws Exception {
         Path bad = Files.writeString(dir.resolve("roto.mp4"), "esto no es un video");
         StackPane root = fx(StackPane::new);

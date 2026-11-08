@@ -8,7 +8,15 @@ import java.util.concurrent.CompletableFuture;
 /** Sending and changing messages. */
 public interface ChatMessaging {
     CompletableFuture<Void> sendText(String chatId, String text, String replyToId);
-    CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId);
+    default CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId) {
+        return sendFile(chatId, file, replyToId, false, p -> { });
+    }
+    /**
+     * {@code asDocument}: the file as it is, never shown as a photo or video (WhatsApp's and Telegram's "document");
+     * {@code progress} gets how much of it went up, 0 to 1, on any thread.
+     */
+    CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, boolean asDocument,
+                                     java.util.function.DoubleConsumer progress);
     CompletableFuture<Void> editMessage(String chatId, String messageId, String newText);
     CompletableFuture<Void> deleteMessage(String chatId, String messageId);
     /** Adds the reaction if the user has not reacted with this emoji, otherwise removes it. */

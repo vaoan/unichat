@@ -27,8 +27,11 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.Region;
+import javafx.scene.Node;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
+import app.unichat.service.UploadQueue;
 import javafx.util.Duration;
 
 import java.io.File;
@@ -58,6 +61,14 @@ public final class Composer extends VBox {
     private Message editing;
     private boolean typingSent;
     private final HBox row;
+    /** The rounded box: one line (row), or the text above the buttons when they would leave it too little room. */
+    private final VBox frame;
+    private final Region rowGrow = new Region();
+    private boolean stacked;
+    /** Held here: the global properties only keep a weak reference, so a closed chat's composer can go. */
+    private final javafx.beans.InvalidationListener frameFit;
+    /** Below this many characters' width the text goes on its own line (160 % text, a narrow window, the info panel). */
+    private static final double MIN_INPUT_EM = 14;
     private final Button send;
     private final Button mic;
     private AiReplyButton ai;
@@ -99,18 +110,14 @@ public final class Composer extends VBox {
         });
         HBox.setHgrow(input, Priority.ALWAYS);
 
-        Button attach = Icons.iconButton(Icons.ATTACH, I18n.t("composer.attach"), this::chooseFile);
-        Button emoji = Icons.iconButton(Icons.EMOJI, I18n.t("composer.emojis"), null);
+        Button attach = Icons.iconButton(Icons.ATTACH, I18n.t("composer.attach"), null);
+        attach.setOnAction(e -> attachMenu().show(attach, javafx.geometry.Side.TOP, 0, -4));
+        // One button for emojis, stickers and GIFs: opens the panel on whichever of them was used last.
+        Button emoji = Icons.iconButton(Icons.EMOJI, I18n.t("composer.mediaPanel"), null);
         emoji.setOnAction(e -> {
-            if (onPanel != null) onPanel.accept(SidePanel.Tab.EMOJIS);
+            if (onPanel != null) onPanel.accept(SidePanel.lastMediaTab());
             else EmojiPicker.show(emoji, this::insert);
         });
-        Button stickers = new Button("GIF");
-        stickers.getStyleClass().addAll("icon-button", "gif-button");
-        stickers.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE); // 160 % text: "GIF", not "…"
-        stickers.setAccessibleText(I18n.t("composer.stickersGifs"));
-        stickers.setTooltip(new javafx.scene.control.Tooltip(I18n.t("composer.stickersGifs")));
-        stickers.setOnAction(e -> { if (onPanel != null) onPanel.accept(SidePanel.Tab.STICKERS); });
         Button send = Icons.iconButton(Icons.SEND, I18n.t("composer.send"), this::send);
         send.getStyleClass().add("send-button");
         send.disableProperty().bind(input.textProperty().map(t -> t.isBlank()));
@@ -120,11 +127,18 @@ public final class Composer extends VBox {
         mic.getStyleClass().add("mic-button");
         ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, this::aiDone, AiReplyButton::replyWriter);
         fix = new AiReplyButton(AiReplyButton.FIX, this::fixRequest, this::fixed, onError, this::aiDone, AiReplyButton::fixWriter);
-        row = new HBox(4, attach, input, ai.node(), fix.node(), stickers, emoji, mic, send);
+        row = new HBox(4, attach, input, ai.node(), fix.node(), emoji, mic, send);
         row.setAlignment(Pos.BOTTOM_CENTER);
-        row.getStyleClass().add("composer-row");
+        frame = new VBox(2, row);
+        frame.getStyleClass().add("composer-row");
+        // Again when the room changes: the width, the text size (icons grow with it), the AI buttons coming or going.
+        javafx.beans.InvalidationListener fit = o -> stack(frame.getWidth() < buttonsWidth() + MIN_INPUT_EM * input.getFont().getSize());
+        frame.widthProperty().addListener(fit);
+        Icons.SCALE.addListener(new javafx.beans.WeakInvalidationListener(fit));
+        AiReplyButton.SHOWN.addListener(new javafx.beans.WeakInvalidationListener(fit));
+        frameFit = fit;
         aiStatus.getChildren().addAll(ai.status(), fix.status());
-        getChildren().addAll(banner, aiStatus, row);
+        getChildren().addAll(banner, aiStatus, frame);
         input.textProperty().addListener((o, a, t) -> refreshVoice());
         refreshVoice();
 
@@ -155,6 +169,47 @@ public final class Composer extends VBox {
     }
 
     public void focus() { input.requestFocus(); }
+
+    /** What the buttons beside the text take, as they are now (the AI ones and the mic come and go). */
+    private double buttonsWidth() {
+        double w = row.getSpacing() * (row.getChildren().size() - 1) + frame.getInsets().getLeft() + frame.getInsets().getRight();
+        for (Node n : row.getChildren()) {
+            if (n != input && n != rowGrow && n.isManaged()) w += n.prefWidth(-1);
+        }
+        return w;
+    }
+
+    private void stack(boolean on) {
+        if (on == stacked) return;
+        stacked = on;
+        boolean focused = input.isFocused();
+        if (on) {
+            row.getChildren().remove(input);
+            HBox.setHgrow(rowGrow, Priority.ALWAYS);
+            row.getChildren().add(1, rowGrow);
+            frame.getChildren().add(0, input);
+            // On its own line nothing stretches it any more: at least as tall as the buttons were, or a scroll bar shows.
+            input.minHeightProperty().bind(row.heightProperty());
+        } else {
+            input.minHeightProperty().unbind();
+            input.setMinHeight(Region.USE_COMPUTED_SIZE);
+            frame.getChildren().remove(input);
+            row.getChildren().remove(rowGrow);
+            row.getChildren().add(1, input);
+        }
+        if (focused) input.requestFocus();
+    }
+
+    /**
+     * A key typed elsewhere in the window writes here (as in Telegram): takes the focus with the caret at the end, so
+     * the character lands in the box. False while it can't take text (recording a voice note).
+     */
+    boolean takeTyping() {
+        if (chatId == null || !input.isVisible() || input.isDisabled() || voiceBar != null) return false;
+        input.requestFocus();
+        input.end();
+        return true;
+    }
 
     /** The microphone takes the send button's place while there's nothing written and this chat takes voice notes. */
     void refreshVoice() {
@@ -192,7 +247,7 @@ public final class Composer extends VBox {
         recorder = r;
         mic.setDisable(false);
         voiceBar = new VoiceBar(r, () -> discardRecording(null), this::sendRecording, this::discardRecording);
-        getChildren().set(getChildren().indexOf(row), voiceBar);
+        getChildren().set(getChildren().indexOf(frame), voiceBar);
         r.start();
         voiceBar.focusSend();
     }
@@ -200,7 +255,7 @@ public final class Composer extends VBox {
     private VoiceRecorder endRecordingUi() {
         VoiceRecorder r = recorder;
         recorder = null;
-        if (voiceBar != null) getChildren().set(getChildren().indexOf(voiceBar), row);
+        if (voiceBar != null) getChildren().set(getChildren().indexOf(voiceBar), frame);
         voiceBar = null;
         return r;
     }
@@ -350,18 +405,60 @@ public final class Composer extends VBox {
         focus();
     }
 
+    /** Dropped files: one goes as it is, several as a batch (one at a time, with the upload bar). */
     public void sendFiles(List<File> files) {
-        if (chatId == null) return;
+        sendFiles(files, false);
+    }
+
+    /** {@code asDocument}: each as the original file, never as a photo or video. */
+    public void sendFiles(List<File> files, boolean asDocument) {
+        send(files, asDocument, false);
+    }
+
+    /** {@code batch}: through the upload queue even if it's a single file. Only the first file answers the reply. */
+    private void send(List<File> files, boolean asDocument, boolean batch) {
+        if (chatId == null || files == null || files.isEmpty()) return;
         String reply = replyTo == null ? null : replyTo.id();
-        for (File f : files) svc.sendFile(chatId, f.toPath(), reply).exceptionally(this::fail);
+        if (files.size() == 1 && !batch) {
+            svc.sendFile(chatId, files.get(0).toPath(), reply, asDocument, p -> { }).exceptionally(this::fail);
+        } else {
+            List<UploadQueue.Upload> uploads = new java.util.ArrayList<>();
+            for (File f : files) uploads.add(new UploadQueue.Upload(chatId, f.toPath(), uploads.isEmpty() ? reply : null, asDocument));
+            UploadQueue.of(svc).addAll(uploads);
+        }
         cancelMode();
     }
 
-    private void chooseFile() {
+    /** As in WhatsApp and Telegram: a file, a photo or video, a document (the original, never a photo) or many at once. */
+    private javafx.scene.control.ContextMenu attachMenu() {
+        javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu(
+                attachItem("composer.attach.file", Icons.ATTACH, () -> choose(false, false, false)),
+                attachItem("composer.attach.photo", Icons.IMAGE, () -> choose(true, false, false)),
+                attachItem("composer.attach.document", Icons.FILE, () -> choose(false, true, false)),
+                attachItem("composer.attach.batch", Icons.UPLOAD, () -> choose(false, false, true)));
+        menu.getStyleClass().add("attach-menu");
+        return menu;
+    }
+
+    private static javafx.scene.control.MenuItem attachItem(String key, String icon, Runnable action) {
+        javafx.scene.control.MenuItem item = new javafx.scene.control.MenuItem(I18n.t(key), Icons.icon(icon, 16));
+        item.setOnAction(e -> action.run());
+        return item;
+    }
+
+    /** {@code photos}: only pictures and videos, several allowed; {@code batch}: as many as wanted, one at a time. */
+    private void choose(boolean photos, boolean asDocument, boolean batch) {
         FileChooser fc = new FileChooser();
-        fc.setTitle(I18n.t("composer.attach"));
-        List<File> files = fc.showOpenMultipleDialog(getScene().getWindow());
-        if (files != null) sendFiles(files);
+        fc.setTitle(I18n.t(batch ? "composer.attach.batch" : photos ? "composer.attach.photo" : "composer.attach"));
+        if (photos) fc.getExtensionFilters().add(new FileChooser.ExtensionFilter(I18n.t("composer.attach.photos"),
+                "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp", "*.heic", "*.bmp", "*.mp4", "*.mov", "*.m4v", "*.webm", "*.mkv"));
+        javafx.stage.Window w = getScene().getWindow();
+        if (batch || photos) {
+            send(fc.showOpenMultipleDialog(w), asDocument, batch);
+        } else {
+            File f = fc.showOpenDialog(w);
+            if (f != null) send(List.of(f), asDocument, false);
+        }
     }
 
     /** ⌘I writes and ⌘O corrects, from anywhere in the window. True if it's one of them, with the AI buttons on. */

@@ -30,8 +30,11 @@ public final class Notifier {
     private volatile String lastChatId;
     private final DesktopToast toast;
 
-    /** {@code onOpen} receives a chat id (or null) when the user clicks the tray icon or a notification. */
-    public Notifier(Runnable onShow, Consumer<String> onOpen, Runnable onQuit) {
+    /**
+     * {@code onOpen} receives a chat id (or null) when the user clicks the tray icon or a notification; {@code onHide}
+     * puts the window away in the tray. The menu, as Telegram's: the window (open or put away), notifications on or off, quit.
+     */
+    public Notifier(Runnable onShow, Runnable onHide, Consumer<String> onOpen, Runnable onQuit) {
         toast = MAC ? new DesktopToast(onOpen) : null;
         this.onOpen = onOpen;
         this.onShow = onShow;
@@ -40,14 +43,21 @@ public final class Notifier {
             return;
         }
         PopupMenu menu = new PopupMenu();
-        MenuItem open = new MenuItem(I18n.t("notifier.open"));
-        open.addActionListener(e -> onShow.run());
-        MenuItem quit = new MenuItem(I18n.t("notifier.quit"));
+        MenuItem window = new MenuItem();
+        window.addActionListener(e -> (windowShown ? onHide : onShow).run());
+        MenuItem notifications = new MenuItem();
+        notifications.addActionListener(e -> {
+            Settings.get().setNotificationsEnabled(!Settings.get().notificationsEnabled());
+            relabel();
+        });
+        MenuItem quit = new MenuItem();
         quit.addActionListener(e -> onQuit.run());
-        menu.add(open);
-        menu.addSeparator();
+        menu.add(window);
+        menu.add(notifications);
         menu.add(quit);
         this.menu = menu;
+        current = this;
+        labelNow();
         // macOS: the native item (narrow, real menu, like Apple's own); the AWT TrayIcon if it's missing or dies.
         if (MAC && startNativeBar()) return;
         addAwtTray();
@@ -64,16 +74,42 @@ public final class Notifier {
     private volatile int unread;
     private BufferedImage trayIcon;
     private volatile boolean disposed;
+    private volatile boolean windowShown;
+    /** The one in use, for Ajustes to reach; null in tests without a display. */
+    private static volatile Notifier current;
 
-    /** The tray and menu-bar menu in the current language. Any thread. */
+    /** The tray and menu-bar menu in the current language and state. Any thread. */
     public void relabel() {
         if (menu == null) return;
         EventQueue.invokeLater(() -> {
-            menu.getItem(0).setLabel(I18n.t("notifier.open"));
-            menu.getItem(2).setLabel(I18n.t("notifier.quit"));
+            labelNow();
             NativeBar b = bar;
             if (b != null) b.syncMenu();
         });
+    }
+
+    /** Notifications were turned on or off elsewhere (Ajustes): the menu says the other one. Any thread. */
+    static void notificationsChanged() {
+        Notifier n = current;
+        if (n != null) n.relabel();
+    }
+
+    private void labelNow() {
+        menu.getItem(0).setLabel(I18n.t(windowShown ? "notifier.hide" : "notifier.open"));
+        menu.getItem(1).setLabel(I18n.t(Settings.get().notificationsEnabled() ? "notifier.mute" : "notifier.unmute"));
+        menu.getItem(2).setLabel(I18n.t("notifier.quit"));
+    }
+
+    /**
+     * Whether the window is open on screen (not hidden in the tray nor minimised). While it is, a click on the
+     * menu-bar icon opens the menu, as Telegram's does; otherwise it brings the window. Any thread.
+     */
+    public void setWindowShown(boolean shown) {
+        if (shown == windowShown) return;
+        windowShown = shown;
+        NativeBar b = bar;
+        if (b != null) b.setLeftClickMenu(shown);
+        relabel();
     }
 
     private boolean startNativeBar() {
@@ -84,6 +120,7 @@ public final class Notifier {
         if (b == null) return false;
         bar = b;
         b.setGlobalShortcut(app.unichat.settings.Settings.get().globalShortcut());
+        b.setLeftClickMenu(windowShown);
         EventQueue.invokeLater(() -> {
             b.setIcon(menuBarIcon());
             b.setTooltip(tooltip);

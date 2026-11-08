@@ -44,7 +44,7 @@ class KeyboardUiTest {
         MockChatService svc = new MockChatService();
         Scene scene = fx(() -> {
             Stage stage = new Stage();
-            Notifier notifier = new Notifier(() -> { }, id -> { }, () -> { });
+            Notifier notifier = new Notifier(() -> { }, () -> { }, id -> { }, () -> { });
             MainView view = new MainView(svc, stage, notifier, () -> { }, url -> { });
             Scene sc = new Scene(view, 1100, 700);
             Theme.register(sc);
@@ -88,6 +88,14 @@ class KeyboardUiTest {
         assertTrue(fx(() -> scene.getRoot().lookupAll(".banner-title").stream()
                 .anyMatch(n -> n.isVisible() && ((javafx.scene.control.Label) n).getText().startsWith("Respondiendo a"))));
 
+        // A letter pressed anywhere else (the chat list here) writes in the message box, as in Telegram.
+        press(scene, KeyCode.F6, false, false);
+        press(scene, KeyCode.F6, false, false);
+        assertEquals("list", fx(() -> zone(scene)));
+        typeLetter(scene, "h");
+        assertEquals("composer", fx(() -> zone(scene)), "typing goes to the message box");
+        assertTrue(fx(() -> ((javafx.scene.control.TextArea) scene.getRoot().lookup(".composer-input")).getText().endsWith("h")));
+
         double before = Settings.get().fontScale();
         press(scene, KeyCode.EQUALS, false, true);
         assertEquals(Math.min(Settings.MAX_FONT_SCALE, before + 0.1), Settings.get().fontScale(), 0.001);
@@ -111,7 +119,7 @@ class KeyboardUiTest {
                 new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"reply\":0,\"edit\":0,\"reaction\":0}")));
         Scene scene = fx(() -> {
             Stage stage = new Stage();
-            MainView view = new MainView(svc, stage, new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            MainView view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             Scene sc = new Scene(view, 1100, 700);
             Theme.register(sc);
             stage.setScene(sc);
@@ -139,6 +147,21 @@ class KeyboardUiTest {
             if (n instanceof Composer) return "composer";
         }
         return "none";
+    }
+
+    /** As the system sends a letter: pressed, then typed, each to whatever has the focus at that moment. */
+    private static void typeLetter(Scene scene, String letter) throws Exception {
+        KeyCode code = KeyCode.getKeyCode(letter.toUpperCase());
+        for (var type : List.of(KeyEvent.KEY_PRESSED, KeyEvent.KEY_TYPED)) {
+            fx(() -> {
+                Node target = scene.getFocusOwner() != null ? scene.getFocusOwner() : scene.getRoot();
+                boolean typed = type == KeyEvent.KEY_TYPED;
+                Event.fireEvent(target, new KeyEvent(type, typed ? letter : "", typed ? "" : letter,
+                        typed ? KeyCode.UNDEFINED : code, false, false, false, false));
+                return null;
+            });
+        }
+        Thread.sleep(150);
     }
 
     private static void press(Scene scene, KeyCode code, boolean shift, boolean shortcut) throws Exception {

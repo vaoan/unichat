@@ -57,6 +57,13 @@ class SendStatusTest {
     }
 
     @Test
+    void theStatusReachesWhoeverWaitsForIt() throws Exception {
+        SyncProcessor.Result r = proc.process(MatrixClient.JSON.readTree(("{'rooms':{'join':{'" + ROOM + "':{'timeline':{'events':["
+                + message("$m", ME) + "," + status("$s", "$m", "SUCCESS") + "]}}}}}").replace('\'', '"')), true);
+        assertEquals("SUCCESS", r.sendStatuses.get("$m"), "a batch sends the next file only once the network has this one");
+    }
+
+    @Test
     void successNeverUndoesARead() {
         sync(message("$m", ME));
         byId("$m").setStatus(MessageStatus.READ);

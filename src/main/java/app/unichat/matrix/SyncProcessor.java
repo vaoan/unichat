@@ -49,6 +49,8 @@ final class SyncProcessor {
         final List<String> invites = new ArrayList<>();
         /** Back-pagination only: false when the start of the room was reached. */
         boolean hasMore = true;
+        /** What bridges said about messages (event id → status), for {@link SendStatuses}. */
+        final Map<String, String> sendStatuses = new HashMap<>();
     }
 
     private final String me;
@@ -420,13 +422,14 @@ final class SyncProcessor {
         JsonNode content = ev.path("content");
         String target = text(content.path("m.relates_to"), "event_id");
         if (target == null) return;
+        String status = String.valueOf(text(content, "status"));
+        r.sendStatuses.put(target, status);
         Message t = room.byId.get(target);
         if (t == null) {
             addPending(room, target, ev);
             return;
         }
         if (!t.outgoing()) return;
-        String status = String.valueOf(text(content, "status"));
         MessageStatus next = status.startsWith("FAIL") ? MessageStatus.FAILED
                 : "SUCCESS".equals(status) && t.status() == MessageStatus.FAILED ? MessageStatus.SENT : null;
         if (next == null || next == t.status()) return;

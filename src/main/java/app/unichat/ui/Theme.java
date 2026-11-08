@@ -77,6 +77,7 @@ public final class Theme {
         String style = "-accent: " + accent + "; -fx-font-size: " + Math.round(13 * s.fontScale() * 10) / 10.0 + "px;";
         if (s.readableFont()) style += " -fx-font-family: \"Verdana\", \"Tahoma\", sans-serif;";
         root.setStyle(style);
+        Icons.SCALE.set(s.fontScale());
     }
 
     /** WCAG contrast ratio between two #RRGGBB colors. */

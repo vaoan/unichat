@@ -180,7 +180,7 @@ class AudioUiTest {
         Stage[] stage = new Stage[1];
         MainView view = fx(() -> {
             stage[0] = new Stage();
-            MainView v = new MainView(svc, stage[0], new Notifier(() -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            MainView v = new MainView(svc, stage[0], new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             v.audio().setVolume(0);
             Scene sc = new Scene(v, 1100, 760);
             Theme.register(sc);

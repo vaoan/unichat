@@ -30,6 +30,8 @@ final class MatrixCore {
      * froze all background work.
      */
     final ExecutorService io = Executors.newCachedThreadPool(Threads.daemon("matrix-io"));
+    /** The bridges' word on what we send. */
+    final SendStatuses statuses = new SendStatuses();
     final List<Listener> listeners = new CopyOnWriteArrayList<>();
 
     MatrixCore(MatrixClient client, SyncProcessor proc, String userId, String serverName, String accessToken) {

@@ -10,20 +10,16 @@ import javafx.scene.image.ImageView;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.Slider;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.stage.Stage;
 import javafx.stage.Window;
-import javafx.util.Duration;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -31,12 +27,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
- * Video window: opens at once with a spinner while the file downloads, and plays it with its controls. Space plays or
- * pauses, the arrows move 5 s, M mutes, Esc closes. What JavaFX can't play goes through ffmpeg; failing that, it offers the
+ * Video window: opens at once with a spinner while the file downloads, and plays it with its controls
+ * ({@link VideoControls}: the keys too). Esc leaves full screen, then closes. What JavaFX can't play goes through ffmpeg; failing that, it offers the
  * system's player.
  */
 final class VideoViewer {
-    private static final double SEEK_SECONDS = 5;
     static final String PLAYER = "video-player";
     private static final int MAX_PICTURE = 1600;
 
@@ -44,6 +39,8 @@ final class VideoViewer {
     private final StackPane screen = new StackPane();
     private final Consumer<Path> openElsewhere;
     private MediaPlayer player;
+    private VideoControls controls;
+    private Runnable onSave;
 
     private VideoViewer(Consumer<Path> openElsewhere) {
         this.openElsewhere = openElsewhere;
@@ -72,21 +69,13 @@ final class VideoViewer {
     }
 
     private void open(Window owner, String title, Runnable onSave) {
+        this.onSave = onSave;
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(40, 40);
         screen.getChildren().add(spin);
         VBox.setVgrow(screen, Priority.ALWAYS);
         BorderPane root = new BorderPane(screen);
         root.getStyleClass().add("media-viewer");
-        if (onSave != null) {
-            Button save = new Button(I18n.t("message.saveAs"));
-            save.getStyleClass().add("secondary-button");
-            save.setOnAction(e -> onSave.run());
-            HBox top = new HBox(save);
-            top.setAlignment(Pos.CENTER_RIGHT);
-            top.getStyleClass().add("video-top");
-            root.setTop(top);
-        }
         stage.initOwner(owner);
         stage.setTitle(title == null ? I18n.t("video.title") : title);
         Scene scene = new Scene(root, Math.min(900, owner.getWidth() * 0.8), Math.min(700, owner.getHeight() * 0.8));
@@ -144,7 +133,8 @@ final class VideoViewer {
         view.fitHeightProperty().bind(screen.heightProperty());
         view.setAccessibleText(I18n.t("video.title"));
         screen.getChildren().setAll(view);
-        ((BorderPane) stage.getScene().getRoot()).setBottom(controls(player));
+        controls = new VideoControls(player, stage, view, screen, onSave, () -> openElsewhere.accept(file));
+        ((BorderPane) stage.getScene().getRoot()).setBottom(controls);
         player.setAutoPlay(true);
     }
 
@@ -172,65 +162,13 @@ final class VideoViewer {
         });
     }
 
-    private HBox controls(MediaPlayer p) {
-        Button toggle = Icons.iconButton(Icons.PAUSE, I18n.t("video.pause"), this::togglePlay);
-        p.statusProperty().addListener((o, a, st) -> {
-            boolean playing = st == MediaPlayer.Status.PLAYING;
-            toggle.setGraphic(Icons.icon(playing ? Icons.PAUSE : Icons.PLAY, 18));
-            toggle.setAccessibleText(I18n.t(playing ? "video.pause" : "video.play"));
-        });
-        Slider position = new Slider(0, 1, 0);
-        position.setAccessibleText(I18n.t("video.position"));
-        position.setFocusTraversable(true);
-        HBox.setHgrow(position, Priority.ALWAYS);
-        Label time = new Label(clock(0));
-        time.getStyleClass().add("video-time");
-        time.setMinWidth(Region.USE_PREF_SIZE);
-        p.currentTimeProperty().addListener((o, a, now) -> {
-            double total = p.getTotalDuration().toSeconds();
-            time.setText(clock(now.toSeconds()) + " / " + clock(total));
-            if (!position.isValueChanging() && total > 0) position.setValue(now.toSeconds() / total);
-        });
-        position.valueChangingProperty().addListener((o, a, moving) -> {
-            if (!moving) p.seek(p.getTotalDuration().multiply(position.getValue()));
-        });
-        Button mute = Icons.iconButton(Icons.VOLUME, I18n.t("video.mute"), null);
-        mute.setOnAction(e -> toggleMute(mute));
-        HBox bar = new HBox(10, toggle, position, time, mute);
-        bar.setAlignment(Pos.CENTER);
-        bar.getStyleClass().add("video-controls");
-        return bar;
-    }
-
-    private void togglePlay() {
-        if (player == null) return;
-        if (player.getStatus() == MediaPlayer.Status.PLAYING) player.pause();
-        else {
-            // At the end, play would stay there: start over.
-            if (player.getCurrentTime().greaterThanOrEqualTo(player.getTotalDuration())) player.seek(Duration.ZERO);
-            player.play();
-        }
-    }
-
-    private void toggleMute(Button mute) {
-        player.setMute(!player.isMute());
-        mute.setGraphic(Icons.icon(player.isMute() ? Icons.VOLUME_OFF : Icons.VOLUME, 18));
-        mute.setAccessibleText(I18n.t(player.isMute() ? "video.unmute" : "video.mute"));
-    }
-
+    /** Esc leaves full screen, then closes; the rest are the player's ({@link VideoControls#key}). */
     private void onKey(KeyEvent e) {
         if (e.getCode() == KeyCode.ESCAPE) {
-            stage.close();
+            if (stage.isFullScreen()) stage.setFullScreen(false);
+            else stage.close();
             e.consume();
-        } else if (player != null && e.getCode() == KeyCode.SPACE) {
-            togglePlay();
-            e.consume();
-        } else if (player != null && (e.getCode() == KeyCode.LEFT || e.getCode() == KeyCode.RIGHT)) {
-            double by = e.getCode() == KeyCode.LEFT ? -SEEK_SECONDS : SEEK_SECONDS;
-            player.seek(player.getCurrentTime().add(Duration.seconds(by)));
-            e.consume();
-        } else if (player != null && e.getCode() == KeyCode.M) {
-            player.setMute(!player.isMute());
+        } else if (controls != null && player != null && controls.key(e)) {
             e.consume();
         }
     }
@@ -260,6 +198,7 @@ final class VideoViewer {
     }
 
     private void release() {
+        controls = null;
         if (player == null) return;
         player.dispose();
         player = null;
