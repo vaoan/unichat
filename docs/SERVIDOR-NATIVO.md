@@ -109,13 +109,37 @@ registro solo con token secreto, y lee los registros de los puentes de `appservi
 
 | | Mac Apple Silicon | Windows x64 | Mac Intel |
 |---|---|---|---|
-| Servidor tuwunel | ✅ compila (sin cambios, 26 min en CI) | ✅ compila y arranca sin las funciones de Linux (`--no-default-features` sin `jemalloc`/`io_uring`/`systemd`; 82 min en CI, `tuwunel.exe` de 123 MB) | ❌ fuera de alcance |
-| Puentes Go (WhatsApp, Telegram, Meta, Slack, Google Messages, X, LinkedIn, Discord) | ✅ binarios oficiales | ✅ compilan con `go build -tags goolm` (no hay binarios oficiales; los compilaría nuestro CI) | ❌ |
-| Signal | ✅ binario oficial | ⚠️ la parte Rust compila; falla al enlazar con Go (pendiente) | ❌ |
+| Servidor tuwunel | ✅ lo compila `natives.yml` (sin cambios, ~26 min) | ✅ lo compila `natives.yml`, sin las funciones de Linux (`--no-default-features` sin `jemalloc`/`io_uring`/`systemd`; ~82 min, `tuwunel.exe` de 123 MB) | ❌ fuera de alcance |
+| Puentes Go (WhatsApp, Telegram, Meta, Slack, Google Messages, X, LinkedIn, Discord) | ✅ binarios oficiales | ✅ los compila `natives.yml` desde Linux (`go build -tags goolm`, cgo con MinGW; no hay binarios oficiales) | ❌ |
+| Signal | ✅ binario oficial | ❌ la parte Rust compila; falla al enlazar con Go (pendiente; `NATIVES_UNBUILT`, Unichat no la ofrece) | ❌ |
 
 - **Mac Intel queda fuera**: GitHub retiró sus máquinas `macos-13` (dic-2025) y quitará las Intel restantes en
   2027; Apple ya no da soporte a Intel.
-- Detalles de las pruebas de compilación: rama `spike/native-builds`, archivo `spike/NOTES.md`.
+
+## Compilaciones propias
+
+Lo que no tiene binarios oficiales lo compila `.github/workflows/natives.yml` y lo publica como el release que
+nombra `NATIVES` en `versions.env` (`natives-<n>`, pre-release, con `sha256sums.txt` y el enlace al código exacto
+de cada archivo, que la AGPL de los puentes pide):
+
+- `tuwunel-darwin-arm64` y `tuwunel-windows-amd64`: `package.sh` y `package.ps1` los meten en la app
+  (`native/fetch-natives.sh`; `TUWUNEL_BIN` gana).
+- `mautrix-<puente>-windows-amd64`: Unichat los descarga en Windows al conectar cada red (`Manifest.releaseUrl`),
+  verificados con `sha256sums.txt` como los oficiales.
+
+Para actualizar un puente o tuwunel: cambia su versión en `versions.env`, sube `NATIVES` (`natives-2`…) y empuja a
+`main`; el workflow corre solo si ese release no existe. Un puente nuevo para Windows no necesita nada más: la lista
+sale de `versions.env`.
+
+Lo que se aprendió al probarlo (en una rama de prueba, ya borrada):
+
+- WhatsApp en Windows: `go tool maubuild` falla («not supported by windows»), pero `go build -tags goolm
+  ./cmd/mautrix-whatsapp` con cgo y MinGW funciona: `.exe` de ~70 MB (33 MB sin símbolos), `--version` y `-e`
+  (configuración de ejemplo) corren bien. Los demás puentes compilan igual (`cmd/<nombre>`; Discord, puente
+  antiguo, en la raíz). Desde un Mac también: `CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc`
+  (`brew install go mingw-w64`).
+- Signal necesita `protoc` (el `spqr` de libsignal); en Windows lo que falla es el enlace de Rust con Go.
+- tuwunel en Windows necesita LLVM/clang para los bindings de rocksdb.
 
 ## Pasar de Docker al servidor nativo
 

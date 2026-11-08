@@ -1,0 +1,195 @@
+# What Unichat builds itself for its no-Docker server, published as the release named by NATIVES in versions.env:
+#   tuwunel-darwin-arm64, tuwunel-windows-amd64   the homeserver (no official macOS/Windows builds)
+#   mautrix-<bridge>-windows-amd64                the bridges for Windows (mautrix publishes Linux and macOS only)
+#   sha256sums.txt                                checked by BinaryStore and the package scripts
+# Runs when versions.env changes and that release doesn't exist yet: bump NATIVES with any version there.
+name: natives
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - src/main/resources/app/unichat/server/versions.env
+      - .github/workflows/natives.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: natives
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      exists: ${{ steps.plan.outputs.exists }}
+      bridges: ${{ steps.plan.outputs.bridges }}
+      tuwunel: ${{ steps.plan.outputs.tuwunel }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, re
+          bridges, settings = [], {}
+          for line in open("src/main/resources/app/unichat/server/versions.env"):
+              line = line.strip()
+              if not line or line.startswith("#"): continue
+              key, value = line.split("=", 1)
+              if key.isupper(): settings[key] = value; continue
+              m = re.fullmatch(r"([^@]+)@([^:]+):(.+)", value)
+              bridges.append({"name": key, "repo": m[1], "tag": m[2], "prefix": m[3]})
+          unbuilt = {b.strip() for b in settings.get("NATIVES_UNBUILT", "").split(",")}
+          print("tag=" + settings["NATIVES"].split("@", 1)[1])
+          print("tuwunel=" + settings["TUWUNEL_VERSION"])
+          print("bridges=" + json.dumps([b for b in bridges if b["name"] not in unbuilt]))
+          EOF
+          tag=$(grep '^tag=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "exists=true"; else echo "exists=false"; fi >> "$GITHUB_OUTPUT"
+
+  bridges:
+    # Cross-compiled from Linux (cgo for SQLite through MinGW; goolm, so no libolm): a minute each, and Linux minutes
+    # cost half of Windows'.
+    needs: plan
+    if: needs.plan.outputs.exists != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        bridge: ${{ fromJSON(needs.plan.outputs.bridges) }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ matrix.bridge.repo }}
+          ref: ${{ matrix.bridge.tag }}
+          path: src
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+      - run: sudo apt-get update -q && sudo apt-get install -y -q gcc-mingw-w64-x86-64
+      - name: Build
+        working-directory: src
+        env:
+          CGO_ENABLED: "1"
+          GOOS: windows
+          GOARCH: amd64
+          CC: x86_64-w64-mingw32-gcc
+        run: |
+          # bridgev2 bridges have their main in cmd/<name>; the legacy Discord bridge at the root.
+          pkg=./cmd/${{ matrix.bridge.prefix }}; tags=goolm
+          if [ ! -d "$pkg" ]; then
+            # Legacy bridge (Discord): its mautrix-go has no goolm, only cgo libolm, so no crypto at all (Unichat turns
+            # bridge encryption off anyway); and its zeroconfig 0.1 uses log/syslog, missing on Windows. The only
+            # changes to its source, listed in the release notes.
+            pkg=.; tags=goolm,nocrypto
+            if grep -q 'go.mau.fi/zeroconfig v0\.1\.' go.mod; then go mod edit -require=go.mau.fi/zeroconfig@v0.2.0 && go mod download go.mau.fi/zeroconfig; fi
+          fi
+          go build -mod=mod -tags "$tags" -trimpath \
+            -ldflags "-s -w -X main.Tag=${{ matrix.bridge.tag }} -X main.Commit=$(git rev-parse HEAD) -X 'main.BuildTime=$(date -u '+%b %_d %Y, %H:%M:%S')'" \
+            -o "../out/${{ matrix.bridge.prefix }}-windows-amd64" "$pkg"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: bridge-${{ matrix.bridge.name }}
+          path: out/
+          retention-days: 1
+
+  tuwunel:
+    needs: plan
+    if: needs.plan.outputs.exists != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin-arm64
+            features: ""
+          # Without the Linux-only features (jemalloc, io_uring, systemd).
+          - os: windows-latest
+            platform: windows-amd64
+            features: --no-default-features --features brotli_compression,element_hacks,gzip_compression,media_thumbnail,release_max_log_level,url_preview,zstd_compression
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: matrix-construct/tuwunel
+          ref: ${{ needs.plan.outputs.tuwunel }}
+      - name: Rust (the version in rust-toolchain.toml)
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ needs.plan.outputs.tuwunel }}
+      - name: LLVM for rocksdb's bindings (Windows)
+        if: runner.os == 'Windows'
+        run: clang --version || choco install llvm -y --no-progress
+      - run: cargo build --release --locked ${{ matrix.features }}
+      - name: Collect
+        run: |
+          exe=target/release/tuwunel; [ "$RUNNER_OS" = Windows ] && exe="$exe.exe"
+          "$exe" --version
+          mkdir out && cp "$exe" "out/tuwunel-${{ matrix.platform }}"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: tuwunel-${{ matrix.platform }}
+          path: out/
+          retention-days: 1
+
+  smoke-windows:
+    # Each Windows build must start: --version, and writing its example config.
+    needs: [bridges, tuwunel]
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: out
+          merge-multiple: true
+      - run: |
+          cd out
+          for f in *-windows-amd64; do
+            cp "$f" "$f.exe"
+            "./$f.exe" --version
+            case "$f" in mautrix-*) "./$f.exe" -e -c "$RUNNER_TEMP/$f.yaml" && test -s "$RUNNER_TEMP/$f.yaml" ;; esac
+          done
+
+  publish:
+    needs: [plan, smoke-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: out
+          merge-multiple: true
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          BRIDGES: ${{ needs.plan.outputs.bridges }}
+        run: |
+          cd out
+          sha256sum -- *-* > sha256sums.txt
+          cat sha256sums.txt
+          # The bridges are AGPL-3.0 and tuwunel Apache-2.0: each file's exact, unmodified source is linked here.
+          {
+            echo "Servidor local de Unichat y puentes para Windows, compilados por natives.yml sin cambios desde su código. No es una versión de la app."
+            echo
+            echo "Código fuente de cada archivo:"
+            echo "- tuwunel-*: https://github.com/matrix-construct/tuwunel/tree/${{ needs.plan.outputs.tuwunel }} (Apache-2.0)"
+            echo "$BRIDGES" | jq -r '.[] | "- \(.prefix)-windows-amd64: https://github.com/\(.repo)/tree/\(.tag) (AGPL-3.0)"'
+            echo
+            echo "Única modificación: mautrix-discord se compila con \`-tags goolm,nocrypto\` y \`go mod edit -require=go.mau.fi/zeroconfig@v0.2.0\` (la 0.1 usa log/syslog, que Windows no tiene). El resto, tal cual."
+          } > ../notes.md
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" --prerelease --title "$TAG" --notes-file ../notes.md -- *

@@ -6,22 +6,26 @@ import java.nio.file.Path;
 
 /** Where the native server stack runs: release asset naming and the per-user data folder. */
 public enum Platform {
-    MAC_ARM64("darwin", "arm64", ""),
-    WINDOWS_AMD64("windows", "amd64", ".exe");
+    MAC_ARM64("darwin", "arm64", "", true),
+    WINDOWS_AMD64("windows", "amd64", ".exe", false);
 
     private final String os;
     private final String arch;
     private final String exeSuffix;
+    private final boolean officialBuilds;
 
-    Platform(String os, String arch, String exeSuffix) {
+    Platform(String os, String arch, String exeSuffix, boolean officialBuilds) {
         this.os = os;
         this.arch = arch;
         this.exeSuffix = exeSuffix;
+        this.officialBuilds = officialBuilds;
     }
 
     public String os() { return os; }
     public String arch() { return arch; }
     public String exeSuffix() { return exeSuffix; }
+    /** Whether the bridges publish binaries for it (mautrix only does for Linux and macOS). */
+    public boolean officialBuilds() { return officialBuilds; }
 
     /** The machine this runs on, or null when the native stack isn't supported (Intel Mac, Linux, 32-bit). */
     public static Platform current() {

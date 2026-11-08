@@ -3,16 +3,18 @@
 #   macOS: release/Unichat.app (+ .dmg)   Linux: release/unichat (+ .deb when dpkg is available)
 set -e
 cd "$(dirname "$0")"
-VERSION=1.0.0
+# The version is the pom's (also the app's: support/AppVersion), so a release changes it in one place.
+VERSION="$(sed -n 's:^  <version>\(.*\)</version>:\1:p' pom.xml | head -1)"
 ./mvnw -q -DskipTests package
 rm -rf target/pkg release && mkdir -p target/pkg release
 cp target/unichat.jar LICENSE THIRD-PARTY.md target/pkg/
-# The local server's homeserver ships inside the app (Contents/app/server/tuwunel; see LocalServer).
-# CI builds it from source; locally pass TUWUNEL_BIN=<path to a tuwunel built at the versions.env tag>.
+# The local server's homeserver ships inside the app (Contents/app/server/tuwunel; see LocalServer): the one
+# natives.yml built (native/fetch-natives.sh), or TUWUNEL_BIN=<path to a tuwunel built at the versions.env tag>.
 if [ -n "${TUWUNEL_BIN:-}" ]; then
   mkdir -p target/pkg/server && cp "$TUWUNEL_BIN" target/pkg/server/tuwunel && chmod 755 target/pkg/server/tuwunel
-else
-  echo "Aviso: sin TUWUNEL_BIN la app no trae el servidor local (solo servidores externos)." >&2
+elif [ "$(uname -s)" = Darwin ]; then
+  native/fetch-natives.sh tuwunel-darwin-arm64 target/pkg/server/tuwunel \
+    || echo "Aviso: sin tuwunel la app no trae el servidor local (solo servidores externos)." >&2
 fi
 # macOS menu-bar item and system notifications: native helper (Contents/app/native/UnichatBar.app); without swiftc
 # the Java tray icon and Unichat's own notification cards are used.
@@ -22,6 +24,7 @@ fi
 # macOS bridges link libolm (Homebrew dropped it): ship ours (native/build-libolm.sh).
 if [ "$(uname -s)" = Darwin ]; then
   LIBOLM="${LIBOLM:-$HOME/Library/Caches/unichat-build/olm/libolm.3.dylib}"
+  [ -f "$LIBOLM" ] || ! command -v cmake >/dev/null || native/build-libolm.sh "$(dirname "$LIBOLM")" >/dev/null
   if [ -f "$LIBOLM" ]; then
     mkdir -p target/pkg/server && cp "$LIBOLM" target/pkg/server/libolm.3.dylib
   else

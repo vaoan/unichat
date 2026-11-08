@@ -28,12 +28,8 @@ public final class BinaryStore {
             .connectTimeout(Duration.ofSeconds(20))
             .build();
 
-    public BinaryStore(Path bin, Platform platform) {
-        this(bin, platform, Manifest.Component::releaseUrl);
-    }
-
-    /** {@code releaseBase}: where a component's release files are (tests point it at a local server). */
-    BinaryStore(Path bin, Platform platform, Function<Manifest.Component, String> releaseBase) {
+    /** {@code releaseBase}: where a component's release files are ({@link Manifest#releaseUrl}; tests use a local server). */
+    public BinaryStore(Path bin, Platform platform, Function<Manifest.Component, String> releaseBase) {
         this.bin = bin;
         this.platform = platform;
         this.releaseBase = releaseBase;

@@ -3,6 +3,8 @@ name: build
 on:
   push:
     branches: [main]
+    # A tag v<version of the pom> also publishes the packages as a GitHub release (job "release").
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -53,6 +55,8 @@ jobs:
           if ($wix) { Add-Content $env:GITHUB_PATH "$($wix.FullName)\bin" }
       - name: Package
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: .\package.ps1
       - uses: actions/upload-artifact@v5
         with:
@@ -76,8 +80,36 @@ jobs:
           java-version: "21"
           cache: maven
       - run: ./package.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
       - uses: actions/upload-artifact@v5
         with:
           name: unichat-macos
           path: release/*.dmg
           retention-days: 1
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: The tag is the pom's version
+        run: |
+          pom="$(sed -n 's:^  <version>\(.*\)</version>:\1:p' pom.xml | head -1)"
+          [ "v$pom" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME, pom $pom: change the pom first" >&2; exit 1; }
+      - uses: actions/download-artifact@v5
+        with:
+          path: release
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd release
+          sha256sum -- * > sha256sums.txt
+          # A version with a suffix (1.1.0-beta.1) is a pre-release: the app's update check skips those.
+          pre=""; case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" $pre --title "Unichat ${GITHUB_REF_NAME#v}" --generate-notes -- *

@@ -60,7 +60,7 @@ public final class LocalServer {
         this.platform = platform;
         this.dir = platform.dataDir();
         this.manifest = Manifest.bundled();
-        this.store = new BinaryStore(dir.resolve("bin"), platform);
+        this.store = new BinaryStore(dir.resolve("bin"), platform, c -> manifest.releaseUrl(c, platform));
         this.secretsFile = new ServerSecrets(dir);
         this.installer = new BridgeInstaller(dir, store, manifest);
         this.supervisor = new Supervisor(dir.resolve("run"));
@@ -129,9 +129,9 @@ public final class LocalServer {
         return port == null || BridgeInstaller.LEGACY_BRIDGES.contains(bridge) ? null : "http://127.0.0.1:" + port + "/_matrix/provision";
     }
 
-    /** Whether this server can install {@code bridge} here (pinned in versions.env, with a known port). */
+    /** Whether this server can install {@code bridge} here (pinned in versions.env and built for it, with a known port). */
     public boolean provides(String bridge) {
-        return BridgePorts.BRIDGE_PORTS.containsKey(bridge) && manifest.bridge(bridge) != null;
+        return BridgePorts.BRIDGE_PORTS.containsKey(bridge) && manifest.builds(bridge, platform);
     }
 
     /** Login of the account on this server: {user, password}. Available after {@link #ensureRunning}. */
@@ -172,7 +172,7 @@ public final class LocalServer {
      * it with the server (a restart of a few seconds) and starts it. Blocking.
      */
     public synchronized void ensureBridge(String bridge, Consumer<String> progress) throws IOException, InterruptedException {
-        if (!BridgePorts.BRIDGE_PORTS.containsKey(bridge)) throw new IOException(I18n.t("server.networkUnavailable", bridge));
+        if (!provides(bridge)) throw new IOException(I18n.t("server.networkUnavailable", bridge));
         if (!running) ensureRunning(progress);
         Set<String> active = activeBridges();
         if (!active.contains(bridge)) {

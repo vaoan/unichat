@@ -3,7 +3,8 @@
 # and Unichat-<ver>.msi when the WiX Toolset is installed (https://wixtoolset.org).
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
-$Version = "1.0.0"
+# The version is the pom's (also the app's: support/AppVersion), so a release changes it in one place.
+$Version = ([xml](Get-Content pom.xml)).project.version
 
 .\mvnw.cmd -q -DskipTests package
 if ($LASTEXITCODE -ne 0) { throw "Maven build failed" }
@@ -11,6 +12,38 @@ if ($LASTEXITCODE -ne 0) { throw "Maven build failed" }
 Remove-Item -Recurse -Force target\pkg, release -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force target\pkg, release | Out-Null
 Copy-Item target\unichat.jar, LICENSE, THIRD-PARTY.md target\pkg\
+
+# The local server (LocalServer): the homeserver ships inside the app; the bridges are downloaded on first use. Both
+# come from Unichat's own release (NATIVES in versions.env, built by .github/workflows/natives.yml), since there are
+# no official Windows builds. $env:TUWUNEL_BIN=<tuwunel.exe> wins.
+New-Item -ItemType Directory -Force target\pkg\server | Out-Null
+try {
+    if ($env:TUWUNEL_BIN) {
+        Copy-Item $env:TUWUNEL_BIN target\pkg\server\tuwunel.exe
+    } else {
+        $natives = (Select-String -Path src\main\resources\app\unichat\server\versions.env -Pattern '^NATIVES=(.+)$').Matches[0].Groups[1].Value
+        $repo, $tag = $natives -split '@', 2
+        $asset = "tuwunel-windows-amd64"
+        Remove-Item -Recurse -Force target\natives -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force target\natives | Out-Null
+        if ((Get-Command gh -ErrorAction SilentlyContinue) -and $env:GH_TOKEN) {
+            # While the repository is private, only gh with a token can reach its releases.
+            gh release download $tag -R $repo -D target\natives -p $asset -p sha256sums.txt
+            if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
+        } else {
+            foreach ($f in @($asset, "sha256sums.txt")) {
+                Invoke-WebRequest "https://github.com/$repo/releases/download/$tag/$f" -OutFile "target\natives\$f"
+            }
+        }
+        $line = Get-Content target\natives\sha256sums.txt | Where-Object { $_ -match "^[0-9a-f]{64}\s+\*?$asset$" } | Select-Object -First 1
+        if (-not $line -or (Get-FileHash "target\natives\$asset" -Algorithm SHA256).Hash.ToLower() -ne ($line -split '\s+')[0]) {
+            throw "tuwunel checksum mismatch"
+        }
+        Copy-Item "target\natives\$asset" target\pkg\server\tuwunel.exe
+    }
+} catch {
+    Write-Warning "Sin tuwunel la app no trae el servidor local (solo servidores externos): $_"
+}
 
 # Animated stickers for chats that only take WebP (WhatsApp): libwebp's gif2webp, pinned (see StickerConverter
 # and native/fetch-gif2webp.sh for the macOS build of the same release).

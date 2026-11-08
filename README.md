@@ -1,8 +1,10 @@
 # Unichat
 
+Español · [English](README.en.md)
+
 Bandeja de mensajes unificada para escritorio — **WhatsApp, Telegram, Signal, Instagram, Messenger,
 Discord, Slack, Google Messages, X y LinkedIn en una sola app** — hecha en **Java 21 + JavaFX** para
-Windows, macOS y Linux. Inspirada en Beeper (misma idea y flujo de trabajo); el código es propio.
+Windows y macOS (Linux, compilándola). Inspirada en Beeper (misma idea y flujo de trabajo); el código es propio.
 
 ![Unichat en modo oscuro](docs/screenshots/oscuro.png)
 
@@ -10,11 +12,45 @@ Windows, macOS y Linux. Inspirada en Beeper (misma idea y flujo de trabajo); el 
 |---|---|---|
 | ![](docs/screenshots/claro.png) | ![](docs/screenshots/comandos.png) | ![](docs/screenshots/conectar-red.png) |
 
+## Instalar
+
+Descarga la última versión en **[Releases](https://github.com/vaoan/unichat/releases/latest)**. No necesita Java:
+viene dentro.
+
+| Sistema | Archivo | Servidor local incluido |
+|---|---|---|
+| Windows 10/11 (x64) | `Unichat-<versión>.msi` (instalador) o `Unichat-<versión>-windows.zip` (portable: descomprime y abre `Unichat\Unichat.exe`) | Sí (Signal todavía no) |
+| macOS 12+ con Apple Silicon (M1 o posterior) | `Unichat-<versión>.dmg` | Sí |
+| Mac Intel, Linux | Compílalo (ver [Compilar](#compilar)) | No: solo con un servidor propio ([docs/BRIDGES.md](docs/BRIDGES.md)) |
+
+**La primera vez que la abres** aparece un aviso, porque la app todavía no está firmada con un certificado pagado:
+
+- **macOS** («no se puede abrir porque Apple no puede comprobar…»): abre Ajustes del Sistema → Privacidad y
+  seguridad, baja hasta el aviso de Unichat y pulsa **Abrir igualmente**. Solo se pide una vez.
+- **Windows** («Windows protegió su PC»): pulsa **Más información** → **Ejecutar de todas formas**.
+
+Para comprobar que el archivo es el publicado, compáralo con `sha256sums.txt` del mismo release
+(`shasum -a 256 <archivo>` en Mac, `Get-FileHash <archivo>` en Windows).
+
+Unichat avisa cuando hay una versión nueva (Ajustes → Privacidad para apagarlo; Ajustes → Acerca de para buscar
+ahora).
+
+## Riesgos de usar puentes
+
+Unichat se conecta a cada red con los puentes de [mautrix](https://github.com/mautrix), que hacen lo mismo que la
+app oficial o la web de esa red, pero **ninguna red los autoriza**. WhatsApp, Instagram, Facebook, LinkedIn o X
+pueden pedirte que vuelvas a iniciar sesión, limitar tu cuenta o, en casos raros, suspenderla. Lo mismo pasa con
+Beeper y con cualquier app no oficial. Si una cuenta es importante para tu trabajo, piénsalo antes de conectarla.
+
+Qué sale de tu computador y a dónde: [docs/PRIVACIDAD.md](docs/PRIVACIDAD.md).
+
 ## Cómo funciona
 
 Unichat es un cliente **Matrix**. Cada red llega mediante un *bridge* [mautrix](https://github.com/mautrix)
-instalado en tu propio servidor Matrix (igual que hacía Beeper). En `server/` está todo para montarlo con
-Docker en un comando — ver **[docs/BRIDGES.md](docs/BRIDGES.md)**.
+(igual que hacía Beeper). En Windows y en Mac con Apple Silicon, Unichat trae su propio servidor Matrix y lo
+instala, arranca y vigila sin que hagas nada: descarga cada puente la primera vez que conectas esa red
+([docs/SERVIDOR-NATIVO.md](docs/SERVIDOR-NATIVO.md)). También puede usar un servidor tuyo: en `server/` está todo
+para montarlo con Docker en un comando ([docs/BRIDGES.md](docs/BRIDGES.md)).
 
 ¿Solo quieres verla? En la pantalla de inicio pulsa **Probar el modo demo**: datos de ejemplo en
 memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura simulados.
@@ -82,14 +118,6 @@ Todo se puede usar **solo con teclado**: F6 / Shift+F6 salta entre barra lateral
 texto; en los mensajes, ↑/↓ recorre, **R** responde, **E** edita, **Enter** abre las acciones, **1–6** reacciona,
 **Esc** vuelve al campo de texto. El foco se ve al navegar con Tab.
 
-## Descargar para Windows
-
-Cada push a `main` compila la app en GitHub Actions. En la pestaña **Actions** → último run →
-artefacto **unichat-windows** encontrarás:
-
-- `Unichat-1.0.0-windows.zip` — portable: descomprime y abre `Unichat\Unichat.exe` (no necesita Java).
-- `Unichat-1.0.0.msi` — instalador (cuando WiX está disponible en el runner).
-
 ## Compilar
 
 Requisito: **JDK 21+** (Maven no hace falta, se usa el wrapper).
@@ -99,6 +127,13 @@ Requisito: **JDK 21+** (Maven no hace falta, se usa el wrapper).
 ./mvnw test             # tests
 ./package.sh            # macOS: release/Unichat.app + .dmg · Linux: app-image (+ .deb)
 ```
+
+Cada push a `main` compila los paquetes en GitHub Actions (artefactos `unichat-windows` y `unichat-macos` del run).
+Para publicar una versión: cambia `<version>` en `pom.xml`, haz commit y empuja el tag `v<versión>`
+(`git tag v1.1.0 && git push origin v1.1.0`); el workflow `build` crea el release con los paquetes y
+`sha256sums.txt`. Un tag con sufijo (`v1.1.0-beta.1`) sale como pre-release y la app no lo ofrece como actualización.
+El servidor y los puentes de Windows los compila aparte el workflow `natives` (ver
+[docs/SERVIDOR-NATIVO.md](docs/SERVIDOR-NATIVO.md#compilaciones-propias)).
 
 ```powershell
 .\mvnw.cmd javafx:run   # Windows: ejecutar desde el código
@@ -154,7 +189,9 @@ Si vuelves a una versión anterior de Unichat te pedirá iniciar sesión otra ve
 El código de Unichat es [0BSD](LICENSE): úsalo, cópialo, modifícalo y distribúyelo como quieras, sin necesidad de
 dar crédito. Eso cubre solo este código. Las piezas de terceros conservan sus propias licencias: JavaFX
 (GPLv2 con excepción de classpath), las bibliotecas Java (Apache 2.0 y BSD), whisper.cpp (MIT), libwebp (BSD), tuwunel
-y libolm (Apache 2.0). Los puentes de mautrix (AGPL-3.0) no vienen en la app: se descargan aparte al conectar cada red.
+y libolm (Apache 2.0). Los puentes de mautrix (AGPL-3.0) no vienen en la app: se descargan aparte al conectar cada red,
+de sus releases oficiales o, en Windows, del release `natives-*` de este repositorio, compilados sin cambios desde
+el código de cada versión (enlazado en ese release).
 La lista completa, con los textos de licencia, está en [THIRD-PARTY.md](THIRD-PARTY.md), que también va dentro de los paquetes.
 
 ---

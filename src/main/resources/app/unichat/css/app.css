@@ -832,3 +832,7 @@
 .contact-name { -fx-text-fill: -text; }
 .contact-detail { -fx-text-fill: -text-2; -fx-font-size: 0.85em; }
 .root.contrast .new-chat-list .list-cell:focused { -fx-border-color: -text; -fx-border-radius: 8; }
+
+/* The rail's networks when they don't fit (Rail.networkScroll): no frame or background of its own. */
+.rail-scroll, .rail-scroll > .viewport { -fx-background-color: transparent; -fx-background-insets: 0; -fx-padding: 0; -fx-border-width: 0; }
+.rail-scroll .scroll-bar:vertical { -fx-pref-width: 6; }

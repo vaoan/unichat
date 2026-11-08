@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,6 +29,29 @@ class ManifestTest {
         assertEquals("v1.9.4", m.tuwunelVersion());
         assertNull(m.bridge("signal"));
         assertEquals(2, m.bridges().size());
+    }
+
+    @Test
+    void windowsTakesTheBridgesUnichatBuildsExceptTheUnbuiltOnes() {
+        Manifest m = Manifest.parse("""
+                whatsapp=mautrix/whatsapp@v0.2610.0:mautrix-whatsapp
+                signal=mautrix/signal@v0.2610.0:mautrix-signal
+                NATIVES=vaoan/unichat@natives-3
+                NATIVES_UNBUILT=signal
+                """);
+        Manifest.Component wa = m.bridge("whatsapp");
+        assertEquals("https://github.com/mautrix/whatsapp/releases/download/v0.2610.0", m.releaseUrl(wa, Platform.MAC_ARM64));
+        assertEquals("https://github.com/vaoan/unichat/releases/download/natives-3", m.releaseUrl(wa, Platform.WINDOWS_AMD64));
+        assertEquals("mautrix-whatsapp-windows-amd64", wa.asset(Platform.WINDOWS_AMD64));
+        assertTrue(m.builds("signal", Platform.MAC_ARM64));
+        assertFalse(m.builds("signal", Platform.WINDOWS_AMD64));
+        assertTrue(m.builds("whatsapp", Platform.WINDOWS_AMD64));
+        assertFalse(m.builds("matrix", Platform.MAC_ARM64), "not in the manifest");
+    }
+
+    @Test
+    void theBundledManifestNamesUnichatsOwnRelease() {
+        assertTrue(Manifest.bundled().nativesUrl().startsWith("https://github.com/vaoan/unichat/releases/download/natives-"));
     }
 
     @Test

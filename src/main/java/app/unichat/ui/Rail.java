@@ -6,10 +6,12 @@ import app.unichat.model.Chat;
 import app.unichat.model.Network;
 import app.unichat.service.ChatService;
 import app.unichat.support.I18n;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -25,7 +27,10 @@ import java.util.List;
 public final class Rail extends VBox {
     private final ChatService svc;
     private final ChatListPane listPane;
+    /** The rail's side padding (css .rail): the networks' scroll spans it. */
+    private static final double RAIL_SIDE = 10;
     private final VBox networks = new VBox(6);
+    private final ScrollPane scroll = new ScrollPane(networks);
     /** Kept between refreshes: this runs on every change of any chat, several times a second on a busy account. */
     private final java.util.Map<Network, Button> networkButtons = new java.util.EnumMap<>(Network.class);
     private final Button inbox;
@@ -59,10 +64,39 @@ public final class Rail extends VBox {
         networks.setAlignment(Pos.TOP_CENTER);
         Region sep = new Region();
         sep.getStyleClass().add("rail-separator");
-        getChildren().addAll(new StackPane(inbox), folders, sep, networks, archive, add, grow, settings);
+        getChildren().addAll(new StackPane(inbox), folders, sep, networkScroll(), archive, add, grow, settings);
         listPane.filterProperty().addListener((o, a, b) -> refresh());
         listPane.foldersOpenProperty().addListener((o, a, b) -> refresh());
         refresh();
+    }
+
+    /**
+     * The networks scroll when they don't fit (many networks, a short window, large text), so the buttons below them
+     * stay in sight; a thin bar in the rail's margin says there are more. As tall as its content otherwise. Focus
+     * brings a button into view. It spans the rail's padding so a button's badge isn't cut off.
+     */
+    private ScrollPane networkScroll() {
+        networks.setPadding(new Insets(2, RAIL_SIDE, 2, RAIL_SIDE));
+        scroll.getStyleClass().add("rail-scroll");
+        scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scroll.setFocusTraversable(false);
+        scroll.setMinHeight(0);
+        scroll.prefViewportHeightProperty().bind(networks.heightProperty());
+        scroll.setMaxHeight(Region.USE_PREF_SIZE);
+        VBox.setMargin(scroll, new Insets(0, -RAIL_SIDE, 0, -RAIL_SIDE));
+        return scroll;
+    }
+
+    /** Scrolls the networks so {@code b} shows whole (keyboard focus). */
+    private void reveal(Button b) {
+        double content = networks.getHeight(), view = scroll.getViewportBounds().getHeight();
+        if (content <= view) return;
+        double top = b.getBoundsInParent().getMinY(), bottom = b.getBoundsInParent().getMaxY();
+        double shown = scroll.getVvalue() * (content - view);
+        if (top < shown) scroll.setVvalue(top / (content - view));
+        else if (bottom > shown + view) scroll.setVvalue((bottom - view) / (content - view));
     }
 
     private Button railButton(Node graphic, String tip, Runnable action) {
@@ -111,8 +145,12 @@ public final class Rail extends VBox {
             };
             List<Account> netAccounts = Accounts.of(accounts, n);
             String count = netAccounts.size() > 1 ? I18n.n("rail.accounts", netAccounts.size()) : "";
-            Button b = networkButtons.computeIfAbsent(n, x -> railButton(NetworkIcons.tile(x, 26, "rail-network"), "", () ->
-                    listPane.goTo(listPane.filterProperty().get().switchTo(x, null))));
+            Button b = networkButtons.computeIfAbsent(n, x -> {
+                Button nb = railButton(NetworkIcons.tile(x, 26, "rail-network"), "", () ->
+                        listPane.goTo(listPane.filterProperty().get().switchTo(x, null)));
+                nb.focusedProperty().addListener((o, was, is) -> { if (is) reveal(nb); });
+                return nb;
+            });
             b.getTooltip().setText(n.displayName() + count + status);
             if (n.isBridged()) b.setOnContextMenuRequested(e -> networkMenu(n, netAccounts).show(b, e.getScreenX(), e.getScreenY()));
             setActive(b, f.network() == n);
