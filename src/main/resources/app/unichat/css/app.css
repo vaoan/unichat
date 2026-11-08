@@ -520,6 +520,10 @@
 .media-viewer { -fx-background-color: rgba(0, 0, 0, 0.92); }
 .ai-status { -fx-padding: 2 8 4 8; }
 .media-viewer-bar { -fx-background-color: -surface; -fx-padding: 6 10; }
+.viewer-nav { -fx-background-color: rgba(0, 0, 0, 0.45); -fx-background-radius: 24; -fx-padding: 12; }
+.viewer-nav .icon { -fx-background-color: white; }
+.viewer-nav:hover { -fx-background-color: rgba(0, 0, 0, 0.7); }
+.viewer-nav:disabled { -fx-opacity: 0; }
 .media-viewer-percent { -fx-text-fill: -text; -fx-padding: 0 4; }
 .audio-bar { -fx-padding: 4 12; -fx-background-color: -surface-2; -fx-border-color: transparent transparent -border transparent; }
 .upload-thumb { -fx-background-color: -selected; -fx-background-radius: 6; }

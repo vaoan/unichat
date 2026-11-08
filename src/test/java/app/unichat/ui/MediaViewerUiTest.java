@@ -98,6 +98,40 @@ class MediaViewerUiTest {
     }
 
     @Test
+    void theArrowsStepThroughTheChatsPictures() throws Exception {
+        fx(() -> { viewer().ifPresent(Window::hide); return null; });
+        java.util.List<MediaViewer.Item> items = new java.util.ArrayList<>();
+        for (int i = 1; i <= 3; i++) {
+            Path f = dir.resolve("foto" + i + ".png");
+            ImageIO.write(new BufferedImage(1600, 1200, BufferedImage.TYPE_INT_RGB), "png", f.toFile());
+            items.add(new MediaViewer.Item("foto" + i, () -> CompletableFuture.completedFuture(f), () -> saves++));
+        }
+        fx(() -> { MediaViewer.show(owner, items, 1); return null; });
+        waitFor(() -> fx(() -> viewer().isPresent() && photo().view().getImage() != null));
+        assertEquals("foto2", fx(() -> ((Stage) viewer().orElseThrow()).getTitle()), "opens on the one clicked");
+
+        key("", KeyCode.RIGHT);
+        waitFor(() -> fx(() -> "foto3".equals(((Stage) viewer().orElseThrow()).getTitle()) && photo().view().getImage() != null));
+        key("", KeyCode.RIGHT);
+        assertEquals("foto3", fx(() -> ((Stage) viewer().orElseThrow()).getTitle()), "stays on the last one");
+        key("", KeyCode.LEFT);
+        key("", KeyCode.LEFT);
+        assertEquals("foto1", fx(() -> ((Stage) viewer().orElseThrow()).getTitle()));
+
+        key("1", KeyCode.DIGIT1); // zoomed in: the arrows pan the picture instead
+        waitFor(() -> fx(() -> photo().view().getImage() != null));
+        key("", KeyCode.RIGHT);
+        assertEquals("foto1", fx(() -> ((Stage) viewer().orElseThrow()).getTitle()));
+        key("", KeyCode.PAGE_DOWN);
+        assertEquals("foto2", fx(() -> ((Stage) viewer().orElseThrow()).getTitle()), "Page Down always goes on");
+        waitFor(() -> fx(() -> photo().view().getImage() != null && photo().zoom().isFitted()));
+
+        // Going full screen for real is a macOS animation a test can't wait on; the button and its name are checked here.
+        assertTrue(fx(() -> buttons(viewer().orElseThrow().getScene().getRoot()).stream()
+                .anyMatch(b -> "Pantalla completa (F)".equals(b.getAccessibleText()))));
+    }
+
+    @Test
     void theWheelZoomsAndTheNodeFollows() throws Exception {
         double before = fx(() -> photo().view().getFitWidth());
         fx(() -> {
@@ -156,7 +190,7 @@ class MediaViewerUiTest {
     @Test
     void everyButtonHasAnAccessibleNameOrTextAndSaveCalls() throws Exception {
         List<Button> buttons = fx(() -> buttons(viewer().orElseThrow().getScene().getRoot()));
-        assertEquals(6, buttons.size());
+        assertEquals(9, buttons.size(), "zoom, fit, 100 %, turn, save, full screen, and before/after");
         for (Button b : buttons) {
             assertTrue(b.getAccessibleText() != null || !b.getText().isEmpty(), String.valueOf(b));
         }

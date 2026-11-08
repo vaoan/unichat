@@ -75,8 +75,8 @@ final class MessageMedia {
             clickable(box, sticker ? I18n.t("media.stickerOpen")
                     : m.fileName() == null ? I18n.t("media.imageOpen") : I18n.t("media.imageFileOpen", m.fileName()), () -> {
                 Window owner = scene.get().getWindow();
-                MediaViewer.show(owner, svc.media(m.mediaUrl(), 0, 0), sticker ? I18n.t("media.sticker") : m.fileName(),
-                        () -> MediaSaver.save(owner, svc, m, toast));
+                if (sticker) MediaViewer.show(owner, svc.media(m.mediaUrl(), 0, 0), I18n.t("media.sticker"), () -> MediaSaver.save(owner, svc, m, toast));
+                else Gallery.open(owner, svc, m, toast);
             });
         }
         return box;
@@ -350,6 +350,7 @@ final class MessageMedia {
         box.setCursor(javafx.scene.Cursor.HAND);
         box.setOnMouseClicked(e -> {
             if ((m.type() == MessageType.VIDEO || m.type() == MessageType.STICKER) && m.mediaUrl() != null && scene.get() != null) openVideo(m);
+            else if (Gallery.isPicture(m) && scene.get() != null) Gallery.open(scene.get().getWindow(), svc, m, toast); // a photo sent as a document
             else openFile(m);
         });
         box.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
