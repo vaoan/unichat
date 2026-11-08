@@ -432,14 +432,15 @@ public final class Composer extends VBox {
 
     /**
      * As in WhatsApp and Telegram: a file as it is, photos and videos (pictures made into photos the network shows as
-     * such, several at once), a document (the original, never a photo) or many files at once.
+     * such, several at once), a document (the original, never a photo), or many files or many photos one by one.
      */
     private javafx.scene.control.ContextMenu attachMenu() {
         javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu(
                 attachItem("composer.attach.file", Icons.ATTACH, () -> choose(false, SendAs.AS_IS, false)),
                 attachItem("composer.attach.photo", Icons.IMAGE, () -> choose(true, SendAs.PHOTO, false)),
                 attachItem("composer.attach.document", Icons.FILE, () -> choose(false, SendAs.DOCUMENT, false)),
-                attachItem("composer.attach.batch", Icons.UPLOAD, () -> choose(false, SendAs.AS_IS, true)));
+                attachItem("composer.attach.batch", Icons.UPLOAD, () -> choose(false, SendAs.AS_IS, true)),
+                attachItem("composer.attach.photoBatch", Icons.CAMERA, () -> choose(true, SendAs.PHOTO, true)));
         menu.getStyleClass().add("attach-menu");
         return menu;
     }
@@ -453,7 +454,8 @@ public final class Composer extends VBox {
     /** {@code photos}: only pictures and videos, several allowed; {@code batch}: as many as wanted, one at a time. */
     private void choose(boolean photos, SendAs as, boolean batch) {
         FileChooser fc = new FileChooser();
-        fc.setTitle(I18n.t(batch ? "composer.attach.batch" : photos ? "composer.attach.photo" : "composer.attach"));
+        fc.setTitle(I18n.t(batch && photos ? "composer.attach.photoBatch" : batch ? "composer.attach.batch"
+                : photos ? "composer.attach.photo" : "composer.attach"));
         if (photos) fc.getExtensionFilters().add(new FileChooser.ExtensionFilter(I18n.t("composer.attach.photos"),
                 "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp", "*.heic", "*.bmp", "*.mp4", "*.mov", "*.m4v", "*.webm", "*.mkv"));
         javafx.stage.Window w = getScene().getWindow();
