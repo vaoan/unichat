@@ -69,10 +69,52 @@ final class MessageRowView {
         return id == null || chat.get() == null ? null : loaded.get(id);
     }
 
+    /** What {@code m} answers: loaded, or already fetched on its own ({@link ChatService#message}); null otherwise. */
+    private Message replied(Message m) {
+        Message r = findLoaded(m.replyToId());
+        return r != null || m.replyToId() == null ? r : svc.message(m.chatId(), m.replyToId()).getNow(null);
+    }
+
+    /** The piece of the message {@code m} answers, above it. */
+    private VBox replyQuote(Message m, double maxWidth) {
+        Message replied = findLoaded(m.replyToId());
+        VBox quote = new VBox(1);
+        quote.getStyleClass().add("reply-quote");
+        Label who = new Label(I18n.t("message.original"));
+        who.getStyleClass().add("reply-sender");
+        Label text = new Label(I18n.t("message.notLoaded"));
+        text.getStyleClass().add("reply-text");
+        text.setMaxWidth(maxWidth - 30);
+        quote.getChildren().addAll(who, text);
+        if (replied != null) {
+            quote(who, text, replied);
+            quote.setOnMouseClicked(e -> jumpTo.accept(replied));
+        } else {
+            // Further back than what's loaded (a big chat): asked for on its own, shown when it comes.
+            java.util.concurrent.CompletableFuture<Message> asked = svc.message(m.chatId(), m.replyToId());
+            Message known = asked.getNow(null);
+            if (known != null) {
+                quote(who, text, known);
+            } else if (!asked.isDone()) {
+                text.setText(I18n.t("message.loadingOriginal"));
+                asked.thenAccept(r -> javafx.application.Platform.runLater(() -> {
+                    if (r != null) quote(who, text, r);
+                    else text.setText(I18n.t("message.notLoaded"));
+                }));
+            }
+        }
+        return quote;
+    }
+
+    private static void quote(Label who, Label text, Message replied) {
+        who.setText(replied.outgoing() ? I18n.t("common.you") : replied.senderName());
+        text.setText(replied.preview());
+    }
+
     /** What a screen reader says for a message row. */
     String describe(Message m) {
         String transcript = m.type() == MessageType.AUDIO && Transcripts.get().state(m.mediaUrl()) instanceof Transcripts.Done d ? d.text() : null;
-        return A11yText.message(m, findLoaded(m.replyToId()), transcript, ZoneId.systemDefault());
+        return A11yText.message(m, replied(m), transcript, ZoneId.systemDefault());
     }
 
     Node node(ThreadRows.MessageRow row, double width) {
@@ -143,19 +185,7 @@ final class MessageRowView {
         bubble.setMaxWidth(maxWidth);
         bubble.setFillWidth(false);
 
-        Message replied = findLoaded(m.replyToId());
-        if (m.replyToId() != null) {
-            VBox quote = new VBox(1);
-            quote.getStyleClass().add("reply-quote");
-            Label who = new Label(replied == null ? I18n.t("message.original") : replied.outgoing() ? I18n.t("common.you") : replied.senderName());
-            who.getStyleClass().add("reply-sender");
-            Label text = new Label(replied == null ? I18n.t("message.notLoaded") : replied.preview());
-            text.getStyleClass().add("reply-text");
-            text.setMaxWidth(maxWidth - 30);
-            quote.getChildren().addAll(who, text);
-            if (replied != null) quote.setOnMouseClicked(e -> jumpTo.accept(replied));
-            bubble.getChildren().add(quote);
-        }
+        if (m.replyToId() != null) bubble.getChildren().add(replyQuote(m, maxWidth));
 
         if (m.deleted()) {
             Label l = new Label(I18n.t("message.deleted"));

@@ -373,6 +373,26 @@ final class SyncProcessor {
         }
     }
 
+    /**
+     * A message fetched on its own (a reply's original, older than what's loaded), read like one in the timeline but
+     * not added to it. Null when the room is unknown or the event isn't a message.
+     */
+    Message standalone(String roomId, JsonNode ev) {
+        MatrixRoom room = rooms.get(roomId);
+        String type = text(ev, "type");
+        if (room == null || text(ev, "event_id") == null || !("m.room.message".equals(type) || "m.sticker".equals(type))) return null;
+        Message m = newMessage(room, ev);
+        JsonNode content = ev.path("content");
+        if (ev.path("unsigned").has("redacted_because") || content.isEmpty()) {
+            m.setDeleted(true);
+            return m;
+        }
+        String body = text(content, "body");
+        if (text(content.path("m.relates_to").path("m.in_reply_to"), "event_id") != null) body = stripReplyFallback(body);
+        applyContent(m, type.equals("m.sticker") ? "m.sticker" : text(content, "msgtype"), body, content);
+        return m;
+    }
+
     private Message newMessage(MatrixRoom room, JsonNode ev) {
         String sender = text(ev, "sender");
         long ts = ev.path("origin_server_ts").asLong(0);

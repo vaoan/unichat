@@ -132,6 +132,20 @@ class SyncProcessorTest {
     }
 
     @Test
+    void aMessageFetchedOnItsOwnIsReadButNotAddedToTheChat() {
+        String room = "!old:example.org";
+        sync(room, "{'state':{'events':[" + member("@bob:example.org", "Bob") + "]},'timeline':{'events':[" + text("$9", ME, 9, "new") + "]}}", false);
+        Message old = proc.standalone(room, json("""
+                {'type':'m.room.message','event_id':'$1','sender':'@bob:example.org','origin_server_ts':1,
+                 'content':{'msgtype':'m.image','body':'IMG_0001.jpg','url':'mxc://s/a'}}"""));
+        assertEquals("Bob", old.senderName());
+        assertEquals(app.unichat.model.MessageType.IMAGE, old.type());
+        assertEquals(1, messages(room).size(), "the chat keeps only what it loaded");
+        assertNull(proc.standalone(room, json("{'type':'m.room.member','event_id':'$2','sender':'@bob:example.org','state_key':'@bob:example.org','content':{}}")));
+        assertNull(proc.standalone("!unknown:example.org", json("{'type':'m.room.message','event_id':'$3','sender':'@bob:example.org','content':{'body':'x'}}")));
+    }
+
+        @Test
     void appliesEditsIncludingOutOfOrder() {
         String room = "!e:example.org";
         String edit = """

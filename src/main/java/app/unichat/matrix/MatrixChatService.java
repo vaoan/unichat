@@ -458,6 +458,44 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         }
     }
 
+    /** Asked once per message (the answer is kept: a reply shows on every redraw). */
+    @Override
+    public CompletableFuture<Message> message(String chatId, String messageId) {
+        if (chatId == null || messageId == null || messageId.startsWith(SyncProcessor.LOCAL_PREFIX)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        synchronized (fetched) {
+            CompletableFuture<Message> known = fetched.get(messageId);
+            if (known != null) return known;
+            CompletableFuture<Message> f = CompletableFuture.supplyAsync(() -> {
+                try {
+                    JsonNode ev = client.get(CLIENT + "/rooms/" + enc(chatId) + "/event/" + enc(messageId));
+                    synchronized (proc) {
+                        return proc.standalone(chatId, ev);
+                    }
+                } catch (IOException e) {
+                    return null;
+                }
+            }, io);
+            fetched.put(messageId, f);
+            // Not had (the server didn't answer): asked again next time it's drawn.
+            f.thenAccept(m -> {
+                if (m == null) synchronized (fetched) {
+                    fetched.remove(messageId, f);
+                }
+            });
+            return f;
+        }
+    }
+
+    /** Messages fetched on their own ({@link #message}); the last few hundred. */
+    private final java.util.Map<String, CompletableFuture<Message>> fetched = new java.util.LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(java.util.Map.Entry<String, CompletableFuture<Message>> e) {
+            return size() > 500;
+        }
+    };
+
     @Override
     public CompletableFuture<Boolean> loadOlder(String chatId) {
         CompletableFuture<Boolean> f = new CompletableFuture<>();
