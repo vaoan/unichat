@@ -125,7 +125,7 @@ public final class SettingsWindow {
                 case "ai" -> AiReplyPage.build();
                 case "gifs" -> gifsPage();
                 case "shortcuts" -> shortcutsPage();
-                case "about" -> aboutPage();
+                case "about" -> AboutPage.build();
                 default -> accountPage(svc, () -> { stage.close(); onLogout.run(); });
             };
             ScrollPane sp = new ScrollPane(page);
@@ -273,10 +273,5 @@ public final class SettingsWindow {
             grid.add(new Label(keys[i][1]), 1, i);
         }
         return page(I18n.t("settings.nav.shortcuts"), grid);
-    }
-
-    private static Node aboutPage() {
-        Label l = Labels.help(I18n.t("settings.about.text"));
-        return page(I18n.t("settings.nav.about"), l);
     }
 }

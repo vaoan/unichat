@@ -46,6 +46,8 @@ public final class MainView extends StackPane {
     /** What the top bar says once the server is connected, while networks reconnect (null: nothing). */
     private String syncingNetworks;
     private final AccountAlertBar accountAlerts = new AccountAlertBar(this::addAccount);
+    /** A newer Unichat, above the account alerts. */
+    private final UpdateBar updateBar;
     private final Runnable onLogout;
     /** The one audio playing, whichever chat is open. */
     private final AudioPlayback audio;
@@ -107,6 +109,8 @@ public final class MainView extends StackPane {
         folderDialogs = new FolderDialogs(svc, this::showOverlay, this::hideOverlay);
         listPane = new ChatListPane(svc, this::openChat, folderDialogs);
         listPane.setOnNewChat(this::showNewChat);
+        updateBar = new UpdateBar(app.unichat.update.UpdateChecker.get(), openLink);
+        listPane.setFooter(updateBar);
         listPane.setFooter(accountAlerts);
         listPane.setToast(this::toast);
         thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast, audio, folderDialogs, library);
@@ -188,6 +192,7 @@ public final class MainView extends StackPane {
     public void dispose() {
         audio.stop();
         uploads.dispose();
+        updateBar.dispose();
         svc.removeListener(listener);
         svc.onSaveFailure(null);
     }
