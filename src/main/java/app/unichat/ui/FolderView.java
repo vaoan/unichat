@@ -22,6 +22,7 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 import java.util.HashMap;
@@ -47,6 +48,9 @@ final class FolderView extends VBox {
     private final VBox namesView;
     private final VBox insideView;
     private final Map<String, Long> unread = new HashMap<>();
+    /** Per folder, its chat with the latest activity (null: empty) and how many chats it holds, for its row. */
+    private final Map<String, Chat> latest = new HashMap<>();
+    private final Map<String, Integer> sizes = new HashMap<>();
     private final FolderDialogs dialogs;
     private Runnable onLeave;
     /** The folder whose chats are showing, or null for the names. */
@@ -202,7 +206,17 @@ final class FolderView extends VBox {
         create.setAccessibleHelp(now.isEmpty() ? I18n.t("folders.none") : null);
         unread.clear();
         FolderRows.Servers servers = new FolderRows.Servers(all);
-        if (current == null) for (Folder f : now) unread.put(f.id(), FolderRows.unread(f, servers));
+        latest.clear();
+        sizes.clear();
+        if (current == null) {
+            for (Folder f : now) {
+                unread.put(f.id(), FolderRows.unread(f, servers));
+                List<Chat> in = FolderRows.chatsIn(f, servers);
+                sizes.put(f.id(), in.size());
+                Chat newest = FolderRows.latest(in);
+                if (newest != null) latest.put(f.id(), newest);
+            }
+        }
 
         updating = true;
         try {
@@ -303,24 +317,47 @@ final class FolderView extends VBox {
         return menu;
     }
 
+    /** A folder's row, as big as a chat's: its tile, name and time, and the last message in it. */
     private final class FolderCell extends ListCell<Folder> {
+        private static final double TILE = 44;
         private final Label name = new Label();
+        private final Label stamp = new Label();
+        private final Label preview = new Label();
         private final Label badge = new Label();
+        private final StackPane tile = new StackPane(Icons.icon(Icons.FOLDER, 22));
         private final HBox root;
 
         FolderCell() {
+            getStyleClass().add("chat-cell");
             name.getStyleClass().add("chat-name");
             name.setMinWidth(0);
+            stamp.getStyleClass().add("chat-stamp");
+            stamp.setMinWidth(Region.USE_PREF_SIZE);
+            preview.getStyleClass().add("chat-preview");
+            preview.setMinWidth(0);
             badge.getStyleClass().add("unread-badge");
             badge.setMinWidth(Region.USE_PREF_SIZE);
+            tile.getStyleClass().add("folder-tile");
+            tile.setMinSize(TILE, TILE);
+            tile.setPrefSize(TILE, TILE);
+            tile.setMaxSize(TILE, TILE);
             Region grow = new Region();
             HBox.setHgrow(grow, Priority.ALWAYS);
-            root = new HBox(10, Icons.icon(Icons.FOLDER, 18), name, grow, badge);
+            HBox top = new HBox(6, name, grow, stamp);
+            top.setAlignment(Pos.CENTER_LEFT);
+            Region grow2 = new Region();
+            HBox.setHgrow(grow2, Priority.ALWAYS);
+            HBox bottom = new HBox(6, preview, grow2, badge);
+            bottom.setAlignment(Pos.CENTER_LEFT);
+            VBox text = new VBox(2, top, bottom);
+            text.setAlignment(Pos.CENTER_LEFT);
+            text.setMinWidth(0);
+            HBox.setHgrow(text, Priority.ALWAYS);
+            root = new HBox(12, tile, text);
             root.setAlignment(Pos.CENTER_LEFT);
             root.setMinWidth(0);
             // Size cells to the viewport instead of their content, so no horizontal scrollbar appears.
             setPrefWidth(0);
-            setPadding(new Insets(10));
             setOnMouseClicked(e -> {
                 if (e.getButton() == MouseButton.PRIMARY && getItem() != null) openFolder(getItem().id());
             });
@@ -339,11 +376,28 @@ final class FolderView extends VBox {
                 return;
             }
             long n = Objects.requireNonNullElse(unread.get(f.id()), 0L);
+            Chat newest = latest.get(f.id());
+            int size = Objects.requireNonNullElse(sizes.get(f.id()), 0);
             name.setText(f.name());
+            Nodes.style(name, "unread", n > 0);
+            tile.setStyle("-fx-background-color: " + Avatar.colorFor(f.name()) + ";");
+            stamp.setText(newest == null || newest.lastActivity() == null ? ""
+                    : Formats.listStamp(newest.lastActivity(), java.time.Instant.now(), java.time.ZoneId.systemDefault()));
+            preview.setText(newest == null ? I18n.t("folders.emptyRow") : lastLine(newest));
+            Nodes.style(preview, "unread", n > 0);
             badge.setText(Formats.badge(n));
             Nodes.show(badge, n > 0);
+            // The chats' own spacing (ChatRowCell), compact list included.
+            setPadding(app.unichat.settings.Settings.get().compactList() ? new Insets(4, 10, 4, 10) : new Insets(8, 10, 8, 10));
             setGraphic(root);
-            setAccessibleText(f.name() + (n == 0 ? "" : ", " + I18n.n("rail.unread", n)));
+            setAccessibleText(f.name() + ", " + I18n.n("folders.chatCount", size) + (n == 0 ? "" : ", " + I18n.n("rail.unread", n))
+                    + (newest == null ? "" : ", " + lastLine(newest)));
+        }
+
+        /** "Familia: ¿Quién trae qué?" — whose chat and what was last said there. */
+        private static String lastLine(Chat c) {
+            String p = c.lastPreview() == null ? "" : c.lastPreview();
+            return p.isEmpty() ? c.title() : c.title() + ": " + p;
         }
     }
 }

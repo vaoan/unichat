@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,6 +32,14 @@ class FolderRowsTest {
 
     private static List<String> ids(List<Chat> chats) {
         return chats.stream().map(Chat::id).toList();
+    }
+
+    @Test
+    void aFoldersRowShowsItsMostRecentChatEvenIfAPinnedOneComesFirst() {
+        Chat old = chat("old", 1);
+        Chat recent = chat("recent", 9);
+        assertSame(recent, FolderRows.latest(List.of(old, recent)));
+        assertNull(FolderRows.latest(List.of()), "an empty folder says so");
     }
 
     @Test

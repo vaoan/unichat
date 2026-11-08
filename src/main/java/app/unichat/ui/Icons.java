@@ -88,6 +88,17 @@ public final class Icons {
      */
     static final javafx.beans.property.DoubleProperty SCALE = new javafx.beans.property.SimpleDoubleProperty(1);
 
+    /** An icon at exactly {@code size} px whatever the text size: for glyphs inside a box of fixed size (a network's tile). */
+    public static Node fixedIcon(String path, double size) {
+        Region r = (Region) icon(path, size);
+        for (var p : java.util.List.of(r.minWidthProperty(), r.minHeightProperty(), r.prefWidthProperty(),
+                r.prefHeightProperty(), r.maxWidthProperty(), r.maxHeightProperty())) {
+            p.unbind();
+            p.set(size);
+        }
+        return r;
+    }
+
     /** An icon node sized {@code size} px at 100 % text; color comes from CSS ({@code .icon} / parent rules). */
     public static Node icon(String path, double size) {
         SVGPath svg = new SVGPath();

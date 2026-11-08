@@ -57,6 +57,16 @@ final class FolderRows {
         return in.stream().sorted(InboxRows.order(activity)).toList();
     }
 
+    /** The chat in it with the most recent activity, for the folder's row (its time and last message); null if empty. */
+    static Chat latest(List<Chat> in) {
+        Chat best = null;
+        for (Chat c : in) {
+            if (c.lastActivity() == null) continue;
+            if (best == null || c.lastActivity().isAfter(best.lastActivity())) best = c;
+        }
+        return best != null ? best : in.isEmpty() ? null : in.get(0);
+    }
+
     static long unread(Folder folder, List<Chat> all) { return unread(folder, new Servers(all)); }
 
     /** Chats with something unread, as the inbox counts them. A channel reached twice (alone and through its server) counts once. */

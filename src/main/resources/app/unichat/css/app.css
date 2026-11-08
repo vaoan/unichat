@@ -819,6 +819,9 @@
 .chat-cell .chat-name.unjoined { -fx-opacity: 0.6; }
 /* Carpetas */
 .folder-names { -fx-padding: 0 0 8 0; }
+.folder-tile { -fx-background-radius: 14; }
+.folder-tile .icon { -fx-background-color: white; }
+.root.contrast .folder-tile { -fx-border-color: -text; -fx-border-width: 1.5; -fx-border-radius: 14; }
 .folder-new { -fx-alignment: center; }
 .folder-dialog { -fx-padding: 18; -fx-spacing: 14; }
 /* Nuevo chat */
