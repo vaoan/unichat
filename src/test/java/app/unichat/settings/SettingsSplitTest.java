@@ -24,10 +24,11 @@ class SettingsSplitTest {
         s.set("gif.tenor.enabled", "true");
         s.set("discord.guilds.paused", "1");
         s.set("window.width", "900");
+        s.set("app.update.lastCheck", "1");
         assertFalse(read("settings.properties").contains("TOKEN"));
         assertTrue(read("settings.properties").contains("ui.theme"));
         assertTrue(read("settings.properties").contains("gif.tenor.enabled"));
-        for (String k : new String[] {"gif.tenor.key", "discord.guilds.paused", "window.width"}) {
+        for (String k : new String[] {"gif.tenor.key", "discord.guilds.paused", "window.width", "app.update.lastCheck"}) {
             assertFalse(read("settings.properties").contains(k), k);
         }
         assertTrue(read("session.properties").contains("TOKEN"));

@@ -47,6 +47,8 @@ public final class Settings {
     static boolean staysOnThisMachine(String key) {
         return key.startsWith("matrix.") || key.startsWith("session.") || key.startsWith("server.")
                 || key.startsWith("window.") || key.startsWith("discord.guilds.")
+                // What the update check heard, about the version installed here.
+                || key.startsWith("app.update.")
                 || (key.startsWith("gif.") && key.endsWith(".key"));
     }
 
