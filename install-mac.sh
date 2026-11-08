@@ -9,6 +9,11 @@
 set -e
 cd "$(dirname "$0")"
 ./package.sh
+# Never replace a copy that runs the local server with one that can't (tuwunel missing: no TUWUNEL_BIN, no download).
+if [ -e /Applications/Unichat.app/Contents/app/server/tuwunel ] && [ ! -e release/Unichat.app/Contents/app/server/tuwunel ]; then
+  echo "Error: este paquete no trae tuwunel y el instalado sí; no lo reemplazo (ver package.sh)." >&2
+  exit 1
+fi
 if pgrep -f "/Applications/Unichat.app/" >/dev/null; then
   osascript -e 'quit app "Unichat"' 2>/dev/null || true
   for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -f "/Applications/Unichat.app/" >/dev/null || break; sleep 1; done

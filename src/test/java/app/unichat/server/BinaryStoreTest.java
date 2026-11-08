@@ -88,6 +88,15 @@ class BinaryStoreTest {
     }
 
     @Test
+    void aHomeserverCopiedFromThePackageCountsAsInstalled() throws Exception {
+        Path shipped = Files.write(dir.resolve("shipped"), BINARY);
+        BinaryStore store = new BinaryStore(dir.resolve("bin"), Platform.MAC_ARM64, c -> "http://127.0.0.1:1");
+        store.installBundled("tuwunel", shipped, "v1.9.4");
+        // A later package without it falls back to install(): the copy there is used, nothing downloaded.
+        assertEquals(store.path("tuwunel"), store.install(new Manifest.Component("tuwunel", "", "v1.9.4", "tuwunel")));
+    }
+
+    @Test
     void checksumMismatchInstallsNothing() {
         publishedSum = "0".repeat(64);
         IOException e = assertThrows(IOException.class, () -> store().install(WA));

@@ -149,7 +149,7 @@ public final class LocalServer {
         if (!running) supervisor.reapOrphans();
         Files.createDirectories(dir.resolve("appservices"));
         progress.accept(I18n.t("server.preparing"));
-        store.installBundled("tuwunel", bundledHomeserver(), manifest.tuwunelVersion());
+        installHomeserver();
         installLibolm();
         writeDoublePuppet(secrets);
         if (activeBridges().contains("telegram") && !TelegramKeys.saved()) {
@@ -345,6 +345,22 @@ public final class LocalServer {
             for (String b : Files.readString(f).strip().split("\\s+")) if (!b.isBlank()) out.add(b);
         }
         return out;
+    }
+
+    /**
+     * The homeserver shipped with the app; a package built without it (it happened: package.sh) keeps the copy
+     * already installed, or downloads Unichat's build of that version, so the server still starts.
+     */
+    private void installHomeserver() throws IOException, InterruptedException {
+        Path shipped;
+        try {
+            shipped = bundledHomeserver();
+        } catch (IOException missing) {
+            System.err.println("tuwunel isn't in this package; using the installed copy or the natives release");
+            store.install(manifest.tuwunel());
+            return;
+        }
+        store.installBundled("tuwunel", shipped, manifest.tuwunelVersion());
     }
 
     /** The homeserver shipped with the app. -Dunichat.tuwunelBin wins (development). */

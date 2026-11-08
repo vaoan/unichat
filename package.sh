@@ -11,7 +11,10 @@ cp target/unichat.jar LICENSE THIRD-PARTY.md target/pkg/
 # The local server's homeserver ships inside the app (Contents/app/server/tuwunel; see LocalServer): the one
 # natives.yml built (native/fetch-natives.sh), or TUWUNEL_BIN=<path to a tuwunel built at the versions.env tag>.
 if [ -n "${TUWUNEL_BIN:-}" ]; then
-  mkdir -p target/pkg/server && cp "$TUWUNEL_BIN" target/pkg/server/tuwunel && chmod 755 target/pkg/server/tuwunel
+  # Separate lines: set -e lets a failure in the middle of an && list through, which shipped an app without it.
+  mkdir -p target/pkg/server
+  cp "$TUWUNEL_BIN" target/pkg/server/tuwunel
+  chmod 755 target/pkg/server/tuwunel
 elif [ "$(uname -s)" = Darwin ]; then
   native/fetch-natives.sh tuwunel-darwin-arm64 target/pkg/server/tuwunel \
     || echo "Aviso: sin tuwunel la app no trae el servidor local (solo servidores externos)." >&2

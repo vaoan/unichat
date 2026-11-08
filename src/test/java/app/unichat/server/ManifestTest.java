@@ -55,6 +55,14 @@ class ManifestTest {
     }
 
     @Test
+    void theHomeserverAlwaysComesFromUnichatsOwnRelease() {
+        Manifest m = Manifest.bundled();
+        assertEquals(m.nativesUrl(), m.releaseUrl(m.tuwunel(), Platform.MAC_ARM64));
+        assertEquals(m.nativesUrl(), m.releaseUrl(m.tuwunel(), Platform.WINDOWS_AMD64));
+        assertEquals("tuwunel-darwin-arm64", m.tuwunel().asset(Platform.MAC_ARM64));
+    }
+
+    @Test
     void rejectsMalformedLines() {
         assertThrows(IllegalArgumentException.class, () -> Manifest.parse("whatsapp=mautrix/whatsapp:v1"));
     }

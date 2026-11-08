@@ -70,9 +70,14 @@ public final class Manifest {
     public Map<String, Component> bridges() { return bridges; }
     public String tuwunelVersion() { return settings.get("TUWUNEL_VERSION"); }
 
+    /** The homeserver as a download: Unichat's own build, in the natives release (tuwunel has none for Mac or Windows). */
+    public Component tuwunel() {
+        return new Component("tuwunel", "", tuwunelVersion(), "tuwunel");
+    }
+
     /** Where {@code c}'s files for {@code p} are: the bridge's own release, or Unichat's where it has none. */
     public String releaseUrl(Component c, Platform p) {
-        return p.officialBuilds() ? c.releaseUrl() : nativesUrl();
+        return p.officialBuilds() && !"tuwunel".equals(c.name()) ? c.releaseUrl() : nativesUrl();
     }
 
     /** Unichat's release with what it builds itself: the homeserver, and the bridges for Windows. */
