@@ -329,7 +329,8 @@ public final class Composer extends VBox {
     private AiReplyButton.Request fixRequest() {
         if (chatId == null || input.getText().isBlank()) return null;
         fixing = input.getText();
-        return new AiReplyButton.Request(chatId, app.unichat.assist.FixPrompt.build(fixing));
+        String text = fixing;
+        return new AiReplyButton.Request(chatId, () -> app.unichat.assist.FixPrompt.build(text));
     }
 
     /** Replaces the text only if it's still what was sent: the person may have kept writing. ⌘Z brings it back. */
@@ -353,9 +354,14 @@ public final class Composer extends VBox {
 
     /** The chat so far, the message chosen with "Responder" if any, and what's written as the idea. Null with nothing to answer. */
     private AiReplyButton.Request aiRequest() {
-        java.util.List<Message> chat = chatId == null ? java.util.List.of() : svc.messages(chatId);
+        java.util.List<Message> chat = chatId == null ? java.util.List.of() : java.util.List.copyOf(svc.messages(chatId));
         if (chat.isEmpty()) return null;
-        return new AiReplyButton.Request(chatId, AiReplyButton.prompt(chat, replyTo, input.getText()));
+        Message target = replyTo;
+        String idea = input.getText();
+        // Voice notes being answered are transcribed first (Whisper, here), so the draft knows what they said.
+        java.util.List<Message> toHear = app.unichat.assist.AiSettings.hearVoiceNotes()
+                ? app.unichat.assist.ReplyPrompt.voiceNotesToHear(chat, target) : java.util.List.of();
+        return new AiReplyButton.Request(chatId, () -> AiReplyButton.prompt(chat, target, idea, AiReplyButton.heard(svc, chat, toHear)));
     }
 
     /** Into the box of the chat it was for: what was written there went into the prompt as the idea. */

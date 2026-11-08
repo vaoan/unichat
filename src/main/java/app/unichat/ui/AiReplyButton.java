@@ -44,8 +44,11 @@ final class AiReplyButton {
     static final Look FIX = new Look(Icons.SPELLCHECK, "aiButton.fix", "O", "aiButton.fixCancel",
             "ai-fix-button", "aiButton.fixNothing", "aiButton.fixWorking");
 
-    /** What to answer; the prompt is built on the UI thread, from live messages. */
-    record Request(String chatId, String prompt) {}
+    /**
+     * What to answer. The messages are read on the UI thread; the prompt is finished off it, since a draft may first
+     * wait for its voice notes to be transcribed.
+     */
+    record Request(String chatId, Supplier<String> prompt) {}
 
     /** Writes a draft, or null if cancelled. Tests put their own in place of the real program. */
     interface Writer {
@@ -128,7 +131,7 @@ final class AiReplyButton {
             String text = null;
             String failure = null;
             try {
-                text = w.write(r.prompt());
+                text = w.write(r.prompt().get());
             } catch (ReplyWriter.Failure e) {
                 failure = e.getMessage();
             }
@@ -174,6 +177,40 @@ final class AiReplyButton {
 
     /** The prompt for this chat; pure enough for the composer to call it with what it has. */
     static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.Message target, String idea) {
-        return ReplyPrompt.build(AiSettings.instructions(), AiSettings.folder() != null, chat, target, idea);
+        return prompt(chat, target, idea, java.util.Map.of());
+    }
+
+    static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.Message target, String idea,
+                         java.util.Map<String, String> heard) {
+        return ReplyPrompt.build(AiSettings.instructions(), AiSettings.folder() != null, chat, target, idea, heard);
+    }
+
+    /** Whisper's turn for the notes of one draft, all together: past it the draft goes with what's done. */
+    private static final java.time.Duration HEARING = java.time.Duration.ofMinutes(3);
+
+    /**
+     * What the chat's voice notes say, by message id: those already transcribed, and {@code toHear} transcribed now
+     * (on this computer). Blocking; one that fails or runs late is left out and appears as a mention.
+     */
+    static java.util.Map<String, String> heard(app.unichat.service.MediaSource svc, java.util.List<app.unichat.model.Message> chat,
+                                               java.util.List<app.unichat.model.Message> toHear) {
+        app.unichat.stt.Transcripts transcripts = app.unichat.stt.Transcripts.get();
+        java.util.Map<String, String> out = new java.util.HashMap<>();
+        for (app.unichat.model.Message m : chat) {
+            if (m.mediaUrl() != null && transcripts.state(m.mediaUrl()) instanceof app.unichat.stt.Transcripts.Done d) out.put(m.id(), d.text());
+        }
+        long deadline = System.nanoTime() + HEARING.toNanos();
+        try {
+            for (app.unichat.model.Message m : toHear) {
+                if (out.containsKey(m.id())) continue;
+                java.time.Duration left = java.time.Duration.ofNanos(deadline - System.nanoTime());
+                if (left.isNegative()) break;
+                String text = transcripts.await(m.mediaUrl(), () -> svc.media(m.mediaUrl(), 0, 0), left);
+                if (text != null) out.put(m.id(), text);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return out;
     }
 }

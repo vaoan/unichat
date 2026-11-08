@@ -91,6 +91,31 @@ public final class Transcripts {
         });
     }
 
+    /**
+     * What {@code mediaUrl} says, transcribing it first if needed. Blocking; null if it fails or isn't done within
+     * {@code timeout} (it carries on, and the next ask finds it).
+     */
+    public String await(String mediaUrl, Supplier<CompletableFuture<Path>> audio, java.time.Duration timeout) throws InterruptedException {
+        CompletableFuture<String> text = new CompletableFuture<>();
+        Runnable check = () -> {
+            State s = state(mediaUrl);
+            if (s instanceof Done d) text.complete(d.text());
+            else if (s instanceof Failed) text.complete(null);
+        };
+        addListener(check);
+        try {
+            State before = state(mediaUrl);
+            if (before instanceof Done d) return d.text();
+            request(mediaUrl, audio);
+            check.run();
+            return text.get(timeout.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+            return null;
+        } finally {
+            removeListener(check);
+        }
+    }
+
     private void set(String mediaUrl, State s) {
         states.put(mediaUrl, s);
         for (Runnable r : listeners) r.run();

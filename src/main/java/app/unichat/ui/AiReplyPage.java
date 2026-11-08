@@ -49,7 +49,9 @@ final class AiReplyPage {
                             AiReplyButton.SHOWN.set(on);
                         })),
                         SettingsForm.row(I18n.t("settings.ai.programRow"), I18n.t("settings.ai.programHelp"), new VBox(4, engines, found)),
-                        SettingsForm.row(I18n.t("settings.ai.folder"), I18n.t("settings.ai.folderHelp"), folderControl())),
+                        SettingsForm.row(I18n.t("settings.ai.folder"), I18n.t("settings.ai.folderHelp"), folderControl()),
+                        SettingsForm.row(I18n.t("settings.ai.voiceNotes"), I18n.t("settings.ai.voiceNotesHelp"),
+                                SettingsForm.toggle(AiSettings.hearVoiceNotes(), AiSettings::setHearVoiceNotes))),
                 new VBox(6, new Label(I18n.t("settings.ai.instructions")), instructions, instructionsHelp));
     }
 

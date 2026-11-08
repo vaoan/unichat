@@ -45,6 +45,22 @@ class TranscriptsTest {
     }
 
     @Test
+    void awaitingGivesTheTextOrNullOnFailureOrDelay(@TempDir Path dir) throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        Transcripts t = new Transcripts(dir, (audio, status) -> {
+            if (audio.endsWith("slow.ogg")) release.await();
+            if (audio.endsWith("bad.ogg")) throw new java.io.IOException("no");
+            return "nos vemos";
+        });
+        java.time.Duration wait = java.time.Duration.ofSeconds(10);
+        assertEquals("nos vemos", t.await("mxc://s/ok", () -> CompletableFuture.completedFuture(dir.resolve("ok.ogg")), wait));
+        assertNull(t.await("mxc://s/bad", () -> CompletableFuture.completedFuture(dir.resolve("bad.ogg")), wait));
+        assertNull(t.await("mxc://s/slow", () -> CompletableFuture.completedFuture(dir.resolve("slow.ogg")), java.time.Duration.ofMillis(100)));
+        release.countDown();
+        assertEquals("nos vemos", t.await("mxc://s/ok", () -> { throw new AssertionError("done already"); }, wait));
+    }
+
+    @Test
     void aFailureCanBeRetried(@TempDir Path dir) throws Exception {
         AtomicInteger runs = new AtomicInteger();
         Transcripts t = new Transcripts(dir, (audio, status) -> {

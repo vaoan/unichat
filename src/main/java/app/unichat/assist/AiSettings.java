@@ -33,6 +33,11 @@ public final class AiSettings {
 
     public static void setInstructions(String text) { Settings.get().set("ai.instructions", text); }
 
+    /** Voice notes being answered are transcribed (on this computer, Whisper) so a draft knows what they said. */
+    public static boolean hearVoiceNotes() { return Settings.get().getBool("ai.voiceNotes", true); }
+
+    public static void setHearVoiceNotes(boolean on) { Settings.get().setBool("ai.voiceNotes", on); }
+
     /** The folder it may read, or null. */
     public static Path folder() {
         String f = Settings.get().getString("ai.folder", "");
