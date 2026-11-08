@@ -712,4 +712,15 @@ final class SyncProcessor {
         return null;
     }
 
+    /** The newest message someone else sent in the room that the server has; null if there's none loaded. */
+    String lastIncomingEventId(String roomId) {
+        MatrixRoom room = rooms.get(roomId);
+        if (room == null) return null;
+        for (int i = room.timeline.size() - 1; i >= 0; i--) {
+            Message m = room.timeline.get(i);
+            if (!m.outgoing() && !m.id().startsWith(LOCAL_PREFIX)) return m.id();
+        }
+        return null;
+    }
+
 }

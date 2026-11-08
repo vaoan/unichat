@@ -26,6 +26,10 @@ no se envía nada por su cuenta a quien lo hizo.
 | Los enlaces de los mensajes | La página del enlace, sin cookies | Al mostrar un mensaje con enlace, para saber si tiene video. Nunca a tu red local |
 | **Escribir con IA** (apagado por defecto) | El servicio de Claude Code o Codex, con tu cuenta | Solo al pulsar el botón: el chat abierto para un borrador; solo tu texto para corregirlo |
 
+Las confirmaciones de lectura se eligen en Ajustes → Privacidad: al abrir el chat, **al responder** (abrir un chat no
+avisa a nadie; al escribir en él, la otra persona ve que leíste) o nunca. La app de la red en tu teléfono marca como
+leído por su cuenta si abres el chat allí.
+
 Las notas de voz se transcriben en tu computador con Whisper: el audio no sale de él.
 
 ## Registros

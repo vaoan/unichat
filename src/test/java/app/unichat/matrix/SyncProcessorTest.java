@@ -146,6 +146,16 @@ class SyncProcessorTest {
     }
 
         @Test
+    void theReceiptOnReplyGoesToTheNewestMessageOfSomeoneElse() {
+        String room = "!r:example.org";
+        assertNull(proc.lastIncomingEventId(room));
+        sync(room, "{'timeline':{'events':[%s,%s,%s]}}".formatted(text("$1", "@bob:example.org", 1, "a"),
+                text("$2", "@bob:example.org", 2, "b"), text("$3", ME, 3, "mine")), false);
+        assertEquals("$2", proc.lastIncomingEventId(room));
+        assertEquals("$3", proc.lastEventId(room));
+    }
+
+    @Test
     void appliesEditsIncludingOutOfOrder() {
         String room = "!e:example.org";
         String edit = """

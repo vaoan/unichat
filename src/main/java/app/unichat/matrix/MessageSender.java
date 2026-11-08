@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.DoubleConsumer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -200,6 +202,7 @@ final class MessageSender {
     /** As {@link #sendEvent}, giving the event's id. */
     private CompletableFuture<String> sendEventId(String chatId, String type, String txn, ObjectNode content) {
         return CompletableFuture.supplyAsync(() -> {
+            readOnReply(chatId);
             try {
                 JsonNode resp = client.sendEvent(chatId, type, txn, content);
                 String id = resp.path("event_id").asText(null);
@@ -216,6 +219,28 @@ final class MessageSender {
                 throw new CompletionException(e);
             }
         }, core.io);
+    }
+
+    /** Per chat, the last message a public receipt went out for when sending, so a batch of files sends one. */
+    private final Map<String, String> readOnReply = new ConcurrentHashMap<>();
+
+    /**
+     * With {@link Settings.ReadReceipts#ON_REPLY}, others see you read their messages once you write: a public m.read
+     * for the newest one of theirs, before the message goes. A failure only costs the receipt.
+     */
+    private void readOnReply(String chatId) {
+        if (Settings.get().readReceipts() != Settings.ReadReceipts.ON_REPLY) return;
+        String last;
+        synchronized (proc) {
+            last = proc.lastIncomingEventId(chatId);
+        }
+        if (last == null || last.equals(readOnReply.get(chatId))) return;
+        try {
+            client.post(CLIENT + "/rooms/" + enc(chatId) + "/receipt/m.read/" + enc(last), MatrixClient.JSON.createObjectNode());
+            readOnReply.put(chatId, last);
+        } catch (Exception e) {
+            System.err.println("Read receipt on reply failed: " + e);
+        }
     }
 
     private void fireLocal(String chatId) {

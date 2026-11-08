@@ -52,7 +52,8 @@ final class ChatActions {
 
     /**
      * Clears unread state and moves the read marker. Sends a public m.read receipt only when
-     * {@link Settings#sendReadReceipts()} is on; otherwise a private receipt (m.read.private).
+     * {@link Settings#readReceipts()} is ALWAYS; otherwise a private receipt (m.read.private), which the server keeps to
+     * itself: bridges never see it.
      */
     void markRead(String chatId) {
         String last;
@@ -73,7 +74,7 @@ final class ChatActions {
             try {
                 if (last != null) {
                     ObjectNode body = MatrixClient.JSON.createObjectNode().put("m.fully_read", last);
-                    body.put(Settings.get().sendReadReceipts() ? "m.read" : "m.read.private", last);
+                    body.put(Settings.get().readReceipts() == Settings.ReadReceipts.ALWAYS ? "m.read" : "m.read.private", last);
                     client.post(CLIENT + "/rooms/" + enc(chatId) + "/read_markers", body);
                     lastReadSent.put(chatId, last);
                 }

@@ -20,6 +20,11 @@ public final class Settings {
 
     /** Tri-state accessibility switch: follow the OS, or force on/off. */
     public enum Mode { SYSTEM, ON, OFF }
+    /**
+     * When others see that you read their messages: on opening the chat, only once you send something in it (reading
+     * stays private until then), or never.
+     */
+    public enum ReadReceipts { ALWAYS, ON_REPLY, NEVER }
 
     public static final double MIN_FONT_SCALE = 0.85;
     public static final double MAX_FONT_SCALE = 1.6;
@@ -267,8 +272,11 @@ public final class Settings {
     /** Off by default: archiving a chat means it shouldn't interrupt you. */
     public boolean notifyArchived() { return getBool("notify.archived", false); }
     public void setNotifyArchived(boolean v) { setBool("notify.archived", v); }
-    public boolean sendReadReceipts() { return getBool("privacy.readReceipts", true); }
-    public void setSendReadReceipts(boolean v) { setBool("privacy.readReceipts", v); }
+    /** {@code privacy.readReceipts} was an on/off switch before; it still decides until a choice is made. */
+    public ReadReceipts readReceipts() {
+        return getEnum("privacy.readReceiptsWhen", getBool("privacy.readReceipts", true) ? ReadReceipts.ALWAYS : ReadReceipts.NEVER);
+    }
+    public void setReadReceipts(ReadReceipts v) { set("privacy.readReceiptsWhen", v.name()); }
     public boolean sendTypingNotifications() { return getBool("privacy.typing", true); }
     public void setSendTypingNotifications(boolean v) { setBool("privacy.typing", v); }
     // --- Accounts ---

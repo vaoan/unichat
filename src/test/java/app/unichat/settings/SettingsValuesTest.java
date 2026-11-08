@@ -36,6 +36,16 @@ class SettingsValuesTest {
     }
 
     @Test
+    void theOldReadReceiptsSwitchDecidesUntilAChoiceIsMade() {
+        Settings s = new Settings(dir);
+        assertEquals(Settings.ReadReceipts.ALWAYS, s.readReceipts());
+        s.set("privacy.readReceipts", "false");
+        assertEquals(Settings.ReadReceipts.NEVER, s.readReceipts());
+        s.setReadReceipts(Settings.ReadReceipts.ON_REPLY);
+        assertEquals(Settings.ReadReceipts.ON_REPLY, new Settings(dir).readReceipts());
+    }
+
+    @Test
     void aSetKeepsOrderAndLeavesWithItsLastValue() {
         Settings s = new Settings(dir);
         assertTrue(s.getSet("k").isEmpty());

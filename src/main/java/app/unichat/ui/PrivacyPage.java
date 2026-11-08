@@ -24,7 +24,7 @@ final class PrivacyPage {
         Settings s = Settings.get();
         return page(I18n.t("settings.nav.privacy"), group(I18n.t("settings.privacy.groupIndicators"),
                 row(I18n.t("settings.privacy.readReceipts"), I18n.t("settings.privacy.readReceiptsHelp"),
-                        toggle(s.sendReadReceipts(), s::setSendReadReceipts)),
+                        readReceiptsChoice(s)),
                 row(I18n.t("settings.privacy.typing"), I18n.t("settings.privacy.typingHelp"),
                         toggle(s.sendTypingNotifications(), s::setSendTypingNotifications))),
                 group(I18n.t("settings.privacy.groupLocal"), row(I18n.t("settings.privacy.dataFolder"), s.dir().toString(), new Label()),
@@ -36,6 +36,11 @@ final class PrivacyPage {
                             s.setCheckUpdates(v);
                             app.unichat.update.UpdateChecker.get().settingChanged();
                         }))));
+    }
+
+    private static Node readReceiptsChoice(Settings s) {
+        return chips(I18n.t("settings.privacy.readReceipts"), List.of(Settings.ReadReceipts.values()),
+                v -> I18n.t("settings.privacy.readReceipts." + v.name()), s.readReceipts(), s::setReadReceipts);
     }
 
     private static Node mediaCacheChoice() {
