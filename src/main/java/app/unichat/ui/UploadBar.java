@@ -84,36 +84,45 @@ final class UploadBar extends HBox {
             if (chatId != null) openChat.accept(chatId);
         });
         stage.getStyleClass().add("audio-time");
-        stage.setMinWidth(Region.USE_PREF_SIZE);
-        HBox where2 = new HBox(4, file, where, stage);
+        // Three columns that never push each other (the names and the stage change with every file):
+        // what and where at a fixed width | the bar, and under it the stage, taking the rest | the numbers at a fixed width.
+        HBox where2 = new HBox(4, file, where);
         where2.setAlignment(Pos.CENTER_LEFT);
+        file.setMinWidth(0);
+        where.setMinWidth(0);
         VBox texts = new VBox(0, what, where2);
         texts.setAlignment(Pos.CENTER_LEFT);
-        // A steady width: the names change with every file, and the bar beside them shouldn't move each time.
-        texts.setMinWidth(Region.USE_PREF_SIZE);
-        texts.setPrefWidth(Region.USE_COMPUTED_SIZE);
-        texts.minWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
-                () -> 22 * what.getFont().getSize(), what.fontProperty()));
+        what.setMinWidth(0);
+        fixedEm(texts, 24);
         percent.getStyleClass().add("upload-percent");
-        percent.setMinWidth(Region.USE_PREF_SIZE);
         eta.getStyleClass().add("audio-time");
-        eta.setMinWidth(Region.USE_PREF_SIZE);
         VBox numbers = new VBox(0, percent, eta);
         numbers.setAlignment(Pos.CENTER_LEFT);
+        fixedEm(numbers, 10);
         tick.setCycleCount(javafx.animation.Animation.INDEFINITE);
 
-        bar.setMaxWidth(480);
-        bar.setPrefWidth(240);
-        bar.setMinWidth(120);
-        HBox.setHgrow(bar, Priority.ALWAYS);
-        Region grow = new Region();
-        HBox.setHgrow(grow, Priority.SOMETIMES);
+        bar.setMaxWidth(Double.MAX_VALUE);
+        bar.setMinWidth(80);
+        stage.setMinWidth(0);
+        VBox middle = new VBox(3, bar, stage);
+        middle.setAlignment(Pos.CENTER_LEFT);
+        middle.setMinWidth(80);
+        HBox.setHgrow(middle, Priority.ALWAYS);
         cancel = Icons.iconButton(Icons.CLOSE, I18n.t("uploadBar.cancel"), queue::cancel);
         close = Icons.iconButton(Icons.CLOSE, I18n.t("uploadBar.close"), queue::dismiss);
         hideLater.setOnFinished(e -> queue.dismiss());
-        getChildren().addAll(thumb, texts, bar, numbers, grow, cancel, close);
+        getChildren().addAll(thumb, texts, middle, numbers, cancel, close);
         queue.addListener(listener);
         refresh();
+    }
+
+    /** Exactly {@code em} times the text size wide, following the text size as it changes. */
+    private void fixedEm(Region r, double em) {
+        javafx.beans.binding.DoubleBinding w = javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> em * what.getFont().getSize(), what.fontProperty());
+        r.minWidthProperty().bind(w);
+        r.prefWidthProperty().bind(w);
+        r.maxWidthProperty().bind(w);
     }
 
     /** The queue outlives this bar (the window is rebuilt on a language change). */
@@ -172,14 +181,14 @@ final class UploadBar extends HBox {
         where.setText(I18n.t("uploadBar.where", title));
         where.setAccessibleText(I18n.t("uploadBar.goToChat", title));
         String network = chat == null ? "" : chat.network().displayName();
-        stage.setText("· " + stage(s, network, System.currentTimeMillis()));
+        stage.setText(stage(s, network, System.currentTimeMillis()));
         boolean counting = s.phase() == UploadQueue.Phase.RETRYING;
         if (counting && tick.getStatus() != javafx.animation.Animation.Status.RUNNING) tick.play();
         if (!counting) tick.stop();
         eta.setText(eta(s.etaMs()));
         Nodes.show(eta, s.etaMs() >= 0);
         bar.setAccessibleText(I18n.t("uploadBar.a11y", s.position(), s.total(), title, (int) Math.floor(s.overall() * 100))
-                + ". " + stage.getText().substring(2) + (s.etaMs() >= 0 ? ". " + eta.getText() : ""));
+                + ". " + stage.getText() + (s.etaMs() >= 0 ? ". " + eta.getText() : ""));
         if (!u.file().equals(shownFile)) showPreview(u.file());
     }
 
