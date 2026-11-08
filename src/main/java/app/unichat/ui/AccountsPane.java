@@ -273,7 +273,12 @@ public final class AccountsPane extends VBox {
         Label sub = new Label(I18n.t("accounts.pickNetwork"));
         sub.setWrapText(true);
         sub.getStyleClass().add("sheet-subtitle");
-        setView(I18n.t("accounts.add"), new VBox(12, sub, scroll), this::showList);
+        sub.setMinHeight(Region.USE_PREF_SIZE);
+        // Unofficial bridges: said once, calmly, before the person picks a network (the same text is in Acerca de).
+        Label risk = Labels.help(I18n.t("accounts.riskNotice"));
+        risk.getStyleClass().add("risk-notice");
+        risk.setMinHeight(Region.USE_PREF_SIZE);
+        setView(I18n.t("accounts.add"), new VBox(12, sub, risk, scroll), this::showList);
     }
 
     // ------------------------------------------------------------------ 3. login wizard

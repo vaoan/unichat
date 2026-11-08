@@ -65,12 +65,19 @@ class ArchitectureTest {
     }
 
     @Test
+    void theUpdateCheckKnowsOnlySettings() {
+        noClasses().that().resideInAPackage("..update..")
+                .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..", "..login..", "..bridge..")
+                .check(APP);
+    }
+
+    @Test
     void theBaseLayersStayAtTheBottom() {
         noClasses().that().resideInAnyPackage("..model..", "..support..", "..bridge..")
-                .should().dependOnClassesThat().resideInAnyPackage("..settings..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..assist..", "..gif..")
+                .should().dependOnClassesThat().resideInAnyPackage("..settings..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..assist..", "..gif..", "..update..")
                 .check(APP);
         noClasses().that().resideInAPackage("..settings..")
-                .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..gif..")
+                .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..gif..", "..update..")
                 .check(APP);
     }
 }

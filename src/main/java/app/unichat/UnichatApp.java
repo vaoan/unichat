@@ -20,6 +20,7 @@ import app.unichat.ui.MacQuit;
 import app.unichat.ui.MainView;
 import app.unichat.ui.Notifier;
 import app.unichat.ui.Theme;
+import app.unichat.update.UpdateChecker;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -134,6 +135,7 @@ public final class UnichatApp extends Application {
         }
         String snapshot = System.getProperty("unichat.snapshot");
         if (snapshot != null) new SnapshotRun(mainView, scene, this::quit).start(snapshot);
+        else UpdateChecker.get().start(); // diagnostics never ask GitHub
     }
 
     /** The demo keeps its choices and folders in the same files as the real service. */

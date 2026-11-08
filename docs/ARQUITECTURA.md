@@ -21,8 +21,9 @@ Cada paquete solo puede depender de los que están debajo. `ArchitectureTest` lo
 | `links` | Abre los enlaces de los mensajes para saber si tienen video o audio, sin llegar nunca a esta máquina ni a su red | `model`, `support` |
 | `gif` | Buscadores de GIF y lectura de cuadros | `model`, `settings`, `support` |
 | `login` | Inicio de sesión en los puentes y cookies del navegador | `model`, `support` |
+| `update` | Pregunta a GitHub si hay una versión nueva de Unichat (`UpdateChecker`; las reglas sin red en `UpdatePolicy`) | `settings`, `support` |
 | `settings` | Preferencias | `support` |
-| `model`, `support`, `bridge` | Datos del dominio; utilidades (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Urls`, `Errors`, `Folders`, `Processes`, `Threads`, `ConvertedFiles`); lo que `matrix` y `server` comparten de los puentes (`BridgeStates`, `BridgePorts`) | nada del proyecto |
+| `model`, `support`, `bridge` | Datos del dominio; utilidades (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Urls`, `Errors`, `Folders`, `Processes`, `Threads`, `ConvertedFiles`, `AppVersion`, `ErrorReport`); lo que `matrix` y `server` comparten de los puentes (`BridgeStates`, `BridgePorts`) | nada del proyecto |
 
 Excepciones aceptadas:
 

@@ -516,6 +516,11 @@
 .rail-button.rail-recovering { -fx-opacity: 0.55; }
 .root.contrast .rail-button.rail-recovering { -fx-opacity: 1; -fx-border-color: -warning; -fx-border-width: 2; -fx-border-radius: 10; }
 .root.contrast .account-alert { -fx-border-color: -text; -fx-border-radius: 8; }
+/* A newer Unichat (UpdateBar): the accent, not the alarm red. */
+.account-alert.update { -fx-background-color: derive(-accent, 85%); }
+.root.dark .account-alert.update { -fx-background-color: derive(-accent, -60%); }
+.account-alert.update .label { -fx-text-fill: -text; }
+.account-alert.update .alert-action { -fx-border-color: -accent; }
 
 .media-viewer { -fx-background-color: rgba(0, 0, 0, 0.92); }
 .ai-status { -fx-padding: 2 8 4 8; }
@@ -577,6 +582,9 @@
 .settings-row { -fx-padding: 12 0; -fx-border-color: transparent transparent -border transparent; }
 .settings-label { -fx-font-weight: 600; }
 .settings-help { -fx-text-fill: -text-3; -fx-font-size: 0.88em; }
+/* Unofficial bridges can get an account restricted (AccountsPane picker, Acerca de): calm, readable, no alarm red. */
+.settings-help.risk-notice { -fx-text-fill: -text-2; -fx-background-color: -surface-2; -fx-background-radius: 8; -fx-padding: 0.6em 0.8em; -fx-border-color: -warning; -fx-border-width: 0 0 0 3; }
+.root.contrast .settings-help.risk-notice { -fx-text-fill: -text; -fx-border-color: -text; -fx-border-width: 1 1 1 3; }
 .accent-swatch {
     -fx-min-width: 26; -fx-min-height: 26; -fx-max-width: 26; -fx-max-height: 26;
     -fx-background-radius: 999;

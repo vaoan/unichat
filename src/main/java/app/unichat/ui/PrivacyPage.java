@@ -30,7 +30,12 @@ final class PrivacyPage {
                 group(I18n.t("settings.privacy.groupLocal"), row(I18n.t("settings.privacy.dataFolder"), s.dir().toString(), new Label()),
                         row(I18n.t("settings.privacy.mediaSpace"), I18n.t("settings.privacy.mediaSpaceHelp"),
                                 mediaCacheChoice())),
-                logsGroup(s));
+                logsGroup(s),
+                group(I18n.t("settings.privacy.groupUpdates"), row(I18n.t("settings.privacy.checkUpdates"), I18n.t("settings.privacy.checkUpdatesHelp"),
+                        toggle(s.checkUpdates(), v -> {
+                            s.setCheckUpdates(v);
+                            app.unichat.update.UpdateChecker.get().settingChanged();
+                        }))));
     }
 
     private static Node mediaCacheChoice() {

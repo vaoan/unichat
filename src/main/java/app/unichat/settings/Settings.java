@@ -300,4 +300,7 @@ public final class Settings {
     public boolean showInDock() { return getBool("app.showInDock", false); }
     public void setShowInDock(boolean v) { setBool("app.showInDock", v); }
     public void setMinimizeToTray(boolean v) { setBool("app.minimizeToTray", v); }
+    /** Ask GitHub once a day whether there's a newer Unichat (update/UpdateChecker). */
+    public boolean checkUpdates() { return getBool("app.checkUpdates", true); }
+    public void setCheckUpdates(boolean v) { setBool("app.checkUpdates", v); }
 }
