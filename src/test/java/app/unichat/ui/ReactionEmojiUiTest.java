@@ -17,8 +17,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -38,14 +36,12 @@ class ReactionEmojiUiTest {
         } catch (IllegalStateException running) {
             up.complete(null);
         }
-        up.get(20, TimeUnit.SECONDS);
+        up.get();
         Platform.setImplicitExit(false);
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        FutureTask<T> t = new FutureTask<>(c);
-        Platform.runLater(t);
-        return t.get(20, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 
     private Label shown(String key, MediaSource source) throws Exception {
@@ -59,11 +55,7 @@ class ReactionEmojiUiTest {
     }
 
     private static void await(Callable<Boolean> c, String what) throws Exception {
-        for (int i = 0; i < 100; i++) {
-            if (fx(c)) return;
-            Thread.sleep(50);
-        }
-        assertTrue(fx(c), what);
+        FxWait.until(what, c);
     }
 
     @Test

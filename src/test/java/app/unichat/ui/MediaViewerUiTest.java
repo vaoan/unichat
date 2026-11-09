@@ -31,7 +31,6 @@ import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -51,7 +50,7 @@ class MediaViewerUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -232,33 +231,25 @@ class MediaViewerUiTest {
     }
 
     private static void waitFor(java.util.concurrent.Callable<Boolean> done) throws Exception {
-        long end = System.currentTimeMillis() + 15_000;
-        while (System.currentTimeMillis() < end) {
-            try {
-                if (done.call()) return;
-            } catch (java.util.concurrent.ExecutionException notYet) {
-                // the picture isn't in the window yet
-            }
-            Thread.sleep(50);
+        try {
+            FxWait.until("the photo showed", done); // a throw (the picture isn't in the window yet) counts as not yet
+        } catch (AssertionError timedOut) {
+            Thread.interrupted(); // so the windows can still be asked what they show
+            throw new AssertionError(timedOut.getMessage() + "; windows: " + windows(), timedOut);
         }
-        throw new AssertionError("the photo never showed; windows: " + fx(() -> Window.getWindows().stream()
+    }
+
+    private static List<String> windows() throws Exception {
+        return fx(() -> Window.getWindows().stream()
                 .map(w -> w.getClass().getSimpleName() + (w.getScene() == null ? "" : ":" + w.getScene().getRoot().getStyleClass()
                         + (w.getScene().getRoot().lookupAll("*").stream().filter(PhotoPane.class::isInstance).findFirst()
                                 .map(n -> " photo w=" + ((PhotoPane) n).getWidth() + " img=" + ((PhotoPane) n).view().getImage()
                                         + " area=" + n.getParent()).orElse(" no photo pane; shows " + w.getScene().getRoot().lookupAll(".label, .progress-indicator").stream()
                                         .map(n -> n instanceof javafx.scene.control.Label l ? "label:" + l.getText() : "spinner").toList()))))
-                .toList()));
+                .toList());
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(c.call());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(15, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 }

@@ -18,9 +18,11 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,25 +37,50 @@ class VoiceUiTest {
     private Stage stage;
     private final List<String> toasts = new ArrayList<>();
     private volatile short amplitude = 8_000;
+    /** Reads the mic may answer; it hands over only what the test gave it ({@link #speak}), then waits for more. */
+    private final Semaphore reads = new Semaphore(0);
+    private volatile CountDownLatch heard = new CountDownLatch(0);
 
     private final class Mic implements PcmSource {
         private volatile boolean closed;
 
-        @Override public int rate() { return 48_000; }
+        @Override public int rate() { return RATE; }
 
         @Override
         public int read(short[] into) throws java.io.IOException {
-            if (closed) return -1;
             try {
-                Thread.sleep(into.length * 1000L / 48_000);
+                reads.acquire();
             } catch (InterruptedException e) {
                 throw new java.io.IOException(e);
             }
+            if (closed) return -1;
             for (int i = 0; i < into.length; i++) into[i] = i % 2 == 0 ? amplitude : (short) -amplitude;
+            heard.countDown();
             return into.length;
         }
 
-        @Override public void close() { closed = true; }
+        @Override
+        public void close() {
+            closed = true;
+            reads.release(); // wakes a read waiting for more
+        }
+    }
+
+    private static final int RATE = 48_000;
+    /** What the recorder asks for in each read: 1/25 s. */
+    private static final long READ_MS = 40;
+
+    /** Hands the recording {@code ms} of sound, all at once, and waits until the recorder has it. */
+    private void speak(long ms) throws InterruptedException {
+        offer(ms);
+        heard.await();
+    }
+
+    /** Lets the mic hand over up to {@code ms} of sound, without waiting for the recorder to take it. */
+    private void offer(long ms) {
+        int n = (int) (ms / READ_MS);
+        heard = new CountDownLatch(n);
+        reads.release(n);
     }
 
     @BeforeAll
@@ -64,7 +91,7 @@ class VoiceUiTest {
         } catch (IllegalStateException running) {
             up.complete(null);
         }
-        up.get(20, TimeUnit.SECONDS);
+        up.get();
         Platform.setImplicitExit(false);
     }
 
@@ -93,17 +120,11 @@ class VoiceUiTest {
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        FutureTask<T> t = new FutureTask<>(c);
-        Platform.runLater(t);
-        return t.get(20, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 
     private static void await(Callable<Boolean> c, String what) throws Exception {
-        for (int i = 0; i < 120; i++) {
-            if (fx(c)) return;
-            Thread.sleep(50);
-        }
-        assertTrue(fx(c), what);
+        FxWait.until(what, c);
     }
 
     private Node mic() { return composer.lookup(".mic-button"); }
@@ -129,7 +150,7 @@ class VoiceUiTest {
     @Test
     void recordingAndSendingLeavesAVoiceNoteWithItsLength() throws Exception {
         startRecording();
-        Thread.sleep(1200);
+        speak(1200);
         fx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(stage.getScene().snapshot(null), null), "png",
                     java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "unichat-voice-bar.png").toFile());
@@ -146,7 +167,7 @@ class VoiceUiTest {
         Message first = svc.messages(CHAT).get(0);
         fx(() -> { composer.reply(first); return null; });
         startRecording();
-        Thread.sleep(1500); // well over the shortest note, even on a busy machine
+        speak(1500); // well over the shortest note
         fx(() -> { ((Button) composer.lookup(".voice-bar .send-button")).fire(); return null; });
         await(() -> voiceNotes().size() == 1, "sent");
         assertEquals(first.id(), voiceNotes().get(0).replyToId());
@@ -154,12 +175,27 @@ class VoiceUiTest {
 
     @Test
     void discardingSendsNothing() throws Exception {
+        java.util.Set<Path> before = recordings();
         startRecording();
-        Thread.sleep(300);
+        java.util.Set<Path> recording = recordings();
+        recording.removeAll(before);
+        assertEquals(1, recording.size(), "the recording's file");
+        Path file = recording.iterator().next();
+        speak(300);
         fx(() -> { composer.lookup(".voice-bar").lookupAll(".icon-button").stream().findFirst().map(n -> (Button) n).orElseThrow().fire(); return null; });
         assertTrue(fx(() -> composer.lookup(".voice-bar") == null));
-        Thread.sleep(300);
+        await(() -> !Files.exists(file), "the discarded recording's file deleted"); // discarding is done
         assertTrue(voiceNotes().isEmpty());
+    }
+
+    /** The recordings' files there are now. */
+    private static java.util.Set<Path> recordings() throws java.io.IOException {
+        Path media = app.unichat.settings.Settings.get().cacheDir().resolve("media");
+        if (!Files.isDirectory(media)) return new java.util.HashSet<>();
+        try (var files = Files.list(media)) {
+            return files.filter(f -> f.getFileName().toString().matches("voice-.*\\.ogg"))
+                    .collect(java.util.stream.Collectors.toCollection(java.util.HashSet::new));
+        }
     }
 
     @Test
@@ -182,6 +218,8 @@ class VoiceUiTest {
     void aMicThatGivesPureSilenceIsReportedInsteadOfSendingNothing() throws Exception {
         amplitude = 0;
         startRecording();
+        // Longer than the silence that gives a mic away; the bar may give up before the recorder took it all.
+        offer(3_000);
         await(() -> toasts.stream().anyMatch(t -> t.startsWith("El micrófono no da sonido")), "says so");
         assertTrue(fx(() -> composer.lookup(".voice-bar") == null));
         assertTrue(voiceNotes().isEmpty());

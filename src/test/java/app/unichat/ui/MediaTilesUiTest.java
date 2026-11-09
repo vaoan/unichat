@@ -23,8 +23,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,7 +47,7 @@ class MediaTilesUiTest {
         } catch (IllegalStateException running) {
             up.complete(null);
         }
-        up.get(20, TimeUnit.SECONDS);
+        up.get();
         Platform.setImplicitExit(false);
     }
 
@@ -106,8 +104,8 @@ class MediaTilesUiTest {
         int loads = asked.get();
         MediaLibrary.Item tres = sticker("tres");
         fx(() -> { library.toggleFavorite(tres); return null; });
-        long end = System.currentTimeMillis() + 5_000;
-        while (tiles().size() < 3 && System.currentTimeMillis() < end) Thread.sleep(20);
+        FxWait.until("a third tile", () -> tiles().size() >= 3);
+        FxWait.settled(); // whatever the new favourite set off has run
         assertEquals(3, tiles().size());
         assertTrue(tiles().containsAll(before));
         assertTrue(asked.get() - loads <= 2, "thumbnail and original of that one: " + (asked.get() - loads));
@@ -130,9 +128,6 @@ class MediaTilesUiTest {
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        if (Platform.isFxApplicationThread()) return c.call();
-        FutureTask<T> t = new FutureTask<>(c);
-        Platform.runLater(t);
-        return t.get(20, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 }

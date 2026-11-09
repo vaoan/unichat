@@ -18,8 +18,6 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,7 +40,7 @@ class AiReplyUiTest {
         } catch (IllegalStateException running) {
             up.complete(null);
         }
-        up.get(20, TimeUnit.SECONDS);
+        up.get();
         Platform.setImplicitExit(false);
     }
 
@@ -83,22 +81,13 @@ class AiReplyUiTest {
         return fx(() -> ((TextArea) composer.lookup(".text-area")).getText());
     }
 
-    private void await(Callable<Boolean> c) throws Exception {
-        long end = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < end) {
-            if (fx(c)) return;
-            Thread.sleep(30);
-        }
-        assertTrue(fx(c), "in time");
-    }
-
     @Test
     void theDraftLandsInTheBoxAndIsNotSent() throws Exception {
         int before = svc.messages(CHAT).size();
         writer(p -> { prompts.add(p); return "Claro, voy"; });
         fx(() -> { ((TextArea) composer.lookup(".text-area")).setText("dile que sí"); return null; });
         press();
-        await(() -> text().equals("Claro, voy"));
+        FxWait.until("the draft in the box", () -> text().equals("Claro, voy"));
         assertEquals(before, svc.messages(CHAT).size(), "only a draft");
         String last = svc.messages(CHAT).get(before - 1).preview();
         String draft = prompts.get(prompts.size() - 1); // learning how the person writes may go first
@@ -121,7 +110,7 @@ class AiReplyUiTest {
         int before = svc.messages(CHAT).size();
         write("como estas 5€ 😀");
         pressFix(p -> { prompts.add(p); return "¿Cómo estás? 5€ 😀"; });
-        await(() -> text().equals("¿Cómo estás? 5€ 😀"));
+        FxWait.until("the corrected text in the box", () -> text().equals("¿Cómo estás? 5€ 😀"));
         assertEquals(before, svc.messages(CHAT).size(), "never sent");
         assertTrue(prompts.get(0).contains("como estas 5€ 😀"));
         assertFalse(prompts.get(0).contains(svc.messages(CHAT).get(before - 1).preview()), "the chat stays here");
@@ -135,7 +124,7 @@ class AiReplyUiTest {
         write("ola");
         pressFix(p -> {
             try {
-                release.await(10, TimeUnit.SECONDS);
+                release.await();
             } catch (InterruptedException e) {
                 return null;
             }
@@ -145,7 +134,7 @@ class AiReplyUiTest {
         assertTrue(fx(() -> composer.lookupAll(".ai-status .label").stream()
                 .anyMatch(n -> ((javafx.scene.control.Label) n).getText().startsWith("Corrigiendo el texto con "))));
         release.countDown();
-        await(() -> text().equals("Hola"));
+        FxWait.until("the corrected text in the box", () -> text().equals("Hola"));
         assertFalse(fx(() -> composer.lookupAll(".ai-status").stream().anyMatch(javafx.scene.Node::isVisible)), "done");
         assertTrue(errors.get(0).startsWith("Texto corregido"), errors.toString());
     }
@@ -159,7 +148,7 @@ class AiReplyUiTest {
             composer.useFixWriter(() -> new AiReplyButton.Writer() {
                 @Override public String write(String p) {
                     try {
-                        release.await(10, TimeUnit.SECONDS);
+                        release.await();
                     } catch (InterruptedException e) {
                         return null;
                     }
@@ -190,7 +179,7 @@ class AiReplyUiTest {
         write("hola");
         pressFix(p -> {
             try {
-                release.await(10, TimeUnit.SECONDS);
+                release.await();
             } catch (InterruptedException e) {
                 return null;
             }
@@ -198,19 +187,19 @@ class AiReplyUiTest {
         });
         write("hola, y otra cosa");
         release.countDown();
-        await(() -> !errors.isEmpty());
+        FxWait.until("a message about how it went", () -> !errors.isEmpty());
         assertEquals("hola, y otra cosa", text());
     }
 
     @Test
     void correctingNothingAsksForTextAndRightTextIsSaid() throws Exception {
         pressFix(p -> "no debería correr");
-        await(() -> !errors.isEmpty());
+        FxWait.until("a message about how it went", () -> !errors.isEmpty());
         assertEquals(AiReplyButton.FIX.nothing(), errors.get(0));
         errors.clear();
         write("Todo bien.");
         pressFix(p -> "Todo bien.");
-        await(() -> !errors.isEmpty());
+        FxWait.until("a message about how it went", () -> !errors.isEmpty());
         assertEquals("El texto ya estaba bien", errors.get(0));
     }
 
@@ -220,7 +209,7 @@ class AiReplyUiTest {
         write("ola");
         pressFix(p -> {
             try {
-                release.await(10, TimeUnit.SECONDS);
+                release.await();
             } catch (InterruptedException e) {
                 return null;
             }
@@ -228,7 +217,7 @@ class AiReplyUiTest {
         });
         fx(() -> { composer.setChat("!otro:demo"); return null; });
         release.countDown();
-        Thread.sleep(300);
+        FxWait.until("a message about how it went", () -> !errors.isEmpty()); // it says it went to the other chat
         assertEquals("", text());
         fx(() -> { composer.setChat(CHAT); return null; });
         assertEquals("Hola", text());
@@ -239,7 +228,7 @@ class AiReplyUiTest {
         CountDownLatch release = new CountDownLatch(1);
         writer(p -> {
             try {
-                release.await(10, TimeUnit.SECONDS);
+                release.await();
             } catch (InterruptedException e) {
                 return null;
             }
@@ -248,7 +237,7 @@ class AiReplyUiTest {
         press();
         fx(() -> { composer.setChat("!otro:demo"); return null; });
         release.countDown();
-        Thread.sleep(300);
+        FxWait.until("a message about how it went", () -> !errors.isEmpty()); // it says it went to the other chat
         assertEquals("", text());
         fx(() -> { composer.setChat(CHAT); return null; });
         assertEquals("Para familia", text());
@@ -260,7 +249,7 @@ class AiReplyUiTest {
         writer(new AiReplyButton.Writer() {
             @Override public String write(String p) throws ReplyWriter.Failure {
                 try {
-                    cancelled.await(10, TimeUnit.SECONDS);
+                    cancelled.await();
                 } catch (InterruptedException ignored) {
                     // Same as cancelled.
                 }
@@ -272,13 +261,13 @@ class AiReplyUiTest {
         press();
         assertEquals("Cancelar el borrador con IA", fx(() -> button().getAccessibleText()));
         press();
-        await(() -> button().getAccessibleText().equals(AiReplyButton.REPLY.idle()));
+        FxWait.until("the button back to idle", () -> button().getAccessibleText().equals(AiReplyButton.REPLY.idle()));
         assertEquals("", text());
         assertTrue(errors.isEmpty());
 
         writer(p -> { throw new ReplyWriter.Failure("Claude Code no pudo responder: Not logged in"); });
         press();
-        await(() -> !errors.isEmpty());
+        FxWait.until("a message about how it went", () -> !errors.isEmpty());
         assertTrue(errors.get(0).contains("Not logged in"));
     }
 
@@ -293,7 +282,7 @@ class AiReplyUiTest {
                 return new AiReplyButton.Writer() {
                     @Override public String write(String p) {
                         try {
-                            stop.await(8, TimeUnit.SECONDS);
+                            stop.await();
                         } catch (InterruptedException ignored) {
                             // Same as cancelled.
                         }
@@ -306,24 +295,43 @@ class AiReplyUiTest {
             return null;
         });
         press();
-        await(() -> started.size() >= 2); // the draft's writer, and the learning one, now working
+        FxWait.until("both programs started", () -> started.size() >= 2); // the draft's writer, and the learning one, now working
         press();
-        await(() -> button().getAccessibleText().equals(AiReplyButton.REPLY.idle()));
+        FxWait.until("the button back to idle", () -> button().getAccessibleText().equals(AiReplyButton.REPLY.idle()));
         for (CountDownLatch l : started) assertEquals(0, l.getCount(), "every program was stopped");
         app.unichat.assist.WritingStyle.get().forget();
     }
 
     @Test
     void aDraftThePersonEmptiedTeachesNothing() throws Exception {
-        app.unichat.assist.WritingStyle.get().forget();
-        writer(p -> "Claro, voy");
-        press();
-        await(() -> text().equals("Claro, voy"));
-        write("");
-        write("ok");
+        app.unichat.assist.WritingStyle style = app.unichat.assist.WritingStyle.get();
+        boolean learns = app.unichat.assist.AiSettings.learnStyle();
+        app.unichat.assist.AiSettings.setLearnStyle(false); // learning would use up the corrections this test looks at
+        try {
+            style.forget();
+            writer(p -> "Claro, voy");
+            press();
+            FxWait.until("the draft in the box", () -> text().equals("Claro, voy"));
+            write("");
+            write("ok");
+            send();
+            // A correction is saved off the FX thread, so "none" is only known once a later one arrives: a real one,
+            // from a draft that is sent changed.
+            press();
+            FxWait.until("the second draft in the box", () -> text().equals("Claro, voy"));
+            write("Claro, ya voy");
+            send();
+            FxWait.until("the real correction saved", () -> !style.pending().isEmpty());
+            assertEquals(List.of(new app.unichat.assist.StylePrompt.Correction("Claro, voy", "Claro, ya voy")), style.pending(),
+                    "no false correction");
+        } finally {
+            app.unichat.assist.AiSettings.setLearnStyle(learns);
+            style.forget();
+        }
+    }
+
+    private void send() throws Exception {
         fx(() -> { ((Button) composer.lookup(".send-button")).fire(); return null; });
-        Thread.sleep(200);
-        assertTrue(app.unichat.assist.WritingStyle.get().pending().isEmpty(), "no false correction");
     }
 
     @Test
@@ -334,17 +342,19 @@ class AiReplyUiTest {
         try {
             writer(p -> "Claro, voy");
             press();
-            await(() -> text().equals("Claro, voy"));
+            FxWait.until("the draft in the box", () -> text().equals("Claro, voy"));
             write("ola");
             pressFix(p -> "Hola");
-            await(() -> text().equals("Hola"));
-            long end = System.currentTimeMillis() + 2_000;
-            while (played.get() < 2 && System.currentTimeMillis() < end) Thread.sleep(20);
+            FxWait.until("the corrected text in the box", () -> text().equals("Hola"));
+            FxWait.until("two sounds", () -> played.get() >= 2);
             assertEquals(2, played.get(), "one for the draft, one for the fix");
             pressFix(p -> { throw new ReplyWriter.Failure("no anda"); });
-            await(() -> errors.contains("no anda"));
-            Thread.sleep(200);
-            assertEquals(2, played.get(), "a failure plays nothing");
+            FxWait.until("the failure said", () -> errors.contains("no anda"));
+            // A sound plays off the FX thread, so "none" is only known once a later one arrives: another fix.
+            write("ola");
+            pressFix(p -> "Hola");
+            FxWait.until("the next fix's sound", () -> played.get() >= 3);
+            assertEquals(3, played.get(), "a failure plays nothing");
         } finally {
             app.unichat.assist.ReadySound.player = real;
         }
@@ -358,9 +368,6 @@ class AiReplyUiTest {
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        if (Platform.isFxApplicationThread()) return c.call();
-        FutureTask<T> t = new FutureTask<>(c);
-        Platform.runLater(t);
-        return t.get(20, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 }

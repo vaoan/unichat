@@ -19,8 +19,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,14 +38,12 @@ class VideoUiTest {
         } catch (IllegalStateException running) {
             up.complete(null);
         }
-        up.get(20, TimeUnit.SECONDS);
+        up.get();
         Platform.setImplicitExit(false);
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        FutureTask<T> t = new FutureTask<>(c);
-        Platform.runLater(t);
-        return t.get(20, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 
     private Path mp4() throws Exception {
@@ -70,11 +66,7 @@ class VideoUiTest {
     }
 
     private static void await(Callable<Boolean> c, String what) throws Exception {
-        for (int i = 0; i < 200; i++) {
-            if (fx(c)) return;
-            Thread.sleep(100);
-        }
-        assertTrue(fx(c), what);
+        FxWait.until(what, c);
     }
 
     private Stage window(StackPane root) throws Exception {
@@ -135,7 +127,8 @@ class VideoUiTest {
         Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(clip), "clip", null, p -> { }));
         await(() -> viewer.getProperties().get(VideoViewer.PLAYER) instanceof MediaPlayer p && p.getStatus() == MediaPlayer.Status.PLAYING, "viewer plays");
         MediaPlayer player = (MediaPlayer) viewer.getProperties().get(VideoViewer.PLAYER);
-        Thread.sleep(400);
+        await(() -> player.getCurrentTime().greaterThan(javafx.util.Duration.ZERO), "a frame on screen");
+        FxWait.settled();
         fx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(viewer.getScene().snapshot(null), null), "png",
                     Path.of(System.getProperty("java.io.tmpdir"), "unichat-video-viewer.png").toFile());
@@ -187,22 +180,27 @@ class VideoUiTest {
         key(viewer, javafx.scene.input.KeyCode.PERIOD, ">");
         double rate = fx(player::getRate);
         assertTrue(rate >= 1.75, "sped up: " + rate);
-        // wait for it to start over (the clip is 2 s), then see how fast its time goes
-        double[] last = {fx(() -> player.getCurrentTime().toSeconds())};
+        // Wait for it to start over (the clip is 2 s) and get a little into the new round, then see how fast its time
+        // goes: how long the clock takes to play 0.6 s of the clip. A speed is clip time over wall time.
+        double[] from = new double[1];
+        long[] t0 = new long[1];
         await(() -> {
             double now = player.getCurrentTime().toSeconds();
-            boolean wrapped = now < last[0] - 0.3;
-            last[0] = now;
-            return wrapped;
+            if (player.getCurrentCount() < 1 || now < 0.2 || now > 1) return false;
+            from[0] = now;
+            t0[0] = System.nanoTime();
+            return true;
         }, "it starts over");
-        Thread.sleep(100);
-        double from = fx(() -> player.getCurrentTime().toSeconds());
-        long t0 = System.nanoTime();
-        Thread.sleep(500);
-        double played = fx(() -> player.getCurrentTime().toSeconds()) - from;
-        double wall = (System.nanoTime() - t0) / 1e9;
+        double[] played = new double[1];
+        long[] t1 = new long[1];
+        await(() -> {
+            played[0] = player.getCurrentTime().toSeconds() - from[0];
+            t1[0] = System.nanoTime();
+            return played[0] >= 0.6;
+        }, "0.6 s of the new round played");
+        double wall = (t1[0] - t0[0]) / 1e9;
         fx(() -> { viewer.close(); owner.close(); return null; });
-        assertTrue(played / wall > 1.4, "after starting over it still plays at " + rate + "x, not " + played / wall);
+        assertTrue(played[0] / wall > 1.4, "after starting over it still plays at " + rate + "x, not " + played[0] / wall);
     }
 
     private static void key(Stage stage,javafx.scene.input.KeyCode code, String text) throws Exception {
@@ -212,7 +210,6 @@ class VideoUiTest {
                     "", text, code, false, false, false, false));
             return null;
         });
-        Thread.sleep(200);
     }
 
     @Test
@@ -233,7 +230,7 @@ class VideoUiTest {
         Process make = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi",
                 "-i", "testsrc=s=128x128:d=1:r=10,format=yuva420p", "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", webm.toString())
                 .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-        org.junit.jupiter.api.Assumptions.assumeTrue(make.waitFor(30, TimeUnit.SECONDS) && make.exitValue() == 0, "can't make a WebM");
+        org.junit.jupiter.api.Assumptions.assumeTrue(make.waitFor() == 0, "can't make a WebM");
 
         app.unichat.model.Message m = new app.unichat.model.Message("$1", "!c", "@a:s", "A", false, java.time.Instant.EPOCH);
         app.unichat.matrix.TestMessages.apply(m, "m.sticker", "{\"body\":\"s\",\"url\":\"mxc://s/1\",\"info\":{\"mimetype\":\"video/webm\",\"w\":128,\"h\":128}}");
@@ -305,7 +302,7 @@ class VideoUiTest {
         Path webm = dir.resolve("video.webm");
         Process make = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=160x120:d=1:r=10",
                 "-c:v", "libvpx-vp9", webm.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-        org.junit.jupiter.api.Assumptions.assumeTrue(make.waitFor(30, TimeUnit.SECONDS) && make.exitValue() == 0, "can't make a WebM");
+        org.junit.jupiter.api.Assumptions.assumeTrue(make.waitFor() == 0, "can't make a WebM");
         StackPane root = fx(StackPane::new);
         Stage owner = window(root);
         Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(webm), "video", null, p -> { }));

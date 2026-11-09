@@ -6,11 +6,13 @@ import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,16 +33,21 @@ class TrayCountTest {
     @Test
     @DisabledOnOs(OS.WINDOWS)
     void theHelperIsToldTheCountAndWhenThereIsNone() throws Exception {
-        Path told = dir.resolve("recibido.txt");
-        Path helper = Files.writeString(dir.resolve("helper"), "#!/bin/sh\nwhile IFS= read -r a; do echo \"$a\" >> '" + told + "'; done\n");
+        // A pipe, not a file: each line is read the moment the helper passes it on, and its end says it has no more.
+        Path told = dir.resolve("recibido");
+        assertEquals(0, new ProcessBuilder("mkfifo", told.toString()).inheritIO().start().waitFor(), "mkfifo");
+        Path helper = Files.writeString(dir.resolve("helper"),
+                "#!/bin/sh\nexec 3>'" + told + "'\nwhile IFS= read -r a; do echo \"$a\" >&3; done\n");
         assertTrue(helper.toFile().setExecutable(true));
         NativeBar bar = NativeBar.start(helper, null, () -> { }, id -> { }, () -> { });
-        try {
+        try (BufferedReader received = Files.newBufferedReader(told)) {
             bar.setCount(3);
             bar.setCount(150);
             bar.setCount(0);
-            for (int i = 0; i < 100 && (!Files.exists(told) || Files.readAllLines(told).size() < 3); i++) Thread.sleep(50);
-            assertEquals(List.of("count\t3", "count\t99+", "count\t"), Files.readAllLines(told));
+            assertEquals(List.of("count\t3", "count\t99+", "count\t"),
+                    List.of(received.readLine(), received.readLine(), received.readLine()));
+            bar.close();
+            assertNull(received.readLine(), "nothing else");
         } finally {
             bar.close();
         }

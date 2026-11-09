@@ -6,9 +6,7 @@ import javafx.scene.image.ImageView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,7 +23,7 @@ class AvatarFlashUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -35,9 +33,7 @@ class AvatarFlashUiTest {
         ImageView photo = fx(() -> (ImageView) avatar.getChildren().stream().filter(n -> n instanceof ImageView).findFirst().orElseThrow());
 
         fx(() -> { avatar.set("Mamá", "!mama", "demo://Avatar-Mama", svc); return null; });
-        long end = System.currentTimeMillis() + 10_000;
-        while (!fx(photo::isVisible) && System.currentTimeMillis() < end) Thread.sleep(50);
-        assertTrue(fx(photo::isVisible), "first load finishes");
+        FxWait.until("first load finishes", photo::isVisible);
 
         // The cell is recycled for another chat, then gets Mamá again (what every inbox refresh does).
         boolean visibleRightAway = fx(() -> {
@@ -64,14 +60,6 @@ class AvatarFlashUiTest {
     }
 
     private static <T> T fx(Supplier<T> s) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(s.get());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+        return FxWait.fx(s::get);
     }
 }
