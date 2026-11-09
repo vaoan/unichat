@@ -71,6 +71,7 @@ public final class Composer extends VBox {
     private final VBox frame;
     private final Region rowGrow = new Region();
     private boolean stacked;
+    private boolean fitPending;
     /** Held here: the global properties only keep a weak reference, so a closed chat's composer can go. */
     private final javafx.beans.InvalidationListener frameFit;
     /** Below this many characters' width the text goes on its own line (160 % text, a narrow window, the info panel). */
@@ -138,7 +139,16 @@ public final class Composer extends VBox {
         frame = new VBox(2, row);
         frame.getStyleClass().add("composer-row");
         // Again when the room changes: the width, the text size (icons grow with it), the AI buttons coming or going.
-        javafx.beans.InvalidationListener fit = o -> stack(frame.getWidth() < buttonsWidth() + MIN_INPUT_EM * input.getFont().getSize());
+        // Decided right after the layout that changed the width, not during it: moving the text box mid-layout (the window
+        // coming back from a notification's click) left the frame at the stacked height with the text beside the buttons.
+        javafx.beans.InvalidationListener fit = o -> {
+            if (fitPending) return;
+            fitPending = true;
+            Platform.runLater(() -> {
+                fitPending = false;
+                stack(frame.getWidth() < buttonsWidth() + MIN_INPUT_EM * input.getFont().getSize());
+            });
+        };
         frame.widthProperty().addListener(fit);
         Icons.SCALE.addListener(new javafx.beans.WeakInvalidationListener(fit));
         AiReplyButton.SHOWN.addListener(new javafx.beans.WeakInvalidationListener(fit));
