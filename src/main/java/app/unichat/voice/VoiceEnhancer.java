@@ -30,7 +30,8 @@ public final class VoiceEnhancer {
     private static final long MODEL_SIZE = 297_646L;
     private static final String MODEL_SHA256 = "70bb6685eb0c2a1d18e2918dca3fbfbd39317010b1802eb1b6ea73a92f3fdec0";
     private static final int OUTPUT_RATE = 48_000;
-    private static final long TIMEOUT_SECONDS = 120;
+    /** Each pass: this much, plus twice the note's length. Two minutes for every note left the person waiting with no word. */
+    private static final long BASE_TIMEOUT_SECONDS = 15;
     private static final String RUMBLE = "highpass=f=80", VOLUME = "speechnorm=e=2:r=0.0001:l=1";
 
     private VoiceEnhancer() {}
@@ -46,16 +47,29 @@ public final class VoiceEnhancer {
      * @param installing called with 0..1 if something has to be downloaded first
      */
     public static VoiceNote improve(VoiceNote note, Path raw, int rate, DoubleConsumer installing) throws InterruptedException {
+        return improve(note, raw, rate, installing, () -> { });
+    }
+
+    /** @param failed told when the filter failed or ran out of time, so the note goes as recorded */
+    public static VoiceNote improve(VoiceNote note, Path raw, int rate, DoubleConsumer installing, Runnable failed)
+            throws InterruptedException {
         if (!enabled()) return note;
+        Path denoised = note.file().resolveSibling(note.file().getFileName() + ".denoised.pcm");
         Path cleanPcm = note.file().resolveSibling(note.file().getFileName() + ".clean.pcm");
         Path cleanOgg = note.file().resolveSibling(note.file().getFileName() + ".clean.ogg");
         try {
             Path ffmpeg = Ffmpeg.whenNeeded(installing);
             if (ffmpeg == null) return note;
             Path model = model(installing);
-            if (!Ffmpeg.run(command(ffmpeg, raw, rate, cleanPcm, model != null), TIMEOUT_SECONDS, model == null ? null : model.getParent())) {
-                System.err.println("Voice note left as recorded: the audio filter failed");
-                return note;
+            long timeout = BASE_TIMEOUT_SECONDS + 2 * note.durationMs() / 1000;
+            Path folder = model == null ? null : model.getParent();
+            List<List<String>> passes = commands(ffmpeg, raw, rate, denoised, cleanPcm, model != null);
+            for (List<String> pass : passes) {
+                if (!Ffmpeg.run(pass, timeout, folder)) {
+                    System.err.println("Voice note left as recorded: the audio filter failed or took too long");
+                    failed.run();
+                    return note;
+                }
             }
             VoiceNote clean = encode(cleanPcm, cleanOgg);
             Files.move(cleanOgg, note.file(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -64,18 +78,26 @@ public final class VoiceEnhancer {
             System.err.println("Voice note left as recorded: " + e.getClass().getSimpleName());
             return note;
         } finally {
+            deleteQuietly(denoised);
             deleteQuietly(cleanPcm);
             deleteQuietly(cleanOgg);
         }
     }
 
-    /** Run from the model's folder and named bare: a full path would need escaping for ffmpeg's filter syntax, per system. */
-    static List<String> command(Path ffmpeg, Path raw, int rate, Path out, boolean withModel) {
+    /**
+     * Two passes: the rumble and noise filters, then the volume one. Chained in one, Homebrew's ffmpeg 9 never finished some
+     * notes (a 22.4 s one stopped at 2^20 samples out); apart, the same filters give the same sound. Run from the model's
+     * folder and named bare: a full path would need escaping for ffmpeg's filter syntax, per system.
+     */
+    static List<List<String>> commands(Path ffmpeg, Path raw, int rate, Path denoised, Path out, boolean withModel) {
         String noise = withModel ? "arnndn=m=" + MODEL : "afftdn=nr=20:nf=-35";
+        return List.of(pass(ffmpeg, raw, rate, RUMBLE + "," + noise, denoised), pass(ffmpeg, denoised, OUTPUT_RATE, VOLUME, out));
+    }
+
+    private static List<String> pass(Path ffmpeg, Path in, int rate, String filters, Path out) {
         return List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error", "-protocol_whitelist", "file",
-                "-f", "s16le", "-ar", Integer.toString(rate), "-ac", "1", "-i", raw.toString(),
-                "-af", RUMBLE + "," + noise + "," + VOLUME,
-                "-f", "s16le", "-ar", Integer.toString(OUTPUT_RATE), "-ac", "1", out.toString());
+                "-f", "s16le", "-ar", Integer.toString(rate), "-ac", "1", "-i", in.toString(),
+                "-af", filters, "-f", "s16le", "-ar", Integer.toString(OUTPUT_RATE), "-ac", "1", out.toString());
     }
 
     /** The model, downloaded if allowed; null means ffmpeg's plain noise filter, which needs none. */

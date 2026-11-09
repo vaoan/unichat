@@ -89,12 +89,19 @@ class VoiceEnhancerTest {
     }
 
     @Test
-    void theCommandReadsOnlyTheRawFileAndNamesTheModelBare() {
-        List<String> c = VoiceEnhancer.command(Path.of("ffmpeg"), Path.of("a.pcm"), 16_000, Path.of("b.pcm"), true);
-        assertEquals("file", c.get(c.indexOf("-protocol_whitelist") + 1));
-        assertEquals("16000", c.get(c.indexOf("-ar") + 1), "the input's rate comes first");
-        assertTrue(c.get(c.indexOf("-af") + 1).contains("arnndn=m=sh.rnnn"));
-        assertFalse(VoiceEnhancer.command(Path.of("ffmpeg"), Path.of("a.pcm"), 48_000, Path.of("b.pcm"), false).get(13).contains("arnndn"));
+    void theCommandsReadOnlyTheRawFileAndNameTheModelBare() {
+        List<List<String>> c = VoiceEnhancer.commands(Path.of("ffmpeg"), Path.of("a.pcm"), 16_000, Path.of("m.pcm"), Path.of("b.pcm"), true);
+        List<String> first = c.get(0), second = c.get(1);
+        assertEquals("file", first.get(first.indexOf("-protocol_whitelist") + 1));
+        assertEquals("16000", first.get(first.indexOf("-ar") + 1), "the input's rate comes first");
+        assertEquals("a.pcm", first.get(first.indexOf("-i") + 1));
+        assertTrue(first.get(first.indexOf("-af") + 1).contains("arnndn=m=sh.rnnn"));
+        // The volume goes in a pass of its own: chained after the noise filter, ffmpeg 9 never finished some notes.
+        assertEquals("m.pcm", second.get(second.indexOf("-i") + 1));
+        assertTrue(second.get(second.indexOf("-af") + 1).startsWith("speechnorm"));
+        assertEquals("b.pcm", second.get(second.size() - 1));
+        assertFalse(VoiceEnhancer.commands(Path.of("ffmpeg"), Path.of("a.pcm"), 48_000, Path.of("m.pcm"), Path.of("b.pcm"), false)
+                .get(0).toString().contains("arnndn"));
     }
 
     /** ffmpeg's own filter, needing no model: the result is a valid note of the same length. */

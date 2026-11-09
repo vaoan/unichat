@@ -21,6 +21,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.TransferMode;
@@ -59,6 +60,11 @@ public final class Composer extends VBox {
         @Override public void paste() { // ⌘V and the menu's Paste alike
             if (!pasteMedia()) super.paste();
         }
+
+        @Override protected void layoutChildren() { // the text is wrapped to the new width here: measure it after
+            super.layoutChildren();
+            autoGrow();
+        }
     };
     private final HBox banner = new HBox(8);
     private final Label bannerTitle = new Label();
@@ -88,6 +94,8 @@ public final class Composer extends VBox {
     /** Holding a key repeats it, and each press after the first would cancel. */
     private KeyCode aiKeyHeld;
     private final VBox aiStatus = new VBox();
+    /** "Preparing the voice note… 3 s": cleaning it up takes seconds, and before it's sent nothing else shows. */
+    private final WorkingLine preparing = new WorkingLine();
     private VoiceBar voiceBar;
     private VoiceRecorder recorder;
     private Runnable beforeRecording = () -> { };
@@ -116,10 +124,8 @@ public final class Composer extends VBox {
         input.getStyleClass().add("composer-input");
         input.addEventFilter(KeyEvent.KEY_PRESSED, this::onKey);
         input.setContextMenu(FormatMenu.of(input, this::features));
-        input.textProperty().addListener((o, a, t) -> {
-            autoGrow();
-            onTyped(t);
-        });
+        input.textProperty().addListener((o, a, t) -> onTyped(t));
+
         HBox.setHgrow(input, Priority.ALWAYS);
 
         Button attach = Icons.iconButton(Icons.ATTACH, I18n.t("composer.attach"), null);
@@ -158,7 +164,7 @@ public final class Composer extends VBox {
         Icons.SCALE.addListener(new javafx.beans.WeakInvalidationListener(fit));
         AiReplyButton.SHOWN.addListener(new javafx.beans.WeakInvalidationListener(fit));
         frameFit = fit;
-        aiStatus.getChildren().addAll(ai.status(), fix.status());
+        aiStatus.getChildren().addAll(ai.status(), fix.status(), preparing.node());
         getChildren().addAll(banner, aiStatus, frame);
         input.textProperty().addListener((o, a, t) -> refreshVoice());
         input.textProperty().addListener((o, a, t) -> { if (t.isBlank()) aiDrafts.forget(chatId); }); // a draft thrown away
@@ -304,6 +310,7 @@ public final class Composer extends VBox {
         String reply = replyTo == null ? null : replyTo.id();
         cancelMode();
         focus();
+        preparing.start(I18n.t("composer.voicePreparing"));
         Thread.ofPlatform().daemon().name("voice-send").start(() -> {
             try {
                 VoiceNote note = r.stop();
@@ -318,7 +325,7 @@ public final class Composer extends VBox {
                     if (told[0]) return;
                     told[0] = true;
                     Platform.runLater(() -> onError.accept(I18n.t("composer.installingEnhancer")));
-                });
+                }, () -> Platform.runLater(() -> onError.accept(I18n.t("composer.voiceNotCleaned"))));
                 r.deleteRaw();
                 svc.sendVoice(toChat, improved, reply).exceptionally(err -> {
                     Platform.runLater(() -> onError.accept(I18n.t("composer.voiceSendFailed")));
@@ -326,6 +333,8 @@ public final class Composer extends VBox {
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> onError.accept(I18n.t("composer.voiceSaveFailed")));
+            } finally {
+                Platform.runLater(preparing::stop); // sent (it shows in the chat) or failed (said so)
             }
         });
     }
@@ -688,13 +697,30 @@ public final class Composer extends VBox {
     }
 
     /** Grows from 1 to 8 lines with content, then scrolls. */
+    /** The text the box draws, found after its first layout. */
+    private Text drawn;
+
+    /** Most of the window the box may take; past it, it scrolls. */
+    private static final double MAX_SHARE = 0.4;
+
+    /**
+     * As tall as the text the box draws (its own Text node: right whatever the width, size or font), up to
+     * {@link #MAX_SHARE} of the window. Guessing it from the font size cut lines at large text sizes.
+     */
     private void autoGrow() {
-        Text measure = new Text(input.getText().isEmpty() ? " " : input.getText());
-        measure.setFont(input.getFont());
-        double width = Math.max(50, input.getWidth() - 24);
-        measure.setWrappingWidth(width);
-        double lineH = input.getFont().getSize() * 1.35;
-        int lines = (int) Math.ceil(measure.getLayoutBounds().getHeight() / lineH);
-        input.setPrefRowCount(Math.max(1, Math.min(8, lines)));
+        if (drawn == null) {
+            for (javafx.scene.Node n : input.lookupAll(".text")) { // the paragraph, inside a Group; the placeholder isn't
+                if (n instanceof Text t && t.getParent() instanceof javafx.scene.Group) drawn = t;
+            }
+            // Wrapped to a new width after the box's own layout: its size changing is what says so.
+            if (drawn != null) drawn.layoutBoundsProperty().addListener((o, a, b) -> autoGrow());
+        }
+        if (drawn == null || !(input.lookup(".scroll-pane") instanceof ScrollPane sp) || !(sp.getContent() instanceof Region content)) {
+            return; // no skin yet: the first layout comes back here
+        }
+        double h = drawn.getLayoutBounds().getHeight() + content.snappedTopInset() + content.snappedBottomInset()
+                + sp.snappedTopInset() + sp.snappedBottomInset() + input.snappedTopInset() + input.snappedBottomInset();
+        double max = getScene() == null ? 300 : Math.max(80, getScene().getHeight() * MAX_SHARE);
+        input.setPrefHeight(Math.ceil(Math.min(h, max))); // the minimum is the stacked layout's (stack)
     }
 }

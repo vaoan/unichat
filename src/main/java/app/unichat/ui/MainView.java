@@ -167,6 +167,8 @@ public final class MainView extends StackPane {
         toast.setMouseTransparent(true);
         StackPane.setAlignment(toast, Pos.BOTTOM_CENTER);
         toast.setTranslateY(-90);
+        // Above the message box, whatever its height: at a fixed place it covered a box grown to several lines.
+        thread.composer().layoutBoundsProperty().addListener((o, a, b) -> { if (toast.isVisible()) placeToast(); });
 
         getChildren().addAll(main, overlay, toast);
         WindowShortcuts shortcuts = new WindowShortcuts(this, svc, rail, listPane, thread, panel);
@@ -434,7 +436,22 @@ public final class MainView extends StackPane {
         thread.setInfoSelected(false);
     }
 
+    /** Just above the open chat's message box and centered on it; with no chat, near the bottom of the window. */
+    private void placeToast() {
+        Node box = thread.composer();
+        if (thread.chat() == null || box.getScene() == null || !box.isVisible()) {
+            toast.setTranslateX(0);
+            toast.setTranslateY(-90);
+            return;
+        }
+        javafx.geometry.Bounds b = box.localToScene(box.getLayoutBounds());
+        javafx.geometry.Bounds me = localToScene(getLayoutBounds());
+        toast.setTranslateY(-(me.getMaxY() - b.getMinY()) - 12);
+        toast.setTranslateX(b.getCenterX() - me.getCenterX());
+    }
+
     public void toast(String text) {
+        placeToast();
         toast.setText(text);
         toast.setAccessibleText(text);
         toast.setVisible(true);
