@@ -62,9 +62,16 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
 
     /**
      * A plain key that nothing used (the timeline's R, T, P and E are consumed before this), pressed outside a text box
-     * with a chat open: the message box takes the focus, and the character that follows lands there.
+     * with a chat open: the message box takes the focus, and the character that follows lands there. ⌘V pastes there too,
+     * so a picture copied elsewhere goes to the open chat.
      */
     void typeIntoComposer(KeyEvent e) {
+        if (!e.isConsumed() && e.getCode() == KeyCode.V && e.isShortcutDown() && !e.isAltDown() && !e.isShiftDown()
+                && thread.chat() != null && !view.overlayOpen() && !(focusOwner() instanceof javafx.scene.control.TextInputControl)) {
+            e.consume(); // a picture copied, pasted with the focus on the list: it goes to the open chat
+            thread.composer().paste();
+            return;
+        }
         if (e.isConsumed() || e.isShortcutDown() || e.isControlDown() || e.isMetaDown() || thread.chat() == null) return;
         if (!isTypedText(e.getText()) || view.overlayOpen()) return;
         Node owner = focusOwner();

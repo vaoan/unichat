@@ -55,7 +55,11 @@ public final class Composer extends VBox {
     /** The program that learns how the person writes; tests put theirs, as for drafts. */
     private volatile java.util.function.Supplier<app.unichat.assist.StyleLearner.Program> learning =
             () -> app.unichat.assist.StyleLearner.program(app.unichat.assist.AiSettings.engine());
-    private final TextArea input = new TextArea();
+    private final TextArea input = new TextArea() {
+        @Override public void paste() { // ⌘V and the menu's Paste alike
+            if (!pasteMedia()) super.paste();
+        }
+    };
     private final HBox banner = new HBox(8);
     private final Label bannerTitle = new Label();
     private final Label bannerText = new Label();
@@ -481,6 +485,25 @@ public final class Composer extends VBox {
     public void insert(String text) {
         input.insertText(input.getCaretPosition(), text);
         focus();
+    }
+
+    /** Pastes into the message box, from wherever the focus is (⌘V with a chat open). */
+    public void paste() {
+        focus();
+        input.paste();
+    }
+
+    /** A picture or files in the clipboard are sent, as dropping them would; text is left to the box. */
+    private boolean pasteMedia() {
+        if (chatId == null) return false;
+        try {
+            Pasting.Send s = Pasting.toSend(Pasting.Copied.from(javafx.scene.input.Clipboard.getSystemClipboard()), Pasting.folder());
+            if (s == null) return false;
+            send(s.files(), s.as(), false);
+        } catch (java.io.IOException e) {
+            fail(e);
+        }
+        return true;
     }
 
     /** Dropped files: one goes as it is, several as a batch (one at a time, with the upload bar). */
