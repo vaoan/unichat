@@ -31,10 +31,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -60,7 +58,7 @@ class FoldersUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -80,7 +78,8 @@ class FoldersUiTest {
             stage.show();
             return sc;
         });
-        Thread.sleep(300);
+        FxWait.until("the chat list shows", () -> !scene.getRoot().lookupAll(".chat-list .list-cell").isEmpty());
+        FxWait.settled();
         pane = fx(() -> (ChatListPane) scene.getRoot().lookupAll("*").stream()
                 .filter(ChatListPane.class::isInstance).findFirst().orElseThrow());
     }
@@ -216,7 +215,7 @@ class FoldersUiTest {
             ((TextField) scene.getRoot().lookup(".search-field")).setText(title(FAMILIA));
             return null;
         });
-        Thread.sleep(100);
+        FxWait.settled();
         assertFalse(fx(pane::foldersOpen));
         assertTrue(fx(() -> showing(inboxList())));
         assertTrue(fx(() -> inboxList().getItems().stream().anyMatch(c -> c.id().equals(FAMILIA))));
@@ -488,7 +487,7 @@ class FoldersUiTest {
     void anArchivedChatInAFolderDoesNotSendTheHiddenFilterToTheArchive() throws Exception {
         String work = svc.createFolder("Trabajo");
         svc.setInFolder(work, svc.chat(FAMILIA), true);
-        svc.setArchived(FAMILIA, true).get(5, TimeUnit.SECONDS);
+        svc.setArchived(FAMILIA, true).get();
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
 
@@ -744,7 +743,7 @@ class FoldersUiTest {
                     false, false, false, false, true, false, false, false, false, false, null));
             return null;
         });
-        Thread.sleep(100);
+        FxWait.settled();
     }
 
     private static void fire(Button b) throws Exception {
@@ -752,7 +751,7 @@ class FoldersUiTest {
             b.fire();
             return null;
         });
-        Thread.sleep(100);
+        FxWait.settled();
     }
 
     private static void key(Node target, KeyCode code) throws Exception {
@@ -760,27 +759,15 @@ class FoldersUiTest {
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false));
             return null;
         });
-        Thread.sleep(100);
+        FxWait.settled();
     }
 
-    /** chatsChanged reaches the list on a timer: wait for it instead of guessing how long. */
-    private static void eventually(String what, Supplier<Boolean> condition) throws Exception {
-        long until = System.currentTimeMillis() + 5000;
-        while (!fx(condition)) {
-            assertTrue(System.currentTimeMillis() < until, what);
-            Thread.sleep(50);
-        }
+    /** chatsChanged reaches the list through a Throttle: wait for it instead of guessing how long. */
+    private static void eventually(String what, Callable<Boolean> condition) throws Exception {
+        FxWait.until(what, condition);
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(s.get());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+    private static <T> T fx(Callable<T> c) throws Exception {
+        return FxWait.fx(c);
     }
 }

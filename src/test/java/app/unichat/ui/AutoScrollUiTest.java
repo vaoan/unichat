@@ -15,9 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,7 +32,7 @@ class AutoScrollUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -44,7 +42,7 @@ class AutoScrollUiTest {
     private Scene start() throws Exception {
         svc = new MockChatService();
         for (int i = 0; i < 12; i++) {
-            svc.sendText(CHAT, "Mensaje largo " + i + "\nsegunda línea\ntercera línea\ncuarta línea", null).get(5, TimeUnit.SECONDS);
+            svc.sendText(CHAT, "Mensaje largo " + i + "\nsegunda línea\ntercera línea\ncuarta línea", null).get();
         }
         Scene scene = fx(() -> {
             Stage stage = new Stage();
@@ -56,12 +54,26 @@ class AutoScrollUiTest {
             stage.show();
             return sc;
         });
-        Thread.sleep(300);
+        FxWait.until("the chat list shows", () -> !scene.getRoot().lookupAll(".chat-list .list-cell").isEmpty());
         fx(() -> { view.openChatId("!familia:demo"); return null; });
-        Thread.sleep(300);
+        FxWait.until("the first chat's timeline shows", () -> showsLast(scene, "!familia:demo"));
+        FxWait.settled();
         fx(() -> { view.openChatId(CHAT); return null; });
-        Thread.sleep(900);
+        FxWait.until("the long chat's timeline shows", () -> showsLast(scene, CHAT));
+        FxWait.settled();
+        // TODO(reactive): ThreadPane's rewrap (a 120 ms PauseTransition after the list's width changes) calls list.refresh()
+        // and rebuilds every bubble, and nothing tells a test it's still pending (a bubble grown before it is thrown away).
+        // Hook: let FxWait.settled() see it, e.g. ThreadPane counts the running rewrap like Throttle.PENDING.
+        Thread.sleep(300);
+        FxWait.settled();
         return scene;
+    }
+
+    /** The timeline lists {@code chatId}'s newest message. */
+    private boolean showsLast(Scene scene, String chatId) {
+        String last = svc.messages(chatId).getLast().id();
+        return timeline(scene).getItems().stream()
+                .anyMatch(r -> r instanceof ThreadRows.MessageRow mr && mr.message().id().equals(last));
     }
 
     @SuppressWarnings("unchecked")
@@ -74,7 +86,8 @@ class AutoScrollUiTest {
     void clickingTheQuoteOfAReplyGoesToTheOriginalAndStaysThere() throws Exception {
         Scene scene = start();
         String firstId = fx(() -> svc.messages(CHAT).get(0).id());
-        svc.sendText(CHAT, "te respondo", firstId);
+        svc.sendText(CHAT, "te respondo", firstId).get();
+        FxWait.until("the sent message shows", () -> showsLast(scene, CHAT));
         untilAtBottom(scene);
         assertTrue("bottom".equals(bottomState(scene)), "starts at the bottom: " + bottomState(scene));
 
@@ -86,20 +99,23 @@ class AutoScrollUiTest {
                     javafx.scene.input.MouseButton.PRIMARY, 1, false, false, false, false, true, false, false, true, false, true, null));
             return null;
         });
-        Thread.sleep(900);
+        FxWait.until("the original is on screen", () -> onScreen(scene, firstId));
+        FxWait.settled();
         assertTrue(!"bottom".equals(bottomState(scene)), "it stayed up: " + bottomState(scene));
-        assertTrue(fx(() -> {
-            ListView<Object> list = timeline(scene);
-            VirtualFlow<?> flow = (VirtualFlow<?>) list.lookup(".virtual-flow");
-            for (int i = 0; i < list.getItems().size(); i++) {
-                if (list.getItems().get(i) instanceof ThreadRows.MessageRow mr && mr.message().id().equals(firstId)) {
-                    return flow.getFirstVisibleCell().getIndex() <= i && i <= flow.getLastVisibleCell().getIndex();
-                }
-            }
-            return false;
-        }), "the original is on screen");
+        assertTrue(fx(() -> onScreen(scene, firstId)), "the original is on screen");
         assertTrue(fx(() -> scene.getRoot().lookup(".jump-down").isVisible()), "a way back down");
         svc.stop();
+    }
+
+    private static boolean onScreen(Scene scene, String id) {
+        ListView<Object> list = timeline(scene);
+        VirtualFlow<?> flow = (VirtualFlow<?>) list.lookup(".virtual-flow");
+        for (int i = 0; i < list.getItems().size(); i++) {
+            if (list.getItems().get(i) instanceof ThreadRows.MessageRow mr && mr.message().id().equals(id)) {
+                return flow.getFirstVisibleCell().getIndex() <= i && i <= flow.getLastVisibleCell().getIndex();
+            }
+        }
+        return false;
     }
 
     private static String bottomState(Scene s) throws Exception {
@@ -119,6 +135,8 @@ class AutoScrollUiTest {
     @Test
     void openingAShortChatEndsAtTheNewestMessage() throws Exception {
         Scene scene = start();
+        untilAtBottom(scene);
+        FxWait.settled(); // and it stays there
         assertTrue(fx(() -> timeline(scene).lookupAll(".scroll-bar").stream()
                 .anyMatch(n -> n instanceof ScrollBar sb && sb.isVisible() && sb.getOrientation() == javafx.geometry.Orientation.VERTICAL)),
                 "precondition: the chat is taller than the window");
@@ -130,15 +148,18 @@ class AutoScrollUiTest {
     void contentThatGrowsAfterwardsKeepsTheBottomInView() throws Exception {
         Scene scene = start();
         // Like a photo or sticker finishing its download: the newest bubble gets taller after it was shown.
-        fx(() -> {
+        Region grown = fx(() -> {
             VirtualFlow<?> flow = (VirtualFlow<?>) timeline(scene).lookup(".virtual-flow");
             IndexedCell<?> last = flow.getLastVisibleCell();
-            if (last.getGraphic() instanceof Region r) r.setMinHeight(r.getHeight() + 220);
-            return null;
+            Region r = (Region) last.getGraphic();
+            r.setMinHeight(r.getHeight() + 220);
+            return r;
         });
+        FxWait.until("the bubble is laid out taller", () -> grown.getHeight() >= grown.getMinHeight());
         untilAtBottom(scene);
         assertTrue("bottom".equals(bottomState(scene)), bottomState(scene));
-        svc.sendText(CHAT, "nuevo", null);
+        svc.sendText(CHAT, "nuevo", null).get();
+        FxWait.until("the sent message shows", () -> showsLast(scene, CHAT));
         untilAtBottom(scene);
         assertTrue("bottom".equals(bottomState(scene)), "still following new messages: " + bottomState(scene));
         svc.stop();
@@ -157,31 +178,24 @@ class AutoScrollUiTest {
                         javafx.scene.input.ScrollEvent.VerticalTextScrollUnits.NONE, 0, 0, null));
                 return null;
             });
-            Thread.sleep(60);
+            FxWait.pulses(1); // the list lays out each turn of the wheel
         }
-        Thread.sleep(400);
+        FxWait.until("the list stops following the bottom", () -> scene.getRoot().lookup(".jump-down").isVisible());
+        FxWait.settled();
         assertTrue(!"bottom".equals(bottomState(scene)), "precondition: scrolled up");
-        svc.sendText(CHAT, "lo que acabo de escribir", null);
+        svc.sendText(CHAT, "lo que acabo de escribir", null).get();
+        FxWait.until("the sent message shows", () -> showsLast(scene, CHAT));
         untilAtBottom(scene);
         assertTrue("bottom".equals(bottomState(scene)), bottomState(scene));
         svc.stop();
     }
 
-    /** The list settles over several layout passes, which take longer on a loaded machine. */
+    /** The list settles over several layout passes. */
     private static void untilAtBottom(Scene scene) throws Exception {
-        long end = System.currentTimeMillis() + 15_000;
-        while (!"bottom".equals(bottomState(scene)) && System.currentTimeMillis() < end) Thread.sleep(50);
+        FxWait.until("the newest message is fully in view", () -> "bottom".equals(bottomState(scene)));
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(c.call());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 }

@@ -16,8 +16,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,14 +33,12 @@ class TypingDotsUiTest {
         } catch (IllegalStateException running) {
             up.complete(null);
         }
-        up.get(20, TimeUnit.SECONDS);
+        up.get();
         Platform.setImplicitExit(false);
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        FutureTask<T> t = new FutureTask<>(c);
-        Platform.runLater(t);
-        return t.get(20, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 
     @Test
@@ -59,10 +55,10 @@ class TypingDotsUiTest {
         });
         assertTrue(fx(dots::isRunning));
         Set<Double> seen = new HashSet<>();
-        for (int i = 0; i < 12; i++) {
-            seen.add(fx(() -> dots.getChildren().get(0).getOpacity()));
-            Thread.sleep(80);
-        }
+        double first = fx(() -> dots.getChildren().get(0).getOpacity());
+        seen.add(first);
+        FxWait.until("the first dot changes", () -> dots.getChildren().get(0).getOpacity() != first);
+        seen.add(fx(() -> dots.getChildren().get(0).getOpacity()));
         assertTrue(seen.size() > 1, "the first dot changes: " + seen);
         fx(() -> root.getChildren().remove(dots));
         assertFalse(fx(dots::isRunning), "nothing keeps ticking once it's gone");
@@ -94,7 +90,7 @@ class TypingDotsUiTest {
         });
         Chat chat = svc.chat("!familia:demo");
         fx(() -> { chat.setTyping(java.util.Set.of("Laura")); view.thread().refreshHeader(); view.list().refresh(); return null; });
-        Thread.sleep(300);
+        FxWait.until("the chat's row shows the dots", () -> view.lookup(".chat-preview.typing .typing-dots") != null);
         assertNotNull(fx(() -> view.lookup(".chat-preview.typing .typing-dots")), "the chat's row in the list too");
         Label line = fx(() -> (Label) view.lookup(".typing-line"));
         assertNotNull(fx(line::getGraphic));
@@ -106,7 +102,7 @@ class TypingDotsUiTest {
             return null;
         });
         fx(() -> { chat.setTyping(java.util.Set.of()); view.thread().refreshHeader(); view.list().refresh(); return null; });
-        Thread.sleep(300);
+        FxWait.until("the dots go", () -> line.getGraphic() == null && view.lookup(".chat-list .typing-dots") == null);
         assertNull(fx(line::getGraphic));
         assertNull(fx(() -> view.lookup(".chat-list .typing-dots")), "a recycled row doesn't keep them");
         fx(() -> { stage[0].close(); svc.stop(); return null; });
