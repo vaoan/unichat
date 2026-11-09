@@ -182,7 +182,22 @@ final class AiReplyButton {
 
     static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.Message target, String idea,
                          java.util.Map<String, String> heard) {
-        return ReplyPrompt.build(AiSettings.instructions(), AiSettings.folder() != null, chat, target, idea, heard);
+        return prompt(chat, target, idea, heard, "");
+    }
+
+    /** {@code style}: how the person writes ({@code writing-style.md}). */
+    static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.Message target, String idea,
+                         java.util.Map<String, String> heard, String style) {
+        return ReplyPrompt.build(AiSettings.instructions(), AiSettings.folder() != null, chat, target, idea, heard, style);
+    }
+
+    /**
+     * Step one of a draft: learn how the person writes from what's new in {@code chat} (when that's on), and the style
+     * the draft is written with. Blocking.
+     */
+    static String style(String chatId, java.util.List<app.unichat.model.Message> chat, app.unichat.assist.StyleLearner.Program program) {
+        app.unichat.assist.WritingStyle store = app.unichat.assist.WritingStyle.get();
+        return AiSettings.learnStyle() ? new app.unichat.assist.StyleLearner(store, program).learn(chatId, chat) : store.text();
     }
 
     /** Whisper's turn for the notes of one draft, all together: past it the draft goes with what's done. */

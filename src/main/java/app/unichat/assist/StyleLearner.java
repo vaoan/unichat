@@ -30,10 +30,10 @@ public final class StyleLearner {
         this.program = program;
     }
 
-    /** With the person's program and no folder to read, as a fix. */
-    public static StyleLearner real(AiEngine engine) {
+    /** The person's program, with no folder to read (as a fix). */
+    public static Program program(AiEngine engine) {
         ReplyWriter writer = new ReplyWriter(TIMEOUT);
-        return new StyleLearner(WritingStyle.get(), prompt -> writer.write(engine, null, prompt));
+        return prompt -> writer.write(engine, null, prompt);
     }
 
     /**

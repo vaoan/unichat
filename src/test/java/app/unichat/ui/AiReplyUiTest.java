@@ -101,8 +101,9 @@ class AiReplyUiTest {
         await(() -> text().equals("Claro, voy"));
         assertEquals(before, svc.messages(CHAT).size(), "only a draft");
         String last = svc.messages(CHAT).get(before - 1).preview();
-        assertTrue(prompts.get(0).contains(last), "the chat goes along");
-        assertTrue(prompts.get(0).contains("dile que sí"), "what was written, as the idea");
+        String draft = prompts.get(prompts.size() - 1); // learning how the person writes may go first
+        assertTrue(draft.contains(last), "the chat goes along");
+        assertTrue(draft.contains("dile que sí"), "what was written, as the idea");
     }
 
     private Button fixButton() { return (Button) composer.lookup(".ai-fix-button"); }

@@ -50,6 +50,11 @@ public final class Composer extends VBox {
     private static final long MIN_VOICE_MS = 700;
 
     private final ChatService svc;
+    /** The AI's draft in each chat, to compare with what's sent. */
+    private final app.unichat.assist.DraftCorrections aiDrafts = new app.unichat.assist.DraftCorrections();
+    /** The program that learns how the person writes; tests put theirs, as for drafts. */
+    private java.util.function.Supplier<app.unichat.assist.StyleLearner.Program> learning =
+            () -> app.unichat.assist.StyleLearner.program(app.unichat.assist.AiSettings.engine());
     private final TextArea input = new TextArea();
     private final HBox banner = new HBox(8);
     private final Label bannerTitle = new Label();
@@ -310,6 +315,7 @@ public final class Composer extends VBox {
 
     /** Tests: a stand-in for the AI program. */
     void useAiWriter(java.util.function.Supplier<AiReplyButton.Writer> writers) {
+        learning = () -> prompt -> writers.get().write(prompt);
         HBox parent = row;
         int at = parent.getChildren().indexOf(ai.node());
         ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, this::aiDone, writers);
@@ -330,7 +336,7 @@ public final class Composer extends VBox {
         if (chatId == null || input.getText().isBlank()) return null;
         fixing = input.getText();
         String text = fixing;
-        return new AiReplyButton.Request(chatId, () -> app.unichat.assist.FixPrompt.build(text));
+        return new AiReplyButton.Request(chatId, () -> app.unichat.assist.FixPrompt.build(text, app.unichat.assist.WritingStyle.get().text()));
     }
 
     /** Replaces the text only if it's still what was sent: the person may have kept writing. ⌘Z brings it back. */
@@ -361,11 +367,16 @@ public final class Composer extends VBox {
         // Voice notes being answered are transcribed first (Whisper, here), so the draft knows what they said.
         java.util.List<Message> toHear = app.unichat.assist.AiSettings.hearVoiceNotes()
                 ? app.unichat.assist.ReplyPrompt.voiceNotesToHear(chat, target) : java.util.List.of();
-        return new AiReplyButton.Request(chatId, () -> AiReplyButton.prompt(chat, target, idea, AiReplyButton.heard(svc, chat, toHear)));
+        String forChat = chatId;
+        return new AiReplyButton.Request(chatId, () -> {
+            String style = AiReplyButton.style(forChat, chat, learning.get()); // first learn how the person writes, then the draft
+            return AiReplyButton.prompt(chat, target, idea, AiReplyButton.heard(svc, chat, toHear), style);
+        });
     }
 
     /** Into the box of the chat it was for: what was written there went into the prompt as the idea. */
     private void aiDraft(String forChat, String draft) {
+        aiDrafts.drafted(forChat, draft); // what's sent instead teaches how the person writes
         if (!forChat.equals(chatId)) {
             drafts.put(forChat, draft);
             onError.accept(I18n.t("composer.draftElsewhere"));
@@ -529,6 +540,8 @@ public final class Composer extends VBox {
             if (!text.equals(editing.body())) svc.editMessage(chatId, editing.id(), text).exceptionally(this::fail);
         } else {
             svc.sendText(chatId, text, replyTo == null ? null : replyTo.id()).exceptionally(this::fail);
+            app.unichat.assist.StylePrompt.Correction c = aiDrafts.sent(chatId, text);
+            if (c != null) Thread.ofVirtual().start(() -> app.unichat.assist.WritingStyle.get().addCorrection(c.draft(), c.sent()));
         }
         input.clear();
         drafts.remove(chatId);
