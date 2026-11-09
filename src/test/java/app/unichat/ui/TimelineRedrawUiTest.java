@@ -53,6 +53,7 @@ class TimelineRedrawUiTest {
         }
         Platform.setImplicitExit(false);
         MockChatService svc = new MockChatService();
+        svc.skipDemoPauses(); // sent, delivered and read come at once, in order
         svc.sendText(CHAT, "primero de la prueba", null).get();
         // The row just before a new one can change its corners when they join a group: this keeps "primero" away from that.
         svc.sendText(CHAT, "intermedio", null).get();
@@ -67,7 +68,7 @@ class TimelineRedrawUiTest {
             return sc;
         });
         FxWait.until("the first message shows", () -> bubble(scene, "primero de la prueba") != null);
-        // The demo marks a sent message read 4–8 s later, and that rightly draws it again: wait until it has.
+        // The demo marks a sent message read (at once here), and that rightly draws it again: wait until it has.
         FxWait.until("the demo marks our messages read", () -> svc.messages(CHAT).stream().filter(Message::outgoing)
                 .allMatch(m -> m.status() == app.unichat.model.MessageStatus.READ));
         FxWait.settled();

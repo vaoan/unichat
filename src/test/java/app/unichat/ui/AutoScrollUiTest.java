@@ -60,12 +60,7 @@ class AutoScrollUiTest {
         FxWait.settled();
         fx(() -> { view.openChatId(CHAT); return null; });
         FxWait.until("the long chat's timeline shows", () -> showsLast(scene, CHAT));
-        FxWait.settled();
-        // TODO(reactive): ThreadPane's rewrap (a 120 ms PauseTransition after the list's width changes) calls list.refresh()
-        // and rebuilds every bubble, and nothing tells a test it's still pending (a bubble grown before it is thrown away).
-        // Hook: let FxWait.settled() see it, e.g. ThreadPane counts the running rewrap like Throttle.PENDING.
-        Thread.sleep(300);
-        FxWait.settled();
+        FxWait.settled(); // including ThreadPane's rewrap after the width settled, which rebuilds every bubble
         return scene;
     }
 

@@ -81,12 +81,35 @@ class ReplyPromptTest {
     }
 
     @Test
-    void aChosenMessageAndTheIdeaAreNamed() {
-        Message first = msg("Ana", false, "La primera");
-        String p = ReplyPrompt.build("", false, List.of(first, msg("Ana", false, "La segunda")), first, "dile que sí");
-        assertTrue(p.contains("Responde a este mensaje:"));
-        assertTrue(p.substring(p.indexOf("Responde a este mensaje:")).contains("La primera"));
-        assertTrue(p.contains("dile que sí"));
+    void theChosenMessageIsMarkedInTheChatAndTheReplyIsAboutItNotTheLastOne() {
+        Message first = msg("Ana", false, "¿Me prestas el carro el sábado?");
+        String p = ReplyPrompt.build("", false, List.of(first, msg("Ana", false, "Por cierto, ¿viste el partido?")), first, "");
+        List<String> marked = p.lines().filter(l -> l.startsWith("→ ")).toList();
+        assertEquals(1, marked.size(), "only the chosen one is marked: " + marked);
+        assertTrue(marked.get(0).endsWith("Ana: ¿Me prestas el carro el sábado?"), "marked where it is in the chat: " + marked);
+        String ask = p.substring(p.lastIndexOf("</chat-"));
+        assertTrue(ask.contains("eligió responder a este mensaje"), ask);
+        assertTrue(ask.contains("no necesariamente el último"), ask);
+        assertTrue(ask.contains("¿Me prestas el carro el sábado?"), "named again where the task is");
+        assertFalse(p.contains("Responde al último mensaje"));
+    }
+
+    @Test
+    void whatTheyAlreadyWroteIsTheBaseNotJustAnIdea() {
+        String p = ReplyPrompt.build("", false, List.of(msg("Ana", false, "¿Vienes?")), null, "sí voy pero llego tarde");
+        String ask = p.substring(p.lastIndexOf("</chat-"));
+        assertTrue(ask.contains("sí voy pero llego tarde"));
+        assertTrue(ask.contains("Úsalo como base"), ask);
+        assertTrue(ask.contains("sin cambiarle el sentido"), ask);
+        assertTrue(ask.contains("si es una indicación para ti"), "\"dile que sí\" is an instruction, not the text: " + ask);
+    }
+
+    @Test
+    void withNothingChosenNorWrittenItAnswersTheLastMessage() {
+        String p = ReplyPrompt.build("", false, List.of(msg("Ana", false, "¿Vienes?")), null, "  ");
+        assertTrue(p.contains("Responde al último mensaje"));
+        assertFalse(p.contains("→ "));
+        assertFalse(p.contains("Úsalo como base"));
     }
 
     @Test

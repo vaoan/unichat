@@ -74,13 +74,15 @@ final class FxWait {
     }
 
     /**
-     * Until the window has done all it was asked: what's queued on the FX thread so far has run, no {@link Throttle} has a
-     * redraw waiting, and a pulse has laid it out. The point to check that something did <em>not</em> happen.
+     * Until the window has done all it was asked: what's queued on the FX thread so far has run, no redraw is waiting
+     * ({@link Redraws}), and a pulse has laid it out. The point to check that something did <em>not</em> happen.
      */
     static void settled() throws Exception {
         fx(() -> null);
-        until("the window's redraws to run", () -> Throttle.PENDING.get() == 0);
-        pulses(2); // the first may have started before the last change; the second lays it out
+        do {
+            until("the window's redraws to run", () -> Redraws.PENDING.get() == 0);
+            pulses(2); // the first may have started before the last change; the second lays it out
+        } while (fx(() -> Redraws.PENDING.get() != 0)); // a layout in those pulses asked for another (a rewrap)
     }
 
     /** Until {@code n} pulses have run from now. */

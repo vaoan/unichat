@@ -159,6 +159,9 @@ final class MessageActionsUi {
             menu.getItems().add(ChatMenus.item(I18n.t("message.openLink", RichText.shown(url, 40)), () -> media.openLink(url)));
         }
         if (a.contains(MessageActions.Action.REPLY)) menu.getItems().add(ChatMenus.item(I18n.t("message.reply"), () -> composer.reply(m)));
+        if (a.contains(MessageActions.Action.REPLY) && AiReplyButton.SHOWN.get()) {
+            menu.getItems().add(ChatMenus.item(I18n.t("message.replyWithAi"), () -> composer.replyWithAi(m)));
+        }
         if (a.contains(MessageActions.Action.COPY)) menu.getItems().add(ChatMenus.item(I18n.t("message.copyText"), () -> Clipboards.copy(m.body())));
         if (a.contains(MessageActions.Action.OPEN_FILE)) menu.getItems().add(ChatMenus.item(I18n.t("message.openFile"), () -> media.openFile(m)));
         if (a.contains(MessageActions.Action.SAVE_AS)) menu.getItems().add(ChatMenus.item(I18n.t("message.saveAs"), () -> {

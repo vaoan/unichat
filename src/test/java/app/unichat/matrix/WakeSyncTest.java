@@ -93,6 +93,7 @@ class WakeSyncTest {
         svc.pauseRetriesWith(millis -> { }); // the order of states is the point, not the waits between tries
         svc.start();
         changes.until(() -> afterRefusals.size() >= 2);
-        assertEquals(List.of(ConnectionState.CONNECTING, ConnectionState.CONNECTING), afterRefusals.subList(0, 2));
+        // Retries keep coming with no pause between them: compare a copy, not the list they're still adding to.
+        assertEquals(List.of(ConnectionState.CONNECTING, ConnectionState.CONNECTING), List.copyOf(afterRefusals).subList(0, 2));
     }
 }

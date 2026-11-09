@@ -120,9 +120,17 @@ public final class ThreadPane extends BorderPane {
         // Bubble widths come from the list's width when a cell is built: rebuild them once it settles (opening the side
         // panel narrowed the list and cut outgoing bubbles at the right edge).
         javafx.animation.PauseTransition rewrap = new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
-        rewrap.setOnFinished(e -> list.refresh());
+        boolean[] waiting = {false};
+        rewrap.setOnFinished(e -> {
+            list.refresh();
+            if (waiting[0]) Redraws.PENDING.decrementAndGet();
+            waiting[0] = false;
+        });
         list.widthProperty().addListener((o, a, w) -> {
-            if (Math.abs(w.doubleValue() - a.doubleValue()) > 1) rewrap.playFromStart();
+            if (Math.abs(w.doubleValue() - a.doubleValue()) <= 1) return;
+            if (!waiting[0]) Redraws.PENDING.incrementAndGet();
+            waiting[0] = true;
+            rewrap.playFromStart();
         });
     }
 

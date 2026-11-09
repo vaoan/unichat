@@ -82,6 +82,22 @@ class AiReplyUiTest {
     }
 
     @Test
+    void replyingWithAiToAnOlderMessageAnswersThatOneAndBuildsOnWhatWasWritten() throws Exception {
+        app.unichat.model.Message older = svc.messages(CHAT).stream().filter(m -> !m.outgoing() && m.body() != null && !m.body().isBlank())
+                .findFirst().orElseThrow();
+        writer(p -> { prompts.add(p); return "Claro, el sábado sí"; });
+        write("sí pero el sábado");
+        fx(() -> { composer.replyWithAi(older); return null; });
+        FxWait.until("the draft in the box", () -> text().equals("Claro, el sábado sí"));
+        String draft = prompts.get(prompts.size() - 1);
+        String ask = draft.substring(draft.lastIndexOf("</chat-"));
+        assertTrue(ask.contains("eligió responder a este mensaje") && ask.contains(older.preview()), ask);
+        assertTrue(ask.contains("sí pero el sábado") && ask.contains("Úsalo como base"), ask);
+        assertTrue(fx(() -> composer.lookup(".composer-banner") != null
+                && composer.lookup(".composer-banner").isVisible()), "still a reply to that message once sent");
+    }
+
+    @Test
     void theDraftLandsInTheBoxAndIsNotSent() throws Exception {
         int before = svc.messages(CHAT).size();
         writer(p -> { prompts.add(p); return "Claro, voy"; });

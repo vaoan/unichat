@@ -102,6 +102,9 @@ final class AiReplyButton {
 
     Button node() { return button; }
 
+    /** A draft or fix is being written (pressing again would cancel it). */
+    boolean busy() { return working != null; }
+
     /** The line that says it's working; hidden otherwise. */
     Node status() { return status; }
 

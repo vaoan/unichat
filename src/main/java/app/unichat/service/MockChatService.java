@@ -90,7 +90,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
             t.setDaemon(true);
             return t;
         });
-        scheduler.schedule(() -> setState(ConnectionState.ONLINE), 400, TimeUnit.MILLISECONDS);
+        after(400, () -> setState(ConnectionState.ONLINE));
         scheduler.scheduleWithFixedDelay(this::simulateIncoming, 25, 40, TimeUnit.SECONDS);
         scheduler.scheduleWithFixedDelay(this::checkReminders, 5, 5, TimeUnit.SECONDS);
     }
@@ -366,12 +366,11 @@ public final class MockChatService implements ChatService, FolderForwarding {
         });
         if (shown.isCompletedExceptionally()) return shown;
         CompletableFuture<Void> sent = new CompletableFuture<>();
-        ScheduledExecutorService s = scheduler();
         for (int i = 1; i <= 5; i++) {
             double p = i / 5.0;
-            s.schedule(() -> progress.accept(p), i * 100L, TimeUnit.MILLISECONDS);
+            after(i * 100L, () -> progress.accept(p));
         }
-        s.schedule(() -> sent.complete(null), 550, TimeUnit.MILLISECONDS);
+        after(550, () -> sent.complete(null));
         return sent;
     }
 
@@ -661,13 +660,22 @@ public final class MockChatService implements ChatService, FolderForwarding {
         return m;
     }
 
+    /** Demo pauses run at once (in the same order): tests wait for what they bring, not for them. */
+    private volatile boolean noPauses;
+
+    public void skipDemoPauses() { noPauses = true; }
+
+    /** {@code r} after the demo's pause of {@code ms}, or right away (queued in order) with {@link #skipDemoPauses}. */
+    private void after(long ms, Runnable r) {
+        scheduler().schedule(r, noPauses ? 0 : ms, TimeUnit.MILLISECONDS);
+    }
+
     /** SENDING -> SENT -> DELIVERED -> READ, like a real network. */
     private void deliver(Chat chat, Message m) {
-        ScheduledExecutorService s = scheduler();
-        s.schedule(() -> setStatus(chat, m, MessageStatus.SENT), 300, TimeUnit.MILLISECONDS);
+        after(300, () -> setStatus(chat, m, MessageStatus.SENT));
         if (chat.bridgeBot()) return;
-        s.schedule(() -> setStatus(chat, m, MessageStatus.DELIVERED), 1200, TimeUnit.MILLISECONDS);
-        s.schedule(() -> setStatus(chat, m, MessageStatus.READ), 4000 + random.nextInt(4000), TimeUnit.MILLISECONDS);
+        after(1200, () -> setStatus(chat, m, MessageStatus.DELIVERED));
+        after(4000 + random.nextInt(4000), () -> setStatus(chat, m, MessageStatus.READ));
     }
 
     private void setStatus(Chat chat, Message m, MessageStatus status) {

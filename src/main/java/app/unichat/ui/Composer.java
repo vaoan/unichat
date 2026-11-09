@@ -396,6 +396,15 @@ public final class Composer extends VBox {
         onError.accept(I18n.t("composer.draftReady"));
     }
 
+    /**
+     * Answers {@code m} with a draft: it becomes the message being replied to, and what's already in the box is the
+     * base of the draft (ReplyPrompt). Nothing new starts while a draft is being written.
+     */
+    void replyWithAi(Message m) {
+        reply(m);
+        if (AiReplyButton.SHOWN.get() && !ai.busy()) ai.node().fire();
+    }
+
     public void reply(Message m) {
         editing = null;
         replyTo = m;
