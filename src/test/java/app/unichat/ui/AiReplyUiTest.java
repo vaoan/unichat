@@ -89,7 +89,7 @@ class AiReplyUiTest {
         write("sí pero el sábado");
         fx(() -> { composer.replyWithAi(older); return null; });
         FxWait.until("the draft in the box", () -> text().equals("Claro, el sábado sí"));
-        String draft = prompts.get(prompts.size() - 1);
+        String draft = prompts.stream().filter(p -> p.startsWith("Redacta")).reduce((a, b) -> b).orElseThrow();
         String ask = draft.substring(draft.lastIndexOf("</chat-"));
         assertTrue(ask.contains("eligió responder a este mensaje") && ask.contains(older.preview()), ask);
         assertTrue(ask.contains("sí pero el sábado") && ask.contains("Úsalo como base"), ask);
@@ -136,7 +136,7 @@ class AiReplyUiTest {
         FxWait.until("the draft in the box", () -> text().equals("Claro, voy"));
         assertEquals(before, svc.messages(CHAT).size(), "only a draft");
         String last = svc.messages(CHAT).get(before - 1).preview();
-        String draft = prompts.get(prompts.size() - 1); // learning how the person writes may go first
+        String draft = prompts.stream().filter(p -> p.startsWith("Redacta")).reduce((a, b) -> b).orElseThrow(); // learning comes after
         assertTrue(draft.contains(last), "the chat goes along");
         assertTrue(draft.contains("dile que sí"), "what was written, as the idea");
     }
@@ -318,34 +318,53 @@ class AiReplyUiTest {
     }
 
     @Test
-    void cancellingStopsTheLearningToo() throws Exception {
-        app.unichat.assist.WritingStyle.get().addCorrection("algo nuevo", "que aprender"); // so it learns first
-        List<CountDownLatch> started = new java.util.concurrent.CopyOnWriteArrayList<>();
-        fx(() -> {
-            composer.useAiWriter(() -> {
-                CountDownLatch stop = new CountDownLatch(1);
-                started.add(stop);
-                return new AiReplyButton.Writer() {
-                    @Override public String write(String p) {
-                        try {
-                            stop.await();
-                        } catch (InterruptedException ignored) {
-                            // Same as cancelled.
-                        }
-                        return null;
-                    }
-
-                    @Override public void cancel() { stop.countDown(); }
-                };
-            });
+    void theDraftDoesNotWaitForLearningWhichComesAfter() throws Exception {
+        app.unichat.assist.WritingStyle.get().addCorrection("algo nuevo", "que aprender"); // something to learn
+        CountDownLatch learning = new CountDownLatch(1);
+        List<String> order = new java.util.concurrent.CopyOnWriteArrayList<>();
+        writer(p -> {
+            if (p.startsWith("Redacta")) {
+                order.add("draft");
+                return "Claro, voy";
+            }
+            order.add("learn");
+            try {
+                learning.await(); // learning takes its time: the draft must not wait for it
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             return null;
         });
         press();
-        FxWait.until("both programs started", () -> started.size() >= 2); // the draft's writer, and the learning one, now working
-        press();
-        FxWait.until("the button back to idle", () -> button().getAccessibleText().equals(AiReplyButton.REPLY.idle()));
-        for (CountDownLatch l : started) assertEquals(0, l.getCount(), "every program was stopped");
+        FxWait.until("the draft in the box, while learning hasn't finished", () -> text().equals("Claro, voy"));
+        FxWait.until("learning, started after the draft", () -> order.contains("learn"));
+        assertEquals(List.of("draft", "learn"), order);
+        learning.countDown();
         app.unichat.assist.WritingStyle.get().forget();
+    }
+
+    @Test
+    void lookingUpGapsSaysItsSearchingTheWeb() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        writer(new AiReplyButton.Writer() {
+            @Override public String write(String p) { return "listo"; }
+            @Override public AiReplyButton.Writer searching() {
+                return p -> {
+                    try {
+                        if (p.startsWith("Redacta")) release.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return "listo, buscado";
+                };
+            }
+        });
+        write("es a las [hora del partido]");
+        press();
+        FxWait.until("the working line says it's searching", () -> composer.lookupAll(".ai-status .label").stream()
+                .anyMatch(n -> ((javafx.scene.control.Label) n).getText().startsWith("Buscando en internet con ")));
+        release.countDown();
+        FxWait.until("the draft", () -> text().equals("listo, buscado"));
     }
 
     @Test

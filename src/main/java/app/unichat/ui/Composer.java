@@ -173,6 +173,7 @@ public final class Composer extends VBox {
         updateBanner();
         input.setText(drafts.getOrDefault(chatId, ""));
         input.positionCaret(input.getLength());
+        hearAhead();
     }
 
     public void focus() { input.requestFocus(); }
@@ -375,17 +376,46 @@ public final class Composer extends VBox {
         // Voice notes being answered are transcribed first (Whisper, here), so the draft knows what they said.
         java.util.List<Message> toHear = app.unichat.assist.AiSettings.hearVoiceNotes()
                 ? app.unichat.assist.ReplyPrompt.voiceNotesToHear(chat, target) : java.util.List.of();
-        String forChat = chatId;
+        // The style learned so far: learning takes a call of its own (~10 s), so it comes after the draft (learnAfter).
+        return new AiReplyButton.Request(chatId, () -> AiReplyButton.prompt(chat, target, idea, AiReplyButton.heard(svc, chat, toHear),
+                app.unichat.assist.WritingStyle.get().text()), () -> { }, app.unichat.assist.ReplyPrompt.hasGaps(idea));
+    }
+
+    /**
+     * After a draft (never before: it would wait ~10 s), the program updates how the person writes from what's new in that
+     * chat and the corrections so far; the next draft uses it. One at a time; nothing when learning is off.
+     */
+    private void learnAfter(String forChat) {
+        if (!app.unichat.assist.AiSettings.learnStyle() || !learningNow.compareAndSet(false, true)) return;
+        java.util.List<Message> chat = java.util.List.copyOf(svc.messages(forChat));
         app.unichat.assist.StyleLearner.Program program = learning.get();
-        return new AiReplyButton.Request(chatId, () -> {
-            String style = AiReplyButton.style(forChat, chat, program); // first learn how the person writes, then the draft
-            return AiReplyButton.prompt(chat, target, idea, AiReplyButton.heard(svc, chat, toHear), style);
-        }, program::cancel, app.unichat.assist.ReplyPrompt.hasGaps(idea));
+        Thread.ofVirtual().name("learn-style").start(() -> {
+            try {
+                new app.unichat.assist.StyleLearner(app.unichat.assist.WritingStyle.get(), program).learn(forChat, chat);
+            } finally {
+                learningNow.set(false);
+            }
+        });
+    }
+
+    private final java.util.concurrent.atomic.AtomicBoolean learningNow = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * The voice notes a draft of the open chat would answer, transcribed now (Whisper, on this computer), so asking for
+     * the draft doesn't wait for them. Only with the AI buttons and hearing voice notes on.
+     */
+    void hearAhead() {
+        if (chatId == null || !AiReplyButton.SHOWN.get() || !app.unichat.assist.AiSettings.hearVoiceNotes()) return;
+        app.unichat.stt.Transcripts transcripts = app.unichat.stt.Transcripts.get();
+        for (Message m : app.unichat.assist.ReplyPrompt.voiceNotesToHear(svc.messages(chatId), null)) {
+            transcripts.requestAhead(m.mediaUrl(), () -> svc.media(m.mediaUrl(), 0, 0));
+        }
     }
 
     /** Into the box of the chat it was for: what was written there went into the prompt as the idea. */
     private void aiDraft(String forChat, String draft) {
         aiDrafts.drafted(forChat, draft); // what's sent instead teaches how the person writes
+        learnAfter(forChat);
         if (!forChat.equals(chatId)) {
             drafts.put(forChat, draft);
             onError.accept(I18n.t("composer.draftElsewhere"));

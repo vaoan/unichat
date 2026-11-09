@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TranscriptsTest {
     private static void await(Transcripts t, String url) throws Exception {
@@ -57,6 +58,27 @@ class TranscriptsTest {
         assertNull(t.await("mxc://s/slow", () -> CompletableFuture.completedFuture(dir.resolve("slow.ogg")), java.time.Duration.ofMillis(100)));
         release.countDown();
         assertEquals("nos vemos", t.await("mxc://s/ok", () -> { throw new AssertionError("done already"); }, wait));
+    }
+
+    @Test
+    void transcribingAheadDoesItOnceAndNeverRetriesAFailure(@TempDir Path dir) throws Exception {
+        AtomicInteger runs = new AtomicInteger();
+        Transcripts t = new Transcripts(dir, (audio, status) -> {
+            runs.incrementAndGet();
+            if (audio.endsWith("bad.ogg")) throw new java.io.IOException("no");
+            return "ya voy";
+        });
+        t.requestAhead("mxc://s/ok", () -> CompletableFuture.completedFuture(dir.resolve("ok.ogg")));
+        await(t, "mxc://s/ok");
+        assertEquals("ya voy", ((Transcripts.Done) t.state("mxc://s/ok")).text(), "ready before anyone asks");
+        t.requestAhead("mxc://s/bad", () -> CompletableFuture.completedFuture(dir.resolve("bad.ogg")));
+        await(t, "mxc://s/bad");
+        int before = runs.get();
+        // Asked ahead on every update of the open chat: a note that failed isn't tried again and again.
+        t.requestAhead("mxc://s/bad", () -> CompletableFuture.completedFuture(dir.resolve("bad.ogg")));
+        t.requestAhead("mxc://s/ok", () -> CompletableFuture.completedFuture(dir.resolve("ok.ogg")));
+        assertEquals(before, runs.get());
+        assertTrue(t.state("mxc://s/bad") instanceof Transcripts.Failed);
     }
 
     @Test

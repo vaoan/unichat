@@ -37,6 +37,9 @@ final class AiReplyButton {
         String nothing() { return I18n.t(nothingKey); }
 
         String working(String engine) { return I18n.t(workingKey, engine); }
+
+        /** What it says while a draft looks [gaps] up on the web: those take the longest. */
+        String searching(String engine) { return I18n.t("aiButton.searchingWeb", engine); }
     }
 
     static final Look REPLY = new Look(Icons.SPARKLE, "aiButton.draft", "I", "aiButton.draftCancel", "ai-button",
@@ -117,10 +120,14 @@ final class AiReplyButton {
     Node status() { return status; }
 
     private void showWorking(boolean on) {
+        showWorking(on, false);
+    }
+
+    private void showWorking(boolean on, boolean web) {
         if (ticking != null) ticking.stop();
         Nodes.show(status, on);
         if (!on) return;
-        String what = look.working(AiSettings.engine().label());
+        String what = web ? look.searching(AiSettings.engine().label()) : look.working(AiSettings.engine().label());
         long start = System.currentTimeMillis();
         statusText.setText(what + "…");
         ticking = new Timeline(new KeyFrame(Duration.seconds(1),
@@ -145,7 +152,7 @@ final class AiReplyButton {
         cancelRequest = r.cancel();
         working = w;
         show(Icons.CLOSE, look.cancel());
-        showWorking(true);
+        showWorking(true, r.web());
         Thread.ofPlatform().daemon().name("ai-reply").start(() -> {
             String text = null;
             String failure = null;
@@ -219,14 +226,6 @@ final class AiReplyButton {
         return ReplyPrompt.build(AiSettings.instructions(), AiSettings.folder() != null, chat, target, idea, heard, style);
     }
 
-    /**
-     * Step one of a draft: learn how the person writes from what's new in {@code chat} (when that's on), and the style
-     * the draft is written with. Blocking.
-     */
-    static String style(String chatId, java.util.List<app.unichat.model.Message> chat, app.unichat.assist.StyleLearner.Program program) {
-        app.unichat.assist.WritingStyle store = app.unichat.assist.WritingStyle.get();
-        return AiSettings.learnStyle() ? new app.unichat.assist.StyleLearner(store, program).learn(chatId, chat) : store.text();
-    }
 
     /** Whisper's turn for the notes of one draft, all together: past it the draft goes with what's done. */
     private static final java.time.Duration HEARING = java.time.Duration.ofMinutes(3);

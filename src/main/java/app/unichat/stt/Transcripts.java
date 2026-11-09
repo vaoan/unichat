@@ -72,6 +72,15 @@ public final class Transcripts {
         }
     }
 
+    /**
+     * {@link #request}, ahead of being needed (a draft will want it): asked on every update of the open chat, so a note
+     * that failed isn't tried again here; the transcribe button and a draft still can.
+     */
+    public void requestAhead(String mediaUrl, Supplier<CompletableFuture<Path>> audio) {
+        if (state(mediaUrl) instanceof Failed) return;
+        request(mediaUrl, audio);
+    }
+
     /** Starts transcribing unless it's done or under way; {@code audio} downloads the file when its turn comes. */
     public void request(String mediaUrl, Supplier<CompletableFuture<Path>> audio) {
         State cur = state(mediaUrl);

@@ -255,6 +255,7 @@ public final class ThreadPane extends BorderPane {
         }
         lastMessageId = newest == null ? null : newest.id();
         composer.refreshVoice(); // what the chat takes can arrive after it was opened
+        composer.hearAhead(); // a voice note that just arrived is ready when a draft answers it
         messageRows.index(msgs);
         List<ThreadRows.Row> next = ThreadRows.build(msgs, ZoneId.systemDefault());
         if (forceBottom) rows.setAll(next); else ThreadRows.update(rows, next);
