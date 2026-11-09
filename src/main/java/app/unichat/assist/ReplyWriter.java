@@ -17,7 +17,16 @@ import java.util.concurrent.TimeUnit;
 
 /** Runs one AI program over one prompt. The prompt and the chat never reach a log. */
 public final class ReplyWriter {
-    private static final long TIMEOUT_MINUTES = 3;
+    private final java.time.Duration timeout;
+
+    public ReplyWriter() {
+        this(java.time.Duration.ofMinutes(3));
+    }
+
+    /** {@code timeout}: how long the program may take before it's stopped. */
+    public ReplyWriter(java.time.Duration timeout) {
+        this.timeout = timeout;
+    }
 
     /** Said to the person as it is. */
     public static final class Failure extends Exception {
@@ -55,7 +64,7 @@ public final class ReplyWriter {
             running = p;
             if (cancelled) stop(p);
             Thread.ofPlatform().daemon().name("ai-prompt").start(() -> feed(p, prompt));
-            if (!p.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
+            if (!p.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
                 stop(p);
                 throw new Failure(I18n.t("ai.failure.timeout", engine.label()));
             }
