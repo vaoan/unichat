@@ -84,6 +84,14 @@ class ListRepaintUiTest {
     }
 
     @Test
+    void aRowShowsAnAccountTagOnlyWhenItHasOne() throws Exception {
+        // An empty tag is a dark circle beside the time: a row never drawn with an account must still hide it.
+        List<String> shown = FxWait.fx(() -> scene.getRoot().lookupAll(".chat-list .list-cell .account-tag").stream()
+                .filter(Node::isVisible).map(n -> ((javafx.scene.control.Label) n).getText()).toList());
+        assertTrue(shown.stream().noneMatch(String::isEmpty), "an empty account tag is showing: " + shown);
+    }
+
+    @Test
     void openingAnotherChatKeepsTheRowsIconsAndTheFavorites() throws Exception {
         FxWait.fx(() -> {
             view.openChatId("!familia:demo");

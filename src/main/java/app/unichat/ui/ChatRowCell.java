@@ -39,8 +39,9 @@ final class ChatRowCell extends ListCell<Chat> {
     private final Node reminderFlag = Icons.icon(Icons.CLOCK, 13);
     private final Node mutedFlag = Icons.icon(Icons.BELL_OFF, 13);
     private final Node pinnedFlag = Icons.icon(Icons.PIN, 13);
-    /** The account tag shown now: drawn again only when it changes. */
+    /** The account tag shown now: drawn again only when it changes, and always the first time (or an empty one shows). */
     private String shownAccount;
+    private boolean accountDrawn;
     private final HBox root;
 
     ChatRowCell(ChatListPane pane, ChatService svc, Spaces spaces) {
@@ -124,7 +125,8 @@ final class ChatRowCell extends ListCell<Chat> {
         name.setText(c.title());
         String account = pane.filterProperty().get().accountId() == null ? Accounts.forChat(pane.accounts(), c) : null;
         // Several accounts on this network: a tiny avatar says which one (full name on hover / screen reader).
-        if (!java.util.Objects.equals(account, shownAccount)) {
+        if (!accountDrawn || !java.util.Objects.equals(account, shownAccount)) {
+            accountDrawn = true;
             shownAccount = account;
             accountTag.setText(account == null ? "" : Formats.accountShort(account));
             accountTag.setStyle(account == null ? "" : "-fx-background-color: " + Avatar.colorFor(account) + ";");
