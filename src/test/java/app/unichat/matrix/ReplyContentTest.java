@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.service.Changes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -9,10 +10,8 @@ import org.junit.jupiter.api.Test;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A reply says what it answers in m.in_reply_to only: bridges pass the body on as it is, so a quote in it reaches the network. */
 class ReplyContentTest {
@@ -55,11 +54,12 @@ class ReplyContentTest {
     @Test
     void theBodyIsOnlyWhatYouWrote() throws Exception {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "reply-test");
+        Changes changes = new Changes();
+        svc.addListener(changes.listener());
         svc.start();
-        for (int i = 0; i < 100 && svc.messages(ROOM).isEmpty(); i++) Thread.sleep(50);
-        assertTrue(!svc.messages(ROOM).isEmpty(), "the room's message arrived");
+        changes.until(() -> !svc.messages(ROOM).isEmpty()); // the room's message arrived
 
-        svc.sendText(ROOM, "la respuesta", "$1").get(10, TimeUnit.SECONDS);
+        svc.sendText(ROOM, "la respuesta", "$1").get();
         svc.stop();
 
         JsonNode c = MatrixClient.JSON.readTree(sendBody);

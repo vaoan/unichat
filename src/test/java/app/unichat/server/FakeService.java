@@ -1,9 +1,10 @@
 package app.unichat.server;
 
 /**
- * Child process for SupervisorTest: "run" stays up, "crash" exits with an error at once; a second argument is printed.
- * "chatty &lt;dir&gt;" writes 1 MB to its output (far more than a pipe holds), creates dir/done, waits for dir/go and
- * prints "after". "bridge ..." and "broken-bridge ..." are a bridge's setup commands, for BridgeInstallerTest.
+ * Child process for SupervisorTest: "run" stays up until its input closes (it's stopped, or the JVM that started it
+ * is gone), "crash" exits with an error at once; a second argument is printed. "chatty &lt;port&gt;" writes 1 MB to
+ * its output (far more than a pipe holds), connects to the test on that port to say so, waits until the test hangs
+ * up and prints "after". "bridge ..." and "broken-bridge ..." are a bridge's setup commands, for BridgeInstallerTest.
  */
 public final class FakeService {
     public static void main(String[] args) throws Exception {
@@ -19,10 +20,10 @@ public final class FakeService {
             String line = "x".repeat(1023);
             for (int i = 0; i < 1024; i++) System.out.println(line);
             System.out.flush();
-            try {
-                java.nio.file.Path dir = java.nio.file.Path.of(args[1]);
-                java.nio.file.Files.writeString(dir.resolve("done"), "done");
-                while (!java.nio.file.Files.exists(dir.resolve("go"))) Thread.sleep(20);
+            try (java.net.Socket test = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), Integer.parseInt(args[1]))) {
+                while (test.getInputStream().read() >= 0) {
+                    // until the test hangs up
+                }
                 System.out.println("after");
                 System.out.flush();
                 if (System.out.checkError()) System.exit(5);
@@ -30,7 +31,9 @@ public final class FakeService {
                 System.exit(4);
             }
         }
-        Thread.sleep(60_000);
+        while (System.in.read() >= 0) {
+            // nobody writes to it: this ends when the input closes
+        }
     }
 
     /** Works in its current folder, like a bridge: writes what it's asked for and leaves a line per call in calls.txt. */

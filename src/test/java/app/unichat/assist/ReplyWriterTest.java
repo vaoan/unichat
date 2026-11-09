@@ -76,19 +76,26 @@ class ReplyWriterTest {
     @Test
     @DisabledOnOs(OS.WINDOWS)
     void cancellingStopsItAtOnce() throws Exception {
-        Path bin = script("sleep 60");
-        ReplyWriter w = new ReplyWriter();
+        // Two pipes: the program says it's running through one, then waits for ever on the other, which nobody opens.
+        Path started = fifo("started"), never = fifo("never");
+        Path bin = script("printf x > '" + started + "'\nexec cat '" + never + "'");
+        // Its own limit is a day: only cancelling can end it while the test runs.
+        ReplyWriter w = new ReplyWriter(java.time.Duration.ofDays(1));
         Thread.ofVirtual().start(() -> {
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException ignored) {
-                return;
+            try (var in = Files.newInputStream(started)) {
+                in.read();
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
             }
             w.cancel();
         });
-        long start = System.currentTimeMillis();
         assertNull(w.run(AiEngine.CLAUDE, bin, null, "x"));
-        assertTrue(System.currentTimeMillis() - start < 10_000);
+    }
+
+    private Path fifo(String name) throws Exception {
+        Path f = dir.resolve(name);
+        assertEquals(0, new ProcessBuilder("mkfifo", f.toString()).inheritIO().start().waitFor());
+        return f;
     }
 
     @Test

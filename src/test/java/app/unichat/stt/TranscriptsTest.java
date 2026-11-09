@@ -6,13 +6,11 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TranscriptsTest {
     private static void await(Transcripts t, String url) throws Exception {
@@ -22,7 +20,7 @@ class TranscriptsTest {
             if (s instanceof Transcripts.Done || s instanceof Transcripts.Failed) done.countDown();
         });
         if (t.state(url) instanceof Transcripts.Done || t.state(url) instanceof Transcripts.Failed) return;
-        assertTrue(done.await(10, TimeUnit.SECONDS));
+        done.await();
     }
 
     @Test
@@ -52,7 +50,8 @@ class TranscriptsTest {
             if (audio.endsWith("bad.ogg")) throw new java.io.IOException("no");
             return "nos vemos";
         });
-        java.time.Duration wait = java.time.Duration.ofSeconds(10);
+        // Only the slow one is about the limit: the others may take what they take.
+        java.time.Duration wait = java.time.Duration.ofDays(1);
         assertEquals("nos vemos", t.await("mxc://s/ok", () -> CompletableFuture.completedFuture(dir.resolve("ok.ogg")), wait));
         assertNull(t.await("mxc://s/bad", () -> CompletableFuture.completedFuture(dir.resolve("bad.ogg")), wait));
         assertNull(t.await("mxc://s/slow", () -> CompletableFuture.completedFuture(dir.resolve("slow.ogg")), java.time.Duration.ofMillis(100)));
@@ -73,7 +72,6 @@ class TranscriptsTest {
 
         t.request("mxc://s/b", () -> CompletableFuture.completedFuture(dir.resolve("b.ogg")));
         await(t, "mxc://s/b");
-        Thread.sleep(50);
         assertEquals("ahora sí", assertInstanceOf(Transcripts.Done.class, t.state("mxc://s/b")).text());
     }
 

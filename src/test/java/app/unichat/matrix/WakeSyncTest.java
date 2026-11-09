@@ -1,6 +1,8 @@
 package app.unichat.matrix;
 
 import app.unichat.model.ConnectionState;
+import app.unichat.service.Changes;
+import app.unichat.service.ChatService;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +12,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -20,9 +23,13 @@ class WakeSyncTest {
     private HttpServer server;
     private MatrixChatService svc;
     private final List<String> syncs = new CopyOnWriteArrayList<>();
+    private final Changes changes = new Changes();
+    /** Holds the long poll open until the test ends. */
+    private final CountDownLatch hang = new CountDownLatch(1);
 
     @AfterEach
     void stop() {
+        hang.countDown();
         if (svc != null) svc.stop();
         if (server != null) server.stop(0);
     }
@@ -36,10 +43,11 @@ class WakeSyncTest {
             String path = ex.getRequestURI().getPath();
             if (path.endsWith("/sync")) {
                 syncs.add(q);
+                changes.changed();
                 // The long poll (timeout=30000) hangs, like one left open before the computer slept.
                 if (q.contains("timeout=30000")) {
                     try {
-                        Thread.sleep(60_000);
+                        hang.await();
                     } catch (InterruptedException e) {
                         return;
                     }
@@ -56,14 +64,15 @@ class WakeSyncTest {
         });
         server.start();
         svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@wake:example.org", "t");
+        svc.addListener(changes.listener());
         svc.start();
-        until(() -> syncs.stream().anyMatch(q -> q.contains("timeout=30000")));
+        changes.until(() -> syncs.stream().anyMatch(q -> q.contains("timeout=30000")));
         int before = syncs.size();
 
         svc.wake();
         assertEquals(ConnectionState.CONNECTING, svc.connectionState(), "shown until the catch-up is in");
-        until(() -> syncs.size() > before && syncs.get(before).contains("timeout=0"));
-        until(() -> svc.connectionState() == ConnectionState.ONLINE);
+        changes.until(() -> syncs.size() > before && syncs.get(before).contains("timeout=0"));
+        changes.until(() -> svc.connectionState() == ConnectionState.ONLINE);
         assertTrue(syncs.get(before).contains("since="), "a catch-up, not a full sync: " + syncs.get(before));
     }
 
@@ -73,13 +82,19 @@ class WakeSyncTest {
         int port = closed.getLocalPort();
         closed.close(); // nothing listens: refused, like the local server a second before it's up
         svc = new MatrixChatService("http://127.0.0.1:" + port, "@starting:example.org", "t");
+        // Each try says SYNCING first; what follows it is what the refusal left.
+        List<ConnectionState> afterRefusals = new CopyOnWriteArrayList<>();
+        svc.addListener(new ChatService.Listener() {
+            @Override public void connectionChanged(ConnectionState state) {
+                if (state != ConnectionState.SYNCING) afterRefusals.add(state);
+                changes.changed();
+            }
+        });
         svc.start();
-        Thread.sleep(1500); // the first refusals and their retries
-        assertEquals(ConnectionState.CONNECTING, svc.connectionState());
-    }
-
-    private static void until(java.util.concurrent.Callable<Boolean> done) throws Exception {
-        for (int i = 0; i < 100 && !done.call(); i++) Thread.sleep(50);
-        assertTrue(done.call(), "within 5 s");
+        // The first refusals and their retries.
+        // TODO(reactive): the second refusal comes after MatrixChatService.backoff's 1 s wait; an injectable
+        // backoff base (a Duration, or a ScheduledExecutorService for the waits) would make it immediate.
+        changes.until(() -> afterRefusals.size() >= 2);
+        assertEquals(List.of(ConnectionState.CONNECTING, ConnectionState.CONNECTING), afterRefusals.subList(0, 2));
     }
 }

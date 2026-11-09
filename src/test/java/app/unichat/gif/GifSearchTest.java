@@ -11,6 +11,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -19,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GifSearchTest {
     private HttpServer server;
     private final List<String> queries = new CopyOnWriteArrayList<>();
+    /** The slow provider answers only once the test is over. */
+    private final CountDownLatch slow = new CountDownLatch(1);
 
     private static final String GIPHY = """
             {"data":[{"id":"g1","title":"Cat GIF","images":{
@@ -47,7 +50,7 @@ class GifSearchTest {
             else if (uri.startsWith("/klipy/api/v1/KEY2/gifs/search")) body = KLIPY;
             else if (uri.startsWith("/broken")) { status = 500; body = "{}"; }
             else if (uri.startsWith("/slow")) {
-                try { Thread.sleep(8000); } catch (InterruptedException ignored) { }
+                try { slow.await(); } catch (InterruptedException ignored) { }
                 body = GIPHY;
             } else { status = 404; body = "{}"; }
             byte[] b = body.getBytes(StandardCharsets.UTF_8);
@@ -62,6 +65,7 @@ class GifSearchTest {
 
     @AfterEach
     void stop() {
+        slow.countDown();
         server.stop(0);
     }
 
@@ -112,10 +116,11 @@ class GifSearchTest {
     void aFailingOrSlowProviderDoesNotHideTheOthers() {
         GifSearch s = new GifSearch(List.of(new GiphyProvider("K", base("broken")), new GiphyProvider("K", base("slow")),
                 new KlipyProvider("KEY2", base("klipy"))));
-        long t0 = System.currentTimeMillis();
+        // The slow one never answers while the test runs, so getting here at all means it was cut off.
+        // TODO(reactive): that takes GifSearch's fixed 5 s TIMEOUT_MS; a constructor taking the Duration would let
+        // this test use a few milliseconds.
         List<Gif> g = s.search("hola", 10);
         assertEquals(1, g.size(), "Klipy's result still comes back");
-        assertTrue(System.currentTimeMillis() - t0 < 7000, "a slow provider is cut off");
     }
 
     @Test

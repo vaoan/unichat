@@ -5,12 +5,15 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executor;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -20,15 +23,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SavedMediaTest {
     @TempDir Path temp;
     private final Map<String, Path> available = new HashMap<>();
-    private final List<String> fetched = new ArrayList<>();
+    private final List<String> fetched = new CopyOnWriteArrayList<>();
 
     private SavedMedia saved(long retrySeconds) {
+        return saved(retrySeconds, Runnable::run);
+    }
+
+    private SavedMedia saved(long retrySeconds, Executor io) {
         return new SavedMedia(temp.resolve("saved"), url -> {
             fetched.add(url);
             Path file = available.get(url);
             return file == null ? CompletableFuture.failedFuture(new java.io.IOException("the bridge lost it"))
                     : CompletableFuture.completedFuture(file);
-        }, url -> "h" + url, Runnable::run, retrySeconds);
+        }, url -> "h" + url, io, retrySeconds);
     }
 
     private Path file(String name, String content) throws Exception {
@@ -79,14 +86,19 @@ class SavedMediaTest {
 
     @Test
     void whatCouldNotBeFetchedIsTriedAgain() throws Exception {
-        SavedMedia s = saved(0);
+        // What runs here runs at once; the retry, which comes from the delay's own thread, waits for the test.
+        Thread test = Thread.currentThread();
+        BlockingQueue<Runnable> retries = new LinkedBlockingQueue<>();
+        SavedMedia s = saved(0, task -> {
+            if (Thread.currentThread() == test) task.run();
+            else retries.add(task);
+        });
         available.put("b", file("b.png", "y"));
         Path later = file("a.png", "x");
         s.keep(Set.of("a", "b"));
         assertNotNull(s.find("b"), "one that fails doesn't stop the others");
         available.put("a", later);
-        long end = System.currentTimeMillis() + 5000;
-        while (s.find("a") == null && System.currentTimeMillis() < end) Thread.sleep(20);
+        retries.take().run();
         assertNotNull(s.find("a"));
         assertTrue(fetched.stream().filter("a"::equals).count() >= 2);
     }

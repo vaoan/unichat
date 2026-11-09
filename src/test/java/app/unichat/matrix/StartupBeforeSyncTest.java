@@ -5,6 +5,7 @@ import app.unichat.model.AccountStatus;
 import app.unichat.model.Chat;
 import app.unichat.model.ConnectionState;
 import app.unichat.model.Network;
+import app.unichat.service.Changes;
 import app.unichat.settings.Settings;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -17,25 +18,27 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Regression test for "a network only shows up after the sync finishes" (WhatsApp, Telegram… all of them).
- * A fake homeserver answers /sync only after {@link #SYNC_DELAY_MS}; connected networks and the cached chats
- * must be available long before that.
+ * A fake homeserver holds every /sync until the test ends; connected networks and the cached chats must be
+ * available without it.
  */
 class StartupBeforeSyncTest {
-    private static final int SYNC_DELAY_MS = 5000;
     private static final String ME = "@yo:localhost";
 
     private HttpServer server;
     private final AtomicInteger syncCalls = new AtomicInteger();
+    /** A slow, busy server: /sync answers only once the test is over. */
+    private final CountDownLatch syncAnswers = new CountDownLatch(1);
+    private final AtomicInteger syncsAnswered = new AtomicInteger();
+    private final Changes changes = new Changes();
     private volatile String sinceSeen;
     private MatrixChatService svc;
 
@@ -50,11 +53,13 @@ class StartupBeforeSyncTest {
                 syncCalls.incrementAndGet();
                 String q = ex.getRequestURI().getQuery();
                 if (q != null && q.contains("since=")) sinceSeen = q.replaceAll(".*since=([^&]*).*", "$1");
+                changes.changed();
                 try {
-                    Thread.sleep(SYNC_DELAY_MS); // a slow, busy server
+                    syncAnswers.await();
                 } catch (InterruptedException ignored) {
                     // test ending
                 }
+                syncsAnswered.incrementAndGet();
                 body = "{\"next_batch\":\"s2\",\"rooms\":{}}";
             } else if (path.contains("/profile/")) {
                 body = "{\"displayname\":\"x\"}";
@@ -74,6 +79,7 @@ class StartupBeforeSyncTest {
 
     @AfterEach
     void stop() {
+        syncAnswers.countDown();
         if (svc != null) svc.stop();
         server.stop(0);
         Settings s = Settings.get();
@@ -113,13 +119,11 @@ class StartupBeforeSyncTest {
     void connectedNetworksAndCachedChatsShowBeforeTheSyncFinishes() throws Exception {
         svc = new MatrixChatService(url(), ME, "token");
         previousRun(svc);
-        long t0 = System.currentTimeMillis();
-        svc.start();
+        start();
 
-        await("cached chats", () -> svc.chats().size() == 2);
-        await("accounts", () -> svc.accounts().stream().filter(a -> a.status() == AccountStatus.CONNECTED).count() == 2);
-        long elapsed = System.currentTimeMillis() - t0;
-        assertTrue(elapsed < 2000, "everything should come from disk, took " + elapsed + " ms");
+        changes.until(() -> svc.chats().size() == 2);
+        changes.until(() -> svc.accounts().stream().filter(a -> a.status() == AccountStatus.CONNECTED).count() == 2);
+        assertEquals(0, syncsAnswered.get(), "everything should come from disk");
         assertNotEquals(ConnectionState.ONLINE, svc.connectionState(), "the server hasn't answered yet");
 
         List<Account> accounts = svc.accounts();
@@ -133,7 +137,7 @@ class StartupBeforeSyncTest {
         assertEquals(Network.TELEGRAM, svc.chat("!tg:localhost").network());
 
         // The network sync resumes from the cached token instead of downloading everything again.
-        await("catch-up sync", () -> "s1".equals(sinceSeen));
+        changes.until(() -> "s1".equals(sinceSeen));
     }
 
     @Test
@@ -141,8 +145,8 @@ class StartupBeforeSyncTest {
         svc = new MatrixChatService(url(), ME, "token");
         previousRun(svc);
         Files.deleteIfExists(svc.syncCacheFile());
-        svc.start();
-        await("accounts", () -> svc.accounts().stream().map(Account::network).distinct().count() == 2);
+        start();
+        changes.until(() -> svc.accounts().stream().map(Account::network).distinct().count() == 2);
         assertNotEquals(ConnectionState.ONLINE, svc.connectionState());
     }
 
@@ -152,21 +156,15 @@ class StartupBeforeSyncTest {
         svc = new MatrixChatService(url(), ME, "token");
         previousRun(svc);
         Settings.get().set("matrix.logins.telegram", System.currentTimeMillis() + "\n");
-        long t0 = System.currentTimeMillis();
-        svc.start();
-        await("telegram chat", () -> svc.chat("!tg:localhost") != null);
-        await("telegram listed", () -> svc.accounts().stream().anyMatch(a -> a.network() == Network.TELEGRAM));
-        long elapsed = System.currentTimeMillis() - t0;
-        assertTrue(elapsed < 2000, "took " + elapsed + " ms");
+        start();
+        changes.until(() -> svc.chat("!tg:localhost") != null);
+        changes.until(() -> svc.accounts().stream().anyMatch(a -> a.network() == Network.TELEGRAM));
+        assertEquals(0, syncsAnswered.get(), "everything should come from disk");
         assertNotEquals(ConnectionState.ONLINE, svc.connectionState(), "the server hasn't answered yet");
     }
 
-    private static void await(String what, BooleanSupplier cond) throws InterruptedException {
-        long end = System.currentTimeMillis() + 2000;
-        while (System.currentTimeMillis() < end) {
-            if (cond.getAsBoolean()) return;
-            Thread.sleep(20);
-        }
-        fail("Not ready within 2 s (sync takes " + SYNC_DELAY_MS + " ms): " + what);
+    private void start() {
+        svc.addListener(changes.listener());
+        svc.start();
     }
 }
