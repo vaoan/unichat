@@ -26,9 +26,9 @@ function Invoke-Quiet([scriptblock]$Cmd) {
     try { & $Cmd *> $null } finally { $ErrorActionPreference = $old }
 }
 
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker no está instalado." }
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker is not installed." }
 Invoke-Quiet { docker info }
-if ($LASTEXITCODE -ne 0) { throw "Docker no está en marcha (abre Docker Desktop)." }
+if ($LASTEXITCODE -ne 0) { throw "Docker is not running (open Docker Desktop)." }
 
 function New-Secret([int]$Length = 32) {
     $chars = [char[]]"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -59,7 +59,7 @@ if (-not (Test-Path ".env")) {
     }
     @("DOMAIN=$Domain", "POSTGRES_PASSWORD=$(New-Secret 32)", "DOUBLE_PUPPET_TOKEN=$(New-Secret 48)") |
         Set-Content -Encoding ascii ".env"
-    Write-Host "Creado server\.env (contiene contraseñas; no lo compartas)."
+    Write-Host "Created server\.env (it holds passwords; don't share it)."
 }
 # Values given on the command line win over .env and are persisted.
 if ($AdminUser) { Set-EnvValue "ADMIN_USER" $AdminUser }
@@ -81,7 +81,7 @@ $Active = @()
 foreach ($b in $Bridges) {
     if (-not $Ports.ContainsKey($b)) { throw "Bridge desconocido: $b" }
     if ($b -eq "telegram" -and -not $TelegramOn) {
-        Write-Host "Telegram queda desactivado: falta TELEGRAM_API_ID / TELEGRAM_API_HASH (ver docs\BRIDGES.md)."
+        Write-Host "Telegram is turned off: TELEGRAM_API_ID / TELEGRAM_API_HASH are missing (see docs\BRIDGES.md)."
         continue
     }
     $Active += $b
@@ -97,7 +97,7 @@ function Invoke-YqEdit([string]$File, [string]$Expr, [hashtable]$Vars) {
     # Expressions go through a file: Windows PowerShell mangles embedded quotes in native arguments.
     Set-Content -Encoding ascii -NoNewline -Path (Join-Path $Data ".yq-expr") -Value $Expr
     & docker run --rm --user root -v "${Data}:/data" @envArgs $YqImage -i --from-file /data/.yq-expr "/data/$File"
-    if ($LASTEXITCODE -ne 0) { throw "yq falló en $File" }
+    if ($LASTEXITCODE -ne 0) { throw "yq failed on $File" }
 }
 function Get-Yq([string]$File, [string]$Expr) {
     Set-Content -Encoding ascii -NoNewline -Path (Join-Path $Data ".yq-expr") -Value $Expr
@@ -114,10 +114,10 @@ function Get-ConfSum([string]$File) { Invoke-DataShell "yq -o=json . /data/$File
 
 # --- Synapse -------------------------------------------------------------------------------
 if (-not (Test-Path "data/synapse/homeserver.yaml")) {
-    Write-Host "Generando configuración de Synapse para $Domain..."
+    Write-Host "Generating the Synapse configuration for $Domain..."
     New-Item -ItemType Directory -Force -Path "data/synapse" | Out-Null
     & docker run --rm -v "$(Join-Path $Data "synapse"):/data" -e "SYNAPSE_SERVER_NAME=$Domain" -e "SYNAPSE_REPORT_STATS=no" $SynapseImage generate
-    if ($LASTEXITCODE -ne 0) { throw "No se pudo generar la configuración de Synapse" }
+    if ($LASTEXITCODE -ne 0) { throw "Could not generate the Synapse configuration" }
 }
 $SynapseFiles = "/data/synapse/homeserver.yaml /data/synapse/appservices/*.yaml"
 $SynapseSumBefore = Get-DataSum $SynapseFiles
@@ -215,7 +215,7 @@ $copy = "rm -rf /data/synapse/appservices && mkdir -p /data/synapse/appservices"
     (($Active | ForEach-Object { " && cp /data/$_/registration.yaml /data/synapse/appservices/$_.yaml" }) -join "") +
     " && chmod 644 /data/synapse/appservices/*.yaml"
 & docker run --rm --user root -v "${Data}:/data" --entrypoint sh $YqImage -c $copy
-if ($LASTEXITCODE -ne 0) { throw "No se pudieron copiar los registros de los bridges" }
+if ($LASTEXITCODE -ne 0) { throw "Could not copy the bridges' registrations" }
 
 # Personal server: the default message/login rate limits are too tight when connecting several bridges
 # in a row (createRoom counts as a message). Failed-login limits stay at Synapse's defaults.
@@ -236,9 +236,9 @@ $Running = @(& docker compose ps --services --status running)
 $Restart = @($Changed | Where-Object { $Running -contains $_ })
 Write-Host "Arrancando contenedores (la primera vez Synapse tarda ~1 min)..."
 & docker compose up -d postgres synapse @Active
-if ($LASTEXITCODE -ne 0) { throw "docker compose up falló" }
+if ($LASTEXITCODE -ne 0) { throw "docker compose up failed" }
 if ($Restart.Count -gt 0) {
-    Write-Host "Reiniciando por cambios de configuración: $($Restart -join ' ')"
+    Write-Host "Restarting after configuration changes: $($Restart -join ' ')"
     & docker compose restart @Restart
 }
 
@@ -253,19 +253,19 @@ if (-not (Test-Path "CREDENCIALES.txt")) {
     $Password = New-Secret 24
     Invoke-Quiet { docker compose exec -T synapse register_new_matrix_user -c /data/homeserver.yaml -u $AdminUser -p $Password -a http://localhost:8008 }
     if ($LASTEXITCODE -eq 0) {
-        @("Unichat / Matrix", "Servidor:   http://localhost:8008", "Usuario:    $AdminUser   ($AdminId)",
-          "Contraseña: $Password") | Set-Content -Encoding UTF8 "CREDENCIALES.txt"
-        Write-Host "Usuario $AdminId creado. Contraseña guardada en server\CREDENCIALES.txt"
+        @("Unichat / Matrix", "Server:     http://localhost:8008", "User:       $AdminUser   ($AdminId)",
+          "Password:   $Password") | Set-Content -Encoding UTF8 "CREDENCIALES.txt"
+        Write-Host "User $AdminId created. Password saved in server\CREDENCIALES.txt"
     } else {
-        Write-Host "No se pudo crear $AdminId (¿ya existe?). Crea otro con:"
+        Write-Host "Could not create $AdminId (does it already exist?). Create another one with:"
         Write-Host "  docker compose exec synapse register_new_matrix_user -c /data/homeserver.yaml -a http://localhost:8008"
     }
 }
 
 Write-Host @"
 
-Listo. En Unichat inicia sesión con:
-  Servidor: http://localhost:8008   (o el dominio público si lo publicaste)
-  Usuario:  $AdminUser   (contraseña en server\CREDENCIALES.txt)
-Luego agrega tus cuentas en Ajustes -> Cuentas. Más detalles en docs\BRIDGES.md.
+Done. Sign in to Unichat with:
+  Server: http://localhost:8008   (or your public domain, if you published it)
+  User:   $AdminUser   (password in server\CREDENCIALES.txt)
+Then add your accounts in Settings -> Accounts. More in docs\BRIDGES.md.
 "@

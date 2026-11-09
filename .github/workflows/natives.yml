@@ -184,12 +184,12 @@ jobs:
           cat sha256sums.txt
           # The bridges are AGPL-3.0 and tuwunel Apache-2.0: each file's exact, unmodified source is linked here.
           {
-            echo "Servidor local de Unichat y puentes para Windows, compilados por natives.yml sin cambios desde su código. No es una versión de la app."
+            echo "Unichat's local server and the bridges for Windows, built by natives.yml from their source, unmodified. Not a version of the app."
             echo
-            echo "Código fuente de cada archivo:"
+            echo "Source of each file:"
             echo "- tuwunel-*: https://github.com/matrix-construct/tuwunel/tree/${{ needs.plan.outputs.tuwunel }} (Apache-2.0)"
             echo "$BRIDGES" | jq -r '.[] | "- \(.prefix)-windows-amd64: https://github.com/\(.repo)/tree/\(.tag) (AGPL-3.0)"'
             echo
-            echo "Única modificación: mautrix-discord se compila con \`-tags goolm,nocrypto\` y \`go mod edit -require=go.mau.fi/zeroconfig@v0.2.0\` (la 0.1 usa log/syslog, que Windows no tiene). El resto, tal cual."
+            echo "Only change: mautrix-discord is built with \`-tags goolm,nocrypto\` and \`go mod edit -require=go.mau.fi/zeroconfig@v0.2.0\` (0.1 uses log/syslog, which Windows lacks). Everything else as is."
           } > ../notes.md
           gh release create "$TAG" -R "$GITHUB_REPOSITORY" --prerelease --title "$TAG" --notes-file ../notes.md -- *

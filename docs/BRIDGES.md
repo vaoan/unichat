@@ -1,19 +1,19 @@
-# Servidor propio y bridges
+# Your own server and bridges
 
-Unichat es un cliente Matrix. Las redes (WhatsApp, Telegram, Signal, Instagram, Messenger, Discord,
-Slack, Google Messages, X y LinkedIn) llegan a través de **bridges mautrix** instalados en tu propio
-servidor Matrix. La carpeta `server/` trae todo lo necesario para levantarlo con Docker.
+Unichat is a Matrix client. The networks (WhatsApp, Telegram, Signal, Instagram, Messenger, Discord,
+Slack, Google Messages, X and LinkedIn) arrive through **mautrix bridges** installed on your own
+Matrix server. The `server/` folder has everything needed to bring it up with Docker.
 
-## Qué incluye
+## What's included
 
-| Servicio | Imagen | Bot | Usuarios "puppet" |
+| Service | Image | Bot | "Puppet" users |
 |---|---|---|---|
-| Synapse (servidor Matrix) | `matrixdotorg/synapse` | — | — |
+| Synapse (Matrix server) | `matrixdotorg/synapse` | — | — |
 | Postgres | `postgres:16-alpine` | — | — |
 | WhatsApp | `dock.mau.dev/mautrix/whatsapp` | `@whatsappbot` | `@whatsapp_…` |
 | Telegram | `dock.mau.dev/mautrix/telegram` | `@telegrambot` | `@telegram_…` |
 | Signal | `dock.mau.dev/mautrix/signal` | `@signalbot` | `@signal_…` |
-| Instagram | `dock.mau.dev/mautrix/meta:v26.07` (modo instagram) | `@instagrambot` | `@instagram_…` |
+| Instagram | `dock.mau.dev/mautrix/meta:v26.07` (instagram mode) | `@instagrambot` | `@instagram_…` |
 | Messenger | `dock.mau.dev/mautrix/meta` | `@facebookbot` | `@facebook_…` |
 | Discord | `dock.mau.dev/mautrix/discord` | `@discordbot` | `@discord_…` |
 | Slack | `dock.mau.dev/mautrix/slack` | `@slackbot` | `@slack_…` |
@@ -21,20 +21,20 @@ servidor Matrix. La carpeta `server/` trae todo lo necesario para levantarlo con
 | X (Twitter) | `dock.mau.dev/mautrix/twitter` | `@twitterbot` | `@twitter_…` |
 | LinkedIn | `dock.mau.dev/mautrix/linkedin` | `@linkedinbot` | `@linkedin_…` |
 
-Unichat reconoce cada red por estos nombres (ver `Network.java`), así que **no los cambies**.
-Cada bridge usa además el prefijo de comandos `!<red>` (`!whatsapp`, `!facebook`, `!twitter`,
-`!gmessages`…): Unichat lo antepone a los comandos que envía para que funcionen en cualquier chat con el bot.
+Unichat recognizes each network by these names (see `Network.java`), so **don't change them**.
+Each bridge also uses the command prefix `!<network>` (`!whatsapp`, `!facebook`, `!twitter`,
+`!gmessages`…): Unichat puts it in front of the commands it sends so they work in any chat with the bot.
 
-**Instagram**: mautrix-meta dejó de soportar Instagram después de la versión v26.07, así que ese
-contenedor está fijado a `v26.07`. Messenger usa la última versión.
+**Instagram**: mautrix-meta stopped supporting Instagram after version v26.07, so that
+container is pinned to `v26.07`. Messenger uses the latest version.
 
-## Requisitos
+## Requirements
 
-- Docker Desktop (Windows/macOS) o Docker Engine + Compose v2 (Linux), **en marcha**.
-- ~2–3 GB de RAM libres.
-- Para Telegram (opcional): un `api_id` y `api_hash` propios (ver más abajo).
+- Docker Desktop (Windows/macOS) or Docker Engine + Compose v2 (Linux), **running**.
+- ~2–3 GB of free RAM.
+- For Telegram (optional): your own `api_id` and `api_hash` (see below).
 
-## Puesta en marcha
+## Getting started
 
 macOS / Linux:
 
@@ -50,35 +50,35 @@ cd server
 .\setup.ps1 -Domain localhost -AdminUser yo
 ```
 
-El script (se puede repetir sin miedo; solo reaplica lo necesario y reinicia lo que cambió):
+The script (safe to run again; it only reapplies what's needed and restarts what changed):
 
-1. Crea `server/.env` con contraseñas aleatorias (git lo ignora; no lo compartas).
-2. Genera la configuración de Synapse (`data/synapse/homeserver.yaml`), la conecta a Postgres y
-   relaja los límites de mensajes/inicios de sesión (es un servidor personal).
-3. Genera la configuración de cada bridge, le pone los nombres de bot/puppet de Unichat,
-   **desactiva el cifrado**, activa el *double puppeting* y crea su `registration.yaml`.
-4. Registra los bridges en Synapse y levanta todo con `docker compose up -d`
-   (los bridges esperan a que Postgres y Synapse estén sanos).
-5. La primera vez crea tu usuario con una contraseña aleatoria y la guarda en
-   **`server/CREDENCIALES.txt`** (git lo ignora).
+1. Creates `server/.env` with random passwords (git ignores it; don't share it).
+2. Generates the Synapse configuration (`data/synapse/homeserver.yaml`), connects it to Postgres and
+   relaxes the message/login rate limits (it's a personal server).
+3. Generates each bridge's configuration, gives it Unichat's bot/puppet names,
+   **turns encryption off**, turns on *double puppeting* and creates its `registration.yaml`.
+4. Registers the bridges with Synapse and brings everything up with `docker compose up -d`
+   (the bridges wait for Postgres and Synapse to be healthy).
+5. The first time, it creates your user with a random password and saves it in
+   **`server/CREDENCIALES.txt`** (git ignores it).
 
-Para elegir solo algunas redes: `BRIDGES="whatsapp signal" ./setup.sh` o
+To choose only some networks: `BRIDGES="whatsapp signal" ./setup.sh` or
 `.\setup.ps1 -Bridges whatsapp,signal`.
 
-Crear otro usuario más tarde:
+To create another user later:
 
 ```bash
 docker compose exec synapse register_new_matrix_user -c /data/homeserver.yaml -a http://localhost:8008
 ```
 
-### Telegram (activar después)
+### Telegram (turn on later)
 
-Telegram exige claves de API propias. Sin ellas el script **deja Telegram desactivado** (no se
-registra en Synapse ni arranca su contenedor) y el resto funciona normal. Para activarlo:
+Telegram requires your own API keys. Without them the script **leaves Telegram off** (it isn't
+registered with Synapse and its container doesn't start) and everything else works normally. To turn it on:
 
-1. Entra en <https://my.telegram.org> → *API development tools* y crea una app: obtienes `api_id`
-   (número) y `api_hash`.
-2. Vuelve a ejecutar el script con ellas (se guardan en `server/.env`, así que solo hace falta una vez):
+1. Go to <https://my.telegram.org> → *API development tools* and create an app: you get an `api_id`
+   (a number) and an `api_hash`.
+2. Run the script again with them (they're saved in `server/.env`, so this is only needed once):
 
    ```bash
    cd server
@@ -90,129 +90,129 @@ registra en Synapse ni arranca su contenedor) y el resto funciona normal. Para a
    $env:TELEGRAM_API_ID="123456"; $env:TELEGRAM_API_HASH="abcdef0123..."; .\setup.ps1
    ```
 
-   También puedes añadir a mano `TELEGRAM_API_ID=...` y `TELEGRAM_API_HASH=...` en `server/.env`
-   y ejecutar `./setup.sh` (o `.\setup.ps1`) sin nada más. El script añade `COMPOSE_PROFILES=telegram`
-   al `.env` para que `docker compose up -d` también arranque Telegram.
+   You can also add `TELEGRAM_API_ID=...` and `TELEGRAM_API_HASH=...` to `server/.env` by hand
+   and run `./setup.sh` (or `.\setup.ps1`) with nothing else. The script adds `COMPOSE_PROFILES=telegram`
+   to `.env` so that `docker compose up -d` also starts Telegram.
 
-Para desactivarlo de nuevo, borra esas dos líneas de `server/.env` y vuelve a ejecutar el script.
+To turn it off again, delete those two lines from `server/.env` and run the script again.
 
-### Sobre el dominio
+### About the domain
 
-El dominio forma parte de tu ID (`@yo:localhost`) y **no se puede cambiar después**.
-`localhost` sirve para usar Unichat en el mismo equipo. Si quieres usarlo desde otros dispositivos,
-usa un dominio real, publica el puerto 8008 detrás de un proxy HTTPS (Caddy, nginx, Traefik) y sirve
-`https://tu-dominio/.well-known/matrix/client` con `{"m.homeserver":{"base_url":"https://matrix.tu-dominio"}}`.
-Con `localhost` el servidor no puede federarse, así que los avatares de los bots (alojados en
-`maunium.net`) no se cargan; es solo cosmético.
+The domain is part of your ID (`@yo:localhost`) and **can't be changed later**.
+`localhost` works for using Unichat on the same computer. If you want to use it from other devices,
+use a real domain, publish port 8008 behind an HTTPS proxy (Caddy, nginx, Traefik) and serve
+`https://tu-dominio/.well-known/matrix/client` with `{"m.homeserver":{"base_url":"https://matrix.tu-dominio"}}`.
+With `localhost` the server can't federate, so the bots' avatars (hosted on
+`maunium.net`) don't load; it's only cosmetic.
 
-## Iniciar sesión en Unichat
+## Signing in to Unichat
 
-En la pantalla de inicio de Unichat escribe:
+On Unichat's start screen enter:
 
-- **Servidor**: `localhost:8008` (o tu dominio; Unichat consulta `.well-known` automáticamente).
-- **Usuario**: `yo` (o el ID completo `@yo:localhost`).
-- **Contraseña**: la de `server/CREDENCIALES.txt`.
+- **Server**: `localhost:8008` (or your domain; Unichat looks up `.well-known` automatically).
+- **Username**: `yo` (or the full ID `@yo:localhost`).
+- **Password**: the one in `server/CREDENCIALES.txt`.
 
-## Conectar cada red
+## Connecting each network
 
-Pulsa **Conectar una red** (botón **+** de la barra lateral, la paleta de comandos o
-*Ajustes → Cuentas*) y elige la red. Unichat abre (o crea) el chat con el bot del bridge y le envía
-el comando de inicio de sesión. Sigue las instrucciones del bot **en ese chat**:
+Press **Connect a network** (the **+** button in the sidebar, the command palette or
+*Settings → Accounts*) and choose the network. Unichat opens (or creates) the chat with the bridge's bot and sends it
+the login command. Follow the bot's instructions **in that chat**:
 
-| Red | Comando que envía Unichat | Qué responde el bot / qué haces tú |
+| Network | Command Unichat sends | What the bot replies / what you do |
 |---|---|---|
-| WhatsApp | `!whatsapp login qr` | Un **código QR**. En el móvil: WhatsApp → *Dispositivos vinculados* → *Vincular dispositivo* y escanéalo. Alternativa: `!whatsapp login phone` (código de emparejamiento). |
-| Telegram | `!telegram login qr` | Un **código QR**. En el móvil: Telegram → *Ajustes → Dispositivos → Vincular dispositivo de escritorio*. Si tienes verificación en dos pasos, el bot pedirá la contraseña. Alternativa: `!telegram login phone`. |
-| Signal | `!signal login` | Un **código QR**. En el móvil: Signal → *Ajustes → Dispositivos vinculados* → **+**. |
-| Google Messages | `!gmessages login` | Unichat conecta tu cuenta de Google con el asistente de cookies (ver «Conectar redes de cookies» abajo). Después confirma el **emoji** que aparece en Mensajes del móvil. Ya no existe el emparejamiento por QR. |
-| Instagram | `!instagram login` | Se conecta con el asistente de cookies de Unichat (sesión del navegador, ventana de inicio de sesión o `cookies.txt`). |
-| Messenger | `!facebook login facebook` | Se conecta con el asistente de cookies de Unichat (facebook.com). Alternativas: `!facebook login messenger` (cookies de messenger.com) o `!facebook login messenger-lite` (usuario y contraseña). |
-| Discord | `!discord login` | Un **código QR**: escanéalo desde la app móvil de Discord (*Ajustes → Escanear código QR*). Alternativa: `!discord login-token`. |
-| Slack | `!slack login email` | Pide el **correo** de tu cuenta de Slack y luego el código que te llega por email. Alternativa: `!slack login token` (token `xoxc-…` + cookie `d` `xoxd-…`). |
-| X | `!twitter login cookies` | Se conecta con el asistente de cookies de Unichat (`auth_token` y `ct0`). Alternativa: `!twitter login password`. |
-| LinkedIn | `!linkedin login cookies` | Se conecta con el asistente de cookies de Unichat (linkedin.com). Alternativa: `!linkedin login password`. |
+| WhatsApp | `!whatsapp login qr` | A **QR code**. On your phone: WhatsApp → *Linked devices* → *Link a device* and scan it. Alternative: `!whatsapp login phone` (pairing code). |
+| Telegram | `!telegram login qr` | A **QR code**. On your phone: Telegram → *Settings → Devices → Link Desktop Device*. If you have two-step verification, the bot will ask for the password. Alternative: `!telegram login phone`. |
+| Signal | `!signal login` | A **QR code**. On your phone: Signal → *Settings → Linked devices* → **+**. |
+| Google Messages | `!gmessages login` | Unichat connects your Google account with the cookie assistant (see "Connecting cookie networks" below). Then confirm the **emoji** that shows up in Messages on your phone. QR pairing no longer exists. |
+| Instagram | `!instagram login` | Connects with Unichat's cookie assistant (browser session, sign-in window or `cookies.txt`). |
+| Messenger | `!facebook login facebook` | Connects with Unichat's cookie assistant (facebook.com). Alternatives: `!facebook login messenger` (messenger.com cookies) or `!facebook login messenger-lite` (username and password). |
+| Discord | `!discord login` | A **QR code**: scan it from the Discord mobile app (*Settings → Scan QR Code*). Alternative: `!discord login-token`. |
+| Slack | `!slack login email` | Asks for your Slack account's **email** and then the code you receive by email. Alternative: `!slack login token` (token `xoxc-…` + cookie `d` `xoxd-…`). |
+| X | `!twitter login cookies` | Connects with Unichat's cookie assistant (`auth_token` and `ct0`). Alternative: `!twitter login password`. |
+| LinkedIn | `!linkedin login cookies` | Connects with Unichat's cookie assistant (linkedin.com). Alternative: `!linkedin login password`. |
 
-Los QR caducan en un minuto o dos: si no te da tiempo, vuelve a pulsar **Conectar una red**.
-Para abandonar un inicio de sesión escribe `cancel` en el chat del bot; `help` muestra todos los comandos.
+QR codes expire in a minute or two: if you don't make it in time, press **Connect a network** again.
+To abandon a login, type `cancel` in the bot's chat; `help` shows all the commands.
 
-Cuando el bot confirma el inicio de sesión, tus chats aparecen solos en la bandeja de Unichat
-(los bridges te invitan a cada sala y Unichat acepta las invitaciones automáticamente).
+When the bot confirms the login, your chats show up on their own in Unichat's inbox
+(the bridges invite you to each room and Unichat accepts the invitations automatically).
 
-**Desconectar**: en *Ajustes → Cuentas → Desconectar* Unichat envía `list-logins` y después
-`logout <id>` a cada sesión que encuentre (o `logout` si el bridge no tiene ese comando).
-Es "mejor esfuerzo": si el bot pide algo más, termina el proceso en su chat.
+**Disconnect**: in *Settings → Accounts → Disconnect* Unichat sends `list-logins` and then
+`logout <id>` to each session it finds (or `logout` if the bridge doesn't have that command).
+It's "best effort": if the bot asks for something else, finish the process in its chat.
 
-## Limitaciones
+## Limitations
 
-- **Sin cifrado de extremo a extremo (E2EE) en Matrix**: Unichat no implementa E2EE. Por eso el
-  script desactiva el cifrado en todos los bridges (`encryption.allow: false`). El tráfico entre
-  la red original y el bridge sigue cifrado como siempre; lo que no se cifra es la parte entre tu
-  servidor y Unichat, por eso conviene que el servidor sea tuyo. Las salas Matrix ya cifradas
-  muestran "🔒 Mensaje cifrado no compatible".
-- **Instagram, Messenger, X, LinkedIn, Slack y Google Messages** usan cookies de la web: pueden
-  caducar y la red podría bloquear la cuenta si detecta un uso inusual. Úsalo bajo tu responsabilidad.
-- **Instagram** depende de una versión antigua de mautrix-meta (v26.07); si Meta cambia algo, puede
-  dejar de funcionar sin arreglo.
-- **WhatsApp y Signal** exigen que el teléfono principal se conecte de vez en cuando.
-- El estado de las cuentas en Unichat es aproximado: se deduce de las salas del bridge y de los
-  mensajes del bot.
-- Los avisos de lectura públicos solo se envían si están activados en *Ajustes → Privacidad*;
-  si no, Unichat envía un recibo privado (`m.read.private`) para limpiar el contador de no leídos.
+- **No end-to-end encryption (E2EE) in Matrix**: Unichat doesn't implement E2EE. That's why the
+  script turns encryption off in every bridge (`encryption.allow: false`). Traffic between
+  the original network and the bridge is still encrypted as always; what isn't encrypted is the part between your
+  server and Unichat, which is why the server should be yours. Matrix rooms that are already encrypted
+  show "🔒 Unsupported encrypted message".
+- **Instagram, Messenger, X, LinkedIn, Slack and Google Messages** use web cookies: they can
+  expire and the network could block the account if it notices unusual use. Use them at your own risk.
+- **Instagram** depends on an old version of mautrix-meta (v26.07); if Meta changes something, it may
+  stop working with no fix.
+- **WhatsApp and Signal** require the main phone to connect every now and then.
+- The account status in Unichat is approximate: it's inferred from the bridge's rooms and the
+  bot's messages.
+- Public read receipts are only sent if they're turned on in *Settings → Privacy*;
+  otherwise Unichat sends a private receipt (`m.read.private`) to clear the unread count.
 
-## Arrancar, parar y mantener
+## Starting, stopping and maintenance
 
-Los contenedores tienen `restart: unless-stopped`: vuelven solos al abrir Docker Desktop.
-Si Docker se reinicia, los bridges pueden reiniciarse un par de veces hasta que Postgres y Synapse
-estén listos; es normal.
+The containers have `restart: unless-stopped`: they come back on their own when Docker Desktop opens.
+If Docker restarts, the bridges may restart a couple of times until Postgres and Synapse
+are ready; that's normal.
 
 ```bash
 cd server
-docker compose ps                                # estado
-docker compose stop                              # parar todo (los datos quedan en server/data)
-docker compose start                             # volver a arrancar
-docker compose logs -f whatsapp                  # ver el log de un bridge
-docker compose pull && ./setup.sh                # actualizar imágenes y reaplicar la configuración
-docker compose down                              # parar y borrar contenedores (no los datos)
+docker compose ps                                # status
+docker compose stop                              # stop everything (the data stays in server/data)
+docker compose start                             # start again
+docker compose logs -f whatsapp                  # see a bridge's log
+docker compose pull && ./setup.sh                # update images and reapply the configuration
+docker compose down                              # stop and remove containers (not the data)
 ```
 
-Copia de seguridad: para el stack y guarda la carpeta `server/data/`, `server/.env` y
+Backup: stop the stack and keep the `server/data/` folder, `server/.env` and
 `server/CREDENCIALES.txt`.
 
-Si cambias nombres de bot o puppets en un `config.yaml`, borra el `registration.yaml` de ese bridge
-y vuelve a ejecutar el script para regenerarlo.
+If you change bot or puppet names in a `config.yaml`, delete that bridge's `registration.yaml`
+and run the script again to regenerate it.
 
-## Conectar redes de cookies (Instagram, Messenger, X, LinkedIn, Google Messages)
+## Connecting cookie networks (Instagram, Messenger, X, LinkedIn, Google Messages)
 
-Ya no hace falta copiar cookies a mano ni sacar un cURL. En **Cuentas → Agregar cuenta → la red** Unichat
-ofrece tres caminos:
+You no longer need to copy cookies by hand or grab a cURL. In **Accounts → Add account → the network** Unichat
+offers three ways:
 
-1. **Usar tu sesión del navegador**: Unichat busca en Firefox y navegadores Chromium (Chrome, Edge, Brave…)
-   si ya tienes sesión iniciada en esa red y te muestra una tarjeta «Usar tu sesión de <red> de <navegador>».
-   En macOS puede pedirte permiso para leer el llavero del navegador.
-2. **Iniciar sesión con otra cuenta**: abre una ventana dentro de Unichat con la página de la red; inicias
-   sesión como siempre (incluida la verificación en dos pasos) y la ventana se cierra sola al terminar.
-3. **Elegir archivo cookies.txt…**: exporta las cookies con la sesión abierta (extensión tipo «Get cookies.txt»)
-   y elige el archivo. Si faltan cookies, Unichat dice cuáles.
+1. **Use your browser session**: Unichat looks in Firefox and Chromium browsers (Chrome, Edge, Brave…)
+   for an existing session on that network and shows you a card "Use your <network> session from <browser>".
+   On macOS it may ask for permission to read the browser's keychain.
+2. **Sign in with another account**: opens a window inside Unichat with the network's page; you sign
+   in as usual (two-step verification included) and the window closes on its own when you're done.
+3. **Choose cookies.txt file…**: export the cookies while signed in (a "Get cookies.txt"-style extension)
+   and choose the file. If cookies are missing, Unichat says which ones.
 
-Además queda un enlace discreto **Pegar cookies manualmente** (JSON o cURL), como antes.
+There's also a discreet **Paste cookies manually** link (JSON or cURL), as before.
 
-Privacidad: solo se leen las cookies de la red que estás conectando, se envían únicamente a tu propio
-servidor Matrix (al bot del puente) y Unichat no las guarda ni las escribe en registros.
+Privacy: only the cookies of the network you're connecting are read, they're sent only to your own
+Matrix server (to the bridge's bot) and Unichat neither keeps them nor writes them to logs.
 
-## Varias cuentas de la misma red
+## Several accounts on the same network
 
-Los bridges nuevos (WhatsApp, Signal, Instagram, Messenger, Google Messages, Slack, X, LinkedIn, Telegram)
-admiten varias sesiones. En Unichat: **Ajustes → Cuentas → Agregar cuenta → elige la red** (el botón + de la barra lateral lleva ahí); se abre un asistente
-con el QR, las opciones de sesión (redes de cookies) o el campo para códigos (el chat técnico con el bot queda oculto, con un enlace
-para verlo). También con clic derecho sobre la red en la barra lateral. En **Ajustes → Redes conectadas** cada cuenta tiene su nombre
-(alias) y su botón **Desconectar**, que cierra solo esa sesión (`logout <id>`).
+The new bridges (WhatsApp, Signal, Instagram, Messenger, Google Messages, Slack, X, LinkedIn, Telegram)
+support several sessions. In Unichat: **Settings → Accounts → Add account → choose the network** (the sidebar's + button takes you there); an assistant opens
+with the QR code, the session options (cookie networks) or the field for codes (the technical chat with the bot stays hidden, with a link
+to see it). Also by right-clicking the network in the sidebar. In **Settings → Connected networks** each account has its name
+(alias) and its **Disconnect** button, which closes only that session (`logout <id>`).
 
-Unichat lee la lista de sesiones con `list-logins` (al conectar o desconectar, y cada pocas horas al
-abrir la app). Limitación: los bridges no siempre indican a qué sesión pertenece cada chat; cuando no se
-sabe, los chats aparecen juntos bajo la red y el filtro por cuenta no se muestra (para no ocultar chats).
+Unichat reads the list of sessions with `list-logins` (when connecting or disconnecting, and every few hours when
+opening the app). Limitation: the bridges don't always say which session each chat belongs to; when it isn't
+known, the chats show up together under the network and the per-account filter isn't shown (so as not to hide chats).
 
-## Historial (backfill)
+## History (backfill)
 
-`setup` activa el backfill en todos los bridges (últimos 50 mensajes por chat al vincular y hasta 500 mensajes
-perdidos tras reinicios). WhatsApp manda el historial **una sola vez, al vincular**: si vinculaste una cuenta
-antes de activar el backfill, desconéctala en **Cuentas** y vuelve a vincularla para recibir tus chats.
+`setup` turns on backfill in every bridge (the last 50 messages per chat when linking and up to 500 missed
+messages after restarts). WhatsApp sends the history **only once, when linking**: if you linked an account
+before turning on backfill, disconnect it in **Accounts** and link it again to receive your chats.

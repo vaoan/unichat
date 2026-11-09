@@ -20,7 +20,7 @@ if [ -n "${TUWUNEL_BIN:-}" ]; then
   chmod 755 target/pkg/server/tuwunel
 elif [ "$(uname -s)" = Darwin ]; then
   native/fetch-natives.sh tuwunel-darwin-arm64 target/pkg/server/tuwunel \
-    || echo "Aviso: sin tuwunel la app no trae el servidor local (solo servidores externos)." >&2
+    || echo "Warning: without tuwunel the app has no local server (external servers only)." >&2
 fi
 # macOS menu-bar item and system notifications: native helper (Contents/app/native/UnichatBar.app); without swiftc
 # the Java tray icon and Unichat's own notification cards are used.
@@ -34,17 +34,17 @@ if [ "$(uname -s)" = Darwin ]; then
   if [ -f "$LIBOLM" ]; then
     mkdir -p target/pkg/server && cp "$LIBOLM" target/pkg/server/libolm.3.dylib
   else
-    echo "Aviso: falta libolm (native/build-libolm.sh); los puentes no arrancarán." >&2
+    echo "Warning: libolm is missing (native/build-libolm.sh); the bridges won't start." >&2
   fi
 fi
 # Animated stickers for chats that only take WebP (WhatsApp): libwebp's gif2webp (see StickerConverter).
 if [ "$(uname -s)" = Darwin ]; then
   mkdir -p target/pkg/server
-  native/build-gif2webp.sh "$PWD/target/pkg/server/gif2webp" || echo "Aviso: sin gif2webp los stickers animados se envían fijos a WhatsApp." >&2
+  native/build-gif2webp.sh "$PWD/target/pkg/server/gif2webp" || echo "Warning: without gif2webp, animated stickers go to WhatsApp as still images." >&2
   # Voice notes to text (stt/Transcriber); the model is downloaded by the app on first use.
   mkdir -p target/pkg/server/whisper
   native/build-whisper.sh "$PWD/target/pkg/server/whisper/whisper-cli" \
-    || echo "Aviso: sin whisper no se pueden transcribir notas de voz (salvo con un comando propio)." >&2
+    || echo "Warning: without whisper, voice notes can't be transcribed (except with your own command)." >&2
 fi
 
 COMMON="--name Unichat --app-version $VERSION --vendor Unichat --input target/pkg --main-jar unichat.jar

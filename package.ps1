@@ -43,7 +43,7 @@ try {
         Copy-Item "target\natives\$asset" target\pkg\server\tuwunel.exe
     }
 } catch {
-    Write-Warning "Sin tuwunel la app no trae el servidor local (solo servidores externos): $_"
+    Write-Warning "Without tuwunel the app has no local server (external servers only): $_"
 }
 
 # Animated stickers for chats that only take WebP (WhatsApp): libwebp's gif2webp, pinned (see StickerConverter
@@ -59,7 +59,7 @@ try {
     New-Item -ItemType Directory -Force target\pkg\server | Out-Null
     Copy-Item "target\libwebp\libwebp-$WebpVersion-windows-x64\bin\gif2webp.exe" target\pkg\server\
 } catch {
-    Write-Warning "Sin gif2webp los stickers animados se envían fijos a WhatsApp: $_"
+    Write-Warning "Without gif2webp, animated stickers go to WhatsApp as still images: $_"
 }
 
 # Voice notes to text (stt/Transcriber): whisper.cpp's official Windows build of the release that
@@ -76,7 +76,7 @@ try {
     Copy-Item target\whisper\Release\whisper-cli.exe, target\whisper\Release\whisper.dll, target\whisper\Release\ggml.dll, `
         target\whisper\Release\ggml-base.dll, target\whisper\Release\ggml-cpu-*.dll target\pkg\server\whisper\
 } catch {
-    Write-Warning "Sin whisper no se pueden transcribir notas de voz (salvo con un comando propio): $_"
+    Write-Warning "Without whisper, voice notes can't be transcribed (except with your own command): $_"
 }
 
 # Name, version, description and copyright end up in Unichat.exe's file details: SignPath checks them when signing.

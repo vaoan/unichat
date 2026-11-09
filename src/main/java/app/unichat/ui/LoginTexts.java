@@ -45,7 +45,7 @@ final class LoginTexts {
         };
     }
 
-    /** Card caption for a browser session, e.g. "Usar tu sesión de Instagram de Firefox (default)". */
+    /** Card caption for a browser session, e.g. "Use your Instagram session from Firefox (default)". */
     static String sessionLabel(String net, BrowserSession s) {
         String profile = s.profile() == null || s.profile().isBlank() ? "" : s.profile();
         return profile.isEmpty() ? I18n.t("login.session.label", net, s.browser())

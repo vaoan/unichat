@@ -13,9 +13,9 @@ SYNAPSE_IMAGE="matrixdotorg/synapse:latest"
 ALL_BRIDGES="whatsapp telegram signal instagram facebook discord slack gmessages twitter linkedin"
 BRIDGES="${BRIDGES:-$ALL_BRIDGES}"
 
-command -v docker >/dev/null || { echo "Docker no está instalado." >&2; exit 1; }
+command -v docker >/dev/null || { echo "Docker is not installed." >&2; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "Falta 'docker compose' (Docker Compose v2)." >&2; exit 1; }
-docker info >/dev/null 2>&1 || { echo "Docker no está en marcha (abre Docker Desktop)." >&2; exit 1; }
+docker info >/dev/null 2>&1 || { echo "Docker is not running (open Docker Desktop)." >&2; exit 1; }
 
 rand() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-32}" || true; }
 
@@ -43,7 +43,7 @@ if [ ! -f .env ]; then
     echo "POSTGRES_PASSWORD=$(rand 32)"
     echo "DOUBLE_PUPPET_TOKEN=$(rand 48)"
   } > .env
-  echo "Creado server/.env (contiene contraseñas; no lo compartas)."
+  echo "Created server/.env (it holds passwords; don't share it)."
 fi
 [ -n "$CLI_ADMIN_USER" ] && env_set ADMIN_USER "$CLI_ADMIN_USER"
 [ -n "$CLI_TG_ID" ] && env_set TELEGRAM_API_ID "$CLI_TG_ID"
@@ -59,7 +59,7 @@ if [ -n "${TELEGRAM_API_ID:-}" ] && [ -n "${TELEGRAM_API_HASH:-}" ]; then TELEGR
 ACTIVE=""
 for b in $BRIDGES; do
   if [ "$b" = telegram ] && [ "$TELEGRAM_ON" = no ]; then
-    echo "Telegram queda desactivado: falta TELEGRAM_API_ID / TELEGRAM_API_HASH (ver docs/BRIDGES.md)."
+    echo "Telegram is turned off: TELEGRAM_API_ID / TELEGRAM_API_HASH are missing (see docs/BRIDGES.md)."
     continue
   fi
   ACTIVE="$ACTIVE $b"
@@ -99,7 +99,7 @@ for b in $ACTIVE; do bridge_port "$b" >/dev/null; done
 
 # --- Synapse -------------------------------------------------------------------------------
 if [ ! -f data/synapse/homeserver.yaml ]; then
-  echo "Generando configuración de Synapse para $DOMAIN..."
+  echo "Generating the Synapse configuration for $DOMAIN..."
   mkdir -p data/synapse
   docker run --rm -v "$PWD/data/synapse:/data" -e SYNAPSE_SERVER_NAME="$DOMAIN" -e SYNAPSE_REPORT_STATS=no \
     "$SYNAPSE_IMAGE" generate
@@ -232,7 +232,7 @@ echo "Arrancando contenedores (la primera vez Synapse tarda ~1 min)..."
 # shellcheck disable=SC2086
 docker compose up -d postgres synapse $ACTIVE
 if [ -n "$RESTART" ]; then
-  echo "Reiniciando por cambios de configuración:$RESTART"
+  echo "Restarting after configuration changes:$RESTART"
   # shellcheck disable=SC2086
   docker compose restart $RESTART
 fi
@@ -252,21 +252,21 @@ if [ ! -f CREDENCIALES.txt ]; then
     umask 077
     cat > CREDENCIALES.txt <<EOF
 Unichat / Matrix
-Servidor:   http://localhost:8008
-Usuario:    $ADMIN_USER   ($ADMIN_ID)
-Contraseña: $PASSWORD
+Server:     http://localhost:8008
+User:       $ADMIN_USER   ($ADMIN_ID)
+Password:   $PASSWORD
 EOF
-    echo "Usuario $ADMIN_ID creado. Contraseña guardada en server/CREDENCIALES.txt"
+    echo "User $ADMIN_ID created. Password saved in server/CREDENCIALES.txt"
   else
-    echo "No se pudo crear $ADMIN_ID (¿ya existe?). Crea otro con:" >&2
+    echo "Could not create $ADMIN_ID (does it already exist?). Create another one with:" >&2
     echo "  docker compose exec synapse register_new_matrix_user -c /data/homeserver.yaml -a http://localhost:8008" >&2
   fi
 fi
 
 cat <<EOF
 
-Listo. En Unichat inicia sesión con:
-  Servidor: http://localhost:8008   (o el dominio público si lo publicaste)
-  Usuario:  $ADMIN_USER   (contraseña en server/CREDENCIALES.txt)
-Luego agrega tus cuentas en Ajustes → Cuentas. Más detalles en docs/BRIDGES.md.
+Done. Sign in to Unichat with:
+  Server: http://localhost:8008   (or your public domain, if you published it)
+  User:   $ADMIN_USER   (password in server/CREDENCIALES.txt)
+Then add your accounts in Settings → Accounts. More in docs/BRIDGES.md.
 EOF

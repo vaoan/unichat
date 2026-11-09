@@ -60,9 +60,9 @@ final class Watchdog {
 
     /** Why to restart, or null to leave it alone. */
     static String reason(Health h, long now) {
-        if (h.probeFailures() >= PROBE_FAILURES) return "no responde";
-        if (h.drops() >= FLAPS) return h.drops() + " desconexiones en 10 min";
-        if (h.troubledSince() >= 0 && now - h.troubledSince() >= STUCK_MS) return "desconectado más de 10 min";
+        if (h.probeFailures() >= PROBE_FAILURES) return "not responding";
+        if (h.drops() >= FLAPS) return h.drops() + " disconnections in 10 min";
+        if (h.troubledSince() >= 0 && now - h.troubledSince() >= STUCK_MS) return "disconnected for over 10 min";
         return null;
     }
 
@@ -140,7 +140,7 @@ final class Watchdog {
                         : new Health(f, states.troubledSince(name), states.dropsWithin(name, FLAP_WINDOW_MS, now));
                 boolean bridge = !name.equals("tuwunel");
                 boolean fresh = internetBack && bridge && !keeper.fragile(name);
-                String why = fresh ? "volvió internet" : reason(h, now, online);
+                String why = fresh ? "internet is back" : reason(h, now, online);
                 Long last = lastRestart.get(name);
                 int row = inARow.getOrDefault(name, 0);
                 // A long quiet run since the last restart: the next one starts with a short wait again.

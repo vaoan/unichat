@@ -18,7 +18,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * "Unichat 1.2 está disponible", at the foot of the chat list like {@link AccountAlertBar}: never over the chats, never
+ * "Unichat 1.2 is available", at the foot of the chat list like {@link AccountAlertBar}: never over the chats, never
  * a window. "Descargar" opens the release page; the cross hides that version for good (a later one shows again).
  */
 final class UpdateBar extends VBox {

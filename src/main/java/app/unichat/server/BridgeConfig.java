@@ -15,7 +15,7 @@ import java.nio.file.Path;
 /**
  * Unichat's keys on a bridge's config.yaml (the bridge generates the file with {@code -e}; these keys are
  * re-applied on every start, everything else is left as the bridge wrote it). Same rules as server/setup.sh,
- * with SQLite and 127.0.0.1 instead of Postgres and Docker host names. See docs/SERVIDOR-NATIVO.md.
+ * with SQLite and 127.0.0.1 instead of Postgres and Docker host names. See docs/NATIVE-SERVER.md.
  */
 public final class BridgeConfig {
     static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory()

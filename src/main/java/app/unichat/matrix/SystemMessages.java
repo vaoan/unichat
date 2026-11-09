@@ -6,7 +6,7 @@ import java.util.function.Function;
 
 import static app.unichat.matrix.SyncEvents.*;
 
-/** The line a room's state change shows in the timeline ("Ana se unió"). */
+/** The line a room's state change shows in the timeline ("Ana joined"). */
 final class SystemMessages {
     private final RoomFields fields;
     private final Function<String, MatrixRoom> room;

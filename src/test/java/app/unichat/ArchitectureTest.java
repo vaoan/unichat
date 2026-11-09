@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
-/** The package rules of docs/ARQUITECTURA.md. A failure here means a new dependency broke a layer, not a flaky test. */
+/** The package rules of docs/ARCHITECTURE.md. A failure here means a new dependency broke a layer, not a flaky test. */
 class ArchitectureTest {
     private static final JavaClasses APP = new ClassFileImporter()
             .withImportOption(new ImportOption.DoNotIncludeTests())

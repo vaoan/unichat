@@ -18,9 +18,9 @@ class WatchdogTest {
 
     @Test
     void hungStuckOrFlappingIsRestarted() {
-        assertEquals("no responde", Watchdog.reason(new Watchdog.Health(3, -1, 0), NOW));
+        assertEquals("not responding", Watchdog.reason(new Watchdog.Health(3, -1, 0), NOW));
         assertNotNull(Watchdog.reason(new Watchdog.Health(0, NOW - 10 * 60_000, 0), NOW));
-        assertEquals("5 desconexiones en 10 min", Watchdog.reason(new Watchdog.Health(0, -1, 5), NOW));
+        assertEquals("5 disconnections in 10 min", Watchdog.reason(new Watchdog.Health(0, -1, 5), NOW));
     }
 
     @Test

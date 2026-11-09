@@ -13,7 +13,7 @@ alive() { [ -f "$RUN/$1.pid" ] && kill -0 "$(cat "$RUN/$1.pid")" 2>/dev/null; }
 
 launch() { # name, workdir, command...
   local name="$1" wd="$2"; shift 2
-  if alive "$name"; then echo "$name ya está corriendo"; return; fi
+  if alive "$name"; then echo "$name is already running"; return; fi
   (cd "$wd" && nohup "$@" >>"$wd/$name.out" 2>&1 & echo $! > "$RUN/$name.pid")
   echo "$name iniciado (pid $(cat "$RUN/$name.pid"))"
 }
@@ -42,13 +42,13 @@ if "user_id" not in done:
     sys.exit("No se pudo crear la cuenta: " + json.dumps(done))
 PY
   (umask 077; cat > "$DIR/CREDENCIALES.txt" <<EOF
-Unichat / Matrix (servidor nativo)
-Servidor:   $HS
-Usuario:    $ADMIN_USER   (@$ADMIN_USER:localhost)
-Contraseña: $pass
+Unichat / Matrix (native server)
+Server:     $HS
+User:       $ADMIN_USER   (@$ADMIN_USER:localhost)
+Password:   $pass
 EOF
 )
-  echo "Cuenta @$ADMIN_USER:localhost creada. Contraseña en $DIR/CREDENCIALES.txt"
+  echo "Account @$ADMIN_USER:localhost created. Password in $DIR/CREDENCIALES.txt"
 }
 
 case "${1:-}" in

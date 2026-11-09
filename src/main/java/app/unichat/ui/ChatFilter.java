@@ -26,7 +26,7 @@ public record ChatFilter(View view, Network network, String accountId, boolean u
     public ChatFilter withAccount(Network n, String id) { return new ChatFilter(view, n, id, unreadOnly, query); }
     /**
      * The rail's network/inbox buttons: shows {@code n} (null = every network) and account {@code id} (null = all)
-     * keeping the chosen chip (Todos / No leídos / Favoritos / Prioridad baja). The archive is a place of its own,
+     * keeping the chosen chip (All / Unread / Favorites / Low priority). The archive is a place of its own,
      * so leaving it goes back to the inbox.
      */
     public ChatFilter switchTo(Network n, String id) {
@@ -39,7 +39,7 @@ public record ChatFilter(View view, Network network, String accountId, boolean u
 
     /**
      * The one definition of "unread and demanding attention in the inbox": used by the inbox badge, the
-     * window title, notifications and the "No leídos" filter, so they can never disagree. Archived, muted,
+     * window title, notifications and the "Unread" filter, so they can never disagree. Archived, muted,
      * low-priority and bridge-bot chats don't count.
      */
     public static boolean inboxUnread(Chat c) {

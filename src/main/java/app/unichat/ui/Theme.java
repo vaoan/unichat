@@ -60,7 +60,7 @@ public final class Theme {
         };
     }
 
-    /** Extra line spacing for message text, in px, when "más interlineado" is on. */
+    /** Extra line spacing for message text, in px, when "wider line spacing" is on. */
     public static double lineSpacing() {
         return Settings.get().wideSpacing() ? Math.round(5 * Settings.get().fontScale()) : 0;
     }

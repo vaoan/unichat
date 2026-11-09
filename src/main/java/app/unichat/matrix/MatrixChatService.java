@@ -332,7 +332,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         return homeserver + "|" + (deviceId == null || deviceId.isBlank() ? userId : deviceId);
     }
 
-    /** Retries (1 + 2 + 4 + 8 + 16 s) shown as "Conectando…" after starting or waking, before "Sin conexión". */
+    /** Retries (1 + 2 + 4 + 8 + 16 s) shown as "Connecting…" after starting or waking, before "No connection". */
     static final int STILL_CONNECTING = 5;
 
     private int backoff(int failures, Exception e) {

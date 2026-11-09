@@ -30,7 +30,7 @@ import java.util.function.Consumer;
 /**
  * The personal server on this computer, with no Docker: installs whatever is missing (homeserver shipped with
  * the app, bridges downloaded on demand), writes the configs, starts and supervises the processes and owns the
- * account Unichat signs in with. See docs/SERVIDOR-NATIVO.md.
+ * account Unichat signs in with. See docs/NATIVE-SERVER.md.
  */
 public final class LocalServer {
     public static final int PORT = 8008;

@@ -394,7 +394,7 @@ final class FolderView extends VBox {
                     + (newest == null ? "" : ", " + lastLine(newest)));
         }
 
-        /** "Familia: ¿Quién trae qué?" — whose chat and what was last said there. */
+        /** "Family: Who's bringing what?" — whose chat and what was last said there. */
         private static String lastLine(Chat c) {
             String p = c.lastPreview() == null ? "" : c.lastPreview();
             return p.isEmpty() ? c.title() : c.title() + ": " + p;

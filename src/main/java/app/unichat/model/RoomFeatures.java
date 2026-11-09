@@ -143,7 +143,7 @@ public final class RoomFeatures {
         return quick.stream().filter(q -> allowed.contains(stripVs(q))).toList();
     }
 
-    /** Any emoji can be a reaction (the "Más emojis" picker makes sense). */
+    /** Any emoji can be a reaction (the "More emojis" picker makes sense). */
     public boolean anyReaction() { return reaction >= 1 && allowedReactions == null; }
 
     public boolean isUnknown() { return unrestricted; }

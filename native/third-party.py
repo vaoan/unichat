@@ -49,34 +49,34 @@ TUWUNEL_V = pinned(r"^TUWUNEL_VERSION=(\S+)", "src/main/resources/app/unichat/se
 JFX_LEGAL = [p["path"] for p in json.loads(fetch("https://api.github.com/repos/openjdk/jfx/git/trees/master?recursive=1"))["tree"]
              if re.match(r"modules/javafx\.(base|graphics|controls|media|web|swing)/src/main/legal/.+\.md$", p["path"])]
 COMPONENTS = [
-    ("whisper.cpp (whisper-cli)", WHISPER, "MIT", "transcribir notas de voz",
+    ("whisper.cpp (whisper-cli)", WHISPER, "MIT", "transcribing voice notes",
      [("LICENSE", fetch(f"{GH}ggml-org/whisper.cpp/v{WHISPER}/LICENSE"))]),
-    ("libwebp (gif2webp)", WEBP, "BSD-3-Clause + concesión de patentes", "stickers animados",
+    ("libwebp (gif2webp)", WEBP, "BSD-3-Clause + patent grant", "animated stickers",
      [("COPYING", fetch(f"{GH}webmproject/libwebp/v{WEBP}/COPYING")), ("PATENTS", fetch(f"{GH}webmproject/libwebp/v{WEBP}/PATENTS"))]),
-    ("GIFLib (dentro de gif2webp)", GIFLIB, "MIT", "leer GIF",
+    ("GIFLib (inside gif2webp)", GIFLIB, "MIT", "reading GIFs",
      [("COPYING", fetch("https://sourceforge.net/p/giflib/code/ci/master/tree/COPYING?format=raw"))]),
-    ("libolm", OLM, "Apache-2.0", "lo necesitan los puentes en macOS",
+    ("libolm", OLM, "Apache-2.0", "needed by the bridges on macOS",
      [("LICENSE", fetch(f"https://gitlab.matrix.org/matrix-org/olm/-/raw/{OLM}/LICENSE"))]),
-    ("tuwunel", TUWUNEL_V, "Apache-2.0", "servidor Matrix local",
+    ("tuwunel", TUWUNEL_V, "Apache-2.0", "local Matrix server",
      [("LICENSE", open(TUWUNEL + "/LICENSE").read())]),
-    ("JavaFX / OpenJFX", "23.0.1", "GPL-2.0 con excepción de classpath; WebKit, GStreamer y GLib con partes LGPL", "interfaz",
+    ("JavaFX / OpenJFX", "23.0.1", "GPL-2.0 with classpath exception; WebKit, GStreamer and GLib with LGPL parts", "user interface",
      [("LICENSE", fetch(GH + "openjdk/jfx/master/LICENSE")), ("ADDITIONAL_LICENSE_INFO", fetch(GH + "openjdk/jfx/master/ADDITIONAL_LICENSE_INFO")),
       ("ASSEMBLY_EXCEPTION", fetch(GH + "openjdk/jfx/master/ASSEMBLY_EXCEPTION"))] + [(p.split("/")[-1], fetch(GH + "openjdk/jfx/master/" + p)) for p in JFX_LEGAL]),
-    ("Jackson (core, databind, annotations, YAML)", "2.17.2", "Apache-2.0", "JSON y YAML",
+    ("Jackson (core, databind, annotations, YAML)", "2.17.2", "Apache-2.0", "JSON and YAML",
      [("NOTICE", jar(JACKSON, "META-INF/NOTICE")), ("FastDoubleParser LICENSE", jar(JACKSON, "META-INF/FastDoubleParser-LICENSE")),
       ("FastDoubleParser NOTICE", jar(JACKSON, "META-INF/FastDoubleParser-NOTICE"))]),
     ("SnakeYAML", "2.2", "Apache-2.0", "YAML", [("LICENSE", fetch(GH + "snakeyaml/snakeyaml/master/LICENSE.txt"))]),
-    ("SQLite JDBC (incluye SQLite)", "3.46.1.3", "Apache-2.0; SQLite es de dominio público", "leer bases de los puentes",
+    ("SQLite JDBC (includes SQLite)", "3.46.1.3", "Apache-2.0; SQLite is public domain", "reading the bridges' databases",
      [("LICENSE", jar("org/xerial/sqlite-jdbc/3.46.1.3/sqlite-jdbc-3.46.1.3.jar", "META-INF/maven/org.xerial/sqlite-jdbc/LICENSE")),
       ("LICENSE.zentus", jar("org/xerial/sqlite-jdbc/3.46.1.3/sqlite-jdbc-3.46.1.3.jar", "META-INF/maven/org.xerial/sqlite-jdbc/LICENSE.zentus"))]),
-    ("JNA", "5.14.0", "Apache-2.0 (elegida entre Apache-2.0 y LGPL-2.1)", "llamadas nativas",
+    ("JNA", "5.14.0", "Apache-2.0 (chosen from Apache-2.0 and LGPL-2.1)", "native calls",
      [("LICENSE", jar("net/java/dev/jna/jna/5.14.0/jna-5.14.0.jar", "META-INF/LICENSE"))]),
-    ("ZXing core", "3.5.3", "Apache-2.0", "códigos QR", [("NOTICE", fetch(GH + "zxing/zxing/zxing-3.5.3/NOTICE"))]),
-    ("TwelveMonkeys ImageIO", "3.12.0", "BSD-3-Clause", "leer WebP", [("LICENSE", fetch(GH + "haraldk/TwelveMonkeys/master/LICENSE.txt"))]),
-    ("JCodec (incluye un decodificador derivado de JAAD)", "0.2.5", "BSD-2-Clause", "videos desde GIF",
+    ("ZXing core", "3.5.3", "Apache-2.0", "QR codes", [("NOTICE", fetch(GH + "zxing/zxing/zxing-3.5.3/NOTICE"))]),
+    ("TwelveMonkeys ImageIO", "3.12.0", "BSD-3-Clause", "reading WebP", [("LICENSE", fetch(GH + "haraldk/TwelveMonkeys/master/LICENSE.txt"))]),
+    ("JCodec (includes a decoder derived from JAAD)", "0.2.5", "BSD-2-Clause", "videos from GIFs",
      [("LICENSE", fetch(GH + "jcodec/jcodec/master/LICENSE"))]),
-    ("jsoup", "1.18.3", "MIT", "leer el HTML de los mensajes", [("LICENSE", fetch(GH + "jhy/jsoup/master/LICENSE"))]),
-    ("Concentus", "1.0.2", "BSD-3-Clause", "decodificar notas de voz Opus", [("LICENSE", fetch(GH + "lostromb/concentus/master/LICENSE"))]),
+    ("jsoup", "1.18.3", "MIT", "reading messages' HTML", [("LICENSE", fetch(GH + "jhy/jsoup/master/LICENSE"))]),
+    ("Concentus", "1.0.2", "BSD-3-Clause", "decoding Opus voice notes", [("LICENSE", fetch(GH + "lostromb/concentus/master/LICENSE"))]),
 ]
 APACHE = fetch("https://www.apache.org/licenses/LICENSE-2.0.txt")
 
@@ -133,38 +133,38 @@ for name, version, lic, d in rust:
     if not found: bare.append(f"{name} {version}")
     for t in found: groups.setdefault(t.strip(), []).append(f"{name} {version}")
 
-o = ["# Componentes de terceros\n",
-     "El código propio de Unichat es [0BSD](LICENSE). Los paquetes de Unichat también llevan los componentes de abajo, "
-     "cada uno con su propia licencia; 0BSD no los cubre. Archivo generado con `native/third-party.py`.\n",
-     "## Incluidos en la app\n", "| Componente | Versión | Licencia | Para qué |\n|---|---|---|---|"]
+o = ["# Third-party components\n",
+     "Unichat's own code is [0BSD](LICENSE). Unichat's packages also carry the components below, "
+     "each under its own license; 0BSD doesn't cover them. Generated by `native/third-party.py`.\n",
+     "## Included in the app\n", "| Component | Version | License | What for |\n|---|---|---|---|"]
 for n, v, l, why, _ in COMPONENTS: o.append(f"| {n} | {v} | {l} | {why} |")
-o.append(f"| Crates de Rust dentro de tuwunel | ver lista | varias, ver abajo | servidor Matrix local |")
-o.append("| OpenJDK (runtime de Java) | el del JDK que empaqueta | GPL-2.0 con excepción de classpath | ejecutar la app |\n")
-o.append("Los avisos del runtime de Java van en la carpeta `legal` del propio runtime. Un paquete generado sin `TUWUNEL_BIN` "
-         "no lleva tuwunel ni libolm.\n")
-o.append("## No incluidos: se descargan al usarlos\n\n| Componente | Licencia |\n|---|---|\n"
-         "| Puentes de mautrix (WhatsApp, Telegram, Signal, Meta, Discord, Slack, Google Messages, X, LinkedIn) | AGPL-3.0 |\n"
-         "| Modelos de voz de Whisper (ggml) | MIT |\n"
-         "| FFmpeg, si hace falta y no lo tienes (compilaciones de martin-riedl.de y gyan.dev) | GPL-3.0 |\n"
-         "| Modelo de ruido de RNNoise `sh.rnnn` (GregorR/rnnoise-models), al mejorar notas de voz | sin derechos de autor, según su autor |\n")
-o.append("## Notas\n\n"
-         "- **LGPL en JavaFX**: WebKit y GStreamer/GLib van como bibliotecas nativas aparte dentro de JavaFX. Su código "
-         "fuente está en <https://github.com/openjdk/jfx>.\n"
-         "- **MPL-2.0**: el crate `as_variant` de tuwunel. Su código fuente está en <https://github.com/matrix-construct/tuwunel> "
-         "y sus dependencias.\n"
-         "- **JAAD**: JCodec trae un decodificador AAC con paquete `net.sourceforge.jaad`, sin aviso propio en el código de "
-         "JCodec; se lista bajo la licencia de JCodec.\n")
-o.append("## Crates de Rust compilados en tuwunel\n\n| Crate | Versión | Licencia |\n|---|---|---|")
-for name, version, lic, _ in rust: o.append(f"| {name} | {version} | {lic or 'ver texto abajo'} |")
-o.append("\n## Textos de licencia\n")
+o.append(f"| Rust crates inside tuwunel | see list | several, see below | local Matrix server |")
+o.append("| OpenJDK (Java runtime) | that of the packaging JDK | GPL-2.0 with classpath exception | running the app |\n")
+o.append("The Java runtime's notices are in the runtime's own `legal` folder. A package built without `TUWUNEL_BIN` "
+         "carries neither tuwunel nor libolm.\n")
+o.append("## Not included: downloaded when used\n\n| Component | License |\n|---|---|\n"
+         "| mautrix bridges (WhatsApp, Telegram, Signal, Meta, Discord, Slack, Google Messages, X, LinkedIn) | AGPL-3.0 |\n"
+         "| Whisper speech models (ggml) | MIT |\n"
+         "| FFmpeg, when needed and you don't have it (builds from martin-riedl.de and gyan.dev) | GPL-3.0 |\n"
+         "| RNNoise noise model `sh.rnnn` (GregorR/rnnoise-models), when improving voice notes | no copyright, per its author |\n")
+o.append("## Notes\n\n"
+         "- **LGPL in JavaFX**: WebKit and GStreamer/GLib ship as separate native libraries inside JavaFX. Their source "
+         "is at <https://github.com/openjdk/jfx>.\n"
+         "- **MPL-2.0**: tuwunel's `as_variant` crate. Its source is at <https://github.com/matrix-construct/tuwunel> "
+         "and its dependencies.\n"
+         "- **JAAD**: JCodec carries an AAC decoder in package `net.sourceforge.jaad`, with no notice of its own in JCodec's "
+         "source; it's listed under JCodec's license.\n")
+o.append("## Rust crates built into tuwunel\n\n| Crate | Version | License |\n|---|---|---|")
+for name, version, lic, _ in rust: o.append(f"| {name} | {version} | {lic or 'see text below'} |")
+o.append("\n## License texts\n")
 for n, v, l, why, parts in COMPONENTS:
     o.append(f"### {n}\n")
     for head, text in parts: o.append(f"**{head}**\n\n{block(text)}")
-o.append("### Apache License 2.0\n\nTexto para todo lo marcado Apache-2.0 aquí arriba y en los crates.\n\n" + block(APACHE))
-o.append("### Avisos de los crates de Rust\n\nCuando un crate ofrece elegir, se usa MIT. Textos idénticos van una sola vez.\n")
+o.append("### Apache License 2.0\n\nThe text for everything marked Apache-2.0 above and in the crates.\n\n" + block(APACHE))
+o.append("### Rust crates' notices\n\nWhere a crate offers a choice, MIT is used. Identical texts appear once.\n")
 for text, names in sorted(groups.items(), key=lambda kv: kv[1][0].lower()):
     o.append("**" + ", ".join(names) + "**\n\n" + block(text))
 if bare:
-    o.append("**Sin archivo de licencia propio; aplica la licencia declarada en la tabla:** " + ", ".join(bare) + "\n")
+    o.append("**No license file of their own; the license declared in the table applies:** " + ", ".join(bare) + "\n")
 open(os.path.join(ROOT, "THIRD-PARTY.md"), "w").write("\n".join(o))
-print(f"{len(COMPONENTS)} componentes, {len(rust)} crates, {len(groups)} textos distintos, sin archivo: {bare}")
+print(f"{len(COMPONENTS)} components, {len(rust)} crates, {len(groups)} distinct texts, no file: {bare}")

@@ -11,7 +11,7 @@ cd "$(dirname "$0")"
 ./package.sh
 # Never replace a copy that runs the local server with one that can't (tuwunel missing: no TUWUNEL_BIN, no download).
 if [ -e /Applications/Unichat.app/Contents/app/server/tuwunel ] && [ ! -e release/Unichat.app/Contents/app/server/tuwunel ]; then
-  echo "Error: este paquete no trae tuwunel y el instalado sí; no lo reemplazo (ver package.sh)." >&2
+  echo "Error: this package has no tuwunel and the installed app does; not replacing it (see package.sh)." >&2
   exit 1
 fi
 if pgrep -f "/Applications/Unichat.app/" >/dev/null; then

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Native (no-Docker) Unichat server on an Apple Silicon Mac: tuwunel homeserver + mautrix bridges + SQLite.
-# Reference implementation of what Unichat's built-in installer does at startup (see docs/SERVIDOR-NATIVO.md).
+# Reference implementation of what Unichat's built-in installer does at startup (see docs/NATIVE-SERVER.md).
 #
 # Usage: native/setup-mac.sh [bridge ...]     (default: every bridge in versions.env)
 # Env:   UNICHAT_SERVER_DIR  data dir (default: ~/Library/Application Support/Unichat/server)
@@ -16,7 +16,7 @@ HS_PORT=8008
 ADMIN_USER="${ADMIN_USER:-yo}"
 OS=darwin ARCH=arm64
 
-[ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ] || { echo "Solo Mac con Apple Silicon." >&2; exit 1; }
+[ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ] || { echo "Apple Silicon Macs only." >&2; exit 1; }
 command -v yq >/dev/null || { echo "Falta yq (brew install yq)." >&2; exit 1; }
 
 rand() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-32}" || true; }
@@ -64,7 +64,7 @@ fetch_bridge() {
   local want got
   want="$(curl -fsSL "$base/sha256sums.txt" | awk -v a="$asset" '$2 == a || $2 == "*"a {print $1}')"
   got="$(shasum -a 256 "$out.part" | awk '{print $1}')"
-  [ -n "$want" ] && [ "$want" = "$got" ] || { rm -f "$out.part"; echo "Checksum inválido para $asset" >&2; exit 1; }
+  [ -n "$want" ] && [ "$want" = "$got" ] || { rm -f "$out.part"; echo "Checksum mismatch for $asset" >&2; exit 1; }
   chmod 755 "$out.part"; xattr -c "$out.part" 2>/dev/null || true
   mv "$out.part" "$out"; echo "$tag" > "$out.version"
 }
@@ -73,7 +73,7 @@ BRIDGES="${*:-whatsapp telegram signal instagram facebook discord slack gmessage
 ACTIVE=""
 for b in $BRIDGES; do
   if [ "$b" = telegram ] && { [ -z "${TELEGRAM_API_ID:-}" ] || [ -z "${TELEGRAM_API_HASH:-}" ]; }; then
-    echo "Telegram queda desactivado: falta TELEGRAM_API_ID / TELEGRAM_API_HASH."; continue
+    echo "Telegram is turned off: TELEGRAM_API_ID / TELEGRAM_API_HASH are missing."; continue
   fi
   ACTIVE="$ACTIVE $b"
 done
@@ -181,4 +181,4 @@ max_request_size = 104857600
 log = "info"
 EOF
 echo "$ACTIVE" | xargs > "$DIR/bridges.active"
-echo "Listo. Arranca con: native/run-mac.sh start"
+echo "Done. Start it with: native/run-mac.sh start"

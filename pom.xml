@@ -92,7 +92,7 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <!-- The package rules of docs/ARQUITECTURA.md, checked by ArchitectureTest. -->
+      <!-- The package rules of docs/ARCHITECTURE.md, checked by ArchitectureTest. -->
       <groupId>com.tngtech.archunit</groupId>
       <artifactId>archunit</artifactId>
       <version>1.4.1</version>

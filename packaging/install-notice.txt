@@ -1,25 +1,4 @@
-UNICHAT — PRIVACIDAD Y LICENCIA / PRIVACY AND LICENSE
-
-ESPAÑOL
-
-Unichat no tiene servidores ni cuentas propias, no recoge estadísticas y no envía nada a quien lo hizo.
-Tus mensajes van de tu computador a cada red (WhatsApp, Telegram…), a través del servidor Matrix que eliges: el
-local, que corre en tu computador, o uno tuyo.
-
-Además, Unichat se conecta a:
-- GitHub, para descargar el servidor local y los puentes al conectar una red, y para buscar actualizaciones una
-  vez al día, sin datos tuyos. Se apaga en Ajustes → Privacidad → Buscar actualizaciones.
-- GitHub y Hugging Face, la primera vez que usas algo que necesita ffmpeg, Whisper o RNNoise. ffmpeg se apaga en
-  Ajustes → Redes → Instalar el conversor automáticamente; Whisper se descarga si transcribes una nota de
-  voz; RNNoise, al enviar una nota de voz con Ajustes → Redes → Mejorar el audio de tus notas de voz.
-- Las páginas de los enlaces que llegan en los mensajes, sin cookies y nunca dentro de tu red local, para mostrar
-  su video. Se apaga en Ajustes → Privacidad → Videos de los enlaces.
-- El buscador de GIFs que elijas, solo cuando buscas.
-- Claude Code o Codex, con tu cuenta, solo si activas «Escribir con IA» (apagado por defecto) y pulsas el botón.
-
-Detalle completo: https://github.com/vaoan/unichat/blob/main/docs/PRIVACIDAD.md
-Desinstalar: Configuración de Windows → Aplicaciones → Unichat → Desinstalar. Tus datos quedan en
-%APPDATA%\Unichat por si vuelves; bórrala para quitarlos.
+UNICHAT — PRIVACY AND LICENSE / PRIVACIDAD Y LICENCIA
 
 ENGLISH
 
@@ -38,9 +17,30 @@ Besides that, Unichat connects to:
 - The GIF search you choose, only when you search.
 - Claude Code or Codex, with your account, only if you turn on "Write with AI" (off by default) and press its button.
 
-Full details: https://github.com/vaoan/unichat/blob/main/docs/PRIVACIDAD.md
+Full details: https://github.com/vaoan/unichat/blob/main/docs/PRIVACY.md
 Uninstall: Windows Settings → Apps → Unichat → Uninstall. Your data stays in %APPDATA%\Unichat in case you come
 back; delete that folder to remove it.
+
+ESPAÑOL
+
+Unichat no tiene servidores ni cuentas propias, no recoge estadísticas y no envía nada a quien lo hizo.
+Tus mensajes van de tu computador a cada red (WhatsApp, Telegram…), a través del servidor Matrix que eliges: el
+local, que corre en tu computador, o uno tuyo.
+
+Además, Unichat se conecta a:
+- GitHub, para descargar el servidor local y los puentes al conectar una red, y para buscar actualizaciones una
+  vez al día, sin datos tuyos. Se apaga en Ajustes → Privacidad → Buscar actualizaciones.
+- GitHub y Hugging Face, la primera vez que usas algo que necesita ffmpeg, Whisper o RNNoise. ffmpeg se apaga en
+  Ajustes → Redes → Instalar el conversor automáticamente; Whisper se descarga si transcribes una nota de
+  voz; RNNoise, al enviar una nota de voz con Ajustes → Redes → Mejorar el audio de tus notas de voz.
+- Las páginas de los enlaces que llegan en los mensajes, sin cookies y nunca dentro de tu red local, para mostrar
+  su video. Se apaga en Ajustes → Privacidad → Videos de los enlaces.
+- El buscador de GIFs que elijas, solo cuando buscas.
+- Claude Code o Codex, con tu cuenta, solo si activas «Escribir con IA» (apagado por defecto) y pulsas el botón.
+
+Detalle completo: https://github.com/vaoan/unichat/blob/main/docs/PRIVACY.md
+Desinstalar: Configuración de Windows → Aplicaciones → Unichat → Desinstalar. Tus datos quedan en
+%APPDATA%\Unichat por si vuelves; bórrala para quitarlos.
 
 LICENSE (0BSD)
 

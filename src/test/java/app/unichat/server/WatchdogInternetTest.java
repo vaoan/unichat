@@ -45,8 +45,8 @@ class WatchdogInternetTest {
     void withoutInternetOnlyAHungProcessIsRestarted() {
         assertNull(Watchdog.reason(new Watchdog.Health(0, NOW - 60 * 60_000, 0), NOW, false), "disconnected for an hour");
         assertNull(Watchdog.reason(new Watchdog.Health(0, -1, 9), NOW, false), "drops");
-        assertEquals("no responde", Watchdog.reason(new Watchdog.Health(3, -1, 0), NOW, false));
-        assertEquals("5 desconexiones en 10 min", Watchdog.reason(new Watchdog.Health(0, -1, 5), NOW, true));
+        assertEquals("not responding", Watchdog.reason(new Watchdog.Health(3, -1, 0), NOW, false));
+        assertEquals("5 disconnections in 10 min", Watchdog.reason(new Watchdog.Health(0, -1, 5), NOW, true));
     }
 
     @Test
@@ -57,7 +57,7 @@ class WatchdogInternetTest {
 
         online = true;
         dog.check();
-        assertEquals(List.of("discord: volvió internet", "telegram: volvió internet"), restarted);
+        assertEquals(List.of("discord: internet is back", "telegram: internet is back"), restarted);
 
         restarted.clear();
         dog.check();
@@ -90,7 +90,7 @@ class WatchdogInternetTest {
         d.check();
         online = true;
         d.check();
-        assertEquals(List.of("telegram: volvió internet"), restarted, "and flapping doesn't either while it's not safe");
+        assertEquals(List.of("telegram: internet is back"), restarted, "and flapping doesn't either while it's not safe");
     }
 
     @Test
@@ -98,7 +98,7 @@ class WatchdogInternetTest {
         boolean[] safe = {true};
         Watchdog d = withFragileFacebook(safe);
         d.check();
-        assertEquals(List.of("facebook: 5 desconexiones en 10 min"), restarted);
+        assertEquals(List.of("facebook: 5 disconnections in 10 min"), restarted);
     }
 
     @Test
@@ -112,6 +112,6 @@ class WatchdogInternetTest {
         restarted.clear();
         online = true;
         dog.check();
-        assertEquals(List.of("discord: volvió internet", "telegram: volvió internet"), restarted);
+        assertEquals(List.of("discord: internet is back", "telegram: internet is back"), restarted);
     }
 }

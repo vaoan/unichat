@@ -59,7 +59,7 @@ public final class Formats {
         return String.format(Locale.ROOT, "%.1f GB", mb / 1024.0);
     }
 
-    /** Up to two initials for avatars: "Ana María" -> "AM", "#desarrollo" -> "D", "" -> "?". */
+    /** Up to two initials for avatars: "Ana María" -> "AM", "#development" -> "D", "" -> "?". */
     public static String initials(String name) {
         if (name == null) return "?";
         String clean = name.replaceAll("[^\\p{L}\\p{N} ]", " ").trim();
@@ -73,7 +73,7 @@ public final class Formats {
 
     /**
      * Two characters naming one of your accounts in a tiny avatar: the last two digits of a phone number
-     * ("+57 300 111 2233" → "33"), otherwise the initials ("Trabajo" → "T", "Ana Pérez" → "AP").
+     * ("+57 300 111 2233" → "33"), otherwise the initials ("Work" → "W", "Ana Pérez" → "AP").
      */
     public static String accountShort(String label) {
         if (label == null || label.isBlank()) return "?";
