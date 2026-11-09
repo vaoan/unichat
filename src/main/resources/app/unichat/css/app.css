@@ -854,3 +854,7 @@
 .command-field.clearable { -fx-padding: 10 2.6em 10 12; }
 .search-clear { -fx-background-color: transparent; -fx-padding: 0.2em; -fx-min-width: 0; -fx-min-height: 0; -fx-cursor: hand; }
 .search-clear:hover { -fx-background-color: -hover; }
+
+/* An avatar that opens its photo large (InfoPane): a round focus ring for the keyboard. */
+.avatar-enlargeable:focus-visible { -fx-border-color: -accent; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-radius: 999; }
+.root.strong-focus .avatar-enlargeable:focus-visible { -fx-border-color: -text; -fx-border-width: 3; }

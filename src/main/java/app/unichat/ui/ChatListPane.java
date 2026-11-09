@@ -262,12 +262,12 @@ public final class ChatListPane extends VBox {
         channels.refresh(all, f);
         updating = true;
         try {
-            items.setAll(visible);
+            ListRows.show(items, visible, Chat::id);
             channels.showRows(this::selectInList);
         } finally {
             updating = false;
         }
-        list.refresh();
+        ListRows.redraw(list);
         channels.redraw();
 
         String base = switch (f.view()) {

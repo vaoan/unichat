@@ -238,8 +238,8 @@ final class FolderView extends VBox {
             folderTitle.setText(current.name());
             chatList.setAccessibleText(I18n.t("folders.chatsOf", current.name()));
         }
-        nameList.refresh();
-        chatList.refresh();
+        ListRows.redraw(nameList);
+        ListRows.redraw(chatList);
         showCurrent();
         if (lost && hadFocus) focus();
     }
@@ -318,7 +318,11 @@ final class FolderView extends VBox {
     }
 
     /** A folder's row, as big as a chat's: its tile, name and time, and the last message in it. */
-    private final class FolderCell extends ListCell<Folder> {
+    private final class FolderCell extends ListCell<Folder> implements ListRows.Redrawable {
+        @Override public void redraw() {
+            if (getItem() != null && !isEmpty()) updateItem(getItem(), false);
+        }
+
         private static final double TILE = 44;
         private final Label name = new Label();
         private final Label stamp = new Label();

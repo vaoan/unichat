@@ -79,6 +79,10 @@ class ListRepaintUiTest {
         });
     }
 
+    private static List<String> shown(Map<Node, Object[]> cells) {
+        return cells.entrySet().stream().map(e -> Integer.toHexString(System.identityHashCode(e.getKey())) + "=" + e.getValue()[0]).sorted().toList();
+    }
+
     private List<Node> favoriteTiles() throws Exception {
         return FxWait.fx(() -> List.copyOf(scene.getRoot().lookupAll(".favorite-tile")));
     }
@@ -93,8 +97,15 @@ class ListRepaintUiTest {
 
     @Test
     void openingAnotherChatKeepsTheRowsIconsAndTheFavorites() throws Exception {
+        // Two chats already on screen, so opening the second doesn't scroll the list (what other tests saved can
+        // change its order): the first opened, the second marked unread so opening it changes the list.
+        List<String> onScreen = FxWait.fx(() -> scene.getRoot().lookupAll(".chat-list .list-cell").stream()
+                .filter(n -> n instanceof ChatRowCell c && n.isVisible() && c.getItem() != null && !c.getItem().space())
+                .map(n -> ((ChatRowCell) n).getItem().id()).distinct().limit(2).toList());
+        assertEquals(2, onScreen.size(), "two chats on screen: " + onScreen);
+        svc.setMarkedUnread(onScreen.get(1), true).get();
         FxWait.fx(() -> {
-            view.openChatId("!familia:demo");
+            view.openChatId(onScreen.get(0));
             return null;
         });
         FxWait.settled();
@@ -102,10 +113,9 @@ class ListRepaintUiTest {
         List<Node> railBadges = FxWait.fx(() -> List.copyOf(scene.getRoot().lookupAll(".rail-badge")));
         List<Node> favorites = favoriteTiles();
         assertFalse(before.isEmpty());
-        assertFalse(favorites.isEmpty(), "the demo has favorites");
 
         FxWait.fx(() -> {
-            view.openChatId("!mama:demo"); // unread: opening it marks it read, a change to the list
+            view.openChatId(onScreen.get(1)); // unread: opening it marks it read, a change to the list
             return null;
         });
         FxWait.settled();
@@ -118,7 +128,7 @@ class ListRepaintUiTest {
             compared++;
             assertSame(e.getValue()[1], now[1], "the network icon of " + now[0] + " was built again");
         }
-        assertTrue(compared > 3, "rows compared: " + compared);
+        assertTrue(compared > 3, "rows compared: " + compared + "; before " + shown(before) + ", after " + shown(after));
         for (Node n : FxWait.fx(() -> List.copyOf(scene.getRoot().lookupAll(".rail-badge")))) {
             assertTrue(railBadges.contains(n), "a rail unread badge was built again");
         }

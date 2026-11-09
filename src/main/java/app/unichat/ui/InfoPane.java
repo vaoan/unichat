@@ -76,6 +76,7 @@ public final class InfoPane extends ScrollPane {
         Avatar a = new Avatar(84);
         a.set(c.title(), c.id(), c.avatarUrl(), svc);
         a.setNetwork(c.network(), true);
+        enlargeable(a, c.avatarUrl(), c.title());
         Label title = new Label(c.title());
         title.getStyleClass().add("info-title");
         title.setWrapText(true);
@@ -133,6 +134,7 @@ public final class InfoPane extends ScrollPane {
             for (Member m : c.members().stream().limit(100).toList()) {
                 Avatar pa = new Avatar(30);
                 pa.set(m.displayName(), m.id(), m.avatarUrl(), svc);
+                enlargeable(pa, m.avatarUrl(), m.displayName());
                 Label n = new Label(m.id().equals(svc.myUserId()) ? I18n.t("info.you", m.displayName()) : m.displayName());
                 n.getStyleClass().add("member-name");
                 HBox row = new HBox(10, pa, n);
@@ -171,6 +173,33 @@ public final class InfoPane extends ScrollPane {
             for (Member m : c.members().stream().limit(100).toList()) b.append(' ').append(m.id()).append(m.displayName()).append(m.avatarUrl());
         }
         return b.toString();
+    }
+
+    /**
+     * A photo opens large in the chat's photo viewer (same controls: zoom, turn, full screen, save), by click, Enter or
+     * Space. Initials alone have nothing to show.
+     */
+    private void enlargeable(Avatar a, String url, String name) {
+        if (url == null || url.isBlank()) return;
+        a.getStyleClass().add("avatar-enlargeable");
+        a.setCursor(javafx.scene.Cursor.HAND);
+        a.setFocusTraversable(true);
+        a.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
+        a.setAccessibleText(I18n.t("info.avatarOpen", name));
+        Runnable open = () -> {
+            if (getScene() == null) return;
+            javafx.stage.Window owner = getScene().getWindow();
+            MediaViewer.show(owner, svc.media(url, 0, 0), name, () -> MediaSaver.save(owner, svc, url, name, toast));
+        };
+        a.setOnMouseClicked(e -> {
+            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) open.run();
+        });
+        a.setOnKeyPressed(e -> {
+            if (e.getCode() == javafx.scene.input.KeyCode.ENTER || e.getCode() == javafx.scene.input.KeyCode.SPACE) {
+                open.run();
+                e.consume();
+            }
+        });
     }
 
     private Node section(String text) {

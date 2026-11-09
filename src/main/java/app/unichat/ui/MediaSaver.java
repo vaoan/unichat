@@ -63,12 +63,17 @@ final class MediaSaver {
 
     /** Asks where to save, then copies the downloaded file there. */
     static void save(Window owner, MediaSource svc, Message m, Consumer<String> toast) {
+        save(owner, svc, m.mediaUrl(), suggestedName(m, ZoneId.systemDefault()), toast);
+    }
+
+    /** Saves the picture at {@code url} (an avatar: no message to name it after) under a name the person picks. */
+    static void save(Window owner, MediaSource svc, String url, String suggested, Consumer<String> toast) {
         FileChooser fc = new FileChooser();
         fc.setTitle(I18n.t("saver.title"));
-        fc.setInitialFileName(suggestedName(m, ZoneId.systemDefault()));
+        fc.setInitialFileName(suggested);
         File target = fc.showSaveDialog(owner);
         if (target == null) return;
-        svc.media(m.mediaUrl(), 0, 0).whenComplete((p, err) -> {
+        svc.media(url, 0, 0).whenComplete((p, err) -> {
             String msg;
             try {
                 if (err != null) throw err;

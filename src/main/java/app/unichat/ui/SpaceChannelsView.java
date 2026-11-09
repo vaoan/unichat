@@ -125,7 +125,7 @@ final class SpaceChannelsView extends VBox {
     void showRows(Runnable select) {
         updating = true;
         try {
-            items.setAll(rows.rows());
+            ListRows.show(items, rows.rows(), Chat::id);
             select.run();
         } finally {
             updating = false;
@@ -133,7 +133,7 @@ final class SpaceChannelsView extends VBox {
     }
 
     void redraw() {
-        list.refresh();
+        ListRows.redraw(list);
         markRead.setDisable(items.stream().noneMatch(c -> actsLikeChat(c) && c.isUnread()));
     }
 

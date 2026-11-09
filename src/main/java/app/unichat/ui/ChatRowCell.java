@@ -21,7 +21,7 @@ import java.time.ZoneId;
 import java.util.Objects;
 
 /** A row of the chat lists: a chat, a server, a server still to add, or a channel still to join. */
-final class ChatRowCell extends ListCell<Chat> {
+final class ChatRowCell extends ListCell<Chat> implements ListRows.Redrawable {
     private final ChatListPane pane;
     private final ChatService svc;
     private final Spaces spaces;
@@ -90,6 +90,11 @@ final class ChatRowCell extends ListCell<Chat> {
             ContextMenu menu = getItem() == null ? null : pane.rowMenu(getItem());
             if (menu != null) menu.show(pane, e.getScreenX(), e.getScreenY());
         });
+    }
+
+    /** Draws its chat again, keeping it: the chat's fields changed, not which chat the row shows. */
+    @Override public void redraw() {
+        if (getItem() != null && !isEmpty()) updateItem(getItem(), false);
     }
 
     @Override
