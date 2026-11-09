@@ -11,10 +11,8 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,7 +31,7 @@ class FilterUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -49,7 +47,8 @@ class FilterUiTest {
             stage.show();
             return sc;
         });
-        Thread.sleep(500);
+        FxWait.until("the chat list shows", () -> !scene.getRoot().lookupAll(".chat-list .list-cell").isEmpty());
+        FxWait.settled();
         ChatListPane list = fx(() -> (ChatListPane) scene.getRoot().lookupAll("*").stream()
                 .filter(n -> n instanceof ChatListPane).findFirst().orElseThrow());
 
@@ -90,18 +89,10 @@ class FilterUiTest {
             b.fire();
             return null;
         });
-        Thread.sleep(100);
+        FxWait.settled();
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(s.get());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+    private static <T> T fx(Callable<T> c) throws Exception {
+        return FxWait.fx(c);
     }
 }

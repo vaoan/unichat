@@ -15,11 +15,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,7 +39,7 @@ class ChatClickUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -81,7 +79,8 @@ class ChatClickUiTest {
             stage.show();
             return sc;
         });
-        Thread.sleep(500);
+        FxWait.until("the chat list shows", () -> !scene.getRoot().lookupAll(".chat-list .list-cell").isEmpty());
+        FxWait.settled();
         // A real click focuses the list first: that's when selecting a row opens its chat.
         boolean focused = fx(() -> {
             javafx.scene.Node list = scene.getRoot().lookup(".chat-list");
@@ -95,7 +94,7 @@ class ChatClickUiTest {
                 pane.filterProperty().set(pane.filterProperty().get().withUnreadOnly(true));
                 return null;
             });
-            Thread.sleep(300);
+            FxWait.settled();
         }
         for (int i = 0; i < (unreadOnly ? 2 : 4); i++) {
             int row = i;
@@ -111,10 +110,10 @@ class ChatClickUiTest {
                 Event.fireEvent(cell, mouse(MouseEvent.MOUSE_CLICKED));
                 return id;
             });
-            for (int w = 0; w < 40 && !clicked.equals(fx(() -> view.currentChatId())); w++) Thread.sleep(50);
+            FxWait.until("the clicked chat " + clicked + " opens", () -> clicked.equals(view.currentChatId()));
             assertEquals(clicked, fx(() -> view.currentChatId()), "the clicked chat opens");
         }
-        Thread.sleep(300);
+        FxWait.settled(); // whatever the clicks set off has run: an error would be in by now
         assertTrue(failures.isEmpty(), "no errors on the UI thread: " + failures);
     }
 
@@ -129,15 +128,7 @@ class ChatClickUiTest {
                 true, false, false, true, false, true, null);
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(s.get());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+    private static <T> T fx(Callable<T> c) throws Exception {
+        return FxWait.fx(c);
     }
 }

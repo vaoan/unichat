@@ -19,10 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,7 +39,7 @@ class RowMenuUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -61,7 +59,8 @@ class RowMenuUiTest {
             stage.show();
             return sc;
         });
-        Thread.sleep(300);
+        FxWait.until("the chat list shows", () -> !scene.getRoot().lookupAll(".chat-list .list-cell").isEmpty());
+        FxWait.settled();
     }
 
     @AfterEach
@@ -86,28 +85,31 @@ class RowMenuUiTest {
                     .findFirst().map(javafx.scene.control.Button.class::cast).orElseThrow().fire();
             return null;
         });
-        Thread.sleep(200);
+        FxWait.until("the folder list shows", () -> firstRow(".folder-list") != null);
         assertMenuSurvivesRefresh(".folder-list");
         fx(() -> {
             Event.fireEvent(firstRow(".folder-list"), new MouseEvent(MouseEvent.MOUSE_CLICKED, 0, 0, 0, 0, MouseButton.PRIMARY, 1,
                     false, false, false, false, true, false, false, false, false, false, null));
             return null;
         });
-        Thread.sleep(200);
+        FxWait.until("the folder's chats show", () -> firstRow(".folder-chats") != null);
         assertMenuSurvivesRefresh(".folder-chats");
     }
 
     /** The person's usual state: a chat open, the list scrolled elsewhere, and other chats moving as messages arrive. */
     @Test
     void aRowsMenuStaysOpenWithAChatOpenAndTheListScrolled() throws Exception {
-        scene.getWindow().setHeight(300);
+        fx(() -> {
+            scene.getWindow().setHeight(300);
+            return null;
+        });
         ChatListPane pane = fx(() -> (ChatListPane) scene.getRoot().lookupAll("*").stream()
                 .filter(ChatListPane.class::isInstance).findFirst().orElseThrow());
         fx(() -> {
             pane.setSelected(FAMILIA);
             return null;
         });
-        Thread.sleep(200);
+        FxWait.settled();
         fx(() -> {
             @SuppressWarnings("unchecked")
             javafx.scene.control.ListView<app.unichat.model.Chat> l =
@@ -119,7 +121,7 @@ class RowMenuUiTest {
             l.scrollTo(last);
             return null;
         });
-        Thread.sleep(300);
+        FxWait.settled();
         fx(() -> {
             scene.getRoot().applyCss();
             scene.getRoot().layout();
@@ -139,8 +141,8 @@ class RowMenuUiTest {
             return null;
         });
         for (int i = 0; i < 6; i++) {
-            svc.setPinned(FAMILIA, i % 2 == 0);
-            Thread.sleep(400);
+            svc.setPinned(FAMILIA, i % 2 == 0).get();
+            FxWait.settled(); // the lists' refresh for it has run
         }
         assertTrue(closedBy[0] == null, "the menu closed when the list refreshed");
     }
@@ -153,9 +155,9 @@ class RowMenuUiTest {
             return null;
         });
         assertFalse(fx(RowMenuUiTest::openMenus).isEmpty(), "the menu of " + list + " opens");
-        for (int i = 0; i < 3; i++) { // refreshes are coalesced: give several time to land
-            svc.setPinned(FAMILIA, i % 2 == 0);
-            Thread.sleep(400);
+        for (int i = 0; i < 3; i++) { // refreshes are coalesced: let each one land before the next
+            svc.setPinned(FAMILIA, i % 2 == 0).get();
+            FxWait.settled();
         }
         boolean open = fx(() -> !openMenus().isEmpty());
         fx(() -> {
@@ -186,15 +188,7 @@ class RowMenuUiTest {
                 .map(ContextMenu.class::cast).toList();
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(s.get());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+    private static <T> T fx(Callable<T> c) throws Exception {
+        return FxWait.fx(c);
     }
 }

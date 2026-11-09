@@ -1,12 +1,12 @@
 package app.unichat.ui;
 
+import app.unichat.service.ChatService;
 import app.unichat.service.MockChatService;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.input.KeyCode;
@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -35,7 +34,7 @@ class NewChatUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -44,31 +43,21 @@ class NewChatUiTest {
     @Test
     void findAContactAndOpenOrCreateTheChat() throws Exception {
         MockChatService svc = new MockChatService();
-        Scene scene = fx(() -> {
-            Stage stage = new Stage();
-            stage.setOpacity(0);
-            MainView view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
-            Scene sc = new Scene(view, 1100, 760);
-            Theme.register(sc);
-            stage.setScene(sc);
-            stage.show();
-            return sc;
-        });
-        Thread.sleep(400);
+        Scene scene = start(svc);
 
         shortcutN(scene);
         assertTrue(fx(() -> pane(scene) != null), "⌘N opens Nuevo chat");
         chooseNetwork(scene, "WhatsApp");
-        // The contacts arrive on another thread: under load, after the assertion unless it waits for them.
-        for (int i = 0; i < 100 && rows(scene).size() < 6; i++) Thread.sleep(100);
+        // The contacts arrive on another thread: wait for them, then check there are exactly six.
+        FxWait.until("WhatsApp's contacts listed", () -> rows(scene).size() >= 6);
         assertEquals(6, rows(scene).size(), rows(scene).toString());
 
         type(scene, "ana");
-        until(() -> names(scene).equals(List.of("Ana Restrepo", "Ana María")));
+        FxWait.until("the search for ana", () -> names(scene).equals(List.of("Ana Restrepo", "Ana María")));
         assertEquals(List.of("Ana Restrepo", "Ana María"), names(scene));
 
         type(scene, "Mamá");
-        until(() -> names(scene).equals(List.of("Mamá")));
+        FxWait.until("the search for Mamá", () -> names(scene).equals(List.of("Mamá")));
         enter(scene);
         assertEquals("!mama:demo", fx(() -> thread(scene).chat().id()), "an existing chat just opens");
         assertNull(fx(() -> pane(scene)), "and the pane closes");
@@ -76,30 +65,29 @@ class NewChatUiTest {
         shortcutN(scene);
         chooseNetwork(scene, "WhatsApp");
         type(scene, "Carlos");
-        until(() -> names(scene).equals(List.of("Carlos Peña")));
+        FxWait.until("the search for Carlos", () -> names(scene).equals(List.of("Carlos Peña")));
         enter(scene);
-        until(() -> fx(() -> thread(scene).chat().id()).equals("!dm-c-carlos:demo"));
+        FxWait.until("Carlos's new chat opens", () -> thread(scene).chat().id().equals("!dm-c-carlos:demo"));
         assertEquals("!dm-c-carlos:demo", fx(() -> thread(scene).chat().id()), "a chat is created and opened");
 
         shortcutN(scene);
         chooseNetwork(scene, "WhatsApp");
         type(scene, "+57 300 111 2222");
-        until(() -> rows(scene).stream().anyMatch(r -> r.startsWith("Escribir a +57 300 111 2222")));
+        FxWait.until("the row to write to the number",
+                () -> rows(scene).stream().anyMatch(r -> r.startsWith("Escribir a +57 300 111 2222")));
         assertTrue(rows(scene).stream().anyMatch(r -> r.startsWith("Escribir a +57 300 111 2222")), rows(scene).toString());
 
         chooseNetwork(scene, "Discord");
-        Thread.sleep(300);
-        String help = fx(() -> scene.getRoot().lookupAll(".new-chat-pane .settings-help").stream()
-                .map(n -> ((Label) n).getText()).filter(t -> n(t)).findFirst().orElse(""));
+        FxWait.until("Discord's hint about Grupos", () -> helpText(scene).contains("Grupos"));
+        String help = fx(() -> helpText(scene));
         assertTrue(help.contains("Grupos"), help);
 
-        awaitSearch(scene);
         for (int i = 0; i < 2; i++) { // the first Esc empties the search box, the second closes (SearchFields)
             fx(() -> {
                 Event.fireEvent(search(scene), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
                 return null;
             });
-            Thread.sleep(200);
+            FxWait.settled();
             if (i == 0) assertEquals("", fx(() -> search(scene).getText()), "the first Esc empties the search");
         }
         assertNull(fx(() -> pane(scene)), "then Esc closes");
@@ -117,19 +105,20 @@ class NewChatUiTest {
             stage.show();
             return sc;
         });
-        Thread.sleep(400);
+        FxWait.until("the chat list shows", () -> !scene.getRoot().lookupAll(".chat-list .list-cell").isEmpty());
+        FxWait.settled();
         return scene;
     }
 
     @Test
     void typingBeforeASlowBridgeAnswersStillSearches() throws Exception {
         MockChatService svc = new MockChatService();
-        svc.simulateSlowBridge(1200);
+        svc.simulateSlowBridge(1200); // the scenario: the bridge says what it can do only after the person typed
         Scene scene = start(svc);
         shortcutN(scene);
         chooseNetwork(scene, "WhatsApp");
         type(scene, "Carlos");
-        Thread.sleep(2000);
+        FxWait.until("the search for Carlos, once the bridge answered", () -> names(scene).equals(List.of("Carlos Peña")));
         assertEquals(List.of("Carlos Peña"), names(scene), "not stuck on 'no disponible'");
         svc.stop();
     }
@@ -137,16 +126,16 @@ class NewChatUiTest {
     @Test
     void aClosedPaneDoesNotJumpToTheChatLater() throws Exception {
         MockChatService svc = new MockChatService();
-        svc.simulateSlowBridge(800);
+        svc.simulateSlowBridge(800); // the scenario: the new chat arrives after the pane was closed
         Scene scene = start(svc);
         fx(() -> { scene.getRoot().lookupAll("*").stream().filter(n -> n instanceof MainView).map(n -> (MainView) n)
                 .findFirst().orElseThrow().openChatId("!familia:demo"); return null; });
         shortcutN(scene);
         chooseNetwork(scene, "WhatsApp");
         type(scene, "Pedro");
-        until(() -> names(scene).equals(List.of("Pedro")));
-        enter(scene);
-        awaitSearch(scene);
+        FxWait.until("the search for Pedro", () -> names(scene).equals(List.of("Pedro")));
+        enter(scene); // the bridge creates the chat: it arrives later
+        CompletableFuture<Void> arrived = arrival(svc, "!dm-c-pedro:demo");
         fx(() -> {
             Event.fireEvent(search(scene), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
             return null;
@@ -156,7 +145,8 @@ class NewChatUiTest {
             Event.fireEvent(scene.getRoot(), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.K, false, !mac, false, mac));
             return null;
         });
-        Thread.sleep(1500);
+        arrived.get(); // every listener has heard of Pedro's new chat
+        FxWait.settled(); // and what they asked the window to do has run
         assertTrue(fx(() -> scene.getRoot().lookup(".command-bar") != null && scene.getRoot().lookup(".command-bar").getScene() != null),
                 "the command bar opened afterwards stays open");
         assertEquals("!familia:demo", fx(() -> thread(scene).chat().id()), "no jump to the chat you gave up on");
@@ -169,13 +159,13 @@ class NewChatUiTest {
         Scene scene = start(svc);
         shortcutN(scene);
         chooseNetwork(scene, "Discord");
-        Thread.sleep(300);
-        awaitSearch(scene);
+        FxWait.until("Discord's hint read out with the search field",
+                () -> String.valueOf(search(scene).getAccessibleHelp()).contains("Grupos"));
         String help = fx(() -> search(scene).getAccessibleHelp());
         assertTrue(help != null && help.contains("Grupos"), String.valueOf(help));
         chooseNetwork(scene, "WhatsApp");
         type(scene, "zzzz");
-        until(() -> "Sin resultados".equals(fx(() -> search(scene).getAccessibleHelp())));
+        FxWait.until("no results read out", () -> "Sin resultados".equals(search(scene).getAccessibleHelp()));
         assertEquals("Sin resultados", fx(() -> search(scene).getAccessibleHelp()));
         svc.stop();
     }
@@ -189,28 +179,30 @@ class NewChatUiTest {
         return n != null && n.isVisible() && n.getScene() != null ? n : null;
     }
 
-    /** The search field, waiting up to 5 s for the pane to show it (fixed sleeps made this test flaky). */
     private static TextField search(Scene s) {
         return (TextField) s.getRoot().lookup(".new-chat-search");
     }
 
-    /** Searches wait 300 ms and run on another thread: how long they take depends on the machine's load. */
-    private static void until(Callable<Boolean> done) throws Exception {
-        long end = System.currentTimeMillis() + 15_000;
-        while (!done.call() && System.currentTimeMillis() < end) Thread.sleep(50);
+    /** The pane's first status line that says something. */
+    private static String helpText(Scene s) {
+        return s.getRoot().lookupAll(".new-chat-pane .settings-help").stream()
+                .map(n -> ((Label) n).getText()).filter(NewChatUiTest::n).findFirst().orElse("");
     }
 
-    private static void awaitSearch(Scene s) throws Exception {
-        long end = System.currentTimeMillis() + 5000;
-        while (System.currentTimeMillis() < end) {
-            if (fx(() -> search(s) != null)) return;
-            Thread.sleep(50);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static ListView<Object> list(Scene s) {
-        return (ListView<Object>) s.getRoot().lookup(".new-chat-list");
+    /**
+     * Completes once {@code chatId} reached the service and every listener heard of it: this one is added last, so the
+     * window's own listeners have run (and queued their work on the FX thread) by then.
+     */
+    private static CompletableFuture<Void> arrival(MockChatService svc, String chatId) {
+        CompletableFuture<Void> arrived = new CompletableFuture<>();
+        svc.addListener(new ChatService.Listener() {
+            @Override
+            public void chatsChanged() {
+                if (svc.chat(chatId) != null) arrived.complete(null);
+            }
+        });
+        if (svc.chat(chatId) != null) arrived.complete(null); // already there: the scenario didn't happen as meant
+        return arrived;
     }
 
     private static List<String> rows(Scene s) throws Exception {
@@ -225,31 +217,30 @@ class NewChatUiTest {
 
     private static void chooseNetwork(Scene s, String name) throws Exception {
         // The pane is built on the next pulse after ⌘N: wait for its network chips.
-        for (int i = 0; i < 30 && !fx(() -> s.getRoot().lookupAll(".new-chat-network").stream()
-                .anyMatch(n -> name.equals(((ToggleButton) n).getText()))); i++) Thread.sleep(100);
+        FxWait.until("the " + name + " chip", () -> s.getRoot().lookupAll(".new-chat-network").stream()
+                .anyMatch(n -> name.equals(((ToggleButton) n).getText())));
         fx(() -> {
             s.getRoot().lookupAll(".new-chat-network").stream().map(n -> (ToggleButton) n)
                     .filter(b -> name.equals(b.getText())).findFirst().orElseThrow().fire();
             return null;
         });
-        Thread.sleep(300);
     }
 
     private static void type(Scene s, String text) throws Exception {
-        awaitSearch(s);
+        FxWait.until("the search field", () -> search(s) != null);
         fx(() -> {
             search(s).setText(text);
             return null;
         });
     }
 
+    /** Enter in the search field, then what it set off on the FX thread (opening a chat that exists) has run. */
     private static void enter(Scene s) throws Exception {
-        awaitSearch(s);
         fx(() -> {
             Event.fireEvent(search(s), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
             return null;
         });
-        Thread.sleep(300);
+        FxWait.settled();
     }
 
     private static void shortcutN(Scene s) throws Exception {
@@ -258,7 +249,7 @@ class NewChatUiTest {
             Event.fireEvent(s.getRoot(), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.N, false, !mac, false, mac));
             return null;
         });
-        Thread.sleep(300);
+        FxWait.settled();
     }
 
     private static ThreadPane thread(Scene s) {
@@ -266,14 +257,6 @@ class NewChatUiTest {
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(c.call());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 }
