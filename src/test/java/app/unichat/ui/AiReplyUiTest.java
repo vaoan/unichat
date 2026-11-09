@@ -98,6 +98,36 @@ class AiReplyUiTest {
     }
 
     @Test
+    void gapsInBracketsLetTheDraftSearchTheWebAndNothingElseDoes() throws Exception {
+        List<Boolean> searched = new ArrayList<>();
+        AiReplyButton.Writer plain = new AiReplyButton.Writer() {
+            // Learning how the person writes calls the program too: only the drafts count here.
+            @Override public String write(String p) { if (p.startsWith("Redacta")) searched.add(false); return "listo"; }
+            @Override public AiReplyButton.Writer searching() {
+                return p -> { if (p.startsWith("Redacta")) searched.add(true); return "listo, buscado"; };
+            }
+        };
+        writer(plain);
+        write("es a las [hora del partido]");
+        press();
+        FxWait.until("the draft", () -> text().equals("listo, buscado"));
+        write("es a las 8");
+        press();
+        FxWait.until("the draft", () -> text().equals("listo"));
+        assertEquals(true, searched.get(searched.size() - 2), "a [gap]: it may search the web");
+        assertEquals(false, searched.get(searched.size() - 1), "no gap: no web");
+    }
+
+    @Test
+    void aGapTheDraftCouldNotFillIsSelectedToTypeIt() throws Exception {
+        writer(p -> "Nos vemos a las 8 en [la dirección]");
+        write("nos vemos a las [hora] en [la dirección]");
+        press();
+        FxWait.until("the draft in the box", () -> text().startsWith("Nos vemos a las 8"));
+        assertEquals("[la dirección]", fx(() -> ((TextArea) composer.lookup(".text-area")).getSelectedText()));
+    }
+
+    @Test
     void theDraftLandsInTheBoxAndIsNotSent() throws Exception {
         int before = svc.messages(CHAT).size();
         writer(p -> { prompts.add(p); return "Claro, voy"; });

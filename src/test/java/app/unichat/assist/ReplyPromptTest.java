@@ -105,6 +105,31 @@ class ReplyPromptTest {
     }
 
     @Test
+    void whatIsInBracketsIsForTheAiToLookUpAndFillIn() {
+        String p = ReplyPrompt.build("", true, List.of(msg("Ana", false, "¿Dónde es la fiesta?")), null,
+                "es en [la dirección de la fiesta] a las [hora]");
+        String ask = p.substring(p.lastIndexOf("</chat-"));
+        assertTrue(ask.contains("[la dirección de la fiesta]") && ask.contains("[hora]"), "each gap named: " + ask);
+        assertTrue(ask.contains("archivos de la carpeta"), "where to look, when it may read the folder: " + ask);
+        assertTrue(ask.indexOf("archivos de la carpeta") < ask.indexOf("en internet"), "the chat and the files first, then the web: " + ask);
+        assertTrue(ask.contains("sin los corchetes"), ask);
+        assertTrue(ask.contains("ni fuentes ni enlaces"), "a chat message, not an answer with sources: " + ask);
+        assertTrue(ask.contains("no lo inventes"), "a gap it can't fill stays for the person: " + ask);
+        assertTrue(ReplyPrompt.hasGaps("es en [la dirección]"));
+        assertFalse(ReplyPrompt.hasGaps("es en la dirección"));
+        assertFalse(ReplyPrompt.hasGaps(null));
+    }
+
+    @Test
+    void withoutBracketsThereAreNoGapsToFill() {
+        String p = ReplyPrompt.build("", false, List.of(msg("Ana", false, "¿Vienes?")), null, "sí voy");
+        assertFalse(p.contains("corchetes"));
+        String folderless = ReplyPrompt.build("", false, List.of(msg("Ana", false, "¿Vienes?")), null, "llego a las [hora]");
+        assertFalse(folderless.substring(folderless.lastIndexOf("</chat-")).contains("archivos de la carpeta"),
+                "no folder to look in");
+    }
+
+    @Test
     void withNothingChosenNorWrittenItAnswersTheLastMessage() {
         String p = ReplyPrompt.build("", false, List.of(msg("Ana", false, "¿Vienes?")), null, "  ");
         assertTrue(p.contains("Responde al último mensaje"));

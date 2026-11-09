@@ -380,7 +380,7 @@ public final class Composer extends VBox {
         return new AiReplyButton.Request(chatId, () -> {
             String style = AiReplyButton.style(forChat, chat, program); // first learn how the person writes, then the draft
             return AiReplyButton.prompt(chat, target, idea, AiReplyButton.heard(svc, chat, toHear), style);
-        }, program::cancel);
+        }, program::cancel, app.unichat.assist.ReplyPrompt.hasGaps(idea));
     }
 
     /** Into the box of the chat it was for: what was written there went into the prompt as the idea. */
@@ -392,7 +392,9 @@ public final class Composer extends VBox {
             return;
         }
         input.setText(draft);
-        input.positionCaret(input.getLength());
+        int[] gap = app.unichat.assist.ReplyPrompt.firstGap(draft); // one it couldn't fill: selected, to type it in
+        if (gap != null) input.selectRange(gap[0], gap[1]);
+        else input.positionCaret(input.getLength());
         onError.accept(I18n.t("composer.draftReady"));
     }
 

@@ -15,7 +15,8 @@ Besides that, Unichat connects to:
 - The pages of links that arrive in messages, without cookies and never inside your local network, to show their
   video. Turn it off in Settings → Privacy → Videos in links.
 - The GIF search you choose, only when you search.
-- Claude Code or Codex, with your account, only if you turn on "Write with AI" (off by default) and press its button.
+- Claude Code or Codex, with your account, only if you turn on "Write with AI" (off by default) and press its button;
+  it searches the web only for what you put in [brackets].
 
 Full details: https://github.com/vaoan/unichat/blob/main/docs/PRIVACY.md
 Uninstall: Windows Settings → Apps → Unichat → Uninstall. Your data stays in %APPDATA%\Unichat in case you come
@@ -36,7 +37,8 @@ Además, Unichat se conecta a:
 - Las páginas de los enlaces que llegan en los mensajes, sin cookies y nunca dentro de tu red local, para mostrar
   su video. Se apaga en Ajustes → Privacidad → Videos de los enlaces.
 - El buscador de GIFs que elijas, solo cuando buscas.
-- Claude Code o Codex, con tu cuenta, solo si activas «Escribir con IA» (apagado por defecto) y pulsas el botón.
+- Claude Code o Codex, con tu cuenta, solo si activas «Escribir con IA» (apagado por defecto) y pulsas el botón;
+  busca en internet solo lo que pongas entre [corchetes].
 
 Detalle completo: https://github.com/vaoan/unichat/blob/main/docs/PRIVACY.md
 Desinstalar: Configuración de Windows → Aplicaciones → Unichat → Desinstalar. Tus datos quedan en

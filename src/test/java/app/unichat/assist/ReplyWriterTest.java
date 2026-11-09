@@ -44,6 +44,22 @@ class ReplyWriterTest {
     }
 
     @Test
+    void gapsToLookUpAddWebSearchAndNothingElse() {
+        Path bin = Path.of("/x/claude");
+        assertFalse(String.join(" ", AiEngine.CLAUDE.command(bin, null, dir, dir.resolve("r"))).contains("Web"), "no web unless asked");
+        List<String> web = AiEngine.CLAUDE.command(bin, null, dir, dir.resolve("r"), true);
+        assertEquals("WebSearch", web.get(web.indexOf("--tools") + 1));
+        assertTrue(web.contains("WebSearch"), "allowed without asking");
+        assertFalse(String.join(" ", web).contains("WebFetch"), "searching, never opening any page (a way to send data out)");
+        Path cv = Path.of("/Users/ana/Mi CV").toAbsolutePath();
+        List<String> both = AiEngine.CLAUDE.command(bin, cv, cv, dir.resolve("r"), true);
+        assertEquals("Read,Glob,Grep,WebSearch", both.get(both.indexOf("--tools") + 1));
+        List<String> codex = AiEngine.CODEX.command(Path.of("/x/codex"), cv, cv, dir.resolve("r"), true);
+        assertTrue(codex.indexOf("--search") >= 0 && codex.indexOf("--search") < codex.indexOf("exec"), "codex --search exec …: " + codex);
+        assertFalse(AiEngine.CODEX.command(Path.of("/x/codex"), cv, cv, dir.resolve("r")).contains("--search"));
+    }
+
+    @Test
     void permissionRulesWriteAbsolutePathsTheirWay() {
         assertEquals("//Users/ana/CV", AiEngine.claudePath(Path.of("/Users/ana/CV/")));
     }

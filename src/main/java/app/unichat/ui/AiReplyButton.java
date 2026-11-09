@@ -48,7 +48,12 @@ final class AiReplyButton {
      * What to answer. The messages are read on the UI thread; the prompt is finished off it, since a draft may first
      * wait for its voice notes to be transcribed.
      */
-    record Request(String chatId, Supplier<String> prompt, Runnable cancel) {
+    /** {@code web}: the person wrote [gaps] to look up, so the program may search the web. */
+    record Request(String chatId, Supplier<String> prompt, Runnable cancel, boolean web) {
+        Request(String chatId, Supplier<String> prompt, Runnable cancel) {
+            this(chatId, prompt, cancel, false);
+        }
+
         Request(String chatId, Supplier<String> prompt) {
             this(chatId, prompt, () -> { });
         }
@@ -57,6 +62,9 @@ final class AiReplyButton {
     /** Writes a draft, or null if cancelled. Tests put their own in place of the real program. */
     interface Writer {
         String write(String prompt) throws ReplyWriter.Failure;
+
+        /** The same writer, allowed to search the web; the ones that can't search stay as they are. */
+        default Writer searching() { return this; }
 
         default void cancel() { }
     }
@@ -133,7 +141,7 @@ final class AiReplyButton {
             onDone.accept(null);
             return;
         }
-        Writer w = writers.get();
+        Writer w = r.web() ? writers.get().searching() : writers.get();
         cancelRequest = r.cancel();
         working = w;
         show(Icons.CLOSE, look.cancel());
@@ -180,12 +188,18 @@ final class AiReplyButton {
     }
 
     private static Writer realWriter(java.nio.file.Path folder) {
+        return realWriter(folder, false);
+    }
+
+    private static Writer realWriter(java.nio.file.Path folder, boolean web) {
         ReplyWriter writer = new ReplyWriter();
         AiEngine engine = AiSettings.engine();
         return new Writer() {
-            @Override public String write(String prompt) throws ReplyWriter.Failure { return writer.write(engine, folder, prompt); }
+            @Override public String write(String prompt) throws ReplyWriter.Failure { return writer.write(engine, folder, prompt, web); }
 
             @Override public void cancel() { writer.cancel(); }
+
+            @Override public Writer searching() { return web ? this : realWriter(folder, true); }
         };
     }
 

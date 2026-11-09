@@ -26,7 +26,7 @@ no se envía nada por su cuenta a quien lo hizo.
 | ffmpeg y el modelo de Whisper o de RNNoise | GitHub y Hugging Face | La primera vez que se necesitan (ffmpeg se apaga en Ajustes → Redes → Instalar el conversor automáticamente) |
 | Búsqueda de GIFs | El buscador de GIFs elegido (Ajustes → GIFs) | Cuando buscas |
 | Los enlaces de los mensajes | La página del enlace, sin cookies | Al mostrar un mensaje con enlace, para saber si tiene video. Nunca a tu red local. Se apaga en Ajustes → Privacidad → Videos de los enlaces |
-| **Escribir con IA** (apagado por defecto) | El servicio de Claude Code o Codex, con tu cuenta | Solo al pulsar el botón: el chat abierto para un borrador; solo tu texto para corregirlo. Con «Aprender cómo escribo», también tus mensajes de ese chat y lo que cambiaste de los borradores, para actualizar `writing-style.md` (tu forma de escribir, guardada en tu carpeta de datos) |
+| **Escribir con IA** (apagado por defecto) | El servicio de Claude Code o Codex, con tu cuenta | Solo al pulsar el botón: el chat abierto para un borrador; solo tu texto para corregirlo. Con «Aprender cómo escribo», también tus mensajes de ese chat y lo que cambiaste de los borradores, para actualizar `writing-style.md` (tu forma de escribir, guardada en tu carpeta de datos)  Si lo que escribiste tiene datos entre [corchetes], puede buscarlos en internet: solo búsquedas, nunca abrir páginas |
 
 Las confirmaciones de lectura se eligen en Ajustes → Privacidad: al abrir el chat, **al responder** (abrir un chat no
 avisa a nadie; al escribir en él, la otra persona ve que leíste) o nunca. La app de la red en tu teléfono marca como

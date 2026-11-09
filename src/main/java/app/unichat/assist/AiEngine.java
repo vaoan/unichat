@@ -32,15 +32,32 @@ public enum AiEngine {
 
     /** The arguments of one reply; the prompt goes through stdin. {@code folder} may be null; {@code reply}: Codex's output file. */
     List<String> command(Path bin, Path folder, Path workDir, Path reply) {
+        return command(bin, folder, workDir, reply, false);
+    }
+
+    /**
+     * {@code web}: the person asked for something to be looked up ([gaps] in what they wrote), so the program may search
+     * the web. Searching only: opening any page would let a message in the chat send data out through its address.
+     */
+    List<String> command(Path bin, Path folder, Path workDir, Path reply, boolean web) {
         List<String> c = new ArrayList<>(List.of(bin.toString()));
         if (this == CLAUDE) {
+            String tools = String.join(",", folder == null ? List.of() : List.of("Read", "Glob", "Grep"));
+            if (web) tools = tools.isEmpty() ? "WebSearch" : tools + ",WebSearch";
             c.addAll(List.of("-p", "--no-session-persistence", "--permission-mode", "dontAsk", "--strict-mcp-config",
-                    "--setting-sources", "", "--disable-slash-commands", "--tools", folder == null ? "" : "Read,Glob,Grep"));
+                    "--setting-sources", "", "--disable-slash-commands", "--tools", tools));
+            List<String> allowed = new ArrayList<>();
             if (folder != null) {
                 String all = claudePath(folder) + "/**";
-                c.addAll(List.of("--allowedTools", "Read(" + all + ")", "Glob(" + all + ")", "Grep(" + all + ")"));
+                allowed.addAll(List.of("Read(" + all + ")", "Glob(" + all + ")", "Grep(" + all + ")"));
+            }
+            if (web) allowed.add("WebSearch");
+            if (!allowed.isEmpty()) {
+                c.add("--allowedTools");
+                c.addAll(allowed);
             }
         } else {
+            if (web) c.add("--search");
             c.addAll(List.of("exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral",
                     "-C", workDir.toString(), "-o", reply.toString(), "-"));
         }

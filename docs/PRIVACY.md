@@ -26,7 +26,7 @@ nothing is sent on its own to whoever made it.
 | ffmpeg and the Whisper or RNNoise model | GitHub and Hugging Face | The first time they're needed (ffmpeg is turned off in Settings → Networks → Install the converter automatically) |
 | GIF search | The chosen GIF search provider (Settings → GIFs) | When you search |
 | The links in messages | The link's page, without cookies | When showing a message with a link, to find out whether it has a video. Never to your local network. Turned off in Settings → Privacy → Connections → Videos in links |
-| **Write with AI** (off by default) | The Claude Code or Codex service, with your account | Only when you press the button: the open chat for a draft; only your text to correct it. With "Learn how I write", also your messages in that chat and what you changed in the drafts, to update `writing-style.md` (your way of writing, kept in your data folder) |
+| **Write with AI** (off by default) | The Claude Code or Codex service, with your account | Only when you press the button: the open chat for a draft; only your text to correct it. With "Learn how I write", also your messages in that chat and what you changed in the drafts, to update `writing-style.md` (your way of writing, kept in your data folder)  If what you wrote has data in [brackets], it may look it up on the web: searches only, never opening pages |
 
 Read receipts are chosen in Settings → Privacy: when you open the chat, **when you reply** (opening a chat
 tells no one; when you write in it, the other person sees you read it) or never. The network's app on your phone marks

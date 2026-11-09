@@ -42,13 +42,22 @@ public final class ReplyWriter {
 
     /** Blocks until it answers. Null if {@link #cancel} stopped it. */
     public String write(AiEngine engine, Path folder, String prompt) throws Failure {
+        return write(engine, folder, prompt, false);
+    }
+
+    /** {@code web}: it may search the web ({@link AiEngine#command(Path, Path, Path, Path, boolean)}). */
+    public String write(AiEngine engine, Path folder, String prompt, boolean web) throws Failure {
         Path bin = engine.find();
         if (bin == null) throw new Failure(I18n.t("ai.failure.notInstalled", engine.label()));
         if (folder != null && !Files.isDirectory(folder)) throw new Failure(I18n.t("ai.failure.noFolder", folder));
-        return run(engine, bin, folder, prompt);
+        return run(engine, bin, folder, prompt, web);
     }
 
     String run(AiEngine engine, Path bin, Path folder, String prompt) throws Failure {
+        return run(engine, bin, folder, prompt, false);
+    }
+
+    String run(AiEngine engine, Path bin, Path folder, String prompt, boolean web) throws Failure {
         Path temp = null;
         try {
             temp = Files.createTempDirectory("unichat-ai");
@@ -56,7 +65,7 @@ public final class ReplyWriter {
             Path reply = temp.resolve("reply.txt");
             Path out = temp.resolve("out.txt");
             Path err = temp.resolve("err.txt");
-            ProcessBuilder b = new ProcessBuilder(engine.command(bin, folder, workDir, reply))
+            ProcessBuilder b = new ProcessBuilder(engine.command(bin, folder, workDir, reply, web))
                     .directory(workDir.toFile()).redirectOutput(out.toFile()).redirectError(err.toFile());
             b.environment().put("PATH", searchPath(bin));
             b.environment().putIfAbsent("LC_CTYPE", "en_US.UTF-8"); // a Mac app opened from Finder has no locale: accents would break
