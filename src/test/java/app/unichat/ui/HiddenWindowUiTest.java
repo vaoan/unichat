@@ -14,10 +14,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.lang.reflect.Field;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,7 +39,7 @@ class HiddenWindowUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -62,7 +59,8 @@ class HiddenWindowUiTest {
             stage.show();
             return sc;
         });
-        Thread.sleep(400);
+        FxWait.until("the chat list shows", () -> !scene.getRoot().lookupAll(".chat-list .list-cell").isEmpty());
+        FxWait.settled();
     }
 
     @AfterEach
@@ -90,8 +88,8 @@ class HiddenWindowUiTest {
         for (int i = 0; i < rounds; i++) {
             svc.setPinned(FAMILIA, i % 2 == 0);
             svc.setFavorite(FAMILIA, i % 2 == 0);
-            svc.sendText(FAMILIA, "hola " + i, null);
-            Thread.sleep(280); // a refresh at most every 250 ms
+            svc.sendText(FAMILIA, "hola " + i, null).get();
+            FxWait.settled(); // every refresh asked for has run
         }
     }
 
@@ -101,7 +99,7 @@ class HiddenWindowUiTest {
             stage.hide();
             return null;
         });
-        Thread.sleep(300);
+        FxWait.settled();
         changeChatsAndMessages(3); // the nodes that already exist are listed once, whatever changes them
         int settled = changedNodes();
         assertTrue(settled < 20, settled + " nodes listed after 3 rounds");
@@ -116,21 +114,17 @@ class HiddenWindowUiTest {
             stage.hide();
             return null;
         });
-        Thread.sleep(200);
-        svc.setFavorite(FAMILIA, !was);
-        Thread.sleep(600);
+        FxWait.settled();
+        svc.setFavorite(FAMILIA, !was).get();
+        FxWait.settled();
         int tiles = fx(() -> scene.getRoot().lookupAll(".favorite-tile").size());
         fx(() -> {
             stage.show();
             return null;
         });
-        Thread.sleep(600);
-        int after = fx(() -> {
-            scene.getRoot().applyCss();
-            scene.getRoot().layout();
-            return scene.getRoot().lookupAll(".favorite-tile").size();
-        });
-        assertEquals(tiles + (was ? -1 : 1), after, "brought up to date on opening");
+        int expected = tiles + (was ? -1 : 1);
+        FxWait.until("the favorites row brought up to date on opening",
+                () -> scene.getRoot().lookupAll(".favorite-tile").size() == expected);
     }
 
     @Test
@@ -139,21 +133,20 @@ class HiddenWindowUiTest {
             stage.hide();
             return null;
         });
-        Thread.sleep(200);
+        FxWait.settled();
         svc.setMarkedUnread(FAMILIA, false);
         svc.markRead(FAMILIA);
-        Thread.sleep(600);
-        String title = fx(() -> stage.getTitle());
         long unread = svc.chats().stream().filter(ChatFilter::inboxUnread).count();
-        assertEquals(unread > 0 ? "Unichat (" + unread + ")" : "Unichat", title);
+        String expected = unread > 0 ? "Unichat (" + unread + ")" : "Unichat";
+        FxWait.until("the title counts " + unread + " unread", () -> expected.equals(stage.getTitle()));
     }
 
     @Test
     void theRailKeepsItsButtons() throws Exception {
         List<Node> first = fx(this::railButtons);
         assertFalse(first.isEmpty());
-        svc.setPinned(FAMILIA, true);
-        Thread.sleep(500);
+        svc.setPinned(FAMILIA, true).get();
+        FxWait.settled();
         List<Node> second = fx(this::railButtons);
         assertEquals(first.size(), second.size());
         for (int i = 0; i < first.size(); i++) assertSame(first.get(i), second.get(i), "rebuilt on every change");
@@ -182,15 +175,7 @@ class HiddenWindowUiTest {
         return false;
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(s.get());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+    private static <T> T fx(java.util.concurrent.Callable<T> c) throws Exception {
+        return FxWait.fx(c);
     }
 }
