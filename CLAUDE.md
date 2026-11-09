@@ -4,7 +4,7 @@ Java 21 + JavaFX 23 desktop unified inbox over Matrix + mautrix bridges, inspire
 (`./mvnw`); use `JAVA_HOME=/opt/homebrew/opt/openjdk@21` on this Mac. User-facing text through `support/I18n` (`I18n.t("key")`, `I18n.n` for counts): `src/main/resources/app/unichat/i18n/messages.properties` (English, the fallback) and
 `messages_es.properties`; a new language is one more `messages_<code>.properties` (found by `I18n.available`, offered in Ajustes → Apariencia; `I18nTest` demands the same keys and placeholders in every file).
 The language changes live (`UnichatApp.relocalize` rebuilds the window), so never keep a text in a `static final` or anything built once. Tests run in Spanish (`unichat.language=es` in the pom).
-Everything in the repo is in **English** (README, docs, scripts, code, commits); `README.es.md` is the Spanish translation of the README, keep it in step. The app itself is bilingual. Must keep working on **Windows** (user's target).
+Everything in the repo is in **English** (README, docs, scripts, code, commits); `README.es.md` and `docs/PRIVACIDAD.md` are the Spanish translations of the README and `docs/PRIVACY.md` (SignPath's application links the latter), keep them in step. The app itself is bilingual. Must keep working on **Windows** (user's target).
 
 ## Layout
 Package rules: `docs/ARCHITECTURE.md`, enforced by `ArchitectureTest` (no cycles, JavaFX only in `ui`, `ui` talks to `service`). Read it before adding a dependency between packages.

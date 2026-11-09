@@ -43,7 +43,7 @@ app oficial o la web de esa red, pero **ninguna red los autoriza**. WhatsApp, In
 pueden pedirte que vuelvas a iniciar sesión, limitar tu cuenta o, en casos raros, suspenderla. Lo mismo pasa con
 Beeper y con cualquier app no oficial. Si una cuenta es importante para tu trabajo, piénsalo antes de conectarla.
 
-Qué sale de tu computador y a dónde: [docs/PRIVACY.md](docs/PRIVACY.md).
+Qué sale de tu computador y a dónde: [docs/PRIVACIDAD.md](docs/PRIVACIDAD.md).
 
 ## Cómo funciona
 
@@ -198,7 +198,7 @@ La solicitud a SignPath Foundation está en curso: hasta que se apruebe, los ins
 - Aprobadores (approvers): [vaoan](https://github.com/vaoan)
 
 Privacidad: Unichat no envía nada a quien lo hizo. Lo que sale de tu computador, a dónde y cómo apagarlo está en
-[docs/PRIVACY.md](docs/PRIVACY.md), y el instalador de Windows lo muestra antes de instalar.
+[docs/PRIVACIDAD.md](docs/PRIVACIDAD.md), y el instalador de Windows lo muestra antes de instalar.
 
 ## Licencia
 

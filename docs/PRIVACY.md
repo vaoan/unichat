@@ -1,5 +1,7 @@
 # Privacy
 
+English · [Español](PRIVACIDAD.md)
+
 Unichat has no servers or accounts of its own. It collects no usage statistics or error reports, and
 nothing is sent on its own to whoever made it.
 
