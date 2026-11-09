@@ -26,7 +26,7 @@ class ReplyPromptTest {
         assertTrue(p.indexOf("Sé breve") < p.indexOf("¿Vienes?"));
         assertTrue(p.indexOf("Ana: ¿Vienes?") < p.indexOf("Yo: Creo que sí"));
         assertTrue(p.indexOf("Yo: Creo que sí") < p.indexOf("Ana: ¿A qué hora?"));
-        assertTrue(p.contains("Responde al último mensaje"));
+        assertTrue(p.contains("al último mensaje de la conversación"));
         assertFalse(p.contains("carpeta actual"));
     }
 
@@ -91,7 +91,7 @@ class ReplyPromptTest {
         assertTrue(ask.contains("eligió responder a este mensaje"), ask);
         assertTrue(ask.contains("no necesariamente el último"), ask);
         assertTrue(ask.contains("¿Me prestas el carro el sábado?"), "named again where the task is");
-        assertFalse(p.contains("Responde al último mensaje"));
+        assertFalse(p.contains("al último mensaje de la conversación"));
     }
 
     @Test
@@ -130,9 +130,32 @@ class ReplyPromptTest {
     }
 
     @Test
+    void theStepsGoInOrderGapsThenIntentionThenWhatIsAnsweredThenTheReply() {
+        Message first = msg("Ana", false, "¿A qué hora es el partido?");
+        String p = ReplyPrompt.build("", false, List.of(first, msg("Ana", false, "Otra cosa")), first, "es a las [hora del partido]");
+        String ask = p.substring(p.lastIndexOf("</chat-"));
+        int gaps = ask.indexOf("1. "), intention = ask.indexOf("2. "), answered = ask.indexOf("3. "), reply = ask.indexOf("4. ");
+        assertTrue(0 < gaps && gaps < intention && intention < answered && answered < reply, ask);
+        assertTrue(ask.substring(gaps, intention).contains("[hora del partido]"), "1: the gaps");
+        assertTrue(ask.substring(intention, answered).contains("intención") && ask.substring(intention, answered).contains("es a las"),
+                "2: what they wrote, as the intention");
+        assertTrue(ask.substring(answered, reply).contains("¿A qué hora es el partido?"), "3: what's being answered");
+        assertTrue(ask.substring(reply).contains("Escribe"), "4: only then the reply");
+    }
+
+    @Test
+    void stepsThatDontApplyAreLeftOutAndTheRestRenumbered() {
+        String p = ReplyPrompt.build("", false, List.of(msg("Ana", false, "¿Vienes?")), null, "sí voy");
+        String ask = p.substring(p.lastIndexOf("</chat-"));
+        assertFalse(ask.contains("corchetes"));
+        assertTrue(ask.contains("1. ") && ask.substring(ask.indexOf("1. ")).contains("intención"), "no gaps: the intention is first: " + ask);
+        assertFalse(ask.contains("4. "));
+    }
+
+    @Test
     void withNothingChosenNorWrittenItAnswersTheLastMessage() {
         String p = ReplyPrompt.build("", false, List.of(msg("Ana", false, "¿Vienes?")), null, "  ");
-        assertTrue(p.contains("Responde al último mensaje"));
+        assertTrue(p.contains("al último mensaje de la conversación"));
         assertFalse(p.contains("→ "));
         assertFalse(p.contains("Úsalo como base"));
     }
