@@ -27,14 +27,13 @@ class BridgesLiveIT {
     void everyBridgeAnswersLogin() throws Exception {
         MatrixChatService svc = MatrixLogin.login(System.getenv("UNICHAT_IT_BRIDGES"),
                 System.getenv("UNICHAT_IT_USER"), System.getenv("UNICHAT_IT_PASSWORD")).join();
+        ServiceChanges changes = ServiceChanges.of(svc);
         svc.start();
         try {
             // Connecting before the first sync would not find existing bot DMs and create duplicates.
-            long online = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < online && svc.connectionState() != ConnectionState.ONLINE) Thread.sleep(250);
+            changes.until("online", () -> svc.connectionState() == ConnectionState.ONLINE);
             String expect = System.getenv().getOrDefault("UNICHAT_IT_EXPECT", "");
-            long end = System.currentTimeMillis() + 30_000;
-            while (System.currentTimeMillis() < end && !containsAll(svc.availableNetworks(), expect)) Thread.sleep(250);
+            changes.until("the bridges " + expect, () -> containsAll(svc.availableNetworks(), expect));
             List<Network> available = svc.availableNetworks();
             System.out.println("availableNetworks = " + available);
             assertTrue(containsAll(available, expect), "missing bridges, got " + available);
@@ -43,7 +42,7 @@ class BridgesLiveIT {
             for (Network n : available) {
                 String roomId = svc.connectNetwork(n).join();
                 String cmd = BridgeProtocol.botCommand(n, BridgeProtocol.loginCommand(n));
-                String reply = awaitBotReply(svc, roomId, cmd);
+                String reply = awaitBotReply(svc, changes, roomId, cmd);
                 System.out.println("=== " + n + " <- " + cmd + "\n" + reply);
                 String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
                 if (reply == null || lower.contains("invalid login flow") || lower.contains("unknown command")) {
@@ -69,33 +68,27 @@ class BridgesLiveIT {
         return true;
     }
 
-    /** Joins the bot messages that arrive after our command (QR images are reported by their body). */
-    private static String awaitBotReply(MatrixChatService svc, String roomId, String command) throws InterruptedException {
-        long end = System.currentTimeMillis() + 45_000;
-        while (System.currentTimeMillis() < end) {
-            List<Message> msgs = svc.messages(roomId);
-            int cmd = -1;
-            for (int i = msgs.size() - 1; i >= 0; i--) {
-                if (msgs.get(i).outgoing() && command.equals(msgs.get(i).body())) { cmd = i; break; }
-            }
-            if (cmd >= 0) {
-                StringBuilder sb = new StringBuilder();
-                for (Message m : msgs.subList(cmd + 1, msgs.size())) {
-                    if (!m.outgoing()) sb.append('[').append(m.type()).append("] ").append(m.body()).append('\n');
-                }
-                // Give multi-message replies (notice + QR image) a moment to complete.
-                if (!sb.isEmpty()) {
-                    Thread.sleep(3000);
-                    sb.setLength(0);
-                    msgs = svc.messages(roomId);
-                    for (Message m : msgs.subList(cmd + 1, msgs.size())) {
-                        if (!m.outgoing()) sb.append('[').append(m.type()).append("] ").append(m.body()).append('\n');
-                    }
-                    return sb.toString().trim();
-                }
-            }
-            Thread.sleep(250);
+    /**
+     * The bot's reply to our command: its messages after the command, as soon as there's one (the first says whether the
+     * login flow exists, which is what's checked; a QR image may follow it).
+     */
+    private static String awaitBotReply(MatrixChatService svc, ServiceChanges changes, String roomId, String command)
+            throws InterruptedException {
+        String[] reply = new String[1];
+        changes.until("the bot's reply to " + command, () -> (reply[0] = replyAfter(svc.messages(roomId), command)) != null);
+        return reply[0];
+    }
+
+    private static String replyAfter(List<Message> msgs, String command) {
+        int cmd = -1;
+        for (int i = msgs.size() - 1; i >= 0; i--) {
+            if (msgs.get(i).outgoing() && command.equals(msgs.get(i).body())) { cmd = i; break; }
         }
-        return null;
+        if (cmd < 0) return null;
+        StringBuilder sb = new StringBuilder();
+        for (Message m : msgs.subList(cmd + 1, msgs.size())) {
+            if (!m.outgoing()) sb.append('[').append(m.type()).append("] ").append(m.body()).append('\n');
+        }
+        return sb.isEmpty() ? null : sb.toString().trim();
     }
 }

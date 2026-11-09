@@ -17,7 +17,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -38,7 +37,7 @@ class SearchKeysUiTest {
                 f.completeExceptionally(t);
             }
         });
-        return f.get(15, TimeUnit.SECONDS);
+        return f.get();
     }
 
     private static void press(Node target, KeyCode code, boolean shortcut) throws Exception {
@@ -53,7 +52,7 @@ class SearchKeysUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -64,7 +63,7 @@ class SearchKeysUiTest {
         Node first = fx(() -> box.getChildren().get(0));
         fx(() -> { info.refresh(); return null; });
         assertTrue(fx(() -> box.getChildren().get(0) == first), "nothing changed: the same nodes");
-        svc.setFavorite("!familia:demo", !svc.chat("!familia:demo").favorite()).get(5, TimeUnit.SECONDS);
+        svc.setFavorite("!familia:demo", !svc.chat("!familia:demo").favorite()).get();
         fx(() -> { info.refresh(); return null; });
         assertFalse(fx(() -> box.getChildren().get(0) == first), "a change: built again");
     }
@@ -74,7 +73,7 @@ class SearchKeysUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }

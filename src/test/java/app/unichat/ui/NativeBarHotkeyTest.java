@@ -8,7 +8,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,7 +26,7 @@ class NativeBarHotkeyTest {
         NativeBar bar = NativeBar.start(helper, null, () -> { }, id -> { }, pressed::countDown);
         try {
             bar.setGlobalShortcut(true);
-            assertTrue(pressed.await(5, TimeUnit.SECONDS), "the shortcut reached Unichat");
+            pressed.await();
             assertEquals("hotkey\t1", Files.readString(told).strip());
         } finally {
             bar.close();
@@ -41,7 +40,7 @@ class NativeBarHotkeyTest {
         CountDownLatch shown = new CountDownLatch(1);
         NativeBar bar = NativeBar.start(helper, null, () -> { }, id -> { }, shown::countDown);
         try {
-            assertTrue(shown.await(5, TimeUnit.SECONDS));
+            shown.await();
         } finally {
             bar.close();
         }

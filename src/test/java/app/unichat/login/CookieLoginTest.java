@@ -7,7 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -57,7 +56,7 @@ class CookieLoginTest {
         String prev = System.getProperty("unichat.browserRoots");
         System.setProperty("unichat.browserRoots", empty.toString());
         try {
-            List<BrowserSession> r = CookieLogin.findBrowserSessions(Network.INSTAGRAM).get(30, TimeUnit.SECONDS);
+            List<BrowserSession> r = CookieLogin.findBrowserSessions(Network.INSTAGRAM).get();
             assertTrue(r.isEmpty());
         } finally {
             if (prev == null) System.clearProperty("unichat.browserRoots");

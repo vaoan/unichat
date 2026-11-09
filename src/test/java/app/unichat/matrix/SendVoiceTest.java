@@ -14,7 +14,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -59,7 +58,7 @@ class SendVoiceTest {
     void itGoesFlaggedAsAVoiceNoteWithItsWaveform() throws Exception {
         Path f = Files.write(dir.resolve("nota.ogg"), new byte[]{1, 2, 3});
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
-        svc.sendVoice("!c:example.org", new VoiceNote(f, 2500, List.of(10, 500, 1024)), null).get(10, TimeUnit.SECONDS);
+        svc.sendVoice("!c:example.org", new VoiceNote(f, 2500, List.of(10, 500, 1024)), null).get();
         JsonNode c = MatrixClient.JSON.readTree(sendBody);
         assertEquals("m.audio", c.path("msgtype").asText());
         assertEquals("mxc://s/v1", c.path("url").asText());

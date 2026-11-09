@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -338,7 +337,7 @@ class PreferencesSyncTest {
     void aChoiceWhileThePreviewIsUpKeepsThePreviewOfTheRest() throws Exception {
         MatrixChatService svc = service();
         svc.processor().replay(cachedSync(ROOM, tags("u.archived")));
-        svc.setFavorite(ROOM, true).get(10, TimeUnit.SECONDS);
+        svc.setFavorite(ROOM, true).get();
         assertTrue(svc.chat(ROOM).archived(), "the chat must not flash into the inbox");
         assertTrue(svc.chat(ROOM).favorite());
     }
@@ -420,10 +419,10 @@ class PreferencesSyncTest {
         MatrixChatService svc = service();
         svc.processor().process(room(ROOM, "", ""), true);
         Chat c = svc.chat(ROOM);
-        svc.setFavorite(ROOM, true).get(10, TimeUnit.SECONDS);
-        svc.setLowPriority(ROOM, true).get(10, TimeUnit.SECONDS);
-        svc.setPinned(ROOM, true).get(10, TimeUnit.SECONDS);
-        svc.setReminder(ROOM, T).get(10, TimeUnit.SECONDS);
+        svc.setFavorite(ROOM, true).get();
+        svc.setLowPriority(ROOM, true).get();
+        svc.setPinned(ROOM, true).get();
+        svc.setReminder(ROOM, T).get();
         assertTrue(c.favorite() && c.lowPriority() && c.pinned());
         assertEquals(T, c.reminderAt());
         assertEquals(List.of(), writes());
@@ -439,13 +438,13 @@ class PreferencesSyncTest {
         svc.processor().process(room(ROOM, "", ""), true);
         AtomicInteger fired = new AtomicInteger();
         svc.addListener(changes(fired));
-        svc.setArchived(ROOM, true).get(10, TimeUnit.SECONDS);
+        svc.setArchived(ROOM, true).get();
         assertTrue(svc.chat(ROOM).archived() && svc.chat(ROOM).muted());
         assertTrue(fired.get() > 0);
         assertEquals(List.of("PUT /_matrix/client/v3/pushrules/global/room/!a:x"), writes());
 
         calls.clear();
-        svc.setMuted(ROOM, false).get(10, TimeUnit.SECONDS);
+        svc.setMuted(ROOM, false).get();
         assertFalse(svc.chat(ROOM).archived() || svc.chat(ROOM).muted());
         assertEquals(List.of("DELETE /_matrix/client/v3/pushrules/global/room/!a:x",
                 "DELETE /_matrix/client/v3/pushrules/global/override/!a:x"), writes());
@@ -462,7 +461,7 @@ class PreferencesSyncTest {
     void markedUnreadStillGoesToTheServer() throws Exception {
         MatrixChatService svc = service();
         svc.processor().process(room(ROOM, "", ""), true);
-        svc.setMarkedUnread(ROOM, true).get(10, TimeUnit.SECONDS);
+        svc.setMarkedUnread(ROOM, true).get();
         assertEquals(1, writes().stream().filter(c -> c.contains("/account_data/m.marked_unread")).count());
     }
 
@@ -472,7 +471,7 @@ class PreferencesSyncTest {
         ruleStatus = 500;
         svc.processor().process(room(ROOM, "", ""), true);
         svc.processor().process(rules(), true);
-        svc.setMuted(ROOM, true).get(30, TimeUnit.SECONDS);
+        svc.setMuted(ROOM, true).get();
         assertTrue(svc.chat(ROOM).muted(), "not reverted");
         assertTrue(prefs.current("matrix:" + ROOM).muted());
         assertEquals(Map.of(), svc.processor().mutesToApply());
@@ -512,7 +511,7 @@ class PreferencesSyncTest {
         String space = "{\"type\":\"m.room.create\",\"state_key\":\"\",\"sender\":\"" + ME + "\",\"content\":{\"type\":\"m.space\"}},"
                 + "{\"type\":\"m.space.child\",\"state_key\":\"!c:x\",\"sender\":\"" + ME + "\",\"content\":{\"via\":[\"x\"]}}";
         svc.processor().process(room("!s:x", space, ""), true);
-        svc.setArchived("!s:x", true).get(10, TimeUnit.SECONDS);
+        svc.setArchived("!s:x", true).get();
         svc.applyQuietRules();
         svc.processor().process(room("!c:x", "", ""), true);
         svc.applyQuietRules();
@@ -541,7 +540,7 @@ class PreferencesSyncTest {
         assertFalse(saved.archived() || saved.muted());
         assertTrue(saved.muteChosenHere(), "still the person's choice");
         assertEquals(Map.of(), restarted.processor().mutesToApply());
-        restarted.actions().muteWritesDone().get(10, TimeUnit.SECONDS);
+        restarted.actions().muteWritesDone().get();
         assertEquals(List.of(), writes());
     }
 
@@ -557,7 +556,7 @@ class PreferencesSyncTest {
 
         assertTrue(svc.chat("!c:x").archived() && svc.chat("!c:x").muted());
         assertFalse(prefs.current("matrix:!c:x").muteChosenHere(), "a rule, not a choice");
-        svc.actions().muteWritesDone().get(10, TimeUnit.SECONDS);
+        svc.actions().muteWritesDone().get();
         assertEquals(List.of("PUT /_matrix/client/v3/pushrules/global/room/!c:x"), writes());
 
         svc.processor().process(rules("!s:x", "!c:x"), true);
@@ -613,7 +612,7 @@ class PreferencesSyncTest {
     void stoppingSavesTheLastChange() throws Exception {
         MatrixChatService svc = service(prefs, "DEVICE");
         svc.processor().process(room(ROOM, "", ""), true);
-        svc.setFavorite(ROOM, true).get(10, TimeUnit.SECONDS);
+        svc.setFavorite(ROOM, true).get();
         svc.stop();
         assertTrue(Files.readString(dir.resolve("preferences.json")).contains("\"favorite\" : true"));
     }

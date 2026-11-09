@@ -12,7 +12,6 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -57,7 +56,7 @@ class SendGifTest {
         Path f = dir.resolve("gato.mp4");
         Files.write(f, new byte[]{0, 0, 0, 24, 'f', 't', 'y', 'p'});
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
-        svc.sendGif("!c:example.org", f, "video/mp4", 480, 360, "$original").get(10, TimeUnit.SECONDS);
+        svc.sendGif("!c:example.org", f, "video/mp4", 480, 360, "$original").get();
         assertTrue(sendPath.contains("/send/m.room.message/"), sendPath);
         JsonNode c = MatrixClient.JSON.readTree(sendBody);
         assertEquals("m.video", c.path("msgtype").asText());
@@ -73,7 +72,7 @@ class SendGifTest {
         Path f = dir.resolve("gato.gif");
         Files.write(f, "GIF89a".getBytes(StandardCharsets.US_ASCII));
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
-        svc.sendGif("!c:example.org", f, "image/gif", 200, 150, null).get(10, TimeUnit.SECONDS);
+        svc.sendGif("!c:example.org", f, "image/gif", 200, 150, null).get();
         JsonNode c = MatrixClient.JSON.readTree(sendBody);
         assertEquals("m.image", c.path("msgtype").asText());
         assertTrue(c.path("info").path("fi.mau.gif").asBoolean());

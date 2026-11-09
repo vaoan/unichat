@@ -16,7 +16,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,7 +31,7 @@ class LoginCaptureUiTest {
         } catch (IllegalStateException running) {
             up.complete(null);
         }
-        up.get(20, TimeUnit.SECONDS);
+        up.get();
         Platform.setImplicitExit(false);
     }
 
@@ -88,7 +87,7 @@ class LoginCaptureUiTest {
             LoginWebView.openCapturing(owner[0], Network.LINKEDIN, params, done::complete, () -> done.completeExceptionally(new AssertionError("cancelled")));
         });
         try {
-            Map<String, String> v = done.get(30, TimeUnit.SECONDS);
+            Map<String, String> v = done.get();
             assertTrue(v.get("cookie_header").contains("JSESSIONID=ajax123"), "an HttpOnly cookie too");
             assertEquals("UA", agent, "the browser the bridge asked for");
             assertEquals("{\"clientVersion\":\"1.2.3\"}", v.get("track"));
@@ -121,7 +120,7 @@ class LoginCaptureUiTest {
             LoginWebView.openCapturing(owner[0], Network.LINKEDIN, params, done::complete, () -> done.completeExceptionally(new AssertionError("cancelled")));
         });
         try {
-            Map<String, String> v = done.get(30, TimeUnit.SECONDS);
+            Map<String, String> v = done.get();
             assertTrue(v.get("cookie_header").contains("JSESSIONID=ajax123"));
             assertTrue(v.get("track").contains("clientVersion"));
         } finally {

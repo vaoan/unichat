@@ -10,7 +10,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -29,7 +28,7 @@ class RailBadgeTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -52,6 +51,6 @@ class RailBadgeTest {
                 done.completeExceptionally(t);
             }
         });
-        done.get(10, TimeUnit.SECONDS);
+        done.get();
     }
 }

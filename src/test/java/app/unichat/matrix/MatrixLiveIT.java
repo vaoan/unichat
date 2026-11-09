@@ -50,6 +50,7 @@ class MatrixLiveIT {
         alice.addListener(new ChatService.Listener() {
             @Override public void incomingMessage(Chat chat, Message m) { notified.add(m); }
         });
+        changes = ServiceChanges.of(alice);
         alice.start();
         try {
             await("online", () -> alice.connectionState() == ConnectionState.ONLINE);
@@ -136,13 +137,11 @@ class MatrixLiveIT {
         return svc.messages(roomId).stream().filter(m -> m.body().equals(text) || text.equals(m.fileName())).findFirst().orElse(null);
     }
 
+    /** alice's changes: each wait reacts to them. */
+    private static ServiceChanges changes;
+
     private static void await(String what, BooleanSupplier cond) throws InterruptedException {
-        long end = System.currentTimeMillis() + 20_000;
-        while (System.currentTimeMillis() < end) {
-            if (cond.getAsBoolean()) return;
-            Thread.sleep(100);
-        }
-        fail("Timed out waiting for: " + what);
+        changes.until(what, cond);
     }
 
     private String bobLogin() throws Exception {

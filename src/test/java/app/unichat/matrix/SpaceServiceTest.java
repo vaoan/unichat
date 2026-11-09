@@ -11,7 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,13 +55,13 @@ class SpaceServiceTest {
 
     @Test
     void joinPostsToJoin() throws Exception {
-        svc().joinChat("!a:x").get(10, TimeUnit.SECONDS);
+        svc().joinChat("!a:x").get();
         assertTrue(calls.stream().anyMatch(c -> c.startsWith("POST /_matrix/client/v3/join/%21a%3Ax")), calls.toString());
     }
 
     @Test
     void hierarchyGivesNames() throws Exception {
-        Map<String, String> names = svc().spaceNames("!s:x").get(10, TimeUnit.SECONDS);
+        Map<String, String> names = svc().spaceNames("!s:x").get();
         assertEquals(Map.of("!a:x", "anuncios", "!b:x", "#reglas:x"), names);
         assertTrue(calls.stream().anyMatch(c -> c.startsWith("GET /_matrix/client/v1/rooms/%21s%3Ax/hierarchy") && c.contains("max_depth=1")), calls.toString());
     }

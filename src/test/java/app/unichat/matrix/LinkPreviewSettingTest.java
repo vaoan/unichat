@@ -4,7 +4,6 @@ import app.unichat.settings.Settings;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,8 +14,10 @@ class LinkPreviewSettingTest {
         s.setLinkPreviews(false);
         try {
             MediaDownloader d = new MediaDownloader(null, Executors.newSingleThreadExecutor());
-            // 192.0.2.1 never answers (TEST-NET): if it were opened, this would wait, not come back empty at once
-            assertTrue(d.linkMedia("https://192.0.2.1/video.mp4").get(1, TimeUnit.SECONDS).isEmpty());
+            // Answered right there, without opening anything: a link that were opened couldn't be done yet
+            var found = d.linkMedia("https://192.0.2.1/video.mp4");
+            assertTrue(found.isDone(), "answered without opening the link");
+            assertTrue(found.get().isEmpty());
         } finally {
             s.setLinkPreviews(true);
         }

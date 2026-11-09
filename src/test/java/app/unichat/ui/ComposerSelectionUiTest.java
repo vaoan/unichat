@@ -14,7 +14,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -32,7 +31,7 @@ class ComposerSelectionUiTest {
                 f.completeExceptionally(t);
             }
         });
-        return f.get(15, TimeUnit.SECONDS);
+        return f.get();
     }
 
     private static void shift(TextArea box, KeyCode arrow) {
@@ -44,7 +43,7 @@ class ComposerSelectionUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }

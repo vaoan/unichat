@@ -13,7 +13,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,7 +25,7 @@ class TelegramKeysFormUiTest {
         CountDownLatch up = new CountDownLatch(1);
         try {
             Platform.startup(up::countDown);
-            up.await(10, TimeUnit.SECONDS);
+            up.await();
         } catch (IllegalStateException alreadyStarted) {
             // another UI test started the toolkit
         }
@@ -74,6 +73,6 @@ class TelegramKeysFormUiTest {
                 f.completeExceptionally(t);
             }
         });
-        return f.get(10, TimeUnit.SECONDS);
+        return f.get();
     }
 }

@@ -205,7 +205,7 @@ class ScrollPerfUiTest {
                         }
                     }
                     try {
-                        Thread.sleep(5);
+                        Thread.sleep(5); // the pace of a person's scrolling: what this test measures against
                     } catch (InterruptedException e) {
                         return;
                     }
@@ -261,7 +261,7 @@ class ScrollPerfUiTest {
             long end = System.currentTimeMillis() + seconds * 1000L;
             while (System.currentTimeMillis() < end) {
                 if (live != null) live.run();
-                Thread.sleep(live != null ? 100 : 200);
+                Thread.sleep(live != null ? 100 : 200); // the scroll lasts `seconds` and messages arrive at this pace: the load being measured
             }
             fx(() -> {
                 timer.stop();
@@ -321,7 +321,7 @@ class ScrollPerfUiTest {
             stage.show();
             return null;
         });
-        Thread.sleep(1000);
+        FxWait.settled();
         long opening = System.nanoTime();
         fx(() -> {
             view[0].openChatId(CHAT);
@@ -329,7 +329,8 @@ class ScrollPerfUiTest {
         });
         fx(() -> null);
         System.out.printf("PERF open the giant chat: %.0f ms%n", (System.nanoTime() - opening) / 1e6);
-        Thread.sleep(4000);
+        FxWait.until("the giant chat's rows", () -> scene[0].getRoot().lookup(".row-cell") != null);
+        FxWait.settled();
         Node timeline = fx(() -> scene[0].getRoot().lookupAll(".list-view").stream().filter(n -> n.lookup(".row-cell") != null).findFirst().orElseThrow());
         Node flow = fx(() -> timeline.lookup(".virtual-flow"));
         run("idle on animations", flow, 0, 8, ui, null);
@@ -360,7 +361,7 @@ class ScrollPerfUiTest {
             });
             fx(() -> null);
             System.out.printf("PERF switch to %s: %.0f ms%n", id.equals(CHAT) ? "giant" : "small", (System.nanoTime() - at) / 1e6);
-            Thread.sleep(1500);
+            FxWait.settled();
         }
         fx(() -> {
             scene[0].getWindow().hide();
