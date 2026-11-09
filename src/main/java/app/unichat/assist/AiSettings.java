@@ -38,6 +38,11 @@ public final class AiSettings {
 
     public static void setHearVoiceNotes(boolean on) { Settings.get().setBool("ai.voiceNotes", on); }
 
+    /** Each draft first learns how the person writes from what's new ({@link StyleLearner}): one more call then. */
+    public static boolean learnStyle() { return Settings.get().getBool("ai.learnStyle", true); }
+
+    public static void setLearnStyle(boolean on) { Settings.get().setBool("ai.learnStyle", on); }
+
     /** The folder it may read, or null. */
     public static Path folder() {
         String f = Settings.get().getString("ai.folder", "");
