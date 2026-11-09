@@ -470,7 +470,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### libwebp (gif2webp)
+### libwebp (gif2webp, anim_dump)
 
 **COPYING**
 
