@@ -312,6 +312,7 @@ final class FolderView extends VBox {
         ContextMenu menu = new ContextMenu();
         menu.getItems().addAll(
                 ChatMenus.item(I18n.t("folders.rename"), () -> dialogs.rename(f, this::focus)),
+                ChatMenus.item(I18n.t(f.favorite() ? "folders.unfavorite" : "folders.favorite"), () -> folders.setFolderFavorite(f.id(), !f.favorite())),
                 new SeparatorMenuItem(),
                 ChatMenus.danger(ChatMenus.item(I18n.t("folders.delete"), () -> dialogs.delete(f, this::focus))));
         return menu;

@@ -79,6 +79,7 @@ public final class PreferencesFile {
         String name;
         final Set<String> keys = new LinkedHashSet<>();
         final ObjectNode extra = JSON.createObjectNode();
+        boolean favorite;
 
         MutableFolder(String id, String name) { this.id = id; this.name = name; }
     }
@@ -288,7 +289,7 @@ public final class PreferencesFile {
     synchronized int mainWrites() { return mainWrites; }
 
     public synchronized List<Folder> folders() {
-        return folders.stream().map(f -> new Folder(f.id, f.name, List.copyOf(f.keys))).toList();
+        return folders.stream().map(f -> new Folder(f.id, f.name, List.copyOf(f.keys), f.favorite)).toList();
     }
 
     public synchronized String createFolder(String name) {
@@ -305,6 +306,14 @@ public final class PreferencesFile {
         MutableFolder f = folder(id);
         if (f == null) return;
         f.name = clean;
+        changed();
+    }
+
+    /** Among the favorites, or not. */
+    public synchronized void setFolderFavorite(String id, boolean favorite) {
+        MutableFolder f = folder(id);
+        if (f == null || f.favorite == favorite) return;
+        f.favorite = favorite;
         changed();
     }
 
@@ -394,7 +403,8 @@ public final class PreferencesFile {
             if (!shaped) throw new IllegalArgumentException("folder");
             MutableFolder f = new MutableFolder(n.path("id").asText(), n.path("name").asText());
             for (JsonNode k : n.path("chats")) f.keys.add(k.asText());
-            copyExtra(n, f.extra, "id", "name", "chats");
+            f.favorite = n.path("favorite").asBoolean(false);
+            copyExtra(n, f.extra, "id", "name", "chats", "favorite");
             folders.add(f);
         }
     }
@@ -561,6 +571,7 @@ public final class PreferencesFile {
         ArrayNode fs = root.putArray("folders");
         for (MutableFolder f : folders) {
             ObjectNode n = fs.addObject().put("id", f.id).put("name", f.name);
+            if (f.favorite) n.put("favorite", true);
             ArrayNode keys = n.putArray("chats");
             f.keys.forEach(keys::add);
             n.setAll(f.extra);

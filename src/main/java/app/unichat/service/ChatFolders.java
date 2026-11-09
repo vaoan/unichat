@@ -11,6 +11,8 @@ public interface ChatFolders {
     String createFolder(String name);
     void renameFolder(String id, String name);
     void deleteFolder(String id);
+    /** Shows {@code id} among the favorites, or not. */
+    void setFolderFavorite(String id, boolean favorite);
     void setInFolder(String folderId, Chat chat, boolean in);
     /** Message for the person if the preferences file was unreadable; else null. */
     String preferencesWarning();

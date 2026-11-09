@@ -32,6 +32,12 @@ public final class FolderActions implements ChatFolders {
     }
 
     @Override
+    public void setFolderFavorite(String id, boolean favorite) {
+        prefs.setFolderFavorite(id, favorite);
+        fireChatsChanged.run();
+    }
+
+    @Override
     public void deleteFolder(String id) {
         prefs.deleteFolder(id);
         fireChatsChanged.run();

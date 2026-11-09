@@ -188,6 +188,17 @@ class PreferencesFileTest {
     }
 
     @Test
+    void aFolderCanBeAFavoriteAndItTravelsWithTheFile() {
+        PreferencesFile p = open();
+        String f = p.createFolder("Trabajo");
+        assertFalse(p.folders().get(0).favorite(), "not by default");
+        p.setFolderFavorite(f, true);
+        assertTrue(open().folders().get(0).favorite(), "saved and read back");
+        open().setFolderFavorite(f, false);
+        assertFalse(open().folders().get(0).favorite());
+    }
+
+    @Test
     void aChatCanBeInSeveralFolders() {
         var p = open();
         String a = p.createFolder("A"), b = p.createFolder("B");

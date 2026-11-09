@@ -92,4 +92,14 @@ public final class Formats {
             default -> I18n.t("formats.typing.many", list.size());
         };
     }
+
+    /**
+     * The name under a favorite: the first word, as in "Andrés", unless it's too short to say who ("La", "El"): then the
+     * whole name, which the tile cuts with "…". Without a leading # or @.
+     */
+    static String favoriteName(String title) {
+        String t = title == null ? "" : title.replaceAll("^[#@]", "").strip();
+        int sp = t.indexOf(' ');
+        return sp >= 4 ? t.substring(0, sp) : t;
+    }
 }

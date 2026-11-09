@@ -62,4 +62,13 @@ class FormatsTest {
             I18n.use("es");
         }
     }
+
+    @Test
+    void aFavoriteShowsTheFirstNameUnlessItIsTooShortToSaySomething() {
+        assertEquals("Andrés", Formats.favoriteName("Andrés Mejía"));
+        assertEquals("desarrollo", Formats.favoriteName("#desarrollo"));
+        assertEquals("Nyx", Formats.favoriteName("Nyx"));
+        assertEquals("La Fiera de Cali", Formats.favoriteName("La Fiera de Cali"), "\"La\" says nothing: the whole name, cut by the tile");
+        assertEquals("Gaming", Formats.favoriteName("Gaming • #general"));
+    }
 }

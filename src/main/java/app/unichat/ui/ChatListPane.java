@@ -290,21 +290,26 @@ public final class ChatListPane extends VBox {
         boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && !channels.isOpen() && !foldersOpen();
         List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.personalSpace() && !c.archived() && !c.bridgeBot()
                 && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).limit(8).toList() : List.of();
-        showFavorites(favs);
+        List<app.unichat.service.Folder> favFolders = showFavs && f.network() == null
+                ? svc.folders().stream().filter(app.unichat.service.Folder::favorite).toList() : List.of();
+        showFavorites(favs, favFolders, all);
     }
 
     /**
      * The favorites row, built again only when what it shows changed: it's refreshed on every change to the list (opening
      * a chat marks it read), and new tiles repaint every avatar. The selection and the unread dot change on the tiles there.
      */
-    private void showFavorites(List<Chat> favs) {
+    private void showFavorites(List<Chat> favs, List<app.unichat.service.Folder> folders, List<Chat> all) {
         StringBuilder shown = new StringBuilder(Settings.get().showNetworkBadges() ? "b" : "");
         for (Chat c : favs) {
             shown.append('|').append(c.id()).append(c.title()).append(c.avatarUrl()).append(c.network());
         }
+        for (app.unichat.service.Folder fo : folders) shown.append("|folder ").append(fo.id()).append(fo.name());
         if (!shown.toString().equals(favoritesShown)) {
             favoritesShown = shown.toString();
-            favorites.getChildren().setAll(favs.stream().map(this::favoriteTile).toList());
+            List<Node> tiles = new java.util.ArrayList<>(favs.stream().map(this::favoriteTile).toList());
+            folders.forEach(fo -> tiles.add(favoriteFolderTile(fo)));
+            favorites.getChildren().setAll(tiles);
         }
         for (int i = 0; i < favs.size(); i++) {
             javafx.scene.Node tile = favorites.getChildren().get(i);
@@ -313,7 +318,53 @@ public final class ChatListPane extends VBox {
             tile.lookup(".unread-dot").setVisible(c.space() ? rows.unread().getOrDefault(c.id(), 0) > 0 : c.isUnread());
             tile.setAccessibleText(I18n.t("chatList.favoriteA11y", A11yText.chat(c, Accounts.forChat(accounts, c), Instant.now(), ZoneId.systemDefault())));
         }
-        Nodes.show(favorites, !favs.isEmpty());
+        for (int i = 0; i < folders.size(); i++) {
+            javafx.scene.Node tile = favorites.getChildren().get(favs.size() + i);
+            long unread = FolderRows.unread(folders.get(i), all);
+            tile.lookup(".unread-dot").setVisible(unread > 0);
+            tile.setAccessibleText(I18n.t("chatList.favoriteFolderA11y", folders.get(i).name(), unread > 0 ? ", " + I18n.n("rail.unread", (int) unread) : ""));
+        }
+        Nodes.show(favorites, !favs.isEmpty() || !folders.isEmpty());
+    }
+
+    /** A favorite folder: its folder icon where a chat has its picture; opens the folder. */
+    private Node favoriteFolderTile(app.unichat.service.Folder fo) {
+        StackPane icon = new StackPane(Icons.icon(Icons.FOLDER, 22));
+        icon.getStyleClass().add("favorite-folder-icon");
+        icon.setMinSize(44, 44);
+        icon.setMaxSize(44, 44);
+        StackPane dot = new StackPane();
+        dot.getStyleClass().add("unread-dot");
+        StackPane.setAlignment(dot, Pos.TOP_RIGHT);
+        StackPane av = new StackPane(icon, dot);
+        av.setMaxSize(44, 44);
+        VBox tile = new VBox(4, av, favoriteName(fo.name(), fo.name()));
+        tile.setAlignment(Pos.TOP_CENTER);
+        tile.getStyleClass().addAll("favorite-tile", "favorite-folder");
+        tile.setUserData("folder:" + fo.id());
+        Runnable open = () -> showFolder(fo.name());
+        tile.setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.PRIMARY) open.run();
+        });
+        tile.setFocusTraversable(true);
+        tile.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
+        tile.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) open.run();
+        });
+        return tile;
+    }
+
+    /** The name under a favorite tile: centered and cut with "…" in the tile's width (em), the whole one on hover. */
+    private static Label favoriteName(String shown, String whole) {
+        Label name = new Label(shown);
+        name.getStyleClass().add("favorite-name");
+        name.setMaxWidth(Double.MAX_VALUE);
+        name.setAlignment(Pos.CENTER);
+        name.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        name.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        name.setEllipsisString("…");
+        name.setTooltip(new javafx.scene.control.Tooltip(whole));
+        return name;
     }
 
     /**
@@ -407,8 +458,7 @@ public final class ChatListPane extends VBox {
         Avatar a = new Avatar(44);
         a.set(c.title(), c.id(), c.avatarUrl(), svc);
         a.setNetwork(c.network(), Settings.get().showNetworkBadges());
-        Label name = new Label(firstWord(c.title()));
-        name.getStyleClass().add("favorite-name");
+        Label name = favoriteName(Formats.favoriteName(c.title()), c.title());
         StackPane dot = new StackPane();
         dot.getStyleClass().add("unread-dot");
         dot.setVisible(c.space() ? rows.unread().getOrDefault(c.id(), 0) > 0 : c.isUnread());
@@ -430,12 +480,6 @@ public final class ChatListPane extends VBox {
         });
         tile.setOnContextMenuRequested(e -> menuFor(c).show(this, e.getScreenX(), e.getScreenY()));
         return tile;
-    }
-
-    private static String firstWord(String s) {
-        String t = s.replaceAll("^[#@]", "").trim();
-        int sp = t.indexOf(' ');
-        return sp > 0 ? t.substring(0, sp) : t;
     }
 
     /** Shows a server's channels over the list. */
