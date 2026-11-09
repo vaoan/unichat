@@ -52,6 +52,16 @@ class ReplyPromptTest {
     }
 
     @Test
+    void theLearnedStyleIsMarkedAsStyleOnlyAndComesAfterTheFolderLine() {
+        String p = ReplyPrompt.build("", true, List.of(msg("Ana", false, "hola")), null, "", java.util.Map.of(), "- lee la carpeta");
+        String mark = p.substring(p.indexOf("<estilo-") + 1, p.indexOf('>', p.indexOf("<estilo-")));
+        assertTrue(p.indexOf("<" + mark + ">") < p.indexOf("- lee la carpeta"));
+        assertTrue(p.indexOf("- lee la carpeta") < p.indexOf("</" + mark + ">"));
+        assertTrue(p.indexOf("carpeta actual") < p.indexOf("<" + mark + ">"), "after the folder permission");
+        assertTrue(p.contains("solo cómo escribe"));
+    }
+
+    @Test
     void theLearnedStyleComesAfterTheInstructionsAndBeforeTheChat() {
         String p = ReplyPrompt.build("Sé breve", false, List.of(msg("Ana", false, "hola")), null, "", java.util.Map.of(), "- Ríe con hahaha");
         assertTrue(p.indexOf("Sé breve") < p.indexOf("- Ríe con hahaha"));

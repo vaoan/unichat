@@ -67,6 +67,47 @@ class StyleLearnerTest {
     }
 
     @Test
+    void theFileStaysReadableWhileLearning() throws Exception {
+        WritingStyle s = new WritingStyle(dir);
+        java.util.concurrent.CountDownLatch inside = new java.util.concurrent.CountDownLatch(1), release = new java.util.concurrent.CountDownLatch(1);
+        StyleLearner l = new StyleLearner(s, p -> {
+            inside.countDown();
+            try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return "- x";
+        });
+        Thread t = Thread.ofPlatform().start(() -> l.learn("!c", CHAT));
+        inside.await();
+        java.util.concurrent.CompletableFuture<String> read = java.util.concurrent.CompletableFuture.supplyAsync(s::text);
+        assertEquals("", read.get(2, java.util.concurrent.TimeUnit.SECONDS), "not blocked by the AI call");
+        release.countDown();
+        t.join();
+    }
+
+    @Test
+    void aHandEditDuringLearningIsKept() {
+        WritingStyle s = new WritingStyle(dir);
+        s.addCorrection("a", "b");
+        StyleLearner l = new StyleLearner(s, p -> {
+            s.save("- a mano");
+            return "- aprendido";
+        });
+        assertEquals("- a mano", l.learn("!c", CHAT));
+        assertEquals("- a mano", s.text());
+        assertEquals(1, s.pending().size(), "not used: learned again next time");
+    }
+
+    @Test
+    void draftsSentAsTheyWereAreNotTheirWriting() {
+        AtomicInteger calls = new AtomicInteger();
+        WritingStyle s = new WritingStyle(dir);
+        s.writtenByAi("hahaha sí");
+        s.writtenByAi("nos vemos");
+        StyleLearner l = new StyleLearner(s, p -> { calls.incrementAndGet(); return "- x"; });
+        l.learn("!c", CHAT);
+        assertEquals(0, calls.get(), "only the AI's texts: nothing of theirs to learn from");
+    }
+
+    @Test
     void oneAtATime() throws Exception {
         AtomicInteger now = new AtomicInteger(), most = new AtomicInteger();
         WritingStyle s = new WritingStyle(dir);

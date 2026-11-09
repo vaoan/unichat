@@ -14,6 +14,11 @@ public final class DraftCorrections {
         drafts.put(chatId, draft);
     }
 
+    /** The person emptied the box: that draft wasn't sent, and what comes next isn't a correction of it. */
+    public void forget(String chatId) {
+        if (chatId != null) drafts.remove(chatId);
+    }
+
     /** The draft and what was sent instead, if there was a draft in that chat; it's used up either way. */
     public StylePrompt.Correction sent(String chatId, String text) {
         String draft = drafts.remove(chatId);

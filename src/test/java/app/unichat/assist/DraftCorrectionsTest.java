@@ -14,4 +14,12 @@ class DraftCorrectionsTest {
         assertEquals(new StylePrompt.Correction("hola", "hola!"), d.sent("A", "hola!"));
         assertNull(d.sent("A", "otra"), "used once");
     }
+
+    @Test
+    void aDraftThePersonDeletedIsForgotten() {
+        DraftCorrections d = new DraftCorrections();
+        d.drafted("A", "un borrador largo");
+        d.forget("A");
+        assertNull(d.sent("A", "ok"));
+    }
 }

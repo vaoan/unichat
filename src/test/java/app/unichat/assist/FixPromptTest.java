@@ -12,7 +12,8 @@ class FixPromptTest {
         String p = FixPrompt.build("hola", "- Ríe con hahaha");
         assertTrue(p.contains("- Ríe con hahaha"));
         assertTrue(p.indexOf("- Ríe con hahaha") < p.indexOf("\nhola\n"));
-        assertFalse(FixPrompt.build("hola", "").contains("forma de escribir"));
+        assertFalse(FixPrompt.build("hola", "").contains("estilo-"));
+        assertTrue(p.contains("<estilo-"), "marked off, like in a draft");
     }
 
     @Test

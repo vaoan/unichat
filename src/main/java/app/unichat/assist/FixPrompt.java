@@ -14,8 +14,8 @@ public final class FixPrompt {
 
     /** {@code style}: how the person writes ({@link StylePrompt}), so a fix doesn't turn it into someone else's. */
     public static String build(String text, String style) {
-        String keep = style == null || style.isBlank() ? ""
-                : "Respeta su forma de escribir, que es esta (no cambies sus palabras para ajustarlas a ella):\n" + style.strip() + "\n\n";
+        String learned = StylePrompt.section(style);
+        String keep = learned.isEmpty() ? "" : "Respeta su forma de escribir (no cambies sus palabras para ajustarlas a ella).\n" + learned;
         String mark = "texto-" + UUID.randomUUID(); // the text can't fake its own end without knowing it
         return "Corrige la ortografía, la gramática, la puntuación y la redacción del texto que va entre las marcas <" + mark + ">. "
                 + "Es un mensaje que la persona escribió y va a enviar por chat.\n\n"

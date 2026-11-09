@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class WritingStyle {
     static final int MAX_PENDING = 20;
+    private static final int MAX_AI_TEXTS = 200;
     private static final ObjectMapper JSON = new ObjectMapper();
     private static WritingStyle instance;
 
@@ -28,6 +29,8 @@ public final class WritingStyle {
     private final List<StylePrompt.Correction> pending;
     /** Per chat, the newest message of mine already learned from; kept in memory, so a restart learns once again. */
     private final Map<String, String> learnedUpTo = new ConcurrentHashMap<>();
+    /** What was sent from drafts lately; in memory. */
+    private final java.util.Set<String> aiTexts = new java.util.LinkedHashSet<>();
 
     WritingStyle(Path dir) {
         styleFile = dir.resolve("writing-style.md");
@@ -77,7 +80,31 @@ public final class WritingStyle {
         save("");
         pending.clear();
         learnedUpTo.clear();
+        aiTexts.clear();
         savePending();
+    }
+
+    /** Sent from a draft: the AI's words, not the person's, so they're never learned from as their writing. */
+    public synchronized void writtenByAi(String text) {
+        if (text == null) return;
+        aiTexts.add(text.strip());
+        while (aiTexts.size() > MAX_AI_TEXTS) aiTexts.remove(aiTexts.iterator().next());
+    }
+
+    synchronized boolean isWrittenByAi(String text) {
+        return text != null && aiTexts.contains(text.strip());
+    }
+
+    /**
+     * Saves what was learned, uses up the corrections it came from and marks the chat as learned, but only if the
+     * file is still {@code readAs}: the person may have changed it by hand meanwhile (Ajustes), and that wins.
+     */
+    synchronized boolean commit(String readAs, String learned, int correctionsUsed, String chatId, String newest) {
+        if (!text().equals(readAs)) return false;
+        save(learned);
+        used(correctionsUsed);
+        learnedUpTo(chatId, newest);
+        return true;
     }
 
     String learnedUpTo(String chatId) {

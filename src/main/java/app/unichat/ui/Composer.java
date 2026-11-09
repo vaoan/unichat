@@ -53,7 +53,7 @@ public final class Composer extends VBox {
     /** The AI's draft in each chat, to compare with what's sent. */
     private final app.unichat.assist.DraftCorrections aiDrafts = new app.unichat.assist.DraftCorrections();
     /** The program that learns how the person writes; tests put theirs, as for drafts. */
-    private java.util.function.Supplier<app.unichat.assist.StyleLearner.Program> learning =
+    private volatile java.util.function.Supplier<app.unichat.assist.StyleLearner.Program> learning =
             () -> app.unichat.assist.StyleLearner.program(app.unichat.assist.AiSettings.engine());
     private final TextArea input = new TextArea();
     private final HBox banner = new HBox(8);
@@ -146,6 +146,7 @@ public final class Composer extends VBox {
         aiStatus.getChildren().addAll(ai.status(), fix.status());
         getChildren().addAll(banner, aiStatus, frame);
         input.textProperty().addListener((o, a, t) -> refreshVoice());
+        input.textProperty().addListener((o, a, t) -> { if (t.isBlank()) aiDrafts.forget(chatId); }); // a draft thrown away
         refreshVoice();
 
         setOnDragOver(e -> {
@@ -315,7 +316,14 @@ public final class Composer extends VBox {
 
     /** Tests: a stand-in for the AI program. */
     void useAiWriter(java.util.function.Supplier<AiReplyButton.Writer> writers) {
-        learning = () -> prompt -> writers.get().write(prompt);
+        learning = () -> {
+            AiReplyButton.Writer w = writers.get();
+            return new app.unichat.assist.StyleLearner.Program() {
+                @Override public String write(String prompt) throws app.unichat.assist.ReplyWriter.Failure { return w.write(prompt); }
+
+                @Override public void cancel() { w.cancel(); }
+            };
+        };
         HBox parent = row;
         int at = parent.getChildren().indexOf(ai.node());
         ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, this::aiDone, writers);
@@ -368,10 +376,11 @@ public final class Composer extends VBox {
         java.util.List<Message> toHear = app.unichat.assist.AiSettings.hearVoiceNotes()
                 ? app.unichat.assist.ReplyPrompt.voiceNotesToHear(chat, target) : java.util.List.of();
         String forChat = chatId;
+        app.unichat.assist.StyleLearner.Program program = learning.get();
         return new AiReplyButton.Request(chatId, () -> {
-            String style = AiReplyButton.style(forChat, chat, learning.get()); // first learn how the person writes, then the draft
+            String style = AiReplyButton.style(forChat, chat, program); // first learn how the person writes, then the draft
             return AiReplyButton.prompt(chat, target, idea, AiReplyButton.heard(svc, chat, toHear), style);
-        });
+        }, program::cancel);
     }
 
     /** Into the box of the chat it was for: what was written there went into the prompt as the idea. */
@@ -541,7 +550,11 @@ public final class Composer extends VBox {
         } else {
             svc.sendText(chatId, text, replyTo == null ? null : replyTo.id()).exceptionally(this::fail);
             app.unichat.assist.StylePrompt.Correction c = aiDrafts.sent(chatId, text);
-            if (c != null) Thread.ofVirtual().start(() -> app.unichat.assist.WritingStyle.get().addCorrection(c.draft(), c.sent()));
+            if (c != null) Thread.ofVirtual().start(() -> {
+                app.unichat.assist.WritingStyle style = app.unichat.assist.WritingStyle.get();
+                style.addCorrection(c.draft(), c.sent());
+                style.writtenByAi(c.sent()); // came from a draft: not to be learned from as their own writing
+            });
         }
         input.clear();
         drafts.remove(chatId);

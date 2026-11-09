@@ -283,6 +283,50 @@ class AiReplyUiTest {
     }
 
     @Test
+    void cancellingStopsTheLearningToo() throws Exception {
+        app.unichat.assist.WritingStyle.get().addCorrection("algo nuevo", "que aprender"); // so it learns first
+        List<CountDownLatch> started = new java.util.concurrent.CopyOnWriteArrayList<>();
+        fx(() -> {
+            composer.useAiWriter(() -> {
+                CountDownLatch stop = new CountDownLatch(1);
+                started.add(stop);
+                return new AiReplyButton.Writer() {
+                    @Override public String write(String p) {
+                        try {
+                            stop.await(8, TimeUnit.SECONDS);
+                        } catch (InterruptedException ignored) {
+                            // Same as cancelled.
+                        }
+                        return null;
+                    }
+
+                    @Override public void cancel() { stop.countDown(); }
+                };
+            });
+            return null;
+        });
+        press();
+        await(() -> started.size() >= 2); // the draft's writer, and the learning one, now working
+        press();
+        await(() -> button().getAccessibleText().equals(AiReplyButton.REPLY.idle()));
+        for (CountDownLatch l : started) assertEquals(0, l.getCount(), "every program was stopped");
+        app.unichat.assist.WritingStyle.get().forget();
+    }
+
+    @Test
+    void aDraftThePersonEmptiedTeachesNothing() throws Exception {
+        app.unichat.assist.WritingStyle.get().forget();
+        writer(p -> "Claro, voy");
+        press();
+        await(() -> text().equals("Claro, voy"));
+        write("");
+        write("ok");
+        fx(() -> { ((Button) composer.lookup(".send-button")).fire(); return null; });
+        Thread.sleep(200);
+        assertTrue(app.unichat.assist.WritingStyle.get().pending().isEmpty(), "no false correction");
+    }
+
+    @Test
     void itsHiddenUnlessTurnedOn() throws Exception {
         assertTrue(fx(() -> button().isVisible()));
         fx(() -> { AiReplyButton.SHOWN.set(false); return null; });

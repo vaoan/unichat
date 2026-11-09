@@ -28,6 +28,14 @@ class StylePromptTest {
     }
 
     @Test
+    void onlyAListOfAtMost40BulletsIsAStyleFile() {
+        assertNull(StylePrompt.accept("No tengo suficiente información para actualizar el archivo."));
+        assertNull(StylePrompt.accept("- uno\nY aquí una explicación"));
+        assertNull(StylePrompt.accept("- x\n".repeat(41)));
+        assertEquals("# Estilo\n- uno\n\n* dos", StylePrompt.accept("# Estilo\n- uno\n\n* dos"));
+    }
+
+    @Test
     void anEmptyStyleAddsNothingToAPrompt() {
         assertEquals("", StylePrompt.section(" "));
         assertTrue(StylePrompt.section("- hahaha").contains("- hahaha"));

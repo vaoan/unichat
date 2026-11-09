@@ -48,7 +48,11 @@ final class AiReplyButton {
      * What to answer. The messages are read on the UI thread; the prompt is finished off it, since a draft may first
      * wait for its voice notes to be transcribed.
      */
-    record Request(String chatId, Supplier<String> prompt) {}
+    record Request(String chatId, Supplier<String> prompt, Runnable cancel) {
+        Request(String chatId, Supplier<String> prompt) {
+            this(chatId, prompt, () -> { });
+        }
+    }
 
     /** Writes a draft, or null if cancelled. Tests put their own in place of the real program. */
     interface Writer {
@@ -71,6 +75,8 @@ final class AiReplyButton {
     private final Consumer<String> onDone;
     private final Supplier<Writer> writers;
     private Writer working;
+    /** What else the request runs (learning how the person writes), stopped with it. */
+    private Runnable cancelRequest = () -> { };
 
     AiReplyButton(Look look, Supplier<Request> request, java.util.function.BiConsumer<String, String> onDraft, Consumer<String> onError, Consumer<String> onDone, Supplier<Writer> writers) {
         this.look = look;
@@ -115,6 +121,7 @@ final class AiReplyButton {
     private void pressed() {
         if (working != null) {
             working.cancel();
+            cancelRequest.run();
             return;
         }
         Request r = request.get();
@@ -124,6 +131,7 @@ final class AiReplyButton {
             return;
         }
         Writer w = writers.get();
+        cancelRequest = r.cancel();
         working = w;
         show(Icons.CLOSE, look.cancel());
         showWorking(true);
