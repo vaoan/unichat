@@ -109,8 +109,14 @@ class RowMenuUiTest {
         });
         Thread.sleep(200);
         fx(() -> {
-            javafx.scene.control.ListView<?> l = (javafx.scene.control.ListView<?>) scene.getRoot().lookup(".chat-list");
-            l.scrollTo(l.getItems().size() - 1);
+            @SuppressWarnings("unchecked")
+            javafx.scene.control.ListView<app.unichat.model.Chat> l =
+                    (javafx.scene.control.ListView<app.unichat.model.Chat>) scene.getRoot().lookup(".chat-list");
+            // The bottom of the list, at its last row that has a menu: a server to add has none, and in a short
+            // window it may be the only row in view.
+            int last = l.getItems().size() - 1;
+            while (last > 0 && pane.rowMenu(l.getItems().get(last)) == null) last--;
+            l.scrollTo(last);
             return null;
         });
         Thread.sleep(300);
@@ -125,6 +131,7 @@ class RowMenuUiTest {
             }
             return null;
         });
+        assertFalse(fx(() -> openMenus().isEmpty()), () -> "no row opened a menu; rows: " + rowsDebug());
         ContextMenu menu = fx(() -> openMenus().get(0));
         Throwable[] closedBy = new Throwable[1];
         fx(() -> {
@@ -162,6 +169,16 @@ class RowMenuUiTest {
         return scene.getRoot().lookupAll(list + " .list-cell").stream()
                 .filter(n -> n instanceof ListCell<?> c && c.getItem() != null && n.isVisible())
                 .findFirst().orElseThrow(() -> new AssertionError("no row in " + list));
+    }
+
+    private String rowsDebug() {
+        try {
+            return fx(() -> scene.getRoot().lookupAll(".chat-list .list-cell").stream()
+                    .map(n -> n.getClass().getSimpleName() + ":" + (n instanceof ListCell<?> c && c.getItem() != null ? c.getItem() : "empty") + ":" + n.isVisible())
+                    .toList().toString());
+        } catch (Exception e) {
+            return e.toString();
+        }
     }
 
     private static List<ContextMenu> openMenus() {

@@ -172,9 +172,14 @@ class HiddenWindowUiTest {
     private List<Node> railButtons() {
         return scene.getRoot().lookupAll(".rail-button").stream()
                 .filter(n -> n.getStyleClass().contains("rail-button") && n instanceof Button b && b.getGraphic() != null
-                        && b.getParent() != null && b.getParent().getParent() instanceof Rail
-                        && b.getParent() instanceof javafx.scene.layout.VBox)
+                        && inRail(b))
                 .toList();
+    }
+
+    /** The networks sit in a scroll area inside the rail (Rail.networkScroll), not directly in it. */
+    private static boolean inRail(Node n) {
+        for (Node p = n.getParent(); p != null; p = p.getParent()) if (p instanceof Rail) return true;
+        return false;
     }
 
     private static <T> T fx(Supplier<T> s) throws Exception {

@@ -241,7 +241,12 @@ class MediaViewerUiTest {
             }
             Thread.sleep(50);
         }
-        throw new AssertionError("the photo never showed");
+        throw new AssertionError("the photo never showed; windows: " + fx(() -> Window.getWindows().stream()
+                .map(w -> w.getClass().getSimpleName() + (w.getScene() == null ? "" : ":" + w.getScene().getRoot().getStyleClass()
+                        + (w.getScene().getRoot().lookupAll("*").stream().filter(PhotoPane.class::isInstance).findFirst()
+                                .map(n -> " photo w=" + ((PhotoPane) n).getWidth() + " img=" + ((PhotoPane) n).view().getImage()
+                                        + " area=" + n.getParent()).orElse(" no photo pane"))))
+                .toList()));
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {

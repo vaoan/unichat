@@ -94,12 +94,15 @@ class NewChatUiTest {
         assertTrue(help.contains("Grupos"), help);
 
         awaitSearch(scene);
-        fx(() -> {
-            Event.fireEvent(search(scene), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
-            return null;
-        });
-        Thread.sleep(200);
-        assertNull(fx(() -> pane(scene)), "Esc closes");
+        for (int i = 0; i < 2; i++) { // the first Esc empties the search box, the second closes (SearchFields)
+            fx(() -> {
+                Event.fireEvent(search(scene), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
+                return null;
+            });
+            Thread.sleep(200);
+            if (i == 0) assertEquals("", fx(() -> search(scene).getText()), "the first Esc empties the search");
+        }
+        assertNull(fx(() -> pane(scene)), "then Esc closes");
         svc.stop();
     }
 

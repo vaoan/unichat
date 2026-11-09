@@ -34,6 +34,8 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      # JavaFX plays video on Linux through the system's FFmpeg libraries (libavcodec/libavformat).
+      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
       - run: ./mvnw -B verify -Pheadless-ui
 
   windows:
