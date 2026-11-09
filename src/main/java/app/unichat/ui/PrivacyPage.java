@@ -35,7 +35,9 @@ final class PrivacyPage {
                         toggle(s.checkUpdates(), v -> {
                             s.setCheckUpdates(v);
                             app.unichat.update.UpdateChecker.get().settingChanged();
-                        }))));
+                        })),
+                        row(I18n.t("settings.privacy.linkPreviews"), I18n.t("settings.privacy.linkPreviewsHelp"),
+                                toggle(s.linkPreviews(), s::setLinkPreviews))));
     }
 
     private static Node readReceiptsChoice(Settings s) {

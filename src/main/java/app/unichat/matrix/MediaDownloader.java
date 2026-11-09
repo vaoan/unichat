@@ -69,6 +69,7 @@ final class MediaDownloader {
     }
 
     CompletableFuture<java.util.Optional<LinkMedia>> linkMedia(String url) {
+        if (!Settings.get().linkPreviews()) return CompletableFuture.completedFuture(java.util.Optional.empty());
         return links.inspect(url);
     }
 

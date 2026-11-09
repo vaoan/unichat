@@ -185,6 +185,20 @@ Si vuelves a una versión anterior de Unichat te pedirá iniciar sesión otra ve
 - El estado de cada cuenta conectada es aproximado (se deduce de los mensajes del bot del bridge).
 - Cada arranque hace una sincronización inicial completa.
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+La solicitud a SignPath Foundation está en curso: hasta que se apruebe, los instaladores de Windows salen sin firmar
+(ver [Instalar](#instalar)). Cuando se apruebe, solo se firma lo que compila GitHub Actions desde este repositorio
+(`.github/workflows/build.yml`), y cada release se firma con la aprobación a mano de quien la aprueba.
+
+- Autores y revisores (committers and reviewers): [vaoan](https://github.com/vaoan)
+- Aprobadores (approvers): [vaoan](https://github.com/vaoan)
+
+Privacidad: Unichat no envía nada a quien lo hizo. Lo que sale de tu computador, a dónde y cómo apagarlo está en
+[docs/PRIVACIDAD.md](docs/PRIVACIDAD.md), y el instalador de Windows lo muestra antes de instalar.
+
 ## Licencia
 
 El código de Unichat es [0BSD](LICENSE): úsalo, cópialo, modifícalo y distribúyelo como quieras, sin necesidad de

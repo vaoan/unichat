@@ -84,6 +84,20 @@ To publish a version: change `<version>` in `pom.xml`, commit, and push the tag 
 creates the release with the packages and `sha256sums.txt`. The local server and the Windows bridges are built by
 the `natives` workflow ([docs/SERVIDOR-NATIVO.md](docs/SERVIDOR-NATIVO.md)).
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+The application to SignPath Foundation is in progress: until it's approved, the Windows installers are unsigned. Once
+approved, only what GitHub Actions builds from this repository (`.github/workflows/build.yml`) is signed, and each
+release is signed after an approver's manual approval.
+
+- Committers and reviewers: [vaoan](https://github.com/vaoan)
+- Approvers: [vaoan](https://github.com/vaoan)
+
+Privacy: Unichat sends nothing to its authors. What leaves your computer, where to and how to turn it off is in
+[docs/PRIVACIDAD.md](docs/PRIVACIDAD.md) (Spanish); the Windows installer shows it before installing.
+
 ## License
 
 Unichat's own code is [0BSD](LICENSE). Third-party parts keep their licenses; the full list with license texts is

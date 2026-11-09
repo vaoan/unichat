@@ -12,6 +12,8 @@ if ($LASTEXITCODE -ne 0) { throw "Maven build failed" }
 Remove-Item -Recurse -Force target\pkg, release -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force target\pkg, release | Out-Null
 Copy-Item target\unichat.jar, LICENSE, THIRD-PARTY.md target\pkg\
+# What leaves the computer and the license: shown by the .msi before installing (SignPath's terms), and kept beside the app.
+Copy-Item packaging\install-notice.txt target\pkg\PRIVACY.txt
 
 # The local server (LocalServer): the homeserver ships inside the app; the bridges are downloaded on first use. Both
 # come from Unichat's own release (NATIVES in versions.env, built by .github/workflows/natives.yml), since there are
@@ -27,7 +29,6 @@ try {
         Remove-Item -Recurse -Force target\natives -ErrorAction SilentlyContinue
         New-Item -ItemType Directory -Force target\natives | Out-Null
         if ((Get-Command gh -ErrorAction SilentlyContinue) -and $env:GH_TOKEN) {
-            # While the repository is private, only gh with a token can reach its releases.
             gh release download $tag -R $repo -D target\natives -p $asset -p sha256sums.txt
             if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
         } else {
@@ -78,7 +79,9 @@ try {
     Write-Warning "Sin whisper no se pueden transcribir notas de voz (salvo con un comando propio): $_"
 }
 
+# Name, version, description and copyright end up in Unichat.exe's file details: SignPath checks them when signing.
 $common = @("--name", "Unichat", "--app-version", $Version, "--vendor", "Unichat",
+            "--description", "Unichat", "--copyright", "Copyright (c) 2026 vaoan",
             "--input", "target\pkg", "--main-jar", "unichat.jar", "--main-class", "app.unichat.Launcher",
             "--dest", "release", "--icon", "packaging\unichat.ico", "--java-options", "-Xmx1g")
 
@@ -87,7 +90,7 @@ if ($LASTEXITCODE -ne 0) { throw "jpackage app-image failed" }
 Compress-Archive -Path release\Unichat -DestinationPath "release\Unichat-$Version-windows.zip" -Force
 
 if (Get-Command candle.exe -ErrorAction SilentlyContinue) {
-    jpackage @common --type msi --win-menu --win-shortcut --win-dir-chooser --win-per-user-install `
+    jpackage @common --type msi --license-file packaging\install-notice.txt --win-menu --win-shortcut --win-dir-chooser --win-per-user-install `
         --win-upgrade-uuid "6f1c3a52-7d0e-4c55-9b1e-2f5d7c8a9e10"
 } else {
     Write-Host "WiX not found: skipping .msi (the portable zip is ready)."

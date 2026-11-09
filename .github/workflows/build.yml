@@ -112,4 +112,6 @@ jobs:
           sha256sum -- * > sha256sums.txt
           # A version with a suffix (1.1.0-beta.1) is a pre-release: the app's update check skips those.
           pre=""; case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" $pre --title "Unichat ${GITHUB_REF_NAME#v}" --generate-notes -- *
+          # SignPath's terms: every release page links the code signing policy.
+          notes="[Code signing policy](https://github.com/$GITHUB_REPOSITORY#code-signing-policy) · [Privacidad](https://github.com/$GITHUB_REPOSITORY/blob/main/docs/PRIVACIDAD.md)"
+          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" $pre --title "Unichat ${GITHUB_REF_NAME#v}" --notes "$notes" --generate-notes -- *
