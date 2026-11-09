@@ -115,9 +115,11 @@ On Unichat's start screen enter:
 
 ## Connecting each network
 
-Press **Connect a network** (the **+** button in the sidebar, the command palette or
-*Settings → Accounts*) and choose the network. Unichat opens (or creates) the chat with the bridge's bot and sends it
-the login command. Follow the bot's instructions **in that chat**:
+Open **Settings → Accounts → Add account** (the **+** button at the foot of the sidebar takes you there, and so
+does "Add account" in the command palette) and choose the network. An assistant opens: Unichat talks to the bridge's
+bot for you, sending it the login command and showing what it asks for (a QR code, the session options of cookie
+networks, or a field for codes). The chat with the bot stays hidden; **View the bridge's technical chat** shows it.
+What each network asks for:
 
 | Network | Command Unichat sends | What the bot replies / what you do |
 |---|---|---|
@@ -132,14 +134,14 @@ the login command. Follow the bot's instructions **in that chat**:
 | X | `!twitter login cookies` | Connects with Unichat's cookie assistant (`auth_token` and `ct0`). Alternative: `!twitter login password`. |
 | LinkedIn | `!linkedin login cookies` | Connects with Unichat's cookie assistant (linkedin.com). Alternative: `!linkedin login password`. |
 
-QR codes expire in a minute or two: if you don't make it in time, press **Connect a network** again.
-To abandon a login, type `cancel` in the bot's chat; `help` shows all the commands.
+QR codes expire in a minute or two: if you don't make it in time, press **Try again** in the assistant. Cancelling in the
+assistant abandons the login and goes back to the networks. In the bot's technical chat, `cancel` does the same and `help` lists every command.
 
 When the bot confirms the login, your chats show up on their own in Unichat's inbox
 (the bridges invite you to each room and Unichat accepts the invitations automatically).
 
-**Disconnect**: in *Settings → Accounts → Disconnect* Unichat sends `list-logins` and then
-`logout <id>` to each session it finds (or `logout` if the bridge doesn't have that command).
+**Disconnect**: in *Settings → Accounts*, the account's **⋯** menu → **Disconnect…**. Unichat sends `list-logins` and
+then `logout <id>` to that session (or `logout` if the bridge doesn't have that command).
 It's "best effort": if the bot asks for something else, finish the process in its chat.
 
 ## Limitations
@@ -202,10 +204,11 @@ Matrix server (to the bridge's bot) and Unichat neither keeps them nor writes th
 ## Several accounts on the same network
 
 The new bridges (WhatsApp, Signal, Instagram, Messenger, Google Messages, Slack, X, LinkedIn, Telegram)
-support several sessions. In Unichat: **Settings → Accounts → Add account → choose the network** (the sidebar's + button takes you there); an assistant opens
-with the QR code, the session options (cookie networks) or the field for codes (the technical chat with the bot stays hidden, with a link
-to see it). Also by right-clicking the network in the sidebar. In **Settings → Connected networks** each account has its name
-(alias) and its **Disconnect** button, which closes only that session (`logout <id>`).
+support several sessions. In Unichat: **Settings → Accounts → Add account → choose the network**, the same assistant as for the first one. Also
+by right-clicking the network in the sidebar → **Add another <network> account**, or from an account's **⋯** menu in
+*Settings → Accounts*. That menu also has **Rename…** (a name only Unichat uses, such as Personal or Work, to tell the
+accounts apart) and **Disconnect…**, which closes only that session (`logout <id>`). With more than one account, the
+right-click menu of a network in the sidebar shows its chats per account.
 
 Unichat reads the list of sessions with `list-logins` (when connecting or disconnecting, and every few hours when
 opening the app). Limitation: the bridges don't always say which session each chat belongs to; when it isn't

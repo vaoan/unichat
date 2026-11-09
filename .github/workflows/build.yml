@@ -24,7 +24,8 @@ jobs:
       - run: ./mvnw -B verify
 
   ui-headless:
-    runs-on: ubuntu-latest
+    # 24.04: its FFmpeg 6 is one JavaFX 23 can play video with; newer Ubuntus ship FFmpeg 8, which it can't.
+    runs-on: ubuntu-24.04
     # Informative for now: a couple of these tests are still unstable, and they shouldn't hold back the packages.
     continue-on-error: true
     steps:
