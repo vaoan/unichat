@@ -1,6 +1,6 @@
 // UnichatBar: the menu-bar item, drawn natively so it is as narrow as Apple's own (Java's TrayIcon adds a fixed
-// 12pt margin on each side). Unichat starts it and drives it through stdin, one tab-separated command per line:
-//   icon <base64 png>     44×44 px, shown at 22×22 pt (2x)
+// 12pt margin on each side), with a template icon like Apple's own: one black shape that macOS paints for the
+// menu bar's light or dark look and for the highlight while the menu is open. Unichat starts it and drives it through stdin, one tab-separated command per line:
 //   tip <text>            tooltip
 //   count <text>          beside the icon, the unread count; empty shows the icon alone
 //   menu <n>              followed by n lines, each "item <tag> <enabled 0|1> <checked -1|0|1> <label>" or "sep"
@@ -124,7 +124,8 @@ final class Hotkey {
 }
 
 final class Bar: NSObject, NSMenuDelegate {
-    static let size: CGFloat = 22
+    /** Apple's menu-bar icons are about 16–18 pt tall in a 22 pt bar. */
+    static let size: CGFloat = 18
     /** Variable length: macOS sizes the item to the image and centres it (a fixed length left it off-centre). */
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     let menu = NSMenu()
@@ -138,10 +139,36 @@ final class Bar: NSObject, NSMenuDelegate {
         super.init()
         menu.autoenablesItems = false
         menu.delegate = self
+        item.button?.image = Bar.glyph()
         item.button?.imagePosition = .imageOnly
         item.button?.target = self
         item.button?.action = #selector(clicked)
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    }
+
+    /**
+     * A speech bubble with three dots cut out, as in the app's icon. Vector, so it's sharp at any scale; a template,
+     * so macOS gives it the menu bar's colour.
+     */
+    static func glyph() -> NSImage {
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: NSRect(x: 1.5, y: 4.5, width: 15, height: 11.5), xRadius: 4.5, yRadius: 4.5).fill()
+            let tail = NSBezierPath()
+            tail.move(to: NSPoint(x: 4.5, y: 5.5))
+            tail.line(to: NSPoint(x: 3, y: 1.5))
+            tail.curve(to: NSPoint(x: 9, y: 5), controlPoint1: NSPoint(x: 5.5, y: 2.2), controlPoint2: NSPoint(x: 7.5, y: 3.5))
+            tail.close()
+            tail.fill()
+            NSGraphicsContext.current?.compositingOperation = .destinationOut
+            for x in [5.5, 9.0, 12.5] {
+                NSBezierPath(ovalIn: NSRect(x: x - 1.25, y: 9, width: 2.5, height: 2.5)).fill()
+            }
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "Unichat"
+        return image
     }
 
     /** A status item with a menu opens it on any click: it only has one while it's showing. */
@@ -162,10 +189,6 @@ final class Bar: NSObject, NSMenuDelegate {
     func handle(_ line: String) {
         let parts = line.components(separatedBy: "\t")
         switch parts[0] {
-        case "icon":
-            guard parts.count > 1, let data = Data(base64Encoded: parts[1]), let image = NSImage(data: data) else { return }
-            image.size = NSSize(width: Bar.size, height: Bar.size)
-            item.button?.image = image
         case "open": // as if right clicked, or closes it if open (lets tests capture the highlight and the open menu)
             if isOpen { menu.cancelTracking() } else { showMenu() }
         case "press":

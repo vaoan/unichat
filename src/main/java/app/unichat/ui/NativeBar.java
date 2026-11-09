@@ -6,9 +6,7 @@ import java.awt.MenuItem;
 import java.awt.PopupMenu;
 import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
-import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -16,8 +14,6 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Base64;
-import javax.imageio.ImageIO;
 
 /**
  * The macOS menu-bar item drawn by the native helper (native/UnichatBar.swift, built by native/build-bar.sh and
@@ -33,7 +29,6 @@ final class NativeBar {
     private final Writer out;
     private final PopupMenu menu;
     private String lastMenu = "";
-    private BufferedImage lastIcon;
     private volatile boolean alive = true;
 
     private NativeBar(Process process, PopupMenu menu) {
@@ -109,18 +104,6 @@ final class NativeBar {
     /** Removes {@code chatId}'s notifications from Notification Center (it was read). */
     void clear(String chatId) {
         send("clear\t" + clean(chatId) + "\n");
-    }
-
-    void setIcon(BufferedImage image) {
-        if (image == lastIcon) return; // images are cached, so the same object means the same picture
-        lastIcon = image;
-        ByteArrayOutputStream png = new ByteArrayOutputStream();
-        try {
-            ImageIO.write(image, "png", png);
-        } catch (IOException e) {
-            return;
-        }
-        send("icon\t" + Base64.getEncoder().encodeToString(png.toByteArray()) + "\n");
     }
 
     /** Opens the menu as a right click would, or closes it if open (control channel "menu", for tests). */

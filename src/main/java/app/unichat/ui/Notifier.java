@@ -134,28 +134,11 @@ public final class Notifier {
         b.setGlobalShortcut(app.unichat.settings.Settings.get().globalShortcut());
         b.setLeftClickMenu(windowShown && windowFocused);
         EventQueue.invokeLater(() -> {
-            b.setIcon(menuBarIcon());
             b.setTooltip(tooltip);
             b.setCount(unread);
             b.syncMenu();
         });
         return true;
-    }
-
-    /** The app icon at 44 px: shown at 22 pt, sharp on Retina menu bars. */
-    private static BufferedImage menuBarIcon() {
-        try (InputStream in = Notifier.class.getResourceAsStream("/app/unichat/icons/app-128.png")) {
-            BufferedImage src = ImageIO.read(in);
-            BufferedImage out = new BufferedImage(44, 44, BufferedImage.TYPE_INT_ARGB);
-            java.awt.Graphics2D g = out.createGraphics();
-            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            g.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING, java.awt.RenderingHints.VALUE_RENDER_QUALITY);
-            g.drawImage(src, 0, 0, 44, 44, null);
-            g.dispose();
-            return out;
-        } catch (Exception e) {
-            return new BufferedImage(44, 44, BufferedImage.TYPE_INT_ARGB);
-        }
     }
 
     /**
