@@ -79,7 +79,9 @@ final class VideoViewer {
         screen.setMinSize(0, 0);
         BorderPane root = new BorderPane(screen);
         root.getStyleClass().add("media-viewer");
-        stage.initOwner(owner);
+        // Not owned by the main window: macOS gives an owned window no full screen of its own, and JavaFX hung on
+        // setFullScreen. Its own window, then, with the app's icon (Windows shows it in the taskbar).
+        if (owner instanceof Stage main) stage.getIcons().setAll(main.getIcons());
         stage.setTitle(title == null ? I18n.t("video.title") : title);
         Scene scene = new Scene(root, Math.min(900, owner.getWidth() * 0.8), Math.min(700, owner.getHeight() * 0.8));
         Theme.register(scene);

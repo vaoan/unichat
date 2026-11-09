@@ -81,6 +81,21 @@ class MediaViewerUiTest {
     }
 
     @Test
+    void fullScreenFillsTheScreen() throws Exception {
+        Stage v = (Stage) fx(() -> viewer().orElseThrow());
+        fx(() -> {
+            // F, as the person presses it; an owned window hung in setFullScreen on macOS
+            javafx.event.Event.fireEvent(v.getScene().getRoot(), new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,
+                    "", "f", javafx.scene.input.KeyCode.F, false, false, false, false));
+            return null;
+        });
+        double screenWidth = fx(() -> javafx.stage.Screen.getScreensForRectangle(v.getX(), v.getY(), 1, 1).get(0).getBounds().getWidth());
+        FxWait.until("the window fills the screen (" + screenWidth + " wide)", () -> v.isFullScreen() && v.getWidth() >= screenWidth - 1);
+        fx(() -> { v.setFullScreen(false); return null; });
+        FxWait.until("back to a window", () -> !v.isFullScreen());
+    }
+
+    @Test
     void aTallPictureLeavesRoomForTheControls() throws Exception {
         Path tall = dir.resolve("alta.png");
         ImageIO.write(new BufferedImage(300, 5000, BufferedImage.TYPE_INT_RGB), "png", tall.toFile());

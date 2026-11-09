@@ -188,6 +188,23 @@ class VideoUiTest {
     }
 
     @Test
+    void fullScreenFillsTheScreen() throws Exception {
+        Path clip = mp4();
+        StackPane root = fx(StackPane::new);
+        Stage owner = window(root);
+        Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(clip), "clip", () -> { }, p -> { }));
+        FxWait.until("the video plays", () -> viewer.getProperties().get(VideoViewer.PLAYER) instanceof MediaPlayer p
+                && p.getStatus() == MediaPlayer.Status.PLAYING);
+        key(viewer, javafx.scene.input.KeyCode.F, "f"); // an owned window hung right here on macOS
+        double screenWidth = fx(() -> javafx.stage.Screen.getScreensForRectangle(viewer.getX(), viewer.getY(), 1, 1).get(0).getBounds().getWidth());
+        FxWait.until("the window fills the screen (" + screenWidth + " wide)",
+                () -> viewer.isFullScreen() && viewer.getWidth() >= screenWidth - 1);
+        fx(() -> { viewer.setFullScreen(false); return null; });
+        FxWait.until("back to a window", () -> !viewer.isFullScreen());
+        fx(() -> { viewer.close(); owner.close(); return null; });
+    }
+
+    @Test
     void repeatingKeepsTheSpeed() throws Exception {
         Path clip = mp4();
         StackPane root = fx(StackPane::new);
