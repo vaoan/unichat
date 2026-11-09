@@ -136,10 +136,10 @@ class AutoScrollUiTest {
             if (last.getGraphic() instanceof Region r) r.setMinHeight(r.getHeight() + 220);
             return null;
         });
-        Thread.sleep(600);
+        untilAtBottom(scene);
         assertTrue("bottom".equals(bottomState(scene)), bottomState(scene));
         svc.sendText(CHAT, "nuevo", null);
-        Thread.sleep(600);
+        untilAtBottom(scene);
         assertTrue("bottom".equals(bottomState(scene)), "still following new messages: " + bottomState(scene));
         svc.stop();
     }
