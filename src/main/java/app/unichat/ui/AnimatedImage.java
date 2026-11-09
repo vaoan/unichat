@@ -117,6 +117,17 @@ public final class AnimatedImage {
         return f;
     }
 
+    /**
+     * How much smaller frames of {@code w}x{@code h} (decoded at twice their size on screen) are made so {@code count} of
+     * them fit {@link #MAX_ANIMATION_BYTES}: never below half, their size on screen. Dropping frames made a sticker play at
+     * half its frame rate; a little less sharpness keeps its motion.
+     */
+    static double shrinkToKeep(int count, int w, int h) {
+        double bytes = (double) count * Math.max(1, w) * Math.max(1, h) * 4;
+        if (bytes <= MAX_ANIMATION_BYTES) return 1.0;
+        return Math.max(0.5, Math.sqrt(MAX_ANIMATION_BYTES / bytes) * 0.98); // a margin: rounding sizes up mustn't go over
+    }
+
     /** Keep 1 of every {@code step} frames so an animation of {@code count} frames of {@code w}x{@code h} fits the caps. */
     static int step(int count, int w, int h) {
         long perFrame = Math.max(1L, (long) w * h * 4);
@@ -147,11 +158,20 @@ public final class AnimatedImage {
         List<Image> images = new ArrayList<>();
         List<Integer> delays = new ArrayList<>();
         int[] step = {1};
+        int[] fit = {maxW, maxH};
         GifFrames.read(file, f -> {
             int i = delays.size();
             delays.add(f.delayMs());
-            BufferedImage scaled = i % step[0] == 0 ? scale(f.image(), maxW, maxH) : null;
-            if (i == 0) step[0] = step(count, scaled.getWidth(), scaled.getHeight());
+            BufferedImage scaled = i % step[0] == 0 ? scale(f.image(), fit[0], fit[1]) : null;
+            if (i == 0) {
+                double s = shrinkToKeep(count, scaled.getWidth(), scaled.getHeight()); // keep the frames, lose a little sharpness
+                if (s < 1) {
+                    fit[0] = (int) Math.round(scaled.getWidth() * s);
+                    fit[1] = (int) Math.round(scaled.getHeight() * s);
+                    scaled = scale(scaled, fit[0], fit[1]);
+                }
+                step[0] = step(count, scaled.getWidth(), scaled.getHeight());
+            }
             if (scaled != null) images.add(toFx(scaled));
         });
         if (images.isEmpty()) throw new IOException(I18n.t("image.gifEmpty"));
@@ -278,9 +298,12 @@ public final class AnimatedImage {
         if (hit != null) return hit;
         RawFrames raw = composeWebp(file, maxW, maxH);
         List<Image> images = new ArrayList<>();
-        int step = raw.images().isEmpty() ? 1
-                : step(raw.images().size(), raw.images().get(0).getWidth(), raw.images().get(0).getHeight());
-        for (int i = 0; i < raw.images().size(); i += step) images.add(toFx(raw.images().get(i)));
+        int count = raw.images().size();
+        int w = count == 0 ? 1 : raw.images().get(0).getWidth(), h = count == 0 ? 1 : raw.images().get(0).getHeight();
+        double s = shrinkToKeep(count, w, h);
+        int sw = (int) Math.round(w * s), sh = (int) Math.round(h * s);
+        int step = count == 0 ? 1 : step(count, sw, sh);
+        for (int i = 0; i < count; i += step) images.add(toFx(s < 1 ? scale(raw.images().get(i), sw, sh) : raw.images().get(i)));
         return remember(key, new Frames(List.copyOf(images), sample(raw.durationsMs(), step)));
     }
 
@@ -291,6 +314,21 @@ public final class AnimatedImage {
             return new RawFrames(List.of(scale(small, maxW, maxH)), List.of(0));
         }
         WebpLayout layout = parseLayout(Files.readAllBytes(file));
+        if (!layout.frames().isEmpty()) {
+            // libwebp composites it as a browser does; the Java decoder below gets some lossy frames' colours wrong (black
+            // blotches over a sticker). It's only the fallback when anim_dump is missing or fails.
+            List<BufferedImage> libwebp = app.unichat.video.AnimDump.frames(file);
+            if (libwebp != null && libwebp.size() == layout.frames().size()) {
+                List<BufferedImage> images = new ArrayList<>();
+                List<Integer> durations = new ArrayList<>();
+                for (int i = 0; i < libwebp.size(); i++) {
+                    images.add(scale(libwebp.get(i), maxW, maxH));
+                    int ms = layout.frames().get(i).durationMs();
+                    durations.add(ms <= 10 ? 100 : ms); // like browsers: very short/zero durations play at 100 ms
+                }
+                return new RawFrames(List.copyOf(images), List.copyOf(durations));
+            }
+        }
         ImageReader reader = new WebPImageReaderSpi().createReaderInstance();
         try (ImageInputStream in = ImageIO.createImageInputStream(file.toFile())) {
             reader.setInput(in);

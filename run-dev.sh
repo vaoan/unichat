@@ -13,8 +13,10 @@ LIBOLM="${LIBOLM:-$HOME/Library/Caches/unichat-build/olm/libolm.3.dylib}"
 # Animated stickers to WhatsApp: libwebp's gif2webp (native/build-gif2webp.sh), fetched once.
 if [ "$(uname -s)" = Darwin ]; then
   GIF2WEBP="$HOME/Library/Caches/unichat-build/gif2webp"
-  [ -x "$GIF2WEBP" ] || native/build-gif2webp.sh "$GIF2WEBP" || true
+  ANIM_DUMP="$HOME/Library/Caches/unichat-build/anim_dump"
+  { [ -x "$GIF2WEBP" ] && [ -x "$ANIM_DUMP" ]; } || native/build-gif2webp.sh "$GIF2WEBP" "$ANIM_DUMP" || true
   [ -x "$GIF2WEBP" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.gif2webp=$GIF2WEBP"
+  [ -x "$ANIM_DUMP" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.animDump=$ANIM_DUMP"
   # Voice notes to text: whisper.cpp built once (native/build-whisper.sh, a few minutes).
   WHISPER="$HOME/Library/Caches/unichat-build/whisper-cli"
   [ -x "$WHISPER" ] || native/build-whisper.sh "$WHISPER" || true

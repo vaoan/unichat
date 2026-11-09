@@ -58,6 +58,8 @@ try {
     Expand-Archive $zip -DestinationPath target\libwebp -Force
     New-Item -ItemType Directory -Force target\pkg\server | Out-Null
     Copy-Item "target\libwebp\libwebp-$WebpVersion-windows-x64\bin\gif2webp.exe" target\pkg\server\
+    # Animated stickers are decoded with libwebp's anim_dump (video/AnimDump): the Java decoder gets some frames wrong.
+    Copy-Item "target\libwebp\libwebp-$WebpVersion-windows-x64\bin\anim_dump.exe" target\pkg\server\
 } catch {
     Write-Warning "Without gif2webp, animated stickers go to WhatsApp as still images: $_"
 }

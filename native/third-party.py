@@ -51,7 +51,7 @@ JFX_LEGAL = [p["path"] for p in json.loads(fetch("https://api.github.com/repos/o
 COMPONENTS = [
     ("whisper.cpp (whisper-cli)", WHISPER, "MIT", "transcribing voice notes",
      [("LICENSE", fetch(f"{GH}ggml-org/whisper.cpp/v{WHISPER}/LICENSE"))]),
-    ("libwebp (gif2webp)", WEBP, "BSD-3-Clause + patent grant", "animated stickers",
+    ("libwebp (gif2webp, anim_dump)", WEBP, "BSD-3-Clause + patent grant", "animated stickers",
      [("COPYING", fetch(f"{GH}webmproject/libwebp/v{WEBP}/COPYING")), ("PATENTS", fetch(f"{GH}webmproject/libwebp/v{WEBP}/PATENTS"))]),
     ("GIFLib (inside gif2webp)", GIFLIB, "MIT", "reading GIFs",
      [("COPYING", fetch("https://sourceforge.net/p/giflib/code/ci/master/tree/COPYING?format=raw"))]),

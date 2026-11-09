@@ -40,7 +40,7 @@ fi
 # Animated stickers for chats that only take WebP (WhatsApp): libwebp's gif2webp (see StickerConverter).
 if [ "$(uname -s)" = Darwin ]; then
   mkdir -p target/pkg/server
-  native/build-gif2webp.sh "$PWD/target/pkg/server/gif2webp" || echo "Warning: without gif2webp, animated stickers go to WhatsApp as still images." >&2
+  native/build-gif2webp.sh "$PWD/target/pkg/server/gif2webp" "$PWD/target/pkg/server/anim_dump" || echo "Warning: without gif2webp, animated stickers go to WhatsApp as still images." >&2
   # Voice notes to text (stt/Transcriber); the model is downloaded by the app on first use.
   mkdir -p target/pkg/server/whisper
   native/build-whisper.sh "$PWD/target/pkg/server/whisper/whisper-cli" \

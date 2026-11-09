@@ -106,4 +106,35 @@ class AnimatedImageTest {
         }
         w.dispose();
     }
+
+    @Test
+    void aBigAnimationLowersItsResolutionBeforeDroppingFrames() {
+        // The Verdi sticker: 83 frames of 348x360 (twice its size on screen) were over the budget, so every other frame
+        // was dropped and it played at half its frame rate. Smaller frames keep them all.
+        double s = AnimatedImage.shrinkToKeep(83, 348, 360);
+        assertTrue(s < 1 && s >= 0.5, "smaller, not below the size on screen: " + s);
+        assertEquals(1, AnimatedImage.step(83, (int) Math.round(348 * s), (int) Math.round(360 * s)), "every frame kept");
+        assertEquals(1.0, AnimatedImage.shrinkToKeep(20, 200, 200), "one that fits stays sharp");
+        double huge = AnimatedImage.shrinkToKeep(1000, 800, 800);
+        assertEquals(0.5, huge, "never below half (its size on screen)");
+        assertTrue(AnimatedImage.step(1000, 400, 400) > 1, "past that, frames go");
+    }
+
+    @Test
+    void animatedWebpIsCompositedByLibwebpWhenThereIsAnimDump() throws Exception {
+        Path built = Path.of(System.getProperty("user.home"), "Library/Caches/unichat-build/anim_dump");
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.isExecutable(built), "no anim_dump here");
+        System.setProperty("unichat.animDump", built.toString());
+        Path f = Files.createTempFile("moving", ".webp");
+        try (java.io.InputStream in = AnimatedImageTest.class.getResourceAsStream("/app/unichat/video/moving.webp")) {
+            Files.copy(in, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        AnimatedImage.RawFrames raw = AnimatedImage.composeWebp(f, 96, 96);
+        List<java.awt.image.BufferedImage> libwebp = app.unichat.video.AnimDump.frames(f);
+        assertEquals(libwebp.size(), raw.images().size());
+        for (int i = 0; i < libwebp.size(); i++) {
+            assertEquals(libwebp.get(i).getRGB(40, 32), raw.images().get(i).getRGB(40, 32), "frame " + i + " as libwebp has it");
+        }
+        assertEquals(List.of(40, 40, 40, 40, 40, 40), raw.durationsMs());
+    }
 }
