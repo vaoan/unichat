@@ -67,6 +67,19 @@ class LogFilesTest {
     }
 
     @Test
+    void heapDumpsGoLikeLogs() throws Exception {
+        // A memory dump (-XX:+HeapDumpOnOutOfMemoryError, written to logs/) once took 1.6 GB, kept forever.
+        assertTrue(LogFiles.isLog(root.resolve("unichat-oom.hprof")));
+        Path old = file("logs/unichat-oom.hprof", 10);
+        Path fresh = file("logs/java_pid42.hprof", 0);
+        LogFiles.cleanOld(List.of(root.resolve("logs")), Duration.ofDays(7), now);
+        assertFalse(Files.exists(old), "past the retention");
+        assertTrue(Files.exists(fresh));
+        LogFiles.clearAll(List.of(root.resolve("logs")));
+        assertFalse(Files.exists(fresh), "\"delete logs now\" takes it too");
+    }
+
+    @Test
     void missingRootsAreIgnored() {
         assertEquals(0, LogFiles.cleanOld(List.of(root.resolve("nope")), Duration.ofDays(1), now));
     }

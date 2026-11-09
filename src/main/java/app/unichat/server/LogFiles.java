@@ -22,8 +22,11 @@ import java.util.regex.Pattern;
  * Only files named like logs are touched (never databases or configs). Retention: Ajustes → Privacidad.
  */
 public final class LogFiles {
-    /** unichat.log, tuwunel.log, bridge.log, whatsapp.out, their ".1" copies and the bridges' dated backups. */
-    private static final Pattern LOG = Pattern.compile("(?i).+\\.(log|out)(\\.\\d+)?");
+    /**
+     * unichat.log, tuwunel.log, bridge.log, whatsapp.out, their ".1" copies, the bridges' dated backups and Java's memory
+     * dumps (.hprof: one took 1.6 GB and stayed forever).
+     */
+    private static final Pattern LOG = Pattern.compile("(?i).+\\.(log|out)(\\.\\d+)?|.+\\.hprof");
     /** Folders holding a database (tuwunel's RocksDB): never searched for logs. */
     private static final Set<String> DATABASE_DIRS = Set.of("db");
     /** Files a running process is writing to: emptied by {@link #clearAll}, not deleted. */
