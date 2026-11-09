@@ -78,7 +78,7 @@ class FavoritesRowUiTest {
         });
         List<String> problems = FxWait.fx(() -> {
             List<String> out = new java.util.ArrayList<>();
-            List<Node> tiles = List.copyOf(scene.getRoot().lookupAll(".favorite-tile"));
+            List<Node> tiles = scene.getRoot().lookupAll(".favorite-tile").stream().filter(Node::isVisible).toList();
             double width = tiles.get(0).getLayoutBounds().getWidth();
             for (Node t : tiles) {
                 Label name = (Label) t.lookup(".favorite-name");
@@ -120,6 +120,68 @@ class FavoritesRowUiTest {
                 .findFirst().orElseThrow().openChatId("!familia:demo"); return null; }); // back to the inbox
         svc.setFolderFavorite(id, false);
         FxWait.until("no longer among the favorites", () -> scene.getRoot().lookup(".favorite-tile.favorite-folder") == null);
+    }
+
+    /** The favorites' row: one line, never wider than the column; true when a "+N" tile stands for the rest. */
+    private List<String> oneRowProblems(Scene scene) throws Exception {
+        String shot = System.getProperty("unichat.favoritesShot");
+        if (shot != null) FxWait.fx(() -> {
+            Node row = scene.getRoot().lookup(".favorites").getParent();
+            javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(row.snapshot(null, null), null), "png",
+                    new java.io.File(shot + "-row-" + scene.getRoot().lookupAll(".favorite-tile").size() + ".png"));
+            return null;
+        });
+        return FxWait.fx(() -> {
+            List<String> out = new java.util.ArrayList<>();
+            Node row = scene.getRoot().lookup(".favorites");
+            Bounds r = row.localToScene(row.getLayoutBounds());
+            Double top = null;
+            for (Node t : row.lookupAll(".favorite-tile")) {
+                if (!t.isVisible()) continue;
+                Bounds b = t.localToScene(t.getLayoutBounds());
+                if (top == null) top = b.getMinY();
+                if (Math.abs(b.getMinY() - top) > 0.5) out.add("a tile on another line");
+                if (b.getMaxX() > r.getMaxX() + 0.5) out.add("a tile past the column");
+            }
+            return out;
+        });
+    }
+
+    @Test
+    void fourFavoritesStayOnOneLineWithLargeText() throws Exception {
+        Scene scene = open(1.6);
+        svc.setFavorite("!devs:demo", true).get();
+        FxWait.fx(() -> { Theme.applyAll(); stage.setWidth(960); return null; });
+        FxWait.until("four favorites", () -> scene.getRoot().lookupAll(".favorite-tile").size() >= 4);
+        FxWait.settled();
+        assertEquals(List.of(), oneRowProblems(scene));
+        assertEquals(4L, (long) FxWait.fx(() -> scene.getRoot().lookupAll(".favorite-tile").stream()
+                .filter(Node::isVisible).filter(n -> !n.getStyleClass().contains("favorite-more")).count()), "all four, narrower");
+    }
+
+    @Test
+    void moreThanFitLeaveATileForTheRestThatOpensTheFavorites() throws Exception {
+        Scene scene = open(1.6);
+        for (String id : List.of("!devs:demo", "!familia:demo", "!sofia:demo", "!valen:demo", "!notas:demo", "!carlos:demo")) {
+            svc.setFavorite(id, true).get();
+        }
+        FxWait.fx(() -> { Theme.applyAll(); stage.setWidth(900); return null; });
+        FxWait.until("the tile for the rest", () -> scene.getRoot().lookup(".favorite-more") != null
+                && scene.getRoot().lookup(".favorite-more").isVisible());
+        FxWait.settled();
+        assertEquals(List.of(), oneRowProblems(scene));
+        long all = FxWait.fx(() -> svc.chats().stream().filter(c -> c.favorite() && !c.archived() && !c.personalSpace() && !c.bridgeBot()).count());
+        long shown = FxWait.fx(() -> scene.getRoot().lookupAll(".favorite-tile").stream()
+                .filter(Node::isVisible).filter(n -> !n.getStyleClass().contains("favorite-more")).count());
+        Node more = FxWait.fx(() -> scene.getRoot().lookup(".favorite-more"));
+        assertEquals("+" + (all - shown), FxWait.fx(() -> ((Label) more.lookup(".favorite-more-count")).getText()));
+        FxWait.fx(() -> {
+            javafx.event.Event.fireEvent(more, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "",
+                    javafx.scene.input.KeyCode.ENTER, false, false, false, false));
+            return null;
+        });
+        FxWait.until("the Favorites view", () -> scene.getRoot().lookupAll(".pane-title").stream()
+                .anyMatch(n -> n instanceof Label l && l.getText().equals(app.unichat.support.I18n.t("chatList.title.favorites"))));
     }
 
     @Test

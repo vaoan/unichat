@@ -44,7 +44,8 @@ public final class ChatListPane extends VBox {
     private final ObjectProperty<ChatFilter> filter = new SimpleObjectProperty<>(ChatFilter.DEFAULT);
     private final ObservableList<Chat> items = FXCollections.observableArrayList();
     private final ListView<Chat> list = new ListView<>(items);
-    private final FlowPane favorites = new FlowPane();
+    private final FavoritesRow favorites = new FavoritesRow(
+            () -> goTo(filter.get().switchTo(null, null).withUnreadOnly(false).withView(ChatFilter.View.FAVORITES)));
     private final FlowPane accountRow = new FlowPane(6, 6);
     private final Label title = new Label();
     private final Label empty = new Label();
@@ -91,9 +92,6 @@ public final class ChatListPane extends VBox {
         chips.getToggles().get(0).setSelected(true);
         chips.selectedToggleProperty().addListener((o, a, b) -> { if (b == null) a.setSelected(true); });
 
-        favorites.getStyleClass().add("favorites");
-        favorites.setHgap(4);
-        favorites.setVgap(4);
 
         configureList();
 
@@ -289,7 +287,7 @@ public final class ChatListPane extends VBox {
 
         boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && !channels.isOpen() && !foldersOpen();
         List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.personalSpace() && !c.archived() && !c.bridgeBot()
-                && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).limit(8).toList() : List.of();
+                && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).toList() : List.of();
         List<app.unichat.service.Folder> favFolders = showFavs && f.network() == null
                 ? svc.folders().stream().filter(app.unichat.service.Folder::favorite).toList() : List.of();
         showFavorites(favs, favFolders, all);
@@ -309,17 +307,17 @@ public final class ChatListPane extends VBox {
             favoritesShown = shown.toString();
             List<Node> tiles = new java.util.ArrayList<>(favs.stream().map(this::favoriteTile).toList());
             folders.forEach(fo -> tiles.add(favoriteFolderTile(fo)));
-            favorites.getChildren().setAll(tiles);
+            favorites.setTiles(tiles);
         }
         for (int i = 0; i < favs.size(); i++) {
-            javafx.scene.Node tile = favorites.getChildren().get(i);
+            javafx.scene.Node tile = favorites.tiles().get(i);
             Chat c = favs.get(i);
             Nodes.style(tile, "selected", c.id().equals(selectedId));
             tile.lookup(".unread-dot").setVisible(c.space() ? rows.unread().getOrDefault(c.id(), 0) > 0 : c.isUnread());
             tile.setAccessibleText(I18n.t("chatList.favoriteA11y", A11yText.chat(c, Accounts.forChat(accounts, c), Instant.now(), ZoneId.systemDefault())));
         }
         for (int i = 0; i < folders.size(); i++) {
-            javafx.scene.Node tile = favorites.getChildren().get(favs.size() + i);
+            javafx.scene.Node tile = favorites.tiles().get(favs.size() + i);
             long unread = FolderRows.unread(folders.get(i), all);
             tile.lookup(".unread-dot").setVisible(unread > 0);
             tile.setAccessibleText(I18n.t("chatList.favoriteFolderA11y", folders.get(i).name(), unread > 0 ? ", " + I18n.n("rail.unread", (int) unread) : ""));
