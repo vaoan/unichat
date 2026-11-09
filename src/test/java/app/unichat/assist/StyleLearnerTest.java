@@ -58,6 +58,41 @@ class StyleLearnerTest {
         assertEquals(1, s.pending().size());
     }
 
+    private static String bullets(int n, int width) {
+        StringBuilder b = new StringBuilder("# Estilo\n");
+        for (int i = 0; i < n; i++) b.append("- rasgo ").append(i).append(' ').append("x".repeat(width)).append('\n');
+        return b.toString();
+    }
+
+    @Test
+    void aFileTooLongIsAskedToBeShortenedOnceAndThenSaved() {
+        WritingStyle s = new WritingStyle(dir);
+        s.save("- viejo");
+        s.addCorrection("hahaha nos vemos", "nos vemos");
+        java.util.List<String> asked = new java.util.ArrayList<>();
+        String tooLong = bullets(38, 90); // what a real answer was: 38 traits, 3 676 characters
+        StyleLearner l = new StyleLearner(s, p -> {
+            asked.add(p);
+            return asked.size() == 1 ? tooLong : bullets(20, 40);
+        });
+        assertEquals(bullets(20, 40).strip(), l.learn("!c", CHAT).strip());
+        assertEquals(2, asked.size(), "one more call to shorten it, not a lost lesson");
+        assertTrue(asked.get(1).contains(tooLong.strip()) && asked.get(1).contains("3000"), "it gets its own answer and the limit");
+        assertTrue(s.pending().isEmpty(), "the corrections were learned");
+    }
+
+    @Test
+    void stillTooLongAfterShorteningKeepsTheOldFileAndTheCorrections() {
+        WritingStyle s = new WritingStyle(dir);
+        s.save("- viejo");
+        s.addCorrection("a", "b");
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        StyleLearner l = new StyleLearner(s, p -> { calls.incrementAndGet(); return bullets(38, 90); });
+        assertEquals("- viejo", l.learn("!c", CHAT));
+        assertEquals(2, calls.get(), "shortened once, not again and again");
+        assertEquals(1, s.pending().size());
+    }
+
     @Test
     void anEssayIsNotSaved() {
         WritingStyle s = new WritingStyle(dir);

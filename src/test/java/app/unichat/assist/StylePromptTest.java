@@ -40,4 +40,19 @@ class StylePromptTest {
         assertEquals("", StylePrompt.section(" "));
         assertTrue(StylePrompt.section("- hahaha").contains("- hahaha"));
     }
+
+    @Test
+    void theLearningPromptGivesTheLimitAndWhatTheFileAlreadyTakes() {
+        String p = StylePrompt.learn("- uno\n- dos", List.of("hola"), List.of());
+        assertTrue(p.contains("3000 caracteres"), p);
+        assertTrue(p.contains("ya tiene " + "- uno\n- dos".length()), "how much room is left: " + p);
+    }
+
+    @Test
+    void whyAnAnswerIsRejectedIsSaid() {
+        assertTrue(StylePrompt.problem("- a\n".repeat(1000)).contains("caracteres"));
+        assertTrue(StylePrompt.problem("Aquí está tu archivo:\n- a").contains("texto"));
+        assertTrue(StylePrompt.problem("- a\n".repeat(41)).contains("viñetas"));
+        assertEquals(null, StylePrompt.problem("- hahaha"));
+    }
 }

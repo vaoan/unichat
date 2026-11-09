@@ -59,8 +59,16 @@ public final class StyleLearner {
                 String answer = program.write(StylePrompt.learn(current, mine.stream().map(Message::body).toList(), corrections));
                 if (answer == null) return current; // cancelled
                 String learned = StylePrompt.accept(answer);
+                String why = StylePrompt.problem(answer);
+                if (learned == null && why != null && why.contains("caracteres")) {
+                    // Only too long: what it learned is there, so it's shortened once rather than thrown away.
+                    String shorter = program.write(StylePrompt.shorten(answer));
+                    if (shorter == null) return current; // cancelled
+                    learned = StylePrompt.accept(shorter);
+                    why = StylePrompt.problem(shorter);
+                }
                 if (learned == null) {
-                    System.err.println("Writing style not learned: the answer wasn't a short list of traits");
+                    System.err.println("Writing style not learned: " + why);
                     return current;
                 }
                 return store.commit(current, learned, corrections.size(), chatId, newest) ? learned : store.text();
