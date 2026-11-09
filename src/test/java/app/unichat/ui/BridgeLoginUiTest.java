@@ -19,15 +19,12 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * The dynamic login screen against a fake WhatsApp bridge: choose a method, see the QR, the bridge confirms,
@@ -58,7 +55,7 @@ class BridgeLoginUiTest {
                 out = "{\"login_id\":\"P\",\"type\":\"display_and_wait\",\"step_id\":\"fi.mau.whatsapp.login.code\",\"display_and_wait\":{\"type\":\"code\",\"data\":\"ABCD-1234\"}}";
             } else if (p.endsWith("/display_and_wait")) {
                 try {
-                    scanned.await(20, TimeUnit.SECONDS); // the user is scanning
+                    scanned.await(); // the user is scanning
                 } catch (InterruptedException ignored) {
                     // test over
                 }
@@ -78,7 +75,7 @@ class BridgeLoginUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -109,19 +106,19 @@ class BridgeLoginUiTest {
     void qrLoginFromChoiceToConnected() throws Exception {
         AtomicBoolean connected = new AtomicBoolean();
         Scene scene = open(connected);
-        await(() -> button(scene, "Escanear un código QR") != null);
+        await("the choice of methods", () -> button(scene, "Escanear un código QR") != null);
         assertTrue(text(scene).contains("¿Cómo quieres conectar WhatsApp?"));
         shot(scene, "1-elegir");
         assertTrue(text(scene).indexOf("Escanear un código QR") < text(scene).indexOf("Usar tu número de teléfono"), "QR first");
         fx(() -> { buttonNow(scene, "Escanear un código QR").fire(); return null; });
 
-        await(() -> fx0(() -> scene.getRoot().lookupAll("*").stream().anyMatch(n -> n instanceof ImageView)));
+        await("the QR", () -> fx0(() -> scene.getRoot().lookupAll("*").stream().anyMatch(n -> n instanceof ImageView)));
         assertTrue(text(scene).contains("Escanea el código con tu teléfono"));
         assertTrue(text(scene).contains("Dispositivos vinculados"));
         shot(scene, "2-qr");
 
         scanned.countDown();
-        await(() -> button(scene, "Listo") != null);
+        await("connected", () -> button(scene, "Listo") != null);
         assertTrue(text(scene).contains("WhatsApp está conectado"));
         shot(scene, "3-listo");
         fx(() -> { buttonNow(scene, "Listo").fire(); return null; });
@@ -131,15 +128,15 @@ class BridgeLoginUiTest {
     @Test
     void phoneFlowValidatesThenShowsTheCode() throws Exception {
         Scene scene = open(new AtomicBoolean());
-        await(() -> button(scene, "Usar tu número de teléfono") != null);
+        await("the choice of methods", () -> button(scene, "Usar tu número de teléfono") != null);
         fx(() -> { buttonNow(scene, "Usar tu número de teléfono").fire(); return null; });
-        await(() -> fx0(() -> field(scene) != null));
+        await("the phone field", () -> fx0(() -> field(scene) != null));
         fx(() -> { field(scene).setText("300 123 4567"); buttonNow(scene, "Continuar").fire(); return null; });
-        await(() -> text(scene).contains("código de país"));
+        await("the country code asked for", () -> text(scene).contains("código de país"));
         shot(scene, "4-telefono-error");
         assertTrue(submitted == null, "nothing sent while invalid");
         fx(() -> { field(scene).setText("+57 300 123 4567"); buttonNow(scene, "Continuar").fire(); return null; });
-        await(() -> text(scene).contains("ABCD-1234"));
+        await("the pairing code", () -> text(scene).contains("ABCD-1234"));
         assertTrue(submitted.contains("\"phone_number\":\"+573001234567\""), submitted);
         assertTrue(text(scene).contains("Escribe este código en tu teléfono"));
         shot(scene, "5-codigo");
@@ -209,23 +206,10 @@ class BridgeLoginUiTest {
     }
 
     private static <T> T fx(Supplier<T> s) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(s.get());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+        return FxWait.fx(s::get);
     }
 
-    private static void await(BooleanSupplier c) throws InterruptedException {
-        long end = System.currentTimeMillis() + 15000;
-        while (System.currentTimeMillis() < end) {
-            if (c.getAsBoolean()) return;
-            Thread.sleep(50);
-        }
-        fail("not reached in 15 s");
+    private static void await(String what, BooleanSupplier c) throws Exception {
+        FxWait.until(what, c::getAsBoolean);
     }
 }

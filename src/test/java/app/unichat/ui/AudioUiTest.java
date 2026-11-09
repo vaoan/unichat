@@ -25,8 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,7 +47,7 @@ class AudioUiTest {
         } catch (IllegalStateException running) {
             up.complete(null);
         }
-        up.get(20, TimeUnit.SECONDS);
+        up.get();
         Platform.setImplicitExit(false);
     }
 
@@ -70,17 +68,11 @@ class AudioUiTest {
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        FutureTask<T> t = new FutureTask<>(c);
-        Platform.runLater(t);
-        return t.get(20, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 
     private static void await(Callable<Boolean> c, String what) throws Exception {
-        for (int i = 0; i < 100; i++) {
-            if (fx(c)) return;
-            Thread.sleep(50);
-        }
-        assertTrue(fx(c), what);
+        FxWait.until(what, c);
     }
 
     private static Message audio(String id, String url) {
@@ -191,7 +183,7 @@ class AudioUiTest {
         });
         AudioPlayback audio = view.audio();
         await(() -> view.lookup(".timeline .audio-toggle") != null, "the voice note shows its player");
-        Thread.sleep(300);
+        FxWait.settled(); // the timeline done drawing, so the button pressed is the one that stays
         fx(() -> { ((Button) view.lookup(".timeline .audio-toggle")).fire(); return null; });
         await(() -> audio.state() == AudioPlayback.State.PLAYING, "plays");
         assertEquals("!familia:demo", fx(() -> audio.chat().id()));
@@ -202,7 +194,7 @@ class AudioUiTest {
         });
 
         fx(() -> { view.openChatId("!andres:demo"); return null; });
-        Thread.sleep(300);
+        FxWait.settled(); // the other chat fully shown
         assertEquals(AudioPlayback.State.PLAYING, fx(audio::state), "changing chats doesn't stop it");
         Node bar = fx(() -> view.lookup(".audio-bar"));
         assertTrue(fx(bar::isVisible));

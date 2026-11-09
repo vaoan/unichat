@@ -11,9 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,7 +26,7 @@ class NetworkSettingsUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -58,7 +56,7 @@ class NetworkSettingsUiTest {
             SettingsWindow.select("Redes");
             return null;
         });
-        Thread.sleep(300);
+        FxWait.until("the WhatsApp options show", () -> option("Enviar stickers animados de WhatsApp como Sticker") != null);
         assertTrue(fx(() -> option("Enviar stickers animados de WhatsApp como Sticker").isSelected()), "sticker by default");
         fx(() -> { option("Enviar stickers animados de WhatsApp como GIF").fire(); return null; });
         assertEquals("GIF", Settings.get().getString("whatsapp.animatedStickers", null));
@@ -67,14 +65,6 @@ class NetworkSettingsUiTest {
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(c.call());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 }

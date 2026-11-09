@@ -17,9 +17,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -36,22 +34,14 @@ class ReplyStickerUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(c.call());
-            } catch (Exception | AssertionError e) {
-                f.completeExceptionally(e);
-            }
-        });
-        return f.get(20, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 
     private static void press(Node tile) {
@@ -79,7 +69,7 @@ class ReplyStickerUiTest {
             stage.show();
             return g;
         });
-        Thread.sleep(300);
+        FxWait.until("the sticker's tile", () -> grid.lookup(".sticker-tile") != null);
         fx(() -> {
             composer.reply(original);
             press(grid.lookup(".sticker-tile"));

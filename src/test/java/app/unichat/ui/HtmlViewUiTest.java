@@ -16,9 +16,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -43,22 +41,14 @@ class HtmlViewUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(c.call());
-            } catch (Exception | AssertionError e) {
-                f.completeExceptionally(e);
-            }
-        });
-        return f.get(20, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 
     private static String texts(Node root) {
@@ -90,7 +80,7 @@ class HtmlViewUiTest {
         String videoLink = "https://a.example/pelicula";
         svc.addLinkMedia("https://fixupx.com/a/1", new LinkMedia(LinkMedia.Kind.AUDIO, audioLink, "audio/mpeg", 10));
         svc.addLinkMedia("https://x.com/hashtag/b", new LinkMedia(LinkMedia.Kind.VIDEO, videoLink, "video/mp4", 50_000_000));
-        svc.sendText(CHAT, "cuerpo", null).get(5, TimeUnit.SECONDS);
+        svc.sendText(CHAT, "cuerpo", null).get();
         fx(() -> {
             var ms = svc.messages(CHAT);
             ms.get(ms.size() - 1).setHtml(EMBED);
@@ -109,29 +99,36 @@ class HtmlViewUiTest {
         });
         // Checked in the same turn that sees the chip: the row can be drawn again at any moment (the list settling its
         // width), and a new drawing has no chip until its links answer, a turn later.
-        boolean checked = false;
-        for (int i = 0; i < 150 && !checked; i++) {
-            checked = fx(() -> {
-                if (!chipShown(scene)) return false;
-                Node bubble = bubbleWith(scene, "Hola ");
-            String all = texts(bubble);
-            for (String shown : List.of("mundo", "Título", "uno", "celda", "sin cargar")) assertTrue(all.contains(shown), shown + " in: " + all);
-            for (String gone : List.of("alert", "malo", "secreto")) assertFalse(all.contains(gone), gone + " in: " + all);
-            assertEquals(1, bubble.lookupAll(".html-quote").size());
-            assertEquals(1, bubble.lookupAll(".media-box").size(), "the picture from our server, and only that");
+        // A failed check is kept and thrown here: FxWait.until would take it for "not yet" and wait on.
+        Throwable[] failed = {null};
+        FxWait.until("the chip showed", () -> {
+            if (!chipShown(scene)) return false;
+            try {
+                checkBubble(scene);
+            } catch (AssertionError | RuntimeException e) {
+                failed[0] = e;
+            }
+            return true;
+        });
+        if (failed[0] instanceof AssertionError e) throw e;
+        if (failed[0] != null) throw new AssertionError(failed[0]);
+    }
 
-            assertEquals(1, bubble.lookupAll(".file-chip").size(), "a long video waits in a chip");
-            assertTrue(bubble.lookupAll(".file-name").stream().anyMatch(n -> ((Label) n).getText().equals("pelicula")));
-            assertTrue(bubble.lookupAll(".hover-actions").isEmpty());
-            assertTrue(scene.getRoot().lookupAll(".hover-actions").stream().allMatch(a -> a.getLayoutBounds().getHeight() < 60), "the actions don't stretch");
+    private void checkBubble(Scene scene) {
+        Node bubble = bubbleWith(scene, "Hola ");
+        String all = texts(bubble);
+        for (String shown : List.of("mundo", "Título", "uno", "celda", "sin cargar")) assertTrue(all.contains(shown), shown + " in: " + all);
+        for (String gone : List.of("alert", "malo", "secreto")) assertFalse(all.contains(gone), gone + " in: " + all);
+        assertEquals(1, bubble.lookupAll(".html-quote").size());
+        assertEquals(1, bubble.lookupAll(".media-box").size(), "the picture from our server, and only that");
 
-            Hyperlink veil = (Hyperlink) bubble.lookup(".html-spoiler");
-            veil.fire();
-            assertTrue(texts(bubble).contains("secreto"), "shown when asked for");
-                return true;
-            });
-            if (!checked) Thread.sleep(100);
-        }
-        assertTrue(checked, "the chip showed");
+        assertEquals(1, bubble.lookupAll(".file-chip").size(), "a long video waits in a chip");
+        assertTrue(bubble.lookupAll(".file-name").stream().anyMatch(n -> ((Label) n).getText().equals("pelicula")));
+        assertTrue(bubble.lookupAll(".hover-actions").isEmpty());
+        assertTrue(scene.getRoot().lookupAll(".hover-actions").stream().allMatch(a -> a.getLayoutBounds().getHeight() < 60), "the actions don't stretch");
+
+        Hyperlink veil = (Hyperlink) bubble.lookup(".html-spoiler");
+        veil.fire();
+        assertTrue(texts(bubble).contains("secreto"), "shown when asked for");
     }
 }

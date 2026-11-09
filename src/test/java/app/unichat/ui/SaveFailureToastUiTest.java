@@ -14,12 +14,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /** A preferences save that fails while running reaches the person as a toast. */
@@ -35,7 +32,7 @@ class SaveFailureToastUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -54,11 +51,7 @@ class SaveFailureToastUiTest {
         try {
             assumeTrue(!Files.isWritable(dir));
             svc.createFolder("Trabajo");
-            long end = System.currentTimeMillis() + 5000;
-            while (!TEXT.equals(fx(() -> toast(scene).getText()))) {
-                if (System.currentTimeMillis() > end) fail("no toast: " + fx(() -> toast(scene).getText()));
-                Thread.sleep(50);
-            }
+            FxWait.until("a toast saying the preferences weren't saved", () -> TEXT.equals(toast(scene).getText()));
             assertEquals(TEXT, fx(() -> toast(scene).getAccessibleText()));
         } finally {
             Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwxr-xr-x"));
@@ -74,14 +67,6 @@ class SaveFailureToastUiTest {
     private static Label toast(Scene scene) { return (Label) scene.getRoot().lookup(".toast"); }
 
     private static <T> T fx(Callable<T> call) throws Exception {
-        CompletableFuture<T> done = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                done.complete(call.call());
-            } catch (Exception | AssertionError e) {
-                done.completeExceptionally(e);
-            }
-        });
-        return done.get(10, TimeUnit.SECONDS);
+        return FxWait.fx(call);
     }
 }

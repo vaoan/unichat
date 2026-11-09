@@ -13,11 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,15 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class AiShortcutUiTest {
     private static <T> T fx(Callable<T> c) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(c.call());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(15, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 
     private static void press(Node target, boolean shift) throws Exception {
@@ -53,7 +42,7 @@ class AiShortcutUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -75,19 +64,19 @@ class AiShortcutUiTest {
                     });
             return sc;
         });
-        Thread.sleep(500);
+        FxWait.until("the chat list and the text box show",
+                () -> scene.getRoot().lookup(".chat-cell") != null && scene.getRoot().lookup(".composer-row .text-area") != null);
+        FxWait.settled();
         TextArea box = fx(() -> (TextArea) scene.getRoot().lookup(".composer-row .text-area"));
         assertFalse(infoOpen(scene));
 
         Node elsewhere = fx(() -> scene.getRoot().lookup(".chat-cell"));
         fx(() -> { elsewhere.requestFocus(); return null; });
         press(elsewhere, false);
-        assertTrue(wrote.await(5, TimeUnit.SECONDS), "from anywhere in the window");
+        wrote.await(); // from anywhere in the window
         assertFalse(infoOpen(scene), "the info panel stays as it was");
-        for (int i = 0; i < 100 && !"Borrador".equals(fx(box::getText)); i++) Thread.sleep(50);
-        assertEquals("Borrador", fx(box::getText));
-        for (int i = 0; i < 100 && !fx(box::isFocused); i++) Thread.sleep(50);
-        assertTrue(fx(box::isFocused) || fx(() -> scene.getFocusOwner() == box), "ready for Enter");
+        FxWait.until("the draft in the box", () -> "Borrador".equals(box.getText()));
+        FxWait.until("the focus in the box, ready for Enter", () -> box.isFocused() || scene.getFocusOwner() == box);
 
         press(scene.getRoot(), true);
         assertTrue(infoOpen(scene), "the info panel has its own key");
