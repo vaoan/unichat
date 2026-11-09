@@ -1,6 +1,6 @@
 # Unichat — notes for Claude
 
-Java 21 + JavaFX 23 desktop clone of Beeper: unified inbox over Matrix + mautrix bridges. Maven via wrapper
+Java 21 + JavaFX 23 desktop unified inbox over Matrix + mautrix bridges, inspired by Beeper (no code or assets of theirs). Maven via wrapper
 (`./mvnw`); use `JAVA_HOME=/opt/homebrew/opt/openjdk@21` on this Mac. User-facing text through `support/I18n` (`I18n.t("key")`, `I18n.n` for counts): `src/main/resources/app/unichat/i18n/messages.properties` (English, the fallback) and
 `messages_es.properties`; a new language is one more `messages_<code>.properties` (found by `I18n.available`, offered in Ajustes → Apariencia; `I18nTest` demands the same keys and placeholders in every file).
 The language changes live (`UnichatApp.relocalize` rebuilds the window), so never keep a text in a `static final` or anything built once. Tests run in Spanish (`unichat.language=es` in the pom).
@@ -92,5 +92,5 @@ follows OS high contrast / reduced motion. Every new control needs an accessible
 ## Rules
 - KISS, DRY, SOLID (`docs/ARQUITECTURA.md`). Java files stay under 800 lines, methods under 100 (Checkstyle fails the build); split by responsibility.
 - Run `./mvnw verify` before committing (tests, architecture rules, copied code). Never point tests at the real data dir (surefire sets `unichat.dataDir`).
-- Don't copy anything from Beeper's app bundle (proprietary). Design tokens were only used as reference.
+- Nothing from Beeper's app (proprietary): no code, icons, texts or other assets.
 - See `.claude/mistakes.md` before touching CSS sizing, icons, AWT/tray or Javadoc.
