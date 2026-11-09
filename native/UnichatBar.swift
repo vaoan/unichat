@@ -6,7 +6,7 @@
 //   menu <n>              followed by n lines, each "item <tag> <enabled 0|1> <checked -1|0|1> <label>" or "sep"
 //   open                  opens the menu as a right click would, or closes it if it is open (for tests)
 //   press                 acts as a left click (for tests)
-//   leftmenu <0|1>        1: a left click opens the menu too (the window is open); 0: it brings the window ("show")
+//   leftmenu <0|1>        1: a left click opens the menu too (the window is open and focused); 0: it brings the window ("show")
 //   notify <chat id> <sound 0|1> <title> <body>   a system notification (Notification Center, Do Not Disturb…)
 //   clear <chat id>       removes that chat's notifications (it was read)
 //   hotkey <0|1>          turns the global shortcut (⌃⌥U) off or on

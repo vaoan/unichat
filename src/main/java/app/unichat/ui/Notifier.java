@@ -75,6 +75,7 @@ public final class Notifier {
     private BufferedImage trayIcon;
     private volatile boolean disposed;
     private volatile boolean windowShown;
+    private volatile boolean windowFocused;
     /** The one in use, for Ajustes to reach; null in tests without a display. */
     private static volatile Notifier current;
 
@@ -101,15 +102,26 @@ public final class Notifier {
     }
 
     /**
-     * Whether the window is open on screen (not hidden in the tray nor minimised). While it is, a click on the
-     * menu-bar icon opens the menu, as Telegram's does; otherwise it brings the window. Any thread.
+     * Whether the window is open on screen (not hidden in the tray nor minimised). While it is and has the focus, a
+     * click on the menu-bar icon opens the menu, as Telegram's does; otherwise it brings the window. Any thread.
      */
     public void setWindowShown(boolean shown) {
         if (shown == windowShown) return;
         windowShown = shown;
-        NativeBar b = bar;
-        if (b != null) b.setLeftClickMenu(shown);
+        syncLeftClick();
         relabel();
+    }
+
+    /** Whether one of Unichat's windows has the focus: behind other apps, a click brings it to the front. Any thread. */
+    public void setWindowFocused(boolean focused) {
+        if (focused == windowFocused) return;
+        windowFocused = focused;
+        syncLeftClick();
+    }
+
+    private void syncLeftClick() {
+        NativeBar b = bar;
+        if (b != null) b.setLeftClickMenu(windowShown && windowFocused);
     }
 
     private boolean startNativeBar() {
@@ -120,7 +132,7 @@ public final class Notifier {
         if (b == null) return false;
         bar = b;
         b.setGlobalShortcut(app.unichat.settings.Settings.get().globalShortcut());
-        b.setLeftClickMenu(windowShown);
+        b.setLeftClickMenu(windowShown && windowFocused);
         EventQueue.invokeLater(() -> {
             b.setIcon(menuBarIcon());
             b.setTooltip(tooltip);

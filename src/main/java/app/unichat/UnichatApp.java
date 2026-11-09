@@ -80,6 +80,7 @@ public final class UnichatApp extends Application {
         javafx.beans.InvalidationListener shown = o -> notifier.setWindowShown(stage.isShowing() && !stage.isIconified());
         stage.showingProperty().addListener(shown);
         stage.iconifiedProperty().addListener(shown);
+        watchFocus();
         DockIcon.setTrayAvailable(notifier.hasTray());
         // macOS "Salir" (⌘Q, app menu, Dock, logout) quits for real; closing the window only hides it in the tray.
         MacQuit.install(this::quit, () -> {
@@ -255,6 +256,22 @@ public final class UnichatApp extends Application {
         hiddenAt = System.currentTimeMillis();
         stage.hide();
         DockIcon.hide();
+    }
+
+    /**
+     * Tells the menu-bar icon whether any Unichat window has the focus (the settings or a photo count too). Each window
+     * is watched while it's on screen: hidden ones leave {@code Window.getWindows()}, and come back when shown.
+     */
+    private void watchFocus() {
+        javafx.beans.value.ChangeListener<Boolean> focus = (o, a, b) -> Platform.runLater(() ->
+                notifier.setWindowFocused(javafx.stage.Window.getWindows().stream().anyMatch(javafx.stage.Window::isFocused)));
+        for (javafx.stage.Window w : javafx.stage.Window.getWindows()) w.focusedProperty().addListener(focus);
+        javafx.stage.Window.getWindows().addListener((javafx.collections.ListChangeListener<javafx.stage.Window>) c -> {
+            while (c.next()) {
+                for (javafx.stage.Window w : c.getRemoved()) w.focusedProperty().removeListener(focus);
+                for (javafx.stage.Window w : c.getAddedSubList()) w.focusedProperty().addListener(focus);
+            }
+        });
     }
 
     private void showWindow() {
