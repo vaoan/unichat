@@ -168,7 +168,44 @@ class VideoUiTest {
         fx(() -> { viewer.close(); owner.close(); return null; });
     }
 
-    private static void key(Stage stage, javafx.scene.input.KeyCode code, String text) throws Exception {
+    @Test
+    void repeatingKeepsTheSpeed() throws Exception {
+        Path clip = mp4();
+        StackPane root = fx(StackPane::new);
+        Stage owner = window(root);
+        Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(clip), "clip", () -> { }, p -> { }));
+        await(() -> viewer.getProperties().get(VideoViewer.PLAYER) instanceof MediaPlayer p && p.getStatus() == MediaPlayer.Status.PLAYING, "viewer plays");
+        MediaPlayer player = (MediaPlayer) viewer.getProperties().get(VideoViewer.PLAYER);
+        fx(() -> {
+            viewer.getScene().getRoot().lookupAll(".icon-button").stream()
+                    .filter(n -> n.getAccessibleText() != null && n.getAccessibleText().startsWith("Repetir"))
+                    .findFirst().map(n -> (javafx.scene.control.Button) n).orElseThrow().fire();
+            return null;
+        });
+        key(viewer, javafx.scene.input.KeyCode.PERIOD, ">");
+        key(viewer, javafx.scene.input.KeyCode.PERIOD, ">");
+        key(viewer, javafx.scene.input.KeyCode.PERIOD, ">");
+        double rate = fx(player::getRate);
+        assertTrue(rate >= 1.75, "sped up: " + rate);
+        // wait for it to start over (the clip is 2 s), then see how fast its time goes
+        double[] last = {fx(() -> player.getCurrentTime().toSeconds())};
+        await(() -> {
+            double now = player.getCurrentTime().toSeconds();
+            boolean wrapped = now < last[0] - 0.3;
+            last[0] = now;
+            return wrapped;
+        }, "it starts over");
+        Thread.sleep(100);
+        double from = fx(() -> player.getCurrentTime().toSeconds());
+        long t0 = System.nanoTime();
+        Thread.sleep(500);
+        double played = fx(() -> player.getCurrentTime().toSeconds()) - from;
+        double wall = (System.nanoTime() - t0) / 1e9;
+        fx(() -> { viewer.close(); owner.close(); return null; });
+        assertTrue(played / wall > 1.4, "after starting over it still plays at " + rate + "x, not " + played / wall);
+    }
+
+    private static void key(Stage stage,javafx.scene.input.KeyCode code, String text) throws Exception {
         fx(() -> {
             javafx.scene.Node target = stage.getScene().getFocusOwner() != null ? stage.getScene().getFocusOwner() : stage.getScene().getRoot();
             javafx.event.Event.fireEvent(target, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,

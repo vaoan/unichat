@@ -97,6 +97,7 @@ final class VideoControls extends VBox {
 
         replay = replayButton();
         p.setRate(lastRate);
+        p.setOnRepeat(this::reapplyRate);
         p.statusProperty().addListener((o, a, st) -> showPlaying(st == MediaPlayer.Status.PLAYING && !ended));
         p.setOnEndOfMedia(() -> {
             if (p.getCycleCount() == MediaPlayer.INDEFINITE) return;
@@ -179,6 +180,18 @@ final class VideoControls extends VBox {
         screen.getChildren().remove(replay);
         p.seek(Duration.ZERO);
         p.play();
+        reapplyRate();
+    }
+
+    /**
+     * Starting over, the native player goes back to 1x while {@code getRate()} keeps saying the chosen speed, so
+     * setting it to the same value would do nothing: go through 1 to make it take.
+     */
+    private void reapplyRate() {
+        double r = p.getRate();
+        if (r == 1) return;
+        p.setRate(1);
+        p.setRate(r);
     }
 
     void seekBy(double seconds) {
