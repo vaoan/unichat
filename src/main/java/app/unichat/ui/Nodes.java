@@ -14,7 +14,9 @@ final class Nodes {
 
     /** Has style class {@code cls} only while {@code on}. */
     static void style(Node n, String cls, boolean on) {
-        n.getStyleClass().remove(cls);
+        // Untouched when already so: any change to the classes makes JavaFX apply the CSS to the node again.
+        if (n.getStyleClass().contains(cls) == on) return;
         if (on) n.getStyleClass().add(cls);
+        else n.getStyleClass().removeAll(cls);
     }
 }

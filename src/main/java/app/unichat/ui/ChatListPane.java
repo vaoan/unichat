@@ -55,6 +55,8 @@ public final class ChatListPane extends VBox {
     private Runnable onNewChat;
     private final Consumer<Chat> onOpen;
     private String selectedId;
+    /** What the favorites row was built from ({@link #showFavorites}). */
+    private String favoritesShown;
     private boolean updating;
     /** The server row the keyboard is on, if any (it opens on Enter, not on arrowing). */
     private String arrowedRow;
@@ -288,7 +290,29 @@ public final class ChatListPane extends VBox {
         boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && !channels.isOpen() && !foldersOpen();
         List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.personalSpace() && !c.archived() && !c.bridgeBot()
                 && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).limit(8).toList() : List.of();
-        favorites.getChildren().setAll(favs.stream().map(this::favoriteTile).toList());
+        showFavorites(favs);
+    }
+
+    /**
+     * The favorites row, built again only when what it shows changed: it's refreshed on every change to the list (opening
+     * a chat marks it read), and new tiles repaint every avatar. The selection and the unread dot change on the tiles there.
+     */
+    private void showFavorites(List<Chat> favs) {
+        StringBuilder shown = new StringBuilder(Settings.get().showNetworkBadges() ? "b" : "");
+        for (Chat c : favs) {
+            shown.append('|').append(c.id()).append(c.title()).append(c.avatarUrl()).append(c.network());
+        }
+        if (!shown.toString().equals(favoritesShown)) {
+            favoritesShown = shown.toString();
+            favorites.getChildren().setAll(favs.stream().map(this::favoriteTile).toList());
+        }
+        for (int i = 0; i < favs.size(); i++) {
+            javafx.scene.Node tile = favorites.getChildren().get(i);
+            Chat c = favs.get(i);
+            Nodes.style(tile, "selected", c.id().equals(selectedId));
+            tile.lookup(".unread-dot").setVisible(c.space() ? rows.unread().getOrDefault(c.id(), 0) > 0 : c.isUnread());
+            tile.setAccessibleText(I18n.t("chatList.favoriteA11y", A11yText.chat(c, Accounts.forChat(accounts, c), Instant.now(), ZoneId.systemDefault())));
+        }
         Nodes.show(favorites, !favs.isEmpty());
     }
 
@@ -394,7 +418,7 @@ public final class ChatListPane extends VBox {
         VBox tile = new VBox(4, av, name);
         tile.setAlignment(Pos.TOP_CENTER);
         tile.getStyleClass().add("favorite-tile");
-        if (c.id().equals(selectedId)) tile.getStyleClass().add("selected");
+        tile.setUserData(c.id());
         tile.setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY) open(c);
         });

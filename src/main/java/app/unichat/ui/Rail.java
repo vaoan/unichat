@@ -200,16 +200,21 @@ public final class Rail extends VBox {
             wrap.getStyleClass().add("rail-graphic");
             b.setGraphic(wrap);
         }
-        wrap.getChildren().removeIf(n -> n.getStyleClass().contains("rail-badge"));
         String tip = b.getTooltip() == null ? "" : b.getTooltip().getText();
         b.setAccessibleText(count > 0 ? tip + ", " + I18n.n("rail.unread", count) : tip);
-        if (count > 0) {
-            Label badge = new Label(Formats.badge(count));
+        // One badge per button, kept: the rail is updated on every change to the chats, and a new label repaints it.
+        Label badge = (Label) wrap.getChildren().stream().filter(n -> n.getStyleClass().contains("rail-badge")).findFirst().orElse(null);
+        if (badge == null && count > 0) {
+            badge = new Label();
             badge.getStyleClass().add("rail-badge");
             StackPane.setAlignment(badge, Pos.TOP_RIGHT);
             badge.setTranslateX(12);
             badge.setTranslateY(-10);
             wrap.getChildren().add(badge);
+        }
+        if (badge != null) {
+            if (count > 0) badge.setText(Formats.badge(count));
+            badge.setVisible(count > 0);
         }
     }
 }

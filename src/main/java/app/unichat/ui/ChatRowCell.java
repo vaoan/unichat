@@ -6,6 +6,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -32,6 +33,14 @@ final class ChatRowCell extends ListCell<Chat> {
     private final Label badge = new Label();
     private final HBox flags = new HBox(4);
     private final Label disclosure = new Label();
+    private static final Insets COMPACT = new Insets(4, 10, 4, 10);
+    private static final Insets NORMAL = new Insets(8, 10, 8, 10);
+    /** Built once per row and only shown or hidden: rows are drawn again on every change, and new icons repaint them. */
+    private final Node reminderFlag = Icons.icon(Icons.CLOCK, 13);
+    private final Node mutedFlag = Icons.icon(Icons.BELL_OFF, 13);
+    private final Node pinnedFlag = Icons.icon(Icons.PIN, 13);
+    /** The account tag shown now: drawn again only when it changes. */
+    private String shownAccount;
     private final HBox root;
 
     ChatRowCell(ChatListPane pane, ChatService svc, Spaces spaces) {
@@ -48,6 +57,7 @@ final class ChatRowCell extends ListCell<Chat> {
         flags.setMinWidth(Region.USE_PREF_SIZE);
         flags.setAlignment(Pos.CENTER_RIGHT);
         flags.getStyleClass().add("chat-flags");
+        flags.getChildren().addAll(reminderFlag, mutedFlag, pinnedFlag);
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.ALWAYS);
         name.setMinWidth(0);
@@ -94,7 +104,7 @@ final class ChatRowCell extends ListCell<Chat> {
         pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("compact"), compact);
         String a11y = drawChat(c);
         boolean unjoined = pane.channels().isUnjoined(c);
-        disclosure.setGraphic(c.space() ? Icons.icon(Icons.CHEVRON_RIGHT, 14) : null);
+        if (c.space() && disclosure.getGraphic() == null) disclosure.setGraphic(Icons.icon(Icons.CHEVRON_RIGHT, 14));
         Nodes.show(disclosure, c.space());
         Nodes.style(name, "unjoined", unjoined);
         if (Spaces.isOffer(c)) a11y = drawOffer(c);
@@ -102,7 +112,8 @@ final class ChatRowCell extends ListCell<Chat> {
         else if (unjoined) a11y = drawUnjoined(c);
         setGraphic(root);
         setAccessibleText(a11y);
-        setPadding(compact ? new Insets(4, 10, 4, 10) : new Insets(8, 10, 8, 10));
+        Insets padding = compact ? COMPACT : NORMAL;
+        if (!padding.equals(getPadding())) setPadding(padding);
         pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("current"), Objects.equals(c.id(), pane.selectedId()));
     }
 
@@ -113,10 +124,13 @@ final class ChatRowCell extends ListCell<Chat> {
         name.setText(c.title());
         String account = pane.filterProperty().get().accountId() == null ? Accounts.forChat(pane.accounts(), c) : null;
         // Several accounts on this network: a tiny avatar says which one (full name on hover / screen reader).
-        accountTag.setText(account == null ? "" : Formats.accountShort(account));
-        accountTag.setStyle(account == null ? "" : "-fx-background-color: " + Avatar.colorFor(account) + ";");
-        accountTag.setTooltip(account == null ? null : new javafx.scene.control.Tooltip(I18n.t("chatRow.account", account)));
-        Nodes.show(accountTag, account != null);
+        if (!java.util.Objects.equals(account, shownAccount)) {
+            shownAccount = account;
+            accountTag.setText(account == null ? "" : Formats.accountShort(account));
+            accountTag.setStyle(account == null ? "" : "-fx-background-color: " + Avatar.colorFor(account) + ";");
+            accountTag.setTooltip(account == null ? null : new javafx.scene.control.Tooltip(I18n.t("chatRow.account", account)));
+            Nodes.show(accountTag, account != null);
+        }
         stamp.setText(Formats.listStamp(c.lastActivity(), Instant.now(), ZoneId.systemDefault()));
         boolean unread = c.isUnread();
         Nodes.style(name, "unread", unread);
@@ -131,10 +145,9 @@ final class ChatRowCell extends ListCell<Chat> {
             preview.setText(who + c.lastPreview());
         }
         Nodes.style(preview, "unread", unread);
-        flags.getChildren().clear();
-        if (c.reminderAt() != null) flags.getChildren().add(Icons.icon(Icons.CLOCK, 13));
-        if (c.muted()) flags.getChildren().add(Icons.icon(Icons.BELL_OFF, 13));
-        if (c.pinned()) flags.getChildren().add(Icons.icon(Icons.PIN, 13));
+        Nodes.show(reminderFlag, c.reminderAt() != null);
+        Nodes.show(mutedFlag, c.muted());
+        Nodes.show(pinnedFlag, c.pinned());
         int n = c.unreadCount();
         badge.setText(c.mentionCount() > 0 ? "@" : n > 0 ? Formats.badge(n) : "");
         Nodes.show(badge, unread);

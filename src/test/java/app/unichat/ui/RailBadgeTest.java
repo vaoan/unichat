@@ -20,7 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class RailBadgeTest {
     private static List<String> badges(Button b) {
-        return b.getGraphic().lookupAll(".rail-badge").stream().map(n -> ((Label) n).getText()).toList();
+        // The badge is kept and hidden at 0 (a new one each time repainted the rail): what's seen is the visible one.
+        return b.getGraphic().lookupAll(".rail-badge").stream().filter(Node::isVisible).map(n -> ((Label) n).getText()).toList();
     }
 
     @Test

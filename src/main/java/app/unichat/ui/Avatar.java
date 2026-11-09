@@ -20,6 +20,8 @@ public final class Avatar extends StackPane {
     private final Label initials = new Label();
     private final ImageView image = new ImageView();
     private final Label badge = new Label();
+    private Network shownNetwork;
+    private final java.util.Map<Network, javafx.scene.Node> glyphs = new java.util.EnumMap<>(Network.class);
     private String loadedUrl;
 
     public Avatar(double size) {
@@ -92,10 +94,14 @@ public final class Avatar extends StackPane {
             badge.setVisible(false);
             return;
         }
+        // Rows are drawn again on every change to the list, and a list cell passes through other chats while it updates:
+        // each network's icon is built once per avatar and kept, so drawing the same network again paints nothing new.
+        if (network == shownNetwork && badge.isVisible()) return;
+        shownNetwork = network;
         double b = badge.getMinWidth();
         if (NetworkIcons.path(network) != null) {
             badge.setText("");
-            badge.setGraphic(NetworkIcons.glyph(network, b));
+            badge.setGraphic(glyphs.computeIfAbsent(network, n -> NetworkIcons.glyph(n, b)));
         } else {
             badge.setGraphic(null);
             badge.setText(network.badgeLetter());
