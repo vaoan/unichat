@@ -76,7 +76,8 @@ public final class ThreadPane extends BorderPane {
         composer = new Composer(svc, toast);
         composer.setBeforeRecording(audio::pause);
         media = new MessageMedia(svc, openLink, toast, library, this::getScene, audio);
-        messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, library, this::getScene, this::member);
+        messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, library, this::getScene, this::member,
+                this::jumpTo);
 
         favButton = Icons.iconButton(Icons.STAR, I18n.t("thread.favorite"), () -> svc.setFavorite(chat.id(), !chat.favorite()));
         archiveButton = Icons.iconButton(Icons.ARCHIVE, I18n.t("thread.archive", Shortcuts.key("E")),
@@ -179,6 +180,9 @@ public final class ThreadPane extends BorderPane {
             });
         });
     }
+
+    /** Selects and shows {@code target} (the message a reply quotes). */
+    private void jumpTo(Message target) { scroll.jumpTo(target); }
 
     public Chat chat() { return chat; }
     public Composer composer() { return composer; }

@@ -120,7 +120,7 @@ final class NewChatPane extends VBox {
         VBox.setVgrow(list, Priority.ALWAYS);
         networks.setAccessibleText(I18n.t("newChat.network"));
         accountRow.setAccessibleText(I18n.t("newChat.account"));
-        getChildren().addAll(title, networks, accountRow, search, status, list);
+        getChildren().addAll(title, networks, accountRow, SearchFields.clearable(search), status, list);
         // Closed (Esc, another overlay): a chat still being created must not take over the screen later.
         sceneProperty().addListener((o, a, b) -> { if (b == null) cancelPending(); });
 

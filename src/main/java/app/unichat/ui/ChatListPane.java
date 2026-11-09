@@ -147,6 +147,7 @@ public final class ChatListPane extends VBox {
         StackPane.setMargin(searchIcon, new Insets(0, 0, 0, 10));
         searchIcon.setMouseTransparent(true);
         searchBox.getStyleClass().add("search-box");
+        SearchFields.addClear(searchBox, search);
         return searchBox;
     }
 

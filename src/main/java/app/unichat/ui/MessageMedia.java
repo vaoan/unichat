@@ -456,6 +456,23 @@ final class MessageMedia {
         return action;
     }
 
+    /** Whether {@link #view} has something to open for {@code m}: a photo, a video or a reel. */
+    boolean canView(Message m) {
+        if (m.deleted()) return false;
+        if (m.isReelLink()) return m.externalUrl() != null;
+        return m.mediaUrl() != null && (m.type() == MessageType.VIDEO || Gallery.isPicture(m));
+    }
+
+    /** What a click on {@code m}'s picture or video opens; for the keyboard, through the message's menu. */
+    void view(Message m) {
+        if (!canView(m) || scene.get() == null) return;
+        if (m.isReelLink()) openLink.accept(m.externalUrl());
+        else if (m.type() == MessageType.VIDEO) openVideo(m);
+        else Gallery.open(scene.get().getWindow(), svc, m, toast);
+    }
+
+    void openLink(String url) { openLink.accept(url); }
+
     void openFile(Message m) {
         if (m.mediaUrl() == null) return;
         svc.media(m.mediaUrl(), 0, 0).whenComplete((p, err) -> {

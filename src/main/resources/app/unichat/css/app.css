@@ -633,7 +633,8 @@
 
 /* Keyboard focus: visible only when navigating with the keyboard (:focus-visible). */
 .button:focus-visible, .toggle-button:focus-visible, .hyperlink:focus-visible,
-.favorite-tile:focus-visible, .media-box:focus-visible, .file-chip:focus-visible {
+.favorite-tile:focus-visible, .media-box:focus-visible, .file-chip:focus-visible,
+.sticker-tile:focus-visible, .gif-tile:focus-visible, .login-choice:focus-visible, .media-thumb-tile:focus-visible {
     -fx-border-color: -accent;
     -fx-border-width: 2;
     -fx-border-radius: 10;
@@ -649,6 +650,8 @@
 
 .root.strong-focus .button:focus-visible, .root.strong-focus .toggle-button:focus-visible,
 .root.strong-focus .hyperlink:focus-visible, .root.strong-focus .favorite-tile:focus-visible,
+.root.strong-focus .sticker-tile:focus-visible, .root.strong-focus .gif-tile:focus-visible,
+.root.strong-focus .login-choice:focus-visible, .root.strong-focus .media-thumb-tile:focus-visible,
 .root.strong-focus .text-field:focused, .root.strong-focus .password-field:focused,
 .root.strong-focus .composer-row:focus-within, .root.strong-focus .list-view:focus-visible .list-cell:selected {
     -fx-border-color: -text;
@@ -844,3 +847,10 @@
 /* The rail's networks when they don't fit (Rail.networkScroll): no frame or background of its own. */
 .rail-scroll, .rail-scroll > .viewport { -fx-background-color: transparent; -fx-background-insets: 0; -fx-padding: 0; -fx-border-width: 0; }
 .rail-scroll .scroll-bar:vertical { -fx-pref-width: 6; }
+
+/* A search box's ✕ (SearchFields): room for it on the right, so the text never runs under it. */
+.text-field.clearable { -fx-padding: 0.333em 2.4em 0.333em 0.583em; }
+.search-field.clearable { -fx-padding: 8 2.4em 8 2.5em; }
+.command-field.clearable { -fx-padding: 10 2.6em 10 12; }
+.search-clear { -fx-background-color: transparent; -fx-padding: 0.2em; -fx-min-width: 0; -fx-min-height: 0; -fx-cursor: hand; }
+.search-clear:hover { -fx-background-color: -hover; }

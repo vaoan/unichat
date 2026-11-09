@@ -74,7 +74,7 @@ final class GifGrid extends VBox {
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("side-panel-scroll");
         VBox.setVgrow(scroll, javafx.scene.layout.Priority.ALWAYS);
-        getChildren().addAll(search, scroll);
+        getChildren().addAll(SearchFields.clearable(search), scroll);
     }
 
     /** Rebuilds for the open chat: notices, favourites/recents, then search results (or trending). */

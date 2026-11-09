@@ -17,7 +17,7 @@ import java.io.File;
  * {@code -Dunichat.openSpace=<id>} a server's channels,
  * {@code -Dunichat.openFolders=true} the list of folders, {@code -Dunichat.openFolder=<name>} inside one,
  * {@code -Dunichat.overlay=command|newchat|add|picker|folder|folderDelete|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
- * {@code -Dunichat.network=<protocol id>} filters the inbox to one network.
+ * {@code -Dunichat.network=<protocol id>} filters the inbox to one network, {@code -Dunichat.search=<text>} searches it.
  */
 final class SnapshotRun {
     private final MainView mainView;
@@ -56,6 +56,8 @@ final class SnapshotRun {
         if (folder != null || Boolean.getBoolean("unichat.openFolders")) mainView.showFolders(folder);
         String draft = System.getProperty("unichat.draft"); // text in the message box: the send button shows
         if (draft != null) mainView.type(draft);
+        String search = System.getProperty("unichat.search"); // text in the chat list's search box: its ✕ shows
+        if (search != null && scene.getRoot().lookup(".search-box .search-field") instanceof javafx.scene.control.TextField f) f.setText(search);
         String upload = System.getProperty("unichat.upload"); // files sent as a batch to the open chat: the upload bar
         if (upload != null) mainView.sendFiles(java.util.Arrays.stream(upload.split(",")).map(File::new).toList(),
                 // -Dunichat.uploadAs=PHOTO|DOCUMENT (-Dunichat.uploadAsDocument=true, as before, is DOCUMENT)

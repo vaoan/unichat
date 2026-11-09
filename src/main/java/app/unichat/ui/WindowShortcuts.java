@@ -39,7 +39,7 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
 
     /** F6 / Shift+F6: rail → chat list → messages → message input (→ side panel when open). */
     private void cycleFocus(int dir) {
-        Node owner = view.getScene() == null ? null : view.getScene().getFocusOwner();
+        Node owner = focusOwner();
         int current = -1;
         for (Node n = owner; n != null; n = n.getParent()) {
             if (n == rail) current = 0;
@@ -67,7 +67,7 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
     void typeIntoComposer(KeyEvent e) {
         if (e.isConsumed() || e.isShortcutDown() || e.isControlDown() || e.isMetaDown() || thread.chat() == null) return;
         if (!isTypedText(e.getText()) || view.overlayOpen()) return;
-        Node owner = view.getScene() == null ? null : view.getScene().getFocusOwner();
+        Node owner = focusOwner();
         if (owner instanceof javafx.scene.control.TextInputControl) return;
         if (inTimeline(owner) && isTimelineKey(e.getCode())) return; // a shortcut this message doesn't allow: nothing
         thread.composer().takeTyping();
@@ -90,10 +90,16 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
         return text != null && !text.isEmpty() && !text.isBlank() && text.codePoints().noneMatch(Character::isISOControl);
     }
 
+    private Node focusOwner() {
+        return view.getScene() == null ? null : view.getScene().getFocusOwner();
+    }
+
     @Override public void handle(KeyEvent e) {
         boolean mod = e.isShortcutDown();
         Chat c = thread.chat();
-        if (mod && e.getCode() == KeyCode.K) {
+        if (e.getCode() == KeyCode.ESCAPE && SearchFields.clearOnEscape(focusOwner())) {
+            // First Esc empties the search box; the next one closes what it's in.
+        } else if (mod && e.getCode() == KeyCode.K) {
             view.showCommandBar();
         } else if (mod && e.getCode() == KeyCode.N) {
             view.showNewChat();
@@ -101,6 +107,9 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
             view.hideOverlay();
         } else if (mod && e.getCode() == KeyCode.COMMA) {
             view.showSettings();
+        } else if (mod && e.getCode() == KeyCode.L && c != null) {
+            view.hideOverlay();
+            thread.composer().focus(); // straight to the message box, from anywhere
         } else if (mod && e.getCode() == KeyCode.F) {
             listPane.focusSearch();
         } else if (e.isAltDown() && (e.getCode() == KeyCode.UP || e.getCode() == KeyCode.DOWN)) {

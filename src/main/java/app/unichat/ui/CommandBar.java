@@ -86,7 +86,7 @@ public final class CommandBar extends VBox {
             }
         });
         VBox.setVgrow(list, Priority.ALWAYS);
-        getChildren().addAll(field, list);
+        getChildren().addAll(SearchFields.clearable(field), list);
         filter("");
     }
 

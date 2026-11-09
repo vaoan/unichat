@@ -35,9 +35,13 @@ final class MessageActionsUi {
     private final MediaLibrary library;
     private final Supplier<Scene> scene;
     private final Function<String, Member> member;
+    private final Consumer<Message> jumpTo;
+    /** Links offered in a message's menu: the keyboard has no other way to them. */
+    private static final int MENU_LINKS = 5;
 
     MessageActionsUi(ChatService svc, Consumer<String> toast, Composer composer, MessageMedia media, Supplier<Chat> chat,
-                     MediaLibrary library, Supplier<Scene> scene, Function<String, Member> member) {
+                     MediaLibrary library, Supplier<Scene> scene, Function<String, Member> member, Consumer<Message> jumpTo) {
+        this.jumpTo = jumpTo;
         this.svc = svc;
         this.toast = toast;
         this.composer = composer;
@@ -137,10 +141,23 @@ final class MessageActionsUi {
         return MessageActions.of(m, chat.get().features(), java.time.Instant.now()).contains(a);
     }
 
+    /** The message {@code m} answers, if it's in the timeline to go to. */
+    private Message replied(Message m) {
+        if (m.replyToId() == null) return null;
+        for (Message x : svc.messages(m.chatId())) if (x.id().equals(m.replyToId())) return x;
+        return null;
+    }
+
     ContextMenu messageMenu(Message m) {
         ContextMenu menu = new ContextMenu();
         java.util.Set<MessageActions.Action> a = MessageActions.of(m, chat.get().features(), Instant.now());
         if (a.isEmpty()) return menu;
+        if (media.canView(m)) menu.getItems().add(ChatMenus.item(I18n.t("message.view"), () -> media.view(m)));
+        Message replied = replied(m);
+        if (replied != null) menu.getItems().add(ChatMenus.item(I18n.t("message.goToReplied"), () -> jumpTo.accept(replied)));
+        for (String url : RichText.addresses(m.body()).stream().distinct().limit(MENU_LINKS).toList()) {
+            menu.getItems().add(ChatMenus.item(I18n.t("message.openLink", RichText.shown(url, 40)), () -> media.openLink(url)));
+        }
         if (a.contains(MessageActions.Action.REPLY)) menu.getItems().add(ChatMenus.item(I18n.t("message.reply"), () -> composer.reply(m)));
         if (a.contains(MessageActions.Action.COPY)) menu.getItems().add(ChatMenus.item(I18n.t("message.copyText"), () -> Clipboards.copy(m.body())));
         if (a.contains(MessageActions.Action.OPEN_FILE)) menu.getItems().add(ChatMenus.item(I18n.t("message.openFile"), () -> media.openFile(m)));

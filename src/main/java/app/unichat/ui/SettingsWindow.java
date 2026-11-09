@@ -239,6 +239,7 @@ public final class SettingsWindow {
     private static Node shortcutsPage() {
         String[][] keys = {
                 {Shortcuts.key("K"), I18n.t("settings.shortcuts.searchChats")},
+                {Shortcuts.key("L"), I18n.t("settings.shortcuts.composer")},
                 {"F6 / Shift+F6", I18n.t("settings.shortcuts.jumpZones")},
                 {I18n.t("settings.shortcuts.walkKeys"), I18n.t("settings.shortcuts.walk")},
                 {I18n.t("settings.shortcuts.actionKeys"), I18n.t("settings.shortcuts.actions")},
@@ -256,6 +257,7 @@ public final class SettingsWindow {
                 {I18n.t("settings.shortcuts.selectKeys"), I18n.t("settings.shortcuts.select")},
                 {I18n.t("settings.shortcuts.editLastKeys"), I18n.t("settings.shortcuts.editLast")},
                 {"Esc", I18n.t("settings.shortcuts.cancel")},
+                {"Esc", I18n.t("settings.shortcuts.clearSearch")},
                 {I18n.t("settings.shortcuts.doubleClickKeys"), I18n.t("settings.shortcuts.doubleClick")},
         };
         if (MainView.MAC) {

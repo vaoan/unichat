@@ -32,6 +32,8 @@ public final class InfoPane extends ScrollPane {
     private final Runnable close;
     private final Consumer<String> toast;
     private Chat chat;
+    /** What the panel was last built from ({@link #shown}): unchanged, it isn't built again. */
+    private String built;
 
     public InfoPane(ChatService svc, Runnable close, Consumer<String> toast) {
         this.svc = svc;
@@ -51,7 +53,14 @@ public final class InfoPane extends ScrollPane {
         refresh();
     }
 
+    /**
+     * Builds the panel again only when something on it changed: the window calls this on every new message and list
+     * change, and building it anew blanked the photo and the pictures until they loaded again (a flash each time).
+     */
     public void refresh() {
+        String now = chat == null ? null : shown(chat);
+        if (now != null && now.equals(built)) return;
+        built = now;
         box.getChildren().clear();
         if (chat == null) return;
         Chat c = chat;
@@ -145,6 +154,25 @@ public final class InfoPane extends ScrollPane {
         box.getChildren().addAll(new VBox(8, lowPrio, leave));
     }
 
+    /** Everything the panel draws from {@code c}, as one string to compare. */
+    private String shown(Chat c) {
+        StringBuilder b = new StringBuilder().append(c.id()).append('|').append(c.title()).append('|').append(c.avatarUrl())
+                .append('|').append(c.network()).append('|').append(c.group()).append('|').append(c.topic())
+                .append('|').append(c.muted()).append(c.favorite()).append(c.pinned()).append(c.archived()).append(c.lowPriority())
+                .append('|').append(I18n.locale());
+        if (c.reminderAt() != null) b.append('|').append(Formats.listStamp(c.reminderAt(), Instant.now(), ZoneId.systemDefault()))
+                .append(c.reminderAt());
+        List<Message> media = svc.messages(c.id()).stream()
+                .filter(m -> !m.deleted() && m.type() == MessageType.IMAGE && m.mediaUrl() != null).toList();
+        b.append("|media ").append(media.size());
+        for (Message m : media.subList(Math.max(0, media.size() - 9), media.size())) b.append(' ').append(m.id());
+        if (c.group() || c.members().size() > 2) {
+            b.append("|members ").append(c.members().size());
+            for (Member m : c.members().stream().limit(100).toList()) b.append(' ').append(m.id()).append(m.displayName()).append(m.avatarUrl());
+        }
+        return b.toString();
+    }
+
     private Node section(String text) {
         Label l = new Label(text);
         l.getStyleClass().add("info-section");
@@ -176,12 +204,11 @@ public final class InfoPane extends ScrollPane {
                 System.err.println("Could not decode a shared photo: " + e);
             }
         }, AnimatedImage.DECODER);
-        v.setOnMouseClicked(e -> {
-            if (getScene() == null) return;
-            javafx.stage.Window owner = getScene().getWindow();
-            Gallery.open(owner, svc, m, toast);
+        // A tile: reached with Tab and opened with Enter or Space, not only clicked.
+        Node tile = MediaTile.of(v, 84, 84, "media-thumb-tile", I18n.t("media.imageOpen"), true, () -> {
+            if (getScene() != null) Gallery.open(getScene().getWindow(), svc, m, toast);
         });
-        v.setCursor(javafx.scene.Cursor.HAND);
-        return v;
+        v.setPreserveRatio(false); // a square, as before
+        return tile;
     }
 }

@@ -63,7 +63,7 @@ final class DiscordServersPage extends StackPane {
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("login-scroll");
         VBox.setVgrow(scroll, Priority.ALWAYS);
-        getChildren().setAll(new VBox(10, help, search, count, scroll));
+        getChildren().setAll(new VBox(10, help, SearchFields.clearable(search), count, scroll));
         Platform.runLater(search::requestFocus);
     }
 
