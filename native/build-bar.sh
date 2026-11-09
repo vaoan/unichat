@@ -9,7 +9,9 @@ cd "$(dirname "$0")"
 OUT="${1:-$HOME/Library/Caches/unichat-build/UnichatBar.app}"
 rm -rf "$OUT"
 mkdir -p "$OUT/Contents/MacOS" "$OUT/Contents/Resources"
-swiftc -O UnichatBar.swift -o "$OUT/Contents/MacOS/UnichatBar"
+# Built for the app's minimum, not this Mac's version: by default swiftc targets the macOS it runs on.
+MACOS_MIN="${MACOS_MIN:-13.3}"
+swiftc -O -target "arm64-apple-macos$MACOS_MIN" UnichatBar.swift -o "$OUT/Contents/MacOS/UnichatBar"
 
 # The app icon, so notifications show Unichat's.
 ICONSET="$(mktemp -d)/Unichat.iconset"
@@ -22,7 +24,7 @@ done
 iconutil -c icns "$ICONSET" -o "$OUT/Contents/Resources/Unichat.icns"
 rm -rf "$(dirname "$ICONSET")"
 
-cat > "$OUT/Contents/Info.plist" <<'PLIST'
+cat > "$OUT/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -35,7 +37,7 @@ cat > "$OUT/Contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleVersion</key><string>1</string>
-  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSMinimumSystemVersion</key><string>$MACOS_MIN</string>
   <!-- No Dock icon, no menu bar of its own: Unichat is the app the person sees. -->
   <key>LSUIElement</key><true/>
 </dict>

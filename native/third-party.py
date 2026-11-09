@@ -40,7 +40,8 @@ def pinned(pattern, file):
 
 JACKSON = "com/fasterxml/jackson/core/jackson-core/2.17.2/jackson-core-2.17.2.jar"
 WHISPER = pinned(r"^VERSION=(\S+)", "native/build-whisper.sh")
-WEBP = pinned(r"^VERSION=(\S+)", "native/fetch-gif2webp.sh")
+WEBP = pinned(r"^VERSION=(\S+)", "native/build-gif2webp.sh")
+GIFLIB = pinned(r"^GIFLIB_VERSION=(\S+)", "native/build-gif2webp.sh")
 OLM = pinned(r"^VERSION=(\S+)", "native/build-libolm.sh")
 TUWUNEL_V = pinned(r"^TUWUNEL_VERSION=(\S+)", "src/main/resources/app/unichat/server/versions.env")
 
@@ -52,7 +53,7 @@ COMPONENTS = [
      [("LICENSE", fetch(f"{GH}ggml-org/whisper.cpp/v{WHISPER}/LICENSE"))]),
     ("libwebp (gif2webp)", WEBP, "BSD-3-Clause + concesión de patentes", "stickers animados",
      [("COPYING", fetch(f"{GH}webmproject/libwebp/v{WEBP}/COPYING")), ("PATENTS", fetch(f"{GH}webmproject/libwebp/v{WEBP}/PATENTS"))]),
-    ("GIFLib (dentro de gif2webp)", "la que enlaza libwebp", "MIT", "leer GIF",
+    ("GIFLib (dentro de gif2webp)", GIFLIB, "MIT", "leer GIF",
      [("COPYING", fetch("https://sourceforge.net/p/giflib/code/ci/master/tree/COPYING?format=raw"))]),
     ("libolm", OLM, "Apache-2.0", "lo necesitan los puentes en macOS",
      [("LICENSE", fetch(f"https://gitlab.matrix.org/matrix-org/olm/-/raw/{OLM}/LICENSE"))]),

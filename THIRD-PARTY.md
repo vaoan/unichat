@@ -8,7 +8,7 @@ El código propio de Unichat es [0BSD](LICENSE). Los paquetes de Unichat tambié
 |---|---|---|---|
 | whisper.cpp (whisper-cli) | 1.9.5 | MIT | transcribir notas de voz |
 | libwebp (gif2webp) | 1.6.0 | BSD-3-Clause + concesión de patentes | stickers animados |
-| GIFLib (dentro de gif2webp) | la que enlaza libwebp | MIT | leer GIF |
+| GIFLib (dentro de gif2webp) | 5.2.2 | MIT | leer GIF |
 | libolm | 3.2.16 | Apache-2.0 | lo necesitan los puentes en macOS |
 | tuwunel | v1.9.4 | Apache-2.0 | servidor Matrix local |
 | JavaFX / OpenJFX | 23.0.1 | GPL-2.0 con excepción de classpath; WebKit, GStreamer y GLib con partes LGPL | interfaz |

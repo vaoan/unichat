@@ -20,7 +20,7 @@ viene dentro.
 | Sistema | Archivo | Servidor local incluido |
 |---|---|---|
 | Windows 10/11 (x64) | `Unichat-<versión>.msi` (instalador) o `Unichat-<versión>-windows.zip` (portable: descomprime y abre `Unichat\Unichat.exe`) | Sí (Signal todavía no) |
-| macOS 12+ con Apple Silicon (M1 o posterior) | `Unichat-<versión>.dmg` | Sí |
+| macOS 13.3+ (Ventura) con Apple Silicon (M1 o posterior) | `Unichat-<versión>.dmg` | Sí |
 | Mac Intel, Linux | Compílalo (ver [Compilar](#compilar)) | No: solo con un servidor propio ([docs/BRIDGES.md](docs/BRIDGES.md)) |
 
 **La primera vez que la abres** aparece un aviso, porque la app todavía no está firmada con un certificado pagado:

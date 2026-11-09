@@ -4,6 +4,9 @@
 set -e
 cd "$(dirname "$0")"
 # The version is the pom's (also the app's: support/AppVersion), so a release changes it in one place.
+# The oldest macOS the app runs on (whisper-cli's Metal needs 13.3): every binary inside is built for it, and
+# native/check-macos-min.sh refuses a package where one needs more.
+export MACOS_MIN=13.3
 VERSION="$(sed -n 's:^  <version>\(.*\)</version>:\1:p' pom.xml | head -1)"
 ./mvnw -q -DskipTests package
 rm -rf target/pkg release && mkdir -p target/pkg release
@@ -37,7 +40,7 @@ fi
 # Animated stickers for chats that only take WebP (WhatsApp): libwebp's gif2webp (see StickerConverter).
 if [ "$(uname -s)" = Darwin ]; then
   mkdir -p target/pkg/server
-  native/fetch-gif2webp.sh "$PWD/target/pkg/server/gif2webp" || echo "Aviso: sin gif2webp los stickers animados se envían fijos a WhatsApp." >&2
+  native/build-gif2webp.sh "$PWD/target/pkg/server/gif2webp" || echo "Aviso: sin gif2webp los stickers animados se envían fijos a WhatsApp." >&2
   # Voice notes to text (stt/Transcriber); the model is downloaded by the app on first use.
   mkdir -p target/pkg/server/whisper
   native/build-whisper.sh "$PWD/target/pkg/server/whisper/whisper-cli" \
@@ -59,6 +62,9 @@ case "$(uname -s)" in
     jpackage $COMMON --type app-image --icon target/Unichat.icns --mac-package-identifier app.unichat
     # A menu bar app: no Dock icon at launch nor among the Dock's recent apps (Ajustes can show one, see ui/DockIcon).
     plutil -insert LSUIElement -bool true release/Unichat.app/Contents/Info.plist
+    # The oldest macOS it runs on is the newest any binary inside asks for (whisper-cli: 13.3); jpackage says 10.11.
+    plutil -replace LSMinimumSystemVersion -string "$MACOS_MIN" release/Unichat.app/Contents/Info.plist
+    native/check-macos-min.sh release/Unichat.app "$MACOS_MIN"
     codesign --force --deep -s - release/Unichat.app
     jpackage --type dmg --name Unichat --app-version $VERSION --vendor Unichat --dest release --app-image release/Unichat.app || echo "dmg skipped"
     ;;

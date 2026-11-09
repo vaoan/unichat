@@ -23,7 +23,7 @@ if [ ! -x "$BIN" ]; then
   # GGML_NATIVE=OFF: the binary runs on every Apple Silicon Mac, not only the one that built it.
   cmake -S "$SRC" -B "$SRC/build" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF \
     -DGGML_METAL_EMBED_LIBRARY=ON -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF \
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 >/dev/null
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOS_MIN:-13.3}" >/dev/null
   cmake --build "$SRC/build" -j --config Release --target whisper-cli >/dev/null
   cp "$SRC/build/bin/whisper-cli" "$BIN"
   # The sources and objects are ~300 MB; only the binary is kept.

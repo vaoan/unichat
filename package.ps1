@@ -47,7 +47,7 @@ try {
 }
 
 # Animated stickers for chats that only take WebP (WhatsApp): libwebp's gif2webp, pinned (see StickerConverter
-# and native/fetch-gif2webp.sh for the macOS build of the same release).
+# and native/build-gif2webp.sh for the macOS build of the same release).
 $WebpVersion = "1.6.0"
 $WebpAsset = "libwebp-$WebpVersion-windows-x64.zip"
 $WebpSha256 = "48886f506b21f62e4661f0f4cbfca19800897c385128e8902542d29a950c93f1"

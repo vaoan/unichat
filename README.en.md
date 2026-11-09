@@ -17,7 +17,7 @@ included.
 | System | File | Built-in local server |
 |---|---|---|
 | Windows 10/11 (x64) | `Unichat-<version>.msi` (installer) or `Unichat-<version>-windows.zip` (portable: unzip and open `Unichat\Unichat.exe`) | Yes (not Signal yet) |
-| macOS 12+ on Apple Silicon (M1 or later) | `Unichat-<version>.dmg` | Yes |
+| macOS 13.3+ (Ventura) on Apple Silicon (M1 or later) | `Unichat-<version>.dmg` | Yes |
 | Intel Mac, Linux | Build it (see below) | No: only with your own server ([docs/BRIDGES.md](docs/BRIDGES.md), in Spanish) |
 
 **The first time you open it** you get a warning, because the app isn't signed with a paid certificate yet:
