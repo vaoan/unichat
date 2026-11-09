@@ -311,6 +311,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
     public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) {
         CompletableFuture<Void> sent = sendLocal(chatId, replyToId, m -> {
             m.setBody(Message.withoutEmoteCommand(text));
+            m.setHtml(app.unichat.model.Markup.html(m.body()));
             if (Message.isEmoteCommand(text)) m.setType(MessageType.EMOTE);
         });
         Chat chat = chats.get(chatId);

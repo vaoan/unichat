@@ -12,6 +12,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A reply says what it answers in m.in_reply_to only: bridges pass the body on as it is, so a quote in it reaches the network. */
 class ReplyContentTest {
@@ -65,5 +66,28 @@ class ReplyContentTest {
         JsonNode c = MatrixClient.JSON.readTree(sendBody);
         assertEquals("la respuesta", c.path("body").asText());
         assertEquals("$1", c.path("m.relates_to").path("m.in_reply_to").path("event_id").asText());
+    }
+
+    @Test
+    void marksGoAsHtmlForTheBridgeAndTheBodyKeepsThem() throws Exception {
+        MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "format-test");
+        Changes changes = new Changes();
+        svc.addListener(changes.listener());
+        svc.start();
+        changes.until(() -> !svc.messages(ROOM).isEmpty());
+
+        svc.sendText(ROOM, "nos vemos *mañana*", null).get();
+        JsonNode sent = MatrixClient.JSON.readTree(sendBody);
+        assertEquals("nos vemos *mañana*", sent.path("body").asText());
+        assertEquals("org.matrix.custom.html", sent.path("format").asText());
+        assertEquals("nos vemos <strong>mañana</strong>", sent.path("formatted_body").asText());
+
+        svc.editMessage(ROOM, "$1", "_mejor_ hoy").get();
+        JsonNode edit = MatrixClient.JSON.readTree(sendBody).path("m.new_content");
+        assertEquals("<em>mejor</em> hoy", edit.path("formatted_body").asText());
+
+        svc.sendText(ROOM, "sin formato", null).get();
+        assertTrue(MatrixClient.JSON.readTree(sendBody).path("formatted_body").isMissingNode(), "plain text goes as it always did");
+        svc.stop();
     }
 }

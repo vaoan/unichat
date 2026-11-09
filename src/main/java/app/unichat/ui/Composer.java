@@ -115,6 +115,7 @@ public final class Composer extends VBox {
         input.setPrefRowCount(1);
         input.getStyleClass().add("composer-input");
         input.addEventFilter(KeyEvent.KEY_PRESSED, this::onKey);
+        input.setContextMenu(FormatMenu.of(input, this::features));
         input.textProperty().addListener((o, a, t) -> {
             autoGrow();
             onTyped(t);
@@ -584,7 +585,14 @@ public final class Composer extends VBox {
         if (forChat == null || forChat.equals(chatId)) focus();
     }
 
+    /** What the open chat's network supports; null with no chat. */
+    private app.unichat.model.RoomFeatures features() {
+        Chat c = chatId == null ? null : svc.chat(chatId);
+        return c == null ? null : c.features();
+    }
+
     private void onKey(KeyEvent e) {
+        if (FormatMenu.onKey(e, input, features())) return;
         if (e.getCode() == KeyCode.ENTER) {
             boolean sendOnEnter = Settings.get().sendOnEnter();
             boolean modifier = e.isShortcutDown();

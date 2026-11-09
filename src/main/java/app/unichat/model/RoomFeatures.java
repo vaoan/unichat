@@ -20,7 +20,8 @@ public final class RoomFeatures {
     /** Pseudo message types used in the {@code file} map besides m.image/m.video/m.audio/m.file. */
     public static final String STICKER = "m.sticker", GIF = "fi.mau.gif", VOICE = "org.matrix.msc3245.voice";
 
-    public static final RoomFeatures UNKNOWN = new RoomFeatures(true, 2, 0, 2, 0, false, 2, 2, 0, null, null, true, null);
+    public static final RoomFeatures UNKNOWN = new RoomFeatures(true, 2, 0, 2, 0, false, 2, 2, 0, null, null, true, null,
+            java.util.EnumSet.allOf(TextFormat.class));
 
     private final boolean unrestricted;
     private final int edit;
@@ -37,10 +38,12 @@ public final class RoomFeatures {
     private final boolean anyFile;
     /** msgtype → MIME types offered (may hold wildcards like image/*); a type missing here takes any. */
     private final Map<String, java.util.Set<String>> mimes;
+    /** The text formats the network shows (the {@code formatting} map). */
+    private final java.util.Set<TextFormat> formats;
 
     private RoomFeatures(boolean unrestricted, int edit, long editMaxAgeSec, int delete, long deleteMaxAgeSec, boolean deleteForMe,
                          int reply, int reaction, int reactionCount, List<String> allowedReactions, Map<String, Long> files,
-                         boolean anyFile, Map<String, java.util.Set<String>> mimes) {
+                         boolean anyFile, Map<String, java.util.Set<String>> mimes, java.util.Set<TextFormat> formats) {
         this.unrestricted = unrestricted;
         this.edit = edit;
         this.editMaxAgeSec = editMaxAgeSec;
@@ -54,6 +57,7 @@ public final class RoomFeatures {
         this.files = files == null ? Map.of() : Map.copyOf(files);
         this.anyFile = anyFile;
         this.mimes = mimes == null ? Map.of() : Map.copyOf(mimes);
+        this.formats = java.util.Set.copyOf(formats);
     }
 
     public static RoomFeatures parse(JsonNode c) {
@@ -77,16 +81,24 @@ public final class RoomFeatures {
             allowed = new ArrayList<>();
             for (JsonNode r : c.path("allowed_reactions")) allowed.add(r.asText());
         }
+        java.util.Set<TextFormat> formats = java.util.EnumSet.noneOf(TextFormat.class);
+        for (TextFormat f : TextFormat.values()) if (c.path("formatting").path(f.feature()).asInt(0) >= 1) formats.add(f);
         return new RoomFeatures(false, c.path("edit").asInt(0), c.path("edit_max_age").asLong(0),
                 c.path("delete").asInt(0), c.path("delete_max_age").asLong(0), c.path("delete_for_me").asBoolean(false),
-                c.path("reply").asInt(0), c.path("reaction").asInt(0), c.path("reaction_count").asInt(0), allowed, files, false, mimes);
+                c.path("reply").asInt(0), c.path("reaction").asInt(0), c.path("reaction_count").asInt(0), allowed, files, false, mimes, formats);
     }
 
     /** mautrix-discord predates room features: what its code supports (edits/deletes without limit, no voice). */
     public static RoomFeatures discord() {
         Map<String, Long> files = new HashMap<>();
         for (String t : List.of("m.image", "m.video", "m.audio", "m.file", STICKER, GIF)) files.put(t, 0L);
-        return new RoomFeatures(false, 2, 0, 2, 0, false, 2, 2, 0, null, files, false, null);
+        return new RoomFeatures(false, 2, 0, 2, 0, false, 2, 2, 0, null, files, false, null,
+                java.util.EnumSet.allOf(TextFormat.class)); // Discord's Markdown has them all
+    }
+
+    /** Whether the network shows {@code f}; one it doesn't isn't offered in the message box's menu. */
+    public boolean formats(TextFormat f) {
+        return formats.contains(f);
     }
 
     public boolean accepts(String type) {

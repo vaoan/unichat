@@ -4,6 +4,7 @@ import app.unichat.bridge.BridgePorts;
 import app.unichat.model.VoiceNote;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import app.unichat.model.Chat;
+import app.unichat.model.Markup;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
@@ -56,11 +57,13 @@ final class MessageSender {
         String body = Message.withoutEmoteCommand(text);
         content.put("msgtype", emote ? "m.emote" : "m.text");
         content.put("body", body);
+        String html = formatted(content, body);
         addReply(content, replyToId);
         synchronized (proc) {
             proc.addLocalEcho(chatId, txn, m -> {
                 m.setType(emote ? MessageType.EMOTE : MessageType.TEXT);
                 m.setBody(body);
+                m.setHtml(html);
                 m.setReplyToId(replyToId);
             });
         }
@@ -190,6 +193,16 @@ final class MessageSender {
      * Adds m.relates_to. No "> quote" in the body: Matrix dropped that fallback (v1.13) and bridges pass the body on as
      * it is, so the network would show the quote, Matrix ids included, under the real reply.
      */
+    /**
+     * The marks in {@code text} (*bold*, _italic_… {@link Markup}) as HTML, which each bridge writes its network's way;
+     * the body keeps them as written. Returns the HTML, or null when there are none (plain text, as always).
+     */
+    private static String formatted(ObjectNode content, String text) {
+        String html = Markup.html(text);
+        if (html != null) content.put("format", "org.matrix.custom.html").put("formatted_body", html);
+        return html;
+    }
+
     private static void addReply(ObjectNode content, String replyToId) {
         if (replyToId == null || replyToId.startsWith(SyncProcessor.LOCAL_PREFIX)) return;
         content.putObject("m.relates_to").putObject("m.in_reply_to").put("event_id", replyToId);
@@ -399,7 +412,10 @@ final class MessageSender {
             MatrixRoom r = proc.room(chatId);
             target = r == null ? null : r.byId.get(messageId);
             if (target != null) {
-                if (!target.isMedia()) target.setBody(newText);
+                if (!target.isMedia()) {
+                    target.setBody(newText);
+                    target.setHtml(Markup.html(newText));
+                }
                 target.setEdited(true);
             }
         }
@@ -408,7 +424,8 @@ final class MessageSender {
         String msgtype = target != null && target.type() == MessageType.EMOTE ? "m.emote" : "m.text";
         content.put("msgtype", msgtype);
         content.put("body", "* " + newText);
-        content.putObject("m.new_content").put("msgtype", msgtype).put("body", newText);
+        formatted(content, "* " + newText);
+        formatted(content.putObject("m.new_content").put("msgtype", msgtype).put("body", newText), newText);
         content.putObject("m.relates_to").put("rel_type", "m.replace").put("event_id", messageId);
         return core.run(() -> client.sendEvent(chatId, "m.room.message", core.newTxnId(), content));
     }
