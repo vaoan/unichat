@@ -12,10 +12,8 @@ import javafx.stage.Window;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,7 +30,7 @@ class MediaClickUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -48,8 +46,7 @@ class MediaClickUiTest {
             view.openChatId("!familia:demo");
             return sc;
         });
-        // Wait for the photo to render (a fixed sleep was flaky under load).
-        for (int i = 0; i < 100 && !fx(() -> scene.getRoot().lookup(".media-box") != null); i++) Thread.sleep(100);
+        FxWait.until("the photo renders", () -> scene.getRoot().lookup(".media-box") != null);
         // Count only viewer windows: the demo's simulated incoming messages open notification cards too.
         int before = fx(MediaClickUiTest::viewers);
         fx(() -> {
@@ -59,7 +56,8 @@ class MediaClickUiTest {
             Event.fireEvent(media, mouse(MouseEvent.MOUSE_RELEASED, media, true));
             return null;
         });
-        Thread.sleep(300);
+        FxWait.until("a viewer opens", () -> viewers() > before);
+        FxWait.settled(); // and only one
         assertEquals(before + 1, (int) fx(MediaClickUiTest::viewers), "viewer opened on the first click");
         boolean viewer = fx(() -> Window.getWindows().stream().anyMatch(w -> w.getScene() != null
                 && w.getScene().getRoot().getStyleClass().contains("media-viewer")));
@@ -81,15 +79,7 @@ class MediaClickUiTest {
                 true, false, false, true, false, still, null);
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(s.get());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+    private static <T> T fx(Callable<T> c) throws Exception {
+        return FxWait.fx(c);
     }
 }

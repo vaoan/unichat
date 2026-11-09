@@ -11,10 +11,8 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,7 +26,7 @@ class AccountsSyncUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -48,26 +46,20 @@ class AccountsSyncUiTest {
             stage.show();
             return sc;
         });
-        Thread.sleep(300);
+        FxWait.until("the accounts are listed", () -> scene.getRoot().lookupAll(".button").stream()
+                .anyMatch(n -> "Sincronizar chats".equals(((Button) n).getText())));
+        FxWait.settled();
         List<Button> sync = fx(() -> scene.getRoot().lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Sincronizar chats".equals(b.getText())).toList());
         assertEquals(1, sync.size(), "only Telegram has it");
         assertTrue(fx(() -> sync.get(0).getAccessibleText()).contains("Telegram"));
         fx(() -> { sync.get(0).fire(); return null; });
-        Thread.sleep(400);
+        FxWait.until("a toast about Telegram", () -> toasts.stream().anyMatch(t -> t.contains("Telegram")));
         assertTrue(toasts.stream().anyMatch(t -> t.contains("Telegram")), toasts.toString());
         svc.stop();
     }
 
     private static <T> T fx(Callable<T> c) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(c.call());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+        return FxWait.fx(c);
     }
 }

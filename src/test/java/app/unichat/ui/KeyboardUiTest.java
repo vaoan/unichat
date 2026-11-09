@@ -15,10 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,7 +34,7 @@ class KeyboardUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -53,7 +51,7 @@ class KeyboardUiTest {
             view.openChatId("!familia:demo");
             return sc;
         });
-        Thread.sleep(500);
+        untilOpen(scene);
 
         String cellText = fx(() -> scene.getRoot().lookupAll(".chat-cell").stream()
                 .map(n -> (String) n.queryAccessibleAttribute(javafx.scene.AccessibleAttribute.TEXT))
@@ -110,7 +108,7 @@ class KeyboardUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -127,7 +125,7 @@ class KeyboardUiTest {
             view.openChatId("!familia:demo");
             return sc;
         });
-        Thread.sleep(500);
+        untilOpen(scene);
         for (int i = 0; i < 3; i++) press(scene, KeyCode.F6, false, false);
         assertEquals("timeline", fx(() -> zone(scene)));
         press(scene, KeyCode.R, false, false);
@@ -161,7 +159,7 @@ class KeyboardUiTest {
                 return null;
             });
         }
-        Thread.sleep(150);
+        FxWait.settled(); // what the key started (focus moves, redraws) has run
     }
 
     private static void press(Scene scene, KeyCode code, boolean shift, boolean shortcut) throws Exception {
@@ -172,18 +170,17 @@ class KeyboardUiTest {
                     shortcut && !mac, false, shortcut && mac));
             return null;
         });
-        Thread.sleep(150);
+        FxWait.settled(); // what the key started (focus moves, redraws) has run
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(s.get());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+    /** The chat list and the open chat are drawn, and the focus has landed. */
+    private static void untilOpen(Scene scene) throws Exception {
+        FxWait.until("the chat list and the open chat show", () -> !scene.getRoot().lookupAll(".chat-cell").isEmpty()
+                && !scene.getRoot().lookupAll(".row-cell").isEmpty());
+        FxWait.settled();
+    }
+
+    private static <T> T fx(Callable<T> c) throws Exception {
+        return FxWait.fx(c);
     }
 }

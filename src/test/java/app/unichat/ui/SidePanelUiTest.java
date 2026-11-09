@@ -10,9 +10,8 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -27,7 +26,7 @@ class SidePanelUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -44,7 +43,8 @@ class SidePanelUiTest {
             view[0].openChatId("!familia:demo");
             return sc;
         });
-        Thread.sleep(500);
+        FxWait.until("the chat opens", () -> scene.getRoot().lookup(".composer-input") != null);
+        FxWait.settled();
         assertFalse(fx(() -> panel(scene) != null), "closed at first");
 
         fx(() -> { view[0].togglePanel(SidePanel.Tab.PROFILE); return null; });
@@ -53,7 +53,7 @@ class SidePanelUiTest {
 
         fx(() -> { view[0].showPanel(SidePanel.Tab.EMOJIS); return null; });
         assertEquals(SidePanel.Tab.EMOJIS, fx(() -> panel(scene).current()), "switches tab without closing");
-        Thread.sleep(300); // one pulse: the scroll pane builds its content
+        FxWait.until("the scroll pane builds its emojis", () -> panel(scene).lookup(".emoji-button") != null);
 
         fx(() -> {
             Button smile = (Button) panel(scene).lookupAll(".emoji-button").iterator().next();
@@ -86,7 +86,7 @@ class SidePanelUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -107,9 +107,9 @@ class SidePanelUiTest {
                     app.unichat.model.MediaLibrary.Kind.STICKER, "mxc://demo/fav", "image/png", 160, 160, null));
             return sc;
         });
-        Thread.sleep(400);
+        FxWait.until("the chat opens", () -> scene.getRoot().lookup(".composer-input") != null);
         fx(() -> { view[0].showPanel(SidePanel.Tab.STICKERS); return null; });
-        Thread.sleep(300);
+        FxWait.until("the stickers tab lists its tiles", () -> panel(scene).lookup(".sticker-tile") != null);
         int before = fx(() -> svc.chat("!familia:demo").lastPreview().length());
         fx(() -> {
             Node tile = panel(scene).lookup(".sticker-tile");
@@ -119,7 +119,7 @@ class SidePanelUiTest {
                     javafx.scene.input.KeyCode.ENTER, false, false, false, false));
             return null;
         });
-        Thread.sleep(300);
+        FxWait.until("the sticker is sent", () -> "Sticker".equals(svc.chat("!familia:demo").lastPreview()));
         assertEquals("Sticker", fx(() -> svc.chat("!familia:demo").lastPreview()), "sent to the open chat");
         assertTrue(before >= 0);
 
@@ -131,14 +131,16 @@ class SidePanelUiTest {
                     5, 5, b.getMinX() + 5, b.getMinY() + 5, false, null));
             return null;
         });
-        Thread.sleep(200);
+        FxWait.until("the context menu shows", () -> javafx.stage.Window.getWindows().stream()
+                .anyMatch(w -> w instanceof javafx.scene.control.ContextMenu));
         javafx.scene.control.MenuItem enlarge = fx(() -> javafx.stage.Window.getWindows().stream()
                 .filter(w -> w instanceof javafx.scene.control.ContextMenu).map(w -> (javafx.scene.control.ContextMenu) w)
                 .flatMap(m -> m.getItems().stream()).filter(i -> "Ver en grande".equals(i.getText())).findFirst().orElse(null));
         assertTrue(enlarge != null, "the menu offers Ver en grande");
         long windows = fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage).count());
         fx(() -> { enlarge.fire(); return null; });
-        Thread.sleep(300);
+        FxWait.until("the sticker's window opens", () -> javafx.stage.Window.getWindows().stream()
+                .anyMatch(w -> w instanceof Stage s && "Sticker".equals(s.getTitle())));
         Stage big = fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage s && "Sticker".equals(s.getTitle()))
                 .map(Stage.class::cast).findFirst().orElse(null));
         assertTrue(big != null && fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage).count()) > windows,
@@ -152,7 +154,8 @@ class SidePanelUiTest {
             view[0].showPanel(SidePanel.Tab.STICKERS);
             return null;
         });
-        Thread.sleep(300);
+        FxWait.until("the tile tells why it's dimmed",
+                () -> panel(scene).lookup(".sticker-tile").getAccessibleText().contains("no acepta stickers"));
         String text = fx(() -> panel(scene).lookup(".sticker-tile").getAccessibleText());
         assertTrue(text.contains("no acepta stickers"), text);
     }
@@ -163,7 +166,7 @@ class SidePanelUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }
@@ -182,9 +185,11 @@ class SidePanelUiTest {
             view[0].openChatId("!familia:demo");
             return sc;
         });
-        Thread.sleep(400);
+        FxWait.until("the chat opens", () -> scene.getRoot().lookup(".composer-input") != null);
         fx(() -> { view[0].showPanel(SidePanel.Tab.GIFS); return null; });
-        Thread.sleep(300);
+        FxWait.until("the GIFs tab explains how to turn on a provider", () -> panel(scene).lookupAll(".label").stream()
+                .anyMatch(n -> ((javafx.scene.control.Label) n).getText() != null
+                        && ((javafx.scene.control.Label) n).getText().contains("Ajustes → GIFs")));
         String text = fx(() -> panel(scene).lookupAll(".label").stream()
                 .map(n -> ((javafx.scene.control.Label) n).getText()).reduce("", (a, b) -> a + "\n" + b));
         assertTrue(text.contains("Ajustes → GIFs"), text);
@@ -196,20 +201,7 @@ class SidePanelUiTest {
         return null;
     }
 
-    @FunctionalInterface
-    private interface Fx<T> {
-        T get() throws Exception;
-    }
-
-    private static <T> T fx(Fx<T> s) throws Exception {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        Platform.runLater(() -> {
-            try {
-                f.complete(s.get());
-            } catch (Throwable t) {
-                f.completeExceptionally(t);
-            }
-        });
-        return f.get(10, TimeUnit.SECONDS);
+    private static <T> T fx(Callable<T> c) throws Exception {
+        return FxWait.fx(c);
     }
 }
