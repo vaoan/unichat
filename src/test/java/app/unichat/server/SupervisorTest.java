@@ -4,6 +4,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -13,11 +16,11 @@ import java.util.function.BooleanSupplier;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 class SupervisorTest {
     @TempDir Path dir;
-    private final Supervisor sup = new Supervisor(Duration.ofMillis(50), Duration.ofMillis(200));
+    private static final Duration FIRST_BACKOFF = Duration.ofMillis(50), MAX_BACKOFF = Duration.ofMillis(200);
+    private final Supervisor sup = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF);
 
     @AfterEach
     void stop() {
@@ -34,7 +37,7 @@ class SupervisorTest {
     void runsAndLogsAndStops() throws Exception {
         Path log = dir.resolve("svc.log");
         sup.start("svc", dir, fake("run"), log);
-        await(() -> sup.isRunning("svc"));
+        assertTrue(sup.isRunning("svc"));
         await(() -> contains(log, "started"));
         sup.stopAll();
         assertFalse(sup.isRunning("svc"));
@@ -46,11 +49,13 @@ class SupervisorTest {
         // than a pipe holds) and, once the log can be written again, lines reach it.
         Path log = Files.createDirectory(dir.resolve("bridge.log"));
         String java = ProcessHandle.current().info().command().orElse("java");
-        sup.start("chatty", dir, List.of(java, "-cp", System.getProperty("java.class.path"), FakeService.class.getName(),
-                "chatty", dir.toString()), log);
-        await(() -> Files.exists(dir.resolve("done")));
-        Files.delete(log);
-        Files.writeString(dir.resolve("go"), "");
+        try (ServerSocket test = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            sup.start("chatty", dir, List.of(java, "-cp", System.getProperty("java.class.path"), FakeService.class.getName(),
+                    "chatty", Integer.toString(test.getLocalPort())), log);
+            Socket wrote = test.accept(); // it calls once its 1 MB is out, which only a reader makes possible
+            Files.delete(log);
+            wrote.close(); // go on
+        }
         await(() -> contains(log, "after"));
         assertEquals(0, sup.restarts("chatty"), "the same process: its output was never closed under it");
     }
@@ -70,14 +75,14 @@ class SupervisorTest {
     @Test
     void orphansFromAPreviousRunAreStopped() throws Exception {
         Path run = dir.resolve("run");
-        Supervisor first = new Supervisor(Duration.ofMillis(50), Duration.ofMillis(200), run);
+        Supervisor first = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run);
         first.start("svc", dir, fake("run"), dir.resolve("svc.log"));
-        await(() -> first.isRunning("svc"));
+        assertTrue(first.isRunning("svc"));
         long orphan = Long.parseLong(Files.readString(run.resolve("svc.pid")).strip().split(" ")[0]);
         // Unichat dies without stopping its children (forced quit, crash): the next run cleans up.
-        Supervisor next = new Supervisor(Duration.ofMillis(50), Duration.ofMillis(200), run);
+        Supervisor next = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run);
         next.reapOrphans();
-        await(() -> ProcessHandle.of(orphan).map(h -> !h.isAlive()).orElse(true));
+        ProcessHandle.of(orphan).ifPresent(h -> h.onExit().join());
         assertFalse(Files.exists(run.resolve("svc.pid")));
     }
 
@@ -87,7 +92,7 @@ class SupervisorTest {
         Files.createDirectories(run);
         // A pid file pointing at this test's own JVM (not started by the supervisor): must survive.
         Files.writeString(run.resolve("svc.pid"), Long.toString(ProcessHandle.current().pid()));
-        new Supervisor(Duration.ofMillis(50), Duration.ofMillis(200), run).reapOrphans();
+        new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run).reapOrphans();
         assertTrue(ProcessHandle.current().isAlive());
         assertFalse(Files.exists(run.resolve("svc.pid")));
     }
@@ -103,9 +108,11 @@ class SupervisorTest {
     @Test
     void stoppedServicesAreNotRestarted() throws Exception {
         sup.start("svc", dir, fake("run"), dir.resolve("svc.log"));
-        await(() -> sup.isRunning("svc"));
+        assertTrue(sup.isRunning("svc"));
         sup.stop("svc");
-        Thread.sleep(400);
+        // TODO(reactive): proving that no restart comes needs time: longer than any wait before one. A Supervisor
+        // taking a ScheduledExecutorService for its restarts would let the test see that none was ever scheduled.
+        Thread.sleep(MAX_BACKOFF.toMillis() * 2);
         assertFalse(sup.isRunning("svc"));
         assertEquals(0, sup.restarts("svc"));
     }
@@ -118,12 +125,13 @@ class SupervisorTest {
         }
     }
 
+    /**
+     * Until {@code cond} holds; the tests' JUnit timeout is the only limit.
+     * TODO(reactive): what's polled here (a log's lines, the restart count) has no event to wait on; a Supervisor
+     * listener told of each line copied to a log and each restart (or a ScheduledExecutorService for restarts) would
+     * replace the polling.
+     */
     private static void await(BooleanSupplier cond) throws InterruptedException {
-        long end = System.currentTimeMillis() + 15000;
-        while (System.currentTimeMillis() < end) {
-            if (cond.getAsBoolean()) return;
-            Thread.sleep(50);
-        }
-        fail("condition not met in 15 s");
+        while (!cond.getAsBoolean()) Thread.sleep(50);
     }
 }

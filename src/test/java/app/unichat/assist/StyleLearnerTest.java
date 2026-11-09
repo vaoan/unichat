@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -69,7 +70,7 @@ class StyleLearnerTest {
     @Test
     void theFileStaysReadableWhileLearning() throws Exception {
         WritingStyle s = new WritingStyle(dir);
-        java.util.concurrent.CountDownLatch inside = new java.util.concurrent.CountDownLatch(1), release = new java.util.concurrent.CountDownLatch(1);
+        CountDownLatch inside = new CountDownLatch(1), release = new CountDownLatch(1);
         StyleLearner l = new StyleLearner(s, p -> {
             inside.countDown();
             try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
@@ -78,7 +79,7 @@ class StyleLearnerTest {
         Thread t = Thread.ofPlatform().start(() -> l.learn("!c", CHAT));
         inside.await();
         java.util.concurrent.CompletableFuture<String> read = java.util.concurrent.CompletableFuture.supplyAsync(s::text);
-        assertEquals("", read.get(2, java.util.concurrent.TimeUnit.SECONDS), "not blocked by the AI call");
+        assertEquals("", read.get(), "not blocked by the AI call");
         release.countDown();
         t.join();
     }
@@ -110,15 +111,21 @@ class StyleLearnerTest {
     @Test
     void oneAtATime() throws Exception {
         AtomicInteger now = new AtomicInteger(), most = new AtomicInteger();
+        CountDownLatch inside = new CountDownLatch(1), release = new CountDownLatch(1);
         WritingStyle s = new WritingStyle(dir);
         StyleLearner l = new StyleLearner(s, p -> {
             most.accumulateAndGet(now.incrementAndGet(), Math::max);
-            try { Thread.sleep(200); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            inside.countDown();
+            try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
             now.decrementAndGet();
             return "- x";
         });
         Thread a = Thread.ofPlatform().start(() -> l.learn("!a", CHAT));
+        inside.await();
         Thread b = Thread.ofPlatform().start(() -> l.learn("!b", CHAT));
+        // While the first is inside, the second either queues up at the lock or, wrongly, gets in too.
+        while (b.getState() != Thread.State.BLOCKED && most.get() < 2 && b.isAlive()) Thread.onSpinWait();
+        release.countDown();
         a.join();
         b.join();
         assertEquals(1, most.get());

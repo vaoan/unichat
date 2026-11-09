@@ -8,6 +8,7 @@ import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -27,9 +28,10 @@ class GifFilesTest {
 
     @Test
     void aHangingDownloadGivesUp() throws Exception {
+        CountDownLatch hang = new CountDownLatch(1); // the server answers only once the test is over
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", ex -> {
-            try { Thread.sleep(5000); } catch (InterruptedException ignored) { }
+            try { hang.await(); } catch (InterruptedException ignored) { }
             ex.sendResponseHeaders(200, -1);
             ex.close();
         });
@@ -39,8 +41,9 @@ class GifFilesTest {
             long t0 = System.currentTimeMillis();
             assertThrows(Exception.class, () -> GifFiles.download("http://127.0.0.1:" + server.getAddress().getPort() + "/g", ".gif",
                     Duration.ofMillis(500)));
-            assertTrue(System.currentTimeMillis() - t0 < 3000);
+            assertTrue(System.currentTimeMillis() - t0 < GifFiles.TIMEOUT.toMillis(), "the limit asked for, not the default");
         } finally {
+            hang.countDown();
             server.stop(0);
         }
     }
@@ -56,7 +59,7 @@ class GifFilesTest {
         });
         server.start();
         try {
-            Path f = GifFiles.download("http://127.0.0.1:" + server.getAddress().getPort() + "/g", ".gif", Duration.ofSeconds(5));
+            Path f = GifFiles.download("http://127.0.0.1:" + server.getAddress().getPort() + "/g", ".gif", GifFiles.TIMEOUT);
             assertTrue(Files.exists(f));
             assertEquals("gif-cache", f.getParent().getFileName().toString());
             assertFalse(f.getFileName().toString().contains("/"));

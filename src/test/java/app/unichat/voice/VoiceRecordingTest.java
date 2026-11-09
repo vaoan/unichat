@@ -5,12 +5,13 @@ import app.unichat.stt.OggOpus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -27,6 +28,8 @@ class VoiceRecordingTest {
         private final long total;
         private long at;
         private volatile boolean closed;
+        /** Counted down by the first read: the recording is under way. */
+        final CountDownLatch reading = new CountDownLatch(1);
 
         Tone(int rate, double hz, double seconds) {
             this.rate = rate;
@@ -38,6 +41,7 @@ class VoiceRecordingTest {
 
         @Override
         public int read(short[] into) {
+            reading.countDown();
             if (closed || at >= total) return -1;
             int n = (int) Math.min(into.length, total - at);
             for (int i = 0; i < n; i++, at++) into[i] = (short) (hz == 0 ? 0 : 12_000 * Math.sin(2 * Math.PI * hz * at / rate));
@@ -50,8 +54,19 @@ class VoiceRecordingTest {
     private VoiceNote record(PcmSource source) throws Exception {
         VoiceRecorder r = new VoiceRecorder(source, dir.resolve("nota.ogg"));
         r.start();
-        for (int i = 0; i < 200 && !r.ended(); i++) Thread.sleep(25);
+        awaitEnd(r);
         return r.stop();
+    }
+
+    /**
+     * Until the recording stops by itself (its source ran out, or the limit): joins its thread, which is what
+     * {@link VoiceRecorder#ended} looks at.
+     */
+    private static void awaitEnd(VoiceRecorder r) throws Exception {
+        // VoiceRecorder offers no way to wait for its end; a future it completed on ending would spare this reflection.
+        Field thread = VoiceRecorder.class.getDeclaredField("thread");
+        thread.setAccessible(true);
+        ((Thread) thread.get(r)).join();
     }
 
     private static double rms(Path wav) throws Exception {
@@ -97,8 +112,7 @@ class VoiceRecordingTest {
         VoiceNote note = record(new Tone(48_000, 440, 1));
         Process p = new ProcessBuilder(ffmpeg.toString(), "-v", "error", "-i", note.file().toString(), "-f", "null", "-").redirectErrorStream(true).start();
         String complaints = new String(p.getInputStream().readAllBytes());
-        assertTrue(p.waitFor(30, TimeUnit.SECONDS));
-        assertEquals(0, p.exitValue(), complaints);
+        assertEquals(0, p.waitFor(), complaints);
         assertEquals("", complaints.strip());
     }
 
@@ -115,12 +129,12 @@ class VoiceRecordingTest {
     void pureSilenceIsNoticed() throws Exception {
         VoiceRecorder silent = new VoiceRecorder(new Tone(48_000, 0, 1), dir.resolve("s.ogg"));
         silent.start();
-        for (int i = 0; i < 200 && !silent.ended(); i++) Thread.sleep(25);
+        awaitEnd(silent);
         assertFalse(silent.anySound());
         silent.stop();
         VoiceRecorder heard = new VoiceRecorder(new Tone(48_000, 440, 1), dir.resolve("h.ogg"));
         heard.start();
-        for (int i = 0; i < 200 && !heard.ended(); i++) Thread.sleep(25);
+        awaitEnd(heard);
         assertTrue(heard.anySound());
         heard.stop();
     }
@@ -128,9 +142,10 @@ class VoiceRecordingTest {
     @Test
     void cancellingLeavesNoFile() throws Exception {
         Path f = dir.resolve("c.ogg");
-        VoiceRecorder r = new VoiceRecorder(new Tone(48_000, 440, 60), f);
+        Tone tone = new Tone(48_000, 440, 60);
+        VoiceRecorder r = new VoiceRecorder(tone, f);
         r.start();
-        Thread.sleep(50);
+        tone.reading.await();
         r.cancel();
         assertFalse(Files.exists(f));
     }
@@ -139,7 +154,7 @@ class VoiceRecordingTest {
     void itStopsByItselfAtTheLimit() throws Exception {
         VoiceRecorder r = new VoiceRecorder(new Tone(48_000, 440, 60), dir.resolve("l.ogg"), 1000);
         r.start();
-        for (int i = 0; i < 400 && !r.ended(); i++) Thread.sleep(25);
+        awaitEnd(r);
         assertTrue(r.ended());
         assertEquals(1000, r.stop().durationMs(), 40);
     }
