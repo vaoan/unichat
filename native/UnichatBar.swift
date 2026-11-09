@@ -2,7 +2,7 @@
 // 12pt margin on each side), with a template icon like Apple's own: one black shape that macOS paints for the
 // menu bar's light or dark look and for the highlight while the menu is open. Unichat starts it and drives it through stdin, one tab-separated command per line:
 //   tip <text>            tooltip
-//   count <text>          beside the icon, the unread count; empty shows the icon alone
+//   count <text>          beside the icon, the unread count, and a red dot on the icon; empty shows the icon alone
 //   menu <n>              followed by n lines, each "item <tag> <enabled 0|1> <checked -1|0|1> <label>" or "sep"
 //   open                  opens the menu as a right click would, or closes it if it is open (for tests)
 //   press                 acts as a left click (for tests)
@@ -144,6 +144,32 @@ final class Bar: NSObject, NSMenuDelegate {
         item.button?.target = self
         item.button?.action = #selector(clicked)
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        if let button = item.button {
+            unreadDot.wantsLayer = true
+            unreadDot.layer?.backgroundColor = NSColor.systemRed.cgColor
+            unreadDot.layer?.cornerRadius = Bar.dot / 2
+            unreadDot.isHidden = true
+            unreadDot.setAccessibilityElement(false) // the count and the tooltip say it
+            button.addSubview(unreadDot)
+            button.postsFrameChangedNotifications = true
+            NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: button, queue: .main) { [weak self] _ in
+                self?.placeDot()
+            }
+        }
+    }
+
+    /**
+     * A red dot on the icon's top-right corner while there are unread chats. A view of its own: the icon is a template
+     * (macOS paints it for the bar), and a template can't keep a colour.
+     */
+    static let dot: CGFloat = 7
+    private let unreadDot = NSView(frame: NSRect(x: 0, y: 0, width: Bar.dot, height: Bar.dot))
+
+    private func placeDot() {
+        guard let button = item.button, let cell = button.cell as? NSButtonCell else { return }
+        let icon = cell.imageRect(forBounds: button.bounds)
+        // The button is flipped: y grows downwards, so the icon's top is its minY.
+        unreadDot.frame = NSRect(x: icon.maxX - Bar.dot + 1, y: icon.minY - 1, width: Bar.dot, height: Bar.dot)
     }
 
     /**
@@ -200,6 +226,8 @@ final class Bar: NSObject, NSMenuDelegate {
             item.button?.title = text
             item.button?.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize + 1, weight: .semibold)
             item.button?.imagePosition = text.isEmpty ? .imageOnly : .imageLeading
+            unreadDot.isHidden = text.isEmpty
+            placeDot()
         case "tip":
             item.button?.toolTip = parts.count > 1 ? parts[1] : nil
         case "menu":
