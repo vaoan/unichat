@@ -184,17 +184,16 @@ class GroupsUiTest {
     @Test
     void aJoinThatArrivesTooLateDoesNotOpenByItself() throws Exception {
         Scene scene = open(Network.DISCORD);
-        // TODO(reactive): the scenario is "the wait (300 ms) ends before the room arrives (900 ms)", so it still rests on
-        // two timers of the app. A MockChatService gate that holds a joined room until the test lets it arrive would
-        // remove both: then Spaces.joinWaitMs could be 0 and the test would release the room after the toast.
-        Spaces.joinWaitMs = 300;
+        // The order the test sets, not two timers: the app stops waiting first, then the room arrives.
+        Spaces.joinWaitMs = 0;
         try {
-            svc.simulateSlowBridge(900); // the joined room arrives after the wait is over
+            Runnable letTheRoomIn = svc.holdBridge();
             fx(() -> { view.openChatId("!familia:demo"); return null; });
             enter(scene, fx(() -> chatList(scene)), "!servidor:demo");
             CompletableFuture<Void> arrived = arrival(svc, MockChatService.UNJOINED_CHANNEL_ID);
             enter(scene, fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
             FxWait.until("the toast that it will show up later", () -> toastText(scene).contains("aparecerá"));
+            letTheRoomIn.run();
             arrived.get(); // the room came in after all, and every listener heard of it
             FxWait.settled(); // and what they asked the window to do has run
             assertEquals("!familia:demo", fx(() -> thread(scene).chat().id()), "no surprise jump minutes later");

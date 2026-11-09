@@ -90,10 +90,8 @@ class WakeSyncTest {
                 changes.changed();
             }
         });
+        svc.pauseRetriesWith(millis -> { }); // the order of states is the point, not the waits between tries
         svc.start();
-        // The first refusals and their retries.
-        // TODO(reactive): the second refusal comes after MatrixChatService.backoff's 1 s wait; an injectable
-        // backoff base (a Duration, or a ScheduledExecutorService for the waits) would make it immediate.
         changes.until(() -> afterRefusals.size() >= 2);
         assertEquals(List.of(ConnectionState.CONNECTING, ConnectionState.CONNECTING), afterRefusals.subList(0, 2));
     }

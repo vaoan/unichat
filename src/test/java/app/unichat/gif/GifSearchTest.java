@@ -114,11 +114,10 @@ class GifSearchTest {
 
     @Test
     void aFailingOrSlowProviderDoesNotHideTheOthers() {
+        // The slow one never answers while the test runs; the search gives up once the broken and the fast one are in,
+        // as it would after its 5 s, and must still return the fast one's results.
         GifSearch s = new GifSearch(List.of(new GiphyProvider("K", base("broken")), new GiphyProvider("K", base("slow")),
-                new KlipyProvider("KEY2", base("klipy"))));
-        // The slow one never answers while the test runs, so getting here at all means it was cut off.
-        // TODO(reactive): that takes GifSearch's fixed 5 s TIMEOUT_MS; a constructor taking the Duration would let
-        // this test use a few milliseconds.
+                new KlipyProvider("KEY2", base("klipy"))), searches -> java.util.concurrent.CompletableFuture.allOf(searches.get(0), searches.get(2)));
         List<Gif> g = s.search("hola", 10);
         assertEquals(1, g.size(), "Klipy's result still comes back");
     }

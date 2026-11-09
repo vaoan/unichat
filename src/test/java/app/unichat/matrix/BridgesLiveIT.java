@@ -27,7 +27,7 @@ class BridgesLiveIT {
     void everyBridgeAnswersLogin() throws Exception {
         MatrixChatService svc = MatrixLogin.login(System.getenv("UNICHAT_IT_BRIDGES"),
                 System.getenv("UNICHAT_IT_USER"), System.getenv("UNICHAT_IT_PASSWORD")).join();
-        ServiceChanges changes = ServiceChanges.of(svc);
+        app.unichat.service.Changes changes = app.unichat.service.Changes.of(svc);
         svc.start();
         try {
             // Connecting before the first sync would not find existing bot DMs and create duplicates.
@@ -72,7 +72,7 @@ class BridgesLiveIT {
      * The bot's reply to our command: its messages after the command, as soon as there's one (the first says whether the
      * login flow exists, which is what's checked; a QR image may follow it).
      */
-    private static String awaitBotReply(MatrixChatService svc, ServiceChanges changes, String roomId, String command)
+    private static String awaitBotReply(MatrixChatService svc, app.unichat.service.Changes changes, String roomId, String command)
             throws InterruptedException {
         String[] reply = new String[1];
         changes.until("the bot's reply to " + command, () -> (reply[0] = replyAfter(svc.messages(roomId), command)) != null);

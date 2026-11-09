@@ -214,7 +214,6 @@
       <id>headless-ui</id>
       <properties>
         <argLine>-Dunichat.uiTests=true -Dunichat.headless=true -Dglass.platform=Monocle -Dmonocle.platform=Headless -Dprism.order=sw -Dprism.text=t2k -Djava.awt.headless=true</argLine>
-        <surefire.rerunFailingTestsCount>1</surefire.rerunFailingTestsCount>
       </properties>
       <dependencies>
         <dependency>

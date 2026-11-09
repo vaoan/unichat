@@ -94,6 +94,20 @@ public final class Supervisor {
         }
     }
 
+    /** What happens to the processes, as it happens: lets tests wait for an event instead of polling. */
+    interface Listener {
+        /** A line of {@code name}'s output reached its log. */
+        default void logged(String name) {}
+        /** {@code name}'s process ended; {@code restarting} says whether a restart was scheduled for it. */
+        default void exited(String name, boolean restarting) {}
+        /** {@code name} was started again after an exit. */
+        default void restarted(String name) {}
+    }
+
+    private volatile Listener listener = new Listener() { };
+
+    void listen(Listener l) { listener = l; }
+
     private final class Service {
         final String name;
         final Path workDir;
@@ -119,7 +133,7 @@ public final class Supervisor {
             launchedAt = System.currentTimeMillis();
             Process p = process;
             notePid(name, p);
-            Thread pump = new Thread(() -> pump(p, log), "log-" + name);
+            Thread pump = new Thread(() -> pump(p, log, () -> listener.logged(name)), "log-" + name);
             pump.setDaemon(true);
             pump.start();
             p.onExit().thenRun(() -> onExit(this, p));
@@ -136,6 +150,11 @@ public final class Supervisor {
      * next one tries again.
      */
     static void pump(Process p, Path log) {
+        pump(p, log, () -> { });
+    }
+
+    /** {@link #pump(Process, Path)}, running {@code afterLine} after each line written. */
+    static void pump(Process p, Path log, Runnable afterLine) {
         InputStream raw = p.getInputStream();
         BufferedReader in = new BufferedReader(new InputStreamReader(raw, StandardCharsets.UTF_8));
         OutputStream out = null;
@@ -153,6 +172,7 @@ public final class Supervisor {
                         Files.move(log, log.resolveSibling(log.getFileName() + ".1"), StandardCopyOption.REPLACE_EXISTING);
                     }
                     reported = false;
+                    afterLine.run();
                 } catch (Throwable t) {
                     out = closeQuietly(out);
                     if (!reported) System.err.println("Log copy failing (" + log.getFileName() + "): " + t);
@@ -199,10 +219,14 @@ public final class Supervisor {
     }
 
     private void onExit(Service s, Process p) {
-        if (!s.wanted || s.process != p || services.get(s.name) != s) return;
+        if (!s.wanted || s.process != p || services.get(s.name) != s) {
+            listener.exited(s.name, false);
+            return;
+        }
         // A process that ran fine for a while starts over with short waits (days-old crashes don't count).
         if (System.currentTimeMillis() - s.launchedAt > STABLE_MS) s.streak = 0;
         scheduleRestart(s);
+        listener.exited(s.name, true);
     }
 
     private void scheduleRestart(Service s) {
@@ -214,6 +238,7 @@ public final class Supervisor {
                 s.restarts++;
                 s.streak++;
                 s.launch();
+                listener.restarted(s.name);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (IOException e) {

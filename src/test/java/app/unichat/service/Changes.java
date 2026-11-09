@@ -21,6 +21,22 @@ public final class Changes {
         }
     }
 
+    /** One that hears every event of {@code svc}. */
+    public static Changes of(ChatSession svc) {
+        Changes c = new Changes();
+        svc.addListener(c.listener());
+        return c;
+    }
+
+    /** {@link #until(BooleanSupplier)}, saying what never happened when the JUnit timeout stops it. */
+    public void until(String what, BooleanSupplier done) throws InterruptedException {
+        try {
+            until(done);
+        } catch (InterruptedException timedOut) {
+            throw new AssertionError("never happened: " + what, timedOut);
+        }
+    }
+
     /** Blocks until {@code done} holds; the tests' JUnit timeout is the only limit. */
     public void until(BooleanSupplier done) throws InterruptedException {
         while (true) {

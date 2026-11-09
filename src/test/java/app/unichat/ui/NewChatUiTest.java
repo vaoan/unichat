@@ -113,11 +113,12 @@ class NewChatUiTest {
     @Test
     void typingBeforeASlowBridgeAnswersStillSearches() throws Exception {
         MockChatService svc = new MockChatService();
-        svc.simulateSlowBridge(1200); // the scenario: the bridge says what it can do only after the person typed
+        Runnable bridgeAnswers = svc.holdBridge(); // the scenario: the bridge says what it can do only after the person typed
         Scene scene = start(svc);
         shortcutN(scene);
         chooseNetwork(scene, "WhatsApp");
         type(scene, "Carlos");
+        bridgeAnswers.run();
         FxWait.until("the search for Carlos, once the bridge answered", () -> names(scene).equals(List.of("Carlos Peña")));
         assertEquals(List.of("Carlos Peña"), names(scene), "not stuck on 'no disponible'");
         svc.stop();
@@ -126,7 +127,6 @@ class NewChatUiTest {
     @Test
     void aClosedPaneDoesNotJumpToTheChatLater() throws Exception {
         MockChatService svc = new MockChatService();
-        svc.simulateSlowBridge(800); // the scenario: the new chat arrives after the pane was closed
         Scene scene = start(svc);
         fx(() -> { scene.getRoot().lookupAll("*").stream().filter(n -> n instanceof MainView).map(n -> (MainView) n)
                 .findFirst().orElseThrow().openChatId("!familia:demo"); return null; });
@@ -134,6 +134,7 @@ class NewChatUiTest {
         chooseNetwork(scene, "WhatsApp");
         type(scene, "Pedro");
         FxWait.until("the search for Pedro", () -> names(scene).equals(List.of("Pedro")));
+        Runnable chatArrives = svc.holdBridge(); // the scenario: the new chat arrives after the pane was closed
         enter(scene); // the bridge creates the chat: it arrives later
         CompletableFuture<Void> arrived = arrival(svc, "!dm-c-pedro:demo");
         fx(() -> {
@@ -145,6 +146,7 @@ class NewChatUiTest {
             Event.fireEvent(scene.getRoot(), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.K, false, !mac, false, mac));
             return null;
         });
+        chatArrives.run(); // the pane is closed and the command bar open: now the chat comes in
         arrived.get(); // every listener has heard of Pedro's new chat
         FxWait.settled(); // and what they asked the window to do has run
         assertTrue(fx(() -> scene.getRoot().lookup(".command-bar") != null && scene.getRoot().lookup(".command-bar").getScene() != null),

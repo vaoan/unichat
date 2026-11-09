@@ -50,7 +50,7 @@ class MatrixLiveIT {
         alice.addListener(new ChatService.Listener() {
             @Override public void incomingMessage(Chat chat, Message m) { notified.add(m); }
         });
-        changes = ServiceChanges.of(alice);
+        changes = app.unichat.service.Changes.of(alice);
         alice.start();
         try {
             await("online", () -> alice.connectionState() == ConnectionState.ONLINE);
@@ -138,7 +138,7 @@ class MatrixLiveIT {
     }
 
     /** alice's changes: each wait reacts to them. */
-    private static ServiceChanges changes;
+    private static app.unichat.service.Changes changes;
 
     private static void await(String what, BooleanSupplier cond) throws InterruptedException {
         changes.until(what, cond);

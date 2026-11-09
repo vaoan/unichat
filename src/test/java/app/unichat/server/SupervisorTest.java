@@ -19,8 +19,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SupervisorTest {
     @TempDir Path dir;
-    private static final Duration FIRST_BACKOFF = Duration.ofMillis(50), MAX_BACKOFF = Duration.ofMillis(200);
+    /** No wait before a restart: the tests follow the Supervisor's events, not its timing. */
+    private static final Duration FIRST_BACKOFF = Duration.ZERO, MAX_BACKOFF = Duration.ZERO;
     private final Supervisor sup = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF);
+    private final app.unichat.service.Changes changes = new app.unichat.service.Changes();
+    /** Each exit the Supervisor handled: "name:true" when it scheduled a restart. */
+    private final List<String> exits = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    {
+        sup.listen(new Supervisor.Listener() {
+            @Override public void logged(String name) { changes.changed(); }
+            @Override public void exited(String name, boolean restarting) {
+                exits.add(name + ":" + restarting);
+                changes.changed();
+            }
+            @Override public void restarted(String name) { changes.changed(); }
+        });
+    }
 
     @AfterEach
     void stop() {
@@ -110,9 +125,9 @@ class SupervisorTest {
         sup.start("svc", dir, fake("run"), dir.resolve("svc.log"));
         assertTrue(sup.isRunning("svc"));
         sup.stop("svc");
-        // TODO(reactive): proving that no restart comes needs time: longer than any wait before one. A Supervisor
-        // taking a ScheduledExecutorService for its restarts would let the test see that none was ever scheduled.
-        Thread.sleep(MAX_BACKOFF.toMillis() * 2);
+        // The Supervisor handled the exit: with no restart scheduled, none can come.
+        changes.until("the stopped process's exit handled", () -> exits.contains("svc:false") || exits.contains("svc:true"));
+        assertEquals(List.of("svc:false"), exits, "no restart scheduled");
         assertFalse(sup.isRunning("svc"));
         assertEquals(0, sup.restarts("svc"));
     }
@@ -125,13 +140,8 @@ class SupervisorTest {
         }
     }
 
-    /**
-     * Until {@code cond} holds; the tests' JUnit timeout is the only limit.
-     * TODO(reactive): what's polled here (a log's lines, the restart count) has no event to wait on; a Supervisor
-     * listener told of each line copied to a log and each restart (or a ScheduledExecutorService for restarts) would
-     * replace the polling.
-     */
-    private static void await(BooleanSupplier cond) throws InterruptedException {
-        while (!cond.getAsBoolean()) Thread.sleep(50);
+    /** Until {@code cond} holds, checked again at each event of the Supervisor (a log line, an exit, a restart). */
+    private void await(BooleanSupplier cond) throws InterruptedException {
+        changes.until(cond);
     }
 }

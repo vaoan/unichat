@@ -134,9 +134,8 @@ public final class MockChatService implements ChatService, FolderForwarding {
                 fireChats();
             }
         };
-        // Like a real server: the join answers at once, the room reaches sync a bit later on a slow bridge.
-        if (bridgeDelayMs <= 0) arrive.run();
-        else CompletableFuture.delayedExecutor(bridgeDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS).execute(arrive);
+        // Like a real server: the join answers at once, the room reaches sync later on a slow bridge.
+        viaBridge(arrive);
         return CompletableFuture.completedFuture(null);
     }
 
@@ -219,16 +218,30 @@ public final class MockChatService implements ChatService, FolderForwarding {
                 new Contact("c-pedro", "Pedro", List.of("tel:+573001110006"), null, null));
     }
 
-    private volatile long bridgeDelayMs;
+    /** Open unless a test holds the bridge ({@link #holdBridge}): what the bridge does then waits for it. */
+    private volatile CompletableFuture<Void> bridgeGate = CompletableFuture.completedFuture(null);
 
     /** Demo/tests: the contacts API answers after {@code ms} and new DMs arrive that much later, like a real bridge. */
-    public void simulateSlowBridge(long ms) {
-        bridgeDelayMs = ms;
+    /**
+     * A slow bridge, for tests: its answers, the rooms it joins and the chats it creates wait until the returned
+     * Runnable lets them through, so a test decides what happens first instead of racing two times.
+     */
+    public Runnable holdBridge() {
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        bridgeGate = gate;
+        return () -> gate.complete(null);
+    }
+
+    private void viaBridge(Runnable r) {
+        CompletableFuture<Void> gate = bridgeGate;
+        if (gate.isDone()) r.run();
+        else gate.thenRunAsync(r);
     }
 
     private <T> CompletableFuture<T> later(java.util.function.Supplier<T> s) {
-        if (bridgeDelayMs <= 0) return CompletableFuture.completedFuture(s.get());
-        return CompletableFuture.supplyAsync(s, CompletableFuture.delayedExecutor(bridgeDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS));
+        CompletableFuture<Void> gate = bridgeGate;
+        if (gate.isDone()) return CompletableFuture.completedFuture(s.get());
+        return gate.thenApplyAsync(x -> s.get());
     }
 
     @Override
@@ -271,8 +284,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
                 fireChats();
             }
         };
-        if (bridgeDelayMs <= 0) create.run();
-        else CompletableFuture.delayedExecutor(bridgeDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS).execute(create);
+        viaBridge(create);
         return CompletableFuture.completedFuture("!" + key + ":demo");
     }
 

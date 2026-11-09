@@ -335,6 +335,13 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     /** Retries (1 + 2 + 4 + 8 + 16 s) shown as "Connecting…" after starting or waking, before "No connection". */
     static final int STILL_CONNECTING = 5;
 
+    /** How a retry waits its turn: {@link Thread#sleep} (interrupted by waking); tests that only care about the order skip it. */
+    interface Pause { void pause(long millis) throws InterruptedException; }
+
+    private volatile Pause pause = Thread::sleep;
+
+    void pauseRetriesWith(Pause p) { pause = p; }
+
     private int backoff(int failures, Exception e) {
         if (!core.running) return failures;
         System.err.println("Matrix sync failed (" + failures + "): " + e);
@@ -342,7 +349,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         setState(reconnecting && failures <= STILL_CONNECTING ? ConnectionState.CONNECTING : ConnectionState.OFFLINE);
         long seconds = Math.min(30, 1L << Math.min(failures - 1, 5));
         try {
-            Thread.sleep(seconds * 1000);
+            pause.pause(seconds * 1000);
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
         }

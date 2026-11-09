@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * Searches every active provider at once and interleaves their results (one of each in turn). A provider that fails
@@ -12,9 +13,18 @@ import java.util.concurrent.TimeUnit;
 public final class GifSearch {
     private static final long TIMEOUT_MS = 5000;
     private final List<GifProvider> providers;
+    /** Given every provider's search, when to stop waiting for the ones still going. */
+    private final Function<List<CompletableFuture<List<Gif>>>, CompletableFuture<?>> giveUp;
 
     public GifSearch(List<GifProvider> providers) {
+        this(providers, searches -> CompletableFuture.runAsync(() -> { },
+                CompletableFuture.delayedExecutor(TIMEOUT_MS, TimeUnit.MILLISECONDS)));
+    }
+
+    /** Tests give up when the answers they expect are in, instead of after a time. */
+    GifSearch(List<GifProvider> providers, Function<List<CompletableFuture<List<Gif>>>, CompletableFuture<?>> giveUp) {
         this.providers = List.copyOf(providers);
+        this.giveUp = giveUp;
     }
 
     public boolean isEmpty() {
@@ -43,9 +53,10 @@ public final class GifSearch {
                 } catch (Exception e) {
                     return List.<Gif>of();
                 }
-            }).completeOnTimeout(List.of(), TIMEOUT_MS, TimeUnit.MILLISECONDS));
+            }));
         }
-        List<List<Gif>> lists = futures.stream().map(CompletableFuture::join).toList();
+        CompletableFuture.anyOf(CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)), giveUp.apply(futures)).join();
+        List<List<Gif>> lists = futures.stream().map(f -> f.getNow(List.of())).toList(); // still going: left out
         List<Gif> out = new ArrayList<>();
         for (int i = 0; out.size() < limit; i++) {
             boolean any = false;
