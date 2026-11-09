@@ -41,6 +41,7 @@ final class AiReplyPage {
         instructions.textProperty().addListener((o, a, t) -> AiSettings.setInstructions(t));
         Label instructionsHelp = new Label(I18n.t("settings.ai.instructionsHelp"));
         instructionsHelp.getStyleClass().add("settings-help");
+        instructionsHelp.setWrapText(true); // at 160 % it was cut short
 
         return SettingsForm.page(I18n.t("settings.nav.ai"), intro, privacy,
                 SettingsForm.group(I18n.t("settings.ai.groupGeneral"),
@@ -51,8 +52,29 @@ final class AiReplyPage {
                         SettingsForm.row(I18n.t("settings.ai.programRow"), I18n.t("settings.ai.programHelp"), new VBox(4, engines, found)),
                         SettingsForm.row(I18n.t("settings.ai.folder"), I18n.t("settings.ai.folderHelp"), folderControl()),
                         SettingsForm.row(I18n.t("settings.ai.voiceNotes"), I18n.t("settings.ai.voiceNotesHelp"),
-                                SettingsForm.toggle(AiSettings.hearVoiceNotes(), AiSettings::setHearVoiceNotes))),
-                new VBox(6, new Label(I18n.t("settings.ai.instructions")), instructions, instructionsHelp));
+                                SettingsForm.toggle(AiSettings.hearVoiceNotes(), AiSettings::setHearVoiceNotes)),
+                        SettingsForm.row(I18n.t("settings.ai.learnStyle"), I18n.t("settings.ai.learnStyleHelp"),
+                                SettingsForm.toggle(AiSettings.learnStyle(), AiSettings::setLearnStyle))),
+                new VBox(6, new Label(I18n.t("settings.ai.instructions")), instructions, instructionsHelp),
+                learnedBox());
+    }
+
+    /** What was learned of how the person writes (writing-style.md): to read, fix by hand, or forget. */
+    private static Node learnedBox() {
+        app.unichat.assist.WritingStyle style = app.unichat.assist.WritingStyle.get();
+        TextArea learned = new TextArea(style.text());
+        learned.setWrapText(true);
+        learned.setPrefRowCount(6);
+        learned.setAccessibleText(I18n.t("settings.ai.learnedAccessible"));
+        learned.textProperty().addListener((o, a, t) -> style.save(t));
+        Button forget = new Button(I18n.t("settings.ai.forget"));
+        forget.getStyleClass().add("secondary-button");
+        forget.setOnAction(e -> {
+            style.forget();
+            learned.clear();
+        });
+        Label help = Labels.help(I18n.t("settings.ai.learnedHelp"));
+        return new VBox(6, new Label(I18n.t("settings.ai.learned")), learned, help, forget);
     }
 
     private static Node folderControl() {

@@ -84,6 +84,15 @@ final class SnapshotRun {
             var params = new javafx.scene.SnapshotParameters();
             params.setTransform(javafx.scene.transform.Transform.scale(k, k));
             var shot = settings != null ? settings.getScene() : scene;
+            // -Dunichat.settingsScroll=1: the settings page scrolled to its end (its window has a fixed size).
+            String scroll = System.getProperty("unichat.settingsScroll");
+            if (settings != null && scroll != null) {
+                for (var n : shot.getRoot().lookupAll(".scroll-pane")) {
+                    if (n instanceof javafx.scene.control.ScrollPane sp) sp.setVvalue(Double.parseDouble(scroll));
+                }
+                shot.getRoot().applyCss();
+                shot.getRoot().layout();
+            }
             var img = shot.getRoot().snapshot(params, null);
             javax.imageio.ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", new File(out));
         } catch (Exception ex) {
