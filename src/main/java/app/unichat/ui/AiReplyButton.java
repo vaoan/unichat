@@ -150,7 +150,10 @@ final class AiReplyButton {
                 idle();
                 showWorking(false);
                 if (error != null) onError.accept(error);
-                else if (draft != null) onDraft.accept(r.chatId(), draft);
+                else if (draft != null) {
+                    onDraft.accept(r.chatId(), draft);
+                    app.unichat.assist.ReadySound.play(); // the person may be in another window meanwhile
+                }
                 onDone.accept(r.chatId());
             });
         });

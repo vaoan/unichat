@@ -126,6 +126,8 @@
             <unichat.dataDir>${project.build.directory}/test-data</unichat.dataDir>
             <!-- Tests read the Spanish texts, whatever the machine's language. -->
             <unichat.language>es</unichat.language>
+            <!-- No sounds through the speakers. -->
+            <unichat.silent>true</unichat.silent>
           </systemPropertyVariables>
         </configuration>
       </plugin>

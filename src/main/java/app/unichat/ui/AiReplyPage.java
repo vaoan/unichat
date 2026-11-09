@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.assist.AiEngine;
 import app.unichat.assist.AiSettings;
+import app.unichat.assist.ReadySound;
 import app.unichat.support.I18n;
 import java.io.File;
 import java.nio.file.Path;
@@ -9,6 +10,7 @@ import java.util.List;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Slider;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -55,8 +57,31 @@ final class AiReplyPage {
                                 SettingsForm.toggle(AiSettings.hearVoiceNotes(), AiSettings::setHearVoiceNotes)),
                         SettingsForm.row(I18n.t("settings.ai.learnStyle"), I18n.t("settings.ai.learnStyleHelp"),
                                 SettingsForm.toggle(AiSettings.learnStyle(), AiSettings::setLearnStyle))),
+                readySound(),
                 new VBox(6, new Label(I18n.t("settings.ai.instructions")), instructions, instructionsHelp),
                 learnedBox());
+    }
+
+    /** The sound when a draft or a fix is ready: which one, how loud, and a way to hear it. */
+    private static Node readySound() {
+        Slider volume = new Slider(0, 100, AiSettings.readyVolume());
+        volume.setPrefWidth(200);
+        volume.setAccessibleText(I18n.t("settings.ai.readyVolume"));
+        volume.valueProperty().addListener((o, a, v) -> AiSettings.setReadyVolume(v.intValue()));
+        volume.valueChangingProperty().addListener((o, a, changing) -> { if (!changing) ReadySound.play(); });
+        Node tones = SettingsForm.chips(I18n.t("settings.ai.readySound"), List.of(ReadySound.Tone.values()),
+                t -> I18n.t("settings.ai.tone." + t.name()), AiSettings.readyTone(), t -> {
+                    AiSettings.setReadyTone(t);
+                    ReadySound.play();
+                });
+        Button tryIt = new Button(I18n.t("settings.ai.tryIt"));
+        HBox volumeRow = new HBox(8, volume, tryIt);
+        volumeRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        tryIt.getStyleClass().add("secondary-button");
+        tryIt.setOnAction(e -> ReadySound.play());
+        return SettingsForm.group(I18n.t("settings.ai.groupSound"),
+                SettingsForm.row(I18n.t("settings.ai.readySound"), I18n.t("settings.ai.readySoundHelp"), tones),
+                SettingsForm.row(I18n.t("settings.ai.readyVolume"), null, volumeRow));
     }
 
     /** What was learned of how the person writes (writing-style.md): to read, fix by hand, or forget. */

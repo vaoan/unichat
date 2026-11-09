@@ -43,6 +43,16 @@ public final class AiSettings {
 
     public static void setLearnStyle(boolean on) { Settings.get().setBool("ai.learnStyle", on); }
 
+    /** The sound when a draft or a fix is ready. */
+    public static ReadySound.Tone readyTone() { return Settings.get().getEnum("ai.readySound", ReadySound.Tone.CHIME); }
+
+    public static void setReadyTone(ReadySound.Tone t) { Settings.get().set("ai.readySound", t.name()); }
+
+    /** 0–100. */
+    public static int readyVolume() { return Math.min(100, Settings.get().getInt("ai.readyVolume", 60, 0)); }
+
+    public static void setReadyVolume(int v) { Settings.get().set("ai.readyVolume", Integer.toString(Math.max(0, Math.min(100, v)))); }
+
     /** The folder it may read, or null. */
     public static Path folder() {
         String f = Settings.get().getString("ai.folder", "");

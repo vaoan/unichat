@@ -327,6 +327,30 @@ class AiReplyUiTest {
     }
 
     @Test
+    void aSoundSaysTheDraftOrTheFixIsReadyButNotAFailure() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger played = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.function.Consumer<short[]> real = app.unichat.assist.ReadySound.player;
+        app.unichat.assist.ReadySound.player = s -> played.incrementAndGet();
+        try {
+            writer(p -> "Claro, voy");
+            press();
+            await(() -> text().equals("Claro, voy"));
+            write("ola");
+            pressFix(p -> "Hola");
+            await(() -> text().equals("Hola"));
+            long end = System.currentTimeMillis() + 2_000;
+            while (played.get() < 2 && System.currentTimeMillis() < end) Thread.sleep(20);
+            assertEquals(2, played.get(), "one for the draft, one for the fix");
+            pressFix(p -> { throw new ReplyWriter.Failure("no anda"); });
+            await(() -> errors.contains("no anda"));
+            Thread.sleep(200);
+            assertEquals(2, played.get(), "a failure plays nothing");
+        } finally {
+            app.unichat.assist.ReadySound.player = real;
+        }
+    }
+
+    @Test
     void itsHiddenUnlessTurnedOn() throws Exception {
         assertTrue(fx(() -> button().isVisible()));
         fx(() -> { AiReplyButton.SHOWN.set(false); return null; });
