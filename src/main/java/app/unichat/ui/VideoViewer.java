@@ -74,6 +74,9 @@ final class VideoViewer {
         spin.setMaxSize(40, 40);
         screen.getChildren().add(spin);
         VBox.setVgrow(screen, Priority.ALWAYS);
+        // The video's size follows the screen's, so the screen must not take its size from the video: a phone video
+        // taller than the window held it at the video's height and pushed the controls out of the window.
+        screen.setMinSize(0, 0);
         BorderPane root = new BorderPane(screen);
         root.getStyleClass().add("media-viewer");
         stage.initOwner(owner);

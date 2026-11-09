@@ -81,6 +81,30 @@ class MediaViewerUiTest {
     }
 
     @Test
+    void aTallPictureLeavesRoomForTheControls() throws Exception {
+        Path tall = dir.resolve("alta.png");
+        ImageIO.write(new BufferedImage(300, 5000, BufferedImage.TYPE_INT_RGB), "png", tall.toFile());
+        fx(() -> {
+            viewer().ifPresent(Window::hide);
+            MediaViewer.show(owner, CompletableFuture.completedFuture(tall), "Alta", () -> saves++);
+            return null;
+        });
+        FxWait.until("the tall picture shows", () -> viewer().isPresent() && photo().view().getImage() != null
+                && photo().view().getImage().getHeight() > 1000);
+        FxWait.settled();
+        String where = fx(() -> {
+            javafx.scene.Node bar = viewer().orElseThrow().getScene().getRoot().lookup(".media-viewer-bar");
+            javafx.geometry.Bounds b = bar.localToScene(bar.getBoundsInLocal());
+            return b.getMinY() + ".." + b.getMaxY() + " in " + viewer().orElseThrow().getScene().getHeight();
+        });
+        assertTrue(fx(() -> {
+            javafx.scene.Node bar = viewer().orElseThrow().getScene().getRoot().lookup(".media-viewer-bar");
+            javafx.geometry.Bounds b = bar.localToScene(bar.getBoundsInLocal());
+            return b.getHeight() > 0 && b.getMaxY() <= viewer().orElseThrow().getScene().getHeight() + 0.5;
+        }), "the controls are inside the window: " + where);
+    }
+
+    @Test
     void keysDriveTheZoomAndTheTurn() throws Exception {
         double fit = fx(() -> photo().zoom().scale());
         key("+", KeyCode.PLUS);

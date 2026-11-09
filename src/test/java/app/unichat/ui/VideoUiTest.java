@@ -47,13 +47,17 @@ class VideoUiTest {
     }
 
     private Path mp4() throws Exception {
-        Path f = dir.resolve("clip.mp4");
+        return mp4(160, 120);
+    }
+
+    private Path mp4(int width, int height) throws Exception {
+        Path f = dir.resolve("clip-" + width + "x" + height + ".mp4");
         var enc = org.jcodec.api.awt.AWTSequenceEncoder.createSequenceEncoder(f.toFile(), 25);
         for (int i = 0; i < 50; i++) {
-            BufferedImage img = new BufferedImage(160, 120, BufferedImage.TYPE_3BYTE_BGR);
+            BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
             Graphics2D g = img.createGraphics();
             g.setColor(new Color(i * 5, 80, 160));
-            g.fillRect(0, 0, 160, 120);
+            g.fillRect(0, 0, width, height);
             g.dispose();
             enc.encodeImage(img);
         }
@@ -158,6 +162,28 @@ class VideoUiTest {
                 "K plays it again");
         assertTrue(fx(() -> viewer.getScene().getRoot().lookupAll(".icon-button").stream()
                 .anyMatch(n -> "Pantalla completa (F)".equals(n.getAccessibleText()))), "full screen button");
+        fx(() -> { viewer.close(); owner.close(); return null; });
+    }
+
+    @Test
+    void aTallVideoLeavesRoomForTheControls() throws Exception {
+        Path clip = mp4(240, 1600); // a phone video, taller than the window
+        StackPane root = fx(StackPane::new);
+        Stage owner = window(root);
+        Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(clip), "clip", () -> { }, p -> { }));
+        FxWait.until("the video plays", () -> viewer.getProperties().get(VideoViewer.PLAYER) instanceof MediaPlayer p
+                && p.getStatus() == MediaPlayer.Status.PLAYING);
+        FxWait.settled();
+        String where = fx(() -> {
+            javafx.scene.Node bar = viewer.getScene().getRoot().lookup(".video-controls");
+            javafx.geometry.Bounds b = bar.localToScene(bar.getBoundsInLocal());
+            return b.getMinY() + ".." + b.getMaxY() + " in " + viewer.getScene().getHeight();
+        });
+        assertTrue(fx(() -> {
+            javafx.scene.Node bar = viewer.getScene().getRoot().lookup(".video-controls");
+            javafx.geometry.Bounds b = bar.localToScene(bar.getBoundsInLocal());
+            return b.getHeight() > 0 && b.getMaxY() <= viewer.getScene().getHeight() + 0.5;
+        }), "the controls are inside the window: " + where);
         fx(() -> { viewer.close(); owner.close(); return null; });
     }
 
