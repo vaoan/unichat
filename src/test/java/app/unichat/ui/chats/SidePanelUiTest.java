@@ -143,7 +143,7 @@ class SidePanelUiTest {
                 .flatMap(m -> m.getItems().stream()).filter(i -> "Ver en grande".equals(i.getText())).findFirst().orElse(null));
         assertTrue(enlarge != null, "the menu offers Ver en grande");
         long windows = fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage).count());
-        fx(() -> { enlarge.fire(); return null; });
+        fx(() -> { enlarge.fire(); enlarge.getParentPopup().hide(); return null; }); // as a real click on it does
         FxWait.until("the sticker's window opens", () -> javafx.stage.Window.getWindows().stream()
                 .anyMatch(w -> w instanceof Stage s && "Sticker".equals(s.getTitle())));
         Stage big = fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage s && "Sticker".equals(s.getTitle()))

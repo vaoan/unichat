@@ -62,8 +62,9 @@ class ProfileMediaUiTest {
             return null;
         });
         javafx.scene.control.ContextMenu menu = FxWait.fx(() -> javafx.stage.Window.getWindows().stream()
-                .filter(w -> w instanceof javafx.scene.control.ContextMenu && w.isShowing()).map(w -> (javafx.scene.control.ContextMenu) w)
-                .findFirst().orElseThrow());
+                // This tile's menu: on Linux another test's menu was still showing, and the first one found was that one.
+                .filter(w -> w instanceof javafx.scene.control.ContextMenu cm && w.isShowing() && cm.getOwnerNode() == photoTile)
+                .map(w -> (javafx.scene.control.ContextMenu) w).findFirst().orElseThrow());
         FxWait.fx(() -> { menu.getItems().get(0).fire(); menu.hide(); return null; });
         assertEquals(app.unichat.model.MessageType.IMAGE, jumped.get().type(), "the photo's message");
         // A voice note is on "Audios", not with the documents, and plays right there.
