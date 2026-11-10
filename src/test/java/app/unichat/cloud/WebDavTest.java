@@ -40,4 +40,14 @@ class WebDavTest {
             assertEquals(app.unichat.support.I18n.t("cloud.error.login"), e.getMessage());
         }
     }
+
+    @Test
+    void aServerThatNeverAnswersEndsInAFailureNotAHang() throws Exception {
+        try (java.net.ServerSocket silent = new java.net.ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress())) {
+            // It takes the connection and never says a word (pCloud's WebDAV with two-step verification on did this).
+            WebDav dav = new WebDav("http://127.0.0.1:" + silent.getLocalPort() + "/dav", "u", "p", java.time.Duration.ofNanos(1));
+            IOException e = assertThrows(IOException.class, dav::check);
+            assertEquals(app.unichat.support.I18n.t("cloud.error.noAnswer"), e.getMessage());
+        }
+    }
 }

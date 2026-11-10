@@ -24,7 +24,17 @@ public final class WebDav {
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(20)).followRedirects(HttpClient.Redirect.NORMAL).build();
 
+    /** How long a question (is it there, which version, a folder) may go unanswered: a server that never answers ends in a failure, never a hang. */
+    static final Duration ANSWER = Duration.ofSeconds(30);
+    private final Duration answer;
+
     public WebDav(String url, String user, String secret) {
+        this(url, user, secret, ANSWER);
+    }
+
+    /** {@code answer}: how long a question may wait for its answer (files going up or down have no limit). */
+    WebDav(String url, String user, String secret, Duration answer) {
+        this.answer = answer;
         this.base = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
         this.auth = "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(StandardCharsets.UTF_8));
     }
@@ -49,8 +59,10 @@ public final class WebDav {
     public String stamp(String path) throws IOException {
         HttpResponse<String> r;
         try {
-            r = http.send(HttpRequest.newBuilder(uri(path)).header("Authorization", auth).header("Depth", "0")
+            r = http.send(HttpRequest.newBuilder(uri(path)).timeout(answer).header("Authorization", auth).header("Depth", "0")
                     .method("PROPFIND", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+        } catch (java.net.http.HttpTimeoutException e) {
+            throw new IOException(I18n.t("cloud.error.noAnswer"), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException(e);
@@ -97,9 +109,12 @@ public final class WebDav {
 
     private HttpResponse<Void> send(String method, String path, HttpRequest.BodyPublisher body, boolean depth0) throws IOException {
         HttpRequest.Builder b = HttpRequest.newBuilder(uri(path)).header("Authorization", auth).method(method, body);
+        if (!method.equals("PUT")) b.timeout(answer); // a big file going up takes as long as it takes
         if (depth0) b.header("Depth", "0");
         try {
             return http.send(b.build(), HttpResponse.BodyHandlers.discarding());
+        } catch (java.net.http.HttpTimeoutException e) {
+            throw new IOException(I18n.t("cloud.error.noAnswer"), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException(e);
@@ -110,6 +125,8 @@ public final class WebDav {
         try {
             return http.send(HttpRequest.newBuilder(uri(path)).header("Authorization", auth).GET().build(),
                     HttpResponse.BodyHandlers.ofByteArray());
+        } catch (java.net.http.HttpTimeoutException e) {
+            throw new IOException(I18n.t("cloud.error.noAnswer"), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException(e);
