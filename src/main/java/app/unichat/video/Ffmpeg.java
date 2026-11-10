@@ -51,6 +51,26 @@ public final class Ffmpeg {
     }
 
     /** Runs one ffmpeg command, giving up after {@code timeoutSeconds}; whether it worked. */
+    /**
+     * The input options for a file from other people: only it may be read. ffmpeg tells the format by the content, and
+     * an HLS playlist, a concat list or a DASH manifest names other files, which {@code -protocol_whitelist file} still
+     * lets it read (a "video" could carry ~/.ssh/id_rsa into what is saved and uploaded): those are refused.
+     */
+    public static List<String> input(Path file) throws IOException {
+        byte[] head;
+        try (var in = java.nio.file.Files.newInputStream(file)) {
+            head = in.readNBytes(64);
+        }
+        String start = new String(head, java.nio.charset.StandardCharsets.ISO_8859_1).replace("\u00EF\u00BB\u00BF", "").stripLeading();
+        for (String list : LISTS) {
+            if (start.regionMatches(true, 0, list, 0, list.length())) throw new IOException(I18n.t("video.notAVideo"));
+        }
+        return List.of("-protocol_whitelist", "file", "-i", file.toString()); // lesson-ok: ffmpeg-input
+    }
+
+    /** How the formats that name other files begin: HLS, ffmpeg's concat list, a DASH manifest (XML). */
+    private static final List<String> LISTS = List.of("#EXTM3U", "ffconcat", "<?xml", "<MPD");
+
     static boolean run(List<String> command, long timeoutSeconds) throws IOException, InterruptedException {
         return run(command, timeoutSeconds, null);
     }

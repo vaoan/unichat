@@ -87,9 +87,10 @@ public final class Transcriber {
         Path ffmpeg = Ffmpeg.find();
         List<String> cmd;
         if (ffmpeg != null) {
-            cmd = List.of(ffmpeg.toString(), "-nostdin", "-loglevel", "error", "-y",
-                    // The file comes from other people: nothing but itself may be read.
-                    "-protocol_whitelist", "file", "-i", audio.toString(), "-ar", "16000", "-ac", "1", wav.toString());
+            List<String> c = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-loglevel", "error", "-y"));
+            c.addAll(app.unichat.video.Ffmpeg.input(audio)); // the file comes from other people
+            c.addAll(List.of("-ar", "16000", "-ac", "1", wav.toString()));
+            cmd = c;
         } else if (Os.mac()) {
             cmd = List.of("/usr/bin/afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", audio.toString(), wav.toString());
         } else {

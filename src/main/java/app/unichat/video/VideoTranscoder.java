@@ -65,8 +65,9 @@ public final class VideoTranscoder {
      * Whole or not at all: the converted copy replaces it only once finished. The file it ends up as.
      */
     public static Path makePlayable(Path ffmpeg, Path file) throws IOException, InterruptedException {
-        Processes.Result info = Processes.capture(new ProcessBuilder(ffmpeg.toString(), "-hide_banner", "-nostdin",
-                "-protocol_whitelist", "file", "-i", file.toString()).redirectErrorStream(true), TIMEOUT_SECONDS);
+        List<String> probe = new ArrayList<>(List.of(ffmpeg.toString(), "-hide_banner", "-nostdin"));
+        probe.addAll(Ffmpeg.input(file)); // the file comes from other people
+        Processes.Result info = Processes.capture(new ProcessBuilder(probe).redirectErrorStream(true), TIMEOUT_SECONDS);
         if (playsEverywhere(info.out())) return file;
         String name = file.getFileName().toString();
         Path out = file.resolveSibling((name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name) + ".mp4");
@@ -90,10 +91,10 @@ public final class VideoTranscoder {
         return Os.mac() ? List.of("h264_videotoolbox", "libx264") : List.of("libx264");
     }
 
-    static List<String> command(Path ffmpeg, Path video, Path out, String encoder) {
-        List<String> c = new ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
-                // The file comes from other people: nothing but itself may be read.
-                "-protocol_whitelist", "file", "-i", video.toString(), "-map", "0:v:0", "-map", "0:a:0?",
+    static List<String> command(Path ffmpeg, Path video, Path out, String encoder) throws IOException {
+        List<String> c = new ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error"));
+        c.addAll(Ffmpeg.input(video)); // the file comes from other people
+        c.addAll(List.of("-map", "0:v:0", "-map", "0:a:0?",
                 // H.264 needs even sizes and this pixel format to play everywhere.
                 "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", encoder));
         c.addAll(encoder.equals("libx264") ? List.of("-preset", "veryfast", "-crf", "23") : List.of("-b:v", "4M"));

@@ -79,11 +79,11 @@ public final class SendablePhotos {
         return c;
     }
 
-    static List<String> ffmpeg(Path ffmpeg, Path in, Path out) {
-        return List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
-                // The file is the person's own, but only it may be read all the same.
-                "-protocol_whitelist", "file", "-i", in.toString(),
-                "-vf", "scale='min(" + SIDE + ",iw)':'min(" + SIDE + ",ih)':force_original_aspect_ratio=decrease",
-                "-q:v", "3", "-frames:v", "1", out.toString());
+    static List<String> ffmpeg(Path ffmpeg, Path in, Path out) throws IOException {
+        List<String> c = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error"));
+        c.addAll(Ffmpeg.input(in)); // the person's own, but it may have been downloaded from anywhere
+        c.addAll(List.of("-vf", "scale='min(" + SIDE + ",iw)':'min(" + SIDE + ",ih)':force_original_aspect_ratio=decrease",
+                "-q:v", "3", "-frames:v", "1", out.toString()));
+        return c;
     }
 }

@@ -57,10 +57,11 @@ public final class BigPictures {
         return List.of("/usr/bin/sips", "-s", "format", "png", "-Z", Integer.toString(SIDE), in.toString(), "--out", out.toString());
     }
 
-    static List<String> ffmpeg(Path ffmpeg, Path in, Path out) {
-        return List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
-                // The file comes from other people: only itself may be read.
-                "-protocol_whitelist", "file", "-i", in.toString(),
-                "-vf", "scale=" + SIDE + ":" + SIDE + ":force_original_aspect_ratio=decrease", "-frames:v", "1", out.toString());
+    static List<String> ffmpeg(Path ffmpeg, Path in, Path out) throws IOException {
+        List<String> c = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error"));
+        c.addAll(Ffmpeg.input(in)); // the file comes from other people
+        c.addAll(List.of("-vf", "scale=" + SIDE + ":" + SIDE + ":force_original_aspect_ratio=decrease", "-frames:v", "1",
+                out.toString()));
+        return c;
     }
 }

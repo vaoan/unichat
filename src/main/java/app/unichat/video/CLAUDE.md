@@ -7,3 +7,6 @@ ffmpeg, yt-dlp, stickers and picture conversions.
   Ajustes → Redes (`<network>.animatedStickers` = STICKER|GIF|VIDEO) can send them as mp4 instead (`GifFrames` +
   JCodec, pure Java).
 - `VideoTranscoder.makePlayable`: a saved video as H.264/AAC in its place (what ffmpeg says of it, `playsEverywhere`; no ffprobe, only ffmpeg ships), used on what a link saves (`autosave/LinkSaver`). `YtDlp` keeps the pinned yt-dlp ready (running it is InstaTray's engine); `GalleryDl` finds the person's gallery-dl.
+
+## Lessons
+- ffmpeg tells a file's format by its content: a "video" from a chat that is really an HLS playlist (or a concat list, a DASH manifest) names other files, and `-protocol_whitelist file` still let it read them into the output that's saved and uploaded. Files from others go in through `Ffmpeg.input`, which refuses those (`FfmpegInputTest`; `.claude/lessons.tsv` `ffmpeg-input`). A forced format (`-f matroska`, `-f s16le`) doesn't probe and is fine.

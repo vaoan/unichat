@@ -7,3 +7,4 @@ static-text	src/main/java/**/*.java	static\s+final[^=;(]*=\s*I18n\.	The language
 gif-as-image	src/main/java/**/*.java	new\s+Image\([^)]*\.gif	JavaFX animates a GIF in new Image() forever and keeps every frame (OOM in a day): use AnimatedImage.decodeGif / still.
 css-accent-loop	src/main/resources/**/*.css	-accent\s*:\s*derive\(\s*-accent	A looked-up color derived from itself is a loop: compute it in code (Theme.accessibleAccent).
 css-label-min-width	src/main/resources/**/*.css	\.(unread-badge|badge|chip|label)[^{]*\{[^}]*-fx-min-width	Author CSS beats setMinWidth(USE_PREF_SIZE): a min width in CSS truncated wide glyphs to "". Set it in code.
+ffmpeg-input	src/main/java/**/*.java	"-protocol_whitelist",\s*"file",\s*"-i"	A file from other people goes to ffmpeg through Ffmpeg.input: it also refuses playlists and manifests that make ffmpeg read other local files.
