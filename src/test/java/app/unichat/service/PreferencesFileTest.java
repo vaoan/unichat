@@ -495,4 +495,18 @@ class PreferencesFileTest {
         assertEquals("matrix:!r", ChatKeys.of(null, "1", "!r"));
         assertEquals("matrix:!r", ChatKeys.of("telegram", null, "!r"));
     }
+
+    @Test
+    void savingKindsAllUnlessLeftOutAndWhatWasOnStaysAll(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp) {
+        PreferencesFile p = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
+        assertTrue(p.saveKinds("k").isEmpty(), "nothing saved at first");
+        p.choose("k", PreferencesFile.Flag.AUTO_SAVE, true); // turned on before there were kinds
+        assertEquals(java.util.EnumSet.allOf(app.unichat.model.SaveKind.class), p.saveKinds("k"));
+        p.chooseSaveKinds("k", java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS, app.unichat.model.SaveKind.LINKS));
+        p.flush();
+        PreferencesFile again = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
+        assertEquals(java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS, app.unichat.model.SaveKind.LINKS), again.saveKinds("k"), "kept");
+        again.chooseSaveKinds("k", java.util.Set.of());
+        assertTrue(again.saveKinds("k").isEmpty(), "none chosen: off");
+    }
 }

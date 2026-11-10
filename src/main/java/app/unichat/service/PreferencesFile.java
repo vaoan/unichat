@@ -36,8 +36,13 @@ import java.util.UUID;
 public final class PreferencesFile {
     public enum Flag {
         ARCHIVED("archived"), MUTED("muted"), FAVORITE("favorite"), LOW_PRIORITY("lowPriority"), PINNED("pinned"),
-        /** Save everything others send in this chat ({@code autosave}): Unichat's own, no server ever says it. */
-        AUTO_SAVE("autoSave");
+        /** Save what others send in this chat ({@code autosave}): Unichat's own, no server ever says it. */
+        AUTO_SAVE("autoSave"),
+        /** A kind left out of what's saved: all are saved unless left out (what was on before kinds existed stays all). */
+        AUTO_SAVE_NO_PHOTOS("autoSaveNoPhotos"), AUTO_SAVE_NO_VIDEOS("autoSaveNoVideos"), AUTO_SAVE_NO_AUDIO("autoSaveNoAudio"),
+        AUTO_SAVE_NO_DOCUMENTS("autoSaveNoDocuments"), AUTO_SAVE_NO_GIFS("autoSaveNoGifs"), AUTO_SAVE_NO_LINKS("autoSaveNoLinks"),
+        /** The profile doesn't show what was shared in this chat (its options). */
+        MEDIA_HIDDEN("mediaHidden");
 
         final String json;
 
@@ -54,7 +59,7 @@ public final class PreferencesFile {
                 case FAVORITE -> favorite;
                 case LOW_PRIORITY -> lowPriority;
                 case PINNED -> pinned;
-                case AUTO_SAVE -> null;
+                default -> null; // Unichat's own: no server says them
             };
         }
     }
@@ -351,6 +356,34 @@ public final class PreferencesFile {
     public synchronized boolean isOn(String key, Flag flag) {
         Entry e = chats.get(key);
         return e != null && is(e, flag);
+    }
+
+    /** What the chat with this key saves of what it receives; empty when it saves nothing. */
+    public synchronized java.util.Set<app.unichat.model.SaveKind> saveKinds(String key) {
+        Entry e = chats.get(key);
+        java.util.Set<app.unichat.model.SaveKind> out = EnumSet.noneOf(app.unichat.model.SaveKind.class);
+        if (e == null || !is(e, Flag.AUTO_SAVE)) return out;
+        for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) if (!is(e, leftOut(k))) out.add(k);
+        return out;
+    }
+
+    /** The person chose what this chat saves; nothing turns it off. */
+    public synchronized void chooseSaveKinds(String key, java.util.Set<app.unichat.model.SaveKind> kinds) {
+        Entry e = entry(key);
+        e.values.put(Flag.AUTO_SAVE, !kinds.isEmpty());
+        for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) e.values.put(leftOut(k), !kinds.contains(k));
+        changed();
+    }
+
+    private static Flag leftOut(app.unichat.model.SaveKind k) {
+        return switch (k) {
+            case PHOTOS -> Flag.AUTO_SAVE_NO_PHOTOS;
+            case VIDEOS -> Flag.AUTO_SAVE_NO_VIDEOS;
+            case AUDIO -> Flag.AUTO_SAVE_NO_AUDIO;
+            case DOCUMENTS -> Flag.AUTO_SAVE_NO_DOCUMENTS;
+            case GIFS -> Flag.AUTO_SAVE_NO_GIFS;
+            case LINKS -> Flag.AUTO_SAVE_NO_LINKS;
+        };
     }
 
     private Entry entry(String key) { return chats.computeIfAbsent(key, k -> new Entry()); }

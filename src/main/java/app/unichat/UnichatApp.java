@@ -206,6 +206,12 @@ public final class UnichatApp extends Application {
             if (local != null) MatrixChatService.setBridgeProvisioner(provisioner(local));
         }
         service = svc;
+        // Chats that save what they receive do it from the first sync, window shown or not; the menu-bar icon shows it.
+        app.unichat.autosave.AutoSave.of(svc).setProgress(new app.unichat.autosave.AutoSave.Progress() {
+            @Override public void changed(int done, int total) { notifier.setDownloadProgress(done, total); }
+            @Override public void finished(int saved, app.unichat.model.Chat chat) { notifier.downloadsDone(saved, chat); }
+            @Override public void failed(String what, app.unichat.model.Chat chat, String why) { notifier.downloadFailed(what, chat, why); }
+        });
         mainView = new MainView(svc, stage, notifier, this::logout, this::openLink);
         scene.setRoot(mainView);
         Theme.applyAll();

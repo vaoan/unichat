@@ -67,11 +67,30 @@ public final class YtDlp {
         return c;
     }
 
-    /** Saves the video behind {@code url} into {@code dir}; false when there's none there or it failed. Blocking. */
-    public static boolean download(Path ytDlp, Path ffmpeg, Path dir, String url) throws IOException, InterruptedException {
+    /**
+     * Saves the video behind {@code url} into {@code dir}. Blocking. Null when it's saved; otherwise why not, in
+     * yt-dlp's own words ("Video unavailable", "Unsupported URL"…), or that it took too long.
+     */
+    public static String download(Path ytDlp, Path ffmpeg, Path dir, String url) throws IOException, InterruptedException {
         Files.createDirectories(dir);
-        Processes.Result r = Processes.quiet(command(ytDlp, ffmpeg, dir, url), null, DOWNLOAD_SECONDS);
-        return r.ok();
+        Processes.Result r = Processes.capture(new ProcessBuilder(command(ytDlp, ffmpeg, dir, url)).redirectErrorStream(true),
+                DOWNLOAD_SECONDS);
+        if (r.ok()) return null;
+        if (!r.finished()) return I18n.t("autosave.error.tooLong");
+        return reason(r.out());
+    }
+
+    /** yt-dlp's last "ERROR:" line, without its "[site] id:" prefix; the last line when there's none. */
+    static String reason(String out) {
+        String last = "";
+        for (String line : out.strip().split("\\R")) {
+            if (line.startsWith("ERROR:")) last = line.substring("ERROR:".length()).strip();
+        }
+        if (last.isEmpty()) {
+            String[] lines = out.strip().split("\\R");
+            last = lines.length == 0 ? "" : lines[lines.length - 1].strip();
+        }
+        return last.replaceFirst("^\\[[^]]+] [^:]+: ", "");
     }
 
     private static Build build() {

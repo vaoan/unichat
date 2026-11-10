@@ -81,6 +81,12 @@ public final class Message {
         return fileSize > 0 && fileSize <= INLINE_MAX_BYTES && ms <= INLINE_MAX_MS;
     }
 
+    /** A GIF, however it came: a picture of that type, or a video the bridge marks as one (WhatsApp, Telegram). */
+    public boolean isGif() {
+        if ("image/gif".equals(mimeType)) return type == MessageType.IMAGE;
+        return mediaInfo != null && mediaInfo.path("fi.mau.gif").asBoolean(false) && type != MessageType.STICKER;
+    }
+
     /** A reel that came only as its picture and a link: the bridge has no video to give, its page does. */
     public boolean isReelLink() {
         return type == MessageType.IMAGE && externalUrl != null

@@ -121,6 +121,11 @@ final class NativeBar {
         send("count\t" + (count > 0 ? Formats.badge(count) : "") + "\n");
     }
 
+    /** Saving going on: a ring on the icon, filled {@code f} (spinning while -1); NaN takes it away. */
+    void setProgress(double f) {
+        send("progress\t" + (Double.isNaN(f) ? "" : String.format(java.util.Locale.ROOT, "%.3f", f)) + "\n");
+    }
+
     void setTooltip(String text) {
         send("tip\t" + clean(text) + "\n");
     }

@@ -876,3 +876,7 @@
 /* An avatar that opens its photo large (InfoPane): a round focus ring for the keyboard. */
 .avatar-enlargeable:focus-visible { -fx-border-color: -accent; -fx-border-width: 2; -fx-border-radius: 999; -fx-background-radius: 999; }
 .root.strong-focus .avatar-enlargeable:focus-visible { -fx-border-color: -text; -fx-border-width: 3; }
+
+/* A chat's options: the kinds it saves, under the switch that turns saving on. */
+.chat-options-kinds { -fx-padding: 0 0 0 1.8em; }
+.chat-options-scroll { -fx-padding: 0; -fx-background-insets: 0; }

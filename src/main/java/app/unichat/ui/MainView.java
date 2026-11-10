@@ -41,6 +41,7 @@ public final class MainView extends StackPane {
     private final BorderPane threadArea = new BorderPane();
     private final StackPane overlay = new StackPane();
     private Runnable protectPhoto = () -> { };
+    private Consumer<Chat> chatOptions = c -> { };
     private final Label toast = new Label();
     private final Label connection = new Label();
     private ConnectionState state = ConnectionState.CONNECTING;
@@ -133,7 +134,7 @@ public final class MainView extends StackPane {
         panel.setContent(SidePanel.Tab.FAVORITES, favorites, favorites::refresh);
         thread.composer().setOnPanel(this::togglePanel);
         offerProtectedPhotos(svc);
-        app.unichat.autosave.AutoSave.of(svc); // listening from the start: chats that save everything do so at once
+        offerChatOptions(svc);
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::showSettings);
 
         threadArea.setCenter(thread);
@@ -449,6 +450,18 @@ public final class MainView extends StackPane {
         javafx.geometry.Bounds me = localToScene(getLayoutBounds());
         toast.setTranslateY(-(me.getMaxY() - b.getMinY()) - 12);
         toast.setTranslateX(b.getCenterX() - me.getCenterX());
+    }
+
+    /** The gear in a chat's header: its own options, what it saves of what arrives among them. */
+    private void offerChatOptions(ChatService svc) {
+        ChatOptions options = new ChatOptions(svc, this::showOverlay, this::hideOverlay, this::toast);
+        chatOptions = chat -> options.open(chat, () -> thread.composer().focus());
+        thread.setOnOptions(chatOptions);
+    }
+
+    /** A chat's options sheet, for the chat open (snapshot diagnostics). */
+    public void showChatOptions() {
+        if (thread.chat() != null) chatOptions.accept(thread.chat());
     }
 
     /** The clip's "Foto protegida contra IA": asks how hard, then protects and sends ({@link CloakSend}). */

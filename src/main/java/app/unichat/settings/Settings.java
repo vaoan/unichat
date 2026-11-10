@@ -54,6 +54,8 @@ public final class Settings {
                 || key.startsWith("window.") || key.startsWith("discord.guilds.")
                 // What the update check heard, about the version installed here.
                 || key.startsWith("app.update.")
+                // Folders where chats' things are saved: paths of this computer.
+                || key.startsWith("autosave.")
                 || (key.startsWith("gif.") && key.endsWith(".key"));
     }
 

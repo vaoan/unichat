@@ -2,11 +2,14 @@ package app.unichat.autosave;
 
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
-import app.unichat.model.MessageType;
+import app.unichat.model.SaveKind;
 import app.unichat.service.ChatPreferences;
+import app.unichat.service.ChatReader;
 import app.unichat.service.ChatService;
 import app.unichat.service.ChatSession;
 import app.unichat.service.MediaSource;
+import app.unichat.settings.Settings;
+import app.unichat.support.I18n;
 import app.unichat.support.Urls;
 import app.unichat.video.Ffmpeg;
 import app.unichat.video.YtDlp;
@@ -15,8 +18,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -24,10 +30,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Saves everything others send in a chat that has it on (its profile, {@link ChatPreferences#setAutoSave}): photos,
- * videos, audio and voice notes, documents and GIFs (not stickers), and the video behind each link ({@link YtDlp}).
- * Done as it arrives, so what disappears later (view once, timers) is kept too. Into
- * {@code <Downloads>/Unichat/<chat>/}, one file at a time on a thread of its own; nothing saved is overwritten.
+ * Saves what others send in a chat that has it on (its options, {@link ChatPreferences#setAutoSave}), each kind chosen
+ * apart ({@link SaveKind}): photos, videos, audio and voice notes, documents, GIFs (never stickers), and the video
+ * behind each link ({@link YtDlp}). As soon as a message is there, the chat opened or not: every change to the chat's
+ * messages (a sync, live or catching up after sleep or a restart) saves what's newer than the last one saved
+ * ({@link SavedUpTo}), so what disappears later (view once, timers) is kept and history from before stays out. Into
+ * the chat's folder ({@link SaveFolders}), one file at a time on a thread of its own; nothing saved is overwritten.
  */
 public final class AutoSave implements ChatService.Listener {
     /** What saving does, apart so tests don't need a server or yt-dlp. */
@@ -35,67 +43,118 @@ public final class AutoSave implements ChatService.Listener {
         /** The file behind {@code mediaUrl}, downloaded. */
         Path media(String mediaUrl) throws IOException, InterruptedException;
 
-        /** The video behind {@code url} saved into {@code dir}; false when there's none. */
-        boolean link(String url, Path dir) throws IOException, InterruptedException;
+        /** The video behind {@code url} saved into {@code dir}: null, or why not. */
+        String link(String url, Path dir) throws IOException, InterruptedException;
+    }
+
+    /** What saving is doing, for the menu-bar icon and the notices. Called on the saving thread. */
+    public interface Progress {
+        /** {@code done} of {@code total} in the round going on; total 0: nothing going on. */
+        void changed(int done, int total);
+
+        /** A round ended with {@code saved} files saved; {@code chat} is where the last came from. */
+        void finished(int saved, Chat chat);
+
+        /** {@code what} (a file's name, a link) from {@code chat} couldn't be saved, because {@code why}. */
+        void failed(String what, Chat chat, String why);
     }
 
     private static final Map<ChatSession, AutoSave> BY_SERVICE = new WeakHashMap<>();
 
     private final ChatPreferences prefs;
-    private final Path root;
+    private final ChatReader chats;
+    private final SavedUpTo savedUpTo;
     private final Saver saver;
+    private volatile Progress progress = new Progress() {
+        @Override public void changed(int done, int total) { }
+        @Override public void finished(int saved, Chat chat) { }
+        @Override public void failed(String what, Chat chat, String why) { }
+    };
+    /** The round going on: only the saving thread touches them. */
+    private int total;
+    private int done;
+    private int savedInRound;
+    private Chat lastChat;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "autosave");
         t.setDaemon(true);
         return t;
     });
 
-    AutoSave(ChatPreferences prefs, Path root, Saver saver) {
+    AutoSave(ChatPreferences prefs, ChatReader chats, SavedUpTo savedUpTo, Saver saver) {
         this.prefs = prefs;
-        this.root = root;
+        this.chats = chats;
+        this.savedUpTo = savedUpTo;
         this.saver = saver;
     }
 
-    /** The one for {@code svc}, listening from the first call (the window is rebuilt on a language change). */
+    /** The one for {@code svc}, listening from the first call: it's started with the service, before its first sync. */
     public static synchronized AutoSave of(ChatService svc) {
         return BY_SERVICE.computeIfAbsent(svc, s -> {
-            AutoSave a = new AutoSave(svc, defaultRoot(), downloading(svc));
+            AutoSave a = new AutoSave(svc, svc, new SavedUpTo(Settings.dataDir().resolve("autosave.json")),
+                    downloading(svc));
             svc.addListener(a);
             return a;
         });
     }
 
-    /** Where a chat's things go. */
+    /** Where a chat's things go ({@link SaveFolders}). */
     public Path folder(Chat chat) {
-        return root.resolve(FileNames.folder(chat.title()));
+        return SaveFolders.of(chat);
     }
 
-    /**
-     * {@code <home>/Downloads/Unichat}: Windows and macOS both call the folder Downloads on disk.
-     * {@code -Dunichat.autosaveDir} puts it elsewhere (tests never write to the person's folders).
-     */
-    static Path defaultRoot() {
-        String chosen = System.getProperty("unichat.autosaveDir");
-        return chosen != null ? Path.of(chosen) : Path.of(System.getProperty("user.home"), "Downloads", "Unichat");
+    public void setProgress(Progress p) {
+        progress = p;
     }
 
-    /** {@code folder} as a person reads it: under their home, "~/…". */
-    public static String shown(Path folder) {
-        Path home = Path.of(System.getProperty("user.home"));
-        return folder.startsWith(home) ? "~" + java.io.File.separator + home.relativize(folder) : folder.toString();
+    /** Turned on just now: from here on, not what was there before. */
+    public void startNow(String chatId) {
+        worker.execute(() -> savedUpTo.startNow(chatId));
     }
 
     @Override
-    public void received(Chat chat, Message m) {
-        if (m.outgoing() || m.deleted() || !prefs.autoSaves(chat.id())) return;
-        Path dir = folder(chat);
-        if (wanted(m)) worker.execute(() -> saveMedia(m, dir));
-        for (String url : links(m)) worker.execute(() -> saveLink(url, dir));
+    public void messagesChanged(String chatId) {
+        worker.execute(() -> catchUp(chatId));
     }
 
-    /** Media that's saved: all of it but stickers (a GIF is a video or picture with a flag, so it's in). */
-    static boolean wanted(Message m) {
-        return m.isMedia() && m.type() != MessageType.STICKER && m.mediaUrl() != null;
+    /** Saves, in order, what others sent in {@code chatId} since the last one saved. On the worker. */
+    private void catchUp(String chatId) {
+        Set<SaveKind> kinds = prefs.autoSaves(chatId);
+        Chat chat = chats.chat(chatId);
+        if (kinds.isEmpty() || chat == null) return;
+        List<Message> fresh = chats.messages(chatId).stream()
+                .filter(m -> !m.outgoing() && !m.deleted() && m.timestamp() != null && savedUpTo.isNew(chatId, m))
+                .sorted(Comparator.comparing(Message::timestamp)).toList();
+        Path dir = folder(chat);
+        for (Message m : fresh) total += work(m, kinds);
+        if (total > done) progress.changed(done, total);
+        for (Message m : fresh) {
+            SaveKind kind = SaveKind.of(m); // null: a sticker, or no media
+            if (kind != null && kinds.contains(kind)) step(chat, saveMedia(m, chat, dir));
+            if (kinds.contains(SaveKind.LINKS)) for (String url : links(m)) step(chat, saveLink(url, chat, dir));
+            savedUpTo.saved(chatId, m);
+        }
+    }
+
+    /** How many things {@code m} gives to save. */
+    private static int work(Message m, Set<SaveKind> kinds) {
+        SaveKind kind = SaveKind.of(m);
+        return (kind != null && kinds.contains(kind) ? 1 : 0) + (kinds.contains(SaveKind.LINKS) ? links(m).size() : 0);
+    }
+
+    /** One thing done, saved or not; the round ends when nothing's left. */
+    private void step(Chat chat, boolean saved) {
+        done++;
+        if (saved) {
+            savedInRound++;
+            lastChat = chat;
+        }
+        progress.changed(done, total);
+        if (done < total) return;
+        if (savedInRound > 0) progress.finished(savedInRound, lastChat);
+        total = done = savedInRound = 0;
+        lastChat = null;
+        progress.changed(0, 0);
     }
 
     /** The links in what it says, and the page a reel shown as a picture points to. */
@@ -105,26 +164,198 @@ public final class AutoSave implements ChatService.Listener {
         return out;
     }
 
-    private void saveMedia(Message m, Path dir) {
+    private boolean saveMedia(Message m, Chat chat, Path dir) {
+        String name = FileNames.forMessage(m, ZoneId.systemDefault());
+        Path file = null;
         try {
-            Path file = saver.media(m.mediaUrl());
+            file = saver.media(m.mediaUrl());
             Files.createDirectories(dir);
-            Files.copy(file, FileNames.free(dir, FileNames.forMessage(m, ZoneId.systemDefault())), StandardCopyOption.COPY_ATTRIBUTES);
+            Files.copy(file, FileNames.free(dir, name), StandardCopyOption.COPY_ATTRIBUTES);
+            return true;
         } catch (IOException | RuntimeException e) {
-            System.err.println("Auto-save: a file from " + m.chatId() + " couldn't be saved: " + e.getMessage());
+            return failed(name, chat, why(e, dir, file));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            return false;
         }
     }
 
-    private void saveLink(String url, Path dir) {
+    private boolean saveLink(String url, Chat chat, Path dir) {
         try {
-            if (!saver.link(url, dir)) System.err.println("Auto-save: no video saved from a link in " + dir.getFileName());
+            String why = saver.link(url, dir);
+            return why == null || failed(url, chat, why);
         } catch (IOException | RuntimeException e) {
-            System.err.println("Auto-save: a link's video couldn't be saved: " + e.getMessage());
+            return failed(url, chat, why(e, dir, null));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            return false;
         }
+    }
+
+    /** Tells and logs it; false, as nothing was saved. */
+    private boolean failed(String what, Chat chat, String why) {
+        System.err.println("Auto-save: " + what + " from " + chat.id() + " not saved: " + why);
+        progress.failed(what, chat, why);
+        return false;
+    }
+
+    /**
+     * Why it failed, as a person reads it. No room is told by the space left where it was going (the system's own
+     * words differ on each one), a folder that can't be written by the kind of error; else the error's own words.
+     */
+    static String why(Exception e, Path dir, Path file) {
+        try {
+            long needed = file != null && Files.isRegularFile(file) ? Files.size(file) : 0;
+            Path existing = dir;
+            while (existing != null && !Files.exists(existing)) existing = existing.getParent();
+            if (existing != null && Files.getFileStore(existing).getUsableSpace() <= Math.max(needed, 1 << 20)) {
+                return I18n.t("autosave.error.noSpace");
+            }
+        } catch (IOException ignored) {
+            // can't tell the space: the error's own words below
+        }
+        if (e instanceof java.nio.file.AccessDeniedException) return I18n.t("autosave.error.denied", dir);
+        Throwable cause = e.getCause() != null && e.getMessage() != null && e.getMessage().startsWith("java.") ? e.getCause() : e;
+        return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+    }
+
+    /**
+     * Exploring a chat's past, for its options: going on or not, back to when everything was looked at, whether that's
+     * the beginning, and what this run saved and found gone.
+     */
+    public record Exploring(boolean running, Instant back, boolean start, int saved, int unavailable) {}
+
+    private final Map<String, Exploring> exploring = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Set<String> stopping = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final List<Runnable> exploringListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Where exploring {@code chatId}'s past is. Any thread. */
+    public Exploring exploring(String chatId) {
+        Exploring now = exploring.get(chatId);
+        if (now != null) return now;
+        SavedUpTo.Back b = savedUpTo.back(chatId);
+        return new Exploring(false, b == null ? null : b.back(), b != null && b.start(), 0, 0);
+    }
+
+    /** Runs on any thread whenever exploring changes. */
+    public void addExploringListener(Runnable r) {
+        exploringListeners.add(r);
+    }
+
+    public void removeExploringListener(Runnable r) {
+        exploringListeners.remove(r);
+    }
+
+    /**
+     * Goes back through {@code chatId}'s history to its beginning, saving the kinds it has on of what's still there.
+     * Page by page, each a job of its own, so what arrives meanwhile isn't kept waiting; it continues where an earlier
+     * run stopped and never takes what saving as it arrives already did.
+     */
+    public void explore(String chatId) {
+        if (exploring(chatId).running()) return;
+        stopping.remove(chatId);
+        Exploring was = exploring(chatId);
+        setExploring(chatId, new Exploring(true, was.back(), was.start(), 0, 0));
+        worker.execute(() -> explorePage(chatId));
+    }
+
+    public void stopExploring(String chatId) {
+        stopping.add(chatId);
+    }
+
+    private void setExploring(String chatId, Exploring e) {
+        exploring.put(chatId, e);
+        for (Runnable r : exploringListeners) r.run();
+    }
+
+    /** One page: what's loaded and not yet looked at, newest first; then the next older page, or the end. Worker. */
+    private void explorePage(String chatId) {
+        Set<SaveKind> kinds = prefs.autoSaves(chatId);
+        Chat chat = chats.chat(chatId);
+        if (stopping.remove(chatId) || kinds.isEmpty() || chat == null) {
+            endExploring(chatId, chat, false);
+            return;
+        }
+        List<Message> old = chats.messages(chatId).stream()
+                .filter(m -> !m.outgoing() && !m.deleted() && m.timestamp() != null && savedUpTo.isOld(chatId, m))
+                .sorted(Comparator.comparing(Message::timestamp).reversed()).toList();
+        Path dir = folder(chat);
+        for (Message m : old) {
+            if (stopping.contains(chatId)) break;
+            String noSpace = exploreOne(m, kinds, chatId, dir);
+            savedUpTo.exploredBack(chatId, m.timestamp(), false);
+            if (noSpace != null) {
+                progress.failed(I18n.t("autosave.exploring"), chat, noSpace);
+                endExploring(chatId, chat, false);
+                return;
+            }
+        }
+        chats.loadOlder(chatId).whenComplete((more, err) -> worker.execute(() -> {
+            if (err != null || !Boolean.TRUE.equals(more)) endExploring(chatId, chat, err == null);
+            else explorePage(chatId);
+        }));
+    }
+
+    /** Saves what {@code m} has of {@code kinds}; null, or why there's no room (then exploring stops). */
+    private String exploreOne(Message m, Set<SaveKind> kinds, String chatId, Path dir) {
+        SaveKind kind = SaveKind.of(m);
+        if (kind != null && kinds.contains(kind)) {
+            String why = copyQuietly(m, dir);
+            if (I18n.t("autosave.error.noSpace").equals(why)) return why;
+            count(chatId, why == null);
+        }
+        if (!kinds.contains(SaveKind.LINKS)) return null;
+        for (String url : links(m)) {
+            String why = linkQuietly(url, dir);
+            if (I18n.t("autosave.error.noSpace").equals(why)) return why;
+            count(chatId, why == null);
+        }
+        return null;
+    }
+
+    /** Copies {@code m}'s file into {@code dir}: null, or why not. */
+    private String copyQuietly(Message m, Path dir) {
+        Path file = null;
+        try {
+            file = saver.media(m.mediaUrl());
+            Files.createDirectories(dir);
+            Files.copy(file, FileNames.free(dir, FileNames.forMessage(m, ZoneId.systemDefault())), StandardCopyOption.COPY_ATTRIBUTES);
+            return null;
+        } catch (IOException | RuntimeException e) {
+            return why(e, dir, file);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+    }
+
+    /** Saves the video behind {@code url} into {@code dir}: null, or why not. */
+    private String linkQuietly(String url, Path dir) {
+        try {
+            return saver.link(url, dir);
+        } catch (IOException | RuntimeException e) {
+            return why(e, dir, null);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+    }
+
+    private void count(String chatId, boolean saved) {
+        Exploring e = exploring(chatId);
+        setExploring(chatId, new Exploring(true, e.back(), e.start(), e.saved() + (saved ? 1 : 0), e.unavailable() + (saved ? 0 : 1)));
+    }
+
+    /** Done (or stopped): one notice for what this run saved, one for what was no longer there. */
+    private void endExploring(String chatId, Chat chat, boolean start) {
+        Exploring e = exploring(chatId);
+        SavedUpTo.Back reached = savedUpTo.back(chatId);
+        if (start) savedUpTo.exploredBack(chatId, reached == null ? Instant.EPOCH : reached.back(), true);
+        SavedUpTo.Back b = savedUpTo.back(chatId);
+        setExploring(chatId, new Exploring(false, b == null ? null : b.back(), b != null && b.start(), e.saved(), e.unavailable()));
+        if (chat == null) return;
+        if (e.saved() > 0) progress.finished(e.saved(), chat);
+        if (e.unavailable() > 0) progress.failed(I18n.n("autosave.unavailable", e.unavailable()), chat, I18n.t("autosave.unavailableWhy"));
     }
 
     /** For tests: runs {@code then} once everything asked so far is done. */
@@ -144,9 +375,9 @@ public final class AutoSave implements ChatService.Listener {
             }
 
             @Override
-            public boolean link(String url, Path dir) throws IOException, InterruptedException {
+            public String link(String url, Path dir) throws IOException, InterruptedException {
                 Path ytDlp = YtDlp.whenNeeded(p -> { });
-                if (ytDlp == null) return false;
+                if (ytDlp == null) return I18n.t("autosave.error.noYtDlp");
                 return YtDlp.download(ytDlp, Ffmpeg.whenNeeded(p -> { }), dir, url);
             }
         };

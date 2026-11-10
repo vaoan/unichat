@@ -32,7 +32,7 @@ class FileNamesTest {
     void aFolderUnderHomeReadsFromTilde() {
         java.nio.file.Path home = java.nio.file.Path.of(System.getProperty("user.home"));
         assertEquals("~" + java.io.File.separator + "Downloads" + java.io.File.separator + "Unichat",
-                AutoSave.shown(home.resolve("Downloads").resolve("Unichat")));
-        assertEquals(java.nio.file.Path.of("/elsewhere/x").toString(), AutoSave.shown(java.nio.file.Path.of("/elsewhere/x")));
+                SaveFolders.shown(home.resolve("Downloads").resolve("Unichat")));
+        assertEquals(java.nio.file.Path.of("/elsewhere/x").toString(), SaveFolders.shown(java.nio.file.Path.of("/elsewhere/x")));
     }
 }

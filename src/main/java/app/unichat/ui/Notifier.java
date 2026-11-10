@@ -63,7 +63,12 @@ public final class Notifier {
         addAwtTray();
     }
 
+    /** Ajustes → Notificaciones: the icon shows downloads going on; a notice when they're done. On unless turned off. */
+    public static final String TRAY_PROGRESS = "downloads.trayProgress";
+    public static final String NOTIFY_DONE = "downloads.notifyDone";
     private static final int BADGED_SIZE = 32;
+    /** What saving is doing, as the icon shows it: NaN nothing, -1 going with nothing done yet, else 0..1. AWT thread. */
+    private double download = Double.NaN;
     private static final int BADGE_HEIGHT = 20;
 
     private final PopupMenu menu;
@@ -230,7 +235,7 @@ public final class Notifier {
         tooltip = count > 0 ? I18n.t("notifier.tooltipUnread", count) : "Unichat";
         if (tray != null) {
             tray.setToolTip(tooltip);
-            if (changed) tray.setImage(withCount(trayIcon, count));
+            if (changed) tray.setImage(icon());
         }
         NativeBar b = bar;
         if (b != null) {
@@ -244,6 +249,67 @@ public final class Notifier {
         } catch (Exception ignored) {
             // Badge is cosmetic.
         }
+    }
+
+    /**
+     * Saving what chats receive: {@code done} of {@code total}, a ring that fills on the icon's corner (spinning until
+     * the first is done); total 0 puts the icon back. Off in Ajustes, the icon stays as it is. Any thread.
+     */
+    public void setDownloadProgress(int done, int total) {
+        double f = total <= 0 || !Settings.get().getBool(TRAY_PROGRESS, true) ? Double.NaN : done == 0 ? -1 : (double) done / total;
+        awt(() -> {
+            if (Double.compare(f, download) == 0) return;
+            download = f;
+            if (tray != null) tray.setImage(icon());
+            NativeBar b = bar;
+            if (b != null) b.setProgress(f);
+        });
+    }
+
+    /** A round of saving ended: how many, and the chat of the last (clicking the notice opens it). Any thread. */
+    public void downloadsDone(int saved, Chat chat) {
+        Settings s = Settings.get();
+        if (!s.notificationsEnabled() || !s.getBool(NOTIFY_DONE, true)) return;
+        system(chat.id(), I18n.t("notifier.downloadsDone"), I18n.n("notifier.downloadsSaved", saved, chat.title()), TrayIcon.MessageType.INFO);
+    }
+
+    /** Something couldn't be saved: always told, with what, why and from where, whatever the other notices. Any thread. */
+    public void downloadFailed(String what, Chat chat, String why) {
+        system(chat.id(), I18n.t("notifier.downloadFailed", what), why + " · " + chat.title(), TrayIcon.MessageType.ERROR);
+    }
+
+    /** A notice of Unichat's own (not a message): macOS's own when allowed, else the card or the tray's balloon. */
+    private void system(String chatId, String title, String body, TrayIcon.MessageType type) {
+        NativeBar b = bar;
+        if (b != null && Boolean.TRUE.equals(b.notificationsAllowed())) {
+            b.notify(chatId, title, body, false);
+            return;
+        }
+        javafx.application.Platform.runLater(() -> show(title, body, chatId, type));
+    }
+
+    private BufferedImage icon() {
+        return withProgress(withCount(trayIcon, unread), download);
+    }
+
+    /** The tray icon with a ring on its lower left corner, filled {@code f} (a quarter while unknown); NaN: as it is. */
+    static BufferedImage withProgress(BufferedImage icon, double f) {
+        if (Double.isNaN(f)) return icon;
+        BufferedImage out = new BufferedImage(BADGED_SIZE, BADGED_SIZE, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = out.createGraphics();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.drawImage(icon, 0, 0, BADGED_SIZE, BADGED_SIZE, null);
+        int d = 14, x = 1, y = BADGED_SIZE - d - 1;
+        g.setColor(new java.awt.Color(0, 0, 0, 150));
+        g.fillOval(x - 1, y - 1, d + 2, d + 2);
+        g.setStroke(new java.awt.BasicStroke(3f, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
+        g.setColor(new java.awt.Color(255, 255, 255, 90));
+        g.drawOval(x + 2, y + 2, d - 4, d - 4);
+        g.setColor(new java.awt.Color(0x4F8CFF));
+        g.drawArc(x + 2, y + 2, d - 4, d - 4, 90, f < 0 ? -90 : -(int) Math.round(360 * f));
+        g.dispose();
+        return out;
     }
 
     /** The tray icon with the count in a corner, as a Windows notification area shows it: no text fits beside it. */

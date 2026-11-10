@@ -1,6 +1,5 @@
 package app.unichat.ui;
 
-import app.unichat.autosave.AutoSave;
 import app.unichat.model.Chat;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
@@ -32,11 +31,13 @@ public final class InfoPane extends ScrollPane {
     private final VBox box = new VBox(16);
     private final Runnable close;
     private final Consumer<String> toast;
+    private final ProfileMedia media;
     private Chat chat;
     /** What the panel was last built from ({@link #shown}): unchanged, it isn't built again. */
     private String built;
 
     public InfoPane(ChatService svc, Runnable close, Consumer<String> toast) {
+        this.media = new ProfileMedia(svc, () -> getScene() == null ? null : getScene().getWindow(), toast);
         this.svc = svc;
         this.close = close;
         this.toast = toast;
@@ -120,16 +121,11 @@ public final class InfoPane extends ScrollPane {
             box.getChildren().add(rem);
         }
 
-        List<Message> media = svc.messages(c.id()).stream()
-                .filter(m -> !m.deleted() && m.type() == MessageType.IMAGE && m.mediaUrl() != null).toList();
-        if (!media.isEmpty()) {
-            box.getChildren().add(section(I18n.t("info.media", media.size())));
-            FlowPane grid = new FlowPane(4, 4);
-            for (Message m : media.subList(Math.max(0, media.size() - 9), media.size())) grid.getChildren().add(thumb(m));
-            box.getChildren().add(grid);
+        List<javafx.scene.Node> shared = media.section(c);
+        if (!shared.isEmpty()) {
+            box.getChildren().add(section(I18n.t("info.mediaTitle")));
+            box.getChildren().addAll(shared);
         }
-
-        box.getChildren().addAll(autoSave(c));
 
         if (c.group() || c.members().size() > 2) {
             box.getChildren().add(section(I18n.t("info.members", c.members().size())));
@@ -159,37 +155,6 @@ public final class InfoPane extends ScrollPane {
         box.getChildren().addAll(new VBox(8, lowPrio, leave));
     }
 
-    /**
-     * "Guardar todo lo que envíen": everything others send in this chat, as it arrives, into a folder of its own
-     * ({@link AutoSave}); the folder opens from here.
-     */
-    private List<javafx.scene.Node> autoSave(Chat c) {
-        boolean on = svc.autoSaves(c.id());
-        javafx.scene.control.CheckBox box = new javafx.scene.control.CheckBox(I18n.t("info.autoSave"));
-        box.setSelected(on);
-        box.setWrapText(true);
-        box.setOnAction(e -> svc.setAutoSave(c.id(), box.isSelected()).thenRun(() -> Platform.runLater(this::refresh)));
-        java.nio.file.Path folder = AutoSave.of(svc).folder(c);
-        Label help = Labels.help(I18n.t("info.autoSaveHelp", AutoSave.shown(folder)));
-        box.setAccessibleHelp(help.getText());
-        VBox out = new VBox(4, box, help);
-        out.getStyleClass().add("info-autosave");
-        if (on) {
-            Button open = new Button(I18n.t("info.autoSaveOpen"));
-            open.getStyleClass().add("secondary-button");
-            open.setOnAction(e -> {
-                try {
-                    java.nio.file.Files.createDirectories(folder); // nothing has arrived yet: an empty folder to look at
-                    Browser.openFolder(folder, () -> Platform.runLater(() -> toast.accept(I18n.t("info.autoSaveOpenFailed"))));
-                } catch (java.io.IOException ex) {
-                    toast.accept(I18n.t("info.autoSaveOpenFailed"));
-                }
-            });
-            out.getChildren().add(open);
-        }
-        return List.of(section(I18n.t("info.autoSaveTitle")), out);
-    }
-
     /** Everything the panel draws from {@code c}, as one string to compare. */
     private String shown(Chat c) {
         StringBuilder b = new StringBuilder().append(c.id()).append('|').append(c.title()).append('|').append(c.avatarUrl())
@@ -198,15 +163,12 @@ public final class InfoPane extends ScrollPane {
                 .append('|').append(I18n.locale());
         if (c.reminderAt() != null) b.append('|').append(Formats.listStamp(c.reminderAt(), Instant.now(), ZoneId.systemDefault()))
                 .append(c.reminderAt());
-        List<Message> media = svc.messages(c.id()).stream()
-                .filter(m -> !m.deleted() && m.type() == MessageType.IMAGE && m.mediaUrl() != null).toList();
-        b.append("|media ").append(media.size());
-        for (Message m : media.subList(Math.max(0, media.size() - 9), media.size())) b.append(' ').append(m.id());
+        b.append("|media ").append(media.shown(c));
         if (c.group() || c.members().size() > 2) {
             b.append("|members ").append(c.members().size());
             for (Member m : c.members().stream().limit(100).toList()) b.append(' ').append(m.id()).append(m.displayName()).append(m.avatarUrl());
         }
-        return b.toString() + "|autoSave=" + svc.autoSaves(c.id());
+        return b.toString();
     }
 
     /**
@@ -254,24 +216,4 @@ public final class InfoPane extends ScrollPane {
         return b;
     }
 
-    private Node thumb(Message m) {
-        ImageView v = new ImageView();
-        v.setFitWidth(84);
-        v.setFitHeight(84);
-        v.getStyleClass().add("media-thumb");
-        svc.media(m.mediaUrl(), 168, 168).thenAcceptAsync(p -> {
-            try {
-                Image img = AnimatedImage.still(p, 168, 168);
-                Platform.runLater(() -> v.setImage(img));
-            } catch (java.io.IOException e) {
-                System.err.println("Could not decode a shared photo: " + e);
-            }
-        }, AnimatedImage.DECODER);
-        // A tile: reached with Tab and opened with Enter or Space, not only clicked.
-        Node tile = MediaTile.of(v, 84, 84, "media-thumb-tile", I18n.t("media.imageOpen"), true, () -> {
-            if (getScene() != null) Gallery.open(getScene().getWindow(), svc, m, toast);
-        });
-        v.setPreserveRatio(false); // a square, as before
-        return tile;
-    }
 }

@@ -440,10 +440,17 @@ public final class MockChatService implements ChatService, FolderForwarding {
     @Override public CompletableFuture<Void> setMarkedUnread(String id, boolean v) { return update(id, c -> c.setMarkedUnread(v)); }
     @Override public CompletableFuture<Void> setFavorite(String id, boolean v) { return choose(id, PreferencesFile.Flag.FAVORITE, v, c -> c.setFavorite(v)); }
     @Override public CompletableFuture<Void> setLowPriority(String id, boolean v) { return choose(id, PreferencesFile.Flag.LOW_PRIORITY, v, c -> c.setLowPriority(v)); }
-    @Override public CompletableFuture<Void> setAutoSave(String id, boolean v) { return choose(id, PreferencesFile.Flag.AUTO_SAVE, v, c -> { }); }
-    @Override public boolean autoSaves(String id) {
+    @Override public CompletableFuture<Void> setAutoSave(String id, java.util.Set<app.unichat.model.SaveKind> kinds) {
+        return update(id, c -> { if (c.prefKey() != null) prefs.chooseSaveKinds(c.prefKey(), kinds); });
+    }
+    @Override public CompletableFuture<Void> setMediaHidden(String id, boolean v) { return choose(id, PreferencesFile.Flag.MEDIA_HIDDEN, v, c -> { }); }
+    @Override public boolean mediaHidden(String id) {
         Chat c = chat(id);
-        return c != null && c.prefKey() != null && prefs.isOn(c.prefKey(), PreferencesFile.Flag.AUTO_SAVE);
+        return c != null && c.prefKey() != null && prefs.isOn(c.prefKey(), PreferencesFile.Flag.MEDIA_HIDDEN);
+    }
+    @Override public java.util.Set<app.unichat.model.SaveKind> autoSaves(String id) {
+        Chat c = chat(id);
+        return c == null || c.prefKey() == null ? java.util.Set.of() : prefs.saveKinds(c.prefKey());
     }
     @Override public CompletableFuture<Void> setArchived(String id, boolean v) { return quiet(id, v); }
     @Override public CompletableFuture<Void> setMuted(String id, boolean v) { return quiet(id, v); }
@@ -735,7 +742,6 @@ public final class MockChatService implements ChatService, FolderForwarding {
         append(chat, m);
         if (countUnread) chat.setUnreadCount(chat.unreadCount() + 1);
         fireChats();
-        listeners.forEach(l -> l.received(chat, m));
         if (!chat.muted()) listeners.forEach(l -> l.incomingMessage(chat, m));
     }
 

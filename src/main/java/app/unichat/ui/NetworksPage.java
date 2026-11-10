@@ -70,7 +70,36 @@ final class NetworksPage {
                             Ffmpeg.setAutoInstall(v);
                             refresh.run();
                         })),
-                row(I18n.t("settings.networks.converter"), null, new VBox(6, state, install)));
+                row(I18n.t("settings.networks.converter"), null, new VBox(6, state, install)),
+                row(I18n.t("settings.networks.autoSaveFolder"), I18n.t("settings.networks.autoSaveFolderHelp"), autoSaveFolder()));
+    }
+
+    /** The base folder of what chats save as it arrives; a chat can have its own (its options). */
+    private static Node autoSaveFolder() {
+        Label where = new Label();
+        where.setWrapText(true);
+        Button change = new Button(I18n.t("chatOptions.changeFolder"));
+        change.getStyleClass().add("secondary-button");
+        Button reset = new Button(I18n.t("settings.networks.autoSaveFolderReset"));
+        reset.getStyleClass().add("secondary-button");
+        Runnable redraw = () -> {
+            where.setText(app.unichat.autosave.SaveFolders.shown(app.unichat.autosave.SaveFolders.base()));
+            Nodes.show(reset, app.unichat.autosave.SaveFolders.baseChosen());
+        };
+        change.setOnAction(e -> {
+            javafx.stage.DirectoryChooser dc = new javafx.stage.DirectoryChooser();
+            dc.setTitle(I18n.t("settings.networks.autoSaveFolder"));
+            java.io.File f = dc.showDialog(change.getScene().getWindow());
+            if (f == null) return;
+            app.unichat.autosave.SaveFolders.setBase(f.toPath());
+            redraw.run();
+        });
+        reset.setOnAction(e -> {
+            app.unichat.autosave.SaveFolders.setBase(null);
+            redraw.run();
+        });
+        redraw.run();
+        return new VBox(6, where, new javafx.scene.layout.FlowPane(8, 6, change, reset));
     }
 
     /** Options that only make sense for one network; each network gets its own group. */

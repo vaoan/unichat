@@ -185,7 +185,12 @@ public final class SettingsWindow {
                 dockRow(s),
                 shortcutRow(s),
         };
-        return page(I18n.t("settings.nav.notifications"), group(I18n.t("settings.notifications.desktop"), java.util.Arrays.stream(rows).filter(java.util.Objects::nonNull).toArray(Node[]::new)));
+        return page(I18n.t("settings.nav.notifications"), group(I18n.t("settings.notifications.desktop"), java.util.Arrays.stream(rows).filter(java.util.Objects::nonNull).toArray(Node[]::new)),
+                group(I18n.t("settings.notifications.downloads"),
+                        row(I18n.t("settings.notifications.downloadsRing"), I18n.t("settings.notifications.downloadsRingHelp"),
+                                toggle(s.getBool(Notifier.TRAY_PROGRESS, true), v -> s.setBool(Notifier.TRAY_PROGRESS, v))),
+                        row(I18n.t("settings.notifications.downloadsDone"), I18n.t("settings.notifications.downloadsDoneHelp"),
+                                toggle(s.getBool(Notifier.NOTIFY_DONE, true), v -> s.setBool(Notifier.NOTIFY_DONE, v)))));
     }
 
     /** Without a Dock icon a Mac app isn't in ⌘Tab; null elsewhere. */

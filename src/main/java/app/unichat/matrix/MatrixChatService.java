@@ -374,9 +374,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 // History a bridge backfills or resends arrives as new events: only what's really new is announced.
                 if (!notifyGate.isNew(m, now)) continue;
                 Chat c = chat(m.chatId());
-                if (c == null || c.bridgeBot()) continue;
-                core.fire(l -> l.received(c, m));
-                if (!c.muted()) core.fire(l -> l.incomingMessage(c, m));
+                if (c != null && !c.muted() && !c.bridgeBot()) core.fire(l -> l.incomingMessage(c, m));
             }
         }
         for (String roomId : r.invites) autoJoin(roomId);
@@ -575,8 +573,10 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public CompletableFuture<Void> setMarkedUnread(String chatId, boolean unread) { return chatActions.setMarkedUnread(chatId, unread); }
     @Override public CompletableFuture<Void> setFavorite(String chatId, boolean favorite) { return chatActions.setFavorite(chatId, favorite); }
     @Override public CompletableFuture<Void> setLowPriority(String chatId, boolean lowPriority) { return chatActions.setLowPriority(chatId, lowPriority); }
-    @Override public CompletableFuture<Void> setAutoSave(String chatId, boolean on) { return chatActions.setAutoSave(chatId, on); }
-    @Override public boolean autoSaves(String chatId) { return chatActions.autoSaves(chatId); }
+    @Override public CompletableFuture<Void> setAutoSave(String chatId, java.util.Set<app.unichat.model.SaveKind> kinds) { return chatActions.setAutoSave(chatId, kinds); }
+    @Override public java.util.Set<app.unichat.model.SaveKind> autoSaves(String chatId) { return chatActions.autoSaves(chatId); }
+    @Override public CompletableFuture<Void> setMediaHidden(String chatId, boolean hidden) { return chatActions.setMediaHidden(chatId, hidden); }
+    @Override public boolean mediaHidden(String chatId) { return chatActions.mediaHidden(chatId); }
     @Override public CompletableFuture<Void> setArchived(String chatId, boolean archived) { return chatActions.setArchived(chatId, archived); }
     @Override public CompletableFuture<Void> setPinned(String chatId, boolean pinned) { return chatActions.setPinned(chatId, pinned); }
     @Override public CompletableFuture<Void> setMuted(String chatId, boolean muted) { return chatActions.setMuted(chatId, muted); }

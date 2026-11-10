@@ -41,6 +41,7 @@ public final class ThreadPane extends BorderPane {
     private final Composer composer;
     private final AudioPlayback audio;
     private final MessageMedia media;
+    private Consumer<Chat> onOptions;
     private final MessageActionsUi messageActions;
 
     /** The message actions (reacting), for tests. */
@@ -161,7 +162,11 @@ public final class ThreadPane extends BorderPane {
         infoButton.setAccessibleText(I18n.t("thread.chatInfo"));
         Button more = Icons.iconButton(Icons.MORE, I18n.t("thread.moreOptions"), null);
         more.setOnAction(e -> ChatMenus.forChat(chat, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4));
-        HBox header = new HBox(10, headerAvatar, titles, favButton, archiveButton, infoButton, more);
+        Button options = Icons.iconButton(Icons.SETTINGS, I18n.t("thread.chatOptions"), () -> {
+            if (chat != null && onOptions != null) onOptions.accept(chat);
+        });
+        options.getStyleClass().add("chat-options-button");
+        HBox header = new HBox(10, headerAvatar, titles, favButton, archiveButton, infoButton, options, more);
         header.getStyleClass().add("thread-header");
         header.setAlignment(Pos.CENTER_LEFT);
         titles.setOnMouseClicked(e -> toggleInfo.run());
@@ -217,6 +222,9 @@ public final class ThreadPane extends BorderPane {
 
     /** Called with a server's id when its name in the header is clicked. */
     public void setOnShowServer(Consumer<String> r) { this.onShowServer = r; }
+
+    /** The gear in the header: the chat's own options ({@link ChatOptions}). */
+    void setOnOptions(Consumer<Chat> r) { this.onOptions = r; }
 
     public void refreshHeader() {
         if (chat == null) return;

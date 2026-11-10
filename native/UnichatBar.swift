@@ -10,6 +10,8 @@
 //   notify <chat id> <sound 0|1> <title> <body>   a system notification (Notification Center, Do Not Disturb…)
 //   clear <chat id>       removes that chat's notifications (it was read)
 //   hotkey <0|1>          turns the global shortcut (⌃⌥U) off or on
+//   progress <f>          saving what chats receive: a ring on the icon's lower corner filled f (0..1), spinning while
+//                         -1; empty takes it away
 // It writes to stdout: "click <tag>" when a menu item is chosen, "show" on a left click of the icon while leftmenu is 0
 // (a right click, or Control and click, always opens the menu), "open <chat id>" when a notification is clicked,
 // "hotkey" when the global shortcut is pressed,
@@ -123,6 +125,56 @@ final class Hotkey {
     }
 }
 
+/** A small ring that fills as saving goes on, spinning while nothing is done yet. Its own view, like the unread dot. */
+final class Ring: NSView {
+    var fraction: CGFloat = -1 {
+        didSet {
+            spin(fraction < 0)
+            needsDisplay = true
+        }
+    }
+    private var angle: CGFloat = 90
+    private var timer: Timer?
+
+    private func spin(_ on: Bool) {
+        if on, timer == nil {
+            timer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                self.angle -= 30
+                self.needsDisplay = true
+            }
+            RunLoop.main.add(timer!, forMode: .common) // also while a menu is open
+        } else if !on {
+            timer?.invalidate()
+            timer = nil
+        }
+    }
+
+    override func removeFromSuperview() {
+        spin(false)
+        super.removeFromSuperview()
+    }
+
+    override func draw(_ dirty: NSRect) {
+        let r = bounds.insetBy(dx: 1.5, dy: 1.5)
+        NSColor.windowBackgroundColor.withAlphaComponent(0.85).setFill()
+        NSBezierPath(ovalIn: bounds).fill()
+        let track = NSBezierPath(ovalIn: r)
+        track.lineWidth = 1.5
+        NSColor.labelColor.withAlphaComponent(0.3).setStroke()
+        track.stroke()
+        let arc = NSBezierPath()
+        let start = fraction < 0 ? angle : 90
+        let length = fraction < 0 ? 90 : 360 * max(0, min(1, fraction))
+        arc.appendArc(withCenter: NSPoint(x: bounds.midX, y: bounds.midY), radius: r.width / 2,
+                      startAngle: start, endAngle: start - length, clockwise: true)
+        arc.lineWidth = 2
+        arc.lineCapStyle = .round
+        NSColor.controlAccentColor.setStroke()
+        arc.stroke()
+    }
+}
+
 final class Bar: NSObject, NSMenuDelegate {
     /** Apple's menu-bar icons are about 16–18 pt tall in a 22 pt bar. */
     static let size: CGFloat = 18
@@ -151,6 +203,9 @@ final class Bar: NSObject, NSMenuDelegate {
             unreadDot.isHidden = true
             unreadDot.setAccessibilityElement(false) // the count and the tooltip say it
             button.addSubview(unreadDot)
+            ring.isHidden = true
+            ring.setAccessibilityElement(false)
+            button.addSubview(ring)
             button.postsFrameChangedNotifications = true
             NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: button, queue: .main) { [weak self] _ in
                 self?.placeDot()
@@ -164,12 +219,16 @@ final class Bar: NSObject, NSMenuDelegate {
      */
     static let dot: CGFloat = 7
     private let unreadDot = NSView(frame: NSRect(x: 0, y: 0, width: Bar.dot, height: Bar.dot))
+    static let ringSize: CGFloat = 9
+    private let ring = Ring(frame: NSRect(x: 0, y: 0, width: Bar.ringSize, height: Bar.ringSize))
 
     private func placeDot() {
         guard let button = item.button, let cell = button.cell as? NSButtonCell else { return }
         let icon = cell.imageRect(forBounds: button.bounds)
         // The button is flipped: y grows downwards, so the icon's top is its minY.
         unreadDot.frame = NSRect(x: icon.maxX - Bar.dot + 1, y: icon.minY - 1, width: Bar.dot, height: Bar.dot)
+        // Lower right corner, where the dot isn't.
+        ring.frame = NSRect(x: icon.maxX - Bar.ringSize + 1, y: icon.maxY - Bar.ringSize + 1, width: Bar.ringSize, height: Bar.ringSize)
     }
 
     /**
@@ -245,6 +304,12 @@ final class Bar: NSObject, NSMenuDelegate {
             if parts.count > 1 { notes.clear(chat: parts[1]) }
         case "hotkey":
             hotkey.set(on: parts.count > 1 && parts[1] == "1")
+        case "progress":
+            let value = parts.count > 1 ? Double(parts[1]) : nil
+            ring.isHidden = value == nil
+            ring.fraction = CGFloat(value ?? 0)
+            if value == nil { ring.fraction = 0 } // stops the spinning
+            placeDot()
         default:
             break
         }

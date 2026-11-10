@@ -18,4 +18,11 @@ class YtDlpTest {
         assertEquals("/t/ffmpeg", c.get(c.indexOf("--ffmpeg-location") + 1));
         assertTrue(!YtDlp.command(Path.of("y"), null, Path.of("d"), "https://x").contains("--ffmpeg-location"));
     }
+
+    @Test
+    void theReasonIsYtDlpsOwnErrorLine() {
+        assertEquals("Video unavailable", YtDlp.reason("[youtube] abc: Downloading webpage\nERROR: [youtube] abc: Video unavailable\n"));
+        assertEquals("Unsupported URL: https://x.org", YtDlp.reason("WARNING: x\nERROR: Unsupported URL: https://x.org"));
+        assertEquals("algo raro", YtDlp.reason("algo raro\n"), "no ERROR line: the last one");
+    }
 }

@@ -26,11 +26,6 @@ public interface ChatService extends ChatSession, ChatReader, MediaSource, ChatM
         default void connectionChanged(ConnectionState state) {}
         /** A new incoming message that should produce a desktop notification (respects mute). */
         default void incomingMessage(Chat chat, Message message) {}
-        /**
-         * Every new message from someone else, as it arrives (not history nor a bridge's backfill), muted chats too;
-         * never a bridge bot's chat. What saving everything a chat receives listens to.
-         */
-        default void received(Chat chat, Message message) {}
         /** A chat reminder came due. */
         default void reminderDue(Chat chat) {}
     }
