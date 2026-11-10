@@ -241,9 +241,7 @@ final class ProfileMedia {
         String thumb = m.mediaInfo() == null ? "" : m.mediaInfo().path("thumbnail_url").asText("");
         if (!thumb.isEmpty()) load(v, thumb);
         javafx.scene.layout.StackPane tile = MediaTile.of(v, TILE, TILE, "media-thumb-tile", I18n.t("media.videoOpen"), true, () -> {
-            if (window.get() == null) return;
-            VideoViewer.show(window.get(), svc.media(m.mediaUrl(), 0, 0), I18n.t("video.title"),
-                    () -> MediaSaver.save(window.get(), svc, m, toast), p -> Browser.openFile(p, () -> toast.accept(I18n.t("video.openFailed"))));
+            if (window.get() != null) MediaOpening.video(window.get(), svc, m, I18n.t("video.title"), audio, toast);
         });
         tile.getChildren().add(Icons.icon(Icons.PLAY, 22));
         return goesToItsMessage(tile, m);
@@ -289,10 +287,7 @@ final class ProfileMedia {
         b.getStyleClass().add("profile-file");
         b.setMaxWidth(Double.MAX_VALUE);
         b.setAccessibleText(name + ", " + meta.getText());
-        b.setOnAction(e -> svc.media(m.mediaUrl(), 0, 0).whenComplete((p, err) -> {
-            if (err != null) Platform.runLater(() -> toast.accept(I18n.t("media.downloadFailed")));
-            else Browser.openFile(p, () -> toast.accept(I18n.t("media.openFailed")));
-        }));
+        b.setOnAction(e -> MediaOpening.file(svc, m, toast));
         return withJump(b, m);
 
     }

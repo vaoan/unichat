@@ -38,34 +38,44 @@ public final class Notifier {
         toast = MAC ? new DesktopToast(onOpen) : null;
         this.onOpen = onOpen;
         this.onShow = onShow;
-        if (GraphicsEnvironment.isHeadless()) { // tests, snapshot runs: no tray, and AWT menus can't be built
-            this.menu = null;
-            this.windowItem = this.notificationsItem = this.quitItem = null;
+        awt(() -> build(onHide, onQuit));
+    }
+
+    /**
+     * The menu and the icon, on AWT's thread (on macOS it shares the main thread with JavaFX: AWT called from the FX
+     * thread hung the app). Then {@link #ready} says whether there is a tray.
+     */
+    private void build(Runnable onHide, Runnable onQuit) {
+        if (GraphicsEnvironment.isHeadless() || disposed) { // tests, snapshot runs: no tray, and AWT menus can't be built
+            ready.complete(false);
             return;
         }
-        PopupMenu menu = new PopupMenu();
-        MenuItem window = new MenuItem();
-        this.windowItem = window;
-        window.addActionListener(e -> (windowShown ? onHide : onShow).run());
-        MenuItem notifications = new MenuItem();
-        this.notificationsItem = notifications;
-        notifications.addActionListener(e -> {
+        PopupMenu popup = new PopupMenu();
+        windowItem = new MenuItem();
+        windowItem.addActionListener(e -> (windowShown ? onHide : onShow).run());
+        notificationsItem = new MenuItem();
+        notificationsItem.addActionListener(e -> {
             Settings.get().setNotificationsEnabled(!Settings.get().notificationsEnabled());
             relabel();
         });
-        MenuItem quit = new MenuItem();
-        this.quitItem = quit;
-        quit.addActionListener(e -> onQuit.run());
-        menu.add(window);
-        menu.add(notifications);
-        menu.add(quit);
-        this.menu = menu;
+        quitItem = new MenuItem();
+        quitItem.addActionListener(e -> onQuit.run());
+        popup.add(windowItem);
+        popup.add(notificationsItem);
+        popup.add(quitItem);
+        menu = popup;
         current = this;
         labelNow();
         // macOS: the native item (narrow, real menu, like Apple's own); the AWT TrayIcon if it's missing or dies.
-        if (MAC && startNativeBar()) return;
-        addAwtTray();
+        if (!MAC || !startNativeBar()) addAwtTray();
+        ready.complete(hasTray());
     }
+
+    /**
+     * Completes, on AWT's thread, once the tray is built: true if there is one (the menu-bar item or the tray icon).
+     * Until then the window can't count on being put away in it.
+     */
+    public java.util.concurrent.CompletableFuture<Boolean> ready() { return ready; }
 
     /** Ajustes → Notificaciones: the icon shows downloads going on; a notice when they're done. On unless turned off. */
     public static final String TRAY_PROGRESS = "downloads.trayProgress";
@@ -75,9 +85,11 @@ public final class Notifier {
     private double download = Double.NaN;
     private static final int BADGE_HEIGHT = 20;
 
-    private final PopupMenu menu;
-    /** The menu's own items, by name: the cloud's lines go above them, so their places change. */
-    private final MenuItem windowItem, notificationsItem, quitItem;
+    private final java.util.concurrent.CompletableFuture<Boolean> ready = new java.util.concurrent.CompletableFuture<>();
+    /** Null until built, and without a display. AWT thread. */
+    private PopupMenu menu;
+    /** The menu's own items, by name: the cloud's lines go above them, so their places change. AWT thread. */
+    private MenuItem windowItem, notificationsItem, quitItem;
     /** The cloud's lines shown at the menu's top (and their separator), and what they say. AWT thread. */
     private final java.util.List<MenuItem> cloudItems = new java.util.ArrayList<>();
     private java.util.List<String> cloudLines = java.util.List.of();
@@ -97,8 +109,8 @@ public final class Notifier {
 
     /** The tray and menu-bar menu in the current language and state. Any thread. */
     public void relabel() {
-        if (menu == null) return;
-        EventQueue.invokeLater(() -> {
+        awt(() -> {
+            if (menu == null) return;
             labelNow();
             NativeBar b = bar;
             if (b != null) b.syncMenu();
@@ -271,10 +283,10 @@ public final class Notifier {
      * not clickable), and the icon's ring while files go up and nothing is being saved. Any thread.
      */
     public void setCloud(app.unichat.cloud.Cloud.Status s) {
-        if (menu == null) return;
         java.util.List<String> lines = CloudTexts.menuLines(s, java.time.Instant.now());
         double ring = Settings.get().getBool(TRAY_PROGRESS, true) ? CloudTexts.ring(s) : Double.NaN;
         awt(() -> {
+            if (menu == null) return;
             if (!lines.equals(cloudLines)) {
                 cloudItems.forEach(menu::remove);
                 cloudItems.clear();
@@ -385,14 +397,17 @@ public final class Notifier {
         return out;
     }
 
+    /** After the tray was built, if it's still being built: both on AWT's thread. */
     public void dispose() {
         disposed = true;
-        NativeBar b = bar;
-        bar = null;
-        if (b != null) b.close();
-        TrayIcon t = tray;
-        tray = null;
-        if (t != null) awt(() -> SystemTray.getSystemTray().remove(t));
+        awt(() -> {
+            NativeBar b = bar;
+            bar = null;
+            if (b != null) b.close();
+            TrayIcon t = tray;
+            tray = null;
+            if (t != null) SystemTray.getSystemTray().remove(t);
+        });
     }
 
     /** AWT calls must not run on the JavaFX thread (they share the AppKit main thread on macOS). */

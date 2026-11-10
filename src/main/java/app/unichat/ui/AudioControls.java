@@ -85,7 +85,7 @@ final class AudioControls extends HBox {
         if (!position.isValueChanging()) position.setValue(total > 0 ? Math.min(1, now / total) : 0);
         updating = false;
         // A length nobody reported isn't 0:00: that reads as an empty audio.
-        String length = total > 0 ? VideoViewer.clock(total) : "";
-        time.setText(!mine ? length : total > 0 ? VideoViewer.clock(now) + " / " + length : VideoViewer.clock(now));
+        String length = total > 0 ? Formats.clock(total) : "";
+        time.setText(!mine ? length : total > 0 ? Formats.clock(now) + " / " + length : Formats.clock(now));
     }
 }

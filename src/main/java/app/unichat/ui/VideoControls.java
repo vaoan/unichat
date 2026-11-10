@@ -84,7 +84,7 @@ final class VideoControls extends VBox {
         full = Icons.iconButton(Icons.FULLSCREEN, I18n.t("video.fullScreen"), this::toggleFullScreen);
         speedMenu();
 
-        Label time = new Label(VideoViewer.clock(0));
+        Label time = new Label(Formats.clock(0));
         time.getStyleClass().add("video-time");
         time.setMinWidth(Region.USE_PREF_SIZE);
         HBox.setMargin(time, new javafx.geometry.Insets(0, 0, 0, 8));
@@ -128,7 +128,7 @@ final class VideoControls extends VBox {
         boolean[] fromPlayer = {false};
         p.currentTimeProperty().addListener((o, a, now) -> {
             double total = p.getTotalDuration().toSeconds();
-            time.setText(VideoViewer.clock(now.toSeconds()) + " / " + VideoViewer.clock(total));
+            time.setText(Formats.clock(now.toSeconds()) + " / " + Formats.clock(total));
             if (position.isValueChanging() || !(total > 0)) return;
             fromPlayer[0] = true;
             position.setValue(now.toSeconds() / total);

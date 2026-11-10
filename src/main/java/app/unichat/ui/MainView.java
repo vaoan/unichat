@@ -200,16 +200,10 @@ public final class MainView extends StackPane {
     private final javafx.beans.value.ChangeListener<Boolean> onFocused = this::focusChanged;
 
     private void showingChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean showing) {
-        if (!showing) return;
-        Redraws.PENDING.incrementAndGet(); // the window shown again is brought up to date: a redraw to come
-        Platform.runLater(() -> {
-            try {
-                catchUp();
-            } finally {
-                Redraws.PENDING.decrementAndGet();
-            }
-        });
+        if (showing) catchingUp.request(); // the window shown again is brought up to date: a redraw to come
     }
+
+    private final FxCoalescer catchingUp = new FxCoalescer(this::catchUp);
 
     private void focusChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean focused) {
         if (focused && thread.chat() != null) svc.markRead(thread.chat().id());

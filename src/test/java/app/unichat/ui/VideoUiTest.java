@@ -352,13 +352,4 @@ class VideoUiTest {
         await(() -> viewer.getProperties().get(VideoViewer.PLAYER) instanceof MediaPlayer p && p.getStatus() == MediaPlayer.Status.PLAYING, "plays converted");
         fx(() -> { viewer.close(); owner.close(); return null; });
     }
-
-    @Test
-    void theClockReadsLikeAClock() {
-        assertEquals("0:00", VideoViewer.clock(0));
-        assertEquals("1:05", VideoViewer.clock(65));
-        assertEquals("10:05", VideoViewer.clock(605));
-        assertEquals("1:02:05", VideoViewer.clock(3725));
-        assertEquals("0:00", VideoViewer.clock(Double.NaN));
-    }
 }

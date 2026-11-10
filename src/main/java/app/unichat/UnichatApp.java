@@ -88,12 +88,15 @@ public final class UnichatApp extends Application {
                 if (mainView != null) mainView.openChatId(id);
             });
         }, this::quit);
-        Platform.setImplicitExit(!notifier.hasTray());
+        // The tray is built on AWT's thread: what depends on it waits until it exists.
+        notifier.ready().thenAccept(tray -> Platform.runLater(() -> {
+            Platform.setImplicitExit(!tray);
+            DockIcon.setTrayAvailable(tray);
+        }));
         javafx.beans.InvalidationListener shown = o -> notifier.setWindowShown(stage.isShowing() && !stage.isIconified());
         stage.showingProperty().addListener(shown);
         stage.iconifiedProperty().addListener(shown);
         watchFocus();
-        DockIcon.setTrayAvailable(notifier.hasTray());
         // macOS "Salir" (⌘Q, app menu, Dock, logout) quits for real; closing the window only hides it in the tray.
         MacQuit.install(this::quit, () -> {
             if (TrayReopen.shouldShow(stage.isShowing(), System.currentTimeMillis() - hiddenAt)) showWindow();

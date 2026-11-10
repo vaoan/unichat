@@ -1,15 +1,8 @@
 package app.unichat.ui;
 
 import app.unichat.model.Chat;
-import app.unichat.model.VoiceNote;
-import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
-import app.unichat.voice.Microphone;
-import app.unichat.voice.VoiceEnhancer;
 import app.unichat.voice.PcmSource;
-import app.unichat.voice.VoiceRecorder;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import app.unichat.model.Message;
 import app.unichat.service.ChatService;
@@ -48,14 +41,7 @@ import java.util.function.Consumer;
  * input edits your last message, Esc cancels reply/edit. Drafts are kept per chat.
  */
 public final class Composer extends VBox {
-    private static final long MIN_VOICE_MS = 700;
-
     private final ChatService svc;
-    /** The AI's draft in each chat, to compare with what's sent. */
-    private final app.unichat.assist.DraftCorrections aiDrafts = new app.unichat.assist.DraftCorrections();
-    /** The program that learns how the person writes; tests put theirs, as for drafts. */
-    private volatile java.util.function.Supplier<app.unichat.assist.StyleLearner.Program> learning =
-            () -> app.unichat.assist.StyleLearner.program(app.unichat.assist.AiSettings.engine());
     private final TextArea input = new TextArea() {
         @Override public void paste() { // ⌘V and the menu's Paste alike
             if (!pasteMedia()) super.paste();
@@ -81,25 +67,15 @@ public final class Composer extends VBox {
     private final VBox frame;
     private final Region rowGrow = new Region();
     private boolean stacked;
-    private boolean fitPending;
     /** Held here: the global properties only keep a weak reference, so a closed chat's composer can go. */
     private final javafx.beans.InvalidationListener frameFit;
     /** Below this many characters' width the text goes on its own line (160 % text, a narrow window, the info panel). */
     private static final double MIN_INPUT_EM = 14;
     private final Button send;
-    private final Button mic;
-    private AiReplyButton ai;
-    private AiReplyButton fix;
-    private String fixing;
-    /** Holding a key repeats it, and each press after the first would cancel. */
-    private KeyCode aiKeyHeld;
-    private final VBox aiStatus = new VBox();
-    /** "Preparing the voice note… 3 s": cleaning it up takes seconds, and before it's sent nothing else shows. */
-    private final WorkingLine preparing = new WorkingLine();
-    private VoiceBar voiceBar;
-    private VoiceRecorder recorder;
-    private Runnable beforeRecording = () -> { };
-    private Callable<PcmSource> microphone = Microphone::open;
+    private final VoiceRecording voice;
+    private final ComposerAi ai;
+    /** The rounded box, or the voice bar while recording: what's in its place. */
+    private Node boxShown;
 
     public Composer(ChatService svc, Consumer<String> onError) {
         this.svc = svc;
@@ -141,50 +117,69 @@ public final class Composer extends VBox {
         send.disableProperty().bind(input.textProperty().map(t -> t.isBlank()));
 
         this.send = send;
-        mic = Icons.iconButton(Icons.MIC, I18n.t("composer.record"), this::startRecording);
-        mic.getStyleClass().add("mic-button");
-        ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, this::aiDone, AiReplyButton::replyWriter);
-        fix = new AiReplyButton(AiReplyButton.FIX, this::fixRequest, this::fixed, onError, this::aiDone, AiReplyButton::fixWriter);
-        row = new HBox(4, attach, input, ai.node(), fix.node(), emoji, mic, send);
+        voice = new VoiceRecording(svc, onError, new VoiceRecording.Box() {
+            @Override public String chatId() { return chatId; }
+
+            @Override public String replyId() { return replyTo == null ? null : replyTo.id(); }
+
+            @Override public void cancelMode() { Composer.this.cancelMode(); }
+
+            @Override public void focus() { Composer.this.focus(); }
+
+            @Override public void showInstead(Node bar) { Composer.this.showInstead(bar); }
+        });
+        ai = new ComposerAi(svc, input, drafts, onError, new ComposerAi.Box() {
+            @Override public String chatId() { return chatId; }
+
+            @Override public Message replyTo() { return replyTo; }
+
+            @Override public void reply(Message m) { Composer.this.reply(m); }
+
+            @Override public void focus() { Composer.this.focus(); }
+        });
+        row = new HBox(4, attach, input, ai.replyButton(), ai.fixButton(), emoji, voice.button(), send);
         row.setAlignment(Pos.BOTTOM_CENTER);
         frame = new VBox(2, row);
         frame.getStyleClass().add("composer-row");
         // Again when the room changes: the width, the text size (icons grow with it), the AI buttons coming or going.
         // Decided right after the layout that changed the width, not during it: moving the text box mid-layout (the window
         // coming back from a notification's click) left the frame at the stacked height with the text beside the buttons.
-        javafx.beans.InvalidationListener fit = o -> {
-            if (fitPending) return;
-            fitPending = true;
-            Redraws.PENDING.incrementAndGet(); // a redraw to come: what's measured before it is the half-moved box
-            Platform.runLater(() -> {
-                fitPending = false;
-                try {
-                    stack(frame.getWidth() < buttonsWidth() + MIN_INPUT_EM * input.getFont().getSize());
-                } finally {
-                    Redraws.PENDING.decrementAndGet();
-                }
-            });
-        };
+        FxCoalescer refit = new FxCoalescer(() -> stack(frame.getWidth() < buttonsWidth() + MIN_INPUT_EM * input.getFont().getSize()));
+        javafx.beans.InvalidationListener fit = o -> refit.request();
         frame.widthProperty().addListener(fit);
         Icons.SCALE.addListener(new javafx.beans.WeakInvalidationListener(fit));
         AiReplyButton.SHOWN.addListener(new javafx.beans.WeakInvalidationListener(fit));
         frameFit = fit;
-        aiStatus.getChildren().addAll(ai.status(), fix.status(), preparing.node());
-        getChildren().addAll(banner, aiStatus, frame);
+        VBox statuses = new VBox();
+        statuses.getChildren().addAll(ai.statuses());
+        statuses.getChildren().add(voice.status());
+        boxShown = frame;
+        getChildren().addAll(banner, statuses, frame);
         input.textProperty().addListener((o, a, t) -> refreshVoice());
-        input.textProperty().addListener((o, a, t) -> { if (t.isBlank()) aiDrafts.forget(chatId); }); // a draft thrown away
         refreshVoice();
 
-        setOnDragOver(e -> {
+        acceptDrops(this);
+        typingStop.setOnFinished(e -> stopTyping());
+    }
+
+    /** Files dropped on {@code target} (this box, the timeline above it) are sent to the open chat. */
+    void acceptDrops(Node target) {
+        target.setOnDragOver(e -> {
             if (e.getDragboard().hasFiles()) e.acceptTransferModes(TransferMode.COPY);
             e.consume();
         });
-        setOnDragDropped(e -> {
+        target.setOnDragDropped(e -> {
             sendFiles(e.getDragboard().getFiles());
             e.setDropCompleted(true);
             e.consume();
         });
-        typingStop.setOnFinished(e -> stopTyping());
+    }
+
+    /** {@code bar} where the rounded box is (recording a voice note); null puts the box back. */
+    private void showInstead(Node bar) {
+        Node now = bar == null ? frame : bar;
+        getChildren().set(getChildren().indexOf(boxShown), now);
+        boxShown = now;
     }
 
     public void setChat(String newChatId) {
@@ -192,7 +187,7 @@ public final class Composer extends VBox {
             stopTyping();
             drafts.put(chatId, editing == null ? input.getText() : "");
         }
-        if (recorder != null) discardRecording(I18n.t("composer.recordingDiscarded"));
+        voice.discardIfRecording(I18n.t("composer.recordingDiscarded"));
         chatId = newChatId;
         replyTo = null;
         editing = null;
@@ -239,7 +234,7 @@ public final class Composer extends VBox {
      * the character lands in the box. False while it can't take text (recording a voice note).
      */
     boolean takeTyping() {
-        if (chatId == null || !input.isVisible() || input.isDisabled() || voiceBar != null) return false;
+        if (chatId == null || !input.isVisible() || input.isDisabled() || voice.recording()) return false;
         input.requestFocus();
         input.end();
         return true;
@@ -249,225 +244,29 @@ public final class Composer extends VBox {
     void refreshVoice() {
         Chat c = chatId == null ? null : svc.chat(chatId);
         boolean offer = c != null && c.features().voiceSend() != null && input.getText().isBlank() && editing == null;
-        Nodes.show(mic, offer);
+        Nodes.show(voice.button(), offer);
         Nodes.show(send, !offer);
     }
 
     /** Runs before a recording starts: what's playing shouldn't end up in it. */
-    void setBeforeRecording(Runnable r) { beforeRecording = r; }
+    void setBeforeRecording(Runnable r) { voice.setBeforeRecording(r); }
 
-    void setMicrophone(Callable<PcmSource> source) { microphone = source; }
-
-    private void startRecording() {
-        beforeRecording.run();
-        mic.setDisable(true);
-        // Opening it can wait for the system's permission question.
-        Thread.ofPlatform().daemon().name("open-microphone").start(() -> {
-            try {
-                PcmSource source = microphone.call();
-                Path file = Settings.get().cacheDir().resolve("media").resolve("voice-" + java.util.UUID.randomUUID() + ".ogg");
-                VoiceRecorder r = new VoiceRecorder(source, file);
-                Platform.runLater(() -> showRecording(r));
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    mic.setDisable(false);
-                    onError.accept(e.getMessage() != null ? e.getMessage() : I18n.t("composer.micFailed"));
-                });
-            }
-        });
-    }
-
-    private void showRecording(VoiceRecorder r) {
-        recorder = r;
-        mic.setDisable(false);
-        voiceBar = new VoiceBar(r, () -> discardRecording(null), this::sendRecording, this::discardRecording);
-        getChildren().set(getChildren().indexOf(frame), voiceBar);
-        r.start();
-        voiceBar.focusSend();
-    }
-
-    private VoiceRecorder endRecordingUi() {
-        VoiceRecorder r = recorder;
-        recorder = null;
-        if (voiceBar != null) getChildren().set(getChildren().indexOf(voiceBar), frame);
-        voiceBar = null;
-        return r;
-    }
-
-    private void discardRecording(String message) {
-        VoiceRecorder r = endRecordingUi();
-        if (r == null) return;
-        Thread.ofPlatform().daemon().name("voice-discard").start(() -> {
-            try {
-                r.cancel();
-            } catch (Exception e) {
-                System.err.println("Could not discard a recording: " + e.getClass().getSimpleName());
-            }
-        });
-        if (message != null) onError.accept(message);
-        focus();
-    }
-
-    private void sendRecording() {
-        VoiceRecorder r = endRecordingUi();
-        if (r == null) return;
-        String toChat = chatId;
-        String reply = replyTo == null ? null : replyTo.id();
-        cancelMode();
-        focus();
-        preparing.start(I18n.t("composer.voicePreparing"));
-        Thread.ofPlatform().daemon().name("voice-send").start(() -> {
-            try {
-                VoiceNote note = r.stop();
-                if (note.durationMs() < MIN_VOICE_MS) {
-                    r.deleteRaw();
-                    Files.deleteIfExists(note.file());
-                    Platform.runLater(() -> onError.accept(I18n.t("composer.voiceTooShort")));
-                    return;
-                }
-                boolean[] told = {false};
-                VoiceNote improved = VoiceEnhancer.improve(note, r.raw(), r.rate(), done -> {
-                    if (told[0]) return;
-                    told[0] = true;
-                    Platform.runLater(() -> onError.accept(I18n.t("composer.installingEnhancer")));
-                }, () -> Platform.runLater(() -> onError.accept(I18n.t("composer.voiceNotCleaned"))));
-                r.deleteRaw();
-                svc.sendVoice(toChat, improved, reply).exceptionally(err -> {
-                    Platform.runLater(() -> onError.accept(I18n.t("composer.voiceSendFailed")));
-                    return null;
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> onError.accept(I18n.t("composer.voiceSaveFailed")));
-            } finally {
-                Platform.runLater(preparing::stop); // sent (it shows in the chat) or failed (said so)
-            }
-        });
-    }
+    void setMicrophone(Callable<PcmSource> source) { voice.setMicrophone(source); }
 
     /** Tests: a stand-in for the AI program. */
-    void useAiWriter(java.util.function.Supplier<AiReplyButton.Writer> writers) {
-        learning = () -> {
-            AiReplyButton.Writer w = writers.get();
-            return new app.unichat.assist.StyleLearner.Program() {
-                @Override public String write(String prompt) throws app.unichat.assist.ReplyWriter.Failure { return w.write(prompt); }
-
-                @Override public void cancel() { w.cancel(); }
-            };
-        };
-        HBox parent = row;
-        int at = parent.getChildren().indexOf(ai.node());
-        ai = new AiReplyButton(AiReplyButton.REPLY, this::aiRequest, this::aiDraft, onError, this::aiDone, writers);
-        parent.getChildren().set(at, ai.node());
-        aiStatus.getChildren().set(0, ai.status());
-    }
+    void useAiWriter(java.util.function.Supplier<AiReplyButton.Writer> writers) { ai.useAiWriter(writers); }
 
     /** Tests: a stand-in for the AI program that corrects. */
-    void useFixWriter(java.util.function.Supplier<AiReplyButton.Writer> writers) {
-        int at = row.getChildren().indexOf(fix.node());
-        fix = new AiReplyButton(AiReplyButton.FIX, this::fixRequest, this::fixed, onError, this::aiDone, writers);
-        row.getChildren().set(at, fix.node());
-        aiStatus.getChildren().set(1, fix.status());
-    }
+    void useFixWriter(java.util.function.Supplier<AiReplyButton.Writer> writers) { ai.useFixWriter(writers); }
 
-    /** Only what's written goes: not the chat, nor the instructions for replies. Null with nothing written. */
-    private AiReplyButton.Request fixRequest() {
-        if (chatId == null || input.getText().isBlank()) return null;
-        fixing = input.getText();
-        String text = fixing;
-        return new AiReplyButton.Request(chatId, () -> app.unichat.assist.FixPrompt.build(text, app.unichat.assist.WritingStyle.get().text()));
-    }
+    /** Transcribes now the voice notes a draft of the open chat would answer ({@link ComposerAi#hearAhead}). */
+    void hearAhead() { ai.hearAhead(); }
 
-    /** Replaces the text only if it's still what was sent: the person may have kept writing. ⌘Z brings it back. */
-    private void fixed(String forChat, String result) {
-        String corrected = app.unichat.assist.FixPrompt.keepWrapping(fixing, result);
-        if (!forChat.equals(chatId)) {
-            if (fixing.equals(drafts.get(forChat))) {
-                drafts.put(forChat, corrected);
-                onError.accept(I18n.t("composer.fixedElsewhere"));
-            }
-        } else if (!input.getText().equals(fixing)) {
-            onError.accept(I18n.t("composer.fixChanged"));
-        } else if (corrected.equals(fixing.strip())) {
-            onError.accept(I18n.t("composer.fixNothing"));
-        } else {
-            input.replaceText(0, input.getLength(), corrected);
-            input.positionCaret(input.getLength());
-            onError.accept(I18n.t("composer.fixed", Shortcuts.key("Z")));
-        }
-    }
-
-    /** The chat so far, the message chosen with "Responder" if any, and what's written as the idea. Null with nothing to answer. */
-    private AiReplyButton.Request aiRequest() {
-        java.util.List<Message> chat = chatId == null ? java.util.List.of() : java.util.List.copyOf(svc.messages(chatId));
-        if (chat.isEmpty()) return null;
-        Message target = replyTo;
-        String idea = input.getText();
-        // Voice notes being answered are transcribed first (Whisper, here), so the draft knows what they said.
-        java.util.List<Message> toHear = app.unichat.assist.AiSettings.hearVoiceNotes()
-                ? app.unichat.assist.ReplyPrompt.voiceNotesToHear(chat, target) : java.util.List.of();
-        // The style learned so far: learning takes a call of its own (~10 s), so it comes after the draft (learnAfter).
-        return new AiReplyButton.Request(chatId, () -> AiReplyButton.prompt(chat, target, idea, AiReplyButton.heard(svc, chat, toHear),
-                app.unichat.assist.WritingStyle.get().text()), () -> { }, app.unichat.assist.ReplyPrompt.hasGaps(idea));
-    }
-
-    /**
-     * After a draft (never before: it would wait ~10 s), the program updates how the person writes from what's new in that
-     * chat and the corrections so far; the next draft uses it. One at a time; nothing when learning is off.
-     */
-    private void learnAfter(String forChat) {
-        if (!app.unichat.assist.AiSettings.learnStyle() || !learningNow.compareAndSet(false, true)) return;
-        java.util.List<Message> chat = java.util.List.copyOf(svc.messages(forChat));
-        app.unichat.assist.StyleLearner.Program program = learning.get();
-        Thread.ofVirtual().name("learn-style").start(() -> {
-            try {
-                new app.unichat.assist.StyleLearner(app.unichat.assist.WritingStyle.get(), program).learn(forChat, chat);
-            } finally {
-                learningNow.set(false);
-            }
-        });
-    }
-
-    private final java.util.concurrent.atomic.AtomicBoolean learningNow = new java.util.concurrent.atomic.AtomicBoolean();
-
-    /**
-     * The voice notes a draft of the open chat would answer, transcribed now (Whisper, on this computer), so asking for
-     * the draft doesn't wait for them. Only with the AI buttons and hearing voice notes on.
-     */
-    void hearAhead() {
-        if (chatId == null || !AiReplyButton.SHOWN.get() || !app.unichat.assist.AiSettings.hearVoiceNotes()) return;
-        app.unichat.stt.Transcripts transcripts = app.unichat.stt.Transcripts.get();
-        for (Message m : app.unichat.assist.ReplyPrompt.voiceNotesToHear(svc.messages(chatId), null)) {
-            transcripts.requestAhead(m.mediaUrl(), () -> svc.media(m.mediaUrl(), 0, 0));
-        }
-    }
-
-    /** Into the box of the chat it was for: what was written there went into the prompt as the idea. */
     /** A draft for {@code forChat} has arrived (package-visible for tests). */
-    void aiDraft(String forChat, String draft) {
-        aiDrafts.drafted(forChat, draft); // what's sent instead teaches how the person writes
-        learnAfter(forChat);
-        if (!forChat.equals(chatId)) {
-            drafts.put(forChat, draft);
-            onError.accept(I18n.t("composer.draftElsewhere"));
-            return;
-        }
-        // As an edit, not setText (which forgets the undo history): ⌘Z brings back what was written before, since a
-        // draft built on it can still change what the person meant.
-        input.replaceText(0, input.getLength(), draft);
-        int[] gap = app.unichat.assist.ReplyPrompt.firstGap(draft); // one it couldn't fill: selected, to type it in
-        if (gap != null) input.selectRange(gap[0], gap[1]);
-        else input.positionCaret(input.getLength());
-        onError.accept(I18n.t("composer.draftReady", Shortcuts.key("Z")));
-    }
+    void aiDraft(String forChat, String draft) { ai.aiDraft(forChat, draft); }
 
-    /**
-     * Answers {@code m} with a draft: it becomes the message being replied to, and what's already in the box is the
-     * base of the draft (ReplyPrompt). Nothing new starts while a draft is being written.
-     */
-    void replyWithAi(Message m) {
-        reply(m);
-        if (AiReplyButton.SHOWN.get() && !ai.busy()) ai.node().fire();
-    }
+    /** Answers {@code m} with a draft ({@link ComposerAi#replyWithAi}). */
+    void replyWithAi(Message m) { ai.replyWithAi(m); }
 
     public void reply(Message m) {
         editing = null;
@@ -496,12 +295,12 @@ public final class Composer extends VBox {
     private Consumer<SidePanel.Tab> onPanel;
     private Runnable onProtect;
 
-    /** The emoji and sticker/GIF buttons open the side panel on that tab. */
     /** "Foto protegida contra IA" in the clip's menu: the window asks how hard ({@link CloakSend}). */
     public void setOnProtect(Runnable onProtect) {
         this.onProtect = onProtect;
     }
 
+    /** The media button opens the side panel on that tab. */
     public void setOnPanel(Consumer<SidePanel.Tab> onPanel) {
         this.onPanel = onPanel;
     }
@@ -593,21 +392,9 @@ public final class Composer extends VBox {
     }
 
     /** ⌘I writes and ⌘O corrects, from anywhere in the window. True if it's one of them, with the AI buttons on. */
-    boolean aiKeyPressed(KeyCode key) {
-        if ((key != KeyCode.O && key != KeyCode.I) || !AiReplyButton.SHOWN.get()) return false;
-        if (aiKeyHeld != key) (key == KeyCode.O ? fix : ai).node().fire();
-        aiKeyHeld = key;
-        return true;
-    }
+    boolean aiKeyPressed(KeyCode key) { return ai.keyPressed(key); }
 
-    void aiKeyReleased(KeyCode key) {
-        if (key == aiKeyHeld) aiKeyHeld = null;
-    }
-
-    /** It finished, so the text box gets the keys: Enter sends. Unless the person moved to another chat meanwhile. */
-    private void aiDone(String forChat) {
-        if (forChat == null || forChat.equals(chatId)) focus();
-    }
+    void aiKeyReleased(KeyCode key) { ai.keyReleased(key); }
 
     /** What the open chat's network supports; null with no chat. */
     private app.unichat.model.RoomFeatures features() {
@@ -655,12 +442,7 @@ public final class Composer extends VBox {
             if (!text.equals(editing.body())) svc.editMessage(chatId, editing.id(), text).exceptionally(this::fail);
         } else {
             svc.sendText(chatId, text, replyTo == null ? null : replyTo.id()).exceptionally(this::fail);
-            app.unichat.assist.StylePrompt.Correction c = aiDrafts.sent(chatId, text);
-            if (c != null) Thread.ofVirtual().start(() -> {
-                app.unichat.assist.WritingStyle style = app.unichat.assist.WritingStyle.get();
-                style.addCorrection(c.draft(), c.sent());
-                style.writtenByAi(c.sent()); // came from a draft: not to be learned from as their own writing
-            });
+            ai.sent(chatId, text);
         }
         input.clear();
         drafts.remove(chatId);
@@ -711,7 +493,6 @@ public final class Composer extends VBox {
         typingSent = false;
     }
 
-    /** Grows from 1 to 8 lines with content, then scrolls. */
     /** The text the box draws, found after its first layout. */
     private Text drawn;
 

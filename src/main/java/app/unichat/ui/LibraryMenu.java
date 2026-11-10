@@ -36,12 +36,10 @@ final class LibraryMenu {
         javafx.stage.Window owner = from.getScene().getWindow();
         app.unichat.model.Message m = MediaItems.message(item);
         String title = I18n.t(item.kind() == MediaLibrary.Kind.STICKER ? "library.kind.sticker" : "library.kind.gif");
-        Runnable save = () -> MediaSaver.save(owner, svc, m, toast);
-        var file = svc.media(item.url(), 0, 0);
         if (item.mime() != null && item.mime().startsWith("video/")) {
-            VideoViewer.show(owner, file, title, save, p -> Browser.openFile(p, () -> toast.accept(I18n.t("video.openFailed"))));
+            MediaOpening.video(owner, svc, m, title, null, toast); // a sticker or GIF: silent, nothing to pause
         } else {
-            MediaViewer.show(owner, file, title, save);
+            MediaViewer.show(owner, svc.media(item.url(), 0, 0), title, () -> MediaSaver.save(owner, svc, m, toast));
         }
     }
 

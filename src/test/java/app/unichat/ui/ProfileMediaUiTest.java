@@ -81,4 +81,64 @@ class ProfileMediaUiTest {
         FxWait.fx(() -> { pane.getScene().getWindow().hide(); return null; });
         svc.stop();
     }
+
+    /** The voice note playing pauses for a video opened from the info panel, as it does for one opened in the chat. */
+    @Test
+    void aVideoOpenedHerePausesTheVoiceNotePlaying(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        try {
+            CountDownLatch started = new CountDownLatch(1);
+            Platform.startup(started::countDown);
+            started.await();
+        } catch (IllegalStateException alreadyRunning) {
+            // another UI test started the toolkit
+        }
+        Platform.setImplicitExit(false);
+        MockChatService svc = new MockChatService();
+        String id = "!familia:demo";
+        svc.setMediaHidden(id, false).get();
+        java.nio.file.Path clip = java.nio.file.Files.writeString(dir.resolve("clip.mp4"), "not really a video");
+        svc.sendFile(id, clip, null, app.unichat.service.SendAs.AS_IS, p -> { });
+        app.unichat.model.Message video = svc.messages(id).getLast();
+        video.setType(app.unichat.model.MessageType.VIDEO);
+        app.unichat.model.Message note = svc.messages(id).stream()
+                .filter(m -> m.type() == app.unichat.model.MessageType.AUDIO && m.mediaUrl() != null).findFirst().orElseThrow();
+        List<String> toasts = new java.util.concurrent.CopyOnWriteArrayList<>();
+        AudioPlayback audio = FxWait.fx(() -> {
+            AudioPlayback a = new AudioPlayback(svc, toasts::add);
+            a.setVolume(0);
+            return a;
+        });
+        InfoPane pane = FxWait.fx(() -> {
+            InfoPane p = new InfoPane(svc, () -> { }, toasts::add);
+            p.setAudio(audio);
+            Stage stage = new Stage();
+            stage.setOpacity(0);
+            stage.setScene(new Scene(p, 360, 900));
+            stage.show();
+            p.show(svc.chat(id));
+            audio.toggle(note, svc.chat(id));
+            return p;
+        });
+        FxWait.until("the voice note plays (or says it can't)", () -> !toasts.isEmpty() || audio.state() == AudioPlayback.State.PLAYING);
+        assertEquals(List.of(), toasts, "the voice note didn't play");
+        ToggleButton videos = FxWait.fx(() -> pane.lookupAll(".media-tab").stream().map(n -> (ToggleButton) n)
+                .filter(t -> t.getAccessibleText().startsWith("Videos")).findFirst().orElseThrow());
+        FxWait.fx(() -> { videos.fire(); return null; });
+        javafx.scene.Node tile = FxWait.fx(() -> pane.lookupAll(".media-thumb-tile").stream()
+                .filter(n -> app.unichat.support.I18n.t("media.videoOpen").equals(n.getAccessibleText())).findFirst().orElseThrow());
+        List<javafx.stage.Window> before = FxWait.fx(() -> List.copyOf(javafx.stage.Window.getWindows()));
+        FxWait.fx(() -> {
+            javafx.event.Event.fireEvent(tile, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "",
+                    javafx.scene.input.KeyCode.ENTER, false, false, false, false));
+            return null;
+        });
+        FxWait.until("the voice note pauses for the video", () -> audio.state() == AudioPlayback.State.PAUSED);
+        FxWait.fx(() -> {
+            audio.stop();
+            List.copyOf(javafx.stage.Window.getWindows()).stream().filter(w -> !before.contains(w)).forEach(javafx.stage.Window::hide);
+            pane.getScene().getWindow().hide();
+            return null;
+        });
+        svc.stop();
+    }
 }

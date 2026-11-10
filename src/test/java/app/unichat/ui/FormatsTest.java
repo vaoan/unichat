@@ -71,4 +71,13 @@ class FormatsTest {
         assertEquals("La Fiera de Cali", Formats.favoriteName("La Fiera de Cali"), "\"La\" says nothing: the whole name, cut by the tile");
         assertEquals("Gaming", Formats.favoriteName("Gaming • #general"));
     }
+
+    @Test
+    void theClockReadsLikeAClock() {
+        assertEquals("0:00", Formats.clock(0));
+        assertEquals("1:05", Formats.clock(65));
+        assertEquals("10:05", Formats.clock(605));
+        assertEquals("1:02:05", Formats.clock(3725));
+        assertEquals("0:00", Formats.clock(Double.NaN));
+    }
 }

@@ -22,8 +22,15 @@ public final class DockIcon {
 
     private DockIcon() {}
 
-    /** Whether the menu bar icon exists; without it the Dock is the only way back to a hidden window. */
-    public static void setTrayAvailable(boolean available) { trayAvailable = available; }
+    /**
+     * Whether the menu bar icon exists; without it the Dock is the only way back to a hidden window. Known once the tray
+     * is built (after the window may have shown), so the Dock icon follows it then.
+     */
+    public static void setTrayAvailable(boolean available) {
+        if (available == trayAvailable) return;
+        trayAvailable = available;
+        if (mainShowing) apply();
+    }
 
     /** Whether the Dock icon goes with the window: the person's choice, unless it's the only way in. */
     static boolean wanted(boolean setting, boolean tray) { return setting || !tray; }

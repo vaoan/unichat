@@ -189,7 +189,7 @@ public final class LoginWebView {
     }
 
     /**
-     * Same window, finishing when {@code extractJs} (run in the page every second and after each load) returns a
+     * Same window, finishing when {@code extractJs} (run in the page every 1.5 s and after each load) returns a
      * string {@code valid} accepts, e.g. Discord's account token, which lives in the page and not in a cookie.
      * The value is never logged.
      */
@@ -206,10 +206,6 @@ public final class LoginWebView {
         }, onCancel);
     }
 
-    /**
-     * The window: shows {@code url}; every 1.5 s and after each page load asks {@code finish} whether the login
-     * is done; a non-null answer closes the window and then runs it.
-     */
     /** Fresh local storage per window (another account can log in; nothing stays behind). */
     private static Path freshStorage(WebEngine engine) {
         Path storage = null;
@@ -234,6 +230,10 @@ public final class LoginWebView {
         return bar;
     }
 
+    /**
+     * The window: shows {@code url}; every 1.5 s and after each page load asks {@code finish} whether the login
+     * is done; a non-null answer closes the window and then runs it.
+     */
     private static void openWindow(Window owner, Network network, String url, String userAgent,
                                    BiFunction<WebEngine, CookieManager, Runnable> finish, Runnable onCancel) {
         if (openStage != null) { // never swap the global handler twice

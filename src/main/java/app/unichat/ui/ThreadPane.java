@@ -21,7 +21,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ToggleButton;
-import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -93,14 +92,7 @@ public final class ThreadPane extends BorderPane {
         redrawOnTranscriptProgress();
         StackPane.setAlignment(scroll.jumpDown(), Pos.BOTTOM_RIGHT);
         StackPane timeline = new StackPane(list, scroll.jumpDown());
-        timeline.setOnDragOver(e -> {
-            if (e.getDragboard().hasFiles()) e.acceptTransferModes(TransferMode.COPY);
-            e.consume();
-        });
-        timeline.setOnDragDropped(e -> {
-            composer.sendFiles(e.getDragboard().getFiles());
-            e.setDropCompleted(true);
-        });
+        composer.acceptDrops(timeline);
 
         typing.getStyleClass().add("typing-line");
         VBox bottom = new VBox(typing, composer);
@@ -124,19 +116,12 @@ public final class ThreadPane extends BorderPane {
         // when that width gives other bubbles. Opening the side panel used to rebuild every row, photos blinking, though
         // in most windows the bubbles stay as they were (MessageRowView.bubbleWidth).
         double[] built = {Double.NaN};
-        boolean[] waiting = {false};
+        FxCoalescer rewrap = new FxCoalescer(list::refresh);
         list.widthProperty().addListener((o, a, w) -> {
             double now = MessageRowView.bubbleWidth(w.doubleValue());
             if (now == built[0]) return;
             built[0] = now;
-            if (waiting[0]) return;
-            waiting[0] = true;
-            Redraws.PENDING.incrementAndGet();
-            Platform.runLater(() -> {
-                list.refresh();
-                waiting[0] = false;
-                Redraws.PENDING.decrementAndGet();
-            });
+            rewrap.request();
         });
     }
 
@@ -185,13 +170,8 @@ public final class ThreadPane extends BorderPane {
     }
 
     /** Transcript progress redraws the visible rows; coalesced so a model download doesn't flood the FX thread. */
-    private final java.util.concurrent.atomic.AtomicBoolean refreshQueued = new java.util.concurrent.atomic.AtomicBoolean();
-    private final Runnable onTranscript = () -> {
-        if (refreshQueued.compareAndSet(false, true)) Platform.runLater(() -> {
-            refreshQueued.set(false);
-            list.refresh();
-        });
-    };
+    private final FxCoalescer transcriptRedraw = new FxCoalescer(list::refresh);
+    private final Runnable onTranscript = transcriptRedraw::request;
 
     private void redrawOnTranscriptProgress() {
         Transcripts.get().addListener(onTranscript);

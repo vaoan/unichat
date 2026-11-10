@@ -61,13 +61,6 @@ final class VideoViewer {
         return v.stage;
     }
 
-    /** "1:05", or "1:02:05" past an hour. */
-    static String clock(double seconds) {
-        long s = Double.isNaN(seconds) || seconds < 0 ? 0 : (long) seconds;
-        String ms = String.format("%02d:%02d", s / 60 % 60, s % 60);
-        return s >= 3600 ? (s / 3600) + ":" + ms : ms.startsWith("0") ? ms.substring(1) : ms;
-    }
-
     private void open(Window owner, String title, Runnable onSave) {
         this.onSave = onSave;
         ProgressIndicator spin = new ProgressIndicator();

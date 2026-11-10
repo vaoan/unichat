@@ -33,13 +33,13 @@ final class FormatMenu {
     }
 
     static ContextMenu of(TextArea box, Supplier<RoomFeatures> features) {
-        MenuItem undo = item("composer.menu.undo", box::undo);
-        MenuItem redo = item("composer.menu.redo", box::redo);
-        MenuItem cut = item("composer.menu.cut", box::cut);
-        MenuItem copy = item("composer.menu.copy", box::copy);
-        MenuItem paste = item("composer.menu.paste", box::paste);
-        MenuItem delete = item("composer.menu.delete", () -> box.replaceSelection(""));
-        MenuItem all = item("composer.menu.selectAll", box::selectAll);
+        MenuItem undo = ChatMenus.item(I18n.t("composer.menu.undo"), box::undo);
+        MenuItem redo = ChatMenus.item(I18n.t("composer.menu.redo"), box::redo);
+        MenuItem cut = ChatMenus.item(I18n.t("composer.menu.cut"), box::cut);
+        MenuItem copy = ChatMenus.item(I18n.t("composer.menu.copy"), box::copy);
+        MenuItem paste = ChatMenus.item(I18n.t("composer.menu.paste"), box::paste);
+        MenuItem delete = ChatMenus.item(I18n.t("composer.menu.delete"), () -> box.replaceSelection(""));
+        MenuItem all = ChatMenus.item(I18n.t("composer.menu.selectAll"), box::selectAll);
         Menu format = new Menu(I18n.t("composer.menu.format"));
         ContextMenu menu = new ContextMenu(undo, redo, new SeparatorMenuItem(), cut, copy, paste, delete,
                 new SeparatorMenuItem(), all, new SeparatorMenuItem(), format);
@@ -54,7 +54,7 @@ final class FormatMenu {
             format.getItems().clear();
             for (TextFormat t : TextFormat.values()) {
                 if (f != null && !f.formats(t)) continue;
-                MenuItem m = item("composer.format." + t.name().toLowerCase(java.util.Locale.ROOT), () -> apply(box, t));
+                MenuItem m = ChatMenus.item(I18n.t("composer.format." + t.name().toLowerCase(java.util.Locale.ROOT)), () -> apply(box, t));
                 m.setAccelerator(shortcut(t)); // shown; the box's key handler does it (onKey)
                 format.getItems().add(m);
             }
@@ -80,11 +80,5 @@ final class FormatMenu {
         TextFormat.Edit edit = f.apply(box.getText(), from, to);
         box.replaceText(0, box.getLength(), edit.text()); // one step: ⌘Z takes it back whole
         box.selectRange(edit.from(), edit.to());
-    }
-
-    private static MenuItem item(String key, Runnable action) {
-        MenuItem m = new MenuItem(I18n.t(key));
-        m.setOnAction(e -> action.run());
-        return m;
     }
 }

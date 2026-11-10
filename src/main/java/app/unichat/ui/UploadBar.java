@@ -23,7 +23,6 @@ import javafx.util.Duration;
 
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -53,8 +52,9 @@ final class UploadBar extends HBox {
     private final StackPane thumb = new StackPane();
     private final Button cancel;
     private final Button close;
-    private final AtomicBoolean scheduled = new AtomicBoolean();
-    private final Runnable listener = this::schedule;
+    /** Progress comes many times a second from the upload's thread: one redraw per frame is plenty. */
+    private final FxCoalescer redraw = new FxCoalescer(this::refresh);
+    private final Runnable listener = redraw::request;
     private final PauseTransition hideLater = new PauseTransition(DONE_SHOWN);
     private Path shownFile;
     private String chatId;
@@ -129,14 +129,6 @@ final class UploadBar extends HBox {
         queue.removeListener(listener);
         hideLater.stop();
         tick.stop();
-    }
-
-    /** Progress comes many times a second from the upload's thread: one redraw per frame is plenty. */
-    private void schedule() {
-        if (scheduled.compareAndSet(false, true)) Platform.runLater(() -> {
-            scheduled.set(false);
-            refresh();
-        });
     }
 
     private void refresh() {

@@ -70,7 +70,7 @@ final class VoiceBar extends HBox {
     void focusSend() { getChildren().get(getChildren().size() - 1).requestFocus(); }
 
     private void tick() {
-        time.setText(VideoViewer.clock(recorder.durationMs() / 1000.0));
+        time.setText(Formats.clock(recorder.durationMs() / 1000.0));
         level.setProgress(Math.min(1, recorder.level() * 2));
         if (recorder.durationMs() >= SILENT_MS && !recorder.anySound()) {
             ticks.stop();

@@ -49,9 +49,9 @@ final class AiReplyButton {
 
     /**
      * What to answer. The messages are read on the UI thread; the prompt is finished off it, since a draft may first
-     * wait for its voice notes to be transcribed.
+     * wait for its voice notes to be transcribed. {@code web}: the person wrote [gaps] to look up, so the program may
+     * search the web.
      */
-    /** {@code web}: the person wrote [gaps] to look up, so the program may search the web. */
     record Request(String chatId, Supplier<String> prompt, Runnable cancel, boolean web) {
         Request(String chatId, Supplier<String> prompt, Runnable cancel) {
             this(chatId, prompt, cancel, false);

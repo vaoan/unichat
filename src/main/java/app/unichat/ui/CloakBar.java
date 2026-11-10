@@ -2,7 +2,6 @@ package app.unichat.ui;
 
 import app.unichat.cloak.CloakJob;
 import app.unichat.support.I18n;
-import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -10,8 +9,6 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * On top of the window while a picture is being protected (and Mist installed the first time), like the upload bar:
@@ -27,8 +24,8 @@ final class CloakBar extends HBox {
     private final Label eta = new Label();
     private final Button cancel;
     private final Button close;
-    private final AtomicBoolean scheduled = new AtomicBoolean();
-    private final Runnable listener = this::schedule;
+    private final FxCoalescer redraw = new FxCoalescer(this::refresh);
+    private final Runnable listener = redraw::request;
 
     CloakBar(CloakJob job) {
         super(10);
@@ -63,13 +60,6 @@ final class CloakBar extends HBox {
             else job.addListener(listener);
         });
         refresh();
-    }
-
-    private void schedule() {
-        if (scheduled.compareAndSet(false, true)) Platform.runLater(() -> {
-            scheduled.set(false);
-            refresh();
-        });
     }
 
     private void refresh() {

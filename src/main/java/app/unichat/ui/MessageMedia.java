@@ -276,10 +276,7 @@ final class MessageMedia {
     }
 
     private void openVideo(Message m) {
-        audio.pause();
-        Window owner = scene.get().getWindow();
-        VideoViewer.show(owner, svc.media(m.mediaUrl(), 0, 0), m.fileName(), () -> MediaSaver.save(owner, svc, m, toast),
-                p -> Browser.openFile(p, () -> toast.accept(I18n.t("video.openFailed"))));
+        MediaOpening.video(scene.get().getWindow(), svc, m, m.fileName(), audio, toast);
     }
 
     /** Stickers, GIFs and WebP may be animated: those load the original file, never a (static) thumbnail. */
@@ -478,13 +475,6 @@ final class MessageMedia {
     void openLink(String url) { openLink.accept(url); }
 
     void openFile(Message m) {
-        if (m.mediaUrl() == null) {
-            toast.accept(I18n.t("media.downloadFailed")); // nothing to open: say so, never a click that does nothing
-            return;
-        }
-        svc.media(m.mediaUrl(), 0, 0).whenComplete((p, err) -> {
-            if (err != null) Platform.runLater(() -> toast.accept(I18n.t("media.downloadFailed")));
-            else Browser.openFile(p, () -> toast.accept(I18n.t("media.openFailed")));
-        });
+        MediaOpening.file(svc, m, toast);
     }
 }

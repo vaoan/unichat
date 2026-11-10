@@ -4,7 +4,6 @@ import app.unichat.autosave.AutoSave;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatReader;
 import app.unichat.support.I18n;
-import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
@@ -15,7 +14,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -33,8 +31,9 @@ final class ExploreBar extends HBox {
     private final Label text = new Label();
     private final ProgressBar bar = new ProgressBar(ProgressBar.INDETERMINATE_PROGRESS);
     private final Button stop;
-    private final AtomicBoolean scheduled = new AtomicBoolean();
-    private final Runnable listener = this::schedule;
+    /** Changes come from the saving thread, many per file: one redraw per frame. */
+    private final FxCoalescer redraw = new FxCoalescer(this::refresh);
+    private final Runnable listener = redraw::request;
     private String chatId;
 
     ExploreBar(AutoSave save, ChatReader chats, Consumer<String> openChat) {
@@ -79,14 +78,6 @@ final class ExploreBar extends HBox {
     /** The saver outlives this bar (the window is rebuilt on a language change). */
     void dispose() {
         unlisten.accept(listener);
-    }
-
-    /** Changes come from the saving thread, many per file: one redraw per frame. */
-    private void schedule() {
-        if (scheduled.compareAndSet(false, true)) Platform.runLater(() -> {
-            scheduled.set(false);
-            refresh();
-        });
     }
 
     void refresh() {
