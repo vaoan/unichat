@@ -48,8 +48,19 @@ public final class FileNames {
         String name = forMessage(m, zone);
         int dot = name.lastIndexOf('.');
         String tag = " [" + tag(m) + "]";
-        return dot > 0 ? name.substring(0, dot) + tag + name.substring(dot) : name + tag;
+        String ext = dot > 0 ? name.substring(dot) : "";
+        String saved = dot > 0 ? name.substring(0, dot) + tag + ext : name + tag;
+        return SHELL_ACTIVE.contains(ext.toLowerCase(java.util.Locale.ROOT)) ? saved + ".txt" : saved;
     }
+
+    /**
+     * What Windows' Explorer acts on just by showing the folder (an icon or a location read from inside the file): a
+     * {@code \\host\share} there sends the login's NTLM hash to whoever sent it. Saved with ".txt" after, on every system
+     * (the folder may be synced to a Windows machine): still readable, inert.
+     */
+    private static final java.util.Set<String> SHELL_ACTIVE = java.util.Set.of(".url", ".lnk", ".scf", ".library-ms",
+            ".searchconnector-ms", ".search-ms", ".website", ".theme", ".themepack", ".deskthemepack", ".appref-ms",
+            ".settingcontent-ms");
 
     /** The message's id as it goes in a name: without Matrix's "$", safe for any disk, at most 60 characters. */
     public static String tag(Message m) {

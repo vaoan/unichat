@@ -18,6 +18,14 @@ public interface MediaSource {
         return media(url, width, height);
     }
 
+    /**
+     * Whether {@code error}, from {@link #media}, means the file will never come: deleted, expired, not an address it
+     * can open. Otherwise (the network, the server for now) asking again later may work.
+     */
+    default boolean gone(Throwable error) {
+        return false;
+    }
+
     /** The video or audio a web link holds, by opening it; empty if it holds none or can't be opened. */
     default CompletableFuture<java.util.Optional<LinkMedia>> linkMedia(String url) {
         return CompletableFuture.completedFuture(java.util.Optional.empty());

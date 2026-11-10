@@ -45,12 +45,12 @@ final class LinkSaver {
         return found.isEmpty() ? new Link(Site.OTHER, "other:" + url, url) : found.getFirst();
     }
 
-    /** Null when saved; otherwise why not, in the person's words. Interrupted: stopped (nothing half-written stays). */
-    static String save(String url, Path dir, String tag, DoubleConsumer progress, Tools tools, Path cookiesDir)
+    /** Null when saved; otherwise why not, and whether that's for good. Interrupted: stopped (nothing half-written stays). */
+    static Failure save(String url, Path dir, String tag, DoubleConsumer progress, Tools tools, Path cookiesDir)
             throws IOException, InterruptedException {
         // Only a web address reaches a tool: the engine ends its options before the link too ("--"), but what a chat
         // says should never get that far.
-        if (!url.matches("(?i)https?://\\S+")) return I18n.t("autosave.link.notALink");
+        if (!url.matches("(?i)https?://\\S+")) return Failure.forGood(I18n.t("autosave.link.notALink"));
         Link link = linkOf(url);
         Fetch.Result r = Fetch.run(new Fetch.Request(link, dir, tag, Cookies.forLink(cookiesDir, link), LIMIT), tools,
                 new Fetch.Listener() {
@@ -70,8 +70,17 @@ final class LinkSaver {
                 yield null;
             }
             case CANCELLED -> throw new InterruptedException();
-            case FAILED, FAILED_PERMANENT -> reason(r.reason());
+            case FAILED, FAILED_PERMANENT -> failure(r);
         };
+    }
+
+    /** A failed run in the person's words, and whether it's for good. */
+    static Failure failure(Fetch.Result r) {
+        // Tried again at each change of the chat, a run that took the whole LIMIT would hold all saving that long each
+        // time, and a missing tool is still missing at the next change: neither is worth holding the chat's later files.
+        boolean forGood = r.outcome() == Fetch.Outcome.FAILED_PERMANENT || Fetch.TIMED_OUT.equals(r.reason())
+                || r.reason().endsWith(Fetch.NOT_INSTALLED);
+        return new Failure(reason(r.reason()), forGood);
     }
 
     /** The engine's reason as Unichat says it; a tool's own words as they are. */

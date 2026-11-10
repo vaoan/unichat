@@ -344,6 +344,26 @@ class SyncProcessorTest {
     }
 
     @Test
+    void aConfirmedEchoTakesTheServersTimeWhenItsEventComes() {
+        // The echo's time is when sending started, before the upload: an answer saved meanwhile moved autosave's mark
+        // past it, so what I sent was never saved. The server's time puts it where the server has it.
+        String room = "!t:example.org";
+        sync(room, "{'timeline':{'events':[]}}", false);
+        proc.addLocalEcho(room, "t3", m -> m.setBody("foto"));
+        proc.confirmLocalEcho(room, "t3", "$mine");
+        long server = java.time.Instant.now().plusSeconds(3600).toEpochMilli();
+        SyncProcessor.Result r = sync(room, "{'timeline':{'events':[" + text("$mine", ME, server, "foto") + "]}}", true);
+        assertEquals(1, messages(room).size(), "still one message");
+        Message mine = messages(room).get(0);
+        assertEquals("$mine", mine.id());
+        assertEquals(java.time.Instant.ofEpochMilli(server), mine.timestamp());
+        assertEquals("foto", mine.body());
+        assertEquals(mine, proc.room(room).byId.get("$mine"));
+        assertTrue(r.messagesChanged.contains(room), "so autosave looks again");
+        assertTrue(r.newMessages.isEmpty(), "never a notification for what I sent");
+    }
+
+    @Test
     void liveIncomingMessagesAreReported() {
         String room = "!n:example.org";
         SyncProcessor.Result r = sync(room, "{'timeline':{'events':[%s]}}".formatted(text("$1", "@bob:example.org", 1, "a")), true);

@@ -149,7 +149,16 @@ public final class Message {
 
     /** The same message under another id, the way a local echo becomes the event the server gave it. */
     public Message withId(String newId) {
-        Message m = new Message(newId, chatId, senderId, senderName, outgoing, timestamp);
+        return copy(newId, timestamp);
+    }
+
+    /** The same message at another time: a confirmed echo taking the server's, which says where it really is. */
+    public Message withTimestamp(Instant at) {
+        return copy(id, at);
+    }
+
+    private Message copy(String newId, Instant at) {
+        Message m = new Message(newId, chatId, senderId, senderName, outgoing, at);
         m.type = type;
         m.body = body;
         m.mediaUrl = mediaUrl;

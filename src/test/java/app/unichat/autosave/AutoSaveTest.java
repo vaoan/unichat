@@ -38,6 +38,11 @@ class AutoSaveTest {
     private final List<String> told = new CopyOnWriteArrayList<>();
     /** A link that has no video, and a file that can't be downloaded. */
     private static final String NO_VIDEO = "https://example.org/sin-video", BROKEN = "mxc://s/roto.jpg", ENDLESS = "mxc://s/enorme.mov";
+    /** A file and a link that fail for {@link #flaky}'s reason while it's set, and are saved once it isn't. */
+    private static final String FLAKY = "mxc://s/a-veces.jpg", FLAKY_LINK = "https://example.org/a-veces";
+    private volatile String flaky;
+    /** Every file asked for, in order. */
+    private final List<String> asked = new CopyOnWriteArrayList<>();
     /** Counted down when a download of {@link #ENDLESS} starts: it never ends by itself (a huge video). */
     private final CountDownLatch endlessStarted = new CountDownLatch(1);
     private AutoSave save;
@@ -74,7 +79,10 @@ class AutoSaveTest {
                     progress.accept(0.25);
                     progress.accept(0.5);
                 }
-                if (mediaUrl.equals(BROKEN)) throw new java.io.IOException("el puente no respondió");
+                asked.add(mediaUrl);
+                if (mediaUrl.equals(BROKEN)) throw new AutoSave.Gone("el puente no respondió", null);
+                String why = flaky;
+                if (mediaUrl.equals(FLAKY) && why != null) throw new java.io.IOException(why);
                 if (mediaUrl.equals(ENDLESS)) {
                     endlessStarted.countDown();
                     new CountDownLatch(1).await(); // until interrupted
@@ -82,8 +90,10 @@ class AutoSaveTest {
                 return cached;
             }
 
-            @Override public String link(String url, Path folder, String tag, java.util.function.DoubleConsumer progress) {
-                if (url.equals(NO_VIDEO)) return "Unsupported URL";
+            @Override public Failure link(String url, Path folder, String tag, java.util.function.DoubleConsumer progress) {
+                if (url.equals(NO_VIDEO)) return Failure.forGood("Unsupported URL");
+                String why = flaky;
+                if (url.equals(FLAKY_LINK) && why != null) return Failure.forNow(why);
                 links.add(url);
                 return null;
             }
@@ -406,5 +416,93 @@ class AutoSaveTest {
         assertEquals(2, save.exploring(chat.id()).unavailable());
         assertEquals(1, told.stream().filter(x -> x.startsWith("failed")).count(), "one notice: " + told);
         assertTrue(told.stream().anyMatch(x -> x.startsWith("failed 2 archivos anteriores ya no estaban")), told.toString());
+    }
+
+    @Test
+    void aFileTheServerSaysIsGoneIsGoneForGood() {
+        RuntimeException notThere = new RuntimeException("HTTP 404"), later = new RuntimeException("HTTP 502");
+        app.unichat.service.MediaSource source = new app.unichat.service.MediaSource() {
+            @Override public CompletableFuture<Path> media(String url, int w, int h) {
+                return CompletableFuture.failedFuture(url.endsWith("gone") ? notThere : later);
+            }
+
+            @Override public boolean gone(Throwable error) {
+                return error == notThere;
+            }
+        };
+        AutoSave.Saver saver = AutoSave.downloading(source);
+        org.junit.jupiter.api.Assertions.assertThrows(AutoSave.Gone.class, () -> saver.media("mxc://s/gone", p -> { }));
+        java.io.IOException e = org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, () -> saver.media("mxc://s/x", p -> { }));
+        assertFalse(e instanceof AutoSave.Gone, "a 502 may work next time");
+    }
+
+    private List<String> failures() {
+        return told.stream().filter(x -> x.startsWith("failed")).toList();
+    }
+
+    @Test
+    void aSaveThatFailsForNowIsTriedAgainAtTheNextChangeAndWhatCameAfterWaitsForIt() throws Exception {
+        svc.setAutoSave(chat.id(), EnumSet.allOf(SaveKind.class)).get();
+        save.startNow(chat.id());
+        flaky = "sin red";
+        Message first = media(MessageType.IMAGE, "a-veces.jpg", false, later(1));
+        first.setMediaUrl(FLAKY);
+        arrive(first, media(MessageType.IMAGE, "despues.jpg", false, later(2)));
+        assertEquals(List.of(), saved(), "what came after waits: saving it would move the mark past the one that failed");
+        assertEquals("progress 0/0", told.getLast(), "the ring doesn't stay half full: " + told);
+        arrive(); // another change of the chat: still failing
+        flaky = null;
+        arrive();
+        assertEquals(List.of("a-veces.jpg", "despues.jpg"), saved(), "a failed save was marked done and lost for good");
+        assertEquals(List.of("failed a-veces.jpg: sin red"), failures(), "told once, not at every try");
+    }
+
+    @Test
+    void aLinkThatFailsForNowIsTriedAgainToo() throws Exception {
+        svc.setAutoSave(chat.id(), EnumSet.of(SaveKind.LINKS)).get();
+        save.startNow(chat.id());
+        flaky = "Unable to download webpage";
+        Message text = new Message("t", chat.id(), "@ana", "Ana", false, later(1));
+        text.setType(MessageType.TEXT);
+        text.setBody(FLAKY_LINK);
+        arrive(text);
+        assertEquals(List.of(), links);
+        flaky = null;
+        arrive();
+        assertEquals(List.of(FLAKY_LINK), links);
+    }
+
+    @Test
+    void aFailureIsToldAgainOnlyWhenItChangesOrAfterSomethingWasSaved() throws Exception {
+        svc.setAutoSave(chat.id(), EnumSet.allOf(SaveKind.class)).get();
+        save.startNow(chat.id());
+        flaky = "sin red";
+        Message first = media(MessageType.IMAGE, "a-veces.jpg", false, later(1));
+        first.setMediaUrl(FLAKY);
+        arrive(first);
+        arrive();
+        flaky = "el servidor no responde";
+        arrive();
+        arrive();
+        flaky = null;
+        arrive();
+        flaky = "sin red";
+        Message second = media(MessageType.IMAGE, "otra.jpg", false, later(2));
+        second.setMediaUrl(FLAKY);
+        arrive(second);
+        assertEquals(List.of("failed a-veces.jpg: sin red", "failed a-veces.jpg: el servidor no responde", "failed otra.jpg: sin red"),
+                failures());
+    }
+
+    @Test
+    void whatsGoneForGoodIsntTriedAgainNorHoldsWhatCameAfter() throws Exception {
+        svc.setAutoSave(chat.id(), EnumSet.allOf(SaveKind.class)).get();
+        save.startNow(chat.id());
+        Message broken = media(MessageType.IMAGE, "roto.jpg", false, later(1));
+        broken.setMediaUrl(BROKEN);
+        arrive(broken, media(MessageType.IMAGE, "bien.jpg", false, later(2)));
+        arrive();
+        assertEquals(List.of("bien.jpg"), saved());
+        assertEquals(1, asked.stream().filter(BROKEN::equals).count(), "asked once: " + asked);
     }
 }

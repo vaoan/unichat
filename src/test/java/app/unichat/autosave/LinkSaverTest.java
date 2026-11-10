@@ -58,9 +58,9 @@ class LinkSaverTest {
     @DisabledOnOs(OS.WINDOWS) // the fake tool is a shell script
     void aLinkIsSavedInTheChatsFolderWithTheMessagesIdAndSaysHowFarItGot() throws Exception {
         List<Double> progress = new ArrayList<>();
-        String why = LinkSaver.save("https://www.youtube.com/watch?v=dQw4w9WgXcQ", dir.resolve("Ana"), "abc", progress::add,
+        Failure failed = LinkSaver.save("https://www.youtube.com/watch?v=dQw4w9WgXcQ", dir.resolve("Ana"), "abc", progress::add,
                 fakeYtDlp(), Files.createDirectories(dir.resolve("Downloads")));
-        assertNull(why, "saved");
+        assertNull(failed, "saved");
         assertTrue(Files.exists(dir.resolve("Ana/clip [abc].mp4")));
         assertEquals(List.of(0.5), progress, "the engine's progress, as Unichat shows it");
     }
@@ -69,8 +69,8 @@ class LinkSaverTest {
     @DisabledOnOs(OS.WINDOWS)
     void textThatIsntAWebAddressNeverReachesATool() throws Exception {
         Tools tools = fakeYtDlp();
-        String why = LinkSaver.save("--exec=rm -rf ~", dir.resolve("Ana"), "abc", p -> { }, tools, dir);
-        assertEquals(I18n.t("autosave.link.notALink"), why);
+        Failure why = LinkSaver.save("--exec=rm -rf ~", dir.resolve("Ana"), "abc", p -> { }, tools, dir);
+        assertEquals(Failure.forGood(I18n.t("autosave.link.notALink")), why, "and trying again won't change that");
         assertFalse(Files.exists(dir.resolve("Ana/.ran")), "yt-dlp never ran");
     }
 
@@ -86,5 +86,18 @@ class LinkSaverTest {
         assertEquals(I18n.t("autosave.error.tooLong"), LinkSaver.reason(Fetch.TIMED_OUT));
         assertEquals(I18n.t("autosave.link.missingTool", "gallery-dl"), LinkSaver.reason("gallery-dl" + Fetch.NOT_INSTALLED));
         assertEquals("Unsupported URL: https://x.org", LinkSaver.reason("Unsupported URL: https://x.org"), "a tool's own words as they are");
+    }
+
+    @Test
+    void whatTheEngineCallsForGoodIsntTriedAgainNorIsWhatWouldHoldSavingForHours() {
+        assertTrue(LinkSaver.failure(new Fetch.Result(Fetch.Outcome.FAILED_PERMANENT, Fetch.NOT_FOUND, List.of(), null)).permanent(),
+                "removed or private");
+        assertFalse(LinkSaver.failure(new Fetch.Result(Fetch.Outcome.FAILED, "Unable to download webpage: connection reset",
+                List.of(), null)).permanent(), "the network: tried again at the chat's next change");
+        // Tried again at every change of the chat, a video that took the 2 hours allowed would hold all saving for hours
+        // each time; a missing tool won't be there at the next change either, and would hold the chat's later files.
+        assertTrue(LinkSaver.failure(new Fetch.Result(Fetch.Outcome.FAILED, Fetch.TIMED_OUT, List.of(), null)).permanent());
+        assertTrue(LinkSaver.failure(new Fetch.Result(Fetch.Outcome.FAILED, "gallery-dl" + Fetch.NOT_INSTALLED, List.of(), null))
+                .permanent());
     }
 }

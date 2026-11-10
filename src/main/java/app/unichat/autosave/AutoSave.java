@@ -41,13 +41,24 @@ import java.util.concurrent.Executors;
 public final class AutoSave implements ChatService.Listener {
     /** What saving does, apart so tests don't need a server or yt-dlp. */
     interface Saver {
-        /** The file behind {@code mediaUrl}, downloaded. */
-        /** {@code progress}: how much has arrived, 0 to 1, when that's known. */
+        /**
+         * The file behind {@code mediaUrl}, downloaded; {@code progress}: how much has arrived, 0 to 1, when that's
+         * known. {@link Gone} when it never will be.
+         */
         Path media(String mediaUrl, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException;
 
-        /** The video behind {@code url} saved into {@code dir}: null, or why not. */
-        /** {@code tag}: the message's id, which goes in the name ({@link FileNames#tag}). */
-        String link(String url, Path dir, String tag, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException;
+        /**
+         * The video behind {@code url} saved into {@code dir}: null, or why not. {@code tag}: the message's id, which
+         * goes in the name ({@link FileNames#tag}).
+         */
+        Failure link(String url, Path dir, String tag, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException;
+    }
+
+    /** A file that can never be downloaded: deleted, expired, not on the server any more. */
+    static final class Gone extends IOException {
+        Gone(String why, Throwable cause) {
+            super(why, cause);
+        }
     }
 
     /** What saving is doing, for the menu-bar icon and the notices. Called on the saving thread. */
@@ -177,13 +188,29 @@ public final class AutoSave implements ChatService.Listener {
         Path dir = folder(chat);
         for (Message m : fresh) total += work(m, wanted.of(m));
         if (total > done) progress.changed(done, total);
-        for (Message m : fresh) {
-            Set<SaveKind> kinds = wanted.of(m);
-            SaveKind kind = SaveKind.of(m); // null: a sticker, or no media
-            if (kind != null && kinds.contains(kind)) step(chat, saveMedia(m, chat, dir));
-            if (kinds.contains(SaveKind.LINKS)) for (String url : links(m)) step(chat, saveLink(url, m, chat, dir));
+        for (int i = 0; i < fresh.size(); i++) {
+            Message m = fresh.get(i);
+            if (!saveAll(m, wanted.of(m), chat, dir)) {
+                // Tried again from here at the chat's next change: marking it done lost it for good, and saving what
+                // came after would move the mark past it all the same.
+                int left = 0;
+                for (Message later : fresh.subList(i + 1, fresh.size())) left += work(later, wanted.of(later));
+                total -= left;
+                endRoundIfDone();
+                return;
+            }
             savedUpTo.saved(chatId, m);
+            toldForNow.remove(chatId);
         }
+    }
+
+    /** Saves what {@code m} has of {@code kinds}; false when something failed that may work next time. */
+    private boolean saveAll(Message m, Set<SaveKind> kinds, Chat chat, Path dir) {
+        boolean done = true;
+        SaveKind kind = SaveKind.of(m); // null: a sticker, or no media
+        if (kind != null && kinds.contains(kind)) done = step(chat, saveMedia(m, chat, dir));
+        if (kinds.contains(SaveKind.LINKS)) for (String url : links(m)) done &= step(chat, saveLink(url, m, chat, dir));
+        return done;
     }
 
     /** How many things {@code m} gives to save. */
@@ -192,15 +219,20 @@ public final class AutoSave implements ChatService.Listener {
         return (kind != null && kinds.contains(kind) ? 1 : 0) + (kinds.contains(SaveKind.LINKS) ? links(m).size() : 0);
     }
 
-    /** One thing done, saved or not; the round ends when nothing's left. */
-    private void step(Chat chat, boolean saved) {
+    /** One thing done, saved or not; the round ends when nothing's left. False: it failed, and may work next time. */
+    private boolean step(Chat chat, Failure failure) {
         done++;
-        if (saved) {
+        if (failure == null) {
             savedInRound++;
             lastChat = chat;
         }
         progress.changed(done, total);
-        if (done < total) return;
+        endRoundIfDone();
+        return failure == null || failure.permanent();
+    }
+
+    private void endRoundIfDone() {
+        if (total == 0 || done < total) return; // nothing going on, or not over yet
         if (savedInRound > 0) progress.finished(savedInRound, lastChat);
         total = done = savedInRound = 0;
         lastChat = null;
@@ -216,17 +248,18 @@ public final class AutoSave implements ChatService.Listener {
         return out;
     }
 
-    private boolean saveMedia(Message m, Chat chat, Path dir) {
+    /** Null when saved (or there already); otherwise why not. */
+    private Failure saveMedia(Message m, Chat chat, Path dir) {
         String name = FileNames.forMessage(m, ZoneId.systemDefault()); // what a notice says: the name as sent
         Path[] file = {null};
         try {
             copyInto(m, dir, file, done -> { });
-            return true;
+            return null;
         } catch (IOException | RuntimeException e) {
-            return failed(name, chat, why(e, dir, file[0]));
+            return failed(name, chat, new Failure(why(e, dir, file[0]), e instanceof Gone));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return false;
+            return Failure.forNow(e.toString());
         }
     }
 
@@ -248,23 +281,34 @@ public final class AutoSave implements ChatService.Listener {
         return true;
     }
 
-    private boolean saveLink(String url, Message m, Chat chat, Path dir) {
+    /** Null when saved; otherwise why not. */
+    private Failure saveLink(String url, Message m, Chat chat, Path dir) {
         try {
-            String why = saver.link(url, dir, FileNames.tag(m), done -> { });
-            return why == null || failed(url, chat, why);
+            Failure f = saver.link(url, dir, FileNames.tag(m), done -> { });
+            return f == null ? null : failed(url, chat, f);
         } catch (IOException | RuntimeException e) {
-            return failed(url, chat, why(e, dir, null));
+            return failed(url, chat, Failure.forNow(why(e, dir, null)));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return false;
+            return Failure.forNow(e.toString());
         }
     }
 
-    /** Tells and logs it; false, as nothing was saved. */
-    private boolean failed(String what, Chat chat, String why) {
-        System.err.println("Auto-save: " + what + " from " + chat.id() + " not saved: " + why);
-        progress.failed(what, chat, why);
-        return false;
+    /**
+     * What failed for now in each chat and was told: tried again at every change of the chat, the same failure is told
+     * once, until the chat gets past it. Only the saving thread touches it.
+     */
+    private final Map<String, Set<String>> toldForNow = new java.util.HashMap<>();
+
+    /** Tells and logs it (a failure for now only the first time); gives it back. */
+    private Failure failed(String what, Chat chat, Failure f) {
+        if (!f.permanent() && !toldForNow.computeIfAbsent(chat.id(), k -> new java.util.HashSet<>()).add(what + "\n" + f.why())) {
+            return f;
+        }
+        System.err.println("Auto-save: " + what + " from " + chat.id() + " not saved" + (f.permanent() ? "" : " (tried again later)")
+                + ": " + f.why());
+        progress.failed(what, chat, f.why());
+        return f;
     }
 
     /**
@@ -477,7 +521,8 @@ public final class AutoSave implements ChatService.Listener {
     /** Saves the video behind {@code url} into {@code dir}: null, {@link #STOPPED}, or why not. */
     private String linkQuietly(String url, Message m, Path dir, String chatId) {
         try {
-            String why = saver.link(url, dir, FileNames.tag(m), done -> arrived(chatId, done));
+            Failure f = saver.link(url, dir, FileNames.tag(m), done -> arrived(chatId, done));
+            String why = f == null ? null : f.why();
             return why != null && stopping.contains(chatId) ? STOPPED : why;
         } catch (IOException | RuntimeException e) {
             return stopping.contains(chatId) ? STOPPED : why(e, dir, null);
@@ -520,19 +565,20 @@ public final class AutoSave implements ChatService.Listener {
         worker.execute(then);
     }
 
-    private static Saver downloading(MediaSource media) {
+    static Saver downloading(MediaSource media) {
         return new Saver() {
             @Override
             public Path media(String mediaUrl, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
                 try {
                     return media.media(mediaUrl, 0, 0, progress).get();
                 } catch (java.util.concurrent.ExecutionException e) {
+                    if (media.gone(e.getCause())) throw new Gone(e.getCause().getMessage(), e.getCause());
                     throw new IOException(e.getCause());
                 }
             }
 
             @Override
-            public String link(String url, Path dir, String tag, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
+            public Failure link(String url, Path dir, String tag, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
                 return LinkSaver.save(url, dir, tag, progress, LinkSaver.tools(), LinkSaver.COOKIES);
             }
         };

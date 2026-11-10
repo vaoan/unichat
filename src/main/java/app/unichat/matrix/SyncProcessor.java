@@ -333,7 +333,12 @@ final class SyncProcessor {
         if (ev.has("state_key")) {
             if (older == null) applyState(room, ev); else learnMember(room, ev);
         }
-        if (room.byId.containsKey(id) || room.reactionEvents.containsKey(id)) return;
+        Message known = room.byId.get(id);
+        if (known != null) {
+            takeServerTime(room, known, ev, r);
+            return;
+        }
+        if (room.reactionEvents.containsKey(id)) return;
 
         JsonNode content = ev.path("content");
         boolean redacted = ev.path("unsigned").has("redacted_because");
@@ -689,6 +694,23 @@ final class SyncProcessor {
         Result ignored = new Result();
         applyPending(room, eventId, ignored);
         fields.refresh(room);
+    }
+
+    /**
+     * A message confirmed from the send's answer (only an event id) still has its echo's time, from before the upload;
+     * its event, when the sync brings it, has the server's. Kept, an answer saved meanwhile moved autosave's mark past
+     * what I sent, and it was never saved.
+     */
+    private void takeServerTime(MatrixRoom room, Message known, JsonNode ev, Result r) {
+        long ts = ev.path("origin_server_ts").asLong(0);
+        Instant server = Instant.ofEpochMilli(ts);
+        if (!known.outgoing() || ts <= 0 || known.timestamp().equals(server)) return;
+        Message fixed = known.withTimestamp(server);
+        int idx = room.timeline.indexOf(known);
+        if (idx >= 0) room.timeline.set(idx, fixed);
+        room.byId.put(fixed.id(), fixed);
+        fields.refresh(room);
+        r.messagesChanged.add(room.id);
     }
 
     void failLocalEcho(String roomId, String txnId) {

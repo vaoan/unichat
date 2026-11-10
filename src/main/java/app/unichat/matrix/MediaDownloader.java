@@ -102,6 +102,26 @@ final class MediaDownloader {
         return f;
     }
 
+    /**
+     * Whether {@code error} from {@link #media} means the file will never come: the server or the bridge says it's not
+     * there (404, 410: deleted, expired) or refuses what was asked (400, 413), or the address isn't one it opens (our own
+     * refusals carry no status nor cause). A dropped connection, a 5xx or a 429 may work next time.
+     */
+    static boolean gone(Throwable error) {
+        Throwable e = error;
+        while (e instanceof java.util.concurrent.CompletionException || e instanceof java.util.concurrent.ExecutionException) {
+            if (e.getCause() == null) break;
+            e = e.getCause();
+        }
+        if (!(e instanceof MatrixException m)) return false;
+        if ("M_NOT_FOUND".equals(m.errcode()) || "M_TOO_LARGE".equals(m.errcode())) return true;
+        return switch (m.status()) {
+            case 400, 404, 410, 413 -> true;
+            case 0 -> m.getCause() == null;
+            default -> false;
+        };
+    }
+
     CompletableFuture<java.util.Optional<LinkMedia>> linkMedia(String url) {
         if (!Settings.get().linkPreviews()) return CompletableFuture.completedFuture(java.util.Optional.empty());
         return links.inspect(url);

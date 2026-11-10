@@ -570,6 +570,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer progress) {
         return media.media(url, width, height, progress);
     }
+    @Override public boolean gone(Throwable error) { return MediaDownloader.gone(error); }
     @Override public CompletableFuture<java.util.Optional<app.unichat.model.LinkMedia>> linkMedia(String url) { return media.linkMedia(url); }
 
     @Override public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) { return sender.sendText(chatId, text, replyToId); }

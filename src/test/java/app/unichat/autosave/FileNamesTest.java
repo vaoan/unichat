@@ -75,4 +75,28 @@ class FileNamesTest {
         org.junit.jupiter.api.Assertions.assertTrue(FileNames.forMessage(m, java.time.ZoneOffset.UTC).startsWith("archivo-20261103"),
                 "nothing left: the made-up name");
     }
+
+    @Test
+    void aFileWindowsActsOnJustByListingTheFolderIsSavedInert(@TempDir Path dir) throws Exception {
+        // Explorer reads a .url's or .library-ms's icon address as soon as it shows the folder: a \\host\share there
+        // sends the login's NTLM hash to whoever sent the file. Saved as text, it's still readable and does nothing.
+        for (String name : java.util.List.of("informe.url", "Docs.library-ms", "x.searchConnector-ms", "acceso.LNK", "a.scf",
+                "b.search-ms", "c.website", "d.theme", "e.themepack", "f.appref-ms", "g.settingcontent-ms")) {
+            app.unichat.model.Message m = new app.unichat.model.Message("$id", "!c", "@a", "Ana", false,
+                    java.time.Instant.parse("2026-11-03T10:00:00Z"));
+            m.setType(app.unichat.model.MessageType.FILE);
+            m.setFileName(name);
+            String saved = FileNames.forSaving(m, java.time.ZoneOffset.UTC);
+            int dot = name.lastIndexOf('.');
+            assertEquals(name.substring(0, dot) + " [id]" + name.substring(dot) + ".txt", saved, name);
+            Path file = Files.writeString(dir.resolve(saved), "x");
+            org.junit.jupiter.api.Assertions.assertTrue(FileNames.savedIn(dir, m), "known again, never saved twice: " + name);
+            Files.delete(file);
+        }
+        app.unichat.model.Message ok = new app.unichat.model.Message("$id", "!c", "@a", "Ana", false,
+                java.time.Instant.parse("2026-11-03T10:00:00Z"));
+        ok.setType(app.unichat.model.MessageType.FILE);
+        ok.setFileName("factura.pdf");
+        assertEquals("factura [id].pdf", FileNames.forSaving(ok, java.time.ZoneOffset.UTC), "anything else as it came");
+    }
 }
