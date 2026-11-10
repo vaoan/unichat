@@ -38,5 +38,5 @@ Each area has its own `CLAUDE.md`, read when its files are: read it before worki
 - `src/main/java/app/unichat/service/` — `ChatService` and its roles, demo mode, the data folder's files, preferences and folders.
 - `src/main/java/app/unichat/server/` — the local server: processes, bridge installs, account states, watchdog.
 - `native/` — the no-Docker stack (`versions.env`), direct media, native builds, the macOS menu-bar helper.
-- `src/main/java/app/unichat/video/`, `voice/`, `stt/`, `assist/`, `cloak/`, `autosave/`, `login/` — stickers and conversions; voice notes; transcripts; AI drafts; protected photos; saving what chats receive; bridge logins.
+- `src/main/java/app/unichat/video/`, `voice/`, `stt/`, `assist/`, `cloak/`, `autosave/`, `cloud/`, `login/` — stickers and conversions; voice notes; transcripts; AI drafts; protected photos; saving what chats receive; the person's own storage (settings and media kept in sync); bridge logins.
 - `packaging/` — packages, releases, versions and updates, code signing, macOS minimum, THIRD-PARTY.

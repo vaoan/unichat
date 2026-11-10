@@ -1,0 +1,9 @@
+# cloud — notes for Claude
+
+The person's own storage account (pCloud, Icedrive, Nextcloud…), over WebDAV. The rules, commands and map are in the root `CLAUDE.md`.
+
+- `WebDav` (PROPFIND/MKCOL/PUT/GET; `stamp` = ETag or date, so a round downloads only what changed), `CloudAccount` (service, address, login and secret: `cloud.` keys stay on this machine; `Unichat/Ajustes`, `Unichat/Multimedia`), `Cloud` (one round a minute and one after anything's saved, on its own thread; `Status` for Ajustes → Nube, `ui/CloudPage`).
+- `SyncedPart`: one thing kept the same on every computer, as one file: three versions (here, the account's, the last agreed `cloud.base.<name>`); only one side changed → it goes to the other; both → the newer; a computer new to the account takes what's there. After adopting, the agreed hash is what this computer holds (agreeing on the account's own sent it back up forever). Two parts: the settings (`Bundle`: portable settings minus `panel.`, and `preferences.json` minus what only follows the server) and what the AI learned (`writing-style.md`; pending corrections stay here).
+- Applied live, never a restart: settings through `Settings.replacePortable`, then `ui/SyncedSettings` (what Ajustes does for the few read once: theme, AI buttons, global shortcut, Dock, notifications label, update check, language last); preferences through `ChatPreferences.adoptPreferences`. `SyncedSettingsUiTest` has a proof for every setting key in the source, and fails for a new one without.
+- Media (`MediaUpload`): each chat's saved folder goes up once (`cloud-uploaded.txt`), never replacing anything (the names carry the message's id); hidden and ".part" files wait.
+- Not in the demo (its chats would reach the person's account), except for a snapshot of the page. Tests use `FakeDav` (an in-memory WebDAV on 127.0.0.1).

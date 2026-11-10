@@ -27,7 +27,6 @@ final class SpeechPage {
         Label intro = Labels.help(I18n.t("settings.speech.intro"));
 
         Label modelState = Labels.help("");
-        modelState.setMaxWidth(240);
         Runnable refreshModel = () -> modelState.setText(SttSettings.model().isInstalled(Transcriber.modelsDir())
                 ? I18n.t("settings.speech.downloaded") : I18n.t("settings.speech.downloadsFirst"));
         refreshModel.run();

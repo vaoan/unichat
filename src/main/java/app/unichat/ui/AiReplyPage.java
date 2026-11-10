@@ -128,7 +128,6 @@ final class AiReplyPage {
             show.run();
         });
         name.setWrapText(true);
-        name.setMaxWidth(240);
         HBox buttons = new HBox(6, choose, remove);
         return new VBox(4, name, buttons);
     }

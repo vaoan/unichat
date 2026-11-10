@@ -55,6 +55,7 @@ public final class SettingsWindow {
             new Page("notifications", "Notificaciones", "settings.nav.notifications"),
             new Page("privacy", "Privacidad", "settings.nav.privacy"),
             new Page("networks", "Redes", "settings.nav.networks"),
+            new Page("cloud", "Nube", "settings.nav.cloud"),
             new Page("speech", "Voz a texto", "settings.nav.speech"),
             new Page("ai", "Escribir con IA", "settings.nav.ai"),
             new Page("gifs", "GIFs", "settings.nav.gifs"),
@@ -121,6 +122,7 @@ public final class SettingsWindow {
                 case "notifications" -> notificationsPage();
                 case "privacy" -> PrivacyPage.build();
                 case "networks" -> NetworksPage.build(svc, toast);
+                case "cloud" -> CloudPage.build(toast);
                 case "speech" -> SpeechPage.build();
                 case "ai" -> AiReplyPage.build();
                 case "gifs" -> gifsPage();

@@ -569,6 +569,11 @@ public final class MainView extends StackPane {
         thread.redraw();
     }
 
+    /** The person's cloud for Ajustes → Nube; null: none (the demo). */
+    public void useCloud(app.unichat.cloud.Cloud cloud) {
+        CloudPage.use(cloud);
+    }
+
     /** The settings changed on another computer and came through the cloud: applied now, as Ajustes would. UI thread. */
     public void settingsSynced() {
         SyncedSettings.apply(this::appearanceChanged);

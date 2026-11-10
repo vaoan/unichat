@@ -36,6 +36,8 @@ public final class UnichatApp extends Application {
     private Notifier notifier;
     private volatile ChatService service;
     private MainView mainView;
+    /** The person's own storage, kept up to date while a real session runs; null in the demo. */
+    private app.unichat.cloud.Cloud cloud;
 
     public static void main(String[] args) {
         if (System.getProperty("unichat.snapshot") != null) {
@@ -209,10 +211,21 @@ public final class UnichatApp extends Application {
         // Chats that save what they receive do it from the first sync, window shown or not; the menu-bar icon shows it.
         app.unichat.autosave.AutoSave.of(svc).setProgress(new app.unichat.autosave.AutoSave.Progress() {
             @Override public void changed(int done, int total) { notifier.setDownloadProgress(done, total); }
-            @Override public void finished(int saved, app.unichat.model.Chat chat) { notifier.downloadsDone(saved, chat); }
+            @Override public void finished(int saved, app.unichat.model.Chat chat) {
+                notifier.downloadsDone(saved, chat);
+                if (cloud != null) cloud.syncNow(); // what was just saved goes up now, not at the next round
+            }
             @Override public void failed(String what, app.unichat.model.Chat chat, String why) { notifier.downloadFailed(what, chat, why); }
         });
         mainView = new MainView(svc, stage, notifier, this::logout, this::openLink);
+        // Never in the demo (its made-up chats would reach the person's account), but for a snapshot of Ajustes → Nube.
+        if (!(svc instanceof app.unichat.service.MockChatService) || System.getProperty("unichat.snapshot") != null) {
+            cloud = app.unichat.cloud.Cloud.create(Settings.dataDir(), svc::preferencesJson, svc::adoptPreferences,
+                    () -> Platform.runLater(() -> { if (mainView != null) mainView.settingsSynced(); }),
+                    () -> app.unichat.autosave.AutoSave.of(svc).folders());
+            cloud.start(java.time.Duration.ofMinutes(1));
+        }
+        mainView.useCloud(cloud);
         scene.setRoot(mainView);
         Theme.applyAll();
         svc.start();
@@ -243,6 +256,8 @@ public final class UnichatApp extends Application {
         ChatService svc = service;
         service = null;
         if (svc == null) return;
+        if (cloud != null) cloud.stop();
+        cloud = null;
         svc.logout().whenComplete((v, err) -> Platform.runLater(() -> {
             svc.stop();
             Settings.get().clearSession();
@@ -308,6 +323,7 @@ public final class UnichatApp extends Application {
     private void quit() {
         Platform.runLater(() -> {
             if (stage.isShowing()) saveGeometry();
+            if (cloud != null) cloud.stop();
             if (service != null) service.stop();
             LocalServer local = Settings.get().localServer() ? LocalServer.get() : null;
             if (local != null) local.stop();

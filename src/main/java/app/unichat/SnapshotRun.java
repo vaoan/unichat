@@ -95,7 +95,22 @@ final class SnapshotRun {
                 shot.getRoot().applyCss();
                 shot.getRoot().layout();
             }
-            var img = shot.getRoot().snapshot(params, null);
+            javafx.scene.Node subject = shot.getRoot();
+            // -Dunichat.settingsFull=true: the whole settings page, top to bottom, not just what the window shows.
+            if (settings != null && Boolean.getBoolean("unichat.settingsFull")) {
+                for (var n : shot.getRoot().lookupAll(".scroll-pane")) {
+                    if (n instanceof javafx.scene.control.ScrollPane sp && sp.getContent() instanceof javafx.scene.layout.Region page) {
+                        double w = sp.getViewportBounds().getWidth();
+                        page.resize(w, page.prefHeight(w));
+                        page.layout();
+                        subject = page;
+                        break; // the page's own: the first, outermost (a text box inside has one too)
+                    }
+                }
+            }
+            if (subject != shot.getRoot() && shot.getRoot() instanceof javafx.scene.layout.Region r && r.getBackground() != null
+                    && !r.getBackground().getFills().isEmpty()) params.setFill(r.getBackground().getFills().getFirst().getFill());
+            var img = subject.snapshot(params, null);
             javax.imageio.ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", new File(out));
         } catch (Exception ex) {
             ex.printStackTrace();

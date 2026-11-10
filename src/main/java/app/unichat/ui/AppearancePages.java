@@ -23,6 +23,8 @@ import static app.unichat.ui.SettingsForm.toggle;
 /** Ajustes → Apariencia and Accesibilidad: how Unichat looks, what they share being the text size and the appearance callback. */
 final class AppearancePages {
     private static final String[] ACCENTS = {"#5B5BD6", "#0090FF", "#12A594", "#46A758", "#F76B15", "#E5484D", "#D6409F", "#8E4EC6", "#1C2024"};
+    /** Each colour's name, for screen readers and its tooltip ("#5B5BD6" said nothing). */
+    private static final String[] ACCENT_NAMES = {"indigo", "blue", "teal", "green", "orange", "red", "pink", "purple", "graphite"};
 
     private AppearancePages() {}
 
@@ -43,17 +45,20 @@ final class AppearancePages {
                     s.setLanguage(code);
                     I18n.use(code); // the window is rebuilt in the new language (UnichatApp)
                 });
-        FlowPane accents = new FlowPane(8, 8);
-        for (String hex : ACCENTS) {
-            Button sw = new Button();
+        FlowPane accents = new FlowPane(6, 8);
+        javafx.scene.control.ToggleGroup accentGroup = new javafx.scene.control.ToggleGroup();
+        for (int i = 0; i < ACCENTS.length; i++) {
+            String hex = ACCENTS[i], name = I18n.t("settings.appearance.accent." + ACCENT_NAMES[i]);
+            javafx.scene.control.ToggleButton sw = new javafx.scene.control.ToggleButton();
             sw.getStyleClass().add("accent-swatch");
-            if (hex.equalsIgnoreCase(s.accent())) sw.getStyleClass().add("selected");
-            sw.setStyle("-fx-background-color: " + hex + ";");
-            sw.setAccessibleText(I18n.t("settings.appearance.accentColor", hex));
+            sw.setToggleGroup(accentGroup);
+            sw.setSelected(hex.equalsIgnoreCase(s.accent()));
+            sw.setStyle("-swatch: " + hex + ";"); // the CSS draws the ring around it
+            sw.setAccessibleText(I18n.t("settings.appearance.accentColor", name));
+            sw.setTooltip(new javafx.scene.control.Tooltip(name));
             sw.setOnAction(e -> {
+                if (!sw.isSelected()) sw.setSelected(true); // one is always chosen
                 s.setAccent(hex);
-                accents.getChildren().forEach(n -> n.getStyleClass().remove("selected"));
-                sw.getStyleClass().add("selected");
                 changed.run();
             });
             accents.getChildren().add(sw);

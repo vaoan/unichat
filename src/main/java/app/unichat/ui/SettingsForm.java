@@ -49,16 +49,9 @@ final class SettingsForm {
             Label h = Labels.help(help);
             text.getChildren().add(h);
         }
-        HBox.setHgrow(text, Priority.ALWAYS);
         if (control.getAccessibleText() == null) control.setAccessibleText(label);
-        if (control instanceof Region r && !(control instanceof Slider)) r.setMinWidth(Region.USE_PREF_SIZE);
         if (help != null && control.getAccessibleHelp() == null) control.setAccessibleHelp(help);
-        Region grow = new Region();
-        HBox.setHgrow(grow, Priority.SOMETIMES);
-        HBox row = new HBox(12, text, grow, control);
-        row.setAlignment(Pos.CENTER_LEFT);
-        row.getStyleClass().add("settings-row");
-        return row;
+        return new SettingsRow(text, control); // beside the text, or under it when it would squeeze it
     }
 
     /** A row with its control under the text, for one too wide to sit beside it (beside, the label was squeezed). */

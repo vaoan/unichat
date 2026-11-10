@@ -100,6 +100,11 @@ public final class AutoSave implements ChatService.Listener {
         });
     }
 
+    /** The folders of every chat that saves something: what goes up to the person's cloud. */
+    public List<Path> folders() {
+        return chats.chats().stream().filter(c -> !Wanted.of(prefs, c.id()).none()).map(SaveFolders::of).distinct().toList();
+    }
+
     /** Where a chat's things go ({@link SaveFolders}). */
     public Path folder(Chat chat) {
         return SaveFolders.of(chat);
