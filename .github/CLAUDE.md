@@ -8,3 +8,4 @@
 
 ## Lessons
 - `natives.yml` pasted `${{ matrix.bridge.* }}` (read from `versions.env`) and other matrix values into `run:` scripts: a crafted value became shell code. They go through `env:` and are used as `"$VAR"`; check with `grep -n '\${{' .github/workflows/*.yml` that none is left inside a `run:`.
+- `ui-headless` blocks the build and the release (since 2026-11-10). It was informative and failed on every run for days without anyone seeing it: `ComposerHeightUiTest`'s sentence still took two lines at 704 px with Linux's wider font. A test's failure message saying what it measured (its sizes) is what found it from CI alone.
