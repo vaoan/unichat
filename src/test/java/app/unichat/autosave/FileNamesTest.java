@@ -50,4 +50,29 @@ class FileNamesTest {
         java.nio.file.Files.writeString(dir.resolve("IMG_3944 [AbC_d-9_ejemplo.org] (2).MOV"), "whole");
         org.junit.jupiter.api.Assertions.assertTrue(FileNames.savedIn(dir, m));
     }
+
+    @Test
+    void aNameCantHideItsRealExtension() {
+        assertEquals("invoicefdp.exe", FileNames.safe("invoice\u202Efdp.exe"), "a right-to-left override showed it as a PDF");
+        assertEquals("ab.txt", FileNames.safe("a\u200Bb\u2066.txt"), "nor any other invisible format character");
+        assertEquals("Familia 🏡", FileNames.safe("Familia 🏡"));
+    }
+
+    @Test
+    void aNameStartingWithADotIsntHiddenAndIsKnownAgain(@TempDir Path dir) throws Exception {
+        assertEquals("profile", FileNames.safe(".profile"));
+        assertEquals("Trash", FileNames.folder(".Trash"), "nor a chat's folder");
+        assertEquals("_", FileNames.folder("..."));
+        app.unichat.model.Message m = new app.unichat.model.Message("$id", "!c", "@a", "Ana", false,
+                java.time.Instant.parse("2026-11-03T10:00:00Z"));
+        m.setType(app.unichat.model.MessageType.FILE);
+        m.setFileName(".profile");
+        String saved = FileNames.forSaving(m, java.time.ZoneOffset.UTC);
+        assertEquals("profile [id]", saved);
+        Files.writeString(dir.resolve(saved), "x");
+        org.junit.jupiter.api.Assertions.assertTrue(FileNames.savedIn(dir, m), "a hidden one was saved again on every explore");
+        m.setFileName("...");
+        org.junit.jupiter.api.Assertions.assertTrue(FileNames.forMessage(m, java.time.ZoneOffset.UTC).startsWith("archivo-20261103"),
+                "nothing left: the made-up name");
+    }
 }

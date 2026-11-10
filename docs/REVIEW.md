@@ -6,7 +6,7 @@ Fixed in that review: `file:` media addresses from messages opened as local file
 
 ## Security
 1. **Bridge and tuwunel checksums come from the same release as the binaries** (`server/BinaryStore.java:52`, `native/setup-mac.sh`, `native/fetch-natives.sh`, `package.ps1`): they catch corruption, not tampering. Pin a SHA-256 per asset and platform in `versions.env`.
-2. **Windows: autosaved files have no Mark-of-the-Web and keep RTL overrides and runnable extensions** (`autosave/FileNames.java:80`, `AutoSave.java:242`): `invoice‮fdp.exe` shows as a PDF and runs without SmartScreen; a `.library-ms` leaks the NTLM hash. Strip `\p{Cf}`, write `Zone.Identifier` (ZoneId=3), neutralize runnable extensions.
+2. **Windows: autosaved files keep runnable extensions** (`autosave/FileNames.java`): a received `.library-ms` or `.url` leaks the NTLM hash when Explorer shows it. Neutralize those extensions (Mark-of-the-Web and `\p{Cf}` are done: `MarkOfTheWebTest`, `FileNamesTest`).
 3. **Codex runs with the person's MCP servers and AGENTS.md** (`assist/AiEngine.java:59`): Claude is isolated (`--strict-mcp-config --setting-sources ""`), Codex only has `--sandbox read-only`. Override its MCP servers and profiles.
 4. **No deadline on response bodies** (`links/LinkInspector.java:108`, `gif/GifFiles.java:47`): four slow links stop link inspection for the session; GIF downloads also lack a size cap and an https check.
 5. **Animated WebP decoded at full size before the frame cap** (`video/AnimDump.java:39`): a small 8000×8000×300 WebP fills the disk or the heap. Refuse by width × height × frames from `parseLayout`.
@@ -23,7 +23,7 @@ Fixed in that review: `file:` media addresses from messages opened as local file
 5. **Any startup catch-up error throws away the cached sync** (`matrix/MatrixChatService.java:254`): a 429 or 502 forces the full multi-MB sync.
 6. **`BotChat.addDirect` overwrites `m.direct` after a failed GET** (`matrix/BotChat.java:186`); a failed reply lookup is cached for good (`MatrixChatService.java:483`, `MatrixException` is unchecked).
 7. **Leaks:** `.part` files in `cache/media` never deleted (`matrix/MatrixClient.java:122`); `pending` events per room grow without bound (`SyncProcessor.java:470`); `MediaDownloader.watching` keys; a new `HttpClient` per call (`support/Downloads.java:46`, `DropboxLogin`, `UpdateChecker`, `MetaSessions`); cloud repair loads a whole file in memory (`cloud/MediaUpload.java:151`).
-8. Lower: `Settings.save` fsyncs twice under the lock on every `set`; the tray is built on the FX thread (`ui/Notifier.java:173`); stopping `ReplyWriter`/`Transcriber` leaves their program running; an old `CloakJob` can write over the new one's status; `Transcripts` can start a note twice; dot-files saved again on each explore; renaming a group splits its folder; `BigPictures` downloads ffmpeg before trying `sips`; Discord server pause fails silently; `config.yaml` rewritten in place (`server/BridgeConfig.java:50`).
+8. Lower: `Settings.save` fsyncs twice under the lock on every `set`; the tray is built on the FX thread (`ui/Notifier.java:173`); stopping `ReplyWriter`/`Transcriber` leaves their program running; an old `CloakJob` can write over the new one's status; `Transcripts` can start a note twice; renaming a group splits its folder; `BigPictures` downloads ffmpeg before trying `sips`; Discord server pause fails silently; `config.yaml` rewritten in place (`server/BridgeConfig.java:50`).
 
 ## DRY
 - Running a program: `ReplyWriter.run`, `Transcriber.run`, `CloakJob.run` re-implement `support/Processes.capture` (and "last line" three times).
@@ -31,7 +31,7 @@ Fixed in that review: `file:` media addresses from messages opened as local file
 - Installers: `Ffmpeg.install` / `YtDlp.install`; the CPU/OS pick in `Ffmpeg`, `YtDlp`, `CloakTool`.
 - HTTP send + error mapping seven times in `cloud/` (`PCloudApi`, `DropboxApi`, `WebDav`, `DropboxLogin`).
 - mxc parsing three times (`MediaDownloader.serverOf`, `.download`, `MessageSender.needsCopy`); `MessageSender.probeMime` repeats `model/MimeTypes`.
-- UI: "open file" (`ProfileMedia`, `MessageMedia`), "open video" ×3 (only one pauses audio), the coalesced redraw ×4 (`UploadBar`, `ExploreBar`, `CloakBar`, `ThreadPane`; none counts in `Redraws.PENDING`), drag and drop (`ThreadPane`, `Composer`), `FormatMenu.item`/`ChatMenus.item`, `VideoControls.frameName` vs `FileNames.safe`.
+- UI: "open file" (`ProfileMedia`, `MessageMedia`), "open video" ×3 (only one pauses audio), the coalesced redraw ×4 (`UploadBar`, `ExploreBar`, `CloakBar`, `ThreadPane`; none counts in `Redraws.PENDING`), drag and drop (`ThreadPane`, `Composer`), `FormatMenu.item`/`ChatMenus.item`.
 - `ChromiumCookies.readCopy` / `FirefoxCookies.readCopy`; `LocalServer.answers` / `Watchdog.answers`; `StylePrompt.accept` / `problem` (and `StyleLearner` reads a Spanish word from a log line).
 
 ## SOLID / KISS

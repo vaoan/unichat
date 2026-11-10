@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.autosave.FileNames;
 import app.unichat.support.I18n;
 import javafx.animation.PauseTransition;
 import javafx.embed.swing.SwingFXUtils;
@@ -374,8 +375,9 @@ final class VideoControls extends VBox {
 
     /** "clip.mp4" at 65.4 s → "clip-1m05s.png". */
     static String frameName(String title, double seconds) {
-        String base = title == null || title.isBlank() ? "video" : title.replaceAll("\\.[A-Za-z0-9]{1,5}$", "");
+        String base = FileNames.safe(title == null ? "" : title.replaceAll("\\.[A-Za-z0-9]{1,5}$", ""));
+        if (base.isEmpty()) base = "video";
         long s = (long) Math.max(0, seconds);
-        return base.replaceAll("[\\\\/:*?\"<>|]", "_") + "-" + (s / 60) + "m" + String.format("%02d", s % 60) + "s.png";
+        return base + "-" + (s / 60) + "m" + String.format("%02d", s % 60) + "s.png";
     }
 }

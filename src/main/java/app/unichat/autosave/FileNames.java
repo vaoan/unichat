@@ -75,9 +75,12 @@ public final class FileNames {
     /**
      * Windows reads "C:x" as relative to drive C and "a:b" as a hidden stream, rejects {@code <>"|?*}, control
      * characters, trailing dots/spaces and DOS device names: clean all of those, slashes too, and keep it under 200.
+     * Invisible format characters go ({@code \p{Cf}}: a right-to-left override, U+202E, showed "invoice[RLO]fdp.exe" as a PDF),
+     * and leading dots too: a hidden file was skipped by {@link #savedIn} and folder moves, so saved again each time.
      */
     public static String safe(String name) {
-        String n = name.replaceAll("[<>:\"|?*/\\\\\\x00-\\x1F]", "_").replaceAll("[. ]+$", "").strip();
+        String n = name.replaceAll("\\p{Cf}", "").replaceAll("[<>:\"|?*/\\\\\\x00-\\x1F]", "_")
+                .replaceAll("[. ]+$", "").replaceAll("^[. ]+", "").strip();
         if (RESERVED.matcher(n).matches()) n = "_" + n;
         if (n.length() > 200) {
             int dot = n.lastIndexOf('.');

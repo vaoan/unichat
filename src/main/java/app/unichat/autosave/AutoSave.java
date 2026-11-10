@@ -10,6 +10,7 @@ import app.unichat.service.ChatSession;
 import app.unichat.service.MediaSource;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import app.unichat.support.MarkOfTheWeb;
 import app.unichat.support.Urls;
 import app.unichat.video.Ffmpeg;
 import app.unichat.video.YtDlp;
@@ -243,6 +244,7 @@ public final class AutoSave implements ChatService.Listener {
         Path part = dir.resolve("." + target.getFileName() + ".part");
         Files.copy(downloaded[0], part, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
         Files.move(part, target, StandardCopyOption.ATOMIC_MOVE);
+        MarkOfTheWeb.mark(target);
         return true;
     }
 

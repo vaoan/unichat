@@ -35,5 +35,7 @@ class VideoControlsTest {
         assertEquals("clip-1m05s.png", VideoControls.frameName("clip.mp4", 65.4));
         assertEquals("video-0m00s.png", VideoControls.frameName(null, 0));
         assertEquals("a_b-0m03s.png", VideoControls.frameName("a/b", 3));
+        assertEquals("clipgnp-0m03s.png", VideoControls.frameName("clip\u202Egnp.mp4", 3), "cleaned as saved files are");
+        assertEquals("video-0m03s.png", VideoControls.frameName(".mp4", 3), "never a hidden file");
     }
 }
