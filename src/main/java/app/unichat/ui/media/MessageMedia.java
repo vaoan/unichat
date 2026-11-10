@@ -73,7 +73,7 @@ public final class MessageMedia {
             if (MessageActions.isStickerOrGif(m)) library.rememberSeen(MediaItems.of(m));
             if (m.isReelLink()) {
                 box.getChildren().add(playBadge());
-                clickable(box, I18n.t("media.reelOpen"), () -> openLink.accept(m.externalUrl()));
+                clickable(box, I18n.t("media.reelOpen"), () -> openReel(m));
                 return box;
             }
             clickable(box, sticker ? I18n.t("media.stickerOpen")
@@ -279,6 +279,11 @@ public final class MessageMedia {
         box.setAccessibleText(accessibleText);
     }
 
+    /** A reel that came only as its picture: its video in the player, fetched from its page; the page if that fails. */
+    private void openReel(Message m) {
+        MediaOpening.reel(scene.get().getWindow(), m.externalUrl(), audio, openLink);
+    }
+
     private void openVideo(Message m) {
         MediaOpening.video(scene.get().getWindow(), svc, m, m.fileName(), audio, toast);
     }
@@ -471,7 +476,7 @@ public final class MessageMedia {
     /** What a click on {@code m}'s picture or video opens; for the keyboard, through the message's menu. */
     public void view(Message m) {
         if (!canView(m) || scene.get() == null) return;
-        if (m.isReelLink()) openLink.accept(m.externalUrl());
+        if (m.isReelLink()) openReel(m);
         else if (m.type() == MessageType.VIDEO) openVideo(m);
         else Gallery.open(scene.get().getWindow(), svc, m, toast);
     }

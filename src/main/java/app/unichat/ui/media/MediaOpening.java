@@ -5,8 +5,11 @@ import app.unichat.model.Message;
 import app.unichat.service.MediaSource;
 import app.unichat.support.I18n;
 import javafx.application.Platform;
+import javafx.stage.Stage;
 import javafx.stage.Window;
 
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /** A message's media opened outside the chat, the same from the timeline, the info panel and the media panel. */
@@ -33,5 +36,25 @@ public final class MediaOpening {
         if (audio != null) audio.pause();
         VideoViewer.show(owner, svc.media(m.mediaUrl(), 0, 0), title, () -> MediaSaver.save(owner, svc, m, toast),
                 p -> Browser.openFile(p, () -> toast.accept(I18n.t("video.openFailed"))));
+    }
+
+    /**
+     * The video of a reel the bridge gave only as its picture and link, in the player: fetched by the engine that saves
+     * links (`autosave/LinkVideo`, once, into the media cache) while the player waits. It opened Instagram before; it
+     * still does when the video can't be had (a private reel, no cookies), and the player closes. FX thread.
+     */
+    public static void reel(Window owner, String url, AudioPlayback audio, Consumer<String> openLink) {
+        if (audio != null) audio.pause();
+        CompletableFuture<Path> video = app.unichat.autosave.LinkVideo.of(url);
+        Stage player = VideoViewer.show(owner, video, I18n.t("media.reelTitle"), null,
+                p -> Browser.openFile(p, () -> openLink.accept(url)));
+        video.whenComplete((p, failed) -> {
+            if (failed == null) return;
+            System.err.println("Reel not playable here, opening its page: " + failed);
+            Platform.runLater(() -> {
+                player.close();
+                openLink.accept(url);
+            });
+        });
     }
 }
