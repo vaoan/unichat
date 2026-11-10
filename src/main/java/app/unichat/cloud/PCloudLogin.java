@@ -7,14 +7,8 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
-import java.util.HashMap;
-import java.util.HexFormat;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -28,22 +22,16 @@ import java.util.function.Consumer;
  */
 public final class PCloudLogin {
     /** Fixed: pCloud takes only the address registered with the app. */
-    public static final int PORT = 43117;
+    public static final int PORT = Loopback.PORT;
     public static final String REDIRECT = "http://localhost:" + PORT + "/pcloud";
     /** Unichat's app at pCloud; empty until registered, and then the one a person registered can be given in Ajustes. */
     static final String CLIENT_ID = "";
 
     private final HttpServer server;
-    private final String state = random();
+    private final String state = Loopback.random(16);
     /** Where the API is for the host pCloud names; null for one that isn't pCloud's (the token never goes there). */
     private final java.util.function.UnaryOperator<String> apiOf;
     private final CompletableFuture<CloudAccount> result = new CompletableFuture<>();
-
-    private static String random() {
-        byte[] b = new byte[16];
-        new SecureRandom().nextBytes(b);
-        return HexFormat.of().formatHex(b);
-    }
 
     /** pCloud's own API hosts only ("api.pcloud.com", Europe's "eapi.pcloud.com"). */
     static String pcloudApi(String hostname) {
@@ -52,7 +40,7 @@ public final class PCloudLogin {
 
     private PCloudLogin(int port, java.util.function.UnaryOperator<String> apiOf) throws IOException {
         this.apiOf = apiOf;
-        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
+        server = Loopback.server(port);
         server.createContext("/pcloud/done", this::done);
         server.createContext("/pcloud", this::page);
         server.start();
@@ -93,42 +81,23 @@ public final class PCloudLogin {
                   .then(t => { document.getElementById('m').textContent = t; });
                 </script>
                 """.formatted(I18n.t("cloud.pcloud.finishing"));
-        reply(x, 200, "text/html; charset=utf-8", html);
+        Loopback.reply(x, 200, "text/html; charset=utf-8", html);
     }
 
     private void done(HttpExchange x) throws IOException {
-        Map<String, String> q = query(x.getRequestURI().getRawQuery());
+        Map<String, String> q = Loopback.query(x.getRequestURI().getRawQuery());
         if (!state.equals(q.get("state"))) {
-            reply(x, 400, "text/plain; charset=utf-8", I18n.t("cloud.pcloud.notOurs"));
+            Loopback.reply(x, 400, "text/plain; charset=utf-8", I18n.t("cloud.pcloud.notOurs"));
             return; // someone else's answer: keep waiting for ours
         }
         String api = apiOf.apply(q.get("hostname"));
         if (q.get("access_token") == null || api == null) {
-            reply(x, 200, "text/plain; charset=utf-8", I18n.t("cloud.pcloud.declined"));
+            Loopback.reply(x, 200, "text/plain; charset=utf-8", I18n.t("cloud.pcloud.declined"));
             result.completeExceptionally(new IOException(I18n.t("cloud.pcloud.declined")));
             return;
         }
-        reply(x, 200, "text/plain; charset=utf-8", I18n.t("cloud.pcloud.done"));
+        Loopback.reply(x, 200, "text/plain; charset=utf-8", I18n.t("cloud.pcloud.done"));
         result.complete(new CloudAccount(CloudAccount.Service.PCLOUD, api, "pCloud", q.get("access_token")));
     }
 
-    private static Map<String, String> query(String raw) {
-        Map<String, String> q = new HashMap<>();
-        if (raw == null) return q;
-        for (String pair : raw.split("&")) {
-            int eq = pair.indexOf('=');
-            if (eq > 0) q.put(URLDecoder.decode(pair.substring(0, eq), StandardCharsets.UTF_8),
-                    URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8));
-        }
-        return q;
-    }
-
-    private static void reply(HttpExchange x, int code, String type, String body) throws IOException {
-        byte[] b = body.getBytes(StandardCharsets.UTF_8);
-        x.getResponseHeaders().set("Content-Type", type);
-        x.sendResponseHeaders(code, b.length);
-        try (var out = x.getResponseBody()) {
-            out.write(b);
-        }
-    }
 }

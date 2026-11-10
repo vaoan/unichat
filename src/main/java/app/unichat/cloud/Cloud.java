@@ -154,7 +154,8 @@ public final class Cloud {
             try {
                 Storage s = a.storage();
                 s.check();
-                return s instanceof PCloudApi p ? new CloudAccount(a.service(), a.url(), p.email(), a.secret()) : a;
+                String email = s instanceof PCloudApi p ? p.email() : s instanceof DropboxApi d ? d.email() : null;
+                return email == null ? a : new CloudAccount(a.service(), a.url(), email, a.secret());
             } catch (IOException e) {
                 throw new java.util.concurrent.CompletionException(e);
             }

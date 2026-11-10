@@ -11,6 +11,8 @@ public record CloudAccount(Service service, String url, String user, String secr
     public enum Service {
         /** Signed in through the browser ({@link PCloudLogin}): works with two-step verification; {@code url} is its API host. */
         PCLOUD(null),
+        /** Signed in through the browser ({@link DropboxLogin}); {@code secret} is the lasting permission. */
+        DROPBOX(null),
         ICEDRIVE("https://webdav.icedrive.io"),
         OTHER(null);
 
@@ -48,9 +50,13 @@ public record CloudAccount(Service service, String url, String user, String secr
         for (String k : new String[] {"cloud.service", "cloud.url", "cloud.user", "cloud.secret", "cloud.settingsBase"}) s.set(k, null);
     }
 
-    /** pCloud through its own API (signed in in the browser); every other service through WebDAV. */
+    /** pCloud and Dropbox through their own APIs (signed in in the browser); every other service through WebDAV. */
     public Storage storage() {
-        return service == Service.PCLOUD ? new PCloudApi(url, secret) : new WebDav(url, user, secret);
+        return switch (service) {
+            case PCLOUD -> new PCloudApi(url, secret);
+            case DROPBOX -> new DropboxApi(DropboxLogin.appKey(), secret);
+            case ICEDRIVE, OTHER -> new WebDav(url, user, secret);
+        };
     }
 
     /** Upload what chats save (on unless turned off). */

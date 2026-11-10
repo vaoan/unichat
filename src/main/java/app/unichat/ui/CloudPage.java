@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.cloud.Cloud;
 import app.unichat.cloud.CloudAccount;
 import app.unichat.cloud.CloudAccount.Service;
+import app.unichat.cloud.DropboxLogin;
 import app.unichat.cloud.PCloudLogin;
 import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
@@ -79,13 +80,14 @@ final class CloudPage {
                 redraw.run();
             }));
         };
-        Node pcloud = pcloudForm(status, tryIt);
+        Node pcloud = signInForm(PCLOUD, status, tryIt), dropbox = signInForm(DROPBOX, status, tryIt);
         Node dav = davForm(chosen, status, tryIt);
         Node services = chips(I18n.t("settings.cloud.service"), List.of(Service.values()),
                 s -> I18n.t("settings.cloud.service." + s.name()), Service.PCLOUD, s -> {
                     chosen[0] = s;
                     Nodes.show(pcloud, s == Service.PCLOUD);
-                    Nodes.show(dav, s != Service.PCLOUD);
+                    Nodes.show(dropbox, s == Service.DROPBOX);
+                    Nodes.show(dav, s == Service.ICEDRIVE || s == Service.OTHER);
                     if (dav.lookup(".cloud-url") instanceof TextField url) {
                         url.setDisable(s != Service.OTHER);
                         url.setText(s.url == null ? "" : s.url);
@@ -93,30 +95,44 @@ final class CloudPage {
                     if (dav.lookup(".cloud-secret-help") instanceof Label help) help.setText(I18n.t("settings.cloud.secretHelp." + s.name()));
                 });
         Nodes.show(dav, false);
-        return group(I18n.t("settings.cloud.account"), stacked(I18n.t("settings.cloud.service"), null, services), pcloud, dav,
+        Nodes.show(dropbox, false);
+        return group(I18n.t("settings.cloud.account"), stacked(I18n.t("settings.cloud.service"), null, services), pcloud, dropbox, dav,
                 actions(status));
     }
 
-    /** "Conectar con pCloud": the browser opens pCloud's page; "Cancelar" while it waits there. */
-    private static Node pcloudForm(Label status, Consumer<CloudAccount> tryIt) {
-        TextField clientId = new TextField(Settings.get().getString("cloud.pcloudClientId", ""));
-        clientId.setAccessibleText(I18n.t("settings.cloud.clientId"));
-        Node clientRow = stacked(I18n.t("settings.cloud.clientId"), I18n.t("settings.cloud.clientIdHelp", PCloudLogin.REDIRECT), clientId);
-        Nodes.show(clientRow, PCloudLogin.clientId().isEmpty() || !Settings.get().getString("cloud.pcloudClientId", "").isEmpty());
-        Button connect = new Button(I18n.t("settings.cloud.connectPcloud"));
+    /** A service signed in to through the browser: its app's key (until Unichat's own is set), and how to start. */
+    private record SignIn(Service service, String keySetting, java.util.function.Supplier<String> key, Start start) {}
+
+    @FunctionalInterface
+    private interface Start {
+        java.util.concurrent.CompletableFuture<CloudAccount> start(String key, Consumer<java.net.URI> browser) throws java.io.IOException;
+    }
+
+    private static final SignIn PCLOUD = new SignIn(Service.PCLOUD, "cloud.pcloudClientId", PCloudLogin::clientId, PCloudLogin::start);
+    private static final SignIn DROPBOX = new SignIn(Service.DROPBOX, "cloud.dropboxAppKey", DropboxLogin::appKey, DropboxLogin::start);
+
+    /** "Conectar con …": the browser opens the service's page; "Cancelar" while it waits there. */
+    private static Node signInForm(SignIn how, Label status, Consumer<CloudAccount> tryIt) {
+        String name = how.service().name();
+        TextField key = new TextField(Settings.get().getString(how.keySetting(), ""));
+        key.setAccessibleText(I18n.t("settings.cloud.appKey." + name));
+        String redirect = how.service() == Service.DROPBOX ? DropboxLogin.REDIRECT : PCloudLogin.REDIRECT;
+        Node keyRow = stacked(I18n.t("settings.cloud.appKey." + name), I18n.t("settings.cloud.appKeyHelp." + name, redirect), key);
+        Nodes.show(keyRow, how.key().get().isEmpty() || !Settings.get().getString(how.keySetting(), "").isEmpty());
+        Button connect = new Button(I18n.t("settings.cloud.connectWith", I18n.t("settings.cloud.service." + name)));
         connect.getStyleClass().add("primary-button");
         Button cancel = new Button(I18n.t("folders.dialog.cancel"));
         cancel.getStyleClass().add("secondary-button");
         Nodes.show(cancel, false);
         java.util.concurrent.CompletableFuture<?>[] waiting = {null};
         connect.setOnAction(e -> {
-            Settings.get().set("cloud.pcloudClientId", clientId.getText().isBlank() ? null : clientId.getText().strip());
-            if (PCloudLogin.clientId().isEmpty()) {
-                say(status, I18n.t("settings.cloud.noClientId"));
+            Settings.get().set(how.keySetting(), key.getText().isBlank() ? null : key.getText().strip());
+            if (how.key().get().isEmpty()) {
+                say(status, I18n.t("settings.cloud.noAppKey." + name));
                 return;
             }
             try {
-                var login = PCloudLogin.start(PCloudLogin.clientId(), uri -> Browser.open(uri.toString()));
+                var login = how.start().start(how.key().get(), uri -> Browser.open(uri.toString()));
                 waiting[0] = login;
                 connect.setDisable(true);
                 Nodes.show(cancel, true);
@@ -135,8 +151,8 @@ final class CloudPage {
         cancel.setOnAction(e -> {
             if (waiting[0] != null) waiting[0].cancel(false);
         });
-        Label help = Labels.help(I18n.t("settings.cloud.pcloudHelp"));
-        return new VBox(clientRow, actions(new VBox(8, help, new FlowPane(8, 6, connect, cancel))));
+        Label help = Labels.help(I18n.t("settings.cloud.signInHelp." + name));
+        return new VBox(keyRow, actions(new VBox(8, help, new FlowPane(8, 6, connect, cancel))));
     }
 
     /** Address, login and password or key for a WebDAV service; "Conectar" tries them. */

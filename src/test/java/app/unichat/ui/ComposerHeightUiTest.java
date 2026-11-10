@@ -61,7 +61,8 @@ class ComposerHeightUiTest {
         FxWait.fx(() -> { composer[0].setMaxWidth(880); return null; }); // wider: fewer lines, a shorter box
         FxWait.settled();
         FxWait.until("all of it on screen, wider", () -> hidden(box) <= 1);
-        assertTrue(FxWait.fx(box::getHeight) < tall, "it shrinks back when it needs less");
+        // Measured after the layout that re-wraps it: one more pass on some systems (Linux), so wait for it, not a time.
+        FxWait.until("it shrinks back when it needs less", () -> box.getHeight() < tall);
 
         FxWait.fx(() -> { box.setText("hola"); return null; });
         FxWait.settled();
