@@ -508,5 +508,6 @@ class PreferencesFileTest {
         assertEquals(java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS, app.unichat.model.SaveKind.LINKS), again.saveKinds("k"), "kept");
         again.chooseSaveKinds("k", java.util.Set.of());
         assertTrue(again.saveKinds("k").isEmpty(), "none chosen: off");
+        again.flush(); // its save runs on a thread of its own: done before the folder goes, or it races the deletion
     }
 }
