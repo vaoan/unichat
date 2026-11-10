@@ -902,3 +902,6 @@
 .profile-file .icon { -fx-background-color: -text-2; }
 .profile-file-name { -fx-text-fill: -text; }
 .profile-link { -fx-padding: 2 0; }
+/* The options' "Peligroso" tab: red when chosen, so it reads as what it is. */
+.media-tab.danger-tab:selected .icon { -fx-background-color: #D92D20; }
+.media-tab.danger-tab:selected { -fx-text-fill: #D92D20; }

@@ -68,9 +68,16 @@ class ChatOptionsUiTest {
         FxWait.fx(() -> { showMedia.fire(); return null; });
         assertTrue(svc.mediaHidden(id), "hidden for this chat");
         svc.setMediaHidden(id, false).get();
+        // Leaving is on its own tab, "Peligroso": nothing of it shows among the everyday options.
+        assertTrue(FxWait.fx(() -> overlay.lookupAll(".danger-button").stream().noneMatch(ChatOptionsUiTest::shown)),
+                "not on the General tab");
+        javafx.scene.control.ToggleButton dangerTab = FxWait.fx(() -> overlay.lookupAll(".media-tab").stream()
+                .map(n -> (javafx.scene.control.ToggleButton) n).filter(t -> t.getText().equals("Peligroso")).findFirst().orElseThrow());
+        FxWait.fx(() -> { dangerTab.fire(); return null; });
+        assertTrue(FxWait.fx(() -> !shown(showMedia)), "and the General options are hidden there");
         // Leaving asks first; "Cancelar" goes back, only the second yes leaves.
         Button ask = FxWait.fx(() -> overlay.lookupAll(".danger-button").stream().map(n -> (Button) n)
-                .filter(Node::isVisible).findFirst().orElseThrow());
+                .filter(ChatOptionsUiTest::shown).findFirst().orElseThrow());
         FxWait.fx(() -> { ask.fire(); return null; });
         Button cancel = FxWait.fx(() -> overlay.lookupAll(".secondary-button").stream().map(n -> (Button) n)
                 .filter(b -> b.isVisible() && b.getText().equals("Cancelar")).findFirst().orElseThrow());
@@ -84,5 +91,11 @@ class ChatOptionsUiTest {
         assertTrue(overlay.getChildren().isEmpty(), "and the sheet closed");
         FxWait.fx(() -> { overlay.getScene().getWindow().hide(); return null; });
         svc.stop();
+    }
+
+    /** On screen: it and everything it's in visible. */
+    private static boolean shown(Node n) {
+        for (Node at = n; at != null; at = at.getParent()) if (!at.isVisible()) return false;
+        return true;
     }
 }

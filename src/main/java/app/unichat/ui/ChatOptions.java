@@ -20,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -88,11 +89,12 @@ final class ChatOptions {
         showMedia.setSelected(!svc.mediaHidden(chat.id()));
         showMedia.setWrapText(true);
         showMedia.setOnAction(e -> svc.setMediaHidden(chat.id(), !showMedia.isSelected()));
-        VBox card = new VBox(12, title, sectionTitle(I18n.t("chatOptions.profileTitle")), showMedia,
+        VBox general = new VBox(12, sectionTitle(I18n.t("chatOptions.profileTitle")), showMedia,
                 sectionTitle(I18n.t("chatOptions.autoSaveTitle")), on, kindBoxes, help,
-                folderRow(chat), sectionTitle(I18n.t("chatOptions.pastTitle")), past(chat, on),
-                sectionTitle(I18n.t(chat.group() ? "info.leaveGroup" : "info.deleteChat")), leave(chat),
-                new HBox(10, openFolder, grow, done));
+                folderRow(chat), openFolder, sectionTitle(I18n.t("chatOptions.pastTitle")), past(chat, on));
+        Label warning = Labels.help(I18n.t("chatOptions.dangerHelp"));
+        VBox danger = new VBox(12, warning, sectionTitle(I18n.t(chat.group() ? "info.leaveGroup" : "info.deleteChat")), leave(chat));
+        VBox card = new VBox(12, title, tabs(general, danger), general, danger, new HBox(10, grow, done));
         card.getStyleClass().addAll("card", "folder-dialog", "chat-options");
         card.setPrefWidth(WIDTH);
         card.sceneProperty().addListener((o, a, scene) -> {
@@ -106,6 +108,42 @@ final class ChatOptions {
         scroll.getStyleClass().addAll("side-panel-scroll", "chat-options-scroll");
         show.accept(scroll);
         Platform.runLater(on::requestFocus);
+    }
+
+    /**
+     * "General" and "Peligroso" (what can't be undone, apart so it's never next to an everyday switch), in the bar the
+     * profile's media uses. Both stay built and only one shows: what's going on in one (exploring the past) keeps going.
+     */
+    private static Node tabs(Node general, Node danger) {
+        javafx.scene.control.ToggleGroup group = new javafx.scene.control.ToggleGroup();
+        HBox bar = new HBox();
+        bar.getStyleClass().add("media-tabs");
+        javafx.scene.control.ToggleButton first = tab(I18n.t("chatOptions.tabGeneral"), Icons.SETTINGS, group, true);
+        javafx.scene.control.ToggleButton second = tab(I18n.t("chatOptions.tabDanger"), Icons.ERROR, group, false);
+        second.getStyleClass().add("danger-tab");
+        Runnable show = () -> {
+            Nodes.show(general, first.isSelected());
+            Nodes.show(danger, second.isSelected());
+        };
+        for (javafx.scene.control.ToggleButton b : List.of(first, second)) {
+            b.setOnAction(e -> {
+                if (!b.isSelected()) b.setSelected(true); // a tab stays chosen
+                show.run();
+            });
+        }
+        bar.getChildren().addAll(first, second);
+        show.run();
+        return bar;
+    }
+
+    private static javafx.scene.control.ToggleButton tab(String text, String icon, javafx.scene.control.ToggleGroup group, boolean on) {
+        javafx.scene.control.ToggleButton b = new javafx.scene.control.ToggleButton(text, Icons.icon(icon, 16));
+        b.getStyleClass().add("media-tab");
+        b.setToggleGroup(group);
+        b.setSelected(on);
+        b.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(b, Priority.ALWAYS);
+        return b;
     }
 
     /**
