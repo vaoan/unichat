@@ -20,6 +20,7 @@ import java.util.concurrent.CountDownLatch;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Opening the side panel (stickers) narrows the timeline: its photos must not load again. Rows are rebuilt only when
@@ -86,6 +87,31 @@ class TimelineWidthUiTest {
         FxWait.settled();
         assertSame(before, FxWait.fx(() -> row(thread, id)), "the same row: not rebuilt, its photo not loaded again");
         assertNotNull(before);
+        FxWait.fx(() -> { stage[0].close(); return null; });
+        svc.stop();
+    }
+
+    @Test
+    void goingToAMessageFromTheProfileSelectsItInTheTimeline() throws Exception {
+        toolkit();
+        MockChatService svc = new MockChatService();
+        Stage[] stage = new Stage[1];
+        ThreadPane thread = FxWait.fx(() -> {
+            ThreadPane t = new ThreadPane(svc, u -> { }, () -> { }, x -> { }, new AudioPlayback(svc, x -> { }),
+                    new FolderDialogs(svc, n -> { }, () -> { }), new MediaLibrary(dir.resolve("media-library.json")));
+            stage[0] = new Stage();
+            stage[0].setOpacity(0);
+            stage[0].setScene(new Scene(t, 900, 800));
+            stage[0].show();
+            t.open(svc.chat("!familia:demo"));
+            return t;
+        });
+        Message target = photo(svc);
+        FxWait.until("the timeline shows", () -> row(thread, target.id()) != null || !thread.lookupAll(".row-cell").isEmpty());
+        FxWait.fx(() -> { thread.jumpToMessage(target); return null; });
+        FxWait.settled();
+        Object selected = FxWait.fx(() -> ((javafx.scene.control.ListView<?>) thread.lookup(".timeline")).getSelectionModel().getSelectedItem());
+        assertTrue(selected instanceof ThreadRows.MessageRow r && r.message() == target, "selected: " + selected);
         FxWait.fx(() -> { stage[0].close(); return null; });
         svc.stop();
     }

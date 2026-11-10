@@ -48,6 +48,30 @@ class ProfileMediaUiTest {
         assertEquals(ratio, shownRatio, 0.05, "the picture's own shape");
         List<String> tabs = FxWait.fx(() -> pane.lookupAll(".media-tab").stream().map(n -> ((ToggleButton) n).getAccessibleText()).toList());
         assertTrue(tabs.stream().anyMatch(t -> t.startsWith("Fotos (")), tabs.toString());
+        // From the media to where it was shared: a file's button, a photo's menu.
+        java.util.concurrent.atomic.AtomicReference<app.unichat.model.Message> jumped = new java.util.concurrent.atomic.AtomicReference<>();
+        FxWait.fx(() -> { pane.setOnJump(jumped::set); return null; });
+        javafx.scene.Node photoTile = FxWait.fx(() -> pane.lookup(".media-thumb-tile"));
+        FxWait.fx(() -> {
+            var p = photoTile.localToScreen(5, 5);
+            javafx.event.Event.fireEvent(photoTile, new javafx.scene.input.ContextMenuEvent(javafx.scene.input.ContextMenuEvent.CONTEXT_MENU_REQUESTED,
+                    5, 5, p.getX(), p.getY(), false, null));
+            return null;
+        });
+        javafx.scene.control.ContextMenu menu = FxWait.fx(() -> javafx.stage.Window.getWindows().stream()
+                .filter(w -> w instanceof javafx.scene.control.ContextMenu && w.isShowing()).map(w -> (javafx.scene.control.ContextMenu) w)
+                .findFirst().orElseThrow());
+        FxWait.fx(() -> { menu.getItems().get(0).fire(); menu.hide(); return null; });
+        assertEquals(app.unichat.model.MessageType.IMAGE, jumped.get().type(), "the photo's message");
+        ToggleButton files = FxWait.fx(() -> pane.lookupAll(".media-tab").stream().map(n -> (ToggleButton) n)
+                .filter(t -> t.getAccessibleText().startsWith("Archivos")).findFirst().orElseThrow());
+        FxWait.fx(() -> { files.fire(); return null; });
+        javafx.scene.control.Button go = FxWait.fx(() -> pane.lookupAll(".button").stream().map(n -> (javafx.scene.control.Button) n)
+                .filter(b -> "Ir al mensaje".equals(b.getAccessibleText())).findFirst().orElseThrow());
+        FxWait.fx(() -> { go.fire(); return null; });
+        assertTrue(jumped.get().type() == app.unichat.model.MessageType.FILE || jumped.get().type() == app.unichat.model.MessageType.AUDIO,
+                "the file's message: " + jumped.get().type());
+
         svc.setMediaHidden(id, true).get();
         FxWait.fx(() -> { pane.refresh(); return null; });
         assertTrue(FxWait.fx(() -> pane.lookup(".media-thumb") == null), "hidden for this chat");

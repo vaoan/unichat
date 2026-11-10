@@ -86,11 +86,17 @@ final class ProfileMedia {
     private final Consumer<String> toast;
     /** The tab open, kept while the profile is drawn again (it is on every message). */
     private Shelf open = Shelf.PHOTOS;
+    private Consumer<Message> jump = m -> { };
 
     ProfileMedia(ChatService svc, Supplier<Window> window, Consumer<String> toast) {
         this.svc = svc;
         this.window = window;
         this.toast = toast;
+    }
+
+    /** "Ir al mensaje": shows in the chat the message a thing was shared in. */
+    void setOnJump(Consumer<Message> jump) {
+        this.jump = jump;
     }
 
     /** The section for {@code c}; nothing when nothing was shared or the chat hides it. */
@@ -188,9 +194,32 @@ final class ProfileMedia {
         ImageView v = new ImageView();
         v.getStyleClass().add("media-thumb");
         load(v, m.mediaUrl());
-        return MediaTile.of(v, TILE, TILE, "media-thumb-tile", I18n.t("media.imageOpen"), true, () -> {
+        return goesToItsMessage(MediaTile.of(v, TILE, TILE, "media-thumb-tile", I18n.t("media.imageOpen"), true, () -> {
             if (window.get() != null) Gallery.open(window.get(), svc, m, toast);
+        }), m);
+    }
+
+    /** A tile opens what it shows; its menu (right click, the menu key) goes to the message instead. */
+    private Node goesToItsMessage(javafx.scene.layout.StackPane tile, Message m) {
+        javafx.scene.control.Tooltip.install(tile, new javafx.scene.control.Tooltip(I18n.t("info.mediaTileHelp")));
+        tile.setAccessibleHelp(I18n.t("info.mediaTileHelp"));
+        tile.setOnContextMenuRequested(e -> {
+            javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu(
+                    ChatMenus.item(I18n.t("info.goToMessage"), () -> jump.accept(m)));
+            menu.show(tile, e.getScreenX(), e.getScreenY());
+            e.consume();
         });
+        return tile;
+    }
+
+    /** The row's own "Ir al mensaje" button, at its end. */
+    private Node withJump(Node row, Message m) {
+        Button go = Icons.iconButton(Icons.CHAT, I18n.t("info.goToMessage"), () -> jump.accept(m));
+        HBox.setHgrow(row, javafx.scene.layout.Priority.ALWAYS);
+        if (row instanceof javafx.scene.layout.Region r) r.setMaxWidth(Double.MAX_VALUE);
+        HBox line = new HBox(4, row, go);
+        line.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        return line;
     }
 
     /** The picture the sender attached, else a play sign; opens the player. */
@@ -205,7 +234,7 @@ final class ProfileMedia {
                     () -> MediaSaver.save(window.get(), svc, m, toast), Desktop::open);
         });
         tile.getChildren().add(Icons.icon(Icons.PLAY, 22));
-        return tile;
+        return goesToItsMessage(tile, m);
     }
 
     private Node link(Link l) {
@@ -214,7 +243,7 @@ final class ProfileMedia {
         meta.getStyleClass().add("settings-help");
         VBox row = new VBox(1, h, meta);
         row.getStyleClass().add("profile-link");
-        return row;
+        return withJump(row, l.from());
     }
 
     /** Name, size, who and when; opens with the system's app. */
@@ -232,7 +261,8 @@ final class ProfileMedia {
             if (err != null) Platform.runLater(() -> toast.accept(I18n.t("media.downloadFailed")));
             else Desktop.open(p);
         }));
-        return b;
+        return withJump(b, m);
+
     }
 
     private String byWhom(Message m) {

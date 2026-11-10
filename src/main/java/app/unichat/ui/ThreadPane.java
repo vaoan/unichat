@@ -198,6 +198,12 @@ public final class ThreadPane extends BorderPane {
     /** Selects and shows {@code target} (the message a reply quotes). */
     private void jumpTo(Message target) { scroll.jumpTo(target); }
 
+    /** Shows {@code m} in the timeline, selected (from the profile's media); the keys work from there. */
+    void jumpToMessage(Message m) {
+        scroll.jumpTo(m);
+        list.requestFocus();
+    }
+
     public Chat chat() { return chat; }
     public Composer composer() { return composer; }
 

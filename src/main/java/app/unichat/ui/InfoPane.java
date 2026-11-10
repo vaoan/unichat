@@ -201,6 +201,11 @@ public final class InfoPane extends ScrollPane {
         return b;
     }
 
+    /** "Ir al mensaje" from the media: shows the message where it was shared. */
+    void setOnJump(Consumer<Message> r) {
+        media.setOnJump(r);
+    }
+
     /** The gear among the actions: the chat's own options ({@link ChatOptions}). */
     void setOnOptions(Consumer<Chat> r) {
         onOptions = r;

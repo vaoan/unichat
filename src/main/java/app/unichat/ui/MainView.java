@@ -457,6 +457,7 @@ public final class MainView extends StackPane {
         ChatOptions options = new ChatOptions(svc, this::showOverlay, this::hideOverlay, this::toast);
         chatOptions = chat -> options.open(chat, () -> thread.composer().focus());
         info.setOnOptions(chatOptions);
+        info.setOnJump(thread::jumpToMessage);
     }
 
     /** A chat's options sheet, for the chat open (snapshot diagnostics). */
