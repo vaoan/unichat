@@ -64,10 +64,11 @@ public final class DockIcon {
 
     /** Makes Unichat the active app (macOS), as a click on its window would; without it, its open menu can't be closed. */
     static void activate() {
-        // macOS 14+ activates cooperatively: `activate` takes the turn the active app (the menu-bar helper, after a
-        // click on a notification or the icon) yielded; the old call is ignored there. macOS 13 only has the old one.
+        // Both: the old call still brings Unichat to the front however it was asked (a click on the menu-bar icon doesn't
+        // make the helper active, so it has no turn to yield: with `activate` alone the window stayed behind), and on
+        // macOS 14+ `activate` takes the turn the helper yielded after a notification's click.
+        send("activateIgnoringOtherApps:", 1L);
         if (responds("activate")) send("activate", 0L);
-        else send("activateIgnoringOtherApps:", 1L);
     }
 
     /** Whether NSApplication answers {@code selector} (asked of the class: no app is made): calling one it doesn't ends the program. */
