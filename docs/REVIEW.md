@@ -9,6 +9,6 @@ Fixed in that review: `file:` media addresses from messages opened as local file
 - Missing media: **404 `M_NOT_FOUND`** from tuwunel and from a bridge's direct media (`MediaDownloader.gone` treats it as gone). A real expired Telegram file wasn't tried.
 
 ## Still open
-1. **`autosave/AutoSave`** (631 lines, grown with the retries): live saving, exploring the past, folder moves and the retry timer in one class. Split exploring (and the retry bookkeeping) out.
-2. **`ui/` is one flat package of 136 files**: subpackages by area (timeline, media, emoji, settings, desktop) would let each carry its own `CLAUDE.md` instead of path rules. A large move: package-private access, `ArchitectureTest` and the path rules all change with it.
-3. Not verified anywhere but by tests: Windows (Mark-of-the-Web, file permissions, `package.ps1`'s pinned hashes), the real tray/menu bar after the AWT-thread change, real Chrome/Codex/whisper runs (network-flag tests), `Recovery` restarting through the packaged launcher (the restart itself runs for real in `RecoveryRestartTest`: a separate process runs out of memory and the next one waits for it to end).
+1. Not verified anywhere but by tests: Windows (Mark-of-the-Web, file permissions, `package.ps1`'s pinned hashes), the real tray/menu bar after the AWT-thread change, a notification's click bringing the window to the front on macOS 14+ (`UnichatBar.swift`'s `yieldActivation`), real Chrome/Codex/whisper runs (network-flag tests), `Recovery` through the packaged launcher (the restart itself runs for real in `RecoveryRestartTest`).
+
+Done since: `AutoSave` split (`LiveSaving`, `Holds`, `PastExplorer`, `SavedFile`, `SavedMove`); `ui/` in eight packages, each with its own `CLAUDE.md` (the `ui-*` path rules are gone).
