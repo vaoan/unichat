@@ -37,7 +37,9 @@ class AutoSaveTest {
     private final List<String> links = new CopyOnWriteArrayList<>();
     private final List<String> told = new CopyOnWriteArrayList<>();
     /** A link that has no video, and a file that can't be downloaded. */
-    private static final String NO_VIDEO = "https://example.org/sin-video", BROKEN = "mxc://s/roto.jpg";
+    private static final String NO_VIDEO = "https://example.org/sin-video", BROKEN = "mxc://s/roto.jpg", ENDLESS = "mxc://s/enorme.mov";
+    /** Counted down when a download of {@link #ENDLESS} starts: it never ends by itself (a huge video). */
+    private final CountDownLatch endlessStarted = new CountDownLatch(1);
     private AutoSave save;
 
     /** The chat's messages as the service holds them; nobody opens the chat. */
@@ -67,12 +69,16 @@ class AutoSaveTest {
     private AutoSave create() throws Exception {
         Path cached = Files.writeString(dir.resolve("cached.bin"), "contenido");
         AutoSave a = new AutoSave(svc, reader(), new SavedUpTo(dir.resolve("autosave.json")), new AutoSave.Saver() {
-            @Override public Path media(String mediaUrl) throws java.io.IOException {
+            @Override public Path media(String mediaUrl) throws java.io.IOException, InterruptedException {
                 if (mediaUrl.equals(BROKEN)) throw new java.io.IOException("el puente no respondió");
+                if (mediaUrl.equals(ENDLESS)) {
+                    endlessStarted.countDown();
+                    new CountDownLatch(1).await(); // until interrupted
+                }
                 return cached;
             }
 
-            @Override public String link(String url, Path folder) {
+            @Override public String link(String url, Path folder, String tag) {
                 if (url.equals(NO_VIDEO)) return "Unsupported URL";
                 links.add(url);
                 return null;
@@ -144,7 +150,9 @@ class AutoSaveTest {
         Path folder = save.folder(chat);
         if (!Files.isDirectory(folder)) return List.of();
         try (Stream<Path> s = Files.list(folder)) {
-            return s.map(p -> p.getFileName().toString()).sorted().toList();
+            // The names carry the message's id ("hoy [id].jpg"): what's compared here is the name it had.
+            return s.map(p -> p.getFileName().toString()).filter(n -> !n.startsWith("."))
+                    .map(n -> n.replaceFirst(" \\[[^\\]]+\\](\\.[^.]+)?$", "$1")).sorted().toList();
         }
     }
 
@@ -281,8 +289,10 @@ class AutoSaveTest {
         assertTrue(e.start(), "got to the beginning");
         assertEquals(3, e.saved());
         assertTrue(told.contains("finished 3 " + chat.id()), told.toString());
-        exploreAndWait(); // again: nothing new back there
+        exploreAndWait(); // again: it got to the beginning, so it goes through it all once more
         assertEquals(List.of("ayer.jpg", "contrato.pdf", "hoy.jpg", "primera.jpg"), saved(), "nothing twice");
+        assertEquals(4, save.exploring(chat.id()).looked(), "it did look again (pressing it used to do nothing)");
+        assertEquals(0, save.exploring(chat.id()).saved(), "and found it all saved already");
     }
 
     @Test
@@ -307,6 +317,29 @@ class AutoSaveTest {
         AutoSave.Exploring e = save.exploring(chat.id());
         assertEquals(3, e.looked(), "ayer, contrato and the video looked at (the video not saved: not chosen)");
         assertEquals(null, e.now(), "nothing going on once over");
+    }
+
+    @Test
+    void stoppingExploringStopsTheDownloadGoingOnAndSaysSoAtOnce() throws Exception {
+        svc.setAutoSave(chat.id(), EnumSet.allOf(SaveKind.class)).get();
+        Message huge = media(MessageType.VIDEO, "enorme.mov", false, Instant.now().minusSeconds(100));
+        huge.setMediaUrl(ENDLESS);
+        timeline.add(huge);
+        save.startNow(chat.id());
+        CountDownLatch over = new CountDownLatch(1);
+        Runnable l = () -> { if (!save.exploring(chat.id()).running()) over.countDown(); };
+        save.addExploringListener(l);
+        save.explore(chat.id());
+        endlessStarted.await();
+        save.stopExploring(chat.id());
+        AutoSave.Now now = save.exploring(chat.id()).now();
+        assertEquals(AutoSave.Doing.STOPPING, now == null ? null : now.doing(), "the button's press shows at once");
+        over.await(); // without stopping the download, this never comes
+        save.removeExploringListener(l);
+        assertEquals(0, save.exploring(chat.id()).saved(), "the cut download isn't counted as saved");
+        assertEquals(0, save.exploring(chat.id()).unavailable(), "nor as gone");
+        arrive(media(MessageType.IMAGE, "despues.jpg", false, later(1)));
+        assertTrue(saved().stream().anyMatch(n -> n.startsWith("despues")), "and saving goes on as before: " + saved());
     }
 
     @Test

@@ -196,9 +196,13 @@ final class ChatOptions {
         javafx.scene.control.ProgressBar working = new javafx.scene.control.ProgressBar(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS);
         working.setMaxWidth(Double.MAX_VALUE);
         working.setAccessibleText(I18n.t("chatOptions.pastRunning"));
+        javafx.beans.property.BooleanProperty halting = new javafx.beans.property.SimpleBooleanProperty();
         Runnable redraw = () -> {
             AutoSave.Exploring e = save.exploring(chat.id());
-            go.setText(I18n.t(e.running() ? "chatOptions.pastStop" : "chatOptions.pastStart"));
+            boolean stoppingNow = e.running() && e.now() != null && e.now().doing() == AutoSave.Doing.STOPPING;
+            go.setText(I18n.t(stoppingNow ? "chatOptions.pastStopping" : e.running() ? "chatOptions.pastStop"
+                    : e.start() ? "chatOptions.pastAgain" : "chatOptions.pastStart"));
+            halting.set(stoppingNow);
             state.setText(pastState(e));
             Nodes.show(state, !state.getText().isEmpty());
             Nodes.show(working, e.running());
@@ -208,7 +212,7 @@ final class ChatOptions {
             else save.explore(chat.id());
             redraw.run();
         });
-        go.disableProperty().bind(on.selectedProperty().not());
+        go.disableProperty().bind(on.selectedProperty().not().or(halting));
         Runnable listener = () -> Platform.runLater(redraw);
         save.addExploringListener(listener);
         state.sceneProperty().addListener((o, a, scene) -> {
@@ -232,6 +236,7 @@ final class ChatOptions {
                 case LOOKING -> I18n.t("chatOptions.pastLooking", day(now.at()));
                 case DOWNLOADING -> I18n.t("chatOptions.pastDownloading", now.what(), day(now.at()));
                 case ASKING_OLDER -> now.at() == null ? I18n.t("chatOptions.pastRunning") : I18n.t("chatOptions.pastAsking", day(now.at()));
+                case STOPPING -> I18n.t("chatOptions.pastStopping");
             };
         } else if (e.start()) doing = I18n.t("chatOptions.pastAtStart");
         else if (e.back() != null) doing = I18n.t("chatOptions.pastUntil", day(e.back()));

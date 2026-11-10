@@ -58,10 +58,10 @@ public final class YtDlp {
      * The command that saves the video at {@code url} into {@code dir}, named after its title. One video, never the
      * playlist it's in; at most 1080p so a long one doesn't take gigabytes; nothing outside {@code dir}.
      */
-    static List<String> command(Path ytDlp, Path ffmpeg, Path dir, String url) {
+    static List<String> command(Path ytDlp, Path ffmpeg, Path dir, String url, String tag) {
         List<String> c = new ArrayList<>(List.of(ytDlp.toString(), "--no-playlist", "--no-progress", "--no-mtime",
                 "--windows-filenames", "--no-overwrites", "-f", "bv*[height<=1080]+ba/b[height<=1080]/b",
-                "-P", dir.toString(), "-o", "%(title).150B [%(id)s].%(ext)s"));
+                "-P", dir.toString(), "-o", "%(title).150B [%(id)s]" + (tag == null ? "" : " [" + tag + "]") + ".%(ext)s"));
         if (ffmpeg != null) c.addAll(List.of("--ffmpeg-location", ffmpeg.toString()));
         c.addAll(List.of("--", url));
         return c;
@@ -71,9 +71,9 @@ public final class YtDlp {
      * Saves the video behind {@code url} into {@code dir}. Blocking. Null when it's saved; otherwise why not, in
      * yt-dlp's own words ("Video unavailable", "Unsupported URL"…), or that it took too long.
      */
-    public static String download(Path ytDlp, Path ffmpeg, Path dir, String url) throws IOException, InterruptedException {
+    public static String download(Path ytDlp, Path ffmpeg, Path dir, String url, String tag) throws IOException, InterruptedException {
         Files.createDirectories(dir);
-        Processes.Result r = Processes.capture(new ProcessBuilder(command(ytDlp, ffmpeg, dir, url)).redirectErrorStream(true),
+        Processes.Result r = Processes.capture(new ProcessBuilder(command(ytDlp, ffmpeg, dir, url, tag)).redirectErrorStream(true),
                 DOWNLOAD_SECONDS);
         if (r.ok()) return null;
         if (!r.finished()) return I18n.t("autosave.error.tooLong");

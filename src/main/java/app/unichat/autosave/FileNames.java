@@ -40,6 +40,39 @@ public final class FileNames {
     }
 
     /**
+     * The name a saved file gets: {@link #forMessage} with the message's Matrix id before the extension
+     * ("IMG_3944 [abc123].MOV"), so two files called the same never overwrite each other, the name still says which file
+     * it is, and a file saved before is known again ({@link #savedIn}).
+     */
+    public static String forSaving(Message m, ZoneId zone) {
+        String name = forMessage(m, zone);
+        int dot = name.lastIndexOf('.');
+        String tag = " [" + tag(m) + "]";
+        return dot > 0 ? name.substring(0, dot) + tag + name.substring(dot) : name + tag;
+    }
+
+    /** The message's id as it goes in a name: without Matrix's "$", safe for any disk, at most 60 characters. */
+    public static String tag(Message m) {
+        String id = safe(m.id().startsWith("$") ? m.id().substring(1) : m.id());
+        return id.length() > 60 ? id.substring(0, 60) : id;
+    }
+
+    /** Whether something of {@code m} is in {@code dir} already (whole: not hidden nor half-written). */
+    public static boolean savedIn(Path dir, Message m) {
+        if (!Files.isDirectory(dir)) return false;
+        String mark = "[" + tag(m) + "]";
+        try (var in = Files.newDirectoryStream(dir)) {
+            for (Path p : in) {
+                String n = p.getFileName().toString();
+                if (n.contains(mark) && !n.startsWith(".") && !n.endsWith(".part")) return true;
+            }
+        } catch (java.io.IOException e) {
+            return false;
+        }
+        return false;
+    }
+
+    /**
      * Windows reads "C:x" as relative to drive C and "a:b" as a hidden stream, rejects {@code <>"|?*}, control
      * characters, trailing dots/spaces and DOS device names: clean all of those, slashes too, and keep it under 200.
      */

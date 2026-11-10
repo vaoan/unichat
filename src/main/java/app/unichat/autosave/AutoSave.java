@@ -44,7 +44,8 @@ public final class AutoSave implements ChatService.Listener {
         Path media(String mediaUrl) throws IOException, InterruptedException;
 
         /** The video behind {@code url} saved into {@code dir}: null, or why not. */
-        String link(String url, Path dir) throws IOException, InterruptedException;
+        /** {@code tag}: the message's id, which goes in the name ({@link FileNames#tag}). */
+        String link(String url, Path dir, String tag) throws IOException, InterruptedException;
     }
 
     /** What saving is doing, for the menu-bar icon and the notices. Called on the saving thread. */
@@ -172,7 +173,7 @@ public final class AutoSave implements ChatService.Listener {
         for (Message m : fresh) {
             SaveKind kind = SaveKind.of(m); // null: a sticker, or no media
             if (kind != null && kinds.contains(kind)) step(chat, saveMedia(m, chat, dir));
-            if (kinds.contains(SaveKind.LINKS)) for (String url : links(m)) step(chat, saveLink(url, chat, dir));
+            if (kinds.contains(SaveKind.LINKS)) for (String url : links(m)) step(chat, saveLink(url, m, chat, dir));
             savedUpTo.saved(chatId, m);
         }
     }
@@ -206,24 +207,38 @@ public final class AutoSave implements ChatService.Listener {
     }
 
     private boolean saveMedia(Message m, Chat chat, Path dir) {
-        String name = FileNames.forMessage(m, ZoneId.systemDefault());
-        Path file = null;
+        String name = FileNames.forMessage(m, ZoneId.systemDefault()); // what a notice says: the name as sent
+        Path[] file = {null};
         try {
-            file = saver.media(m.mediaUrl());
-            Files.createDirectories(dir);
-            Files.copy(file, FileNames.free(dir, name), StandardCopyOption.COPY_ATTRIBUTES);
+            copyInto(m, dir, file);
             return true;
         } catch (IOException | RuntimeException e) {
-            return failed(name, chat, why(e, dir, file));
+            return failed(name, chat, why(e, dir, file[0]));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
         }
     }
 
-    private boolean saveLink(String url, Chat chat, Path dir) {
+    /**
+     * Copies {@code m}'s file into {@code dir} under {@link FileNames#forSaving}, unless it's there already. Written
+     * under a hidden name and renamed once whole: nothing (the cloud, the person) ever takes a half-written file.
+     * {@code downloaded[0]}: the cached file, for telling why it failed. False: it was there already.
+     */
+    private boolean copyInto(Message m, Path dir, Path[] downloaded) throws IOException, InterruptedException {
+        if (FileNames.savedIn(dir, m)) return false;
+        downloaded[0] = saver.media(m.mediaUrl());
+        Files.createDirectories(dir);
+        Path target = FileNames.free(dir, FileNames.forSaving(m, ZoneId.systemDefault()));
+        Path part = dir.resolve("." + target.getFileName() + ".part");
+        Files.copy(downloaded[0], part, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
+        Files.move(part, target, StandardCopyOption.ATOMIC_MOVE);
+        return true;
+    }
+
+    private boolean saveLink(String url, Message m, Chat chat, Path dir) {
         try {
-            String why = saver.link(url, dir);
+            String why = saver.link(url, dir, FileNames.tag(m));
             return why == null || failed(url, chat, why);
         } catch (IOException | RuntimeException e) {
             return failed(url, chat, why(e, dir, null));
@@ -274,7 +289,12 @@ public final class AutoSave implements ChatService.Listener {
     /** What exploring is doing: going through a message of {@code at}, downloading {@code what} from it, or asking the server for older ones. */
     public record Now(Doing doing, Instant at, String what) {}
 
-    public enum Doing { LOOKING, DOWNLOADING, ASKING_OLDER }
+    public enum Doing { LOOKING, DOWNLOADING, ASKING_OLDER, STOPPING }
+
+    /** Why exploring a message ended early: the person stopped it, or the disk is full. */
+    private static final String STOPPED = "stopped";
+    /** Exploring found it saved already (an earlier run): neither saved now nor gone. */
+    private static final String THERE = "there";
 
     private final Map<String, Exploring> exploring = new java.util.concurrent.ConcurrentHashMap<>();
     private final Set<String> stopping = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -306,12 +326,36 @@ public final class AutoSave implements ChatService.Listener {
         if (exploring(chatId).running()) return;
         stopping.remove(chatId);
         Exploring was = exploring(chatId);
+        if (was.start()) {
+            // It got to the beginning before: again from the newest, saving only what isn't there (kinds turned on since,
+            // a file deleted by hand). Pressing it did nothing at all before, and said nothing either.
+            savedUpTo.forgetBack(chatId);
+            was = new Exploring(false, null, false, 0, 0, 0, null);
+        }
         setExploring(chatId, new Exploring(true, was.back(), was.start(), 0, 0, 0, null));
         worker.execute(() -> explorePage(chatId));
     }
 
+    /**
+     * Stops at once: what's downloading is cut (a long video, yt-dlp too) and not counted, and the options show
+     * "Deteniendo…" until it's over. It used to wait for the file going on to end, saying nothing meanwhile.
+     */
     public void stopExploring(String chatId) {
         stopping.add(chatId);
+        Exploring e = exploring(chatId);
+        if (e.running()) setExploring(chatId, withNow(e, new Now(Doing.STOPPING, null, null)));
+        synchronized (stopLock) {
+            if (chatId.equals(exploringChat) && exploringThread != null) exploringThread.interrupt();
+        }
+    }
+
+    private final Object stopLock = new Object();
+    /** The thread exploring one message now, and its chat: what stopping interrupts. */
+    private Thread exploringThread;
+    private String exploringChat;
+
+    private static Exploring withNow(Exploring e, Now now) {
+        return new Exploring(true, e.back(), e.start(), e.saved(), e.unavailable(), e.looked(), now);
     }
 
     private void setExploring(String chatId, Exploring e) {
@@ -336,7 +380,8 @@ public final class AutoSave implements ChatService.Listener {
             Exploring e = exploring(chatId);
             setExploring(chatId, new Exploring(true, m.timestamp(), e.start(), e.saved(), e.unavailable(), e.looked() + 1,
                     new Now(Doing.LOOKING, m.timestamp(), null)));
-            String noSpace = exploreOne(m, kinds, chatId, dir);
+            String noSpace = interruptible(chatId, () -> exploreOne(m, kinds, chatId, dir));
+            if (STOPPED.equals(noSpace)) break; // this one wasn't finished: the next run looks at it again
             savedUpTo.exploredBack(chatId, m.timestamp(), false);
             if (noSpace != null) {
                 progress.failed(I18n.t("autosave.exploring"), chat, noSpace);
@@ -356,50 +401,64 @@ public final class AutoSave implements ChatService.Listener {
         }));
     }
 
-    /** Saves what {@code m} has of {@code kinds}; null, or why there's no room (then exploring stops). */
+    /** Runs {@code work} so that stopping interrupts it; the thread is left clean for the next job either way. */
+    private String interruptible(String chatId, java.util.function.Supplier<String> work) {
+        synchronized (stopLock) {
+            if (stopping.contains(chatId)) return STOPPED;
+            exploringThread = Thread.currentThread();
+            exploringChat = chatId;
+        }
+        try {
+            return work.get();
+        } finally {
+            synchronized (stopLock) {
+                exploringThread = null;
+                exploringChat = null;
+                Thread.interrupted(); // an interrupt that came late must not reach saving as it arrives
+            }
+        }
+    }
+
+    /** Saves what {@code m} has of {@code kinds}; null, {@link #STOPPED}, or why there's no room (then exploring stops). */
     private String exploreOne(Message m, Set<SaveKind> kinds, String chatId, Path dir) {
         SaveKind kind = SaveKind.of(m);
         if (kind != null && kinds.contains(kind)) {
             doing(chatId, Doing.DOWNLOADING, m.timestamp(), FileNames.forMessage(m, ZoneId.systemDefault()));
-            String why = copyQuietly(m, dir);
-            if (I18n.t("autosave.error.noSpace").equals(why)) return why;
-            count(chatId, why == null);
+            String why = copyQuietly(m, dir, chatId);
+            if (STOPPED.equals(why) || I18n.t("autosave.error.noSpace").equals(why)) return why;
+            if (!THERE.equals(why)) count(chatId, why == null);
         }
         if (!kinds.contains(SaveKind.LINKS)) return null;
         for (String url : links(m)) {
             doing(chatId, Doing.DOWNLOADING, m.timestamp(), url);
-            String why = linkQuietly(url, dir);
-            if (I18n.t("autosave.error.noSpace").equals(why)) return why;
+            String why = linkQuietly(url, m, dir, chatId);
+            if (STOPPED.equals(why) || I18n.t("autosave.error.noSpace").equals(why)) return why;
             count(chatId, why == null);
         }
         return null;
     }
 
-    /** Copies {@code m}'s file into {@code dir}: null, or why not. */
-    private String copyQuietly(Message m, Path dir) {
-        Path file = null;
+    /** Copies {@code m}'s file into {@code dir}: null, {@link #STOPPED}, or why not. */
+    private String copyQuietly(Message m, Path dir, String chatId) {
+        Path[] file = {null};
         try {
-            file = saver.media(m.mediaUrl());
-            Files.createDirectories(dir);
-            Files.copy(file, FileNames.free(dir, FileNames.forMessage(m, ZoneId.systemDefault())), StandardCopyOption.COPY_ATTRIBUTES);
-            return null;
+            return copyInto(m, dir, file) ? null : THERE;
         } catch (IOException | RuntimeException e) {
-            return why(e, dir, file);
+            return stopping.contains(chatId) ? STOPPED : why(e, dir, file[0]); // an interrupted copy throws too
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return null;
+            return STOPPED;
         }
     }
 
-    /** Saves the video behind {@code url} into {@code dir}: null, or why not. */
-    private String linkQuietly(String url, Path dir) {
+    /** Saves the video behind {@code url} into {@code dir}: null, {@link #STOPPED}, or why not. */
+    private String linkQuietly(String url, Message m, Path dir, String chatId) {
         try {
-            return saver.link(url, dir);
+            String why = saver.link(url, dir, FileNames.tag(m));
+            return why != null && stopping.contains(chatId) ? STOPPED : why;
         } catch (IOException | RuntimeException e) {
-            return why(e, dir, null);
+            return stopping.contains(chatId) ? STOPPED : why(e, dir, null);
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return null;
+            return STOPPED;
         }
     }
 
@@ -408,8 +467,8 @@ public final class AutoSave implements ChatService.Listener {
     }
 
     private void doing(String chatId, Doing what, Instant at, String item) {
-        Exploring e = exploring(chatId);
-        setExploring(chatId, new Exploring(true, e.back(), e.start(), e.saved(), e.unavailable(), e.looked(), new Now(what, at, item)));
+        if (stopping.contains(chatId)) return; // "Deteniendo…" stays until it's over
+        setExploring(chatId, withNow(exploring(chatId), new Now(what, at, item)));
     }
 
     /** Done (or stopped): one notice for what this run saved, one for what was no longer there. */
@@ -441,10 +500,10 @@ public final class AutoSave implements ChatService.Listener {
             }
 
             @Override
-            public String link(String url, Path dir) throws IOException, InterruptedException {
+            public String link(String url, Path dir, String tag) throws IOException, InterruptedException {
                 Path ytDlp = YtDlp.whenNeeded(p -> { });
                 if (ytDlp == null) return I18n.t("autosave.error.noYtDlp");
-                return YtDlp.download(ytDlp, Ffmpeg.whenNeeded(p -> { }), dir, url);
+                return YtDlp.download(ytDlp, Ffmpeg.whenNeeded(p -> { }), dir, url, tag);
             }
         };
     }

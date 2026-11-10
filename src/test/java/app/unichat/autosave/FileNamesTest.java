@@ -35,4 +35,19 @@ class FileNamesTest {
                 SaveFolders.shown(home.resolve("Downloads").resolve("Unichat")));
         assertEquals(java.nio.file.Path.of("/elsewhere/x").toString(), SaveFolders.shown(java.nio.file.Path.of("/elsewhere/x")));
     }
+
+    @Test
+    void savedFilesCarryTheMessagesIdAndAreKnownAgain(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        app.unichat.model.Message m = new app.unichat.model.Message("$AbC_d-9:ejemplo.org", "!c", "@a", "Ana", false,
+                java.time.Instant.parse("2026-11-03T10:00:00Z"));
+        m.setType(app.unichat.model.MessageType.VIDEO);
+        m.setFileName("IMG_3944.MOV");
+        org.junit.jupiter.api.Assertions.assertEquals("IMG_3944 [AbC_d-9_ejemplo.org].MOV", FileNames.forSaving(m, java.time.ZoneOffset.UTC),
+                "the original name and the Matrix id, without $ nor what Windows refuses");
+        org.junit.jupiter.api.Assertions.assertFalse(FileNames.savedIn(dir, m));
+        java.nio.file.Files.writeString(dir.resolve(".IMG_3944 [AbC_d-9_ejemplo.org].MOV.part"), "half");
+        org.junit.jupiter.api.Assertions.assertFalse(FileNames.savedIn(dir, m), "half-written doesn't count");
+        java.nio.file.Files.writeString(dir.resolve("IMG_3944 [AbC_d-9_ejemplo.org] (2).MOV"), "whole");
+        org.junit.jupiter.api.Assertions.assertTrue(FileNames.savedIn(dir, m));
+    }
 }

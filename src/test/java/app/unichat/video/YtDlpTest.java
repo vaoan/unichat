@@ -11,12 +11,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class YtDlpTest {
     @Test
     void oneVideoIntoTheFolderAndTheLinkCantPassForAnOption() {
-        List<String> c = YtDlp.command(Path.of("/t/yt-dlp"), Path.of("/t/ffmpeg"), Path.of("/d/Familia"), "--exec=rm");
+        List<String> c = YtDlp.command(Path.of("/t/yt-dlp"), Path.of("/t/ffmpeg"), Path.of("/d/Familia"), "--exec=rm", "abc123");
         assertTrue(c.contains("--no-playlist"));
         assertEquals("/d/Familia", c.get(c.indexOf("-P") + 1));
         assertEquals(List.of("--", "--exec=rm"), c.subList(c.size() - 2, c.size()), "after --: a link, whatever it says");
         assertEquals("/t/ffmpeg", c.get(c.indexOf("--ffmpeg-location") + 1));
-        assertTrue(!YtDlp.command(Path.of("y"), null, Path.of("d"), "https://x").contains("--ffmpeg-location"));
+        assertTrue(!YtDlp.command(Path.of("y"), null, Path.of("d"), "https://x", null).contains("--ffmpeg-location"));
+        assertEquals("%(title).150B [%(id)s] [abc123].%(ext)s", c.get(c.indexOf("-o") + 1), "the message's id in the name too");
     }
 
     @Test

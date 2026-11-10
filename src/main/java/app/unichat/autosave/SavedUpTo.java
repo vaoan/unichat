@@ -78,6 +78,11 @@ final class SavedUpTo {
         save();
     }
 
+    /** Exploring starts over from the newest (it got to the beginning before). */
+    synchronized void forgetBack(String chatId) {
+        if (backs.remove(chatId) != null) save();
+    }
+
     /** {@code m} is done: saved, or nothing in it to save. */
     synchronized void saved(String chatId, Message m) {
         Mark mark = marks.get(chatId);
