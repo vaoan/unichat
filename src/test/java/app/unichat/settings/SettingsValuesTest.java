@@ -14,9 +14,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SettingsValuesTest {
     @TempDir Path dir;
 
+    /** Every Settings a test made: their writes run in the background, and must end before the folder is deleted. */
+    private final java.util.List<Settings> made = new java.util.ArrayList<>();
+
+    private Settings made(Settings s) {
+        made.add(s);
+        return s;
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void writesEnd() {
+        made.forEach(Settings::flush);
+    }
+
     @Test
     void numbersKeepTheirMinimumAndDefault() {
-        Settings s = new Settings(dir);
+        Settings s = made(new Settings(dir));
         assertEquals(30, s.getInt("n", 30, 0));
         s.set("n", " 5 ");
         assertEquals(5, s.getInt("n", 30, 0));
@@ -27,7 +40,7 @@ class SettingsValuesTest {
 
     @Test
     void anUnknownEnumNameIsTheDefault() {
-        Settings s = new Settings(dir);
+        Settings s = made(new Settings(dir));
         assertEquals(Settings.Mode.SYSTEM, s.getEnum("m", Settings.Mode.SYSTEM));
         s.set("m", "ON");
         assertEquals(Settings.Mode.ON, s.getEnum("m", Settings.Mode.SYSTEM));
@@ -37,18 +50,18 @@ class SettingsValuesTest {
 
     @Test
     void theOldReadReceiptsSwitchDecidesUntilAChoiceIsMade() {
-        Settings s = new Settings(dir);
+        Settings s = made(new Settings(dir));
         assertEquals(Settings.ReadReceipts.ALWAYS, s.readReceipts());
         s.set("privacy.readReceipts", "false");
         assertEquals(Settings.ReadReceipts.NEVER, s.readReceipts());
         s.setReadReceipts(Settings.ReadReceipts.ON_REPLY);
         s.flush();
-        assertEquals(Settings.ReadReceipts.ON_REPLY, new Settings(dir).readReceipts());
+        assertEquals(Settings.ReadReceipts.ON_REPLY, made(new Settings(dir)).readReceipts());
     }
 
     @Test
     void aSetKeepsOrderAndLeavesWithItsLastValue() {
-        Settings s = new Settings(dir);
+        Settings s = made(new Settings(dir));
         assertTrue(s.getSet("k").isEmpty());
         s.addToSet("k", "b");
         s.addToSet("k", "a");
@@ -62,11 +75,11 @@ class SettingsValuesTest {
 
     @Test
     void theWindowsPlaceStaysOnThisMachine() throws Exception {
-        Settings s = new Settings(dir);
+        Settings s = made(new Settings(dir));
         s.setWindowGeometry(800, 600, 10, 20);
         s.flush();
         assertTrue(Files.readString(dir.resolve("session.properties")).contains("window.width=800.0"));
         assertFalse(Files.exists(dir.resolve("settings.properties")) && Files.readString(dir.resolve("settings.properties")).contains("window."));
-        assertEquals(20.0, new Settings(dir).getDouble("window.y", 0));
+        assertEquals(20.0, made(new Settings(dir)).getDouble("window.y", 0));
     }
 }
