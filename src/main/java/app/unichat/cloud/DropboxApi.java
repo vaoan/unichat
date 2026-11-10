@@ -144,14 +144,34 @@ public final class DropboxApi implements Storage {
     }
 
     @Override
+    public boolean get(String path, Path target) throws IOException {
+        HttpResponse<InputStream> r = authorized(download(path), HttpResponse.BodyHandlers.ofInputStream());
+        if (r.statusCode() != 200) {
+            byte[] error;
+            try (InputStream in = r.body()) {
+                error = in.readNBytes(64 * 1024); // an error's JSON, never a file
+            }
+            IOException failed = failure(r.statusCode(), error);
+            if (failed instanceof Missing) return false;
+            throw failed;
+        }
+        Storage.save(r.body(), target);
+        return true;
+    }
+
+    @Override
     public byte[] get(String path) throws IOException {
         try {
-            return call(HttpRequest.newBuilder(URI.create(content + "/2/files/download"))
-                    .header("Dropbox-API-Arg", arg(JSON.createObjectNode().put("path", abs(path))))
-                    .POST(HttpRequest.BodyPublishers.noBody()), HttpResponse.BodyHandlers.ofByteArray());
+            return call(download(path), HttpResponse.BodyHandlers.ofByteArray());
         } catch (Missing gone) {
             return null;
         }
+    }
+
+    private HttpRequest.Builder download(String path) throws IOException {
+        return HttpRequest.newBuilder(URI.create(content + "/2/files/download"))
+                .header("Dropbox-API-Arg", arg(JSON.createObjectNode().put("path", abs(path))))
+                .POST(HttpRequest.BodyPublishers.noBody());
     }
 
     /** A call with JSON in and out (or no arguments: {@code null}). */
@@ -174,21 +194,31 @@ public final class DropboxApi implements Storage {
         return JSON.writeValueAsString(args);
     }
 
-    /** With today's token; once more with a new one if Dropbox says it expired. */
     private byte[] call(HttpRequest.Builder b, HttpResponse.BodyHandler<byte[]> handler) throws IOException {
-        HttpResponse<byte[]> r = send(b, handler, token(false));
-        if (r.statusCode() == 401) r = send(b, handler, token(true));
-        int code = r.statusCode();
-        if (code == 200) return r.body();
-        String summary = code == 409 ? JSON.readTree(r.body()).path("error_summary").asText("") : "";
-        if (summary.contains("not_found")) throw new Missing();
-        if (summary.contains("conflict")) throw new Conflict();
-        throw new IOException(code == 401 ? I18n.t("cloud.error.dropboxLogin")
+        HttpResponse<byte[]> r = authorized(b, handler);
+        if (r.statusCode() == 200) return r.body();
+        throw failure(r.statusCode(), r.body());
+    }
+
+    /** With today's token; once more with a new one if Dropbox says it expired. */
+    private <T> HttpResponse<T> authorized(HttpRequest.Builder b, HttpResponse.BodyHandler<T> handler) throws IOException {
+        HttpResponse<T> r = send(b, handler, token(false));
+        if (r.statusCode() != 401) return r;
+        if (r.body() instanceof InputStream unread) unread.close();
+        return send(b, handler, token(true));
+    }
+
+    /** What an answer other than 200 means: not there, already there, or why, in the person's words. */
+    private static IOException failure(int code, byte[] body) throws IOException {
+        String summary = code == 409 ? JSON.readTree(body).path("error_summary").asText("") : "";
+        if (summary.contains("not_found")) return new Missing();
+        if (summary.contains("conflict")) return new Conflict();
+        return new IOException(code == 401 ? I18n.t("cloud.error.dropboxLogin")
                 : summary.contains("insufficient_space") ? I18n.t("cloud.error.full")
                 : I18n.t("cloud.error.server", code + (summary.isEmpty() ? "" : " " + summary)));
     }
 
-    private HttpResponse<byte[]> send(HttpRequest.Builder b, HttpResponse.BodyHandler<byte[]> handler, String token) throws IOException {
+    private <T> HttpResponse<T> send(HttpRequest.Builder b, HttpResponse.BodyHandler<T> handler, String token) throws IOException {
         try {
             return http.send(b.copy().header("Authorization", "Bearer " + token).build(), handler);
         } catch (java.net.http.HttpTimeoutException e) {

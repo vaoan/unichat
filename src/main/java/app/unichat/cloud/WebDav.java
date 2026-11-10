@@ -128,8 +128,20 @@ public final class WebDav implements Storage {
 
     /** The file at {@code path}, or null when there's none. */
     @Override
+    public boolean get(String path, Path target) throws IOException {
+        HttpResponse<java.io.InputStream> r = download(path, HttpResponse.BodyHandlers.ofInputStream());
+        if (r.statusCode() != 200) {
+            r.body().close(); // the connection is given back, not left waiting for a body nobody reads
+            if (r.statusCode() == 404) return false;
+            throw failure(r.statusCode());
+        }
+        Storage.save(r.body(), target);
+        return true;
+    }
+
+    @Override
     public byte[] get(String path) throws IOException {
-        HttpResponse<byte[]> r = sendBytes(path);
+        HttpResponse<byte[]> r = download(path, HttpResponse.BodyHandlers.ofByteArray());
         if (r.statusCode() == 404) return null;
         if (r.statusCode() != 200) throw failure(r.statusCode());
         return r.body();
@@ -149,10 +161,9 @@ public final class WebDav implements Storage {
         }
     }
 
-    private HttpResponse<byte[]> sendBytes(String path) throws IOException {
+    private <T> HttpResponse<T> download(String path, HttpResponse.BodyHandler<T> body) throws IOException {
         try {
-            return http.send(HttpRequest.newBuilder(uri(path)).header("Authorization", auth).GET().build(),
-                    HttpResponse.BodyHandlers.ofByteArray());
+            return http.send(HttpRequest.newBuilder(uri(path)).header("Authorization", auth).GET().build(), body);
         } catch (java.net.http.HttpTimeoutException e) {
             throw new IOException(I18n.t("cloud.error.noAnswer"), e);
         } catch (InterruptedException e) {

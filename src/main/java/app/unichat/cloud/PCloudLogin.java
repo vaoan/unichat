@@ -9,6 +9,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -28,6 +29,7 @@ public final class PCloudLogin {
     static final String CLIENT_ID = "";
 
     private final HttpServer server;
+    private final String redirect;
     private final String state = Loopback.random(16);
     /** Where the API is for the host pCloud names; null for one that isn't pCloud's (the token never goes there). */
     private final java.util.function.UnaryOperator<String> apiOf;
@@ -38,13 +40,14 @@ public final class PCloudLogin {
         return hostname != null && hostname.matches("[a-z0-9-]+\\.pcloud\\.com") ? "https://" + hostname : null;
     }
 
-    private PCloudLogin(int port, java.util.function.UnaryOperator<String> apiOf) throws IOException {
+    private PCloudLogin(int port, java.util.function.UnaryOperator<String> apiOf, Duration deadline) throws IOException {
         this.apiOf = apiOf;
         server = Loopback.server(port);
+        redirect = "http://localhost:" + server.getAddress().getPort() + "/pcloud";
         server.createContext("/pcloud/done", this::done);
         server.createContext("/pcloud", this::page);
         server.start();
-        result.whenComplete((a, e) -> server.stop(0));
+        Loopback.until(server, result, deadline);
     }
 
     /** The app's Client ID: the one given in Ajustes, else Unichat's own. */
@@ -58,15 +61,14 @@ public final class PCloudLogin {
      * declined, or cancelled with {@link CompletableFuture#cancel}.
      */
     public static CompletableFuture<CloudAccount> start(String clientId, Consumer<URI> browser) throws IOException {
-        return start(clientId, browser, PORT, PCloudLogin::pcloudApi);
+        return start(clientId, browser, PORT, PCloudLogin::pcloudApi, Loopback.DEADLINE);
     }
 
     static CompletableFuture<CloudAccount> start(String clientId, Consumer<URI> browser, int port,
-                                                 java.util.function.UnaryOperator<String> apiOf) throws IOException {
-        PCloudLogin login = new PCloudLogin(port, apiOf);
-        String redirect = "http://localhost:" + login.server.getAddress().getPort() + "/pcloud";
+                                                 java.util.function.UnaryOperator<String> apiOf, Duration deadline) throws IOException {
+        PCloudLogin login = new PCloudLogin(port, apiOf, deadline);
         browser.accept(URI.create("https://my.pcloud.com/oauth2/authorize?client_id=" + Urls.enc(clientId)
-                + "&response_type=token&redirect_uri=" + Urls.enc(redirect) + "&state=" + login.state));
+                + "&response_type=token&redirect_uri=" + Urls.enc(login.redirect) + "&state=" + login.state));
         return login.result;
     }
 
@@ -77,7 +79,9 @@ public final class PCloudLogin {
                 <body style="font-family: system-ui, sans-serif; padding: 3em; text-align: center">
                 <p id="m">%s</p>
                 <script>
-                fetch('/pcloud/done?' + location.hash.substring(1)).then(r => r.text())
+                const answer = location.hash.substring(1);
+                history.replaceState(null, '', location.pathname); // the token doesn't stay in the browser's history
+                fetch('/pcloud/done?' + answer).then(r => r.text())
                   .then(t => { document.getElementById('m').textContent = t; });
                 </script>
                 """.formatted(I18n.t("cloud.pcloud.finishing"));
@@ -86,7 +90,7 @@ public final class PCloudLogin {
 
     private void done(HttpExchange x) throws IOException {
         Map<String, String> q = Loopback.query(x.getRequestURI().getRawQuery());
-        if (!state.equals(q.get("state"))) {
+        if (!Loopback.ours(state, q.get("state"))) {
             Loopback.reply(x, 400, "text/plain; charset=utf-8", I18n.t("cloud.pcloud.notOurs"));
             return; // someone else's answer: keep waiting for ours
         }

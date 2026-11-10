@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Dropbox through its API and its browser sign-in (PKCE): what Unichat's sync needs of it. */
 class DropboxTest {
     private static final HttpClient HTTP = HttpClient.newHttpClient();
+    private static final java.time.Duration NO_LIMIT = PCloudTest.NO_LIMIT;
 
     @TempDir
     Path dir;
@@ -53,6 +54,19 @@ class DropboxTest {
             fake.put("/" + photo, "g".getBytes(StandardCharsets.UTF_8));
             assertNotEquals(before, api.stamp(photo), "a new version is told apart");
             assertNull(api.stamp("nada.txt"));
+        }
+    }
+
+    @Test
+    void aFileComesDownIntoAFileNeverWholeInMemoryWithATokenMadeAgainIfItExpired() throws Exception {
+        try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
+            byte[] video = new byte[300_000];
+            new java.util.Random(3).nextBytes(video);
+            fake.put("/Unichat/Multimedia/Mamá/video [1].mp4", video);
+            DropboxApi api = api(fake, DropboxApi.SINGLE, 1024);
+            api.check();
+            fake.expire();
+            StorageDownloads.check(api, "Unichat/Multimedia/Mamá/video [1].mp4", video, dir);
         }
     }
 
@@ -119,7 +133,7 @@ class DropboxTest {
     void signingInGivesTheLastingPermissionOnlyWithThisSignInsOwnSecret() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH-1")) {
             URI[] opened = {null};
-            CompletableFuture<CloudAccount> login = DropboxLogin.start("APP", u -> opened[0] = u, 0, fake.url() + "/oauth2/token");
+            CompletableFuture<CloudAccount> login = DropboxLogin.start("APP", u -> opened[0] = u, 0, fake.url() + "/oauth2/token", NO_LIMIT);
             Map<String, String> asked = query(opened[0]);
             assertEquals("APP", asked.get("client_id"));
             assertEquals("offline", asked.get("token_access_type"), "a lasting permission");
@@ -135,10 +149,23 @@ class DropboxTest {
     }
 
     @Test
+    void aSignInLeftInTheBrowserEndsAtItsDeadlineAndCancellingFreesThePortToo() throws Exception {
+        URI[] opened = {null};
+        CompletableFuture<CloudAccount> login = DropboxLogin.start("APP", u -> opened[0] = u, 0, "http://127.0.0.1:9/token", java.time.Duration.ZERO);
+        var e = assertThrows(java.util.concurrent.ExecutionException.class, login::get); // get: a JUnit timeout can interrupt it
+        assertEquals(app.unichat.support.I18n.t("cloud.signIn.expired"), e.getCause().getMessage());
+        PCloudTest.portIsFree(query(opened[0]).get("redirect_uri"));
+
+        login = DropboxLogin.start("APP", u -> opened[0] = u, 0, "http://127.0.0.1:9/token", NO_LIMIT);
+        login.cancel(false);
+        PCloudTest.portIsFree(query(opened[0]).get("redirect_uri"));
+    }
+
+    @Test
     void anAnswerForAnotherRequestIsIgnoredAndADeclineFails() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
             URI[] opened = {null};
-            CompletableFuture<CloudAccount> login = DropboxLogin.start("APP", u -> opened[0] = u, 0, fake.url() + "/oauth2/token");
+            CompletableFuture<CloudAccount> login = DropboxLogin.start("APP", u -> opened[0] = u, 0, fake.url() + "/oauth2/token", NO_LIMIT);
             Map<String, String> asked = query(opened[0]);
             HttpResponse<String> foreign = HTTP.send(HttpRequest.newBuilder(URI.create(asked.get("redirect_uri")
                     + "?code=x&state=otro")).build(), HttpResponse.BodyHandlers.ofString());

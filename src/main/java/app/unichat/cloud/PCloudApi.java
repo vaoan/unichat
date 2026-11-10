@@ -118,7 +118,29 @@ public final class PCloudApi implements Storage {
     }
 
     @Override
+    public boolean get(String path, Path target) throws IOException {
+        URI where = link(path);
+        if (where == null) return false;
+        HttpResponse<java.io.InputStream> r = download(where, HttpResponse.BodyHandlers.ofInputStream());
+        if (r.statusCode() != 200) {
+            r.body().close(); // the connection is given back, not left waiting for a body nobody reads
+            throw new IOException(I18n.t("cloud.error.server", r.statusCode()));
+        }
+        Storage.save(r.body(), target);
+        return true;
+    }
+
+    @Override
     public byte[] get(String path) throws IOException {
+        URI where = link(path);
+        if (where == null) return null;
+        HttpResponse<byte[]> r = download(where, HttpResponse.BodyHandlers.ofByteArray());
+        if (r.statusCode() != 200) throw new IOException(I18n.t("cloud.error.server", r.statusCode()));
+        return r.body();
+    }
+
+    /** Where the file at {@code path} downloads from (a link pCloud makes for it), or null when there's none. */
+    private URI link(String path) throws IOException {
         JsonNode link;
         try {
             link = call("getfilelink", "path=" + Urls.enc(abs(path)) + "&forcedownload=1");
@@ -127,17 +149,13 @@ public final class PCloudApi implements Storage {
         }
         String scheme = host.startsWith("http://") ? "http://" : "https://"; // the same as the API's (a test's is plain)
         String hostPart = link.path("hosts").path(0).asText(), file = link.path("path").asText();
-        URI where;
         try {
             // Encoded already ("%20") it goes as it is; otherwise each character that needs it is encoded.
-            where = file.contains("%") ? URI.create(scheme + hostPart + file)
+            return file.contains("%") ? URI.create(scheme + hostPart + file)
                     : new URI(scheme.replace("://", ""), hostPart, file, null, null);
         } catch (java.net.URISyntaxException e) {
             throw new IOException(e);
         }
-        HttpResponse<byte[]> r = sendBytes(HttpRequest.newBuilder(where).GET());
-        if (r.statusCode() != 200) throw new IOException(I18n.t("cloud.error.server", r.statusCode()));
-        return r.body();
     }
 
     private JsonNode call(String method, String query) throws IOException {
@@ -178,9 +196,9 @@ public final class PCloudApi implements Storage {
         }
     }
 
-    private HttpResponse<byte[]> sendBytes(HttpRequest.Builder b) throws IOException {
+    private <T> HttpResponse<T> download(URI where, HttpResponse.BodyHandler<T> body) throws IOException {
         try {
-            return http.send(b.build(), HttpResponse.BodyHandlers.ofByteArray());
+            return http.send(HttpRequest.newBuilder(where).GET().build(), body);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException(e);

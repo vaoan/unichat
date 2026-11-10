@@ -1,7 +1,10 @@
 package app.unichat.cloud;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 /**
  * The person's storage, however it's reached: WebDAV ({@link WebDav}: Icedrive, Nextcloud…) or pCloud's own API
@@ -29,8 +32,26 @@ public interface Storage {
 
     void put(String path, byte[] data) throws IOException;
 
-    /** The file at {@code path}, or null when there's none. */
+    /** The file at {@code path}, or null when there's none: for small files (the settings); media goes {@link #get(String, Path)}. */
     byte[] get(String path) throws IOException;
+
+    /**
+     * The file at {@code path} into {@code target}, as it arrives, never whole in memory (a video can be gigabytes): through
+     * a hidden ".part" beside it, which takes {@code target}'s name only once whole. False, and {@code target} untouched,
+     * when there's none.
+     */
+    boolean get(String path, Path target) throws IOException;
+
+    /** {@code in} into {@code target} as {@link #get(String, Path)} says: through a hidden ".part", renamed once whole. */
+    static void save(InputStream in, Path target) throws IOException {
+        Path part = target.resolveSibling("." + target.getFileName() + ".part");
+        try (in) {
+            Files.copy(in, part, StandardCopyOption.REPLACE_EXISTING);
+            Files.move(part, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } finally {
+            Files.deleteIfExists(part);
+        }
+    }
 
     /**
      * What the account knows of a file there: its size (-1 unknown) and, where the service gives one, its checksum

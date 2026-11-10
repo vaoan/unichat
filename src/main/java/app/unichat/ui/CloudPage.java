@@ -151,8 +151,21 @@ final class CloudPage {
         cancel.setOnAction(e -> {
             if (waiting[0] != null) waiting[0].cancel(false);
         });
+        cancelWhenGone(connect, () -> waiting[0]);
         Label help = Labels.help(I18n.t("settings.cloud.signInHelp." + name));
         return new VBox(keyRow, actions(new VBox(8, help, new FlowPane(8, 6, connect, cancel))));
+    }
+
+    /**
+     * A sign-in waiting in the browser is cancelled when its page goes (another page of Ajustes) or its window closes:
+     * nobody is left to hear it, and it holds the port the next one needs.
+     */
+    static void cancelWhenGone(Node page, java.util.function.Supplier<java.util.concurrent.Future<?>> waiting) {
+        page.sceneProperty().flatMap(javafx.scene.Scene::windowProperty).flatMap(javafx.stage.Window::showingProperty).orElse(false)
+                .addListener((o, was, showing) -> {
+                    java.util.concurrent.Future<?> w = waiting.get();
+                    if (!showing && w != null) w.cancel(false);
+                });
     }
 
     /** Address, login and password or key for a WebDAV service; "Conectar" tries them. */

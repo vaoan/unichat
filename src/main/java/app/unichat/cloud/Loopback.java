@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.support.I18n;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
@@ -8,7 +9,11 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
@@ -21,11 +26,32 @@ import java.util.Map;
 final class Loopback {
     /** Fixed: a service only sends the browser back to the address registered with its app. */
     static final int PORT = 43117;
+    /** How long a sign-in waits for the browser: one left there gives the port back by itself. */
+    static final Duration DEADLINE = Duration.ofMinutes(10);
 
     private Loopback() {}
 
     static HttpServer server(int port) throws IOException {
         return HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
+    }
+
+    /**
+     * Listens until {@code result} ends (answered, declined, cancelled), or until {@code deadline} if the person leaves the
+     * browser: then it fails, and the port is free again before anyone hears it (the next "Connect" found it busy until
+     * a restart).
+     */
+    static void until(HttpServer server, CompletableFuture<?> result, Duration deadline) {
+        result.whenComplete((a, e) -> server.stop(0));
+        CompletableFuture.delayedExecutor(deadline.toNanos(), TimeUnit.NANOSECONDS).execute(() -> {
+            if (result.isDone()) return;
+            server.stop(0);
+            result.completeExceptionally(new IOException(I18n.t("cloud.signIn.expired")));
+        });
+    }
+
+    /** Whether the {@code state} that came back is ours, in constant time: how long it takes says nothing of ours. */
+    static boolean ours(String state, String back) {
+        return back != null && MessageDigest.isEqual(state.getBytes(StandardCharsets.UTF_8), back.getBytes(StandardCharsets.UTF_8));
     }
 
     static String random(int bytes) {

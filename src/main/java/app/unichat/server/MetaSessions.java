@@ -45,6 +45,9 @@ final class MetaSessions implements Watchdog.SessionKeeper {
     static final long RETRY_AFTER_MS = 60 * 60_000;
     static final int MAX_ATTEMPTS = 2;
     private static final ObjectMapper JSON = new ObjectMapper();
+    /** One for every check, never following a redirect: the redirect is what's looked at. */
+    private static final HttpClient HTTP = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER)
+            .connectTimeout(Duration.ofSeconds(8)).build();
 
     private final Path dir;
     private final BridgeStates states;
@@ -73,9 +76,8 @@ final class MetaSessions implements Watchdog.SessionKeeper {
 
     /** Whether {@code page} sends you to another host; not being able to ask counts as yes: nothing is lost by waiting. */
     static boolean redirectsElsewhere(URI page) {
-        HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(Duration.ofSeconds(8)).build();
         try {
-            HttpResponse<Void> r = http.send(HttpRequest.newBuilder(page).timeout(Duration.ofSeconds(12)).build(),
+            HttpResponse<Void> r = HTTP.send(HttpRequest.newBuilder(page).timeout(Duration.ofSeconds(12)).build(),
                     HttpResponse.BodyHandlers.discarding());
             if (r.statusCode() / 100 != 3) return false;
             URI to = page.resolve(r.headers().firstValue("location").orElse(""));

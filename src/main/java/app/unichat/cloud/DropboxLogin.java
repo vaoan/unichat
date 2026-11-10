@@ -36,6 +36,8 @@ public final class DropboxLogin {
     static final String AUTHORIZE = "https://www.dropbox.com/oauth2/authorize";
     static final String TOKEN = "https://api.dropboxapi.com/oauth2/token";
     private static final ObjectMapper JSON = new ObjectMapper();
+    /** One for every sign-in: each client keeps its own threads and connections. */
+    private static final HttpClient HTTP = HttpClient.newHttpClient();
 
     private final HttpServer server;
     private final String state = Loopback.random(16);
@@ -46,14 +48,14 @@ public final class DropboxLogin {
     private final String tokenUrl;
     private final CompletableFuture<CloudAccount> result = new CompletableFuture<>();
 
-    private DropboxLogin(String appKey, int port, String tokenUrl) throws IOException {
+    private DropboxLogin(String appKey, int port, String tokenUrl, Duration deadline) throws IOException {
         this.appKey = appKey;
         this.tokenUrl = tokenUrl;
         server = Loopback.server(port);
         redirect = "http://localhost:" + server.getAddress().getPort() + "/dropbox";
         server.createContext("/dropbox", this::back);
         server.start();
-        result.whenComplete((a, e) -> server.stop(0));
+        Loopback.until(server, result, deadline);
     }
 
     /** The app's key: the one given in Ajustes, else Unichat's own. */
@@ -67,11 +69,12 @@ public final class DropboxLogin {
      * Dropbox answers; failed if the person declined, or cancelled with {@link CompletableFuture#cancel}.
      */
     public static CompletableFuture<CloudAccount> start(String appKey, Consumer<URI> browser) throws IOException {
-        return start(appKey, browser, Loopback.PORT, TOKEN);
+        return start(appKey, browser, Loopback.PORT, TOKEN, Loopback.DEADLINE);
     }
 
-    static CompletableFuture<CloudAccount> start(String appKey, Consumer<URI> browser, int port, String tokenUrl) throws IOException {
-        DropboxLogin login = new DropboxLogin(appKey, port, tokenUrl);
+    static CompletableFuture<CloudAccount> start(String appKey, Consumer<URI> browser, int port, String tokenUrl,
+                                                 Duration deadline) throws IOException {
+        DropboxLogin login = new DropboxLogin(appKey, port, tokenUrl, deadline);
         browser.accept(URI.create(AUTHORIZE + "?client_id=" + Urls.enc(appKey) + "&response_type=code"
                 + "&token_access_type=offline&code_challenge_method=S256&code_challenge=" + challenge(login.verifier)
                 + "&redirect_uri=" + Urls.enc(login.redirect) + "&state=" + login.state));
@@ -89,7 +92,7 @@ public final class DropboxLogin {
 
     private void back(HttpExchange x) throws IOException {
         Map<String, String> q = Loopback.query(x.getRequestURI().getRawQuery());
-        if (!state.equals(q.get("state"))) {
+        if (!Loopback.ours(state, q.get("state"))) {
             Loopback.reply(x, 400, "text/html; charset=utf-8", Loopback.page(I18n.t("cloud.pcloud.notOurs")));
             return; // someone else's answer: keep waiting for ours
         }
@@ -115,7 +118,7 @@ public final class DropboxLogin {
                 + "&client_id=" + Urls.enc(appKey) + "&redirect_uri=" + Urls.enc(redirect);
         HttpResponse<String> r;
         try {
-            r = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(tokenUrl)).timeout(Duration.ofSeconds(30))
+            r = HTTP.send(HttpRequest.newBuilder(URI.create(tokenUrl)).timeout(Duration.ofSeconds(30))
                     .header("Content-Type", "application/x-www-form-urlencoded")
                     .POST(HttpRequest.BodyPublishers.ofString(form)).build(), HttpResponse.BodyHandlers.ofString());
         } catch (InterruptedException e) {

@@ -20,6 +20,10 @@ import java.util.function.DoubleConsumer;
 
 /** Downloads of pinned files: {@code target} only appears, whole, if the checksum matches. */
 public final class Downloads {
+    /** One for every download: each client keeps its own threads and connections. */
+    private static final HttpClient HTTP = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL)
+            .connectTimeout(Duration.ofSeconds(20)).build();
+
     private Downloads() {}
 
     /** See {@link #fetch(String, long, String, Path, String, DoubleConsumer, Consumer)}. */
@@ -40,12 +44,13 @@ public final class Downloads {
                              Consumer<Path> beforeMove) throws IOException, InterruptedException {
         Files.createDirectories(target.getParent());
         Path part = target.resolveSibling(target.getFileName() + ".part");
-        HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(20)).build();
         try {
-            HttpResponse<InputStream> res = http.send(HttpRequest.newBuilder(URI.create(url)).build(),
+            HttpResponse<InputStream> res = HTTP.send(HttpRequest.newBuilder(URI.create(url)).build(),
                     HttpResponse.BodyHandlers.ofInputStream());
-            if (res.statusCode() != 200) throw new IOException(I18n.t("download.http", res.statusCode(), what));
+            if (res.statusCode() != 200) {
+                res.body().close(); // left open, the connection stayed busy with a body nobody reads
+                throw new IOException(I18n.t("download.http", res.statusCode(), what));
+            }
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             try (InputStream in = new DigestInputStream(res.body(), md);
                  var out = Files.newOutputStream(part)) {

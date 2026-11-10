@@ -45,7 +45,17 @@ class MediaUploadTest {
             files.put(path, stored);
         }
 
-        @Override public byte[] get(String path) { return files.get(path); }
+        /** Only small files (the settings) come down whole: media comes down into a file (a 3 GB video didn't fit). */
+        @Override public byte[] get(String path) {
+            throw new AssertionError("media read whole into memory: " + path);
+        }
+
+        @Override public boolean get(String path, Path target) throws IOException {
+            byte[] f = files.get(path);
+            if (f == null) return false;
+            Files.write(target, f);
+            return true;
+        }
 
         @Override public RemoteFile info(String path) throws IOException {
             byte[] f = files.get(path);

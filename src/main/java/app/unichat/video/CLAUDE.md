@@ -10,3 +10,4 @@ ffmpeg, yt-dlp, stickers and picture conversions.
 
 ## Lessons
 - ffmpeg tells a file's format by its content: a "video" from a chat that is really an HLS playlist (or a concat list, a DASH manifest) names other files, and `-protocol_whitelist file` still let it read them into the output that's saved and uploaded. Files from others go in through `Ffmpeg.input`, which refuses those (`FfmpegInputTest`; `.claude/lessons.tsv` `ffmpeg-input`). A forced format (`-f matroska`, `-f s16le`) doesn't probe and is fine.
+- ffmpeg calls a picture "Video" too (GIF, WebP, APNG, PNG, JPEG as mjpeg): `makePlayable` turned every picture gallery-dl saved from a link into a one-frame MP4. Pictures are told by the format ffmpeg read them as (`VideoTranscoder.picture`: gif, apng, image2, the "…_pipe" image readers), never by the codec, since a camera's MJPEG in an AVI is a video (`VideoTranscoderTest`).

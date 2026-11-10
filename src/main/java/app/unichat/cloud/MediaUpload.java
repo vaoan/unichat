@@ -8,7 +8,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -147,13 +146,12 @@ final class MediaUpload {
         return there.kind() == null ? null : Checksums.of(file, there.kind());
     }
 
-    /** The account's copy in place of this one (this one was cut short), written whole before it replaces it. */
+    /**
+     * The account's copy in place of this one (this one was cut short), written whole before it replaces it; straight
+     * to the disk, never whole in memory (a 3 GB video failed every day).
+     */
     private static void restore(Storage dav, String remote, Path file) throws IOException {
-        byte[] data = dav.get(remote);
-        if (data == null) throw new IOException(I18n.t("cloud.error.mismatch"));
-        Path part = file.resolveSibling("." + file.getFileName() + ".restore");
-        Files.write(part, data);
-        Files.move(part, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        if (!dav.get(remote, file)) throw new IOException(I18n.t("cloud.error.mismatch"));
     }
 
     private void failed(String key, IOException e) {

@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** pCloud through its own API and its browser sign-in, which works with two-step verification. */
 class PCloudTest {
     private static final HttpClient HTTP = HttpClient.newHttpClient();
+    /** A sign-in that waits as long as the test does. */
+    static final java.time.Duration NO_LIMIT = java.time.Duration.ofNanos(Long.MAX_VALUE);
 
     @Test
     void foldersFilesAndWhetherTheyChanged() throws Exception {
@@ -42,6 +44,16 @@ class PCloudTest {
             cloud.put("/" + photo, "g".getBytes(StandardCharsets.UTF_8));
             assertNotEquals(before, api.stamp(photo), "a new version is told apart");
             assertNull(api.stamp("nada.txt"));
+        }
+    }
+
+    @Test
+    void aFileComesDownIntoAFileNeverWholeInMemory(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        try (FakePCloud cloud = new FakePCloud("tok")) {
+            byte[] video = new byte[300_000];
+            new java.util.Random(3).nextBytes(video);
+            cloud.put("/Unichat/Multimedia/Ana/video [1].mp4", video);
+            StorageDownloads.check(new PCloudApi(cloud.host(), "tok"), "Unichat/Multimedia/Ana/video [1].mp4", video, dir);
         }
     }
 
@@ -91,7 +103,7 @@ class PCloudTest {
     @Test
     void signingInInTheBrowserGivesTheAccount() throws Exception {
         URI[] opened = {null};
-        CompletableFuture<CloudAccount> login = PCloudLogin.start("APP", u -> opened[0] = u, 0, h -> "https://" + h);
+        CompletableFuture<CloudAccount> login = PCloudLogin.start("APP", u -> opened[0] = u, 0, h -> "https://" + h, NO_LIMIT);
         Map<String, String> asked = signIn(opened[0], "access_token=T0K&token_type=bearer&uid=1&state=STATE&hostname=eapi.pcloud.com");
         assertEquals("APP", asked.get("client_id"));
         assertEquals("token", asked.get("response_type"));
@@ -104,7 +116,7 @@ class PCloudTest {
     @Test
     void anAnswerForAnotherRequestIsIgnoredAndADeclineFails() throws Exception {
         URI[] opened = {null};
-        CompletableFuture<CloudAccount> login = PCloudLogin.start("APP", u -> opened[0] = u, 0, h -> "https://" + h);
+        CompletableFuture<CloudAccount> login = PCloudLogin.start("APP", u -> opened[0] = u, 0, h -> "https://" + h, NO_LIMIT);
         Map<String, String> q = new HashMap<>();
         for (String pair : opened[0].getRawQuery().split("&")) {
             int eq = pair.indexOf('=');
@@ -116,6 +128,45 @@ class PCloudTest {
         assertFalse(login.isDone(), "still waiting for ours");
         signIn(opened[0], "error=access_denied&state=STATE");
         assertThrows(CompletionException.class, login::join);
+    }
+
+    /** The sign-in's listener is gone: its port can be taken again (the next "Connect" said "port busy" until a restart). */
+    static void portIsFree(String redirect) throws IOException {
+        Loopback.server(URI.create(redirect).getPort()).stop(0);
+    }
+
+    private static String redirect(URI authorize) {
+        return Loopback.query(authorize.getRawQuery()).get("redirect_uri");
+    }
+
+    @Test
+    void aSignInLeftInTheBrowserEndsAtItsDeadlineAndFreesThePort() throws Exception {
+        URI[] opened = {null};
+        CompletableFuture<CloudAccount> login = PCloudLogin.start("APP", u -> opened[0] = u, 0, h -> "https://" + h, java.time.Duration.ZERO);
+        var e = assertThrows(java.util.concurrent.ExecutionException.class, login::get); // get: a JUnit timeout can interrupt it
+        assertEquals(app.unichat.support.I18n.t("cloud.signIn.expired"), e.getCause().getMessage());
+        portIsFree(redirect(opened[0]));
+    }
+
+    @Test
+    void cancellingFreesThePort() throws Exception {
+        URI[] opened = {null};
+        CompletableFuture<CloudAccount> login = PCloudLogin.start("APP", u -> opened[0] = u, 0, h -> "https://" + h, NO_LIMIT);
+        login.cancel(false);
+        portIsFree(redirect(opened[0]));
+    }
+
+    @Test
+    void theTokenDoesntStayInTheBrowsersHistory() throws Exception {
+        URI[] opened = {null};
+        CompletableFuture<CloudAccount> login = PCloudLogin.start("APP", u -> opened[0] = u, 0, h -> "https://" + h, NO_LIMIT);
+        try {
+            String page = HTTP.send(HttpRequest.newBuilder(URI.create(redirect(opened[0]))).build(), HttpResponse.BodyHandlers.ofString()).body();
+            assertTrue(page.contains("history.replaceState(null, '', location.pathname)"), "the address loses its \"#access_token=…\"");
+            assertTrue(page.indexOf("history.replaceState") > page.indexOf("location.hash"), "after the token was read from it");
+        } finally {
+            login.cancel(false);
+        }
     }
 
     @Test

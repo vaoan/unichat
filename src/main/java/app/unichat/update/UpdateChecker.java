@@ -37,6 +37,9 @@ public final class UpdateChecker {
     /** How often the worker looks whether a day has passed: a sleeping computer doesn't count awake time. */
     private static final Duration LOOK_EVERY = Duration.ofHours(1);
     private static final UpdateChecker INSTANCE = new UpdateChecker();
+    /** One for every check: each client keeps its own threads and connections. */
+    private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
+            .followRedirects(HttpClient.Redirect.NORMAL).build();
 
     private final ScheduledExecutorService worker = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "update-check");
@@ -128,14 +131,12 @@ public final class UpdateChecker {
     }
 
     private static String fetch() throws Exception {
-        HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
-                .followRedirects(HttpClient.Redirect.NORMAL).build();
         HttpRequest req = HttpRequest.newBuilder(API).timeout(Duration.ofSeconds(15))
                 .header("Accept", "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")
                 .header("User-Agent", "Unichat/" + AppVersion.current())
                 .GET().build();
-        HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> res = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
         if (res.statusCode() != 200) throw new IllegalStateException("HTTP " + res.statusCode());
         return res.body();
     }

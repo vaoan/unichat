@@ -68,6 +68,27 @@ class DownloadsTest {
         assertEquals("contenido", Files.readString(target));
     }
 
+    /** A refusal's body is let go: left open, the connection stayed busy (and the server kept writing into it) for good. */
+    @Test
+    void aRefusalLetsItsConnectionGo() throws Exception {
+        java.util.concurrent.CountDownLatch letGo = new java.util.concurrent.CountDownLatch(1);
+        server.createContext("/endless", ex -> {
+            ex.sendResponseHeaders(503, 0); // a body with no end: an error page that never stops
+            byte[] chunk = new byte[1 << 16];
+            try (var o = ex.getResponseBody()) {
+                while (true) o.write(chunk);
+            } catch (IOException closedByTheClient) {
+                letGo.countDown();
+            }
+        });
+        String endless = url.replace("/f", "/endless");
+        IOException e = assertThrows(IOException.class,
+                () -> Downloads.fetch(endless, 0, Hashes.sha256("contenido"), dir.resolve("archivo"), "el archivo", p -> { }));
+        assertEquals(I18n.t("download.http", 503, "el archivo"), e.getMessage());
+        letGo.await(); // never, while the body stays open
+        assertFalse(Files.exists(dir.resolve("archivo.part")));
+    }
+
     @Test
     void aFileThatDoesntMatchLeavesNothing() {
         Path target = dir.resolve("archivo");

@@ -26,7 +26,9 @@ class LessonsTest {
             "gif-as-image", new String[] {"src/main/java/X.java", "        view.setImage(new Image(file + \".gif\"));"},
             "css-accent-loop", new String[] {"src/main/resources/x.css", ".root { -accent: derive(-accent, 20%); }"},
             "css-label-min-width", new String[] {"src/main/resources/x.css", ".unread-badge { -fx-min-width: 20; }"},
-            "ffmpeg-input", new String[] {"src/main/java/X.java", "List.of(bin, \"-protocol_whitelist\", \"file\", \"-i\", in)"});
+            "ffmpeg-input", new String[] {"src/main/java/X.java", "List.of(bin, \"-protocol_whitelist\", \"file\", \"-i\", in)"},
+            "oauth-state-equals", new String[] {"src/main/java/app/unichat/cloud/X.java", "        if (!state.equals(q.get(\"state\"))) {"},
+            "http-client-per-call", new String[] {"src/main/java/X.java", "        HttpClient http = HttpClient.newBuilder().build();"});
 
     @Test
     void theRepositoryKeepsEveryLesson() throws IOException {

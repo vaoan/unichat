@@ -14,6 +14,19 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WebDavTest {
+    @org.junit.jupiter.api.io.TempDir
+    java.nio.file.Path dir;
+
+    @Test
+    void aFileComesDownIntoAFileNeverWholeInMemory() throws Exception {
+        try (FakeDav cloud = new FakeDav("u", "p")) {
+            WebDav dav = new WebDav(cloud.url(), "u", "p");
+            byte[] video = new byte[300_000];
+            new java.util.Random(3).nextBytes(video);
+            cloud.put("Unichat/Multimedia/Ana/video [1].mp4", video);
+            StorageDownloads.check(dav, "Unichat/Multimedia/Ana/video [1].mp4", video, dir);
+        }
+    }
     @Test
     void foldersFilesAndWhetherTheyChanged() throws Exception {
         try (FakeDav cloud = new FakeDav("yo@correo.com", "clave")) {
