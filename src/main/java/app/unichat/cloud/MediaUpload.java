@@ -28,7 +28,7 @@ final class MediaUpload {
     }
 
     /** Uploads what's missing; how many went up. Stops at the first failure: what went up stays remembered. */
-    int run(WebDav dav) throws IOException {
+    int run(Storage dav) throws IOException {
         load();
         int sent = 0;
         for (Path folder : folders.get()) {

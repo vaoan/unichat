@@ -3,6 +3,8 @@ package app.unichat.ui;
 import app.unichat.cloud.Cloud;
 import app.unichat.cloud.CloudAccount;
 import app.unichat.cloud.CloudAccount.Service;
+import app.unichat.cloud.PCloudLogin;
+import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 import javafx.application.Platform;
@@ -56,25 +58,97 @@ final class CloudPage {
                                 toggle(CloudAccount.media(), CloudAccount::setMedia))));
     }
 
-    /** Which service, its address (typed only for "Otro"), the login and the password or key; "Conectar" tries it. */
+    /**
+     * Which service. pCloud: "Conectar con pCloud" signs in in the browser (works with two-step verification); the rest:
+     * address (typed only for "Otro"), login and password or key, tried by "Conectar".
+     */
     private static Node connectForm(Consumer<String> toast, Runnable redraw) {
         Service[] chosen = {Service.PCLOUD};
-        TextField url = new TextField(Service.PCLOUD.url);
-        url.setPromptText("https://…");
-        url.setDisable(true);
-        TextField user = new TextField();
-        user.setPromptText(I18n.t("settings.cloud.userPrompt"));
-        PasswordField secret = new PasswordField();
-        Label secretHelp = Labels.help(I18n.t("settings.cloud.secretHelp.PCLOUD"));
         Label status = Labels.help("");
         Nodes.show(status, false);
+        Consumer<CloudAccount> tryIt = a -> {
+            say(status, I18n.t("settings.cloud.trying"));
+            Cloud.verify(a).whenComplete((ok, err) -> Platform.runLater(() -> {
+                if (err != null) {
+                    say(status, I18n.t("settings.cloud.failed", Errors.message(Errors.unwrap(err))));
+                    return;
+                }
+                ok.save();
+                toast.accept(I18n.t("settings.cloud.connected", I18n.t("settings.cloud.service." + ok.service().name())));
+                cloud.syncNow();
+                redraw.run();
+            }));
+        };
+        Node pcloud = pcloudForm(status, tryIt);
+        Node dav = davForm(chosen, status, tryIt);
         Node services = chips(I18n.t("settings.cloud.service"), List.of(Service.values()),
                 s -> I18n.t("settings.cloud.service." + s.name()), Service.PCLOUD, s -> {
                     chosen[0] = s;
-                    url.setDisable(s != Service.OTHER);
-                    url.setText(s.url == null ? "" : s.url);
-                    secretHelp.setText(I18n.t("settings.cloud.secretHelp." + s.name()));
+                    Nodes.show(pcloud, s == Service.PCLOUD);
+                    Nodes.show(dav, s != Service.PCLOUD);
+                    if (dav.lookup(".cloud-url") instanceof TextField url) {
+                        url.setDisable(s != Service.OTHER);
+                        url.setText(s.url == null ? "" : s.url);
+                    }
+                    if (dav.lookup(".cloud-secret-help") instanceof Label help) help.setText(I18n.t("settings.cloud.secretHelp." + s.name()));
                 });
+        Nodes.show(dav, false);
+        return group(I18n.t("settings.cloud.account"), stacked(I18n.t("settings.cloud.service"), null, services), pcloud, dav,
+                actions(status));
+    }
+
+    /** "Conectar con pCloud": the browser opens pCloud's page; "Cancelar" while it waits there. */
+    private static Node pcloudForm(Label status, Consumer<CloudAccount> tryIt) {
+        TextField clientId = new TextField(Settings.get().getString("cloud.pcloudClientId", ""));
+        clientId.setAccessibleText(I18n.t("settings.cloud.clientId"));
+        Node clientRow = stacked(I18n.t("settings.cloud.clientId"), I18n.t("settings.cloud.clientIdHelp", PCloudLogin.REDIRECT), clientId);
+        Nodes.show(clientRow, PCloudLogin.clientId().isEmpty() || !Settings.get().getString("cloud.pcloudClientId", "").isEmpty());
+        Button connect = new Button(I18n.t("settings.cloud.connectPcloud"));
+        connect.getStyleClass().add("primary-button");
+        Button cancel = new Button(I18n.t("folders.dialog.cancel"));
+        cancel.getStyleClass().add("secondary-button");
+        Nodes.show(cancel, false);
+        java.util.concurrent.CompletableFuture<?>[] waiting = {null};
+        connect.setOnAction(e -> {
+            Settings.get().set("cloud.pcloudClientId", clientId.getText().isBlank() ? null : clientId.getText().strip());
+            if (PCloudLogin.clientId().isEmpty()) {
+                say(status, I18n.t("settings.cloud.noClientId"));
+                return;
+            }
+            try {
+                var login = PCloudLogin.start(PCloudLogin.clientId(), uri -> Browser.open(uri.toString()));
+                waiting[0] = login;
+                connect.setDisable(true);
+                Nodes.show(cancel, true);
+                say(status, I18n.t("settings.cloud.inBrowser"));
+                login.whenComplete((a, err) -> Platform.runLater(() -> {
+                    connect.setDisable(false);
+                    Nodes.show(cancel, false);
+                    if (err instanceof java.util.concurrent.CancellationException) say(status, "");
+                    else if (err != null) say(status, I18n.t("settings.cloud.failed", Errors.message(Errors.unwrap(err))));
+                    else tryIt.accept(a);
+                }));
+            } catch (java.io.IOException ex) {
+                say(status, I18n.t("settings.cloud.portBusy", PCloudLogin.PORT));
+            }
+        });
+        cancel.setOnAction(e -> {
+            if (waiting[0] != null) waiting[0].cancel(false);
+        });
+        Label help = Labels.help(I18n.t("settings.cloud.pcloudHelp"));
+        return new VBox(clientRow, actions(new VBox(8, help, new FlowPane(8, 6, connect, cancel))));
+    }
+
+    /** Address, login and password or key for a WebDAV service; "Conectar" tries them. */
+    private static Node davForm(Service[] chosen, Label status, Consumer<CloudAccount> tryIt) {
+        TextField url = new TextField();
+        url.getStyleClass().add("cloud-url");
+        url.setPromptText("https://…");
+        TextField user = new TextField();
+        user.setPromptText(I18n.t("settings.cloud.userPrompt"));
+        PasswordField secret = new PasswordField();
+        Label secretHelp = Labels.help("");
+        secretHelp.getStyleClass().add("cloud-secret-help");
         Button connect = new Button(I18n.t("settings.cloud.connect"));
         connect.getStyleClass().add("primary-button");
         connect.setOnAction(e -> {
@@ -83,29 +157,15 @@ final class CloudPage {
                 say(status, I18n.t("settings.cloud.missing"));
                 return;
             }
-            connect.setDisable(true);
-            say(status, I18n.t("settings.cloud.trying"));
-            Cloud.test(a).whenComplete((ok, err) -> Platform.runLater(() -> {
-                connect.setDisable(false);
-                if (err != null) {
-                    say(status, I18n.t("settings.cloud.failed", Errors.message(Errors.unwrap(err))));
-                    return;
-                }
-                a.save();
-                toast.accept(I18n.t("settings.cloud.connected", I18n.t("settings.cloud.service." + a.service().name())));
-                cloud.syncNow();
-                redraw.run();
-            }));
+            tryIt.accept(a);
         });
         url.setAccessibleText(I18n.t("settings.cloud.url"));
         user.setAccessibleText(I18n.t("settings.cloud.user"));
         secret.setAccessibleText(I18n.t("settings.cloud.secret"));
-        return group(I18n.t("settings.cloud.account"),
-                stacked(I18n.t("settings.cloud.service"), null, services),
-                stacked(I18n.t("settings.cloud.url"), null, url),
+        return new VBox(stacked(I18n.t("settings.cloud.url"), null, url),
                 stacked(I18n.t("settings.cloud.user"), null, user),
                 stacked(I18n.t("settings.cloud.secret"), null, new VBox(4, secret, secretHelp)),
-                actions(new VBox(6, connect, status)));
+                actions(connect));
     }
 
     /** Who's connected, how the last round went (kept current while shown), "Sincronizar ahora" and "Desconectar". */

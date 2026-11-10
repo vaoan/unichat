@@ -125,7 +125,7 @@ public final class Cloud {
     private Status round() {
         CloudAccount a = account.get();
         if (a == null) return publish(Status.OFF);
-        WebDav dav = a.dav();
+        Storage dav = a.storage();
         try {
             Instant now = Instant.now();
             if (CloudAccount.settings()) for (SyncedPart p : parts) p.sync(dav, now);
@@ -148,11 +148,13 @@ public final class Cloud {
         return s;
     }
 
-    /** Whether {@code a} answers with these credentials: nothing, or why not. */
-    public static CompletableFuture<Void> test(CloudAccount a) {
-        return CompletableFuture.runAsync(() -> {
+    /** Whether {@code a} answers with this login: the account to keep (pCloud's with its email, to show who), or why not. */
+    public static CompletableFuture<CloudAccount> verify(CloudAccount a) {
+        return CompletableFuture.supplyAsync(() -> {
             try {
-                a.dav().check();
+                Storage s = a.storage();
+                s.check();
+                return s instanceof PCloudApi p ? new CloudAccount(a.service(), a.url(), p.email(), a.secret()) : a;
             } catch (IOException e) {
                 throw new java.util.concurrent.CompletionException(e);
             }

@@ -9,8 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AppWindowsTest {
+    /** The shortcut key is ⌘ on a Mac and Ctrl elsewhere: both held, so it's pressed on any system (CI is Linux). */
     private static KeyEvent key(KeyCode code, String text, boolean shortcut, boolean shift, boolean alt) {
-        return new KeyEvent(KeyEvent.KEY_PRESSED, text, text, code, shift, false, alt, shortcut);
+        return new KeyEvent(KeyEvent.KEY_PRESSED, text, text, code, shift, shortcut, alt, shortcut);
     }
 
     @Test

@@ -81,8 +81,10 @@ class AudioUiTest {
         return m;
     }
 
+    /** Playing, or failed to: a failure ends the wait at once and says so (it waited to the limit on a machine with no sound). */
     private void awaitPlaying(Message m) throws Exception {
-        await(() -> playback.isCurrent(m) && playback.state() == AudioPlayback.State.PLAYING, m.id() + " plays");
+        await(() -> !toasts.isEmpty() || playback.isCurrent(m) && playback.state() == AudioPlayback.State.PLAYING, m.id() + " plays");
+        org.junit.jupiter.api.Assertions.assertEquals(List.of(), toasts, m.id() + " didn't play");
     }
 
     @Test

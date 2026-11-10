@@ -75,8 +75,17 @@ class InfoAvatarUiTest {
             Event.fireEvent(avatar, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
             return null;
         });
-        FxWait.until("the photo viewer shows the photo", () -> viewer().map(w -> w.getScene().getRoot().lookupAll("*").stream()
-                .anyMatch(n -> n instanceof PhotoPane p && p.view().getImage() != null)).orElse(false));
+        try {
+            FxWait.until("the photo viewer shows the photo", () -> viewer().map(w -> w.getScene().getRoot().lookupAll("*").stream()
+                    .anyMatch(n -> n instanceof PhotoPane p && p.view().getImage() != null)).orElse(false));
+        } catch (AssertionError | RuntimeException e) {
+            // What it saw instead, for a machine where it doesn't (Linux CI): no viewer, or one with no picture, and why.
+            throw new AssertionError("viewer: " + FxWait.fx(() -> viewer().map(w -> w.getScene().getRoot().lookupAll("*").stream()
+                    .filter(n -> n instanceof PhotoPane).map(n -> {
+                        var img = ((PhotoPane) n).view().getImage();
+                        return img == null ? "no image" : img.isError() ? "error " + img.getException() : "image";
+                    }).toList().toString()).orElse("none")), e);
+        }
         assertEquals(mama.title(), FxWait.fx(() -> ((Stage) viewer().orElseThrow()).getTitle()));
     }
 

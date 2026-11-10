@@ -46,7 +46,7 @@ final class SyncedPart {
     }
 
     /** One round with the account; what it did. */
-    Action sync(WebDav dav, Instant now) throws IOException {
+    Action sync(Storage dav, Instant now) throws IOException {
         Bundle mine = local.apply(now);
         String mineHash = mine.hash();
         if (!mineHash.equals(lastLocal)) {
@@ -78,7 +78,7 @@ final class SyncedPart {
         return a;
     }
 
-    private void upload(WebDav dav, Bundle mine, String hash) throws IOException {
+    private void upload(Storage dav, Bundle mine, String hash) throws IOException {
         dav.mkdirs(remotePath.substring(0, remotePath.lastIndexOf('/')));
         dav.put(remotePath, mine.toBytes());
         agreed(hash, dav.stamp(remotePath));

@@ -36,7 +36,10 @@ jobs:
           java-version: "25"
           cache: maven
       # JavaFX plays video on Linux through the system's FFmpeg libraries (libavcodec/libavformat).
-      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
+      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg libasound2t64
+      # A runner has no sound card: ALSA's default device is a null one, which takes the sound and drops it, so the
+      # audio tests' player gets to "playing" instead of failing.
+      - run: printf 'pcm.!default { type null }\n' | sudo tee /etc/asound.conf
       - run: ./mvnw -B verify -Pheadless-ui
 
   windows:

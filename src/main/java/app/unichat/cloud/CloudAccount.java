@@ -9,8 +9,8 @@ import app.unichat.settings.Settings;
 public record CloudAccount(Service service, String url, String user, String secret) {
     /** The services with a known address; any other WebDAV is {@link #OTHER}, its address typed by the person. */
     public enum Service {
-        PCLOUD("https://webdav.pcloud.com"),
-        PCLOUD_EU("https://ewebdav.pcloud.com"),
+        /** Signed in through the browser ({@link PCloudLogin}): works with two-step verification; {@code url} is its API host. */
+        PCLOUD(null),
         ICEDRIVE("https://webdav.icedrive.io"),
         OTHER(null);
 
@@ -48,8 +48,9 @@ public record CloudAccount(Service service, String url, String user, String secr
         for (String k : new String[] {"cloud.service", "cloud.url", "cloud.user", "cloud.secret", "cloud.settingsBase"}) s.set(k, null);
     }
 
-    public WebDav dav() {
-        return new WebDav(url, user, secret);
+    /** pCloud through its own API (signed in in the browser); every other service through WebDAV. */
+    public Storage storage() {
+        return service == Service.PCLOUD ? new PCloudApi(url, secret) : new WebDav(url, user, secret);
     }
 
     /** Upload what chats save (on unless turned off). */

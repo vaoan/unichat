@@ -62,7 +62,7 @@ class MediaClickUiTest {
                 && w.getScene().getRoot().getStyleClass().contains("media-viewer")));
         assertTrue(viewer);
         fx(() -> {
-            Window.getWindows().stream().filter(w -> w.getScene().getRoot().getStyleClass().contains("media-viewer"))
+            Window.getWindows().stream().filter(w -> w.getScene() != null && w.getScene().getRoot().getStyleClass().contains("media-viewer"))
                     .toList().forEach(Window::hide);
             return null;
         });

@@ -18,7 +18,7 @@ import java.util.Base64;
  * is there, folders, putting and getting a file. Paths are relative to the account's root, "/"-separated; each part is
  * encoded here. Nothing is ever deleted nor overwritten by mistake: callers ask {@link #exists} first.
  */
-public final class WebDav {
+public final class WebDav implements Storage {
     private final String base;
     private final String auth;
     private final HttpClient http = HttpClient.newBuilder()
@@ -40,11 +40,13 @@ public final class WebDav {
     }
 
     /** Whether the address answers and takes these credentials; why not, in the person's words. */
+    @Override
     public void check() throws IOException {
         int code = send("PROPFIND", "", HttpRequest.BodyPublishers.noBody(), true).statusCode();
         if (code != 207 && code != 200) throw failure(code);
     }
 
+    @Override
     public boolean exists(String path) throws IOException {
         int code = send("PROPFIND", path, HttpRequest.BodyPublishers.noBody(), true).statusCode();
         if (code == 404) return false;
@@ -56,6 +58,7 @@ public final class WebDav {
      * What tells this version of {@code path} from the next (its ETag, else its date), without downloading it; null
      * when there's none. Each check asks only this, and downloads the file when it changed.
      */
+    @Override
     public String stamp(String path) throws IOException {
         HttpResponse<String> r;
         try {
@@ -79,6 +82,7 @@ public final class WebDav {
     }
 
     /** Makes {@code dir} and the folders above it that are missing. */
+    @Override
     public void mkdirs(String dir) throws IOException {
         StringBuilder at = new StringBuilder();
         for (String part : dir.split("/")) {
@@ -89,17 +93,20 @@ public final class WebDav {
         }
     }
 
+    @Override
     public void put(String path, Path file) throws IOException {
         int code = send("PUT", path, HttpRequest.BodyPublishers.ofFile(file), false).statusCode();
         if (code != 201 && code != 204 && code != 200) throw failure(code);
     }
 
+    @Override
     public void put(String path, byte[] data) throws IOException {
         int code = send("PUT", path, HttpRequest.BodyPublishers.ofByteArray(data), false).statusCode();
         if (code != 201 && code != 204 && code != 200) throw failure(code);
     }
 
     /** The file at {@code path}, or null when there's none. */
+    @Override
     public byte[] get(String path) throws IOException {
         HttpResponse<byte[]> r = sendBytes(path);
         if (r.statusCode() == 404) return null;

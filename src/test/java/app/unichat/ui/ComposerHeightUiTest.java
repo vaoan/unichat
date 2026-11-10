@@ -43,7 +43,9 @@ class ComposerHeightUiTest {
             stage[0] = new Stage();
             composer[0] = c;
             c.setMaxWidth(420);
-            Scene scene = new Scene(new javafx.scene.layout.StackPane(c), 900, 600);
+            // Tall enough that the box (up to 40 % of it) never reaches its cap: there it can't shrink, and on Linux,
+            // whose font is taller, 600 put it there.
+            Scene scene = new Scene(new javafx.scene.layout.StackPane(c), 900, 950);
             scene.getRoot().setStyle("-fx-font-size: 21px;"); // 160 % text
             stage[0].setScene(scene);
             stage[0].show();
@@ -54,6 +56,7 @@ class ComposerHeightUiTest {
         FxWait.settled();
         FxWait.until("all of it on screen", () -> hidden(box) <= 1);
         double tall = FxWait.fx(box::getHeight);
+        assertTrue(tall < 0.4 * 950 - 2, "the narrow box isn't at its cap (" + tall + " px), or it couldn't shrink");
 
         FxWait.fx(() -> { composer[0].setMaxWidth(880); return null; }); // wider: fewer lines, a shorter box
         FxWait.settled();
@@ -65,7 +68,7 @@ class ComposerHeightUiTest {
         double one = FxWait.fx(box::getHeight);
         FxWait.fx(() -> { box.setText("hola\n".repeat(40)); return null; });
         FxWait.settled();
-        assertTrue(FxWait.fx(box::getHeight) < 600 * 0.45, "a long text stops growing and scrolls");
+        assertTrue(FxWait.fx(box::getHeight) < 950 * 0.45, "a long text stops growing and scrolls");
         assertTrue(FxWait.fx(box::getHeight) > one);
         FxWait.fx(() -> { stage[0].close(); return null; });
     }

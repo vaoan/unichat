@@ -150,10 +150,14 @@ final class ProfileMedia {
             case AUDIOS -> Icons.MIC;
             case LINKS -> Icons.EXTERNAL;
             case FILES -> Icons.FILE;
-        }, 16));
+        }, 18));
         b.getStyleClass().add("media-tab");
         b.setToggleGroup(group);
         b.setSelected(s == open);
+        // Equal shares of the bar, the icon over its count: side by side, five of them crowded into uneven pieces.
+        b.setContentDisplay(javafx.scene.control.ContentDisplay.TOP);
+        b.setPrefWidth(0);
+        b.setMinWidth(0);
         b.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(b, javafx.scene.layout.Priority.ALWAYS);
         b.setTooltip(new javafx.scene.control.Tooltip(label));

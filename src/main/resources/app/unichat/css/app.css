@@ -891,7 +891,7 @@
 .media-tabs { -fx-background-color: -surface-2; -fx-background-radius: 10; -fx-padding: 3; -fx-spacing: 2; }
 .media-tab {
     -fx-background-color: transparent; -fx-background-radius: 8; -fx-text-fill: -text-2;
-    -fx-padding: 0.35em 0.4em; -fx-graphic-text-gap: 0.35em; -fx-font-size: 0.9em; -fx-cursor: hand;
+    -fx-padding: 0.4em 0.1em 0.3em 0.1em; -fx-graphic-text-gap: 0.15em; -fx-font-size: 0.8em; -fx-cursor: hand;
 }
 .media-tab .icon { -fx-background-color: -text-2; }
 .media-tab:hover { -fx-background-color: -surface; }
