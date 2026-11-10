@@ -103,6 +103,47 @@ public final class AutoSave implements ChatService.Listener {
         return SaveFolders.of(chat);
     }
 
+    /**
+     * A new base folder (null: the default), taking along each chat's folder under the old one (never the base whole:
+     * it can hold the person's own things); on the saving thread, so nothing is written meanwhile. Gives how many files
+     * moved.
+     */
+    public java.util.concurrent.CompletableFuture<Integer> setBase(Path folder) {
+        return onWorker(() -> {
+            Path before = SaveFolders.base();
+            SaveFolders.setBase(folder);
+            Path after = SaveFolders.base();
+            int moved = 0;
+            for (Chat c : chats.chats()) {
+                if (SaveFolders.hasOwn(c.id())) continue;
+                String name = FileNames.folder(c.title());
+                moved += SavedMove.move(before.resolve(name), after.resolve(name));
+            }
+            return moved;
+        });
+    }
+
+    /** A chat's own folder (null: under the base again), taking along what it saved where it was. */
+    public java.util.concurrent.CompletableFuture<Integer> setOwn(Chat chat, Path folder) {
+        return onWorker(() -> {
+            Path before = SaveFolders.of(chat);
+            SaveFolders.setOwn(chat.id(), folder);
+            return SavedMove.move(before, SaveFolders.of(chat));
+        });
+    }
+
+    private java.util.concurrent.CompletableFuture<Integer> onWorker(java.util.concurrent.Callable<Integer> work) {
+        java.util.concurrent.CompletableFuture<Integer> f = new java.util.concurrent.CompletableFuture<>();
+        worker.execute(() -> {
+            try {
+                f.complete(work.call());
+            } catch (Exception e) {
+                f.completeExceptionally(e);
+            }
+        });
+        return f;
+    }
+
     public void setProgress(Progress p) {
         progress = p;
     }

@@ -107,6 +107,11 @@ public final class Ffmpeg {
         return null;
     }
 
+    /** Whether {@code found} is the one Unichat downloaded (rather than the person's own). */
+    public static boolean downloadedByUnichat(Path found) {
+        return found != null && found.equals(installedPath());
+    }
+
     private static Path installedPath() {
         return Settings.get().dir().resolve("tools").resolve("ffmpeg").resolve(EXE);
     }

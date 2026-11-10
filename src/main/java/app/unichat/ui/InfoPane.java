@@ -201,6 +201,11 @@ public final class InfoPane extends ScrollPane {
         return b;
     }
 
+    /** The window's player: the profile's audio plays right there. */
+    void setAudio(AudioPlayback audio) {
+        media.setAudio(audio);
+    }
+
     /** "Ir al mensaje" from the media: shows the message where it was shared. */
     void setOnJump(Consumer<Message> r) {
         media.setOnJump(r);

@@ -117,6 +117,7 @@ public final class MainView extends StackPane {
         listPane.setToast(this::toast);
         thread = new ThreadPane(svc, openLink, this::toggleInfo, this::toast, audio, folderDialogs, library);
         info = new InfoPane(svc, this::toggleInfo, this::toast);
+        info.setAudio(audio);
         panel = new SidePanel(info);
         thread.setOnShowServer(id -> {
             listPane.showSpace(id);

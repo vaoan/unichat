@@ -28,7 +28,8 @@ class ProfileMediaTest {
                 m("f1", MessageType.FILE, null, true), m("a1", MessageType.AUDIO, null, true), m("p2", MessageType.IMAGE, null, true)));
         assertEquals(List.of("p2", "p1"), c.photos().stream().map(Message::id).toList());
         assertEquals(List.of("v1"), c.videos().stream().map(Message::id).toList());
-        assertEquals(List.of("a1", "f1"), c.files().stream().map(Message::id).toList(), "voice notes and documents, newest first");
+        assertEquals(List.of("a1"), c.audios().stream().map(Message::id).toList(), "audio on its own shelf");
+        assertEquals(List.of("f1"), c.files().stream().map(Message::id).toList(), "and documents on theirs");
         assertEquals(List.of("https://a.org/x", "https://b.org"), c.links().stream().map(ProfileMedia.Link::url).toList());
         assertEquals(2, c.count(ProfileMedia.Shelf.PHOTOS));
     }

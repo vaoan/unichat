@@ -244,13 +244,9 @@ final class ChatOptions {
             dc.setTitle(I18n.t("chatOptions.changeFolder"));
             java.io.File f = dc.showDialog(change.getScene().getWindow());
             if (f == null) return;
-            SaveFolders.setOwn(chat.id(), f.toPath());
-            redraw.run();
+            FolderMoves.tell(AutoSave.of(svc).setOwn(chat, f.toPath()), redraw, toast);
         });
-        general.setOnAction(e -> {
-            SaveFolders.setOwn(chat.id(), null);
-            redraw.run();
-        });
+        general.setOnAction(e -> FolderMoves.tell(AutoSave.of(svc).setOwn(chat, null), redraw, toast));
         redraw.run();
         javafx.scene.layout.FlowPane buttons = new javafx.scene.layout.FlowPane(8, 6, change, general);
         return new VBox(6, where, buttons);

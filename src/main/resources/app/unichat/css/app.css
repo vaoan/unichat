@@ -905,3 +905,12 @@
 /* The options' "Peligroso" tab: red when chosen, so it reads as what it is. */
 .media-tab.danger-tab:selected .icon { -fx-background-color: #D92D20; }
 .media-tab.danger-tab:selected { -fx-text-fill: #D92D20; }
+/* Ajustes → Redes, the converter: its state at a glance, green when ready. */
+.converter-status { -fx-font-weight: bold; -fx-text-fill: -text-2; -fx-graphic-text-gap: 0.4em; }
+.converter-status .icon { -fx-background-color: -text-2; }
+.converter-status.ready { -fx-text-fill: #12B76A; }
+.converter-status.ready .icon { -fx-background-color: #12B76A; }
+/* Ajustes → Redes: "Para todas las redes" above "De cada red". */
+.settings-section-title { -fx-font-size: 1.15em; -fx-font-weight: bold; -fx-text-fill: -text; -fx-padding: 0.6em 0 0 0; }
+.profile-audio { -fx-padding: 4 8; -fx-background-radius: 8; }
+.profile-audio:hover { -fx-background-color: -surface-2; }

@@ -5,8 +5,6 @@ import app.unichat.server.LocalServer;
 import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
-import app.unichat.video.Ffmpeg;
-import app.unichat.video.WebmStickers;
 import app.unichat.voice.VoiceEnhancer;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -27,55 +25,8 @@ import static app.unichat.ui.SettingsForm.toggle;
 final class NetworksPage {
     private NetworksPage() {}
 
-    /** ffmpeg, for the stickers that arrive as WebM: the person's own, or a download when they need it. */
-    private static Node stickerVideoGroup() {
-        Label state = Labels.help("");
-        state.setMaxWidth(240);
-        Button install = new Button(I18n.t("settings.networks.install"));
-        install.getStyleClass().add("secondary-button");
-        install.setMinWidth(Region.USE_PREF_SIZE);
-        Runnable refresh = () -> {
-            boolean found = Ffmpeg.find() != null;
-            state.setText(found ? I18n.t("settings.networks.ffmpegInstalled")
-                    : !Ffmpeg.canInstall() ? I18n.t("settings.networks.ffmpegNoDownload")
-                    : Ffmpeg.autoInstall() ? I18n.t("settings.networks.ffmpegAuto", Formats.fileSize(Ffmpeg.downloadSize()))
-                    : I18n.t("settings.networks.ffmpegMissing"));
-            install.setVisible(!found && Ffmpeg.canInstall());
-            install.setManaged(install.isVisible());
-        };
-        refresh.run();
-        install.setOnAction(e -> {
-            install.setDisable(true);
-            state.setText(I18n.t("settings.networks.downloading"));
-            WebmStickers.WORKER.execute(() -> {
-                String error = null;
-                try {
-                    Ffmpeg.install(done -> javafx.application.Platform.runLater(() -> state.setText(I18n.t("settings.networks.downloadingPercent", (int) (done * 100)))));
-                } catch (Exception ex) {
-                    error = ex.getMessage();
-                }
-                String failed = error;
-                javafx.application.Platform.runLater(() -> {
-                    install.setDisable(false);
-                    refresh.run();
-                    if (failed != null) state.setText(I18n.t("settings.networks.installFailed", failed));
-                });
-            });
-        });
-        return group(I18n.t("settings.networks.groupMedia"),
-                row(I18n.t("settings.networks.enhance"), I18n.t("settings.networks.enhanceHelp"),
-                        toggle(VoiceEnhancer.enabled(), VoiceEnhancer::setEnabled)),
-                row(I18n.t("settings.networks.autoInstall"), I18n.t("settings.networks.autoInstallHelp"),
-                        toggle(Ffmpeg.autoInstall(), v -> {
-                            Ffmpeg.setAutoInstall(v);
-                            refresh.run();
-                        })),
-                row(I18n.t("settings.networks.converter"), null, new VBox(6, state, install)),
-                row(I18n.t("settings.networks.autoSaveFolder"), I18n.t("settings.networks.autoSaveFolderHelp"), autoSaveFolder()));
-    }
-
     /** The base folder of what chats save as it arrives; a chat can have its own (its options). */
-    private static Node autoSaveFolder() {
+    private static Node autoSaveFolder(app.unichat.service.ChatService svc, java.util.function.Consumer<String> toast) {
         Label where = new Label();
         where.setWrapText(true);
         Button change = new Button(I18n.t("chatOptions.changeFolder"));
@@ -91,30 +42,51 @@ final class NetworksPage {
             dc.setTitle(I18n.t("settings.networks.autoSaveFolder"));
             java.io.File f = dc.showDialog(change.getScene().getWindow());
             if (f == null) return;
-            app.unichat.autosave.SaveFolders.setBase(f.toPath());
-            redraw.run();
+            FolderMoves.tell(app.unichat.autosave.AutoSave.of(svc).setBase(f.toPath()), redraw, toast);
         });
-        reset.setOnAction(e -> {
-            app.unichat.autosave.SaveFolders.setBase(null);
-            redraw.run();
-        });
+        reset.setOnAction(e -> FolderMoves.tell(app.unichat.autosave.AutoSave.of(svc).setBase(null), redraw, toast));
         redraw.run();
         return new VBox(6, where, new javafx.scene.layout.FlowPane(8, 6, change, reset));
     }
 
     /** Options that only make sense for one network; each network gets its own group. */
-    static Node build() {
+    /**
+     * What holds for every network first (where saved things go, voice notes, the converter), then each network's own,
+     * in order of name, under headings that say which is which.
+     */
+    static Node build(app.unichat.service.ChatService svc, java.util.function.Consumer<String> toast) {
         Label intro = Labels.help(I18n.t("settings.networks.intro"));
-        return page(I18n.t("settings.nav.networks"), intro, telegramGroup(), stickerVideoGroup(), group("WhatsApp",
-                row(I18n.t("settings.networks.animated"), I18n.t("settings.networks.animatedHelp"),
-                        stickerModeChoice(Network.WHATSAPP))),
+        return page(I18n.t("settings.nav.networks"), intro,
+                heading(I18n.t("settings.networks.forAll")),
+                group(I18n.t("settings.networks.groupSaving"),
+                        SettingsForm.stacked(I18n.t("settings.networks.autoSaveFolder"), I18n.t("settings.networks.autoSaveFolderHelp"),
+                                autoSaveFolder(svc, toast))),
+                group(I18n.t("settings.networks.groupVoice"),
+                        row(I18n.t("settings.networks.enhance"), I18n.t("settings.networks.enhanceHelp"),
+                                toggle(VoiceEnhancer.enabled(), VoiceEnhancer::setEnabled))),
+                ConverterSettings.section(),
+                heading(I18n.t("settings.networks.perNetwork")),
                 group("Discord",
-                        row(I18n.t("settings.networks.discordDelete"), I18n.t("settings.networks.discordDeleteHelp"), discordMediaChoice())));
+                        row(I18n.t("settings.networks.discordDelete"), I18n.t("settings.networks.discordDeleteHelp"), discordMediaChoice())),
+                telegramGroup(),
+                group("WhatsApp",
+                        row(I18n.t("settings.networks.animated"), I18n.t("settings.networks.animatedHelp"),
+                                stickerModeChoice(Network.WHATSAPP))));
+    }
+
+    private static Label heading(String text) {
+        Label l = new Label(text);
+        l.getStyleClass().add("settings-section-title");
+        return l;
     }
 
     /** The person's own Telegram keys; only the local server uses them (other servers keep theirs in their setup). */
     private static Node telegramGroup() {
-        if (!Settings.get().localServer()) return new javafx.scene.layout.Region();
+        if (!Settings.get().localServer()) {
+            Region none = new Region();
+            none.setManaged(false); // no gap in the page where it would be
+            return none;
+        }
         Label done = new Label();
         done.getStyleClass().add("settings-help");
         TelegramKeysForm form = new TelegramKeysForm(I18n.t("settings.networks.telegramSave"), () -> {

@@ -42,6 +42,8 @@ final class SettingsForm {
     static Node row(String label, String help, Node control) {
         Label l = new Label(label);
         l.getStyleClass().add("settings-label");
+        l.setWrapText(true); // beside a wide control (chips) a long name goes on two lines, never "Borrar fotos y video…"
+        l.setMinHeight(Region.USE_PREF_SIZE);
         VBox text = new VBox(2, l);
         if (help != null) {
             Label h = Labels.help(help);
@@ -57,6 +59,19 @@ final class SettingsForm {
         row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("settings-row");
         return row;
+    }
+
+    /** A row with its control under the text, for one too wide to sit beside it (beside, the label was squeezed). */
+    static Node stacked(String label, String help, Node control) {
+        Label l = new Label(label);
+        l.getStyleClass().add("settings-label");
+        VBox box = new VBox(2, l);
+        if (help != null) box.getChildren().add(Labels.help(help));
+        if (control.getAccessibleText() == null) control.setAccessibleText(label);
+        box.getChildren().add(control);
+        VBox.setMargin(control, new javafx.geometry.Insets(6, 0, 0, 0));
+        box.getStyleClass().add("settings-row");
+        return box;
     }
 
     static CheckBox toggle(boolean value, Consumer<Boolean> save) {

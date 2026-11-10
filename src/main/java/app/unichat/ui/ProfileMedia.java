@@ -28,21 +28,21 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * The profile's "Multimedia": what was shared in the chat, by kind in tabs (photos, videos, links, files), newest
+ * The profile's "Multimedia": what was shared in the chat, by kind in tabs (photos, videos, audio, links, files), newest
  * first. Photos keep their shape (shown whole in their square, never stretched). A chat can hide it (its options).
  */
 final class ProfileMedia {
-    enum Shelf { PHOTOS, VIDEOS, LINKS, FILES }
+    enum Shelf { PHOTOS, VIDEOS, AUDIOS, LINKS, FILES }
 
     /** A link written in a message. */
     record Link(String url, Message from) {}
 
     /** The chat's shared things by kind, newest first, at most {@link #MAX} of each. Pure. */
-    record Contents(List<Message> photos, List<Message> videos, List<Link> links, List<Message> files) {
+    record Contents(List<Message> photos, List<Message> videos, List<Message> audios, List<Link> links, List<Message> files) {
         static final int MAX = 60;
 
         static Contents of(List<Message> messages) {
-            List<Message> photos = new ArrayList<>(), videos = new ArrayList<>(), files = new ArrayList<>();
+            List<Message> photos = new ArrayList<>(), videos = new ArrayList<>(), audios = new ArrayList<>(), files = new ArrayList<>();
             List<Link> links = new ArrayList<>();
             for (int i = messages.size() - 1; i >= 0; i--) {
                 Message m = messages.get(i);
@@ -51,13 +51,14 @@ final class ProfileMedia {
                     switch (m.type()) {
                         case IMAGE -> add(photos, m);
                         case VIDEO -> add(videos, m);
-                        case FILE, AUDIO -> add(files, m);
+                        case AUDIO -> add(audios, m); // voice notes and music: heard here, not opened elsewhere
+                        case FILE -> add(files, m);
                         default -> { } // stickers aren't shared things
                     }
                 }
                 for (String url : Urls.in(m.body())) if (links.size() < MAX) links.add(new Link(url, m));
             }
-            return new Contents(photos, videos, links, files);
+            return new Contents(photos, videos, audios, links, files);
         }
 
         private static void add(List<Message> to, Message m) {
@@ -68,13 +69,14 @@ final class ProfileMedia {
             return switch (s) {
                 case PHOTOS -> photos.size();
                 case VIDEOS -> videos.size();
+                case AUDIOS -> audios.size();
                 case LINKS -> links.size();
                 case FILES -> files.size();
             };
         }
 
         boolean isEmpty() {
-            return photos.isEmpty() && videos.isEmpty() && links.isEmpty() && files.isEmpty();
+            return photos.isEmpty() && videos.isEmpty() && audios.isEmpty() && links.isEmpty() && files.isEmpty();
         }
     }
 
@@ -87,6 +89,9 @@ final class ProfileMedia {
     /** The tab open, kept while the profile is drawn again (it is on every message). */
     private Shelf open = Shelf.PHOTOS;
     private Consumer<Message> jump = m -> { };
+    /** The window's player (one at a time); null until given: an audio then opens like a file. */
+    private AudioPlayback audio;
+    private Chat shownChat;
 
     ProfileMedia(ChatService svc, Supplier<Window> window, Consumer<String> toast) {
         this.svc = svc;
@@ -101,6 +106,7 @@ final class ProfileMedia {
 
     /** The section for {@code c}; nothing when nothing was shared or the chat hides it. */
     List<Node> section(Chat c) {
+        shownChat = c;
         Contents contents = Contents.of(svc.messages(c.id()));
         if (contents.isEmpty() || svc.mediaHidden(c.id())) return List.of();
         if (contents.count(open) == 0) {
@@ -141,6 +147,7 @@ final class ProfileMedia {
         ToggleButton b = new ToggleButton(Integer.toString(count), Icons.icon(switch (s) {
             case PHOTOS -> Icons.IMAGE;
             case VIDEOS -> Icons.PLAY;
+            case AUDIOS -> Icons.MIC;
             case LINKS -> Icons.EXTERNAL;
             case FILES -> Icons.FILE;
         }, 16));
@@ -172,6 +179,7 @@ final class ProfileMedia {
         return switch (s) {
             case PHOTOS -> grid(c.photos(), this::photo);
             case VIDEOS -> grid(c.videos(), this::video);
+            case AUDIOS -> rows(c.audios(), this::audio);
             case LINKS -> rows(c.links(), this::link);
             case FILES -> rows(c.files(), this::file);
         };
@@ -246,6 +254,26 @@ final class ProfileMedia {
         return withJump(row, l.from());
     }
 
+    /** The window's player, so an audio plays right here (and stops whatever else was playing). */
+    void setAudio(AudioPlayback audio) {
+        this.audio = audio;
+    }
+
+    /** Who and when (and the name, for music), over its own player. */
+    private Node audio(Message m) {
+        if (audio == null || shownChat == null) return file(m);
+        boolean voiceNote = m.mimeType() != null && m.mimeType().startsWith("audio/ogg");
+        String what = voiceNote || m.fileName() == null ? I18n.t("info.voiceNote") : m.fileName();
+        Label meta = new Label(what + " · " + byWhom(m));
+        meta.getStyleClass().add("settings-help");
+        Chat chat = shownChat;
+        AudioControls controls = new AudioControls(audio, () -> m, () -> audio.toggle(m, chat));
+        controls.setMaxWidth(Double.MAX_VALUE);
+        VBox row = new VBox(2, meta, controls);
+        row.getStyleClass().add("profile-audio");
+        return withJump(row, m);
+    }
+
     /** Name, size, who and when; opens with the system's app. */
     private Node file(Message m) {
         String name = m.fileName() == null || m.fileName().isBlank() ? MediaSaver.suggestedName(m, ZoneId.systemDefault()) : m.fileName();
@@ -253,7 +281,7 @@ final class ProfileMedia {
         meta.getStyleClass().add("settings-help");
         Label title = new Label(name);
         title.getStyleClass().add("profile-file-name");
-        Button b = new Button(null, new HBox(10, Icons.icon(m.type() == MessageType.AUDIO ? Icons.PLAY : Icons.FILE, 18), new VBox(1, title, meta)));
+        Button b = new Button(null, new HBox(10, Icons.icon(m.type() == MessageType.AUDIO ? Icons.MIC : Icons.FILE, 18), new VBox(1, title, meta)));
         b.getStyleClass().add("profile-file");
         b.setMaxWidth(Double.MAX_VALUE);
         b.setAccessibleText(name + ", " + meta.getText());

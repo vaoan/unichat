@@ -63,6 +63,36 @@ class NetworkSettingsUiTest {
         assertEquals("VIDEO", Settings.get().getString("whatsapp.animatedStickers", null));
     }
 
+    /** Every option's name reads whole: never cut ("Borrar fotos y video…") nor squeezed to a letter a line. */
+    @Test
+    void everyOptionsNameReadsWhole() throws Exception {
+        fx(() -> {
+            Stage owner = new Stage();
+            owner.setOpacity(0);
+            owner.show();
+            SettingsWindow.show(owner, new MockChatService(), () -> { }, () -> { }, id -> { }, t -> { });
+            SettingsWindow.select("Redes");
+            return null;
+        });
+        FxWait.until("the page shows", () -> !SettingsWindow.current().getScene().getRoot().lookupAll(".settings-label").isEmpty());
+        FxWait.settled();
+        java.util.List<String> bad = fx(() -> SettingsWindow.current().getScene().getRoot().lookupAll(".settings-label").stream()
+                .map(n -> (javafx.scene.control.Label) n)
+                .filter(l -> l.isTextTruncated() || l.getWidth() + 1 < longestWord(l))
+                .map(l -> l.getText() + " (" + Math.round(l.getWidth()) + " px)").toList());
+        assertTrue(bad.isEmpty(), "cut or squeezed: " + bad);
+    }
+
+    private static double longestWord(javafx.scene.control.Label l) {
+        double widest = 0;
+        for (String w : l.getText().split("\\s+")) {
+            javafx.scene.text.Text t = new javafx.scene.text.Text(w);
+            t.setFont(l.getFont());
+            widest = Math.max(widest, t.getLayoutBounds().getWidth());
+        }
+        return widest;
+    }
+
     private static <T> T fx(Callable<T> c) throws Exception {
         return FxWait.fx(c);
     }

@@ -120,7 +120,7 @@ public final class SettingsWindow {
                 case "accessibility" -> AppearancePages.accessibility(onAppearanceChanged);
                 case "notifications" -> notificationsPage();
                 case "privacy" -> PrivacyPage.build();
-                case "networks" -> NetworksPage.build();
+                case "networks" -> NetworksPage.build(svc, toast);
                 case "speech" -> SpeechPage.build();
                 case "ai" -> AiReplyPage.build();
                 case "gifs" -> gifsPage();

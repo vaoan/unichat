@@ -23,6 +23,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AutoSaveTest {
@@ -89,6 +90,37 @@ class AutoSaveTest {
     void stop() {
         SaveFolders.setOwn(chat.id(), null);
         svc.stop();
+    }
+
+    @Test
+    void aChatsOwnFolderChangedTakesWhatItSaved() throws Exception {
+        Path was = dir.resolve("out");
+        Files.createDirectories(was);
+        Files.writeString(was.resolve("foto.jpg"), "f");
+        assertEquals(1, save.setOwn(chat, dir.resolve("elsewhere")).get());
+        assertTrue(Files.exists(dir.resolve("elsewhere/foto.jpg")), "it's in the new folder");
+        assertFalse(Files.exists(was), "not left behind");
+    }
+
+    @Test
+    void aNewBaseFolderTakesEachChatsFolderButNothingElse() throws Exception {
+        String forced = System.getProperty("unichat.autosaveDir");
+        System.clearProperty("unichat.autosaveDir");
+        try {
+            SaveFolders.setOwn(chat.id(), null);
+            Path oldBase = dir.resolve("Downloads/Unichat");
+            SaveFolders.setBase(oldBase);
+            Path chatFolder = Files.createDirectories(oldBase.resolve(FileNames.folder(chat.title())));
+            Files.writeString(chatFolder.resolve("nota.ogg"), "n");
+            Files.writeString(oldBase.resolve("mio.txt"), "the person's own");
+            Path newBase = dir.resolve("Documents/Unichat");
+            assertEquals(1, save.setBase(newBase).get());
+            assertTrue(Files.exists(newBase.resolve(FileNames.folder(chat.title())).resolve("nota.ogg")));
+            assertTrue(Files.exists(oldBase.resolve("mio.txt")), "what isn't a chat's stays where it was");
+        } finally {
+            SaveFolders.setBase(null);
+            if (forced != null) System.setProperty("unichat.autosaveDir", forced);
+        }
     }
 
     private static Message media(MessageType type, String name, boolean mine, Instant at) {

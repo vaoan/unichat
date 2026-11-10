@@ -33,6 +33,7 @@ class ProfileMediaUiTest {
         svc.setMediaHidden(id, false).get(); // the test data folder is the whole run's: start from a known state
         InfoPane pane = FxWait.fx(() -> {
             InfoPane p = new InfoPane(svc, () -> { }, t -> { });
+            p.setAudio(new AudioPlayback(svc, t -> { }));
             Stage stage = new Stage();
             stage.setOpacity(0);
             stage.setScene(new Scene(p, 360, 900));
@@ -63,14 +64,15 @@ class ProfileMediaUiTest {
                 .findFirst().orElseThrow());
         FxWait.fx(() -> { menu.getItems().get(0).fire(); menu.hide(); return null; });
         assertEquals(app.unichat.model.MessageType.IMAGE, jumped.get().type(), "the photo's message");
-        ToggleButton files = FxWait.fx(() -> pane.lookupAll(".media-tab").stream().map(n -> (ToggleButton) n)
-                .filter(t -> t.getAccessibleText().startsWith("Archivos")).findFirst().orElseThrow());
-        FxWait.fx(() -> { files.fire(); return null; });
+        // A voice note is on "Audios", not with the documents, and plays right there.
+        ToggleButton audios = FxWait.fx(() -> pane.lookupAll(".media-tab").stream().map(n -> (ToggleButton) n)
+                .filter(t -> t.getAccessibleText().startsWith("Audios")).findFirst().orElseThrow());
+        FxWait.fx(() -> { audios.fire(); return null; });
+        assertTrue(FxWait.fx(() -> pane.lookup(".profile-audio .audio-controls") != null), "its own player");
         javafx.scene.control.Button go = FxWait.fx(() -> pane.lookupAll(".button").stream().map(n -> (javafx.scene.control.Button) n)
                 .filter(b -> "Ir al mensaje".equals(b.getAccessibleText())).findFirst().orElseThrow());
         FxWait.fx(() -> { go.fire(); return null; });
-        assertTrue(jumped.get().type() == app.unichat.model.MessageType.FILE || jumped.get().type() == app.unichat.model.MessageType.AUDIO,
-                "the file's message: " + jumped.get().type());
+        assertEquals(app.unichat.model.MessageType.AUDIO, jumped.get().type(), "the voice note's message");
 
         svc.setMediaHidden(id, true).get();
         FxWait.fx(() -> { pane.refresh(); return null; });
