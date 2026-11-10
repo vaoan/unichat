@@ -1,4 +1,4 @@
-# Builds Unichat for Windows with jpackage (JDK 21+).
+# Builds Unichat for Windows with jpackage (JDK 25+).
 # Output in .\release: Unichat\ (portable folder, Unichat.exe inside), Unichat-<ver>.zip,
 # and Unichat-<ver>.msi when the WiX Toolset is installed (https://wixtoolset.org).
 $ErrorActionPreference = "Stop"

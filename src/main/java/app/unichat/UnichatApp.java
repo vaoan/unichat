@@ -38,7 +38,15 @@ public final class UnichatApp extends Application {
     private MainView mainView;
 
     public static void main(String[] args) {
-        System.setProperty("java.awt.headless", "false");
+        if (System.getProperty("unichat.snapshot") != null) {
+            // Diagnostics never touch the screen: JavaFX's headless platform draws the PNG, and no menu-bar icon,
+            // notification or window appears while the person is working.
+            System.setProperty("glass.platform", "Headless");
+            System.setProperty("prism.order", "sw");
+            System.setProperty("java.awt.headless", "true");
+        } else {
+            System.setProperty("java.awt.headless", "false");
+        }
         launch(args);
     }
 

@@ -87,8 +87,7 @@ class AutoScrollUiTest {
         String firstId = fx(() -> svc.messages(CHAT).get(0).id());
         svc.sendText(CHAT, "te respondo", firstId).get();
         FxWait.until("the sent message shows", () -> showsLast(scene, CHAT));
-        untilAtBottom(scene);
-        assertTrue("bottom".equals(bottomState(scene)), "starts at the bottom: " + bottomState(scene));
+        endsAtBottom(scene);
 
         fx(() -> {
             // The demo chat has replies of its own: this one's is the lowest on screen.
@@ -155,12 +154,10 @@ class AutoScrollUiTest {
             return r;
         });
         FxWait.until("the bubble is laid out taller", () -> grown.getHeight() >= grown.getMinHeight());
-        untilAtBottom(scene);
-        assertTrue("bottom".equals(bottomState(scene)), bottomState(scene));
+        endsAtBottom(scene);
         svc.sendText(CHAT, "nuevo", null).get();
         FxWait.until("the sent message shows", () -> showsLast(scene, CHAT));
-        untilAtBottom(scene);
-        assertTrue("bottom".equals(bottomState(scene)), "still following new messages: " + bottomState(scene));
+        endsAtBottom(scene);
         svc.stop();
     }
 
@@ -184,8 +181,7 @@ class AutoScrollUiTest {
         assertTrue(!"bottom".equals(bottomState(scene)), "precondition: scrolled up");
         svc.sendText(CHAT, "lo que acabo de escribir", null).get();
         FxWait.until("the sent message shows", () -> showsLast(scene, CHAT));
-        untilAtBottom(scene);
-        assertTrue("bottom".equals(bottomState(scene)), bottomState(scene));
+        endsAtBottom(scene);
         svc.stop();
     }
 
@@ -210,6 +206,16 @@ class AutoScrollUiTest {
         assertTrue(!"bottom".equals(bottomState(scene)), "stays scrolled up: " + bottomState(scene));
         assertTrue(fx(() -> scene.getRoot().lookup(".jump-down").isVisible()), "and offers the way back down");
         svc.stop();
+    }
+
+    /**
+     * Where it ends up once the window has done all it was asked: a growing bubble is caught up with on the frame after
+     * it grew, so checking at one moment right after could see that frame (it did with JavaFX 27).
+     */
+    private static void endsAtBottom(Scene scene) throws Exception {
+        untilAtBottom(scene);
+        FxWait.settled();
+        untilAtBottom(scene);
     }
 
     /** The list settles over several layout passes. */

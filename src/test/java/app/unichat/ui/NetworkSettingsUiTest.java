@@ -18,7 +18,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Ajustes → Redes: options that only make sense for one network (how WhatsApp gets animated stickers). */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
-@org.junit.jupiter.api.condition.DisabledIfSystemProperty(named = "unichat.headless", matches = "true", disabledReason = "JavaFX stops under Monocle; needs a display")
 class NetworkSettingsUiTest {
     @BeforeAll
     static void toolkit() throws Exception {

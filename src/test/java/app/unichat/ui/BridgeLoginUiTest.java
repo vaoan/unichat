@@ -82,17 +82,23 @@ class BridgeLoginUiTest {
     }
 
     @AfterEach
-    void stop() {
+    void stop() throws Exception {
         scanned.countDown();
         server.stop(0);
+        // A window left open goes on being drawn for every test after this one.
+        fx(() -> {
+            if (stage != null) stage.close();
+            return null;
+        });
     }
+
+    private Stage stage;
 
     private Scene open(AtomicBoolean connected) throws Exception {
         BridgeLogin api = new BridgeLogin("http://127.0.0.1:" + server.getAddress().getPort() + "/_matrix/provision", "t", "@yo:localhost");
         return fx(() -> {
-            Stage stage = new Stage();
+            stage = new Stage();
             stage.setOpacity(0);
-            stage.setX(-10000);
             BridgeLoginPane pane = new BridgeLoginPane(Network.WHATSAPP, api, () -> stage, () -> connected.set(true), () -> { });
             Scene sc = new Scene(pane, 600, 700);
             Theme.register(sc);

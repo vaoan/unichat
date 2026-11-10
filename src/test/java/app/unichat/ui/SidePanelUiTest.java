@@ -34,7 +34,6 @@ class SidePanelUiTest {
         Scene scene = fx(() -> {
             Stage stage = new Stage();
             stage.setOpacity(0);
-            stage.setX(-10000);
             view[0] = new MainView(new MockChatService(), stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             Scene sc = new Scene(view[0], 1200, 800);
             Theme.register(sc);
@@ -98,7 +97,6 @@ class SidePanelUiTest {
         Scene scene = fx(() -> {
             Stage stage = new Stage();
             stage.setOpacity(0);
-            stage.setX(-10000);
             view[0] = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             Scene sc = new Scene(view[0], 1200, 800);
             Theme.register(sc);
@@ -179,7 +177,6 @@ class SidePanelUiTest {
         Scene scene = fx(() -> {
             Stage stage = new Stage();
             stage.setOpacity(0);
-            stage.setX(-10000);
             view[0] = new MainView(new MockChatService(), stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             Scene sc = new Scene(view[0], 1200, 800);
             Theme.register(sc);

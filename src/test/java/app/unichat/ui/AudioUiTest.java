@@ -33,7 +33,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Real playback of a real voice note, silently. {@code ./mvnw test -Dtest=AudioUiTest -Dunichat.uiTests=true}. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
-@org.junit.jupiter.api.condition.DisabledIfSystemProperty(named = "unichat.headless", matches = "true", disabledReason = "JavaFX stops under Monocle; needs a display")
 class AudioUiTest {
     @TempDir Path dir;
     private final List<String> toasts = new ArrayList<>();

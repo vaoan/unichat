@@ -3,7 +3,7 @@
 [English](README.md) · Español
 
 Bandeja de mensajes unificada para escritorio — **WhatsApp, Telegram, Signal, Instagram, Messenger,
-Discord, Slack, Google Messages, X y LinkedIn en una sola app** — hecha en **Java 21 + JavaFX** para
+Discord, Slack, Google Messages, X y LinkedIn en una sola app** — hecha en **Java 25 + JavaFX** para
 Windows y macOS (Linux, compilándola). Inspirada en Beeper (misma idea y flujo de trabajo); el código es propio.
 La app habla inglés y español, según tu sistema (Ajustes → Apariencia para elegir).
 
@@ -122,7 +122,7 @@ texto; en los mensajes, ↑/↓ recorre, **R** responde, **E** edita, **Enter** 
 
 ## Compilar
 
-Requisito: **JDK 21+** (Maven no hace falta, se usa el wrapper).
+Requisito: **JDK 25+** (Maven no hace falta, se usa el wrapper).
 
 ```bash
 ./run-dev.sh            # macOS / Linux: ejecutar desde el código

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds a native Unichat app for the current OS with jpackage (JDK 21+).
+# Builds a native Unichat app for the current OS with jpackage (JDK 25+).
 #   macOS: release/Unichat.app (+ .dmg)   Linux: release/unichat (+ .deb when dpkg is available)
 set -e
 cd "$(dirname "$0")"

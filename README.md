@@ -3,7 +3,7 @@
 English · [Español](README.es.md)
 
 A unified message inbox for the desktop — **WhatsApp, Telegram, Signal, Instagram, Messenger,
-Discord, Slack, Google Messages, X and LinkedIn in one app** — built with **Java 21 + JavaFX** for
+Discord, Slack, Google Messages, X and LinkedIn in one app** — built with **Java 25 + JavaFX** for
 Windows and macOS (Linux, if you build it). Inspired by Beeper (same idea and workflow); the code is its own.
 The app speaks English and Spanish, following your system (Settings → Appearance to choose).
 
@@ -122,7 +122,7 @@ box; in the messages, ↑/↓ moves through them, **R** replies, **E** edits, **
 
 ## Build
 
-Requirement: **JDK 21+** (Maven isn't needed, the wrapper is used).
+Requirement: **JDK 25+** (Maven isn't needed, the wrapper is used).
 
 ```bash
 ./run-dev.sh            # macOS / Linux: run from source

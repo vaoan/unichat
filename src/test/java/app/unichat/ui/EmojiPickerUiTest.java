@@ -71,6 +71,7 @@ class EmojiPickerUiTest {
         assertTrue(!family.contains("Emoji"), "not the emoji font: " + family);
         assertTrue(FxWait.fx(() -> menu.getItems().stream().noneMatch(i -> app.unichat.support.I18n.t("library.enlarge").equals(i.getText()))),
                 "no 'see it big' for an emoji");
+        FxWait.fx(() -> { b.getScene().getWindow().hide(); return null; });
     }
 
     @Test
@@ -120,6 +121,7 @@ class EmojiPickerUiTest {
             var img = FxWait.fx(() -> grid.snapshot(null, null));
             ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", new File(shot));
         }
+        FxWait.fx(() -> { grid.getScene().getWindow().hide(); return null; });
     }
 
     /** Typing in the search keeps what's called that, in the language in use; Enter takes the first. */

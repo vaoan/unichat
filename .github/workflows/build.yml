@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
           cache: maven
       - run: ./mvnw -B verify
 
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
           cache: maven
       # JavaFX plays video on Linux through the system's FFmpeg libraries (libavcodec/libavformat).
       - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
           cache: maven
       - name: Install WiX 3 (for the .msi)
         continue-on-error: true
@@ -80,7 +80,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
           cache: maven
       - run: ./package.sh
         env:

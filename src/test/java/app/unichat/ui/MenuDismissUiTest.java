@@ -23,9 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * A menu closes with a click outside it or Esc, also while its window isn't the active one (as a test's window never
  * is, and Unichat's often isn't): JavaFX's auto-hide left it open. Real display: the real mouse and keyboard.
  */
-@EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
-@org.junit.jupiter.api.condition.DisabledIfSystemProperty(named = "unichat.headless", matches = "true",
-        disabledReason = "the real mouse and keyboard, and macOS activating the app: none of it under Monocle")
+// The real mouse and keyboard and macOS activating the app: only on the real display, so only when the person runs it.
+@EnabledIfSystemProperty(named = "unichat.realInputTests", matches = "true")
 class MenuDismissUiTest {
     @Test
     void aClickOutsideOrEscapeClosesTheMenu() throws Exception {

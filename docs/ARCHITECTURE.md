@@ -1,6 +1,6 @@
 # Architecture
 
-Unichat is a desktop app (Java 21 + JavaFX). The UI only knows `ChatService`; behind it is Matrix with the
+Unichat is a desktop app (Java 25 + JavaFX 27). The UI only knows `ChatService`; behind it is Matrix with the
 mautrix bridges, or demo mode.
 
 ## Layers

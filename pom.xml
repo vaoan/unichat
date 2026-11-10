@@ -10,9 +10,9 @@
   <name>Unichat</name>
 
   <properties>
-    <maven.compiler.release>21</maven.compiler.release>
+    <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <javafx.version>23.0.1</javafx.version>
+    <javafx.version>27.0.1</javafx.version>
     <jackson.version>2.17.2</jackson.version>
     <main.class>app.unichat.Launcher</main.class>
   </properties>
@@ -209,20 +209,12 @@
     </plugins>
   </build>
   <profiles>
-    <!-- UI tests with no display and no windows: ./mvnw verify -Pheadless-ui. Monocle is the newest published, for JavaFX 21. -->
+    <!-- UI tests with no display and no windows: ./mvnw verify -Pheadless-ui, on JavaFX's own headless platform (25+). -->
     <profile>
       <id>headless-ui</id>
       <properties>
-        <argLine>-Dunichat.uiTests=true -Dunichat.headless=true -Dglass.platform=Monocle -Dmonocle.platform=Headless -Dprism.order=sw -Dprism.text=t2k -Djava.awt.headless=true</argLine>
+        <argLine>-Dunichat.uiTests=true -Dunichat.headless=true -Dglass.platform=Headless -Dprism.order=sw -Djava.awt.headless=true</argLine>
       </properties>
-      <dependencies>
-        <dependency>
-          <groupId>org.testfx</groupId>
-          <artifactId>openjfx-monocle</artifactId>
-          <version>21.0.2</version>
-          <scope>test</scope>
-        </dependency>
-      </dependencies>
     </profile>
   </profiles>
 </project>

@@ -38,7 +38,6 @@ class FilterUiTest {
         Scene scene = fx(() -> {
             Stage stage = new Stage();
             stage.setOpacity(0);
-            stage.setX(-10000);
             MainView view = new MainView(new MockChatService(), stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }),
                     () -> { }, url -> { });
             Scene sc = new Scene(view, 1100, 700);

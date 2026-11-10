@@ -36,8 +36,10 @@ class QuickReactionsUiTest {
         Files.deleteIfExists(library);
         try {
             MockChatService svc = new MockChatService();
+            Stage[] window = new Stage[1];
             ThreadPane thread = FxWait.fx(() -> {
-                Stage stage = new Stage();
+                window[0] = new Stage();
+                Stage stage = window[0];
                 MainView view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
                 stage.setScene(new Scene(view, 1100, 700));
                 stage.show();
@@ -59,6 +61,8 @@ class QuickReactionsUiTest {
             List<String> quick = FxWait.fx(actions::quick);
             assertEquals(List.of("🫠", "🔥"), quick.subList(0, 2), "most first; a removal isn't a use");
             assertEquals(EmojiPicker.QUICK.length, quick.size(), "still six");
+            svc.stop();
+            FxWait.fx(() -> { window[0].close(); return null; });
         } finally {
             Files.deleteIfExists(library);
         }
