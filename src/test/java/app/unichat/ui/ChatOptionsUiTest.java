@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A chat's options: saving what arrives turns on with every kind, each kind turns off apart, and it says where. */
@@ -68,6 +69,18 @@ class ChatOptionsUiTest {
         FxWait.fx(() -> { showMedia.fire(); return null; });
         assertTrue(svc.mediaHidden(id), "hidden for this chat");
         svc.setMediaHidden(id, false).get();
+        // What I send has its own switch and kinds, apart from what others send.
+        CheckBox mineOn = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
+                .filter(b -> b.getText().equals("Guardar lo que yo envíe en este chat")).findFirst().orElseThrow());
+        FxWait.fx(() -> { mineOn.fire(); return null; });
+        assertEquals(java.util.EnumSet.allOf(app.unichat.model.SaveKind.class), svc.autoSaves(id, true), "on: every kind");
+        CheckBox minePhotos = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
+                .filter(b -> "Guardar lo que yo envíe en este chat: Fotos".equals(b.getAccessibleText())).findFirst().orElseThrow());
+        FxWait.fx(() -> { minePhotos.fire(); return null; });
+        assertFalse(svc.autoSaves(id, true).contains(app.unichat.model.SaveKind.PHOTOS), "its own kinds");
+        FxWait.fx(() -> { mineOn.fire(); return null; });
+        assertTrue(svc.autoSaves(id, true).isEmpty(), "and off");
+
         // Leaving is on its own tab, "Peligroso": nothing of it shows among the everyday options.
         assertTrue(FxWait.fx(() -> overlay.lookupAll(".danger-button").stream().noneMatch(ChatOptionsUiTest::shown)),
                 "not on the General tab");

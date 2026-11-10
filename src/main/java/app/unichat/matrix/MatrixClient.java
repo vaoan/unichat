@@ -107,6 +107,11 @@ final class MatrixClient {
      * Returns the response Content-Type (may be null).
      */
     String download(String url, boolean authenticated, Path target) throws IOException {
+        return download(url, authenticated, target, null);
+    }
+
+    /** The same, telling {@code progress} how much has arrived (0 to 1) when the server says the size. */
+    String download(String url, boolean authenticated, Path target, java.util.function.DoubleConsumer progress) throws IOException {
         String full = url.startsWith("http://") || url.startsWith("https://") ? url : baseUrl + url;
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(full)).timeout(Duration.ofMinutes(5)).GET();
         if (authenticated && accessToken != null) b.header("Authorization", "Bearer " + accessToken);
@@ -118,10 +123,30 @@ final class MatrixClient {
             }
             Files.createDirectories(target.getParent());
             Path tmp = target.resolveSibling(target.getFileName() + ".part" + Thread.currentThread().threadId());
-            Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
+            long size = resp.headers().firstValueAsLong("Content-Length").orElse(-1);
+            if (progress == null || size <= 0) Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
+            else copyTelling(in, tmp, size, progress);
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         }
         return resp.headers().firstValue("Content-Type").orElse(null);
+    }
+
+    /** Copies {@code in} to {@code to}, telling each whole percent that arrives (not every packet: a screen shows it). */
+    static void copyTelling(InputStream in, Path to, long size, java.util.function.DoubleConsumer progress) throws IOException {
+        try (var out = Files.newOutputStream(to)) {
+            byte[] buf = new byte[64 * 1024];
+            long got = 0;
+            int told = -1;
+            for (int n; (n = in.read(buf)) > 0; ) {
+                out.write(buf, 0, n);
+                got += n;
+                int percent = (int) Math.min(100, got * 100 / size);
+                if (percent != told) {
+                    told = percent;
+                    progress.accept(percent / 100.0);
+                }
+            }
+        }
     }
 
     private <T> HttpResponse<T> send(HttpRequest req, HttpResponse.BodyHandler<T> handler) throws IOException {

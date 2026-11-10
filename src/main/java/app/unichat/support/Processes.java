@@ -39,9 +39,15 @@ public final class Processes {
 
     /** The same for a command that needs its own folder or redirects. It always gets an empty standard input. */
     public static Result capture(ProcessBuilder command, long seconds) throws IOException, InterruptedException {
+        return capture(command, seconds, null);
+    }
+
+    /** The same, handing {@code eachLine} every line of output as it comes (a download's progress); null: none. */
+    public static Result capture(ProcessBuilder command, long seconds, java.util.function.Consumer<String> eachLine)
+            throws IOException, InterruptedException {
         Process p = command.start();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        Thread reader = Thread.ofPlatform().daemon().name("process-output").start(() -> read(p, out));
+        Thread reader = Thread.ofPlatform().daemon().name("process-output").start(() -> read(p, out, eachLine));
         try {
             closeInput(p);
             boolean finished = p.waitFor(seconds, TimeUnit.SECONDS);
@@ -54,9 +60,23 @@ public final class Processes {
     }
 
     /** Reads to the end whatever happens to the rest: a process nobody reads from stops in write(). */
-    private static void read(Process p, ByteArrayOutputStream out) {
+    private static void read(Process p, ByteArrayOutputStream out, java.util.function.Consumer<String> eachLine) {
         try (InputStream in = p.getInputStream()) {
-            in.transferTo(out);
+            if (eachLine == null) {
+                in.transferTo(out);
+                return;
+            }
+            ByteArrayOutputStream line = new ByteArrayOutputStream();
+            for (int b; (b = in.read()) >= 0; ) {
+                out.write(b);
+                if (b == '\n' || b == '\r') {
+                    if (line.size() > 0) eachLine.accept(line.toString(StandardCharsets.UTF_8));
+                    line.reset();
+                } else {
+                    line.write(b);
+                }
+            }
+            if (line.size() > 0) eachLine.accept(line.toString(StandardCharsets.UTF_8));
         } catch (IOException ended) {
             // Killed, or its pipe closed.
         }

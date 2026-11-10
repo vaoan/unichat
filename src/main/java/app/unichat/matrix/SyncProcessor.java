@@ -84,6 +84,9 @@ final class SyncProcessor {
     /** Shows what the file says now, after a change from outside /sync. */
     void showPreferences(MatrixRoom room) { preferences.show(room); }
 
+    /** Every chat as the file now says (it was just replaced); true if one changed. */
+    boolean settlePreferences() { return preferences.settle(rooms.values(), true); }
+
     /** Room → the mute rule to write: where the file and the server differ. */
     Map<String, Boolean> mutesToApply() { return mutesToApply(Instant.now()); }
 

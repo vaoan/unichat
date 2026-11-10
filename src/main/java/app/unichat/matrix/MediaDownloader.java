@@ -38,6 +38,21 @@ final class MediaDownloader {
                 url -> Hashes.sha256(cacheKey(url, 0, 0)), io, 60);
     }
 
+    /** Who wants to know how far each download in flight got, by its cache key. */
+    private final Map<String, java.util.List<java.util.function.DoubleConsumer>> watching = new ConcurrentHashMap<>();
+
+    /** {@link #media(String, int, int)}, telling {@code progress} how much has arrived while it downloads. */
+    CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer progress) {
+        String key = cacheKey(url, width, height);
+        watching.computeIfAbsent(key, k -> new java.util.concurrent.CopyOnWriteArrayList<>()).add(progress);
+        CompletableFuture<Path> f = media(url, width, height);
+        f.whenComplete((p, e) -> {
+            var l = watching.get(key);
+            if (l != null) l.remove(progress);
+        });
+        return f;
+    }
+
     /** The local file of {@code url}: from the cache, or downloaded once however many ask at the same time. */
     CompletableFuture<Path> media(String url, int width, int height) {
         if (url == null || url.isBlank()) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
@@ -57,7 +72,10 @@ final class MediaDownloader {
         if (prev != null) return prev;
         io.execute(() -> {
             try {
-                f.complete(download(url, width, height, dir, hash));
+                f.complete(download(url, width, height, dir, hash, done -> {
+                    var l = watching.get(key);
+                    if (l != null) l.forEach(c -> c.accept(done));
+                }));
                 trimMediaCache(dir);
             } catch (Throwable t) {
                 f.completeExceptionally(t);
@@ -105,7 +123,7 @@ final class MediaDownloader {
         MediaCache.trim(dir, Settings.get().mediaCacheMb() * 1024L * 1024L, pinned);
     }
 
-    private Path download(String url, int w, int h, Path dir, String hash) throws IOException {
+    private Path download(String url, int w, int h, Path dir, String hash, java.util.function.DoubleConsumer progress) throws IOException {
         Path tmp = dir.resolve(hash + ".download");
         Files.deleteIfExists(tmp);
         String contentType;
@@ -118,16 +136,16 @@ final class MediaDownloader {
             String bridge = BridgePorts.directMediaBase(rest.substring(0, slash));
             if (bridge != null) {
                 // Direct media: the bridge fetches it from the network now (nothing was copied to the server).
-                contentType = client.download(bridge + "/_matrix/client/v1/media/download/" + sm, false, tmp);
+                contentType = client.download(bridge + "/_matrix/client/v1/media/download/" + sm, false, tmp, progress);
             } else if (w > 0 && h > 0) {
                 String q = "?width=" + w + "&height=" + h + "&method=scale";
                 try {
-                    contentType = fetchMedia("/thumbnail/" + sm + q, tmp);
+                    contentType = fetchMedia("/thumbnail/" + sm + q, tmp, null);
                 } catch (MatrixException e) {
                     contentType = null; // not thumbnailable: fall back to the original
                 }
             }
-            if (contentType == null && !Files.exists(tmp)) contentType = fetchMedia("/download/" + sm, tmp);
+            if (contentType == null && !Files.exists(tmp)) contentType = fetchMedia("/download/" + sm, tmp, progress);
         } else if (url.startsWith("http://") || url.startsWith("https://")) {
             // Web addresses come from messages: never to this machine or its network.
             contentType = links.download(url, tmp);
@@ -140,12 +158,12 @@ final class MediaDownloader {
     }
 
     /** Authenticated media (Matrix 1.11) with fallback to the legacy unauthenticated endpoints. */
-    private String fetchMedia(String suffix, Path tmp) throws IOException {
+    private String fetchMedia(String suffix, Path tmp, java.util.function.DoubleConsumer progress) throws IOException {
         try {
-            return client.download("/_matrix/client/v1/media" + suffix, true, tmp);
+            return client.download("/_matrix/client/v1/media" + suffix, true, tmp, progress);
         } catch (MatrixException e) {
             if (!e.isUnrecognized()) throw e;
-            return client.download("/_matrix/media/v3" + suffix, true, tmp);
+            return client.download("/_matrix/media/v3" + suffix, true, tmp, progress);
         }
     }
 

@@ -41,11 +41,12 @@ public final class AutoSave implements ChatService.Listener {
     /** What saving does, apart so tests don't need a server or yt-dlp. */
     interface Saver {
         /** The file behind {@code mediaUrl}, downloaded. */
-        Path media(String mediaUrl) throws IOException, InterruptedException;
+        /** {@code progress}: how much has arrived, 0 to 1, when that's known. */
+        Path media(String mediaUrl, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException;
 
         /** The video behind {@code url} saved into {@code dir}: null, or why not. */
         /** {@code tag}: the message's id, which goes in the name ({@link FileNames#tag}). */
-        String link(String url, Path dir, String tag) throws IOException, InterruptedException;
+        String link(String url, Path dir, String tag, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException;
     }
 
     /** What saving is doing, for the menu-bar icon and the notices. Called on the saving thread. */
@@ -159,18 +160,19 @@ public final class AutoSave implements ChatService.Listener {
         worker.execute(() -> catchUp(chatId));
     }
 
-    /** Saves, in order, what others sent in {@code chatId} since the last one saved. On the worker. */
+    /** Saves, in order, what was sent in {@code chatId} since the last one saved (others', and mine if chosen). Worker. */
     private void catchUp(String chatId) {
-        Set<SaveKind> kinds = prefs.autoSaves(chatId);
+        Wanted wanted = Wanted.of(prefs, chatId);
         Chat chat = chats.chat(chatId);
-        if (kinds.isEmpty() || chat == null) return;
+        if (wanted.none() || chat == null) return;
         List<Message> fresh = chats.messages(chatId).stream()
-                .filter(m -> !m.outgoing() && !m.deleted() && m.timestamp() != null && savedUpTo.isNew(chatId, m))
+                .filter(m -> !m.deleted() && m.timestamp() != null && !wanted.of(m).isEmpty() && savedUpTo.isNew(chatId, m))
                 .sorted(Comparator.comparing(Message::timestamp)).toList();
         Path dir = folder(chat);
-        for (Message m : fresh) total += work(m, kinds);
+        for (Message m : fresh) total += work(m, wanted.of(m));
         if (total > done) progress.changed(done, total);
         for (Message m : fresh) {
+            Set<SaveKind> kinds = wanted.of(m);
             SaveKind kind = SaveKind.of(m); // null: a sticker, or no media
             if (kind != null && kinds.contains(kind)) step(chat, saveMedia(m, chat, dir));
             if (kinds.contains(SaveKind.LINKS)) for (String url : links(m)) step(chat, saveLink(url, m, chat, dir));
@@ -202,7 +204,9 @@ public final class AutoSave implements ChatService.Listener {
     /** The links in what it says, and the page a reel shown as a picture points to. */
     static Set<String> links(Message m) {
         Set<String> out = new LinkedHashSet<>(Urls.in(m.body()));
-        if (m.externalUrl() != null && m.externalUrl().startsWith("http")) out.add(m.externalUrl());
+        // A video that came with its page (Instagram's reels) is that page's video: downloading the page again saved
+        // the same reel twice, the second one in VP9, which a Mac doesn't open.
+        if (m.externalUrl() != null && m.externalUrl().startsWith("http") && m.type() != app.unichat.model.MessageType.VIDEO) out.add(m.externalUrl());
         return out;
     }
 
@@ -210,7 +214,7 @@ public final class AutoSave implements ChatService.Listener {
         String name = FileNames.forMessage(m, ZoneId.systemDefault()); // what a notice says: the name as sent
         Path[] file = {null};
         try {
-            copyInto(m, dir, file);
+            copyInto(m, dir, file, done -> { });
             return true;
         } catch (IOException | RuntimeException e) {
             return failed(name, chat, why(e, dir, file[0]));
@@ -225,9 +229,10 @@ public final class AutoSave implements ChatService.Listener {
      * under a hidden name and renamed once whole: nothing (the cloud, the person) ever takes a half-written file.
      * {@code downloaded[0]}: the cached file, for telling why it failed. False: it was there already.
      */
-    private boolean copyInto(Message m, Path dir, Path[] downloaded) throws IOException, InterruptedException {
+    private boolean copyInto(Message m, Path dir, Path[] downloaded, java.util.function.DoubleConsumer progress)
+            throws IOException, InterruptedException {
         if (FileNames.savedIn(dir, m)) return false;
-        downloaded[0] = saver.media(m.mediaUrl());
+        downloaded[0] = saver.media(m.mediaUrl(), progress);
         Files.createDirectories(dir);
         Path target = FileNames.free(dir, FileNames.forSaving(m, ZoneId.systemDefault()));
         Path part = dir.resolve("." + target.getFileName() + ".part");
@@ -238,7 +243,7 @@ public final class AutoSave implements ChatService.Listener {
 
     private boolean saveLink(String url, Message m, Chat chat, Path dir) {
         try {
-            String why = saver.link(url, dir, FileNames.tag(m));
+            String why = saver.link(url, dir, FileNames.tag(m), done -> { });
             return why == null || failed(url, chat, why);
         } catch (IOException | RuntimeException e) {
             return failed(url, chat, why(e, dir, null));
@@ -286,8 +291,15 @@ public final class AutoSave implements ChatService.Listener {
         }
     }
 
-    /** What exploring is doing: going through a message of {@code at}, downloading {@code what} from it, or asking the server for older ones. */
-    public record Now(Doing doing, Instant at, String what) {}
+    /**
+     * What exploring is doing: going through a message of {@code at}, downloading {@code what} from it ({@code done} of
+     * it, 0 to 1; -1 while unknown), or asking the server for older ones.
+     */
+    public record Now(Doing doing, Instant at, String what, double done) {
+        public Now(Doing doing, Instant at, String what) {
+            this(doing, at, what, -1);
+        }
+    }
 
     public enum Doing { LOOKING, DOWNLOADING, ASKING_OLDER, STOPPING }
 
@@ -306,6 +318,11 @@ public final class AutoSave implements ChatService.Listener {
         if (now != null) return now;
         SavedUpTo.Back b = savedUpTo.back(chatId);
         return new Exploring(false, b == null ? null : b.back(), b != null && b.start(), 0, 0, 0, null);
+    }
+
+    /** The chats whose past is being explored now. Any thread. */
+    public List<String> exploringChats() {
+        return exploring.entrySet().stream().filter(e -> e.getValue().running()).map(Map.Entry::getKey).sorted().toList();
     }
 
     /** Runs on any thread whenever exploring changes. */
@@ -365,14 +382,14 @@ public final class AutoSave implements ChatService.Listener {
 
     /** One page: what's loaded and not yet looked at, newest first; then the next older page, or the end. Worker. */
     private void explorePage(String chatId) {
-        Set<SaveKind> kinds = prefs.autoSaves(chatId);
+        Wanted wanted = Wanted.of(prefs, chatId);
         Chat chat = chats.chat(chatId);
-        if (stopping.remove(chatId) || kinds.isEmpty() || chat == null) {
+        if (stopping.remove(chatId) || wanted.none() || chat == null) {
             endExploring(chatId, chat, false);
             return;
         }
         List<Message> old = chats.messages(chatId).stream()
-                .filter(m -> !m.outgoing() && !m.deleted() && m.timestamp() != null && savedUpTo.isOld(chatId, m))
+                .filter(m -> !m.deleted() && m.timestamp() != null && !wanted.of(m).isEmpty() && savedUpTo.isOld(chatId, m))
                 .sorted(Comparator.comparing(Message::timestamp).reversed()).toList();
         Path dir = folder(chat);
         for (Message m : old) {
@@ -380,7 +397,7 @@ public final class AutoSave implements ChatService.Listener {
             Exploring e = exploring(chatId);
             setExploring(chatId, new Exploring(true, m.timestamp(), e.start(), e.saved(), e.unavailable(), e.looked() + 1,
                     new Now(Doing.LOOKING, m.timestamp(), null)));
-            String noSpace = interruptible(chatId, () -> exploreOne(m, kinds, chatId, dir));
+            String noSpace = interruptible(chatId, () -> exploreOne(m, wanted.of(m), chatId, dir));
             if (STOPPED.equals(noSpace)) break; // this one wasn't finished: the next run looks at it again
             savedUpTo.exploredBack(chatId, m.timestamp(), false);
             if (noSpace != null) {
@@ -442,7 +459,7 @@ public final class AutoSave implements ChatService.Listener {
     private String copyQuietly(Message m, Path dir, String chatId) {
         Path[] file = {null};
         try {
-            return copyInto(m, dir, file) ? null : THERE;
+            return copyInto(m, dir, file, done -> arrived(chatId, done)) ? null : THERE;
         } catch (IOException | RuntimeException e) {
             return stopping.contains(chatId) ? STOPPED : why(e, dir, file[0]); // an interrupted copy throws too
         } catch (InterruptedException e) {
@@ -453,7 +470,7 @@ public final class AutoSave implements ChatService.Listener {
     /** Saves the video behind {@code url} into {@code dir}: null, {@link #STOPPED}, or why not. */
     private String linkQuietly(String url, Message m, Path dir, String chatId) {
         try {
-            String why = saver.link(url, dir, FileNames.tag(m));
+            String why = saver.link(url, dir, FileNames.tag(m), done -> arrived(chatId, done));
             return why != null && stopping.contains(chatId) ? STOPPED : why;
         } catch (IOException | RuntimeException e) {
             return stopping.contains(chatId) ? STOPPED : why(e, dir, null);
@@ -464,6 +481,14 @@ public final class AutoSave implements ChatService.Listener {
 
     private void count(String chatId, boolean saved) {
         setExploring(chatId, exploring(chatId).counted(saved));
+    }
+
+    /** How much of the file downloading now has arrived: shown beside its name. */
+    private void arrived(String chatId, double done) {
+        Exploring e = exploring(chatId);
+        Now now = e.now();
+        if (stopping.contains(chatId) || now == null || now.doing() != Doing.DOWNLOADING) return;
+        setExploring(chatId, withNow(e, new Now(now.doing(), now.at(), now.what(), done)));
     }
 
     private void doing(String chatId, Doing what, Instant at, String item) {
@@ -491,19 +516,19 @@ public final class AutoSave implements ChatService.Listener {
     private static Saver downloading(MediaSource media) {
         return new Saver() {
             @Override
-            public Path media(String mediaUrl) throws IOException, InterruptedException {
+            public Path media(String mediaUrl, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
                 try {
-                    return media.media(mediaUrl, 0, 0).get();
+                    return media.media(mediaUrl, 0, 0, progress).get();
                 } catch (java.util.concurrent.ExecutionException e) {
                     throw new IOException(e.getCause());
                 }
             }
 
             @Override
-            public String link(String url, Path dir, String tag) throws IOException, InterruptedException {
+            public String link(String url, Path dir, String tag, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
                 Path ytDlp = YtDlp.whenNeeded(p -> { });
                 if (ytDlp == null) return I18n.t("autosave.error.noYtDlp");
-                return YtDlp.download(ytDlp, Ffmpeg.whenNeeded(p -> { }), dir, url, tag);
+                return YtDlp.download(ytDlp, Ffmpeg.whenNeeded(p -> { }), dir, url, tag, progress);
             }
         };
     }

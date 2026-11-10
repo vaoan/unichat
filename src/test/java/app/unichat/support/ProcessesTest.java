@@ -89,4 +89,12 @@ class ProcessesTest {
         assertTrue(Files.exists(dir.resolve("hecho.txt")));
         assertFalse(Processes.quiet(sh(FOREVER), null, 0).finished());
     }
+
+    @Test
+    void eachLineIsHandedOverAsItComesAndStillKept() throws Exception {
+        List<String> lines = new java.util.ArrayList<>();
+        Processes.Result r = Processes.capture(new ProcessBuilder(sh("printf 'uno\\n[download]  45.3%%\\rdos'")), NO_LIMIT, lines::add);
+        assertEquals(List.of("uno", "[download]  45.3%", "dos"), lines, "a carriage return ends a line too (progress bars)");
+        assertEquals("uno\n[download]  45.3%\rdos", r.out());
+    }
 }

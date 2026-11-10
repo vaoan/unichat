@@ -499,15 +499,28 @@ class PreferencesFileTest {
     @Test
     void savingKindsAllUnlessLeftOutAndWhatWasOnStaysAll(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp) {
         PreferencesFile p = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
-        assertTrue(p.saveKinds("k").isEmpty(), "nothing saved at first");
+        assertTrue(p.saveKinds("k", false).isEmpty(), "nothing saved at first");
         p.choose("k", PreferencesFile.Flag.AUTO_SAVE, true); // turned on before there were kinds
-        assertEquals(java.util.EnumSet.allOf(app.unichat.model.SaveKind.class), p.saveKinds("k"));
-        p.chooseSaveKinds("k", java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS, app.unichat.model.SaveKind.LINKS));
+        assertEquals(java.util.EnumSet.allOf(app.unichat.model.SaveKind.class), p.saveKinds("k", false));
+        p.chooseSaveKinds("k", false, java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS, app.unichat.model.SaveKind.LINKS));
         p.flush();
         PreferencesFile again = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
-        assertEquals(java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS, app.unichat.model.SaveKind.LINKS), again.saveKinds("k"), "kept");
-        again.chooseSaveKinds("k", java.util.Set.of());
-        assertTrue(again.saveKinds("k").isEmpty(), "none chosen: off");
+        assertEquals(java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS, app.unichat.model.SaveKind.LINKS), again.saveKinds("k", false), "kept");
+        again.chooseSaveKinds("k", false, java.util.Set.of());
+        assertTrue(again.saveKinds("k", false).isEmpty(), "none chosen: off");
         again.flush(); // its save runs on a thread of its own: done before the folder goes, or it races the deletion
+    }
+
+    @Test
+    void whatISendHasItsOwnKinds(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp) {
+        PreferencesFile p = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
+        p.chooseSaveKinds("k", false, java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS));
+        assertTrue(p.saveKinds("k", true).isEmpty(), "what I send isn't saved unless chosen");
+        p.chooseSaveKinds("k", true, java.util.EnumSet.of(app.unichat.model.SaveKind.VIDEOS, app.unichat.model.SaveKind.AUDIO));
+        p.flush();
+        PreferencesFile again = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
+        assertEquals(java.util.EnumSet.of(app.unichat.model.SaveKind.VIDEOS, app.unichat.model.SaveKind.AUDIO), again.saveKinds("k", true), "kept");
+        assertEquals(java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS), again.saveKinds("k", false), "each side its own");
+        again.flush();
     }
 }

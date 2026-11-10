@@ -55,6 +55,7 @@ public final class MainView extends StackPane {
     private final AudioPlayback audio;
     /** The batch going up, whichever chat is open. */
     private final UploadBar uploads;
+    private final ExploreBar exploring;
     private final Consumer<String> openLink;
     private String pendingOpenId;
     private long pendingOpenUntil;
@@ -156,7 +157,8 @@ public final class MainView extends StackPane {
         // On disk (this computer's paths, so it stays here like session.properties): a batch survives a restart.
         java.nio.file.Path pendingUploads = Settings.dataDir().resolve(svc instanceof app.unichat.service.MockChatService ? "uploads-demo.json" : "uploads.json");
         uploads = new UploadBar(app.unichat.service.UploadQueue.of(svc, pendingUploads), svc, this::openChatId);
-        main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true)), uploads,
+        exploring = new ExploreBar(app.unichat.autosave.AutoSave.of(svc), svc, this::openChatId);
+        main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true)), uploads, exploring,
                 new CloakBar(app.unichat.cloak.CloakJob.get())));
 
         overlay.getStyleClass().add("overlay");
@@ -197,6 +199,7 @@ public final class MainView extends StackPane {
     public void dispose() {
         audio.stop();
         uploads.dispose();
+        exploring.dispose();
         updateBar.dispose();
         svc.removeListener(listener);
         svc.onSaveFailure(null);
@@ -556,10 +559,18 @@ public final class MainView extends StackPane {
     }
 
     public void showSettings() {
-        SettingsWindow.show(stage, svc, () -> {
-            Theme.applyAll();
-            refreshAll();
-            thread.redraw();
-        }, onLogout, this::openChatId, this::toast);
+        SettingsWindow.show(stage, svc, this::appearanceChanged, onLogout, this::openChatId, this::toast);
+    }
+
+    /** What Ajustes does after a change: the theme, the lists and the open chat drawn again. */
+    private void appearanceChanged() {
+        Theme.applyAll();
+        refreshAll();
+        thread.redraw();
+    }
+
+    /** The settings changed on another computer and came through the cloud: applied now, as Ajustes would. UI thread. */
+    public void settingsSynced() {
+        SyncedSettings.apply(this::appearanceChanged);
     }
 }

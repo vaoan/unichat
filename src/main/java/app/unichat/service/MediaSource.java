@@ -13,6 +13,11 @@ public interface MediaSource {
      */
     CompletableFuture<Path> media(String url, int width, int height);
 
+    /** The same, telling {@code progress} how much has arrived (0 to 1) while it downloads, when that's known. */
+    default CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer progress) {
+        return media(url, width, height);
+    }
+
     /** The video or audio a web link holds, by opening it; empty if it holds none or can't be opened. */
     default CompletableFuture<java.util.Optional<LinkMedia>> linkMedia(String url) {
         return CompletableFuture.completedFuture(java.util.Optional.empty());

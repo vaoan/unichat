@@ -49,32 +49,12 @@ final class ChatOptions {
         Label title = new Label(I18n.t("chatOptions.title", chat.title()));
         title.getStyleClass().add("sheet-title");
         title.setWrapText(true);
-        Set<SaveKind> saved = svc.autoSaves(chat.id());
-        CheckBox on = new CheckBox(I18n.t("chatOptions.autoSave"));
-        on.setSelected(!saved.isEmpty());
-        on.setWrapText(true);
-        Map<SaveKind, CheckBox> kinds = new EnumMap<>(SaveKind.class);
-        VBox kindBoxes = new VBox(6);
-        kindBoxes.getStyleClass().add("chat-options-kinds");
-        for (SaveKind k : SaveKind.values()) {
-            CheckBox b = new CheckBox(I18n.t("chatOptions.kind." + k.name()));
-            b.setSelected(saved.isEmpty() || saved.contains(k)); // turning it on starts with everything
-            b.disableProperty().bind(on.selectedProperty().not());
-            b.setWrapText(true);
-            kinds.put(k, b);
-            kindBoxes.getChildren().add(b);
-        }
+        SaveChoice theirs = new SaveChoice(I18n.t("chatOptions.autoSave"), svc.autoSaves(chat.id(), false),
+                k -> svc.setAutoSave(chat.id(), false, k), () -> AutoSave.of(svc).startNow(chat.id()));
+        SaveChoice mine = new SaveChoice(I18n.t("chatOptions.autoSaveMine"), svc.autoSaves(chat.id(), true),
+                k -> svc.setAutoSave(chat.id(), true, k), () -> AutoSave.of(svc).startNow(chat.id()));
         Label help = Labels.help(I18n.t("chatOptions.autoSaveHelp"));
-        on.setAccessibleHelp(help.getText());
-        Runnable apply = () -> apply(chat, on, kinds);
-        on.setOnAction(e -> {
-            if (on.isSelected()) {
-                if (kinds.values().stream().noneMatch(CheckBox::isSelected)) kinds.values().forEach(b -> b.setSelected(true));
-                AutoSave.of(svc).startNow(chat.id()); // what's there already stays out
-            }
-            apply.run();
-        });
-        kinds.values().forEach(b -> b.setOnAction(e -> apply.run()));
+        theirs.on.setAccessibleHelp(help.getText());
         Button openFolder = new Button(I18n.t("chatOptions.openFolder"));
         openFolder.getStyleClass().add("secondary-button");
         openFolder.setOnAction(e -> openFolder(SaveFolders.of(chat)));
@@ -90,8 +70,9 @@ final class ChatOptions {
         showMedia.setWrapText(true);
         showMedia.setOnAction(e -> svc.setMediaHidden(chat.id(), !showMedia.isSelected()));
         VBox general = new VBox(12, sectionTitle(I18n.t("chatOptions.profileTitle")), showMedia,
-                sectionTitle(I18n.t("chatOptions.autoSaveTitle")), on, kindBoxes, help,
-                folderRow(chat), openFolder, sectionTitle(I18n.t("chatOptions.pastTitle")), past(chat, on));
+                sectionTitle(I18n.t("chatOptions.autoSaveTitle")), theirs.node, mine.node, help,
+                folderRow(chat), openFolder, sectionTitle(I18n.t("chatOptions.pastTitle")),
+                past(chat, theirs.on.selectedProperty().or(mine.on.selectedProperty())));
         Label warning = Labels.help(I18n.t("chatOptions.dangerHelp"));
         VBox danger = new VBox(12, warning, sectionTitle(I18n.t(chat.group() ? "info.leaveGroup" : "info.deleteChat")), leave(chat));
         VBox card = new VBox(12, title, tabs(general, danger), general, danger, new HBox(10, grow, done));
@@ -107,7 +88,7 @@ final class ChatOptions {
         scroll.setMaxHeight(Region.USE_PREF_SIZE);
         scroll.getStyleClass().addAll("side-panel-scroll", "chat-options-scroll");
         show.accept(scroll);
-        Platform.runLater(on::requestFocus);
+        Platform.runLater(theirs.on::requestFocus);
     }
 
     /**
@@ -185,7 +166,8 @@ final class ChatOptions {
      * "Lo anterior": going back through the chat's history to its beginning, saving the kinds chosen of what's still
      * there ({@link AutoSave#explore}); how far it got, and a way to stop it. Only while saving is on.
      */
-    private Node past(Chat chat, CheckBox on) {
+    /** @param on whether the chat saves anything (the button needs something to look for) */
+    private Node past(Chat chat, javafx.beans.binding.BooleanExpression on) {
         AutoSave save = AutoSave.of(svc);
         Label help = Labels.help(I18n.t("chatOptions.pastHelp"));
         Label state = new Label();
@@ -212,7 +194,7 @@ final class ChatOptions {
             else save.explore(chat.id());
             redraw.run();
         });
-        go.disableProperty().bind(on.selectedProperty().not().or(halting));
+        go.disableProperty().bind(on.not().or(halting));
         Runnable listener = () -> Platform.runLater(redraw);
         save.addExploringListener(listener);
         state.sceneProperty().addListener((o, a, scene) -> {
@@ -234,7 +216,8 @@ final class ChatOptions {
             AutoSave.Now now = e.now();
             doing = now == null ? I18n.t("chatOptions.pastRunning") : switch (now.doing()) {
                 case LOOKING -> I18n.t("chatOptions.pastLooking", day(now.at()));
-                case DOWNLOADING -> I18n.t("chatOptions.pastDownloading", now.what(), day(now.at()));
+                case DOWNLOADING -> I18n.t("chatOptions.pastDownloading", now.what(), day(now.at()))
+                        + (now.done() < 0 ? "" : " · " + Math.round(now.done() * 100) + " %");
                 case ASKING_OLDER -> now.at() == null ? I18n.t("chatOptions.pastRunning") : I18n.t("chatOptions.pastAsking", day(now.at()));
                 case STOPPING -> I18n.t("chatOptions.pastStopping");
             };
@@ -273,12 +256,6 @@ final class ChatOptions {
         redraw.run();
         javafx.scene.layout.FlowPane buttons = new javafx.scene.layout.FlowPane(8, 6, change, general);
         return new VBox(6, where, buttons);
-    }
-
-    private void apply(Chat chat, CheckBox on, Map<SaveKind, CheckBox> kinds) {
-        Set<SaveKind> chosen = EnumSet.noneOf(SaveKind.class);
-        if (on.isSelected()) kinds.forEach((k, b) -> { if (b.isSelected()) chosen.add(k); });
-        svc.setAutoSave(chat.id(), chosen);
     }
 
     private void openFolder(Path folder) {

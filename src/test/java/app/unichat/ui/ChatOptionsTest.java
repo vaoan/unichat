@@ -32,4 +32,12 @@ class ChatOptionsTest {
                 ChatOptions.pastState(new AutoSave.Exploring(false, NOV_3, true, 8, 2, 120, null)));
         assertEquals("", ChatOptions.pastState(new AutoSave.Exploring(false, null, false, 0, 0, 0, null)));
     }
+
+    @Test
+    void aDownloadSaysHowMuchHasArrived() {
+        AutoSave.Exploring e = new AutoSave.Exploring(true, NOV_3, false, 8, 2, 120,
+                new AutoSave.Now(AutoSave.Doing.DOWNLOADING, NOV_3, "IMG_3944.MOV", 0.45));
+        assertEquals("Descargando IMG_3944.MOV (del 3 nov 2026) · 45 %\n120 mensajes revisados · 8 guardados · 2 ya no estaban",
+                ChatOptions.pastState(e));
+    }
 }

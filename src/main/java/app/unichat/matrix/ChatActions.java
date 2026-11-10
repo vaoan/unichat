@@ -111,8 +111,8 @@ final class ChatActions {
         return choose(chatId, Flag.FAVORITE, favorite);
     }
 
-    CompletableFuture<Void> setAutoSave(String chatId, java.util.Set<app.unichat.model.SaveKind> kinds) {
-        return change(chatId, key -> prefs.chooseSaveKinds(key, kinds));
+    CompletableFuture<Void> setAutoSave(String chatId, boolean mine, java.util.Set<app.unichat.model.SaveKind> kinds) {
+        return change(chatId, key -> prefs.chooseSaveKinds(key, mine, kinds));
     }
 
     CompletableFuture<Void> setMediaHidden(String chatId, boolean hidden) {
@@ -126,10 +126,10 @@ final class ChatActions {
         }
     }
 
-    java.util.Set<app.unichat.model.SaveKind> autoSaves(String chatId) {
+    java.util.Set<app.unichat.model.SaveKind> autoSaves(String chatId, boolean mine) {
         synchronized (proc) {
             MatrixRoom room = proc.room(chatId);
-            return room == null ? java.util.Set.of() : prefs.saveKinds(proc.prefKey(room));
+            return room == null ? java.util.Set.of() : prefs.saveKinds(proc.prefKey(room), mine);
         }
     }
 

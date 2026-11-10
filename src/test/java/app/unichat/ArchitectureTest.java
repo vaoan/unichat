@@ -80,6 +80,15 @@ class ArchitectureTest {
     }
 
     @Test
+    void theCloudKnowsOnlySettings() {
+        noClasses().that().resideInAPackage("..cloud..")
+                .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..",
+                        "..login..", "..bridge..", "..stt..", "..assist..", "..gif..", "..update..", "..video..", "..voice..",
+                        "..links..", "..cloak..", "..autosave..", "..ui..")
+                .check(APP);
+    }
+
+    @Test
     void imageProtectionKnowsOnlySettings() {
         noClasses().that().resideInAPackage("..cloak..")
                 .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..",

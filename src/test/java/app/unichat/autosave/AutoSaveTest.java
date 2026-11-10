@@ -69,7 +69,11 @@ class AutoSaveTest {
     private AutoSave create() throws Exception {
         Path cached = Files.writeString(dir.resolve("cached.bin"), "contenido");
         AutoSave a = new AutoSave(svc, reader(), new SavedUpTo(dir.resolve("autosave.json")), new AutoSave.Saver() {
-            @Override public Path media(String mediaUrl) throws java.io.IOException, InterruptedException {
+            @Override public Path media(String mediaUrl, java.util.function.DoubleConsumer progress) throws java.io.IOException, InterruptedException {
+                if (mediaUrl.endsWith("/grande.mov")) {
+                    progress.accept(0.25);
+                    progress.accept(0.5);
+                }
                 if (mediaUrl.equals(BROKEN)) throw new java.io.IOException("el puente no respondió");
                 if (mediaUrl.equals(ENDLESS)) {
                     endlessStarted.countDown();
@@ -78,7 +82,7 @@ class AutoSaveTest {
                 return cached;
             }
 
-            @Override public String link(String url, Path folder, String tag) {
+            @Override public String link(String url, Path folder, String tag, java.util.function.DoubleConsumer progress) {
                 if (url.equals(NO_VIDEO)) return "Unsupported URL";
                 links.add(url);
                 return null;
@@ -340,6 +344,33 @@ class AutoSaveTest {
         assertEquals(0, save.exploring(chat.id()).unavailable(), "nor as gone");
         arrive(media(MessageType.IMAGE, "despues.jpg", false, later(1)));
         assertTrue(saved().stream().anyMatch(n -> n.startsWith("despues")), "and saving goes on as before: " + saved());
+    }
+
+    @Test
+    void exploringSaysHowMuchOfTheFileHasArrived() throws Exception {
+        svc.setAutoSave(chat.id(), EnumSet.allOf(SaveKind.class)).get();
+        timeline.add(media(MessageType.VIDEO, "grande.mov", false, Instant.now().minusSeconds(100)));
+        save.startNow(chat.id());
+        List<Double> seen = java.util.Collections.synchronizedList(new ArrayList<>());
+        Runnable l = () -> {
+            AutoSave.Now now = save.exploring(chat.id()).now();
+            if (now != null && now.done() >= 0 && (seen.isEmpty() || seen.getLast() != now.done())) seen.add(now.done());
+        };
+        save.addExploringListener(l);
+        exploreAndWait();
+        save.removeExploringListener(l);
+        assertEquals(List.of(0.25, 0.5), seen, "what the download told, as it told it");
+    }
+
+    @Test
+    void aReelThatCameAsVideoIsntDownloadedAgainFromItsPage() {
+        Message video = media(MessageType.VIDEO, "AQN8.mp4", false, Instant.now());
+        video.setExternalUrl("https://www.instagram.com/reel/DfA9wPsOEt2/");
+        assertTrue(AutoSave.links(video).isEmpty(), "the video is the reel: once is enough");
+        Message picture = media(MessageType.IMAGE, "portada.jpg", false, Instant.now());
+        picture.setExternalUrl("https://www.instagram.com/reel/DfA9wPsOEt2/");
+        assertEquals(java.util.Set.of("https://www.instagram.com/reel/DfA9wPsOEt2/"), AutoSave.links(picture),
+                "a reel shown as a picture still gets its video");
     }
 
     @Test

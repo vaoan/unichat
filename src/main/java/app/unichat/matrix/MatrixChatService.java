@@ -555,6 +555,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public void keepCached(java.util.Collection<String> urls) { media.keep(urls); }
     @Override public void keepSaved(java.util.Collection<String> urls) { media.save(urls); }
     @Override public CompletableFuture<Path> media(String url, int width, int height) { return media.media(url, width, height); }
+    @Override public CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer progress) {
+        return media.media(url, width, height, progress);
+    }
     @Override public CompletableFuture<java.util.Optional<app.unichat.model.LinkMedia>> linkMedia(String url) { return media.linkMedia(url); }
 
     @Override public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) { return sender.sendText(chatId, text, replyToId); }
@@ -573,9 +576,21 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public CompletableFuture<Void> setMarkedUnread(String chatId, boolean unread) { return chatActions.setMarkedUnread(chatId, unread); }
     @Override public CompletableFuture<Void> setFavorite(String chatId, boolean favorite) { return chatActions.setFavorite(chatId, favorite); }
     @Override public CompletableFuture<Void> setLowPriority(String chatId, boolean lowPriority) { return chatActions.setLowPriority(chatId, lowPriority); }
-    @Override public CompletableFuture<Void> setAutoSave(String chatId, java.util.Set<app.unichat.model.SaveKind> kinds) { return chatActions.setAutoSave(chatId, kinds); }
-    @Override public java.util.Set<app.unichat.model.SaveKind> autoSaves(String chatId) { return chatActions.autoSaves(chatId); }
+    @Override public CompletableFuture<Void> setAutoSave(String chatId, boolean mine, java.util.Set<app.unichat.model.SaveKind> kinds) {
+        return chatActions.setAutoSave(chatId, mine, kinds);
+    }
+    @Override public java.util.Set<app.unichat.model.SaveKind> autoSaves(String chatId, boolean mine) { return chatActions.autoSaves(chatId, mine); }
     @Override public CompletableFuture<Void> setMediaHidden(String chatId, boolean hidden) { return chatActions.setMediaHidden(chatId, hidden); }
+    @Override public byte[] preferencesJson() { return prefs.json(); }
+
+    @Override public boolean adoptPreferences(byte[] json) {
+        synchronized (proc) {
+            if (!prefs.replace(json)) return false;
+            proc.settlePreferences();
+        }
+        core.fire(Listener::chatsChanged);
+        return true;
+    }
     @Override public boolean mediaHidden(String chatId) { return chatActions.mediaHidden(chatId); }
     @Override public CompletableFuture<Void> setArchived(String chatId, boolean archived) { return chatActions.setArchived(chatId, archived); }
     @Override public CompletableFuture<Void> setPinned(String chatId, boolean pinned) { return chatActions.setPinned(chatId, pinned); }

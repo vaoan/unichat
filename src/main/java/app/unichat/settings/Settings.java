@@ -54,8 +54,12 @@ public final class Settings {
                 || key.startsWith("window.") || key.startsWith("discord.guilds.")
                 // What the update check heard, about the version installed here.
                 || key.startsWith("app.update.")
-                // Folders where chats' things are saved: paths of this computer.
-                || key.startsWith("autosave.")
+                // Folders where chats' things are saved, and the AI's folder: paths of this computer.
+                || key.startsWith("autosave.") || key.equals("ai.folder")
+                // The cloud account: its login, and what this computer last agreed on with it.
+                || key.startsWith("cloud.")
+                // Whether this computer's Telegram bridge already re-synced its chats: a marker, not a choice.
+                || key.equals("telegram.chatSyncLimit")
                 || (key.startsWith("gif.") && key.endsWith(".key"));
     }
 
@@ -125,6 +129,20 @@ public final class Settings {
         ByteArrayOutputStream content = new ByteArrayOutputStream();
         from.store(content, comment);
         SyncedFile.replace(target, content.toByteArray(), ownerOnly);
+    }
+
+    /** The settings that may travel to another computer (none of this one's: those are apart). */
+    public synchronized java.util.Map<String, String> portable() {
+        java.util.Map<String, String> copy = new java.util.TreeMap<>();
+        for (String k : props.stringPropertyNames()) copy.put(k, props.getProperty(k));
+        return copy;
+    }
+
+    /** Another computer's settings in place of these (from the cloud), but for the keys {@code keepHere} holds on to. */
+    public synchronized void replacePortable(java.util.Map<String, String> values, java.util.function.Predicate<String> keepHere) {
+        props.stringPropertyNames().stream().filter(k -> !keepHere.test(k)).forEach(props::remove);
+        values.forEach((k, v) -> { if (!keepHere.test(k) && !staysOnThisMachine(k)) props.setProperty(k, v); });
+        save();
     }
 
     public synchronized String getString(String key, String def) { return holder(key).getProperty(key, def); }

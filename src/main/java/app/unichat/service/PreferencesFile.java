@@ -41,6 +41,11 @@ public final class PreferencesFile {
         /** A kind left out of what's saved: all are saved unless left out (what was on before kinds existed stays all). */
         AUTO_SAVE_NO_PHOTOS("autoSaveNoPhotos"), AUTO_SAVE_NO_VIDEOS("autoSaveNoVideos"), AUTO_SAVE_NO_AUDIO("autoSaveNoAudio"),
         AUTO_SAVE_NO_DOCUMENTS("autoSaveNoDocuments"), AUTO_SAVE_NO_GIFS("autoSaveNoGifs"), AUTO_SAVE_NO_LINKS("autoSaveNoLinks"),
+        /** Save what I send in this chat too, with its own kinds left out (same rules). */
+        AUTO_SAVE_MINE("autoSaveMine"),
+        AUTO_SAVE_MINE_NO_PHOTOS("autoSaveMineNoPhotos"), AUTO_SAVE_MINE_NO_VIDEOS("autoSaveMineNoVideos"),
+        AUTO_SAVE_MINE_NO_AUDIO("autoSaveMineNoAudio"), AUTO_SAVE_MINE_NO_DOCUMENTS("autoSaveMineNoDocuments"),
+        AUTO_SAVE_MINE_NO_GIFS("autoSaveMineNoGifs"), AUTO_SAVE_MINE_NO_LINKS("autoSaveMineNoLinks"),
         /** The profile doesn't show what was shared in this chat (its options). */
         MEDIA_HIDDEN("mediaHidden");
 
@@ -197,6 +202,45 @@ public final class PreferencesFile {
 
     private static boolean shown(Entry e, Flag f, ServerValues cached) {
         return e != null && e.values.containsKey(f) ? is(e, f) : Boolean.TRUE.equals(cached.of(f));
+    }
+
+    /** What memory holds, as the file is written. */
+    public synchronized byte[] json() {
+        try {
+            return JSON.writeValueAsBytes(tree());
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** Everything in place of {@code json} (another computer's, from the cloud), then saved; false, unchanged, for a file that isn't one. */
+    public synchronized boolean replace(byte[] json) {
+        JsonNode root;
+        try {
+            root = JSON.readTree(json);
+        } catch (IOException e) {
+            return false;
+        }
+        if (root == null || !root.isObject() || root.path("version").asInt() != VERSION) return false;
+        Map<String, Entry> oldChats = new LinkedHashMap<>(chats);
+        List<MutableFolder> oldFolders = new ArrayList<>(folders);
+        ObjectNode oldExtra = extraRoot.deepCopy();
+        chats.clear();
+        folders.clear();
+        extraRoot.removeAll();
+        try {
+            readRoot(root);
+        } catch (RuntimeException e) {
+            chats.clear();
+            chats.putAll(oldChats);
+            folders.clear();
+            folders.addAll(oldFolders);
+            extraRoot.removeAll();
+            extraRoot.setAll(oldExtra);
+            return false;
+        }
+        changed();
+        return true;
     }
 
     public synchronized void choose(String key, Flag flag, boolean value) {
@@ -358,31 +402,31 @@ public final class PreferencesFile {
         return e != null && is(e, flag);
     }
 
-    /** What the chat with this key saves of what it receives; empty when it saves nothing. */
-    public synchronized java.util.Set<app.unichat.model.SaveKind> saveKinds(String key) {
+    /** What the chat with this key saves of what it receives ({@code mine}: of what I send); empty when nothing. */
+    public synchronized java.util.Set<app.unichat.model.SaveKind> saveKinds(String key, boolean mine) {
         Entry e = chats.get(key);
         java.util.Set<app.unichat.model.SaveKind> out = EnumSet.noneOf(app.unichat.model.SaveKind.class);
-        if (e == null || !is(e, Flag.AUTO_SAVE)) return out;
-        for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) if (!is(e, leftOut(k))) out.add(k);
+        if (e == null || !is(e, mine ? Flag.AUTO_SAVE_MINE : Flag.AUTO_SAVE)) return out;
+        for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) if (!is(e, leftOut(k, mine))) out.add(k);
         return out;
     }
 
-    /** The person chose what this chat saves; nothing turns it off. */
-    public synchronized void chooseSaveKinds(String key, java.util.Set<app.unichat.model.SaveKind> kinds) {
+    /** The person chose what this chat saves of what it receives ({@code mine}: of what they send); nothing turns it off. */
+    public synchronized void chooseSaveKinds(String key, boolean mine, java.util.Set<app.unichat.model.SaveKind> kinds) {
         Entry e = entry(key);
-        e.values.put(Flag.AUTO_SAVE, !kinds.isEmpty());
-        for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) e.values.put(leftOut(k), !kinds.contains(k));
+        e.values.put(mine ? Flag.AUTO_SAVE_MINE : Flag.AUTO_SAVE, !kinds.isEmpty());
+        for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) e.values.put(leftOut(k, mine), !kinds.contains(k));
         changed();
     }
 
-    private static Flag leftOut(app.unichat.model.SaveKind k) {
+    private static Flag leftOut(app.unichat.model.SaveKind k, boolean mine) {
         return switch (k) {
-            case PHOTOS -> Flag.AUTO_SAVE_NO_PHOTOS;
-            case VIDEOS -> Flag.AUTO_SAVE_NO_VIDEOS;
-            case AUDIO -> Flag.AUTO_SAVE_NO_AUDIO;
-            case DOCUMENTS -> Flag.AUTO_SAVE_NO_DOCUMENTS;
-            case GIFS -> Flag.AUTO_SAVE_NO_GIFS;
-            case LINKS -> Flag.AUTO_SAVE_NO_LINKS;
+            case PHOTOS -> mine ? Flag.AUTO_SAVE_MINE_NO_PHOTOS : Flag.AUTO_SAVE_NO_PHOTOS;
+            case VIDEOS -> mine ? Flag.AUTO_SAVE_MINE_NO_VIDEOS : Flag.AUTO_SAVE_NO_VIDEOS;
+            case AUDIO -> mine ? Flag.AUTO_SAVE_MINE_NO_AUDIO : Flag.AUTO_SAVE_NO_AUDIO;
+            case DOCUMENTS -> mine ? Flag.AUTO_SAVE_MINE_NO_DOCUMENTS : Flag.AUTO_SAVE_NO_DOCUMENTS;
+            case GIFS -> mine ? Flag.AUTO_SAVE_MINE_NO_GIFS : Flag.AUTO_SAVE_NO_GIFS;
+            case LINKS -> mine ? Flag.AUTO_SAVE_MINE_NO_LINKS : Flag.AUTO_SAVE_NO_LINKS;
         };
     }
 

@@ -60,6 +60,11 @@ public final class DockIcon {
         send("activateIgnoringOtherApps:", 1L);
     }
 
+    /** "Mostrar en el Dock" changed elsewhere (the cloud): the icon follows, without bringing Unichat to the front. */
+    static void settingChanged() {
+        apply();
+    }
+
     /** A window besides the main one opened, or the last of them closed. */
     static void setOtherWindows(boolean open) {
         if (open == otherWindows) return;

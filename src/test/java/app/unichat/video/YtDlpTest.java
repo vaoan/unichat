@@ -18,6 +18,7 @@ class YtDlpTest {
         assertEquals("/t/ffmpeg", c.get(c.indexOf("--ffmpeg-location") + 1));
         assertTrue(!YtDlp.command(Path.of("y"), null, Path.of("d"), "https://x", null).contains("--ffmpeg-location"));
         assertEquals("%(title).150B [%(id)s] [abc123].%(ext)s", c.get(c.indexOf("-o") + 1), "the message's id in the name too");
+        assertEquals("vcodec:h264,acodec:aac,res:1080", c.get(c.indexOf("-S") + 1), "what any computer plays, before the size");
     }
 
     @Test
@@ -25,5 +26,14 @@ class YtDlpTest {
         assertEquals("Video unavailable", YtDlp.reason("[youtube] abc: Downloading webpage\nERROR: [youtube] abc: Video unavailable\n"));
         assertEquals("Unsupported URL: https://x.org", YtDlp.reason("WARNING: x\nERROR: Unsupported URL: https://x.org"));
         assertEquals("algo raro", YtDlp.reason("algo raro\n"), "no ERROR line: the last one");
+    }
+
+    @Test
+    void itsProgressLinesSayHowFarItGot() {
+        assertEquals(0.453, YtDlp.percent("[download]  45.3% of   10.00MiB at  1.00MiB/s ETA 00:05"), 1e-9);
+        assertEquals(1.0, YtDlp.percent("[download] 100% of 10.00MiB in 00:10"), 1e-9);
+        assertEquals(-1, YtDlp.percent("[youtube] abc: Downloading webpage"), 1e-9);
+        assertTrue(YtDlp.command(Path.of("y"), null, Path.of("d"), "https://x", null).contains("--newline"),
+                "one line per step, so each one is read as it comes");
     }
 }
