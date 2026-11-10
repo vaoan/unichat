@@ -155,9 +155,14 @@ public final class Composer extends VBox {
         javafx.beans.InvalidationListener fit = o -> {
             if (fitPending) return;
             fitPending = true;
+            Redraws.PENDING.incrementAndGet(); // a redraw to come: what's measured before it is the half-moved box
             Platform.runLater(() -> {
                 fitPending = false;
-                stack(frame.getWidth() < buttonsWidth() + MIN_INPUT_EM * input.getFont().getSize());
+                try {
+                    stack(frame.getWidth() < buttonsWidth() + MIN_INPUT_EM * input.getFont().getSize());
+                } finally {
+                    Redraws.PENDING.decrementAndGet();
+                }
             });
         };
         frame.widthProperty().addListener(fit);

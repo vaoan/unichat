@@ -23,3 +23,4 @@ Off by default, only the person runs them: `-Dunichat.networkTests=true` (real d
 - A fixed "now" next to code that reads the real clock (`FirefoxCookiesTest`: cookies valid one day after 2026-10-26) starts failing days later. Give fixtures a margin of years.
 - Matrix media messages keep the name in `fileName`, not `body` (body = caption): match on both.
 - Measure, don't guess: a click simulation (visible→hidden events, cache misses) found the second avatar flash; peak heap with real files (`-Xmx256m` and a folder of them) found the WebP OOM.
+- `FxWait.settled` knows only what counts in `Redraws.PENDING`: a `Platform.runLater` the code queues to change the layout later (`Composer`'s stacking after a width change, `MainView.catchUp` when the window shows again) must count there, or a test measures the half-moved screen. `NotificationOpenUiTest` failed one run in three (on `main` too) until both did.
