@@ -32,6 +32,36 @@ class RedactorTest {
     }
 
     @Test
+    void secretJsonFieldsAndCookies() {
+        hidden("{\"refresh_token\":\"rt_secret1\",\"client_secret\":\"cs_secret2\",\"Session\":\"ss_secret3\"}",
+                "rt_secret1", "cs_secret2", "ss_secret3");
+        hidden("{\"cookies\":{\"li_at\":\"AQEDAT_li\",\"JSESSIONID\":\"ajax:123\"},\"cookie\":\"c_user=42; xs=XsValue\"}",
+                "AQEDAT_li", "ajax:123", "XsValue");
+        hidden("request Cookie: li_at=AQEDAT_li; JSESSIONID=ajax:123", "AQEDAT_li", "ajax:123");
+        hidden("Set-Cookie: sessionid=SidValue; Path=/; HttpOnly", "SidValue");
+        hidden("Authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz");
+    }
+
+    @Test
+    void secretYamlKeysAndQueryParameters() {
+        hidden("  as_token: AsTokenValue", "AsTokenValue");
+        hidden("hs_token: HsTokenValue", "HsTokenValue");
+        hidden("    shared_secret: \"SharedValue\"", "SharedValue");
+        hidden("password: Pa55word", "Pa55word");
+        hidden("GET /login?token=QueryTok1&next=/", "QueryTok1");
+        hidden("GET /x?a=1&token=QueryTok2", "QueryTok2");
+        hidden("POST /refresh?grant=1&refresh_token=QueryTok3 200", "QueryTok3");
+    }
+
+    @Test
+    void plainSentencesAboutTokensAndSessionsStayUnchanged() {
+        for (String line : new String[]{"session started", "token count 3", "Password reset requested for the account",
+                "Failed to get session: context canceled", "{\"session_id_count\":3,\"message\":\"Cookie jar loaded\"}"}) {
+            assertEquals(line, Redactor.redact(line));
+        }
+    }
+
+    @Test
     void personalJsonFieldsInBridgeLogs() {
         String line = "{\"level\":\"debug\",\"name\":\"Ana Pérez\",\"displayname\":\"Pedro\",\"body\":\"hola, nos vemos\","
                 + "\"chat_name\":\"Familia\",\"topic\":\"cumple\",\"message\":\"Creating Matrix room\",\"time\":\"2026-10-26T08:28:31Z\"}";
