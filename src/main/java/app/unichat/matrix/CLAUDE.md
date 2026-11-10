@@ -3,7 +3,7 @@
 `ChatService` over Matrix: sync, sending, bridges seen from the client.
 
 - `matrix/` — `MatrixChatService` (facade: lifecycle, sync loop) over `MatrixCore` (shared), `MessageSender`, `ChatActions`,
-  `BridgeAccounts`, `DiscordServers`, `ContactActions`, `MediaDownloader`, `SyncCache`, `MatrixLogin`; `SyncProcessor`
+  `BridgeAccounts`, `DiscordServers`, `ContactActions`, `MediaDownloader`, `SyncCache`, `MatrixLogin`, `Profiles`, `Invites`, `FetchedMessages`; `SyncProcessor`
   (pure /sync → model, unit tested) with `RoomFields`, `SystemMessages`, `SyncEvents`; `BridgeProtocol` (pure), `BotChat`, `MatrixClient` (HTTP). `MatrixLiveIT` = end-to-end test, needs `UNICHAT_IT_HOMESERVER`.
 - Media cache: `matrix/MediaCache` caps `cache/media`
   (`cache.mediaMb`, LRU; files over 1 MB go first, saved stickers/GIFs are pinned, `MediaSource.keepCached`; one file per direct-media URL whatever the size). `model/MediaLibrary.same` says when two items are one sticker (bridge id, else format, dimensions and bytes), since direct media gives the same file a new URL in each message.
@@ -22,3 +22,5 @@
 - `MatrixException` is unchecked: a `catch (IOException e)` lets it through. A failed reply lookup completed its future exceptionally, skipped the "forget a null" step and stayed cached for good; catch both (`ReplyLookupRetryTest`). Forget before completing, or the next asker races the cleanup.
 - Whatever waits for something that may never come needs an end: `.part` files of a cut download (deleted on failure, and `MediaCache.trim` removes those over an hour old), `MediaDownloader.watching` keys (dropped with their last watcher), `MatrixRoom.pending` (the newest `SyncProcessor.MAX_PENDING` per room) (`DownloadLeftoversTest`, `MediaCacheTest`, `SyncProcessorTest`).
 - The send's answer carries only `event_id`, so a confirmed echo kept the time sending started (before the upload), and an answer saved meanwhile moved autosave's mark past what I sent. When its event comes in the sync, `SyncProcessor.takeServerTime` gives it `origin_server_ts` and tells `messagesChanged` (`SyncProcessorTest.aConfirmedEchoTakesTheServersTimeWhenItsEventComes`).
+- A Discord server pause the bridge refused was logged as the exception's class name only ("failed: MatrixException") and never tried again, so an archived server kept bringing everything. Whatever goes to the server or a bridge on the person's behalf logs the reason and is retried (`Retry`: 1 min doubling to 1 h; `DiscordServers.retryGuildPauses` from `applyMutes`, `DiscordPauseRetryTest`).
+- A media address is parsed once, with `model/Mxc` (server and id checked: no empty part, slash or control character); `startsWith("mxc://")` is only for "is it one".

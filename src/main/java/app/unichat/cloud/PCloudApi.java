@@ -184,25 +184,13 @@ public final class PCloudApi implements Storage {
 
     private String send(HttpRequest.Builder b, boolean question) throws IOException {
         if (question) b.timeout(answer);
-        try {
-            HttpResponse<String> r = http.send(b.header("Authorization", "Bearer " + token).build(), HttpResponse.BodyHandlers.ofString());
-            if (r.statusCode() != 200) throw new IOException(I18n.t("cloud.error.server", r.statusCode()));
-            return r.body();
-        } catch (java.net.http.HttpTimeoutException e) {
-            throw new IOException(I18n.t("cloud.error.noAnswer"), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(e);
-        }
+        HttpResponse<String> r = Http.send(http, b.header("Authorization", "Bearer " + token).build(), HttpResponse.BodyHandlers.ofString());
+        if (r.statusCode() != 200) throw new IOException(I18n.t("cloud.error.server", r.statusCode()));
+        return r.body();
     }
 
     private <T> HttpResponse<T> download(URI where, HttpResponse.BodyHandler<T> body) throws IOException {
-        try {
-            return http.send(HttpRequest.newBuilder(where).GET().build(), body);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(e);
-        }
+        return Http.send(http, HttpRequest.newBuilder(where).GET().build(), body);
     }
 
     private static String abs(String path) {

@@ -6,7 +6,6 @@ import app.unichat.service.PreferencesFile;
 import app.unichat.service.PreferencesFile.Effective;
 import app.unichat.service.PreferencesFile.ServerValues;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
@@ -22,11 +21,6 @@ import java.util.Set;
  * tracks which rule the server has and the writes on their way. Guarded by the processor's lock.
  */
 final class RoomPreferences {
-    private static final Duration FIRST_RETRY = Duration.ofMinutes(1);
-    private static final Duration LAST_RETRY = Duration.ofHours(1);
-
-    private record Retry(int failures, Instant at) {}
-
     private PreferencesFile file = PreferencesFile.inMemory();
     /** Rooms with a silent push rule; means nothing until {@link #rulesHeard}. */
     private Set<String> mutedRooms = new HashSet<>();
@@ -121,7 +115,7 @@ final class RoomPreferences {
         for (MatrixRoom room : rooms) {
             if (room.invite || writing.containsKey(room.id)) continue;
             Retry retry = retries.get(room.id);
-            if (retry != null && now.isBefore(retry.at())) continue;
+            if (retry != null && !retry.due(now)) continue;
             boolean wanted = file.current(keyOf(room)).muted();
             if (wanted != mutedRooms.contains(room.id)) out.put(room.id, wanted);
         }
@@ -138,8 +132,6 @@ final class RoomPreferences {
             retries.remove(roomId);
             return;
         }
-        int failures = retries.containsKey(roomId) ? retries.get(roomId).failures() + 1 : 1;
-        Duration wait = FIRST_RETRY.multipliedBy(1L << Math.min(failures - 1, 10));
-        retries.put(roomId, new Retry(failures, now.plus(wait.compareTo(LAST_RETRY) > 0 ? LAST_RETRY : wait)));
+        retries.put(roomId, Retry.after(retries.get(roomId), now));
     }
 }

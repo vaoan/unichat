@@ -116,7 +116,8 @@ public final class ChromiumCookies {
                         key = keychainKey(b.keychainService());
                     }
                     if (key == null) break;
-                    SessionCookies cookies = readCopy(db, spec, key);
+                    byte[] k = key;
+                    SessionCookies cookies = CookieDbCopy.read(db, copy -> read(copy, spec, k));
                     if (cookies != null) {
                         out.add(new BrowserSession(b.name(), profile.getFileName().toString(), cookies));
                     }
@@ -170,27 +171,6 @@ public final class ChromiumCookies {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return null;
-        }
-    }
-
-    private static SessionCookies readCopy(Path db, CookieSpec spec, byte[] key) {
-        Path tmp = null;
-        Path wal = null;
-        try {
-            tmp = Files.createTempFile("unichat-cookies-", ".sqlite");
-            tmp.toFile().deleteOnExit();
-            Files.copy(db, tmp, StandardCopyOption.REPLACE_EXISTING);
-            Path srcWal = db.resolveSibling("Cookies-wal");
-            if (Files.isRegularFile(srcWal)) {
-                wal = tmp.resolveSibling(tmp.getFileName() + "-wal");
-                wal.toFile().deleteOnExit();
-                Files.copy(srcWal, wal, StandardCopyOption.REPLACE_EXISTING);
-            }
-            return read(tmp, spec, key);
-        } catch (IOException | RuntimeException e) {
-            return null;
-        } finally {
-            FirefoxCookies.deleteCopy(tmp, wal);
         }
     }
 

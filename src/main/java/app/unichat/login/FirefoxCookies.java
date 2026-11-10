@@ -84,36 +84,13 @@ public final class FirefoxCookies {
             for (Path profile : profiles) {
                 Path db = profile.resolve("cookies.sqlite");
                 if (!Files.isRegularFile(db)) continue;
-                SessionCookies cookies = readCopy(db, spec);
+                SessionCookies cookies = CookieDbCopy.read(db, copy -> read(copy, spec, Instant.now()));
                 if (cookies != null) {
                     out.add(new BrowserSession("Firefox", profile.getFileName().toString(), cookies));
                 }
             }
         }
         return out;
-    }
-
-    /** Copies the DB (the browser may lock the live one) and reads the copy; null if unreadable. */
-    private static SessionCookies readCopy(Path db, CookieSpec spec) {
-        Path tmp = null;
-        Path wal = null;
-        try {
-            tmp = Files.createTempFile("unichat-cookies-", ".sqlite");
-            tmp.toFile().deleteOnExit(); // fallback if the delete in finally fails (e.g. locked on Windows)
-            Files.copy(db, tmp, StandardCopyOption.REPLACE_EXISTING);
-            // Recent cookies may still sit in the write-ahead log.
-            Path srcWal = db.resolveSibling("cookies.sqlite-wal");
-            if (Files.isRegularFile(srcWal)) {
-                wal = tmp.resolveSibling(tmp.getFileName() + "-wal");
-                wal.toFile().deleteOnExit();
-                Files.copy(srcWal, wal, StandardCopyOption.REPLACE_EXISTING);
-            }
-            return read(tmp, spec, Instant.now());
-        } catch (IOException | RuntimeException e) {
-            return null;
-        } finally {
-            deleteCopy(tmp, wal);
-        }
     }
 
     /** The folders set in {@link #ROOTS_PROPERTY}, or null when it isn't set. */
@@ -125,24 +102,5 @@ public final class FirefoxCookies {
             if (!part.isBlank()) out.add(Paths.get(part.trim()));
         }
         return out;
-    }
-
-    /** Removes a temporary copy of a browser's database and the files SQLite left beside it. */
-    static void deleteCopy(Path tmp, Path wal) {
-        deleteQuietly(wal);
-        if (tmp != null) {
-            deleteQuietly(tmp);
-            deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-shm"));
-            deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-journal"));
-        }
-    }
-
-    private static void deleteQuietly(Path p) {
-        if (p == null) return;
-        try {
-            Files.deleteIfExists(p);
-        } catch (IOException ignored) {
-            // best effort
-        }
     }
 }

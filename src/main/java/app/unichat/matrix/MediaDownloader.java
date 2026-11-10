@@ -6,6 +6,7 @@ import app.unichat.bridge.BridgePorts;
 import app.unichat.settings.Settings;
 import app.unichat.support.Hashes;
 import app.unichat.model.MimeTypes;
+import app.unichat.model.Mxc;
 import app.unichat.support.I18n;
 import app.unichat.support.Urls;
 
@@ -142,14 +143,9 @@ final class MediaDownloader {
      * Each size used to be a whole copy (a GIF of several MB, twice or more).
      */
     static String cacheKey(String url, int width, int height) {
-        boolean scalable = url.startsWith("mxc://") && BridgePorts.directMediaBase(serverOf(url)) == null;
+        Mxc mxc = Mxc.parse(url);
+        boolean scalable = mxc != null && BridgePorts.directMediaBase(mxc.server()) == null;
         return url + "|" + (scalable ? Math.max(0, width) + "x" + Math.max(0, height) : "0x0");
-    }
-
-    private static String serverOf(String mxc) {
-        String rest = mxc.substring("mxc://".length());
-        int slash = rest.indexOf('/');
-        return slash < 0 ? rest : rest.substring(0, slash);
     }
 
     /** At most once a minute: listing thousands of files after every thumbnail would cost more than it saves. */
@@ -163,13 +159,12 @@ final class MediaDownloader {
         Path tmp = dir.resolve(hash + ".download");
         Files.deleteIfExists(tmp);
         String contentType;
-        if (url.startsWith("mxc://")) {
-            String rest = url.substring("mxc://".length());
-            int slash = rest.indexOf('/');
-            if (slash <= 0) throw new MatrixException(0, null, I18n.t("media.badUrl"));
-            String sm = Urls.enc(rest.substring(0, slash)) + "/" + Urls.enc(rest.substring(slash + 1));
+        if (url.startsWith(Mxc.SCHEME)) {
+            Mxc mxc = Mxc.parse(url);
+            if (mxc == null) throw new MatrixException(0, null, I18n.t("media.badUrl"));
+            String sm = Urls.enc(mxc.server()) + "/" + Urls.enc(mxc.mediaId());
             contentType = null;
-            String bridge = BridgePorts.directMediaBase(rest.substring(0, slash));
+            String bridge = BridgePorts.directMediaBase(mxc.server());
             if (bridge != null) {
                 // Direct media: the bridge fetches it from the network now (nothing was copied to the server).
                 contentType = client.download(bridge + "/_matrix/client/v1/media/download/" + sm, false, tmp, progress);

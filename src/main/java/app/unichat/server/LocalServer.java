@@ -225,23 +225,10 @@ public final class LocalServer {
         supervisor.start("tuwunel", hs, command, hs.resolve("tuwunel.log"));
         long end = System.currentTimeMillis() + 90_000;
         while (System.currentTimeMillis() < end) {
-            if (answers()) return;
+            if (HttpProbe.answers(http, PORT, Duration.ofSeconds(3), HttpProbe.Up.READY)) return;
             Thread.sleep(500);
         }
         throw new IOException(I18n.t("server.noAnswer", hs.resolve("tuwunel.log")));
-    }
-
-    private boolean answers() {
-        try {
-            HttpResponse<Void> r = http.send(HttpRequest.newBuilder(URI.create(URL + "/_matrix/client/versions"))
-                    .timeout(Duration.ofSeconds(3)).build(), HttpResponse.BodyHandlers.discarding());
-            return r.statusCode() == 200;
-        } catch (IOException e) {
-            return false;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
     }
 
     private void startBridge(String b) throws IOException {

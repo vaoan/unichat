@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.Chat;
+import app.unichat.model.MimeTypes;
 import app.unichat.service.ChatReader;
 import app.unichat.service.UploadQueue;
 import app.unichat.support.I18n;
@@ -20,9 +21,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -238,18 +237,7 @@ final class UploadBar extends HBox {
 
     /** "image", "video" or "file", by what the system says it is, else by its name. */
     static String kind(Path f) {
-        String mime = null;
-        try {
-            mime = Files.probeContentType(f);
-        } catch (Exception ignored) {
-            // By name below.
-        }
-        if (mime == null) {
-            String n = f.getFileName().toString().toLowerCase(Locale.ROOT);
-            if (n.matches(".*\\.(jpe?g|png|gif|webp|bmp)$")) return "image";
-            if (n.matches(".*\\.(mp4|mov|m4v|webm|mkv)$")) return "video";
-            return "file";
-        }
+        String mime = MimeTypes.of(f);
         return mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : "file";
     }
 }

@@ -1,10 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgeStates;
-import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -134,7 +131,7 @@ final class Watchdog {
             for (String name : running.get()) {
                 Integer port = ports.get(name);
                 if (port == null) continue;
-                int f = answers(port) ? 0 : failures.getOrDefault(name, 0) + 1;
+                int f = HttpProbe.answers(http, port, Duration.ofSeconds(10), HttpProbe.Up.ALIVE) ? 0 : failures.getOrDefault(name, 0) + 1;
                 failures.put(name, f);
                 Health h = name.equals("tuwunel") ? new Health(f, -1, 0)
                         : new Health(f, states.troubledSince(name), states.dropsWithin(name, FLAP_WINDOW_MS, now));
@@ -158,23 +155,12 @@ final class Watchdog {
             }
             keeper.tick(online, now);
             states.tick();
+        } catch (InterruptedException e) {
+            // Stopping: an unanswered probe now says nothing about the process, so nothing is restarted.
+            Thread.currentThread().interrupt();
         } catch (Throwable t) {
             // The watchdog itself must never stop.
             System.err.println("Watchdog check failed: " + t);
-        }
-    }
-
-    /** Any HTTP answer counts: a hung process doesn't give one within 10 s. */
-    private boolean answers(int port) {
-        try {
-            HttpResponse<Void> r = http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/_matrix/client/versions"))
-                    .timeout(Duration.ofSeconds(10)).build(), HttpResponse.BodyHandlers.discarding());
-            return r.statusCode() > 0;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return true;
-        } catch (Exception e) {
-            return false;
         }
     }
 }

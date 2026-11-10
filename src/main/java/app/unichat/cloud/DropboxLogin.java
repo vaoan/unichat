@@ -116,15 +116,9 @@ public final class DropboxLogin {
     private String exchange(String code) throws IOException {
         String form = "code=" + Urls.enc(code) + "&grant_type=authorization_code&code_verifier=" + Urls.enc(verifier)
                 + "&client_id=" + Urls.enc(appKey) + "&redirect_uri=" + Urls.enc(redirect);
-        HttpResponse<String> r;
-        try {
-            r = HTTP.send(HttpRequest.newBuilder(URI.create(tokenUrl)).timeout(Duration.ofSeconds(30))
-                    .header("Content-Type", "application/x-www-form-urlencoded")
-                    .POST(HttpRequest.BodyPublishers.ofString(form)).build(), HttpResponse.BodyHandlers.ofString());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(e);
-        }
+        HttpResponse<String> r = Http.send(HTTP, HttpRequest.newBuilder(URI.create(tokenUrl)).timeout(Duration.ofSeconds(30))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(form)).build(), HttpResponse.BodyHandlers.ofString());
         JsonNode n = JSON.readTree(r.body());
         String refresh = n.path("refresh_token").asText(null);
         if (r.statusCode() != 200 || refresh == null) {

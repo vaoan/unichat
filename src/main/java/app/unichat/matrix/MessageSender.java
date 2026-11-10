@@ -8,6 +8,8 @@ import app.unichat.model.Markup;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import app.unichat.model.MimeTypes;
+import app.unichat.model.Mxc;
 import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
 import app.unichat.service.ChatService.Listener;
@@ -23,7 +25,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.DoubleConsumer;
@@ -125,11 +126,10 @@ final class MessageSender {
      * not found" (no federation), and the sticker is lost. So what goes to another network goes as a copy on our server.
      */
     static boolean needsCopy(String url, Network network) {
-        if (url == null || !url.startsWith("mxc://")) return false;
-        String server = url.substring("mxc://".length()).split("/", 2)[0];
-        if (BridgePorts.directMediaBase(server) == null) return false;
+        Mxc mxc = Mxc.parse(url);
+        if (mxc == null || BridgePorts.directMediaBase(mxc.server()) == null) return false;
         String bot = network.botLocalpart();
-        return bot == null || !server.equals(BridgePorts.mediaServerName(bot.replaceAll("bot$", "")));
+        return bot == null || !mxc.server().equals(BridgePorts.mediaServerName(bot.replaceAll("bot$", "")));
     }
 
     /** {@code copy}: uploads the file to our server first, whatever the chat accepts ({@link #needsCopy}). */
@@ -266,7 +266,7 @@ final class MessageSender {
      * makes a picture one the network shows as a photo first ({@link OutgoingPhotos}).
      */
     CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, SendAs as, DoubleConsumer progress) {
-        String mime = probeMime(file);
+        String mime = MimeTypes.of(file);
         CompletableFuture<String> sent = as == SendAs.PHOTO && SendablePhotos.convertible(mime)
                 ? CompletableFuture.supplyAsync(() -> OutgoingPhotos.prepare(file, mime), core.io).thenCompose(p ->
                         sendMedia(chatId, p.file(), replyToId, new Kind(p.mime(), p.width(), p.height(), 0, false, progress), content -> { }))
@@ -380,25 +380,6 @@ final class MessageSender {
             addReply(content, replyToId);
             return sendEventId(chatId, "m.room.message", txn, content);
         });
-    }
-
-    private static String probeMime(Path file) {
-        try {
-            String m = Files.probeContentType(file);
-            if (m != null) return m;
-        } catch (IOException ignored) {
-            // fall through
-        }
-        String n = file.getFileName().toString().toLowerCase(Locale.ROOT);
-        if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";
-        if (n.endsWith(".png")) return "image/png";
-        if (n.endsWith(".gif")) return "image/gif";
-        if (n.endsWith(".webp")) return "image/webp";
-        if (n.endsWith(".mp4")) return "video/mp4";
-        if (n.endsWith(".mp3")) return "audio/mpeg";
-        if (n.endsWith(".ogg")) return "audio/ogg";
-        if (n.endsWith(".pdf")) return "application/pdf";
-        return "application/octet-stream";
     }
 
     /** From the header: decoding a phone's photo only to learn its size took 600 MB and more. */

@@ -7,8 +7,11 @@ import app.unichat.service.BridgeAccess.DiscordGuild;
 import app.unichat.service.ChatService.GroupOffer;
 import app.unichat.settings.Settings;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -55,18 +58,49 @@ final class DiscordServers {
      * An archived server brings nothing (no messages, no attachments filling the disk) while its rooms stay in the
      * archive; brought back, it brings messages again, creating channels as people write.
      */
-    void setGuildPaused(String guildId, boolean paused) {
-        core.io.execute(() -> setGuildPausedNow(guildId, paused));
+    CompletableFuture<Void> setGuildPaused(String guildId, boolean paused) {
+        synchronized (pauseRetries) {
+            pauseRetries.remove(guildId); // the latest choice is the one that's tried again
+        }
+        return CompletableFuture.runAsync(() -> setGuildPausedNow(guildId, paused, null), core.io);
     }
 
-    private void setGuildPausedNow(String guildId, boolean paused) {
+    /** A pause (or resume) the bridge didn't take, waiting to be tried again. */
+    private record PauseRetry(boolean paused, Retry retry) {}
+
+    /** By guild id. */
+    private final Map<String, PauseRetry> pauseRetries = new HashMap<>();
+
+    /** Tries again the pauses and resumes that failed and whose time has come, as {@link ChatActions#applyMutes} does mute rules. */
+    CompletableFuture<Void> retryGuildPauses(Instant now) {
+        List<CompletableFuture<Void>> runs = new ArrayList<>();
+        synchronized (pauseRetries) {
+            for (var it = pauseRetries.entrySet().iterator(); it.hasNext(); ) {
+                var e = it.next();
+                if (!e.getValue().retry().due(now)) continue;
+                it.remove();
+                String guild = e.getKey();
+                PauseRetry r = e.getValue();
+                runs.add(CompletableFuture.runAsync(() -> setGuildPausedNow(guild, r.paused(), r.retry()), core.io));
+            }
+        }
+        return CompletableFuture.allOf(runs.toArray(new CompletableFuture[0]));
+    }
+
+    /** Never throws: a failure is logged and tried again later; {@code failedBefore} is null for a first try. */
+    private void setGuildPausedNow(String guildId, boolean paused, Retry failedBefore) {
         try {
             String reply = bots.query(Network.DISCORD, "guilds bridging-mode " + guildId + " " + (paused ? "nothing" : "create-on-message"));
             if (!reply.startsWith("Set guild bridging mode")) throw new MatrixException(0, null, reply);
             if (paused) Settings.get().addToSet(PAUSED_GUILDS_KEY, guildId);
             else Settings.get().removeFromSet(PAUSED_GUILDS_KEY, guildId);
         } catch (Exception e) {
-            System.err.println("Discord server " + (paused ? "pause" : "resume") + " failed: " + e.getClass().getSimpleName());
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            System.err.println("Discord server " + (paused ? "pause" : "resume") + " failed, will retry: " + e);
+            synchronized (pauseRetries) {
+                // A newer choice made meanwhile stays the one to retry.
+                pauseRetries.putIfAbsent(guildId, new PauseRetry(paused, Retry.after(failedBefore, Instant.now())));
+            }
         }
     }
 
@@ -90,7 +124,7 @@ final class DiscordServers {
         core.io.execute(() -> {
             for (String g : todo) {
                 if (!core.running) return;
-                setGuildPausedNow(g, true);
+                setGuildPausedNow(g, true, null);
             }
         });
     }

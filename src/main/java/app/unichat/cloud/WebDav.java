@@ -77,16 +77,8 @@ public final class WebDav implements Storage {
 
     /** What the server says of {@code path} (its PROPFIND answer), or null when there's nothing there. */
     private String properties(String path) throws IOException {
-        HttpResponse<String> r;
-        try {
-            r = http.send(HttpRequest.newBuilder(uri(path)).timeout(answer).header("Authorization", auth).header("Depth", "0")
-                    .method("PROPFIND", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
-        } catch (java.net.http.HttpTimeoutException e) {
-            throw new IOException(I18n.t("cloud.error.noAnswer"), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(e);
-        }
+        HttpResponse<String> r = Http.send(http, HttpRequest.newBuilder(uri(path)).timeout(answer).header("Authorization", auth)
+                .header("Depth", "0").method("PROPFIND", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
         if (r.statusCode() == 404) return null;
         if (r.statusCode() != 207 && r.statusCode() != 200) throw failure(r.statusCode());
         return r.body();
@@ -151,25 +143,11 @@ public final class WebDav implements Storage {
         HttpRequest.Builder b = HttpRequest.newBuilder(uri(path)).header("Authorization", auth).method(method, body);
         if (!method.equals("PUT")) b.timeout(answer); // a big file going up takes as long as it takes
         if (depth0) b.header("Depth", "0");
-        try {
-            return http.send(b.build(), HttpResponse.BodyHandlers.discarding());
-        } catch (java.net.http.HttpTimeoutException e) {
-            throw new IOException(I18n.t("cloud.error.noAnswer"), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(e);
-        }
+        return Http.send(http, b.build(), HttpResponse.BodyHandlers.discarding());
     }
 
     private <T> HttpResponse<T> download(String path, HttpResponse.BodyHandler<T> body) throws IOException {
-        try {
-            return http.send(HttpRequest.newBuilder(uri(path)).header("Authorization", auth).GET().build(), body);
-        } catch (java.net.http.HttpTimeoutException e) {
-            throw new IOException(I18n.t("cloud.error.noAnswer"), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(e);
-        }
+        return Http.send(http, HttpRequest.newBuilder(uri(path)).header("Authorization", auth).GET().build(), body);
     }
 
     private URI uri(String path) {

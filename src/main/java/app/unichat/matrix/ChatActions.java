@@ -214,11 +214,15 @@ final class ChatActions {
         });
     }
 
-    /** Writes the rules that differ from the file; a room with a write under way or waiting to retry stays out. */
+    /**
+     * Writes the rules that differ from the file; a room with a write under way or waiting to retry stays out. Discord
+     * servers whose pause failed are tried again too.
+     */
     void applyMutes() {
         synchronized (proc) {
             proc.mutesToApply().forEach(this::queueMuteWrite);
         }
+        discord.retryGuildPauses(Instant.now());
     }
 
     /**

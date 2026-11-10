@@ -52,9 +52,6 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private static final String SYNC_FILTER =
             "{\"room\":{\"state\":{\"lazy_load_members\":true},\"timeline\":{\"limit\":30,\"lazy_load_members\":true}}}";
     private static final String HISTORY_FILTER = "{\"lazy_load_members\":true}";
-    /** Users whose profile was already requested (lazy-loaded members have no display name yet). */
-    private final Set<String> profileRequested = ConcurrentHashMap.newKeySet();
-    private final java.util.concurrent.Semaphore profileSlots = new java.util.concurrent.Semaphore(6);
     private final MatrixClient client;
     private final String userId;
     private final String serverName;
@@ -64,10 +61,8 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private final Set<String> knownChats = new java.util.HashSet<>();
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(Threads.daemon("matrix-timer"));
     private final Map<String, CompletableFuture<Boolean>> historyInFlight = new ConcurrentHashMap<>();
-    private final Set<String> joinAttempted = ConcurrentHashMap.newKeySet();
     private volatile ConnectionState state = ConnectionState.CONNECTING;
     private volatile String nextBatch;
-    private volatile String displayName;
     private Thread syncThread;
     /** The computer just woke: the open long poll is dropped and the next sync answers at once ({@link #wake}). */
     private volatile boolean woke;
@@ -84,6 +79,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private final BridgeAccounts bridges;
     private final ContactActions contacts;
     private final DiscordServers discord;
+    private final Profiles profiles;
+    private final Invites invites;
+    private final FetchedMessages fetched;
 
     private final String serverIdentity;
     private final PreferencesFile prefs;
@@ -102,7 +100,6 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         this.serverName = userId.substring(userId.indexOf(':') + 1);
         this.proc = new SyncProcessor(userId);
         proc.setPreferences(prefs);
-        this.displayName = SyncEvents.localpart(userId);
         this.core = new MatrixCore(client, proc, userId, serverName, accessToken);
         this.io = core.io;
         this.folders = new FolderActions(prefs, () -> core.fire(Listener::chatsChanged));
@@ -115,6 +112,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         this.bridges = new BridgeAccounts(core, bots, discord);
         this.chatActions = new ChatActions(core, this, discord, prefs);
         this.contacts = new ContactActions(core);
+        this.profiles = new Profiles(core);
+        this.invites = new Invites(core);
+        this.fetched = new FetchedMessages(core);
     }
 
     // ---------------------------------------------------------------- folders
@@ -135,7 +135,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         syncThread.setDaemon(true);
         syncThread.start();
         WakeWatch.onWake(onWake);
-        io.execute(this::loadProfile);
+        io.execute(profiles::loadMine);
         io.execute(bridges::checkBridges);
         timer.scheduleWithFixedDelay(chatActions::checkReminders, 10, 10, TimeUnit.SECONDS);
         bridges.watchLiveStates();
@@ -170,18 +170,6 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
             }
             setState(ConnectionState.LOGGED_OUT);
         }, io);
-    }
-
-    private void loadProfile() {
-        try {
-            String dn = client.get(CLIENT + "/profile/" + enc(userId) + "/displayname").path("displayname").asText(null);
-            if (dn != null && !dn.isBlank()) {
-                displayName = dn;
-                core.fire(Listener::accountsChanged);
-            }
-        } catch (Exception ignored) {
-            // keep localpart
-        }
     }
 
     // ---------------------------------------------------------------- sync loop
@@ -383,7 +371,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 if (c != null && !c.muted() && !c.bridgeBot()) core.fire(l -> l.incomingMessage(c, m));
             }
         }
-        for (String roomId : r.invites) autoJoin(roomId);
+        for (String roomId : r.invites) invites.join(roomId);
         if (notify) {
             for (Message m : r.newMessages) {
                 Chat c = chat(m.chatId());
@@ -392,54 +380,8 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         } else {
             bridges.refreshStaleLogins();
         }
-        fetchMissingProfiles();
+        profiles.fetchMissing();
         bridges.publishIfChanged();
-    }
-
-    /** Fetches display names/avatars of chat counterparts the sync didn't include (lazy-loaded members). */
-    private void fetchMissingProfiles() {
-        Set<String> users;
-        synchronized (proc) {
-            users = proc.unnamedUsers();
-        }
-        for (String u : users) {
-            if (!profileRequested.add(u)) continue;
-            io.execute(() -> {
-                try {
-                    profileSlots.acquire();
-                } catch (InterruptedException e) {
-                    profileRequested.remove(u);
-                    return;
-                }
-                try {
-                    JsonNode p = client.get(CLIENT + "/profile/" + enc(u));
-                    String name = p.path("displayname").asText(null);
-                    String avatar = p.path("avatar_url").asText(null);
-                    if (name == null && avatar == null) return;
-                    List<String> changed;
-                    synchronized (proc) {
-                        changed = proc.applyProfile(u, name, avatar);
-                    }
-                    if (!changed.isEmpty()) core.fire(Listener::chatsChanged);
-                } catch (Exception ignored) {
-                    // keep the fallback name
-                } finally {
-                    profileSlots.release();
-                }
-            });
-        }
-    }
-
-    /** Bridges invite us to portal rooms; join every invite (non-bridge invites show up as chats too). */
-    private void autoJoin(String roomId) {
-        if (!joinAttempted.add(roomId)) return;
-        io.execute(() -> {
-            try {
-                client.join(roomId);
-            } catch (Exception e) {
-                System.err.println("Could not join " + roomId + ": " + e);
-            }
-        });
     }
 
     private void setState(ConnectionState s) {
@@ -452,7 +394,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
 
     @Override public ConnectionState connectionState() { return state; }
     @Override public String myUserId() { return userId; }
-    @Override public String myDisplayName() { return displayName; }
+    @Override public String myDisplayName() { return profiles.myName(); }
 
     @Override
     public List<Chat> chats() {
@@ -473,47 +415,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
 
     /** Asked once per message (the answer is kept: a reply shows on every redraw). */
     @Override
-    public CompletableFuture<Message> message(String chatId, String messageId) {
-        if (chatId == null || messageId == null || messageId.startsWith(SyncProcessor.LOCAL_PREFIX)) {
-            return CompletableFuture.completedFuture(null);
-        }
-        synchronized (fetched) {
-            CompletableFuture<Message> known = fetched.get(messageId);
-            if (known != null) return known;
-            CompletableFuture<Message> f = new CompletableFuture<>();
-            fetched.put(messageId, f);
-            io.execute(() -> {
-                Message m = fetch(chatId, messageId);
-                // Not had (the server didn't answer): asked again next time it's drawn. Forgotten before anyone
-                // waiting hears of it, so whoever asks next asks the server.
-                if (m == null) synchronized (fetched) {
-                    fetched.remove(messageId, f);
-                }
-                f.complete(m);
-            });
-            return f;
-        }
-    }
-
-    /** One message from the server; null when it isn't one or the server failed to answer (an error answer too). */
-    private Message fetch(String chatId, String messageId) {
-        try {
-            JsonNode ev = client.get(CLIENT + "/rooms/" + enc(chatId) + "/event/" + enc(messageId));
-            synchronized (proc) {
-                return proc.standalone(chatId, ev);
-            }
-        } catch (IOException | MatrixException e) {
-            return null;
-        }
-    }
-
-    /** Messages fetched on their own ({@link #message}); the last few hundred. */
-    private final java.util.Map<String, CompletableFuture<Message>> fetched = new java.util.LinkedHashMap<>(16, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(java.util.Map.Entry<String, CompletableFuture<Message>> e) {
-            return size() > 500;
-        }
-    };
+    public CompletableFuture<Message> message(String chatId, String messageId) { return fetched.message(chatId, messageId); }
 
     @Override
     public CompletableFuture<Boolean> loadOlder(String chatId) {

@@ -10,6 +10,7 @@ import app.unichat.model.Member;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
+import app.unichat.model.MimeTypes;
 import app.unichat.model.Network;
 import app.unichat.model.VoiceNote;
 import app.unichat.support.I18n;
@@ -355,7 +356,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
             m.setMediaUrl(file.toUri().toString());
             try {
                 m.setFileSize(Files.size(file));
-                m.setType(MessageType.ofMime(Files.probeContentType(file)));
+                m.setType(MessageType.ofMime(MimeTypes.of(file)));
                 if (as == SendAs.DOCUMENT) m.setType(MessageType.FILE);
                 if (m.type() == MessageType.IMAGE) {
                     BufferedImage img = ImageIO.read(file.toFile());

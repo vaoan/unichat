@@ -219,14 +219,7 @@ public final class DropboxApi implements Storage {
     }
 
     private <T> HttpResponse<T> send(HttpRequest.Builder b, HttpResponse.BodyHandler<T> handler, String token) throws IOException {
-        try {
-            return http.send(b.copy().header("Authorization", "Bearer " + token).build(), handler);
-        } catch (java.net.http.HttpTimeoutException e) {
-            throw new IOException(I18n.t("cloud.error.noAnswer"), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(e);
-        }
+        return Http.send(http, b.copy().header("Authorization", "Bearer " + token).build(), handler);
     }
 
     /** A short-lived token from the lasting permission: kept until Dropbox says it expired. */
@@ -234,17 +227,9 @@ public final class DropboxApi implements Storage {
         if (access != null && !fresh) return access;
         String form = "grant_type=refresh_token&refresh_token=" + app.unichat.support.Urls.enc(refresh)
                 + "&client_id=" + app.unichat.support.Urls.enc(appKey);
-        HttpResponse<String> r;
-        try {
-            r = http.send(HttpRequest.newBuilder(URI.create(tokenUrl)).timeout(WebDav.ANSWER)
-                    .header("Content-Type", "application/x-www-form-urlencoded")
-                    .POST(HttpRequest.BodyPublishers.ofString(form)).build(), HttpResponse.BodyHandlers.ofString());
-        } catch (java.net.http.HttpTimeoutException e) {
-            throw new IOException(I18n.t("cloud.error.noAnswer"), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(e);
-        }
+        HttpResponse<String> r = Http.send(http, HttpRequest.newBuilder(URI.create(tokenUrl)).timeout(WebDav.ANSWER)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(form)).build(), HttpResponse.BodyHandlers.ofString());
         String t = r.statusCode() == 200 ? JSON.readTree(r.body()).path("access_token").asText(null) : null;
         if (t == null) throw new IOException(I18n.t("cloud.error.dropboxLogin"));
         access = t;
