@@ -1,9 +1,12 @@
 package app.unichat.autosave;
 
+import app.unichat.model.Chat;
+
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Takes what a chat saved to its new folder when the folder changes: otherwise the new one starts empty and the files
@@ -12,6 +15,30 @@ import java.nio.file.Path;
  */
 final class SavedMove {
     private SavedMove() {}
+
+    /**
+     * A new base folder (null: the default), taking along each chat's folder under the old one (never the base whole:
+     * it can hold the person's own things). Gives how many files moved.
+     */
+    static int toBase(List<Chat> chats, Path folder) throws IOException {
+        Path before = SaveFolders.base();
+        SaveFolders.setBase(folder);
+        Path after = SaveFolders.base();
+        int moved = 0;
+        for (Chat c : chats) {
+            if (SaveFolders.hasOwn(c.id())) continue;
+            String name = SaveFolders.name(c);
+            moved += move(before.resolve(name), after.resolve(name));
+        }
+        return moved;
+    }
+
+    /** A chat's own folder (null: under the base again), taking along what it saved where it was. */
+    static int toOwn(Chat chat, Path folder) throws IOException {
+        Path before = SaveFolders.of(chat);
+        SaveFolders.setOwn(chat.id(), folder);
+        return move(before, SaveFolders.of(chat));
+    }
 
     /** How many files went from {@code from} to {@code to}; nothing when one is inside the other or there's nothing. */
     static int move(Path from, Path to) throws IOException {
