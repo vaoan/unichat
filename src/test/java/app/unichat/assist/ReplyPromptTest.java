@@ -179,4 +179,33 @@ class ReplyPromptTest {
         assertEquals("\"Sí\" y \"no\"", ReplyPrompt.clean("\"Sí\" y \"no\""));
         assertEquals("Hola", ReplyPrompt.clean("Hola"));
     }
+
+    @Test
+    void itSaysWhenItIsNowAndHowLongAgoTheLastMessageWas() {
+        java.time.ZonedDateTime now = java.time.ZonedDateTime.parse("2026-01-02T08:34:05-05:00[America/Bogota]");
+        String p = ReplyPrompt.build("", false, List.of(msg("Yo", true, "hola"), msg("Ana", false, "¿Vienes?")), null, "",
+                java.util.Map.of(), "", now);
+        assertTrue(p.contains("Ahora es viernes 2 de enero de 2026, 08:34 (zona horaria America/Bogota)"), p);
+        assertTrue(p.contains("El último mensaje es de Ana, del 2026-01-01 a las 22:04: hace 10 horas."), p);
+        assertTrue(p.indexOf("Ahora es") < p.indexOf("Hazlo en este orden"));
+    }
+
+    @Test
+    void howLongAgoReadsLikeAPersonWouldSayIt() {
+        java.time.Instant t = Instant.parse("2026-01-02T03:04:05Z");
+        assertEquals("hace un momento", ReplyPrompt.ago(t, t.plusSeconds(30)));
+        assertEquals("hace 1 minuto", ReplyPrompt.ago(t, t.plusSeconds(90)));
+        assertEquals("hace 45 minutos", ReplyPrompt.ago(t, t.plusSeconds(45 * 60)));
+        assertEquals("hace 1 hora", ReplyPrompt.ago(t, t.plusSeconds(3600 + 600)));
+        assertEquals("hace 2 días", ReplyPrompt.ago(t, t.plusSeconds(2 * 86400 + 3600)));
+        assertEquals("hace 1 día", ReplyPrompt.ago(t, t.plusSeconds(86400)));
+    }
+
+    @Test
+    void anEmptyChatStillSaysWhenItIsNow() {
+        String p = ReplyPrompt.build("", false, List.of(), null, "", java.util.Map.of(), "",
+                java.time.ZonedDateTime.parse("2026-01-02T08:34:05-05:00[America/Bogota]"));
+        assertTrue(p.contains("Ahora es viernes"));
+        assertFalse(p.contains("El último mensaje"));
+    }
 }
