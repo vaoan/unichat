@@ -22,17 +22,17 @@ class StylePromptTest {
 
     @Test
     void aReplyTooLongOrEmptyIsRefused() {
-        assertNull(StylePrompt.accept("  "));
-        assertNull(StylePrompt.accept("x".repeat(3001)));
-        assertEquals("- corto", StylePrompt.accept("```\n- corto\n```"));
+        assertNull(file("  "));
+        assertNull(file("x".repeat(3001)));
+        assertEquals("- corto", file("```\n- corto\n```"));
     }
 
     @Test
     void onlyAListOfAtMost40BulletsIsAStyleFile() {
-        assertNull(StylePrompt.accept("No tengo suficiente información para actualizar el archivo."));
-        assertNull(StylePrompt.accept("- uno\nY aquí una explicación"));
-        assertNull(StylePrompt.accept("- x\n".repeat(41)));
-        assertEquals("# Estilo\n- uno\n\n* dos", StylePrompt.accept("# Estilo\n- uno\n\n* dos"));
+        assertNull(file("No tengo suficiente información para actualizar el archivo."));
+        assertNull(file("- uno\nY aquí una explicación"));
+        assertNull(file("- x\n".repeat(41)));
+        assertEquals("# Estilo\n- uno\n\n* dos", file("# Estilo\n- uno\n\n* dos"));
     }
 
     @Test
@@ -49,10 +49,16 @@ class StylePromptTest {
     }
 
     @Test
-    void whyAnAnswerIsRejectedIsSaid() {
-        assertTrue(StylePrompt.problem("- a\n".repeat(1000)).contains("caracteres"));
-        assertTrue(StylePrompt.problem("Aquí está tu archivo:\n- a").contains("texto"));
-        assertTrue(StylePrompt.problem("- a\n".repeat(41)).contains("viñetas"));
-        assertEquals(null, StylePrompt.problem("- hahaha"));
+    void whyAnAnswerIsRejectedIsSaidOnce() {
+        assertEquals(StylePrompt.Problem.TOO_LONG, StylePrompt.check("- a\n".repeat(1000)).problem());
+        assertEquals(StylePrompt.Problem.PROSE, StylePrompt.check("Aquí está tu archivo:\n- a").problem());
+        assertEquals(StylePrompt.Problem.PROSE, StylePrompt.check("x".repeat(3001)).problem(), "prose first: not worth shortening");
+        assertEquals(StylePrompt.Problem.TOO_MANY_BULLETS, StylePrompt.check("- a\n".repeat(41)).problem());
+        assertEquals(StylePrompt.Problem.NO_ANSWER, StylePrompt.check(null).problem());
+        assertEquals(new StylePrompt.Verdict("- hahaha", null), StylePrompt.check("- hahaha"));
+    }
+
+    private static String file(String reply) {
+        return StylePrompt.check(reply).file();
     }
 }

@@ -8,3 +8,4 @@ Leaf utilities, no dependencies in the project. Use them instead of writing anot
 
 ## Lessons
 - An HTTP answer read as a stream (`BodyHandlers.ofInputStream`) is closed even when it's an error: `Downloads` threw on a non-200 and left the body open, the connection busy for good (`DownloadsTest.aRefusalLetsItsConnectionGo`). And one `HttpClient` per class, never one per call: each keeps its own threads and connections until collected (`.claude/lessons.tsv` `http-client-per-call`).
+- Three classes ran programs their own way (and wrote "last line" three times), each missing something `Processes` had: interrupting their thread left the program and its children running. `Processes.capture(builder, Limit, input, eachLine)` covers what they needed (a prompt on stdin, a silence limit) and `lastLines` the reason; `.claude/lessons.tsv` `own-process` keeps the converted packages on it.

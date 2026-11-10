@@ -3,12 +3,18 @@ package app.unichat.support;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
-/** Short-lived helper programs: one that sticks can't hold Unichat past its time, and a full output pipe can't stick one. */
+/**
+ * The one way Unichat runs a program: one that sticks can't hold Unichat past its time, a full output pipe can't stick
+ * one, and one stopped (out of time, or its thread interrupted) is stopped with its children.
+ */
 public final class Processes {
     /** A child it leaves running can keep the pipe open forever: past this, what was read is all there is. */
     private static final long READER_GRACE_MS = 2_000;
@@ -23,6 +29,16 @@ public final class Processes {
      */
     public record Result(boolean finished, int exit, String out) {
         public boolean ok() { return finished && exit == 0; }
+    }
+
+    /**
+     * How long a program may take: in all, and without printing anything (one quiet that long is stuck, when a long
+     * job's whole time can't be told ahead). Seconds; {@link Long#MAX_VALUE}: no such limit.
+     */
+    public record Limit(long seconds, long silentSeconds) {
+        public static Limit of(long seconds) { return new Limit(seconds, Long.MAX_VALUE); }
+
+        public static Limit whileTalking(long silentSeconds) { return new Limit(Long.MAX_VALUE, silentSeconds); }
     }
 
     /** Runs {@code cmd} with its output discarded. @param dir where it runs; null: wherever Unichat does */
@@ -43,14 +59,26 @@ public final class Processes {
     }
 
     /** The same, handing {@code eachLine} every line of output as it comes (a download's progress); null: none. */
-    public static Result capture(ProcessBuilder command, long seconds, java.util.function.Consumer<String> eachLine)
+    public static Result capture(ProcessBuilder command, long seconds, Consumer<String> eachLine)
+            throws IOException, InterruptedException {
+        return capture(command, Limit.of(seconds), null, eachLine);
+    }
+
+    /**
+     * What all the others come to: {@code input} (null: none) is written to it while it runs, its output is read as it
+     * comes, and past {@code limit} it's stopped with its children. Interrupting the waiting thread stops it the same
+     * way, and this throws {@link InterruptedException}.
+     */
+    public static Result capture(ProcessBuilder command, Limit limit, String input, Consumer<String> eachLine)
             throws IOException, InterruptedException {
         Process p = command.start();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        Thread reader = Thread.ofPlatform().daemon().name("process-output").start(() -> read(p, out, eachLine));
+        AtomicLong heard = new AtomicLong(System.nanoTime());
+        Thread reader = Thread.ofPlatform().daemon().name("process-output").start(() -> read(p, out, eachLine, heard));
         try {
-            closeInput(p);
-            boolean finished = p.waitFor(seconds, TimeUnit.SECONDS);
+            if (input == null) closeInput(p);
+            else Thread.ofPlatform().daemon().name("process-input").start(() -> feed(p, input));
+            boolean finished = waitFor(p, limit, heard);
             if (!finished) stop(p);
             reader.join(READER_GRACE_MS);
             return new Result(finished, finished ? p.exitValue() : -1, out.toString(StandardCharsets.UTF_8));
@@ -59,26 +87,61 @@ public final class Processes {
         }
     }
 
+    /**
+     * The last {@code n} lines that say something, joined by " | ": a program ends with its reason. Empty when there's
+     * none.
+     */
+    public static String lastLines(String output, int n) {
+        List<String> lines = output.lines().map(String::strip).filter(l -> !l.isEmpty()).toList();
+        return String.join(" | ", lines.subList(Math.max(0, lines.size() - n), lines.size()));
+    }
+
+    /** Whether it ended within {@code limit}. */
+    private static boolean waitFor(Process p, Limit limit, AtomicLong heard) throws InterruptedException {
+        long start = System.nanoTime();
+        long all = TimeUnit.SECONDS.toNanos(limit.seconds()), silence = TimeUnit.SECONDS.toNanos(limit.silentSeconds());
+        while (true) {
+            long now = System.nanoTime();
+            long left = Math.min(all - (now - start), silence - (now - heard.get()));
+            if (p.waitFor(Math.max(0, left), TimeUnit.NANOSECONDS)) return true;
+            if (left <= 0) return false;
+        }
+    }
+
     /** Reads to the end whatever happens to the rest: a process nobody reads from stops in write(). */
-    private static void read(Process p, ByteArrayOutputStream out, java.util.function.Consumer<String> eachLine) {
+    private static void read(Process p, ByteArrayOutputStream out, Consumer<String> eachLine, AtomicLong heard) {
         try (InputStream in = p.getInputStream()) {
-            if (eachLine == null) {
-                in.transferTo(out);
-                return;
-            }
             ByteArrayOutputStream line = new ByteArrayOutputStream();
-            for (int b; (b = in.read()) >= 0; ) {
-                out.write(b);
-                if (b == '\n' || b == '\r') {
-                    if (line.size() > 0) eachLine.accept(line.toString(StandardCharsets.UTF_8));
-                    line.reset();
-                } else {
-                    line.write(b);
-                }
+            byte[] buf = new byte[8192];
+            for (int n; (n = in.read(buf)) >= 0; ) {
+                heard.set(System.nanoTime());
+                out.write(buf, 0, n);
+                if (eachLine != null) split(buf, n, line, eachLine);
             }
-            if (line.size() > 0) eachLine.accept(line.toString(StandardCharsets.UTF_8));
+            if (eachLine != null && line.size() > 0) eachLine.accept(line.toString(StandardCharsets.UTF_8));
         } catch (IOException ended) {
             // Killed, or its pipe closed.
+        }
+    }
+
+    /** A carriage return ends a line too (progress bars). */
+    private static void split(byte[] buf, int n, ByteArrayOutputStream line, Consumer<String> eachLine) {
+        for (int i = 0; i < n; i++) {
+            byte b = buf[i];
+            if (b == '\n' || b == '\r') {
+                if (line.size() > 0) eachLine.accept(line.toString(StandardCharsets.UTF_8));
+                line.reset();
+            } else {
+                line.write(b);
+            }
+        }
+    }
+
+    private static void feed(Process p, String input) {
+        try (OutputStream in = p.getOutputStream()) {
+            in.write(input.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ignored) {
+            // It exited without reading it all: its exit code says why.
         }
     }
 
@@ -90,6 +153,7 @@ public final class Processes {
         }
     }
 
+    /** It and its children (a shell's, a node script's): one left behind keeps running and holding its files. */
     private static void stop(Process p) throws InterruptedException {
         p.descendants().forEach(ProcessHandle::destroyForcibly);
         p.destroyForcibly();

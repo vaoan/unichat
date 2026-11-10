@@ -83,9 +83,11 @@ public final class Transcripts {
 
     /** Starts transcribing unless it's done or under way; {@code audio} downloads the file when its turn comes. */
     public void request(String mediaUrl, Supplier<CompletableFuture<Path>> audio) {
-        State cur = state(mediaUrl);
-        if (cur instanceof Done || cur instanceof Working) return;
-        set(mediaUrl, new Working(I18n.t("stt.queued")));
+        state(mediaUrl); // what's on disk counts as done
+        State queued = new Working(I18n.t("stt.queued"));
+        // Checked and claimed in one step: asked from two threads at once, both saw nothing and both transcribed it.
+        if (states.compute(mediaUrl, (k, cur) -> cur instanceof Done || cur instanceof Working ? cur : queued) != queued) return;
+        for (Runnable r : listeners) r.run();
         worker.execute(() -> {
             try {
                 set(mediaUrl, new Working(I18n.t("stt.downloadingAudio")));

@@ -8,7 +8,6 @@ import app.unichat.support.Os;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.DoubleConsumer;
@@ -28,18 +27,13 @@ public final class VideoTranscoder {
         if (ConvertedFiles.reuse(out)) return out;
         Path ffmpeg = Ffmpeg.whenNeeded(installProgress);
         if (ffmpeg == null) throw new WebmStickers.NoConverter();
-        Path tmp = out.resolveSibling(out.getFileName() + ".part");
-        try {
-            for (String encoder : encoders()) {
-                if (Ffmpeg.run(command(ffmpeg, video, tmp, encoder), TIMEOUT_SECONDS)) {
-                    Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-                    return out;
-                }
-            }
-        } finally {
-            Files.deleteIfExists(tmp);
-        }
-        throw new IOException(I18n.t("video.convertFailed"));
+        if (PartFile.firstOf(out, TIMEOUT_SECONDS, ways(ffmpeg, video)) == null) throw new IOException(I18n.t("video.convertFailed"));
+        return out;
+    }
+
+    /** One way per encoder, best first. */
+    private static List<PartFile.Way> ways(Path ffmpeg, Path video) {
+        return encoders().stream().map(e -> (PartFile.Way) into -> command(ffmpeg, video, into, e)).toList();
     }
 
     private static final java.util.regex.Pattern STREAM = java.util.regex.Pattern.compile("Stream #\\S+.*?: (Video|Audio): (\\w+)");
@@ -86,19 +80,9 @@ public final class VideoTranscoder {
         if (picture(info.out()) || playsEverywhere(info.out())) return file; // a picture stays one
         String name = file.getFileName().toString();
         Path out = file.resolveSibling((name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name) + ".mp4");
-        Path tmp = file.resolveSibling("." + out.getFileName() + ".part");
-        try {
-            for (String encoder : encoders()) {
-                if (Ffmpeg.run(command(ffmpeg, file, tmp, encoder), TIMEOUT_SECONDS)) {
-                    Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-                    if (!out.equals(file)) Files.deleteIfExists(file);
-                    return out;
-                }
-            }
-        } finally {
-            Files.deleteIfExists(tmp);
-        }
-        throw new IOException(I18n.t("video.convertFailed"));
+        if (PartFile.firstOf(out, TIMEOUT_SECONDS, ways(ffmpeg, file)) == null) throw new IOException(I18n.t("video.convertFailed"));
+        if (!out.equals(file)) Files.deleteIfExists(file);
+        return out;
     }
 
     /** The Mac's hardware encoder is much faster, and every full ffmpeg has libx264. */

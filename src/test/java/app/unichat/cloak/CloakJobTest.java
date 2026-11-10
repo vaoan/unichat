@@ -70,6 +70,57 @@ class CloakJobTest {
         assertTrue(job.start(dir.resolve("b.png"), dir.resolve("b-out.png"), CloakLevel.LIGHT, sent::set), "free again");
     }
 
+    /**
+     * A cancelled job whose thread is slow to stop (a download doesn't end at the interrupt) and the next one started
+     * meanwhile: what the old thread reports later is the old job's, never shown as the new one's.
+     */
+    @Test
+    void anOldJobStoppingLateDoesntWriteOverTheNewOne() throws Exception {
+        CountDownLatch firstInstalling = new CountDownLatch(1), letFirstGo = new CountDownLatch(1), firstReported = new CountDownLatch(1);
+        CountDownLatch secondInstalling = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger installs = new java.util.concurrent.atomic.AtomicInteger();
+        AtomicReference<Path> sent = new AtomicReference<>();
+        CloakJob job = new CloakJob(new CloakJob.Runner() {
+            @Override
+            public void install(CloakTool.Progress progress) throws InterruptedException {
+                if (installs.incrementAndGet() == 1) {
+                    firstInstalling.countDown();
+                    while (true) {
+                        try {
+                            letFirstGo.await(); // deaf to the interrupt, as a download can be for a while
+                            break;
+                        } catch (InterruptedException ignored) {
+                            // keeps going
+                        }
+                    }
+                    progress.at("cloak.install.model", 0.9);
+                } else {
+                    secondInstalling.countDown();
+                    new CountDownLatch(1).await(); // until cancelled
+                }
+            }
+
+            @Override
+            public void protect(Path in, Path out, CloakLevel level, DoubleConsumer progress) throws InterruptedException {
+                progress.accept(0.5);
+                firstReported.countDown();
+                throw new InterruptedException(); // ends here: what finishing would do isn't this test's
+            }
+        });
+        assertTrue(job.start(dir.resolve("a.png"), dir.resolve("a-out.png"), CloakLevel.LIGHT, sent::set));
+        firstInstalling.await();
+        job.cancel();
+        job.dismiss();
+        assertTrue(job.start(dir.resolve("b.png"), dir.resolve("b-out.png"), CloakLevel.STRONG, sent::set));
+        secondInstalling.await();
+        letFirstGo.countDown();
+        firstReported.await(); // the old thread reported its install and its progress: both calls returned
+        assertEquals("b.png", job.status().file(), "the old job wrote over the new one's status");
+        assertEquals(CloakJob.Phase.INSTALLING, job.status().phase());
+        job.cancel();
+        assertNull(sent.get());
+    }
+
     @Test
     void aFailureStaysWithItsReason() throws Exception {
         CloakJob job = new CloakJob(fake(null, null, new IOException("sin espacio")));

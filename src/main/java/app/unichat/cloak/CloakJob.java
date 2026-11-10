@@ -1,11 +1,9 @@
 package app.unichat.cloak;
 
 import app.unichat.support.I18n;
+import app.unichat.support.Processes;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -48,6 +46,11 @@ public final class CloakJob {
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private volatile Status status = Status.IDLE;
     private Thread worker;
+    /**
+     * Which start the status belongs to (guarded by this). A cancelled job's thread can take a while to stop (a download
+     * doesn't end at the interrupt): what it reports then is its own job's, never the next one's.
+     */
+    private long job;
 
     CloakJob(Runner runner) {
         this.runner = runner;
@@ -68,8 +71,9 @@ public final class CloakJob {
     public synchronized boolean start(Path in, Path out, CloakLevel level, Consumer<Path> onDone) {
         if (status.busy()) return false;
         String name = in.getFileName().toString();
+        long id = ++job;
         set(new Status(Phase.INSTALLING, name, level, "cloak.install.checking", -1, System.currentTimeMillis(), null));
-        worker = Thread.ofPlatform().daemon().name("cloak").start(() -> work(in, out, level, onDone, name));
+        worker = Thread.ofPlatform().daemon().name("cloak").start(() -> work(id, in, out, level, onDone, name));
         return true;
     }
 
@@ -85,30 +89,26 @@ public final class CloakJob {
         if (!status.busy()) set(Status.IDLE);
     }
 
-    private void work(Path in, Path out, CloakLevel level, Consumer<Path> onDone, String name) {
+    private void work(long id, Path in, Path out, CloakLevel level, Consumer<Path> onDone, String name) {
         try {
-            runner.install((key, f) -> update(new Status(Phase.INSTALLING, name, level, key, f, status.startedMs(), null)));
+            runner.install((key, f) -> update(id, new Status(Phase.INSTALLING, name, level, key, f, status.startedMs(), null)));
             long started = System.currentTimeMillis();
-            update(new Status(Phase.PROTECTING, name, level, null, 0, started, null));
-            runner.protect(in, out, level, f -> update(new Status(Phase.PROTECTING, name, level, null, f, started, null)));
-            if (!finish(new Status(Phase.DONE, name, level, null, 1, 0, null))) return;
+            update(id, new Status(Phase.PROTECTING, name, level, null, 0, started, null));
+            runner.protect(in, out, level, f -> update(id, new Status(Phase.PROTECTING, name, level, null, f, started, null)));
+            if (!update(id, new Status(Phase.DONE, name, level, null, 1, 0, null))) return;
             onDone.accept(out);
         } catch (InterruptedException e) {
             // Cancelled: the status already says so.
         } catch (IOException | RuntimeException e) {
             System.err.println("Image protection failed: " + e.getMessage());
-            finish(new Status(Phase.FAILED, name, level, null, 0, 0,
+            update(id, new Status(Phase.FAILED, name, level, null, 0, 0,
                     e.getMessage() == null ? I18n.t("cloak.error.run") : e.getMessage()));
         }
     }
 
-    /** Progress, unless it was cancelled meanwhile. */
-    private synchronized void update(Status s) {
-        if (status.busy()) set(s);
-    }
-
-    private synchronized boolean finish(Status s) {
-        if (!status.busy()) return false;
+    /** Job {@code id}'s news, unless it was cancelled meanwhile (or another started since): whether it was taken. */
+    private synchronized boolean update(long id, Status s) {
+        if (id != job || !status.busy()) return false;
         set(s);
         return true;
     }
@@ -149,37 +149,16 @@ public final class CloakJob {
     static void run(List<String> command, Path out, DoubleConsumer progress) throws IOException, InterruptedException {
         Files.createDirectories(out.getParent());
         Files.deleteIfExists(out);
-        Process p = new ProcessBuilder(command).redirectErrorStream(true).start();
-        p.getOutputStream().close();
-        String[] last = {""};
-        long[] heard = {System.currentTimeMillis()};
-        Thread reader = Thread.ofPlatform().daemon().name("cloak-output").start(() -> {
-            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
-                for (String line; (line = r.readLine()) != null; ) {
-                    heard[0] = System.currentTimeMillis();
+        Processes.Result r = Processes.capture(new ProcessBuilder(command).redirectErrorStream(true),
+                Processes.Limit.whileTalking(SILENCE_SECONDS), null, line -> {
                     double f = progress(line);
                     if (f >= 0) progress.accept(f);
-                    else if (!line.isBlank()) last[0] = line;
-                }
-            } catch (IOException ended) {
-                // Killed.
-            }
-        });
-        try {
-            while (!p.waitFor(1, java.util.concurrent.TimeUnit.SECONDS)) {
-                if (System.currentTimeMillis() - heard[0] > SILENCE_SECONDS * 1000) throw new IOException(I18n.t("cloak.error.run"));
-            }
-            reader.join(2_000);
-            if (p.exitValue() != 0 || !Files.isRegularFile(out)) {
-                System.err.println("Image protection: the script failed (exit " + p.exitValue() + "): " + last[0]);
-                throw new IOException(I18n.t("cloak.error.run"));
-            }
-        } finally {
-            if (p.isAlive()) {
-                p.descendants().forEach(ProcessHandle::destroyForcibly);
-                p.destroyForcibly();
-                p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS);
-            }
+                });
+        if (!r.finished()) throw new IOException(I18n.t("cloak.error.run"));
+        if (r.exit() != 0 || !Files.isRegularFile(out)) {
+            String said = String.join("\n", r.out().lines().filter(l -> progress(l) < 0).toList());
+            System.err.println("Image protection: the script failed (exit " + r.exit() + "): " + Processes.lastLines(said, 1));
+            throw new IOException(I18n.t("cloak.error.run"));
         }
     }
 }

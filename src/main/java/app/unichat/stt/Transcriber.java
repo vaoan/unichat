@@ -4,6 +4,7 @@ import app.unichat.support.BundledTools;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
 import app.unichat.support.Os;
+import app.unichat.support.Processes;
 import app.unichat.settings.Settings;
 import app.unichat.video.Ffmpeg;
 
@@ -12,10 +13,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
@@ -27,6 +26,9 @@ public final class Transcriber {
 
     /** Example for "Comando propio"; {archivo} is a WAV/MP3/FLAC file, {idioma} "es", "en"… or "auto". */
     public static final String EXAMPLE_COMMAND = "whisper-cli -m /ruta/al/modelo.bin -f {archivo} -l {idioma} -nt -np";
+
+    /** A long note takes minutes on a slow computer; one stuck that long isn't coming. */
+    private static final long TIMEOUT_SECONDS = 15 * 60;
 
     private Transcriber() {}
 
@@ -113,27 +115,25 @@ public final class Transcriber {
                 || s.startsWith("OggS") || ((h[0] & 0xFF) == 0xFF && (h[1] & 0xE0) == 0xE0);
     }
 
-    /** Runs {@code cmd}; stdout on success, the last error line otherwise. */
-    private static String run(List<String> cmd, Path work) throws IOException, InterruptedException {
-        Path out = work.resolve("stdout.txt"), err = work.resolve("stderr.txt");
-        Process p;
+    /**
+     * Runs {@code cmd}; stdout on success, the last error line otherwise. Out of time or its thread interrupted (the
+     * note's transcript no longer wanted), it's stopped with its children.
+     */
+    static String run(List<String> cmd, Path work) throws IOException, InterruptedException {
+        Path err = work.resolve("stderr.txt");
+        Processes.Result r;
         try {
-            p = new ProcessBuilder(cmd).directory(work.toFile())
-                    .redirectOutput(out.toFile()).redirectError(err.toFile()).start();
+            r = Processes.capture(new ProcessBuilder(cmd).directory(work.toFile()).redirectError(err.toFile()), TIMEOUT_SECONDS);
         } catch (IOException e) {
             throw new IOException(I18n.t("stt.runFailed", Path.of(cmd.get(0)).getFileName(), e.getMessage()));
         }
-        if (!p.waitFor(15, TimeUnit.MINUTES)) {
-            p.destroyForcibly();
-            throw new IOException(I18n.t("stt.tooLong"));
+        if (!r.finished()) throw new IOException(I18n.t("stt.tooLong"));
+        if (r.exit() != 0) {
+            String last = Processes.lastLines(Files.readString(err, StandardCharsets.UTF_8), 1);
+            throw new IOException(I18n.t("stt.failed", Path.of(cmd.get(0)).getFileName(),
+                    last.isEmpty() ? I18n.t("stt.exitCode", r.exit()) : last));
         }
-        if (p.exitValue() != 0) {
-            List<String> lines = new ArrayList<>(Files.readAllLines(err, StandardCharsets.UTF_8));
-            lines.removeIf(String::isBlank);
-            String last = lines.isEmpty() ? I18n.t("stt.exitCode", p.exitValue()) : lines.get(lines.size() - 1).strip();
-            throw new IOException(I18n.t("stt.failed", Path.of(cmd.get(0)).getFileName(), last));
-        }
-        return Files.readString(out, StandardCharsets.UTF_8);
+        return r.out();
     }
 
     /** One paragraph; Whisper's bracketed markers ("[BLANK_AUDIO]", "[Música]") removed. Empty when nothing was said. */

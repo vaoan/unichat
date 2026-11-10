@@ -14,6 +14,7 @@ import java.nio.file.Path;
 public final class SaveFolders {
     static final String BASE_KEY = "autosave.folder";
     private static final String CHAT_KEY = "autosave.folder.chat.";
+    private static final String NAME_KEY = "autosave.folder.name.";
 
     private SaveFolders() {}
 
@@ -42,7 +43,20 @@ public final class SaveFolders {
     /** Where {@code chat}'s things go: its own folder, or one named after it under the base. */
     public static Path of(Chat chat) {
         String own = Settings.get().getString(CHAT_KEY + chat.id(), null);
-        return own != null ? Path.of(own) : base().resolve(FileNames.folder(chat.title()));
+        return own != null ? Path.of(own) : base().resolve(name(chat));
+    }
+
+    /**
+     * The name of {@code chat}'s folder under the base: its title the first time, kept from then on. Anyone in a group
+     * can rename it, and following the title split its files into a new folder, where exploring saved them all again.
+     */
+    static synchronized String name(Chat chat) {
+        Settings s = Settings.get();
+        String kept = s.getString(NAME_KEY + chat.id(), null);
+        if (kept != null) return kept;
+        String name = FileNames.folder(chat.title());
+        s.set(NAME_KEY + chat.id(), name);
+        return name;
     }
 
     /** Null: under the base again. */

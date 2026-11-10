@@ -58,20 +58,18 @@ public final class StyleLearner {
             try {
                 String answer = program.write(StylePrompt.learn(current, mine.stream().map(Message::body).toList(), corrections));
                 if (answer == null) return current; // cancelled
-                String learned = StylePrompt.accept(answer);
-                String why = StylePrompt.problem(answer);
-                if (learned == null && why != null && why.contains("caracteres")) {
+                StylePrompt.Verdict v = StylePrompt.check(answer);
+                if (v.problem() == StylePrompt.Problem.TOO_LONG) {
                     // Only too long: what it learned is there, so it's shortened once rather than thrown away.
                     String shorter = program.write(StylePrompt.shorten(answer));
                     if (shorter == null) return current; // cancelled
-                    learned = StylePrompt.accept(shorter);
-                    why = StylePrompt.problem(shorter);
+                    v = StylePrompt.check(shorter);
                 }
-                if (learned == null) {
-                    System.err.println("Writing style not learned: " + why);
+                if (v.file() == null) {
+                    System.err.println("Writing style not learned: " + v.problem());
                     return current;
                 }
-                return store.commit(current, learned, corrections.size(), chatId, newest) ? learned : store.text();
+                return store.commit(current, v.file(), corrections.size(), chatId, newest) ? v.file() : store.text();
             } catch (ReplyWriter.Failure e) {
                 System.err.println("Writing style not learned: the AI program failed");
                 return current;

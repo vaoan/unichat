@@ -50,9 +50,9 @@ class FfmpegTest {
         System.clearProperty("unichat.ffmpeg");
     }
 
-    private Ffmpeg.Build build(byte[] zip, String entry) throws Exception {
+    private PinnedTool build(byte[] zip, String entry) throws Exception {
         served = zip;
-        return new Ffmpeg.Build("http://127.0.0.1:" + server.getAddress().getPort() + "/z", zip.length,
+        return new PinnedTool("http://127.0.0.1:" + server.getAddress().getPort() + "/z", zip.length,
                 HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(zip)), entry);
     }
 
@@ -111,7 +111,7 @@ class FfmpegTest {
     @Test
     void theDownloadKeepsWorkingForWhisperToo() throws Exception {
         byte[] body = zip("a", "b");
-        Ffmpeg.Build b = build(body, "a");
+        PinnedTool b = build(body, "a");
         Downloads.fetch(b.url(), b.size(), b.sha256(), dir.resolve("m.bin"), "el modelo de voz", p -> { });
         assertEquals(body.length, Files.size(dir.resolve("m.bin")));
     }

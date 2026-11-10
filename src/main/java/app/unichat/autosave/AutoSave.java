@@ -95,7 +95,27 @@ public final class AutoSave implements ChatService.Listener {
         return t;
     });
 
-    AutoSave(ChatPreferences prefs, ChatReader chats, SavedUpTo savedUpTo, Saver saver) {
+    /**
+     * How often a chat held by a failure for now (no space, the network, an error yt-dlp's words don't place) tries again
+     * by itself, so a quiet chat isn't left waiting for its next message: often enough that a disk freed or a network
+     * back is noticed within the half hour, rarely enough that a failing download isn't repeated all day.
+     */
+    static final java.time.Duration RETRY_AFTER = java.time.Duration.ofMinutes(30);
+    /**
+     * After this many of those tries it's let go, for good, so what came after is saved: with {@link #RETRY_AFTER},
+     * a day, which covers a night offline or a full disk until the person (told at the first failure) frees it. The
+     * tries the chat's own changes make don't count, so a busy group doesn't give up within minutes.
+     */
+    static final int MAX_TIMED_TRIES = 48;
+    private final java.time.Duration retryAfter;
+    /** A message holding a chat, and how many timed tries it failed. */
+    private record Held(String messageId, int timedTries) {}
+    /** Only the saving thread touches them. */
+    private final Map<String, Held> held = new java.util.HashMap<>();
+    private final Set<String> retrying = new java.util.HashSet<>();
+
+    AutoSave(ChatPreferences prefs, ChatReader chats, SavedUpTo savedUpTo, java.time.Duration retryAfter, Saver saver) {
+        this.retryAfter = retryAfter;
         this.prefs = prefs;
         this.chats = chats;
         this.savedUpTo = savedUpTo;
@@ -106,7 +126,7 @@ public final class AutoSave implements ChatService.Listener {
     public static synchronized AutoSave of(ChatService svc) {
         return BY_SERVICE.computeIfAbsent(svc, s -> {
             AutoSave a = new AutoSave(svc, svc, new SavedUpTo(Settings.dataDir().resolve("autosave.json")),
-                    downloading(svc));
+                    RETRY_AFTER, downloading(svc));
             svc.addListener(a);
             return a;
         });
@@ -135,7 +155,7 @@ public final class AutoSave implements ChatService.Listener {
             int moved = 0;
             for (Chat c : chats.chats()) {
                 if (SaveFolders.hasOwn(c.id())) continue;
-                String name = FileNames.folder(c.title());
+                String name = SaveFolders.name(c);
                 moved += SavedMove.move(before.resolve(name), after.resolve(name));
             }
             return moved;
@@ -174,11 +194,14 @@ public final class AutoSave implements ChatService.Listener {
 
     @Override
     public void messagesChanged(String chatId) {
-        worker.execute(() -> catchUp(chatId));
+        worker.execute(() -> catchUp(chatId, false));
     }
 
-    /** Saves, in order, what was sent in {@code chatId} since the last one saved (others', and mine if chosen). Worker. */
-    private void catchUp(String chatId) {
+    /**
+     * Saves, in order, what was sent in {@code chatId} since the last one saved (others', and mine if chosen). Worker.
+     * {@code timed}: the try {@link #retryLater} set off, which counts toward letting a held message go.
+     */
+    private void catchUp(String chatId, boolean timed) {
         Wanted wanted = Wanted.of(prefs, chatId);
         Chat chat = chats.chat(chatId);
         if (wanted.none() || chat == null) return;
@@ -190,9 +213,13 @@ public final class AutoSave implements ChatService.Listener {
         if (total > done) progress.changed(done, total);
         for (int i = 0; i < fresh.size(); i++) {
             Message m = fresh.get(i);
-            if (!saveAll(m, wanted.of(m), chat, dir)) {
-                // Tried again from here at the chat's next change: marking it done lost it for good, and saving what
-                // came after would move the mark past it all the same.
+            Held h = held.get(chatId);
+            int tries = (h != null && h.messageId().equals(m.id()) ? h.timedTries() : 0) + (timed && i == 0 ? 1 : 0);
+            if (!saveAll(m, wanted.of(m), chat, dir, tries >= MAX_TIMED_TRIES)) {
+                // Tried again from here at the chat's next change or by itself: marking it done lost it for good, and
+                // saving what came after would move the mark past it all the same.
+                held.put(chatId, new Held(m.id(), tries));
+                retryLater(chatId);
                 int left = 0;
                 for (Message later : fresh.subList(i + 1, fresh.size())) left += work(later, wanted.of(later));
                 total -= left;
@@ -201,15 +228,33 @@ public final class AutoSave implements ChatService.Listener {
             }
             savedUpTo.saved(chatId, m);
             toldForNow.remove(chatId);
+            held.remove(chatId);
         }
     }
 
-    /** Saves what {@code m} has of {@code kinds}; false when something failed that may work next time. */
-    private boolean saveAll(Message m, Set<SaveKind> kinds, Chat chat, Path dir) {
+    /** One try of a held chat after {@link #retryAfter}, however many failures asked for it meanwhile. Worker. */
+    private void retryLater(String chatId) {
+        if (!retrying.add(chatId)) return;
+        java.util.concurrent.CompletableFuture.delayedExecutor(retryAfter.toSeconds(), java.util.concurrent.TimeUnit.SECONDS, worker)
+                .execute(() -> {
+                    retrying.remove(chatId);
+                    catchUp(chatId, true);
+                });
+    }
+
+    /**
+     * Saves what {@code m} has of {@code kinds}; false when something failed that may work next time. {@code lastTry}:
+     * a failure now is let go as for good ({@link #MAX_TIMED_TRIES}).
+     */
+    private boolean saveAll(Message m, Set<SaveKind> kinds, Chat chat, Path dir, boolean lastTry) {
         boolean done = true;
         SaveKind kind = SaveKind.of(m); // null: a sticker, or no media
         if (kind != null && kinds.contains(kind)) done = step(chat, saveMedia(m, chat, dir));
         if (kinds.contains(SaveKind.LINKS)) for (String url : links(m)) done &= step(chat, saveLink(url, m, chat, dir));
+        if (!done && lastTry) {
+            System.err.println("Auto-save: gave up on a message of " + chat.id() + " after " + MAX_TIMED_TRIES + " tries");
+            return true;
+        }
         return done;
     }
 

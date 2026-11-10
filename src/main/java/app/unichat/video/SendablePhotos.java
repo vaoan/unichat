@@ -1,12 +1,8 @@
 package app.unichat.video;
 
-import app.unichat.support.Os;
-import app.unichat.support.Processes;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -44,36 +40,25 @@ public final class SendablePhotos {
      * Blocking; IOException when neither sips nor ffmpeg could make it.
      */
     public static Path jpeg(Path picture, int width, int height, Path dir) throws IOException, InterruptedException {
+        return jpeg(picture, width, height, dir, Ffmpeg.WHEN_NEEDED);
+    }
+
+    /** {@code ffmpeg}: asked for only when sips can't (there's none, or it failed). */
+    static Path jpeg(Path picture, int width, int height, Path dir, Ffmpeg.Source ffmpeg) throws IOException, InterruptedException {
         Files.createDirectories(dir);
         String name = picture.getFileName().toString();
         int dot = name.lastIndexOf('.');
         Path out = dir.resolve((dot > 0 ? name.substring(0, dot) : name) + ".jpg");
-        Path tmp = dir.resolve(out.getFileName() + ".part.jpg");
         boolean shrink = width <= 0 || Math.max(width, height) > SIDE;
-        try {
-            for (List<String> command : commands(picture, tmp, shrink)) {
-                if (Processes.quiet(command, null, TIMEOUT_SECONDS).ok() && Files.isRegularFile(tmp) && Files.size(tmp) > 0) {
-                    Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-                    return out;
-                }
-            }
-        } finally {
-            Files.deleteIfExists(tmp);
-        }
-        throw new IOException("Could not make a photo of " + name);
-    }
-
-    private static List<List<String>> commands(Path in, Path out, boolean shrink) throws IOException, InterruptedException {
-        List<List<String>> all = new ArrayList<>();
-        if (Os.mac()) all.add(sips(in, out, shrink));
-        Path ffmpeg = Ffmpeg.whenNeeded(p -> { });
-        if (ffmpeg != null) all.add(ffmpeg(ffmpeg, in, out));
-        return all;
+        Path made = PartFile.firstOf(out, TIMEOUT_SECONDS, PartFile.sipsThenFfmpeg(into -> sips(picture, into, shrink), ffmpeg,
+                (found, into) -> ffmpeg(found, picture, into)));
+        if (made == null) throw new IOException("Could not make a photo of " + name);
+        return made;
     }
 
     /** sips's -Z also enlarges, so it's only given when the picture is bigger (or of unknown size). */
     static List<String> sips(Path in, Path out, boolean shrink) {
-        List<String> c = new ArrayList<>(List.of("/usr/bin/sips", "-s", "format", "jpeg", "-s", "formatOptions", "85"));
+        List<String> c = new ArrayList<>(List.of(PartFile.SIPS.toString(), "-s", "format", "jpeg", "-s", "formatOptions", "85"));
         if (shrink) c.addAll(List.of("-Z", Integer.toString(SIDE)));
         c.addAll(List.of(in.toString(), "--out", out.toString()));
         return c;

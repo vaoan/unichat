@@ -64,35 +64,39 @@ public final class StylePrompt {
                 + "Escribe únicamente el archivo completo, sin explicaciones.";
     }
 
-    /** Why {@link #accept} refuses {@code reply}, for the log; null when it doesn't. */
-    public static String problem(String reply) {
-        if (reply == null) return "no answer";
-        String r = ReplyPrompt.clean(reply);
-        if (r.isBlank()) return "an empty answer";
-        int bullets = 0;
-        for (String line : r.split("\n")) {
-            String l = line.strip();
-            if (l.startsWith("- ") || l.startsWith("* ")) bullets++;
-            else if (!l.isEmpty() && !l.startsWith("#")) return "texto que no es una lista de rasgos";
-        }
-        if (r.length() > MAX_CHARS) return r.length() + " caracteres, más de " + MAX_CHARS;
-        if (bullets == 0) return "ninguna viñeta";
-        if (bullets > MAX_BULLETS) return bullets + " viñetas, más de " + MAX_BULLETS;
-        return null;
+    /** Why an answer isn't kept, as the log says it. Only {@link #TOO_LONG} is worth asking to shorten. */
+    public enum Problem {
+        NO_ANSWER("no answer"), EMPTY("an empty answer"), PROSE("text that isn't a list of traits"),
+        TOO_LONG("over " + MAX_CHARS + " characters"), NO_BULLETS("no bullets"), TOO_MANY_BULLETS("over " + MAX_BULLETS + " bullets");
+
+        private final String said;
+
+        Problem(String said) { this.said = said; }
+
+        @Override public String toString() { return said; }
     }
 
-    /** The file to save from what the program answered; null when it's empty or too long to keep. */
-    public static String accept(String reply) {
-        if (reply == null) return null;
+    /**
+     * What the program answered, judged once.
+     * @param file what to save; null when there's a problem
+     * @param problem why it isn't kept; null when it is
+     */
+    public record Verdict(String file, Problem problem) {}
+
+    /** Judges an answer: a list of traits (prose is an explanation, not the file) within the limits. */
+    public static Verdict check(String reply) {
+        if (reply == null) return new Verdict(null, Problem.NO_ANSWER);
         String r = ReplyPrompt.clean(reply);
-        if (r.isBlank() || r.length() > MAX_CHARS) return null;
+        if (r.isBlank()) return new Verdict(null, Problem.EMPTY);
         int bullets = 0;
         for (String line : r.split("\n")) {
             String l = line.strip();
             if (l.startsWith("- ") || l.startsWith("* ")) bullets++;
-            else if (!l.isEmpty() && !l.startsWith("#")) return null; // prose: an explanation, not the file
+            else if (!l.isEmpty() && !l.startsWith("#")) return new Verdict(null, Problem.PROSE);
         }
-        return bullets == 0 || bullets > MAX_BULLETS ? null : r;
+        Problem p = r.length() > MAX_CHARS ? Problem.TOO_LONG : bullets == 0 ? Problem.NO_BULLETS
+                : bullets > MAX_BULLETS ? Problem.TOO_MANY_BULLETS : null;
+        return new Verdict(p == null ? r : null, p);
     }
 
     /** The style as a block of a draft's prompt; nothing when there's none yet. */

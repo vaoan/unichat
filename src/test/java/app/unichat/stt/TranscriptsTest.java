@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -98,6 +99,40 @@ class TranscriptsTest {
         t.request("mxc://s/b", () -> CompletableFuture.completedFuture(dir.resolve("b.ogg")));
         await(t, "mxc://s/b");
         assertEquals("ahora sí", assertInstanceOf(Transcripts.Done.class, t.state("mxc://s/b")).text());
+    }
+
+    /** The chat's update, the button and a draft can ask for the same note at once: it's transcribed once. */
+    @Test
+    void askedAtOnceFromSeveralThreadsItsTranscribedOnce(@TempDir Path dir) throws Exception {
+        java.util.Map<String, AtomicInteger> runs = new java.util.concurrent.ConcurrentHashMap<>();
+        Transcripts t = new Transcripts(dir, (audio, status) -> {
+            runs.computeIfAbsent(audio.getFileName().toString(), k -> new AtomicInteger()).incrementAndGet();
+            return "hola";
+        });
+        int askers = 8;
+        for (int note = 0; note < 100; note++) {
+            String url = "mxc://s/" + note;
+            Path audio = dir.resolve(note + ".ogg");
+            java.util.concurrent.CyclicBarrier together = new java.util.concurrent.CyclicBarrier(askers);
+            List<Thread> threads = new java.util.ArrayList<>();
+            for (int i = 0; i < askers; i++) {
+                threads.add(Thread.ofPlatform().start(() -> {
+                    try {
+                        together.await();
+                    } catch (Exception e) {
+                        throw new IllegalStateException(e);
+                    }
+                    t.request(url, () -> CompletableFuture.completedFuture(audio));
+                }));
+            }
+            for (Thread th : threads) th.join(); // lesson-ok: test-future-join (a thread)
+            await(t, url);
+        }
+        CountDownLatch idle = new CountDownLatch(1);
+        t.request("mxc://s/last", () -> { idle.countDown(); return CompletableFuture.completedFuture(dir.resolve("last.ogg")); });
+        idle.await(); // one worker in order: everything asked before has run
+        await(t, "mxc://s/last");
+        runs.forEach((note, n) -> assertEquals(1, n.get(), note + " transcribed " + n.get() + " times"));
     }
 
     @Test

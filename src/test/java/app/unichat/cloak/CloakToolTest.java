@@ -57,11 +57,6 @@ class CloakToolTest {
         assertTrue(c.contains("-I"), "isolated: nothing from the folder it runs in is imported");
     }
 
-    @Test
-    void theInstallErrorKeepsOnlyTheLastLines() {
-        assertEquals("b | c | d", CloakTool.lastLines("a\n\nb\nc\nd\n"));
-    }
-
     /** The real thing: downloads ~330 MB into a temp folder, protects a small picture. {@code -Dunichat.networkTests=true}. */
     @Test
     @EnabledIfSystemProperty(named = "unichat.networkTests", matches = "true")

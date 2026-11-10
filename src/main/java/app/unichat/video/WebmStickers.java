@@ -5,9 +5,7 @@ import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -58,14 +56,8 @@ public final class WebmStickers {
         for (boolean libvpx : new boolean[]{true, false}) {
             for (String format : FORMATS) {
                 Path out = convertedPath(webm, format);
-                Path tmp = out.resolveSibling(out.getFileName() + ".part");
-                try {
-                    if (Ffmpeg.run(command(ffmpeg, webm, tmp, format, libvpx), TIMEOUT_SECONDS)) {
-                        Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-                        return out;
-                    }
-                } finally {
-                    Files.deleteIfExists(tmp);
+                if (PartFile.firstOf(out, TIMEOUT_SECONDS, List.of(into -> command(ffmpeg, webm, into, format, libvpx))) != null) {
+                    return out;
                 }
             }
         }

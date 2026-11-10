@@ -2,13 +2,9 @@ package app.unichat.video;
 
 import app.unichat.support.ConvertedFiles;
 import app.unichat.support.I18n;
-import app.unichat.support.Os;
-import app.unichat.support.Processes;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 
 /**
@@ -26,35 +22,24 @@ public final class BigPictures {
 
     /** The PNG copy of {@code picture} fitting {@value #SIDE} px, made once. Blocking. */
     public static Path shrunk(Path picture) throws IOException, InterruptedException {
+        return shrunk(picture, Ffmpeg.WHEN_NEEDED);
+    }
+
+    /** {@code ffmpeg}: asked for only when sips can't (there's none, or it failed). */
+    static Path shrunk(Path picture, Ffmpeg.Source ffmpeg) throws IOException, InterruptedException {
         Path out = ConvertedFiles.beside(picture, SIDE + ".png");
         if (ConvertedFiles.reuse(out)) return out;
-        Path tmp = out.resolveSibling(out.getFileName() + ".part.png");
         try {
-            for (List<String> command : commands(picture, tmp)) {
-                if (Processes.quiet(command, null, TIMEOUT_SECONDS).ok() && Files.size(tmp) > 0) {
-                    Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-                    return out;
-                }
-            }
+            if (PartFile.firstOf(out, TIMEOUT_SECONDS, PartFile.sipsThenFfmpeg(into -> sips(picture, into), ffmpeg,
+                    (found, into) -> ffmpeg(found, picture, into))) != null) return out;
         } catch (IOException e) {
             // Neither could: said below.
-        } finally {
-            Files.deleteIfExists(tmp);
         }
         throw new IOException(I18n.t("image.tooBig"));
     }
 
-    /** sips first on a Mac (always there, no download); ffmpeg, the person's own or the one Unichat installs. */
-    private static List<List<String>> commands(Path in, Path out) throws IOException, InterruptedException {
-        List<List<String>> all = new java.util.ArrayList<>();
-        if (Os.mac()) all.add(sips(in, out));
-        Path ffmpeg = Ffmpeg.whenNeeded(p -> { });
-        if (ffmpeg != null) all.add(ffmpeg(ffmpeg, in, out));
-        return all;
-    }
-
     static List<String> sips(Path in, Path out) {
-        return List.of("/usr/bin/sips", "-s", "format", "png", "-Z", Integer.toString(SIDE), in.toString(), "--out", out.toString());
+        return List.of(PartFile.SIPS.toString(), "-s", "format", "png", "-Z", Integer.toString(SIDE), in.toString(), "--out", out.toString());
     }
 
     static List<String> ffmpeg(Path ffmpeg, Path in, Path out) throws IOException {

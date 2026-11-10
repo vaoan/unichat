@@ -46,6 +46,8 @@ class AutoSaveTest {
     /** Counted down when a download of {@link #ENDLESS} starts: it never ends by itself (a huge video). */
     private final CountDownLatch endlessStarted = new CountDownLatch(1);
     private AutoSave save;
+    /** Counted down when a round ends having saved something. */
+    private final CountDownLatch roundFinished = new CountDownLatch(1);
 
     /** The chat's messages as the service holds them; nobody opens the chat. */
     private ChatReader reader() {
@@ -68,12 +70,15 @@ class AutoSaveTest {
         svc = new MockChatService();
         chat = svc.chat("!familia:demo");
         SaveFolders.setOwn(chat.id(), dir.resolve("out"));
-        save = create();
+        save = create(NO_RETRY);
     }
 
-    private AutoSave create() throws Exception {
+    /** Tried again only when the chat changes, as the tests below that count tries need: the timer never comes. */
+    private static final java.time.Duration NO_RETRY = java.time.temporal.ChronoUnit.FOREVER.getDuration();
+
+    private AutoSave create(java.time.Duration retryAfter) throws Exception {
         Path cached = Files.writeString(dir.resolve("cached.bin"), "contenido");
-        AutoSave a = new AutoSave(svc, reader(), new SavedUpTo(dir.resolve("autosave.json")), new AutoSave.Saver() {
+        AutoSave a = new AutoSave(svc, reader(), new SavedUpTo(dir.resolve("autosave.json")), retryAfter, new AutoSave.Saver() {
             @Override public Path media(String mediaUrl, java.util.function.DoubleConsumer progress) throws java.io.IOException, InterruptedException {
                 if (mediaUrl.endsWith("/grande.mov")) {
                     progress.accept(0.25);
@@ -100,7 +105,10 @@ class AutoSaveTest {
         });
         a.setProgress(new AutoSave.Progress() {
             @Override public void changed(int done, int total) { told.add("progress " + done + "/" + total); }
-            @Override public void finished(int saved, Chat c) { told.add("finished " + saved + " " + c.id()); }
+            @Override public void finished(int saved, Chat c) {
+                told.add("finished " + saved + " " + c.id());
+                roundFinished.countDown();
+            }
             @Override public void failed(String what, Chat c, String why) { told.add("failed " + what + ": " + why); }
         });
         return a;
@@ -217,7 +225,7 @@ class AutoSaveTest {
         svc.setAutoSave(chat.id(), EnumSet.allOf(SaveKind.class)).get();
         save.startNow(chat.id());
         arrive(media(MessageType.IMAGE, "antes.jpg", false, later(1)));
-        save = create(); // Unichat closed and opened again: where it got to is on disk
+        save = create(NO_RETRY); // Unichat closed and opened again: where it got to is on disk
         arrive(media(MessageType.IMAGE, "mientras.jpg", false, later(2)));
         assertEquals(List.of("antes.jpg", "mientras.jpg"), saved());
     }
@@ -504,5 +512,27 @@ class AutoSaveTest {
         arrive();
         assertEquals(List.of("bien.jpg"), saved());
         assertEquals(1, asked.stream().filter(BROKEN::equals).count(), "asked once: " + asked);
+    }
+
+    /**
+     * A failure for now that never clears (a disk that stays full, an error yt-dlp's words don't place) held the chat
+     * for good, and a quiet chat tried again only at its next message: it's tried again by itself, and given up after
+     * {@link AutoSave#MAX_TIMED_TRIES} of those tries, told once, letting what came after be saved.
+     */
+    @Test
+    void aFailureThatNeverClearsIsTriedAgainByItselfThenLetGo() throws Exception {
+        save = create(java.time.Duration.ZERO);
+        svc.setAutoSave(chat.id(), EnumSet.allOf(SaveKind.class)).get();
+        save.startNow(chat.id());
+        flaky = "sin espacio";
+        Message first = media(MessageType.IMAGE, "a-veces.jpg", false, later(1));
+        first.setMediaUrl(FLAKY);
+        arrive(first, media(MessageType.IMAGE, "despues.jpg", false, later(2)));
+        roundFinished.await(); // nothing else changes in the chat: only trying again by itself gets here
+        assertEquals(List.of("despues.jpg"), saved());
+        assertEquals(1 + AutoSave.MAX_TIMED_TRIES, asked.stream().filter(FLAKY::equals).count(), "the first try, then the timer's: " + asked);
+        assertEquals(List.of("failed a-veces.jpg: sin espacio"), failures(), "told once");
+        arrive();
+        assertEquals(1 + AutoSave.MAX_TIMED_TRIES, asked.stream().filter(FLAKY::equals).count(), "let go for good");
     }
 }

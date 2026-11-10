@@ -91,6 +91,29 @@ class ProcessesTest {
     }
 
     @Test
+    void itsInputIsWrittenWhileItRuns() throws Exception {
+        // More than a pipe holds, to a program that talks first: written on its own, neither waits for the other.
+        Processes.Result r = Processes.capture(new ProcessBuilder(sh("head -c 300000 /dev/zero; wc -c")),
+                Processes.Limit.of(NO_LIMIT), "y".repeat(2_000_000), null);
+        assertTrue(r.ok());
+        assertEquals("2000000", r.out().substring(300_000).strip());
+    }
+
+    @Test
+    void quietPastItsLimitItsKilledWhateverItsTotalTime() throws Exception {
+        // It printed once, then nothing: with no silence allowed it's stopped though it had all the time in the world.
+        Processes.Result r = Processes.capture(new ProcessBuilder(sh("echo hola; " + FOREVER)), Processes.Limit.whileTalking(0), null, null);
+        assertFalse(r.finished());
+    }
+
+    @Test
+    void theLastLinesThatSaySomething() {
+        assertEquals("b | c | d", Processes.lastLines("a\n\nb\n  c  \nd\n\n", 3));
+        assertEquals("d", Processes.lastLines("a\nd", 1));
+        assertEquals("", Processes.lastLines("\n \n", 1));
+    }
+
+    @Test
     void eachLineIsHandedOverAsItComesAndStillKept() throws Exception {
         List<String> lines = new java.util.ArrayList<>();
         Processes.Result r = Processes.capture(new ProcessBuilder(sh("printf 'uno\\n[download]  45.3%%\\rdos'")), NO_LIMIT, lines::add);

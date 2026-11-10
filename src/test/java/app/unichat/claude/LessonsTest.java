@@ -29,7 +29,8 @@ class LessonsTest {
             Map.entry("ffmpeg-input", new String[] {"src/main/java/X.java", "List.of(bin, \"-protocol_whitelist\", \"file\", \"-i\", in)"}),
             Map.entry("oauth-state-equals", new String[] {"src/main/java/app/unichat/cloud/X.java", "        if (!state.equals(q.get(\"state\"))) {"}),
             Map.entry("http-client-per-call", new String[] {"src/main/java/X.java", "        HttpClient http = HttpClient.newBuilder().build();"}),
-            Map.entry("test-future-join", new String[] {"src/test/java/X.java", "        svc.send(m).join();"})); // lesson-ok: test-future-join
+            Map.entry("test-future-join", new String[] {"src/test/java/X.java", "        svc.send(m).join();"}), // lesson-ok: test-future-join
+            Map.entry("own-process", new String[] {"src/main/java/app/unichat/stt/X.java", "        Process p = new ProcessBuilder(cmd).start();"}));
 
     @Test
     void theRepositoryKeepsEveryLesson() throws IOException {

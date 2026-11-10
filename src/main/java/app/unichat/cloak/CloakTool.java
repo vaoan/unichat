@@ -13,7 +13,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -147,7 +146,7 @@ public final class CloakTool {
         Processes.Result r = Processes.capture(b, seconds);
         if (!r.ok()) {
             System.err.println("Image protection: installing failed (" + command.get(1) + ", exit " + r.exit() + "): "
-                    + lastLines(r.out()));
+                    + Processes.lastLines(r.out(), 3));
             throw new IOException(I18n.t("cloak.error.install"));
         }
     }
@@ -162,15 +161,7 @@ public final class CloakTool {
         return target;
     }
 
-    static String lastLines(String out) {
-        List<String> lines = new ArrayList<>(out.lines().filter(l -> !l.isBlank()).toList());
-        return String.join(" | ", lines.subList(Math.max(0, lines.size() - 3), lines.size()));
-    }
-
     private static Pinned uvBuild() {
-        String arch = System.getProperty("os.arch", "");
-        if (Os.mac() && (arch.equals("aarch64") || arch.equals("arm64"))) return UV_MAC_ARM64;
-        if (Os.windows() && (arch.equals("amd64") || arch.equals("x86_64"))) return UV_WINDOWS_AMD64;
-        return null;
+        return Os.pick(UV_MAC_ARM64, null, UV_WINDOWS_AMD64); // PyTorch has no Intel Mac build
     }
 }

@@ -1,9 +1,7 @@
 package app.unichat.video;
 
 import app.unichat.settings.Settings;
-import app.unichat.support.Archives;
 import app.unichat.support.BundledTools;
-import app.unichat.support.Downloads;
 import app.unichat.support.I18n;
 import app.unichat.support.Os;
 import app.unichat.support.Processes;
@@ -19,17 +17,22 @@ import java.util.function.DoubleConsumer;
  * {@code <data>/tools/ffmpeg/} (Ajustes → Redes can turn that off) and kept only if it matches its checksum.
  */
 public final class Ffmpeg {
-    /** A build to install; {@code entry}: the end of the executable's path inside the zip. */
-    record Build(String url, long size, String sha256, String entry) {}
-
-    private static final Build MAC_ARM64 = new Build("https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip",
+    private static final PinnedTool MAC_ARM64 = new PinnedTool("https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip",
             28_395_699L, "c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924", "ffmpeg");
-    private static final Build WINDOWS_AMD64 = new Build("https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip",
+    private static final PinnedTool WINDOWS_AMD64 = new PinnedTool("https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip",
             114_768_076L, "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba", "/bin/ffmpeg.exe");
     /** A Mac app opened from Finder doesn't get the shell's PATH. */
     private static final List<String> USUAL_FOLDERS = List.of("/opt/homebrew/bin", "/usr/local/bin");
     private static final String EXE = Os.windows() ? "ffmpeg.exe" : "ffmpeg";
     private static final String AUTO_KEY = "video.ffmpegAuto";
+
+    /** Where an ffmpeg comes from when one is needed: null when there's none to use. */
+    public interface Source {
+        Path get() throws IOException, InterruptedException;
+    }
+
+    /** The person's own, or the pinned one downloaded if the setting allows. */
+    public static final Source WHEN_NEEDED = () -> whenNeeded(p -> { });
 
     private Ffmpeg() {}
 
@@ -50,7 +53,6 @@ public final class Ffmpeg {
         return null;
     }
 
-    /** Runs one ffmpeg command, giving up after {@code timeoutSeconds}; whether it worked. */
     /**
      * The input options for a file from other people: only it may be read. ffmpeg tells the format by the content, and
      * an HLS playlist, a concat list or a DASH manifest names other files, which {@code -protocol_whitelist file} still
@@ -71,11 +73,10 @@ public final class Ffmpeg {
     /** How the formats that name other files begin: HLS, ffmpeg's concat list, a DASH manifest (XML). */
     private static final List<String> LISTS = List.of("#EXTM3U", "ffconcat", "<?xml", "<MPD");
 
-    static boolean run(List<String> command, long timeoutSeconds) throws IOException, InterruptedException {
-        return run(command, timeoutSeconds, null);
-    }
-
-    /** @param folder where it runs; null: wherever Unichat does */
+    /**
+     * Runs one ffmpeg command, giving up after {@code timeoutSeconds}; whether it worked.
+     * @param folder where it runs; null: wherever Unichat does
+     */
     public static boolean run(List<String> command, long timeoutSeconds, Path folder) throws IOException, InterruptedException {
         return Processes.quiet(command, folder, timeoutSeconds).ok();
     }
@@ -85,7 +86,7 @@ public final class Ffmpeg {
 
     /** Bytes that installing would download. */
     public static long downloadSize() {
-        Build b = build();
+        PinnedTool b = build();
         return b == null ? 0 : b.size();
     }
 
@@ -99,32 +100,17 @@ public final class Ffmpeg {
     public static synchronized Path install(DoubleConsumer progress) throws IOException, InterruptedException {
         Path found = find();
         if (found != null) return found;
-        Build b = build();
+        PinnedTool b = build();
         return b == null ? null : install(b, installedPath(), progress);
     }
 
     /** Downloads, extracts and tries {@code b}; {@code target} only stays if it runs. */
-    static Path install(Build b, Path target, DoubleConsumer progress) throws IOException, InterruptedException {
-        Path zip = target.resolveSibling("ffmpeg-download.zip");
-        try {
-            Downloads.fetch(b.url(), b.size(), b.sha256(), zip, I18n.t("download.what.videoConverter"), progress);
-            if (!Archives.extractOne(zip, b.entry(), target)) throw new IOException(I18n.t("video.noProgram"));
-        } finally {
-            Files.deleteIfExists(zip);
-        }
-        target.toFile().setExecutable(true);
-        if (!Processes.quiet(List.of(target.toString(), "-version"), null, 15).ok()) {
-            Files.deleteIfExists(target);
-            throw new IOException(I18n.t("video.badConverter"));
-        }
-        return target;
+    static Path install(PinnedTool b, Path target, DoubleConsumer progress) throws IOException, InterruptedException {
+        return b.install(target, I18n.t("download.what.videoConverter"), "-version", progress);
     }
 
-    private static Build build() {
-        String arch = System.getProperty("os.arch", "");
-        if (Os.mac() && (arch.equals("aarch64") || arch.equals("arm64"))) return MAC_ARM64;
-        if (Os.windows() && (arch.equals("amd64") || arch.equals("x86_64"))) return WINDOWS_AMD64;
-        return null;
+    private static PinnedTool build() {
+        return Os.pick(MAC_ARM64, null, WINDOWS_AMD64);
     }
 
     /** Whether {@code found} is the one Unichat downloaded (rather than the person's own). */

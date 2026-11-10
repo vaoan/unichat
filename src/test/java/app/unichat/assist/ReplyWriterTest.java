@@ -112,6 +112,28 @@ class ReplyWriterTest {
         assertNull(w.run(AiEngine.CLAUDE, bin, null, "x"));
     }
 
+    /** Interrupting the thread that waits (the draft's task stopped) stops the program too, not just the wait. */
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void interruptingStopsTheProgram() throws Exception {
+        Path started = fifo("started"), never = fifo("never");
+        // It says its own process id, then waits for ever on a pipe nobody opens: only being stopped ends it.
+        Path bin = script("echo $$ > '" + started + "'\nexec cat '" + never + "'");
+        java.util.concurrent.atomic.AtomicReference<String> got = new java.util.concurrent.atomic.AtomicReference<>("not returned");
+        Thread t = Thread.ofPlatform().start(() -> {
+            try {
+                got.set(new ReplyWriter(java.time.Duration.ofDays(1)).run(AiEngine.CLAUDE, bin, null, "x"));
+            } catch (ReplyWriter.Failure e) {
+                got.set(e.getMessage());
+            }
+        });
+        long pid = Long.parseLong(Files.readString(started).strip());
+        t.interrupt();
+        t.join(); // lesson-ok: test-future-join (a thread)
+        assertNull(got.get());
+        assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false), "the program was left running");
+    }
+
     private Path fifo(String name) throws Exception {
         Path f = dir.resolve(name);
         assertEquals(0, new ProcessBuilder("mkfifo", f.toString()).inheritIO().start().waitFor());
