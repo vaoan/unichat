@@ -13,3 +13,4 @@ The API the UI uses, demo mode, and what the person keeps (preferences, folders)
 
 ## Lessons
 - `PreferencesFile` had five jobs in 725 lines. The background writer is `support/BackgroundWriter` (shared with `Settings`), `server-seen.json` is `ServerSeen` and the damaged-file recovery (`.bak`, `.bad-<time>`) is `PreferencesRecovery`; both are guarded by `PreferencesFile`'s lock. Its tests didn't change.
+- `DemoMedia` drew a picture straight into its file, and a caller that found the file there meanwhile took it half written: the info panel's avatar and the photo viewer ask for the same picture at once, and on Linux the viewer showed "couldn't open" (`InfoAvatarUiTest` failed every CI run once the test order changed). Making a file is one at a time (`synchronized`) and whole (`SafeFile`) (`DemoMediaTest`, eight callers at once, which failed on the Mac too).

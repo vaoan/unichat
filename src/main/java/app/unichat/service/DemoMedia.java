@@ -14,25 +14,28 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** The files behind demo mode's media, made once in the cache folder. */
+/**
+ * The files behind demo mode's media, made once in the cache folder. One at a time and whole: a caller that found a file
+ * another was still writing took it half written (the avatar and the photo viewer ask for one picture at once).
+ */
 final class DemoMedia {
     private DemoMedia() {}
 
     /** The demo voice note (a 2 s tone, no speech), copied out of the app's resources. */
-    static Path demoAudio(String name) throws IOException {
+    static synchronized Path demoAudio(String name) throws IOException {
         Path dir = Settings.get().cacheDir().resolve("demo");
         Files.createDirectories(dir);
         Path file = dir.resolve(name);
         if (Files.exists(file)) return file;
         try (var in = DemoMedia.class.getResourceAsStream("/app/unichat/demo/" + name)) {
             if (in == null) throw new IOException(I18n.t("demo.missingAudio", name));
-            Files.copy(in, file);
+            app.unichat.support.SafeFile.at(file).copy(in); // whole or not at all, as the pictures
         }
         return file;
     }
 
     /** Renders a placeholder "photo" (gradient + caption) once and caches it. */
-    static Path demoImage(String name) throws IOException {
+    static synchronized Path demoImage(String name) throws IOException {
         Path dir = Settings.get().cacheDir().resolve("demo");
         Files.createDirectories(dir);
         Path file = dir.resolve(name + ".png");
@@ -55,7 +58,10 @@ final class DemoMedia {
         g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 34));
         g.drawString(name.replace('-', ' '), 32, h - 36);
         g.dispose();
-        ImageIO.write(img, "png", file.toFile());
+        // Whole or not at all: a caller that finds the file while another is drawing it took it half written.
+        java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream();
+        ImageIO.write(img, "png", png);
+        app.unichat.support.SafeFile.replace(file, png.toByteArray(), false);
         return file;
     }
 }
