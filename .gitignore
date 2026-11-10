@@ -12,3 +12,4 @@ server/data/
 target/
 server/CREDENCIALES.txt
 .worktrees/
+.claude/worktrees/
