@@ -68,6 +68,21 @@ public final class PCloudApi implements Storage {
         }
     }
 
+    /** pCloud gives a file's SHA-1 (both regions; Europe adds SHA-256). */
+    @Override
+    public RemoteFile info(String path) throws IOException {
+        JsonNode meta = stat(path);
+        if (meta == null) return null;
+        JsonNode sums;
+        try {
+            sums = call("checksumfile", "path=" + Urls.enc(abs(path)));
+        } catch (Missing gone) {
+            return null;
+        }
+        String sha1 = sums.path("sha1").asText(null);
+        return new RemoteFile(meta.path("size").asLong(-1), sha1 == null ? null : Checksums.SHA1, sha1);
+    }
+
     @Override
     public void mkdirs(String dir) throws IOException {
         StringBuilder at = new StringBuilder();

@@ -74,7 +74,8 @@ final class FakeDropbox implements AutoCloseable {
                 case "/2/users/get_current_account" -> reply(x, 200, "{\"email\": \"yo@correo.com\"}");
                 case "/2/files/get_metadata" -> {
                     String p = arg.path("path").asText();
-                    if (files.containsKey(p)) reply(x, 200, "{\".tag\": \"file\", \"rev\": \"r" + revs.get(p) + "\"}");
+                    if (files.containsKey(p)) reply(x, 200, "{\".tag\": \"file\", \"rev\": \"r" + revs.get(p) + "\", \"size\": "
+                            + files.get(p).length + ", \"content_hash\": \"" + contentHash(files.get(p)) + "\"}");
                     else if (folders.contains(p)) reply(x, 200, "{\".tag\": \"folder\", \"id\": \"id:f\"}");
                     else reply(x, 409, "{\"error_summary\": \"path/not_found/..\"}");
                 }
@@ -135,6 +136,20 @@ final class FakeDropbox implements AutoCloseable {
         }
         access = "a" + tokensMade.incrementAndGet();
         reply(x, 200, "{\"access_token\": \"" + access + "\", \"expires_in\": 14400}");
+    }
+
+    /** Dropbox's content hash, as its documentation describes it: SHA-256 of each 4 MB block's SHA-256. */
+    static String contentHash(byte[] data) {
+        try {
+            java.security.MessageDigest all = java.security.MessageDigest.getInstance("SHA-256");
+            for (int i = 0; i < data.length; i += 4 * 1024 * 1024) {
+                all.update(java.security.MessageDigest.getInstance("SHA-256").digest(
+                        java.util.Arrays.copyOfRange(data, i, Math.min(data.length, i + 4 * 1024 * 1024))));
+            }
+            return java.util.HexFormat.of().formatHex(all.digest());
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static void reply(HttpExchange x, int code, String body) throws IOException {

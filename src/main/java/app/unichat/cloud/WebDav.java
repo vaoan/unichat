@@ -60,6 +60,23 @@ public final class WebDav implements Storage {
      */
     @Override
     public String stamp(String path) throws IOException {
+        String xml = properties(path);
+        if (xml == null) return null;
+        String etag = prop(xml, "getetag"), date = prop(xml, "getlastmodified");
+        return etag != null ? etag : date != null ? date : xml;
+    }
+
+    /** WebDAV says a file's size, not a checksum. */
+    @Override
+    public RemoteFile info(String path) throws IOException {
+        String xml = properties(path);
+        if (xml == null) return null;
+        String size = prop(xml, "getcontentlength");
+        return new RemoteFile(size == null ? -1 : Long.parseLong(size.strip()), null, null);
+    }
+
+    /** What the server says of {@code path} (its PROPFIND answer), or null when there's nothing there. */
+    private String properties(String path) throws IOException {
         HttpResponse<String> r;
         try {
             r = http.send(HttpRequest.newBuilder(uri(path)).timeout(answer).header("Authorization", auth).header("Depth", "0")
@@ -72,8 +89,7 @@ public final class WebDav implements Storage {
         }
         if (r.statusCode() == 404) return null;
         if (r.statusCode() != 207 && r.statusCode() != 200) throw failure(r.statusCode());
-        String etag = prop(r.body(), "getetag"), date = prop(r.body(), "getlastmodified");
-        return etag != null ? etag : date != null ? date : r.body();
+        return r.body();
     }
 
     private static String prop(String xml, String name) {

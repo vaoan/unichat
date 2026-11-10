@@ -39,13 +39,7 @@ final class LibraryMenu {
         Runnable save = () -> MediaSaver.save(owner, svc, m, toast);
         var file = svc.media(item.url(), 0, 0);
         if (item.mime() != null && item.mime().startsWith("video/")) {
-            VideoViewer.show(owner, file, title, save, p -> {
-                try {
-                    java.awt.Desktop.getDesktop().open(p.toFile());
-                } catch (Exception ex) {
-                    toast.accept(I18n.t("video.openFailed"));
-                }
-            });
+            VideoViewer.show(owner, file, title, save, p -> Browser.openFile(p, () -> toast.accept(I18n.t("video.openFailed"))));
         } else {
             MediaViewer.show(owner, file, title, save);
         }

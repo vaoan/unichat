@@ -243,7 +243,7 @@ final class ProfileMedia {
         javafx.scene.layout.StackPane tile = MediaTile.of(v, TILE, TILE, "media-thumb-tile", I18n.t("media.videoOpen"), true, () -> {
             if (window.get() == null) return;
             VideoViewer.show(window.get(), svc.media(m.mediaUrl(), 0, 0), I18n.t("video.title"),
-                    () -> MediaSaver.save(window.get(), svc, m, toast), Desktop::open);
+                    () -> MediaSaver.save(window.get(), svc, m, toast), p -> Browser.openFile(p, () -> toast.accept(I18n.t("video.openFailed"))));
         });
         tile.getChildren().add(Icons.icon(Icons.PLAY, 22));
         return goesToItsMessage(tile, m);
@@ -291,7 +291,7 @@ final class ProfileMedia {
         b.setAccessibleText(name + ", " + meta.getText());
         b.setOnAction(e -> svc.media(m.mediaUrl(), 0, 0).whenComplete((p, err) -> {
             if (err != null) Platform.runLater(() -> toast.accept(I18n.t("media.downloadFailed")));
-            else Desktop.open(p);
+            else Browser.openFile(p, () -> toast.accept(I18n.t("media.openFailed")));
         }));
         return withJump(b, m);
 
@@ -311,18 +311,5 @@ final class ProfileMedia {
                 System.err.println("Could not decode a shared picture: " + e);
             }
         }, AnimatedImage.DECODER);
-    }
-
-    /** The system's app for a file, through AWT's own thread (mistakes.md). */
-    private static final class Desktop {
-        static void open(java.nio.file.Path p) {
-            java.awt.EventQueue.invokeLater(() -> {
-                try {
-                    java.awt.Desktop.getDesktop().open(p.toFile());
-                } catch (Exception ignored) {
-                    // No app for it: nothing happens; it can still be saved from the message.
-                }
-            });
-        }
     }
 }

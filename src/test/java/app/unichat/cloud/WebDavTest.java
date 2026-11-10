@@ -50,4 +50,14 @@ class WebDavTest {
             assertEquals(app.unichat.support.I18n.t("cloud.error.noAnswer"), e.getMessage());
         }
     }
+
+    @Test
+    void itSaysAFilesSize() throws Exception {
+        try (FakeDav cloud = new FakeDav("u", "p")) {
+            WebDav dav = new WebDav(cloud.url(), "u", "p");
+            dav.put("a.jpg", "12345".getBytes(StandardCharsets.UTF_8));
+            assertEquals(new Storage.RemoteFile(5, null, null), dav.info("a.jpg"), "WebDAV gives the size, no checksum");
+            assertNull(dav.info("nada.jpg"));
+        }
+    }
 }

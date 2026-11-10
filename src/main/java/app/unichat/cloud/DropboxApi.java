@@ -73,6 +73,15 @@ public final class DropboxApi implements Storage {
         return m == null ? null : m.path("rev").asText(m.path("id").asText(""));
     }
 
+    /** Dropbox gives a file's size and its own content hash ({@link Checksums#DROPBOX}). */
+    @Override
+    public RemoteFile info(String path) throws IOException {
+        JsonNode m = metadata(path);
+        if (m == null) return null;
+        String hash = m.path("content_hash").asText(null);
+        return new RemoteFile(m.path("size").asLong(-1), hash == null ? null : Checksums.DROPBOX, hash);
+    }
+
     private JsonNode metadata(String path) throws IOException {
         try {
             return rpc("/2/files/get_metadata", JSON.createObjectNode().put("path", abs(path)));

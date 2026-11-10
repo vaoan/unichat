@@ -193,18 +193,39 @@ final class CloudPage {
         Label state = new Label();
         state.setWrapText(true);
         state.setMinHeight(Region.USE_PREF_SIZE);
-        Runnable show = () -> state.setText(statusText(cloud.status(), Instant.now()));
+        javafx.scene.control.ProgressBar working = new javafx.scene.control.ProgressBar();
+        working.setMaxWidth(Double.MAX_VALUE);
+        Button now = new Button(I18n.t("settings.cloud.syncNow"));
+        Button verify = new Button(I18n.t("settings.cloud.verifyNow"));
+        verify.getStyleClass().add("secondary-button");
+        Runnable show = () -> {
+            Cloud.Status st = cloud.status();
+            state.setText(statusText(st, Instant.now()));
+            Cloud.Activity act = st.now();
+            Nodes.show(working, act != null);
+            boolean counted = act != null && (act.step() == Cloud.Step.UPLOADING || act.step() == Cloud.Step.VERIFYING);
+            if (act != null) working.setProgress(counted && act.total() > 0 ? (double) act.done() / act.total()
+                    : javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS);
+            working.setAccessibleText(state.getText());
+            now.setDisable(act != null); // one round at a time
+            verify.setDisable(act != null);
+        };
         Runnable listener = () -> Platform.runLater(show);
         cloud.addListener(listener);
         state.sceneProperty().addListener((o, was, scene) -> {
             if (scene == null) cloud.removeListener(listener);
         });
         show.run();
-        Button now = new Button(I18n.t("settings.cloud.syncNow"));
         now.getStyleClass().add("secondary-button");
         now.setOnAction(e -> {
+            now.setDisable(true);
             state.setText(I18n.t("settings.cloud.syncing"));
             cloud.syncNow();
+        });
+        verify.setOnAction(e -> {
+            verify.setDisable(true);
+            now.setDisable(true);
+            cloud.verifyNow();
         });
         Button off = new Button(I18n.t("settings.cloud.disconnect"));
         off.getStyleClass().add("secondary-button");
@@ -213,15 +234,27 @@ final class CloudPage {
             redraw.run();
         });
         return group(I18n.t("settings.cloud.account"), stacked(I18n.t("settings.cloud.connectedTitle"), null,
-                new VBox(8, who, state, new FlowPane(8, 6, now, off))));
+                new VBox(8, who, state, working, new FlowPane(8, 6, now, verify, off))));
     }
 
     /** "Al día · hace 2 min · 28 archivos subidos", or the last round's error. Pure. */
     static String statusText(Cloud.Status s, Instant now) {
+        Cloud.Activity a = s.now();
+        if (a != null) return switch (a.step()) {
+            case SETTINGS -> I18n.t("settings.cloud.doing.SETTINGS");
+            case LEARNED -> I18n.t("settings.cloud.doing.LEARNED");
+            case UPLOADING -> I18n.t("settings.cloud.doing.UPLOADING", a.done() + 1, a.total(), a.item());
+            case VERIFYING -> I18n.t("settings.cloud.doing.VERIFYING", a.done() + 1, a.total(), a.item());
+        };
         if (!s.connected()) return I18n.t("settings.cloud.notYet");
         String when = s.lastSync() == null ? I18n.t("settings.cloud.never")
                 : I18n.t("settings.cloud.ago", Math.max(0, Duration.between(s.lastSync(), now).toMinutes()));
-        String files = I18n.n("settings.cloud.uploaded", s.uploaded()) + (s.waiting() > 0 ? " · " + I18n.n("settings.cloud.waiting", s.waiting()) : "");
+        String files = I18n.n("settings.cloud.uploaded", s.uploaded()) + (s.waiting() > 0 ? " · " + I18n.n("settings.cloud.waiting", s.waiting()) : "")
+                + (s.retrying() > 0 && s.nextRetry() != null ? " · " + I18n.n("settings.cloud.retrying", s.retrying(),
+                        java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(s.nextRetry().atZone(java.time.ZoneId.systemDefault()))) : "")
+                + (s.conflicts() > 0 ? " · " + I18n.n("settings.cloud.conflicts", s.conflicts()) : "")
+                + (s.lastVerified() != null ? " · " + I18n.t("settings.cloud.verified",
+                        I18n.t("settings.cloud.ago", Math.max(0, Duration.between(s.lastVerified(), now).toMinutes()))) : "");
         if (s.error() != null) return I18n.t("settings.cloud.error", s.error()) + "\n" + when + " · " + files;
         return I18n.t("settings.cloud.ok") + " · " + when + " · " + files;
     }

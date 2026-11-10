@@ -51,9 +51,15 @@ final class FakePCloud implements AutoCloseable {
                 case "userinfo" -> json(x, "{\"result\": 0, \"email\": \"yo@correo.com\"}");
                 case "stat" -> {
                     String p = q.get("path");
-                    if (files.containsKey(p)) json(x, "{\"result\": 0, \"metadata\": {\"hash\": " + versions.get(p) + ", \"modified\": \"x\"}}");
+                    if (files.containsKey(p)) json(x, "{\"result\": 0, \"metadata\": {\"hash\": " + versions.get(p)
+                            + ", \"modified\": \"x\", \"size\": " + files.get(p).length + "}}");
                     else if (dirs.contains(p)) json(x, "{\"result\": 0, \"metadata\": {\"isfolder\": true}}");
                     else json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
+                }
+                case "checksumfile" -> {
+                    byte[] f = files.get(q.get("path"));
+                    if (f == null) json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
+                    else json(x, "{\"result\": 0, \"sha1\": \"" + sha1(f) + "\"}");
                 }
                 case "createfolderifnotexists" -> {
                     String p = q.get("path");
@@ -88,6 +94,14 @@ final class FakePCloud implements AutoCloseable {
     void put(String path, byte[] data) {
         files.put(path, data);
         versions.merge(path, 1, Integer::sum);
+    }
+
+    static String sha1(byte[] data) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-1").digest(data));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static void json(HttpExchange x, String body) throws IOException {

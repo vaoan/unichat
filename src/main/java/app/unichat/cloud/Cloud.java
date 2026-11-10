@@ -29,9 +29,27 @@ import java.util.function.Supplier;
  */
 public final class Cloud {
     /** For the settings page: connected or not, when the last round worked, why the last one didn't, what went up. */
-    public record Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting) {
-        static final Status OFF = new Status(false, null, null, 0, 0);
+    public record Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
+                         int retrying, Instant nextRetry, int conflicts, Instant lastVerified) {
+        static final Status OFF = new Status(false, null, null, 0, 0, null, 0, null, 0, null);
+
+        public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting) {
+            this(connected, lastSync, error, uploaded, waiting, null, 0, null, 0, null);
+        }
+
+        Status doing(Activity a) {
+            return new Status(connected, lastSync, error, uploaded, waiting, a, retrying, nextRetry, conflicts, lastVerified);
+        }
     }
+
+    /** How often everything uploaded is checked against the account (also on "Verificar ahora"). */
+    static final java.time.Duration VERIFY_EVERY = java.time.Duration.ofDays(1);
+    private volatile boolean verifyNext;
+
+    /** What a round is doing right now, for the page to say: checking a part, or uploading file {@code done} of {@code total}. */
+    public record Activity(Step step, int done, int total, String item) {}
+
+    public enum Step { SETTINGS, LEARNED, UPLOADING, VERIFYING }
 
     private static final String STYLE_FILE = "writing-style.md";
 
@@ -128,18 +146,52 @@ public final class Cloud {
         Storage dav = a.storage();
         try {
             Instant now = Instant.now();
-            if (CloudAccount.settings()) for (SyncedPart p : parts) p.sync(dav, now);
-            if (CloudAccount.media()) uploaded += media.run(dav);
-            return publish(new Status(true, now, null, uploaded, CloudAccount.media() ? media.waiting() : 0));
-        } catch (IOException | RuntimeException e) {
-            int waiting;
-            try {
-                waiting = media.waiting();
-            } catch (IOException ignored) {
-                waiting = status.waiting();
+            if (CloudAccount.settings()) {
+                doing(new Activity(Step.SETTINGS, 0, 0, null));
+                parts.get(0).sync(dav, now);
+                doing(new Activity(Step.LEARNED, 0, 0, null));
+                parts.get(1).sync(dav, now);
             }
-            return publish(new Status(true, status.lastSync(), Errors.message(e), uploaded, waiting));
+            if (CloudAccount.media()) {
+                uploaded += media.run(dav, (done, total, name) -> doing(new Activity(Step.UPLOADING, done, total, name)));
+                if (verifyNext || verifyDue(now)) {
+                    verifyNext = false;
+                    uploaded += media.verify(dav, (done, total, name) -> doing(new Activity(Step.VERIFYING, done, total, name)));
+                    Settings.get().set("cloud.lastVerify", now.toString());
+                }
+            }
+            return publish(finished(now, null));
+        } catch (IOException | RuntimeException e) {
+            return publish(finished(status.lastSync(), Errors.message(e)));
         }
+    }
+
+    private static boolean verifyDue(Instant now) {
+        String last = Settings.get().getString("cloud.lastVerify", null);
+        return last == null || Instant.parse(last).plus(VERIFY_EVERY).isBefore(now);
+    }
+
+    private Status finished(Instant lastSync, String error) {
+        int waiting;
+        try {
+            waiting = media.waiting();
+        } catch (IOException ignored) {
+            waiting = status.waiting();
+        }
+        String verified = Settings.get().getString("cloud.lastVerify", null);
+        return new Status(true, lastSync, error, uploaded, waiting, null, media.retrying(), media.nextRetry(), media.conflicts(),
+                verified == null ? null : Instant.parse(verified));
+    }
+
+    /** Checks everything uploaded against the account now, repairing what differs, then the usual round. */
+    public CompletableFuture<Status> verifyNow() {
+        verifyNext = true;
+        return syncNow();
+    }
+
+    /** Mid-round: the status as it was, saying what it's doing now. */
+    private void doing(Activity a) {
+        publish(status.doing(a));
     }
 
     private Status publish(Status s) {

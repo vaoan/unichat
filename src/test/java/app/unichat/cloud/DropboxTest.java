@@ -149,4 +149,18 @@ class DropboxTest {
             assertThrows(CompletionException.class, login::join);
         }
     }
+
+    @Test
+    void itSaysAFilesSizeAndContentHashWhichMatchesTheOneComputedHere() throws Exception {
+        try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
+            DropboxApi api = api(fake, DropboxApi.SINGLE, 1024);
+            Path file = Files.writeString(dir.resolve("a.jpg"), "12345");
+            api.put("Unichat/a.jpg", file);
+            Storage.RemoteFile f = api.info("Unichat/a.jpg");
+            assertEquals(5, f.size());
+            assertEquals(Checksums.DROPBOX, f.kind());
+            assertEquals(Checksums.of(file, Checksums.DROPBOX), f.hash(), "the same hash computed here and there");
+            assertNull(api.info("Unichat/nada.jpg"));
+        }
+    }
 }

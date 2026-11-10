@@ -26,4 +26,14 @@ public interface Storage {
 
     /** The file at {@code path}, or null when there's none. */
     byte[] get(String path) throws IOException;
+
+    /**
+     * What the account knows of a file there: its size (-1 unknown) and, where the service gives one, its checksum
+     * ({@link Checksums} kinds). Null when there's none.
+     */
+    record RemoteFile(long size, String kind, String hash) {}
+
+    default RemoteFile info(String path) throws IOException {
+        return exists(path) ? new RemoteFile(-1, null, null) : null;
+    }
 }

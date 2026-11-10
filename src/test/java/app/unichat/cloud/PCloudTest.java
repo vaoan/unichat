@@ -126,4 +126,18 @@ class PCloudTest {
         assertNull(PCloudLogin.pcloudApi("api.pcloud.com.evil.com"));
         assertNull(PCloudLogin.pcloudApi(null));
     }
+
+    @Test
+    void itSaysAFilesSizeAndSha1() throws Exception {
+        try (FakePCloud cloud = new FakePCloud("tok")) {
+            PCloudApi api = new PCloudApi(cloud.host(), "tok");
+            api.mkdirs("Unichat");
+            api.put("Unichat/a.jpg", "12345".getBytes(StandardCharsets.UTF_8));
+            Storage.RemoteFile f = api.info("Unichat/a.jpg");
+            assertEquals(5, f.size());
+            assertEquals(Checksums.SHA1, f.kind());
+            assertEquals(FakePCloud.sha1("12345".getBytes(StandardCharsets.UTF_8)), f.hash());
+            assertNull(api.info("Unichat/nada.jpg"));
+        }
+    }
 }

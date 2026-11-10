@@ -54,7 +54,8 @@ final class FakeDav implements AutoCloseable {
                         return;
                     }
                     byte[] xml = ("<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\"><d:response><d:propstat><d:prop>"
-                            + (files.containsKey(path) ? "<d:getetag>\"" + versions.get(path) + "\"</d:getetag>" : "")
+                            + (files.containsKey(path) ? "<d:getetag>\"" + versions.get(path) + "\"</d:getetag><d:getcontentlength>"
+                                    + files.get(path).length + "</d:getcontentlength>" : "")
                             + "</d:prop></d:propstat></d:response></d:multistatus>").getBytes(StandardCharsets.UTF_8);
                     x.sendResponseHeaders(207, xml.length);
                     x.getResponseBody().write(xml);
