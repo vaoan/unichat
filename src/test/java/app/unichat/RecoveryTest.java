@@ -1,0 +1,54 @@
+package app.unichat;
+
+import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * An OutOfMemoryError killed the sync thread (no more messages) and froze the window, and Unichat stayed like that until
+ * the person killed it. It starts again by itself, the same way it was started, once the old one is gone, and never
+ * in a loop.
+ */
+class RecoveryTest {
+    @Test
+    void itStartsAgainAsItWasStartedAfterTheOldOneEnds() {
+        assertEquals(List.of("/Applications/Unichat.app/Contents/MacOS/Unichat", "--unichat-after=42:1"),
+                Recovery.command("/Applications/Unichat.app/Contents/MacOS/Unichat", List.of(), 42, 1));
+        // From sources: the same java line; the previous restart's mark is replaced, not piled.
+        assertEquals(List.of("/usr/bin/java", "-cp", "x.jar", "app.unichat.Launcher", "--unichat-after=7:2"),
+                Recovery.command("/usr/bin/java", List.of("-cp", "x.jar", "app.unichat.Launcher", "--unichat-after=3:1"), 7, 2));
+    }
+
+    @Test
+    void theMarkIsReadAndLeftOutOfTheAppsArguments() {
+        Recovery.Start s = Recovery.Start.of(new String[] {"--unichat-after=42:2", "other"});
+        assertEquals(42, s.waitFor());
+        assertEquals(2, s.restarts());
+        assertEquals(List.of("other"), List.of(s.args()));
+        Recovery.Start fresh = Recovery.Start.of(new String[0]);
+        assertEquals(-1, fresh.waitFor());
+        assertEquals(0, fresh.restarts());
+    }
+
+    @Test
+    void neverInALoop() {
+        assertTrue(Recovery.mayRestart(0, Duration.ofSeconds(30)));
+        assertTrue(Recovery.mayRestart(2, Duration.ofMinutes(1)));
+        assertFalse(Recovery.mayRestart(3, Duration.ofMinutes(1)), "a fourth in a row: something's wrong at start");
+        assertTrue(Recovery.mayRestart(3, Duration.ofMinutes(11)), "ran well for a while: counting starts over");
+        assertEquals(1, Recovery.nextCount(3, Duration.ofMinutes(11)));
+        assertEquals(3, Recovery.nextCount(2, Duration.ofMinutes(1)));
+    }
+
+    @Test
+    void onlyRunningOutOfMemoryRestarts() {
+        assertTrue(Recovery.fatal(new OutOfMemoryError("Java heap space")));
+        assertTrue(Recovery.fatal(new StackOverflowError()));
+        assertFalse(Recovery.fatal(new IllegalStateException("a bug in one thread")));
+    }
+}

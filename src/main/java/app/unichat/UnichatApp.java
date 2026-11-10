@@ -55,6 +55,7 @@ public final class UnichatApp extends Application {
     @Override
     public void start(Stage primary) {
         stage = primary;
+        Recovery.watchUi(); // a window that stops answering starts Unichat again
         // -Dunichat.language (tests, snapshots) wins over what was chosen in Ajustes.
         I18n.use(System.getProperty("unichat.language", Settings.get().language()));
         stage.setTitle("Unichat");

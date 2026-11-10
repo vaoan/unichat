@@ -5,6 +5,7 @@ import app.unichat.support.Threads;
 import app.unichat.gif.GifFrames;
 
 import com.twelvemonkeys.imageio.plugins.webp.WebPImageReaderSpi;
+import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.embed.swing.SwingFXUtils;
@@ -403,11 +404,12 @@ public final class AnimatedImage {
      */
     public static void play(ImageView view, Frames frames) {
         // A view that gets a new animation (cell reused, thumbnail then original) stops the previous one.
-        if (view.getProperties().remove(TIMELINE) instanceof Timeline old) old.stop();
+        if (view.getProperties().remove(TIMELINE) instanceof Playing old) old.stop();
         view.setImage(frames.images().get(0));
         if (!frames.animated() || Theme.reduceMotion()) return;
         Timeline t = new Timeline();
-        view.getProperties().put(TIMELINE, t);
+        Playing playing = new Playing(t, frames.bytes());
+        view.getProperties().put(TIMELINE, playing);
         double at = 0;
         for (int i = 0; i < frames.images().size(); i++) {
             Image img = frames.images().get(i);
@@ -421,9 +423,24 @@ public final class AnimatedImage {
         t.getKeyFrames().add(new KeyFrame(Duration.millis(at)));
         t.setCycleCount(Timeline.INDEFINITE);
         view.sceneProperty().addListener((o, a, scene) -> {
-            if (view.getProperties().get(TIMELINE) != t) return;
-            if (scene == null) t.stop(); else t.play();
+            if (view.getProperties().get(TIMELINE) != playing) return;
+            if (scene == null) playing.stop(); else playing.start();
         });
-        if (view.getScene() != null) t.play();
+        if (view.getScene() != null) playing.start();
+    }
+
+    /**
+     * A view's animation and the memory its frames take while it runs ({@link AnimationBudget}): past the budget it
+     * shows its first frame, still, rather than run the heap out.
+     */
+    private record Playing(Timeline timeline, long bytes) {
+        void start() {
+            if (timeline.getStatus() != Animation.Status.RUNNING && AnimationBudget.SHARED.take(bytes)) timeline.play();
+        }
+
+        void stop() {
+            if (timeline.getStatus() == Animation.Status.RUNNING) AnimationBudget.SHARED.release(bytes);
+            timeline.stop();
+        }
     }
 }

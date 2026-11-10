@@ -108,8 +108,8 @@ Left alone because fixing it changes behaviour or needs tests that don't exist. 
 
 1. **Methods of 60 to 100 lines** (see `./mvnw checkstyle:check` with a lower limit): mostly UI constructors.
    **`Network`** is queried with `switch` in several places: a new network touches several files.
-2. **Logs:** written with `System.err`, without levels, and there's no `UncaughtExceptionHandler`, so an error on
-   one of our own threads can get lost. Migrating to `System.Logger` changes the log format, and `AppLog` and `Redactor`
+2. **Logs:** written with `System.err`, without levels. An uncaught error is logged by `Recovery`'s handler (and
+   restarts Unichat when it's fatal), but one inside an executor's task still ends in its `Future`. Migrating to `System.Logger` changes the log format, and `AppLog` and `Redactor`
    must keep filtering.
 3. **`catch` blocks that ignore errors:** they have to be reviewed one by one; some are intentional.
 4. **Global state:** `Settings.get()`, `LocalServer.get()` and the static `provisioner` of `BridgeAccounts` force
