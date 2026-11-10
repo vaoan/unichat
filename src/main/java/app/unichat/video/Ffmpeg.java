@@ -1,6 +1,7 @@
 package app.unichat.video;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.Archives;
 import app.unichat.support.BundledTools;
 import app.unichat.support.Downloads;
 import app.unichat.support.I18n;
@@ -8,14 +9,10 @@ import app.unichat.support.Os;
 import app.unichat.support.Processes;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.function.DoubleConsumer;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 /**
  * ffmpeg, too big to ship: the person's own if there is one, otherwise a pinned build downloaded on first use into
@@ -91,7 +88,7 @@ public final class Ffmpeg {
         Path zip = target.resolveSibling("ffmpeg-download.zip");
         try {
             Downloads.fetch(b.url(), b.size(), b.sha256(), zip, I18n.t("download.what.videoConverter"), progress);
-            extract(zip, b.entry(), target);
+            if (!Archives.extractOne(zip, b.entry(), target)) throw new IOException(I18n.t("video.noProgram"));
         } finally {
             Files.deleteIfExists(zip);
         }
@@ -101,24 +98,6 @@ public final class Ffmpeg {
             throw new IOException(I18n.t("video.badConverter"));
         }
         return target;
-    }
-
-    /** Only that one entry, always to {@code target}: names inside a zip never decide where a file lands. */
-    private static void extract(Path zip, String entry, Path target) throws IOException {
-        try (ZipInputStream in = new ZipInputStream(Files.newInputStream(zip))) {
-            for (ZipEntry e; (e = in.getNextEntry()) != null; ) {
-                if (e.isDirectory() || !(e.getName().equals(entry) || e.getName().endsWith(entry))) continue;
-                copy(in, target);
-                return;
-            }
-        }
-        throw new IOException(I18n.t("video.noProgram"));
-    }
-
-    private static void copy(InputStream in, Path target) throws IOException {
-        Path part = target.resolveSibling(target.getFileName() + ".part");
-        Files.copy(in, part, StandardCopyOption.REPLACE_EXISTING);
-        Files.move(part, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 
     private static Build build() {

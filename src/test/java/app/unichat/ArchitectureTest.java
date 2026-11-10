@@ -72,12 +72,21 @@ class ArchitectureTest {
     }
 
     @Test
+    void imageProtectionKnowsOnlySettings() {
+        noClasses().that().resideInAPackage("..cloak..")
+                .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..",
+                        "..login..", "..bridge..", "..stt..", "..assist..", "..gif..", "..update..", "..video..", "..voice..",
+                        "..links..")
+                .check(APP);
+    }
+
+    @Test
     void theBaseLayersStayAtTheBottom() {
         noClasses().that().resideInAnyPackage("..model..", "..support..", "..bridge..")
-                .should().dependOnClassesThat().resideInAnyPackage("..settings..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..assist..", "..gif..", "..update..")
+                .should().dependOnClassesThat().resideInAnyPackage("..settings..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..assist..", "..gif..", "..update..", "..cloak..")
                 .check(APP);
         noClasses().that().resideInAPackage("..settings..")
-                .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..gif..", "..update..")
+                .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..gif..", "..update..", "..cloak..")
                 .check(APP);
     }
 }

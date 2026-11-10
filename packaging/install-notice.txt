@@ -12,6 +12,8 @@ Besides that, Unichat connects to:
 - GitHub and Hugging Face, the first time you use something that needs ffmpeg, Whisper or RNNoise. ffmpeg is turned off in
   Settings → Networks → Install the converter automatically; Whisper downloads if you transcribe a voice
   note; RNNoise, when you send one with Settings → Networks → Improve the audio of your voice notes.
+- GitHub, PyPI and Hugging Face, only if you choose "Photo protected from AI…" in the clip: the first time it downloads
+  uv, Python, PyTorch, an image encoder and Mist's pattern (it tells you before). The photo is protected on your computer.
 - The pages of links that arrive in messages, without cookies and never inside your local network, to show their
   video. Turn it off in Settings → Privacy → Videos in links.
 - The GIF search you choose, only when you search.
@@ -34,6 +36,8 @@ Además, Unichat se conecta a:
 - GitHub y Hugging Face, la primera vez que usas algo que necesita ffmpeg, Whisper o RNNoise. ffmpeg se apaga en
   Ajustes → Redes → Instalar el conversor automáticamente; Whisper se descarga si transcribes una nota de
   voz; RNNoise, al enviar una nota de voz con Ajustes → Redes → Mejorar el audio de tus notas de voz.
+- GitHub, PyPI y Hugging Face, solo si eliges «Foto protegida contra IA…» en el clip: la primera vez descarga uv,
+  Python, PyTorch, un codificador de imágenes y el patrón de Mist (te avisa antes). La foto se protege en tu equipo.
 - Las páginas de los enlaces que llegan en los mensajes, sin cookies y nunca dentro de tu red local, para mostrar
   su video. Se apaga en Ajustes → Privacidad → Videos de los enlaces.
 - El buscador de GIFs que elijas, solo cuando buscas.

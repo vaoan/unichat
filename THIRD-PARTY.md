@@ -34,9 +34,13 @@ The Java runtime's notices are in the runtime's own `legal` folder. A package bu
 | Whisper speech models (ggml) | MIT |
 | FFmpeg, when needed and you don't have it (builds from martin-riedl.de and gyan.dev) | GPL-3.0 |
 | RNNoise noise model `sh.rnnn` (GregorR/rnnoise-models), when improving voice notes | no copyright, per its author |
+| For photos protected from AI: uv (astral-sh), Python, PyTorch, NumPy, Pillow, safetensors and their dependencies | MIT or Apache-2.0 (uv), PSF-2.0 (Python), BSD-3-Clause (PyTorch, NumPy), MIT-CMU (Pillow), Apache-2.0 (safetensors) |
+| Stable Diffusion 1.4's image encoder weights (CompVis), for the same | CreativeML OpenRAIL-M |
+| Mist's target pattern `MIST.png` (psyker-team/mist), for the same; the attack itself is Unichat's own code | GPL-3.0 |
 
 ## Notes
 
+- **Emoji list**: `emoji/emoji.txt` is made from Unicode's `emoji-test.txt` (Emoji 15.0), under the Unicode License v3 (<https://www.unicode.org/license.txt>).
 - **LGPL in JavaFX**: WebKit and GStreamer/GLib ship as separate native libraries inside JavaFX. Their source is at <https://github.com/openjdk/jfx>.
 - **MPL-2.0**: tuwunel's `as_variant` crate. Its source is at <https://github.com/matrix-construct/tuwunel> and its dependencies.
 - **JAAD**: JCodec carries an AAC decoder in package `net.sourceforge.jaad`, with no notice of its own in JCodec's source; it's listed under JCodec's license.

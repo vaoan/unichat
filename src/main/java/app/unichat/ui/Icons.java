@@ -71,6 +71,7 @@ public final class Icons {
     public static final String MINUS = "M5 11h14v2H5v-2Z";
     public static final String ROTATE = "M12 5V1l5 5-5 5V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8Z";
     public static final String BACK = "M15.4 6 14 4.6 6.6 12l7.4 7.4 1.4-1.4-6-6 6-6Z";
+    public static final String SHIELD = "M12 2 4 5v6c0 5 3.4 9.3 8 11 4.6-1.7 8-6 8-11V5l-8-3Zm0 2.1 6 2.3V11c0 3.9-2.5 7.3-6 8.8-3.5-1.5-6-4.9-6-8.8V6.4l6-2.3Z";
 
     /** The app logo at {@code size} px (rendered from the bundled 256 px PNG). */
     public static Node logo(double size) {

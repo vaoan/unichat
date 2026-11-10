@@ -486,8 +486,14 @@ public final class Composer extends VBox {
     }
 
     private Consumer<SidePanel.Tab> onPanel;
+    private Runnable onProtect;
 
     /** The emoji and sticker/GIF buttons open the side panel on that tab. */
+    /** "Foto protegida contra IA" in the clip's menu: the window asks how hard ({@link CloakSend}). */
+    public void setOnProtect(Runnable onProtect) {
+        this.onProtect = onProtect;
+    }
+
     public void setOnPanel(Consumer<SidePanel.Tab> onPanel) {
         this.onPanel = onPanel;
     }
@@ -550,7 +556,8 @@ public final class Composer extends VBox {
                 attachItem("composer.attach.photo", Icons.IMAGE, () -> choose(true, SendAs.PHOTO, false)),
                 attachItem("composer.attach.document", Icons.FILE, () -> choose(false, SendAs.DOCUMENT, false)),
                 attachItem("composer.attach.batch", Icons.UPLOAD, () -> choose(false, SendAs.AS_IS, true)),
-                attachItem("composer.attach.photoBatch", Icons.CAMERA, () -> choose(true, SendAs.PHOTO, true)));
+                attachItem("composer.attach.photoBatch", Icons.CAMERA, () -> choose(true, SendAs.PHOTO, true)),
+                attachItem("composer.attach.protected", Icons.SHIELD, () -> { if (onProtect != null) onProtect.run(); }));
         menu.getStyleClass().add("attach-menu");
         return menu;
     }

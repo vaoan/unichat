@@ -40,6 +40,7 @@ public final class MainView extends StackPane {
     private final FolderDialogs folderDialogs;
     private final BorderPane threadArea = new BorderPane();
     private final StackPane overlay = new StackPane();
+    private Runnable protectPhoto = () -> { };
     private final Label toast = new Label();
     private final Label connection = new Label();
     private ConnectionState state = ConnectionState.CONNECTING;
@@ -126,14 +127,15 @@ public final class MainView extends StackPane {
         panel.setContent(SidePanel.Tab.STICKERS, stickers, stickers::refresh);
         GifGrid gifs = new GifGrid(svc, library, thread::chat, thread::takeReply, this::toast);
         panel.setContent(SidePanel.Tab.GIFS, gifs, gifs::refresh);
-        javafx.scene.control.ScrollPane emojis = new javafx.scene.control.ScrollPane(
-                EmojiPicker.grid(text -> thread.composer().insert(text), 280, library, this::toast));
+        EmojiGrid emojiGrid = new EmojiGrid(library, text -> thread.composer().insert(text), 280, this::toast);
+        javafx.scene.control.ScrollPane emojis = new javafx.scene.control.ScrollPane(emojiGrid);
         emojis.setFitToWidth(true);
         emojis.getStyleClass().addAll("emoji-picker", "side-panel-scroll");
-        panel.setContent(SidePanel.Tab.EMOJIS, emojis, null);
+        panel.setContent(SidePanel.Tab.EMOJIS, emojis, emojiGrid::refresh);
         FavoritesPane favorites = new FavoritesPane(library, stickers, gifs, text -> thread.composer().insert(text), this::toast);
         panel.setContent(SidePanel.Tab.FAVORITES, favorites, favorites::refresh);
         thread.composer().setOnPanel(this::togglePanel);
+        offerProtectedPhotos(svc);
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::showSettings);
 
         threadArea.setCenter(thread);
@@ -154,7 +156,8 @@ public final class MainView extends StackPane {
         // On disk (this computer's paths, so it stays here like session.properties): a batch survives a restart.
         java.nio.file.Path pendingUploads = Settings.dataDir().resolve(svc instanceof app.unichat.service.MockChatService ? "uploads-demo.json" : "uploads.json");
         uploads = new UploadBar(app.unichat.service.UploadQueue.of(svc, pendingUploads), svc, this::openChatId);
-        main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true)), uploads));
+        main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true)), uploads,
+                new CloakBar(app.unichat.cloak.CloakJob.get())));
 
         overlay.getStyleClass().add("overlay");
         overlay.setVisible(false);
@@ -448,6 +451,20 @@ public final class MainView extends StackPane {
         javafx.geometry.Bounds me = localToScene(getLayoutBounds());
         toast.setTranslateY(-(me.getMaxY() - b.getMinY()) - 12);
         toast.setTranslateX(b.getCenterX() - me.getCenterX());
+    }
+
+    /** The clip's "Foto protegida contra IA": asks how hard, then protects and sends ({@link CloakSend}). */
+    private void offerProtectedPhotos(ChatService svc) {
+        CloakSend cloak = new CloakSend(svc, this::showOverlay, this::hideOverlay, this::toast);
+        protectPhoto = () -> {
+            if (thread.chat() != null) cloak.open(thread.chat().id(), () -> thread.composer().focus());
+        };
+        thread.composer().setOnProtect(protectPhoto);
+    }
+
+    /** The sheet that asks how hard to protect a photo, for the open chat (snapshot diagnostics). */
+    public void showProtectPhoto() {
+        protectPhoto.run();
     }
 
     public void toast(String text) {

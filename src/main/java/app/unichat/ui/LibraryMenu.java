@@ -21,10 +21,12 @@ final class LibraryMenu {
                        app.unichat.service.MediaSource svc) {
         tile.setOnContextMenuRequested(e -> {
             ContextMenu menu = menu(library, item, use, toast);
-            if (item.url() != null) {
+            if (item.kind() != MediaLibrary.Kind.EMOJI && item.url() != null) {
                 menu.getItems().add(use == null ? 0 : 1, ChatMenus.item(I18n.t("library.enlarge"), () -> enlarge(tile, svc, item, toast)));
             }
-            menu.show(tile, e.getScreenX(), e.getScreenY());
+            // Owned by the window, not the tile: a menu takes its owner's styles, and an emoji's (1.45 em, the emoji
+            // font) made it huge, with the emoji font's wide spaces between words.
+            menu.show(tile.getScene().getRoot(), e.getScreenX(), e.getScreenY());
             e.consume();
         });
     }
