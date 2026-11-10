@@ -1,6 +1,6 @@
 # native — notes for Claude
 
-Native builds and the no-Docker stack, and the macOS menu-bar helper. The rules, commands and map are in the root `CLAUDE.md`.
+Native builds and the no-Docker stack, and the macOS menu-bar helper.
 
 - `native/` — no-Docker stack (tuwunel + mautrix bridge binaries + SQLite): `versions.env` pins every component,
   `setup-mac.sh` / `run-mac.sh` are the reference for the installer Unichat will run at startup (install whatever
@@ -15,3 +15,6 @@ Native builds and the no-Docker stack, and the macOS menu-bar helper. The rules,
   `ui/NativeBar` over stdin (the unread count, `ChatFilter.inboxUnread` like the inbox badge, shows beside the icon, with a red dot on the icon's corner, a view of its own since the template icon can't keep a colour; the AWT tray draws it on the icon, `Notifier.withCount`); `Notifier` uses it when macOS allows notifications, else `DesktopToast` (own card, must
   never take keyboard focus), and the AWT TrayIcon if the helper is missing or dies. package.sh ships it as
   `Contents/app/native/UnichatBar.app`.
+
+## Lessons
+- Appending to a generated YAML without a trailing newline glued `rc_message:` to a comment line (Synapse test config). Use `printf '\n...'` when appending.

@@ -253,7 +253,7 @@
     -fx-alignment: center;
 }
 .unread-badge.muted { -fx-background-color: -text-3; }
-.unread-badge.dot { -fx-padding: 0; -fx-min-width: 10; -fx-min-height: 10; -fx-max-width: 10; -fx-max-height: 10; }
+.unread-badge.dot { -fx-padding: 0; -fx-min-width: 10; -fx-min-height: 10; -fx-max-width: 10; -fx-max-height: 10; } /* a dot, no text: lesson-ok: css-label-min-width */
 .empty-label { -fx-text-fill: -text-3; -fx-padding: 30 20; -fx-text-alignment: center; }
 
 /* ---------------------------------------------------------------- thread */

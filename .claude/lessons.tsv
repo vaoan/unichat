@@ -1,0 +1,9 @@
+# Mistakes made once, as patterns that must not come back. Checked by the edit hook (at once) and LessonsTest (the build).
+# One per line, tab-separated: id	files (glob from the repo root)	regex (Java, per line)	why and what to do instead.
+# A line with a real reason to break one says "lesson-ok: <id>" in a comment. Add a row with each lesson that a pattern can catch.
+test-sleep	src/test/**/*.java	Thread\.sleep\(	Tests never wait for a length of time: wait on a latch, future, listener, FxWait or the code's flush() (src/test/CLAUDE.md).
+test-timed-wait	src/test/**/*.java	\.(await|poll|get|tryAcquire|offer|waitFor)\([^()]*,\s*(TimeUnit\.)?(NANOSECONDS|MICROSECONDS|MILLISECONDS|SECONDS|MINUTES)|\.join\(\s*\d+\s*\)|\.waitFor\(\s*\d+	No timeout of a test's own: JUnit's global timeout is the only limit; wait on what the code does (src/test/CLAUDE.md).
+static-text	src/main/java/**/*.java	static\s+final[^=;(]*=\s*I18n\.	The language changes live (UnichatApp.relocalize): a text kept in a static final stays in the old language. Call I18n.t where it is shown.
+gif-as-image	src/main/java/**/*.java	new\s+Image\([^)]*\.gif	JavaFX animates a GIF in new Image() forever and keeps every frame (OOM in a day): use AnimatedImage.decodeGif / still.
+css-accent-loop	src/main/resources/**/*.css	-accent\s*:\s*derive\(\s*-accent	A looked-up color derived from itself is a loop: compute it in code (Theme.accessibleAccent).
+css-label-min-width	src/main/resources/**/*.css	\.(unread-badge|badge|chip|label)[^{]*\{[^}]*-fx-min-width	Author CSS beats setMinWidth(USE_PREF_SIZE): a min width in CSS truncated wide glyphs to "". Set it in code.

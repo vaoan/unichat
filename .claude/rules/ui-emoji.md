@@ -1,0 +1,17 @@
+---
+paths:
+  - "src/main/java/app/unichat/ui/Emoji*.java"
+  - "src/main/java/app/unichat/ui/ReactionEmoji.java"
+  - "src/main/resources/app/unichat/emoji/**"
+  - "native/emoji-list.py"
+---
+# Emoji
+
+- Picker (`EmojiPicker`, side panel `EmojiGrid`): Unicode's Emoji 15.0 list (`resources/app/unichat/emoji/emoji.txt`, made by `native/emoji-list.py` from the pinned emoji-test.txt; 1870 without skin-tone variants; 15.0 because macOS 13.3 draws no newer).
+- JavaFX lays out flags, keycaps and ZWJ sequences in pieces (490 of them on a Mac), so `EmojiArt` measures which and draws those with Java2D (which joins them) as pictures, off the FX thread; one Java2D can't join either stays hidden. In messages, emoji JavaFX draws in pieces (any cluster of more than one character, measured once) are pictures inside the text (`EmojiInline` from `EmojiArt.segments`, `EmojiInlineUiTest`); the text box (a TextArea, plain text only) still shows them in pieces.
+- The list is virtual (`EmojiGrid`, a `ListView` of rows from `EmojiRows`, pure): 1870 buttons at once scrolled at 110 ms a step, the virtual one at 35 (`EmojiScrollPerfUiTest`, `-Dunichat.perfTests=true`); columns follow the width of a real button (`probe`), every emoji button has one size in em so text and pictures line up, and the arrow keys move between emoji since those off screen have no button.
+- The side panel's tab starts with Favoritos (a hint while empty: right-click → Agregar a favoritos) and Recientes (updated when the tab is shown, so nothing moves under the pointer); the reaction picker (`EmojiGrid.Mode.REACTIONS`) is the same list starting with the ones reacted with most. Both have a search box: Unicode's names and keywords in the language in use (`EmojiSearch`, `emoji/names_<lang>.txt` from CLDR by the same script, English for a language without; every word typed begins a word of the name, accents and case aside), ↓ goes to the emoji, Enter takes the first.
+- Quick reactions (popup, message menu, keys 1–6) are the six the person reacts with most (`MediaLibrary.reacted` / `mostReacted`, in media-library.json, so they travel; the usual six fill in until there's history; taking a reaction away isn't a use; `QuickReactionsUiTest`). `EmojiPickerUiTest` (Mac: its emoji font; the headless platform uses the system's fonts too).
+
+## Lessons
+- JavaFX 21 rendered emoji monochrome → JavaFX 23+, with emoji font families forced on emoji-only controls.

@@ -1,0 +1,8 @@
+# Shell commands Claude must not run here (deny: back to Claude with the reason) or must ask the person first (ask).
+# Tab-separated: id	when (regex on the command)	unless (regex, may be empty)	deny|ask	why.
+# Add a row when a command did harm once; GuardTest checks every row has an example it catches.
+ui-tests-on-screen	unichat\.uiTests=true	headless-ui|glass\.platform=Headless	deny	UI tests run only headless: ./mvnw verify -Pheadless-ui (nothing on the person's screen).
+real-display-tests	unichat\.(realInputTests|perfTests)=true		deny	Tests on the real display, mouse or keyboard are only for the person to run.
+app-window	run-dev\.sh	unichat\.snapshot=	deny	run-dev.sh without -Dunichat.snapshot opens the real window on the person's screen: use the snapshot skill.
+open-installed-app	\bopen\b[^|;&]*Unichat\.app		ask	Opens Unichat on the person's screen.
+real-data-dir	Library/Application\\? Support/Unichat|AppData[/\\]+(Roaming|Local)[/\\]+Unichat		ask	The person's real data folder (chats, session, secrets).

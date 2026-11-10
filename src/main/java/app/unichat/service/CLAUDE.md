@@ -1,6 +1,6 @@
 # service — notes for Claude
 
-The API the UI uses, demo mode, and what the person keeps (preferences, folders). The rules, commands and map are in the root `CLAUDE.md`.
+The API the UI uses, demo mode, and what the person keeps (preferences, folders).
 
 - `service/ChatService` — the only API the UI uses (made of small role interfaces; take the narrowest one). Live model objects, listeners on any thread (UI marshals with
   `Platform.runLater`, coalesced in `MainView` by `ui/Throttle`). `MockChatService` = demo mode. `BridgeAccess` = what only bridge-backed services add.

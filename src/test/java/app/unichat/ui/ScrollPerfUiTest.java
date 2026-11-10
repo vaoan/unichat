@@ -206,7 +206,7 @@ class ScrollPerfUiTest {
                     try {
                         // The sampling rate of this profiler, not a wait for the code: sampling the UI thread's stack
                         // every 5 ms is the measurement itself (the one timed pause the testing rules allow).
-                        Thread.sleep(5);
+                        Thread.sleep(5); // lesson-ok: test-sleep
                     } catch (InterruptedException e) {
                         return;
                     }

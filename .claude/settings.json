@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\"" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/java.sh\" Guard" }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/java.sh\" Lessons --hook" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "timeout": 300, "statusMessage": "Compiling and checking the lessons", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-check.sh\"" }] }
+    ]
+  }
+}
