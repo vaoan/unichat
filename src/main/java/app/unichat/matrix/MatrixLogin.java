@@ -97,7 +97,9 @@ public final class MatrixLogin {
         String uid = resp.path("user_id").asText(null);
         if (token == null || uid == null) throw new MatrixException(0, null, I18n.t("matrix.login.badResponse"));
         String wkBase = resp.path("well_known").path("m.homeserver").path("base_url").asText(null);
-        if (wkBase != null && !wkBase.isBlank()) base = MatrixClient.stripSlash(wkBase);
+        if (wkBase != null && !wkBase.isBlank() && safeBase(wkBase) && isHomeserver(http, wkBase)) {
+            base = MatrixClient.stripSlash(wkBase);
+        }
         SyncCache.drop();
         Settings.get().setMatrixSession(base, uid, token, resp.path("device_id").asText(null));
         return new MatrixChatService(base, uid, token);
@@ -117,7 +119,7 @@ public final class MatrixLogin {
             MatrixClient anon = new MatrixClient(http, c, null);
             try {
                 String wk = anon.get("/.well-known/matrix/client").path("m.homeserver").path("base_url").asText(null);
-                if (wk != null && !wk.isBlank() && isHomeserver(http, wk)) return MatrixClient.stripSlash(wk);
+                if (wk != null && !wk.isBlank() && safeBase(wk) && isHomeserver(http, wk)) return MatrixClient.stripSlash(wk);
             } catch (IOException | RuntimeException ignored) {
                 // no .well-known: try the URL itself
             }
@@ -132,6 +134,21 @@ public final class MatrixLogin {
         } catch (IOException | RuntimeException e) {
             return false;
         }
+    }
+
+    /**
+     * Whether an address a server suggests for itself (its {@code .well-known}, the login's {@code well_known}) may be
+     * the session's: https, or plain http only on this machine or its network. Any other would send the token in clear.
+     */
+    static boolean safeBase(String url) {
+        java.net.URI u;
+        try {
+            u = java.net.URI.create(url);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        if (u.getHost() == null) return false;
+        return "https".equalsIgnoreCase(u.getScheme()) || "http".equalsIgnoreCase(u.getScheme()) && isLocalHost(u.getHost());
     }
 
     private static boolean isLocalHost(String hostPort) {
