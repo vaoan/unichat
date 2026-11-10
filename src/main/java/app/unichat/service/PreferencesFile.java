@@ -35,7 +35,9 @@ import java.util.UUID;
  */
 public final class PreferencesFile {
     public enum Flag {
-        ARCHIVED("archived"), MUTED("muted"), FAVORITE("favorite"), LOW_PRIORITY("lowPriority"), PINNED("pinned");
+        ARCHIVED("archived"), MUTED("muted"), FAVORITE("favorite"), LOW_PRIORITY("lowPriority"), PINNED("pinned"),
+        /** Save everything others send in this chat ({@code autosave}): Unichat's own, no server ever says it. */
+        AUTO_SAVE("autoSave");
 
         final String json;
 
@@ -52,6 +54,7 @@ public final class PreferencesFile {
                 case FAVORITE -> favorite;
                 case LOW_PRIORITY -> lowPriority;
                 case PINNED -> pinned;
+                case AUTO_SAVE -> null;
             };
         }
     }
@@ -343,6 +346,12 @@ public final class PreferencesFile {
     }
 
     private static boolean is(Entry e, Flag f) { return Boolean.TRUE.equals(e.values.get(f)); }
+
+    /** Whether {@code flag} is on for the chat with this key, as the file has it (for those no server says). */
+    public synchronized boolean isOn(String key, Flag flag) {
+        Entry e = chats.get(key);
+        return e != null && is(e, flag);
+    }
 
     private Entry entry(String key) { return chats.computeIfAbsent(key, k -> new Entry()); }
 

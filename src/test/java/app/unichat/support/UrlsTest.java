@@ -24,4 +24,11 @@ class UrlsTest {
         assertEquals("a%2Fb%3Fc%23d", Urls.enc("a/b?c#d"));
         assertEquals("ni%C3%B1o", Urls.enc("niño"));
     }
+
+    @Test
+    void addressesInTextWithoutTheSentencesPunctuation() {
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.List.of("https://youtu.be/abc", "http://x.org/a?b=1"),
+                Urls.in("mira https://youtu.be/abc, y http://x.org/a?b=1."));
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.List.of(), Urls.in(null));
+    }
 }

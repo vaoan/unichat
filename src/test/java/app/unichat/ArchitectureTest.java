@@ -72,6 +72,14 @@ class ArchitectureTest {
     }
 
     @Test
+    void savingEverythingAChatReceivesDoesntKnowMatrixNorTheUi() {
+        noClasses().that().resideInAPackage("..autosave..")
+                .should().dependOnClassesThat().resideInAnyPackage("..matrix..", "..server..", "..login..", "..bridge..",
+                        "..stt..", "..assist..", "..gif..", "..update..", "..voice..", "..links..", "..cloak..")
+                .check(APP);
+    }
+
+    @Test
     void imageProtectionKnowsOnlySettings() {
         noClasses().that().resideInAPackage("..cloak..")
                 .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..",
@@ -83,10 +91,10 @@ class ArchitectureTest {
     @Test
     void theBaseLayersStayAtTheBottom() {
         noClasses().that().resideInAnyPackage("..model..", "..support..", "..bridge..")
-                .should().dependOnClassesThat().resideInAnyPackage("..settings..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..assist..", "..gif..", "..update..", "..cloak..")
+                .should().dependOnClassesThat().resideInAnyPackage("..settings..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..assist..", "..gif..", "..update..", "..cloak..", "..autosave..")
                 .check(APP);
         noClasses().that().resideInAPackage("..settings..")
-                .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..gif..", "..update..", "..cloak..")
+                .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..gif..", "..update..", "..cloak..", "..autosave..")
                 .check(APP);
     }
 }

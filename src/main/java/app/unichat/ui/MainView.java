@@ -133,6 +133,7 @@ public final class MainView extends StackPane {
         panel.setContent(SidePanel.Tab.FAVORITES, favorites, favorites::refresh);
         thread.composer().setOnPanel(this::togglePanel);
         offerProtectedPhotos(svc);
+        app.unichat.autosave.AutoSave.of(svc); // listening from the start: chats that save everything do so at once
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::showSettings);
 
         threadArea.setCenter(thread);

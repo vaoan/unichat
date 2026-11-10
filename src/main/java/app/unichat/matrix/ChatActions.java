@@ -111,6 +111,17 @@ final class ChatActions {
         return choose(chatId, Flag.FAVORITE, favorite);
     }
 
+    CompletableFuture<Void> setAutoSave(String chatId, boolean on) {
+        return choose(chatId, Flag.AUTO_SAVE, on);
+    }
+
+    boolean autoSaves(String chatId) {
+        synchronized (proc) {
+            MatrixRoom room = proc.room(chatId);
+            return room != null && prefs.isOn(proc.prefKey(room), Flag.AUTO_SAVE);
+        }
+    }
+
     CompletableFuture<Void> setLowPriority(String chatId, boolean lowPriority) {
         return choose(chatId, Flag.LOW_PRIORITY, lowPriority);
     }

@@ -20,7 +20,7 @@ public final class RichText {
 
     public record Span(Kind kind, String text) {}
 
-    private static final String URL = "https?://[^\\s<>\"]+[^\\s<>\".,;:!?)\\]']";
+    private static final String URL = app.unichat.support.Urls.ADDRESS;
     private static final Pattern ADDRESS = Pattern.compile(URL);
     private static final int MAX_SHOWN_URL = 60;
     private static final int MIN_SHOWN_URL = 20;

@@ -124,6 +124,7 @@
           <systemPropertyVariables>
             <!-- Keep tests away from the real user data folder. -->
             <unichat.dataDir>${project.build.directory}/test-data</unichat.dataDir>
+            <unichat.autosaveDir>${project.build.directory}/test-autosave</unichat.autosaveDir>
             <!-- Tests read the Spanish texts, whatever the machine's language. -->
             <unichat.language>es</unichat.language>
             <!-- No sounds through the speakers. -->

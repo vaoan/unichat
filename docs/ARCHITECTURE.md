@@ -16,8 +16,9 @@ Each package may only depend on the ones below it. `ArchitectureTest` checks thi
 | `server` | Local server: installs, starts and watches tuwunel and the bridges | `bridge`, `settings`, `support` |
 | `stt` | Speech to text | `settings`, `support`, `video` |
 | `assist` | Reply drafts with the person's AI CLI | `model`, `settings`, `support` |
-| `video` | ffmpeg and the conversion of WebM stickers | `settings`, `support` |
+| `video` | ffmpeg, yt-dlp and the conversion of WebM stickers | `settings`, `support` |
 | `voice` | Recording voice notes, cleaning them up and encoding them | `model`, `settings`, `support`, `video` |
+| `autosave` | Saving everything others send in a chat that has it on (media, and the video behind links with yt-dlp) | `service`, `model`, `settings`, `support`, `video` |
 | `cloak` | Protecting a picture from AI training before sending it (Mist's textural attack, in `cloak.py`, run with a Python it installs) | `settings`, `support` |
 | `links` | Opens the links in messages to find out whether they have video or audio, never reaching this machine or its network | `model`, `support` |
 | `gif` | GIF search providers and frame reading | `model`, `settings`, `support` |

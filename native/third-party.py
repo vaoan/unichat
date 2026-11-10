@@ -149,7 +149,8 @@ o.append("## Not included: downloaded when used\n\n| Component | License |\n|---
          "| RNNoise noise model `sh.rnnn` (GregorR/rnnoise-models), when improving voice notes | no copyright, per its author |\n"
          "| For photos protected from AI: uv (astral-sh), Python, PyTorch, NumPy, Pillow, safetensors and their dependencies | MIT or Apache-2.0 (uv), PSF-2.0 (Python), BSD-3-Clause (PyTorch, NumPy), MIT-CMU (Pillow), Apache-2.0 (safetensors) |\n"
          "| Stable Diffusion 1.4's image encoder weights (CompVis), for the same | CreativeML OpenRAIL-M |\n"
-         "| Mist's target pattern `MIST.png` (psyker-team/mist), for the same; the attack itself is Unichat's own code | GPL-3.0 |\n")
+         "| Mist's target pattern `MIST.png` (psyker-team/mist), for the same; the attack itself is Unichat's own code | GPL-3.0 |\n"
+         "| yt-dlp, when a chat saves everything it receives (the video behind links) | Unlicense |\n")
 o.append("## Notes\n\n"
          "- **Emoji list**: `emoji/emoji.txt` is made from Unicode's `emoji-test.txt` (Emoji 15.0), under the Unicode License v3 (<https://www.unicode.org/license.txt>).\n"
          "- **LGPL in JavaFX**: WebKit and GStreamer/GLib ship as separate native libraries inside JavaFX. Their source "

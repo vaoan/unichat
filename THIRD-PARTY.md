@@ -37,6 +37,7 @@ The Java runtime's notices are in the runtime's own `legal` folder. A package bu
 | For photos protected from AI: uv (astral-sh), Python, PyTorch, NumPy, Pillow, safetensors and their dependencies | MIT or Apache-2.0 (uv), PSF-2.0 (Python), BSD-3-Clause (PyTorch, NumPy), MIT-CMU (Pillow), Apache-2.0 (safetensors) |
 | Stable Diffusion 1.4's image encoder weights (CompVis), for the same | CreativeML OpenRAIL-M |
 | Mist's target pattern `MIST.png` (psyker-team/mist), for the same; the attack itself is Unichat's own code | GPL-3.0 |
+| yt-dlp, when a chat saves everything it receives (the video behind links) | Unlicense |
 
 ## Notes
 

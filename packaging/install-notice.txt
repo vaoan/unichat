@@ -14,6 +14,8 @@ Besides that, Unichat connects to:
   note; RNNoise, when you send one with Settings → Networks → Improve the audio of your voice notes.
 - GitHub, PyPI and Hugging Face, only if you choose "Photo protected from AI…" in the clip: the first time it downloads
   uv, Python, PyTorch, an image encoder and Mist's pattern (it tells you before). The photo is protected on your computer.
+- GitHub (yt-dlp) and the sites of the links others send, only in a chat where you turn on "Save everything they send"
+  in its profile: to save the video behind each link.
 - The pages of links that arrive in messages, without cookies and never inside your local network, to show their
   video. Turn it off in Settings → Privacy → Videos in links.
 - The GIF search you choose, only when you search.
@@ -38,6 +40,8 @@ Además, Unichat se conecta a:
   voz; RNNoise, al enviar una nota de voz con Ajustes → Redes → Mejorar el audio de tus notas de voz.
 - GitHub, PyPI y Hugging Face, solo si eliges «Foto protegida contra IA…» en el clip: la primera vez descarga uv,
   Python, PyTorch, un codificador de imágenes y el patrón de Mist (te avisa antes). La foto se protege en tu equipo.
+- GitHub (yt-dlp) y los sitios de los enlaces que te envían, solo en un chat donde enciendas «Guardar todo lo que
+  envíen» en su perfil: para guardar el video de cada enlace.
 - Las páginas de los enlaces que llegan en los mensajes, sin cookies y nunca dentro de tu red local, para mostrar
   su video. Se apaga en Ajustes → Privacidad → Videos de los enlaces.
 - El buscador de GIFs que elijas, solo cuando buscas.

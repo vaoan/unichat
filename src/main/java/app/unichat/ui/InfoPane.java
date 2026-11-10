@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.autosave.AutoSave;
 import app.unichat.model.Chat;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
@@ -128,6 +129,8 @@ public final class InfoPane extends ScrollPane {
             box.getChildren().add(grid);
         }
 
+        box.getChildren().addAll(autoSave(c));
+
         if (c.group() || c.members().size() > 2) {
             box.getChildren().add(section(I18n.t("info.members", c.members().size())));
             VBox people = new VBox(2);
@@ -156,6 +159,37 @@ public final class InfoPane extends ScrollPane {
         box.getChildren().addAll(new VBox(8, lowPrio, leave));
     }
 
+    /**
+     * "Guardar todo lo que envíen": everything others send in this chat, as it arrives, into a folder of its own
+     * ({@link AutoSave}); the folder opens from here.
+     */
+    private List<javafx.scene.Node> autoSave(Chat c) {
+        boolean on = svc.autoSaves(c.id());
+        javafx.scene.control.CheckBox box = new javafx.scene.control.CheckBox(I18n.t("info.autoSave"));
+        box.setSelected(on);
+        box.setWrapText(true);
+        box.setOnAction(e -> svc.setAutoSave(c.id(), box.isSelected()).thenRun(() -> Platform.runLater(this::refresh)));
+        java.nio.file.Path folder = AutoSave.of(svc).folder(c);
+        Label help = Labels.help(I18n.t("info.autoSaveHelp", AutoSave.shown(folder)));
+        box.setAccessibleHelp(help.getText());
+        VBox out = new VBox(4, box, help);
+        out.getStyleClass().add("info-autosave");
+        if (on) {
+            Button open = new Button(I18n.t("info.autoSaveOpen"));
+            open.getStyleClass().add("secondary-button");
+            open.setOnAction(e -> {
+                try {
+                    java.nio.file.Files.createDirectories(folder); // nothing has arrived yet: an empty folder to look at
+                    Browser.openFolder(folder, () -> Platform.runLater(() -> toast.accept(I18n.t("info.autoSaveOpenFailed"))));
+                } catch (java.io.IOException ex) {
+                    toast.accept(I18n.t("info.autoSaveOpenFailed"));
+                }
+            });
+            out.getChildren().add(open);
+        }
+        return List.of(section(I18n.t("info.autoSaveTitle")), out);
+    }
+
     /** Everything the panel draws from {@code c}, as one string to compare. */
     private String shown(Chat c) {
         StringBuilder b = new StringBuilder().append(c.id()).append('|').append(c.title()).append('|').append(c.avatarUrl())
@@ -172,7 +206,7 @@ public final class InfoPane extends ScrollPane {
             b.append("|members ").append(c.members().size());
             for (Member m : c.members().stream().limit(100).toList()) b.append(' ').append(m.id()).append(m.displayName()).append(m.avatarUrl());
         }
-        return b.toString();
+        return b.toString() + "|autoSave=" + svc.autoSaves(c.id());
     }
 
     /**
