@@ -286,6 +286,30 @@ class AutoSaveTest {
     }
 
     @Test
+    void exploringSaysWhatItsDoingAtEachStep() throws Exception {
+        svc.setAutoSave(chat.id(), EnumSet.of(SaveKind.PHOTOS, SaveKind.DOCUMENTS)).get();
+        Instant t = Instant.now();
+        timeline.add(media(MessageType.IMAGE, "ayer.jpg", false, t.minusSeconds(86_400)));
+        older.add(List.of(media(MessageType.FILE, "contrato.pdf", false, t.minusSeconds(5 * 86_400)),
+                media(MessageType.VIDEO, "video.mp4", false, t.minusSeconds(4 * 86_400))));
+        save.startNow(chat.id());
+        List<String> steps = java.util.Collections.synchronizedList(new ArrayList<>());
+        Runnable l = () -> {
+            AutoSave.Now now = save.exploring(chat.id()).now();
+            if (now != null) steps.add(now.doing() + (now.what() == null ? "" : " " + now.what()));
+        };
+        save.addExploringListener(l);
+        exploreAndWait();
+        save.removeExploringListener(l);
+        assertTrue(steps.contains("LOOKING"), steps.toString());
+        assertTrue(steps.stream().anyMatch(x -> x.startsWith("DOWNLOADING") && x.contains("contrato")), steps.toString());
+        assertTrue(steps.contains("ASKING_OLDER"), "asking the server for older messages: " + steps);
+        AutoSave.Exploring e = save.exploring(chat.id());
+        assertEquals(3, e.looked(), "ayer, contrato and the video looked at (the video not saved: not chosen)");
+        assertEquals(null, e.now(), "nothing going on once over");
+    }
+
+    @Test
     void whatsGoneIsCountedAndToldOnceNotFileByFile() throws Exception {
         svc.setAutoSave(chat.id(), EnumSet.allOf(SaveKind.class)).get();
         Instant t = Instant.now();

@@ -262,9 +262,19 @@ public final class AutoSave implements ChatService.Listener {
 
     /**
      * Exploring a chat's past, for its options: going on or not, back to when everything was looked at, whether that's
-     * the beginning, and what this run saved and found gone.
+     * the beginning, what this run looked at, saved and found gone, and what it's doing right now (null when not
+     * running): without that, "Buscando…" for minutes said nothing.
      */
-    public record Exploring(boolean running, Instant back, boolean start, int saved, int unavailable) {}
+    public record Exploring(boolean running, Instant back, boolean start, int saved, int unavailable, int looked, Now now) {
+        Exploring counted(boolean ok) {
+            return new Exploring(running, back, start, saved + (ok ? 1 : 0), unavailable + (ok ? 0 : 1), looked, now);
+        }
+    }
+
+    /** What exploring is doing: going through a message of {@code at}, downloading {@code what} from it, or asking the server for older ones. */
+    public record Now(Doing doing, Instant at, String what) {}
+
+    public enum Doing { LOOKING, DOWNLOADING, ASKING_OLDER }
 
     private final Map<String, Exploring> exploring = new java.util.concurrent.ConcurrentHashMap<>();
     private final Set<String> stopping = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -275,7 +285,7 @@ public final class AutoSave implements ChatService.Listener {
         Exploring now = exploring.get(chatId);
         if (now != null) return now;
         SavedUpTo.Back b = savedUpTo.back(chatId);
-        return new Exploring(false, b == null ? null : b.back(), b != null && b.start(), 0, 0);
+        return new Exploring(false, b == null ? null : b.back(), b != null && b.start(), 0, 0, 0, null);
     }
 
     /** Runs on any thread whenever exploring changes. */
@@ -296,7 +306,7 @@ public final class AutoSave implements ChatService.Listener {
         if (exploring(chatId).running()) return;
         stopping.remove(chatId);
         Exploring was = exploring(chatId);
-        setExploring(chatId, new Exploring(true, was.back(), was.start(), 0, 0));
+        setExploring(chatId, new Exploring(true, was.back(), was.start(), 0, 0, 0, null));
         worker.execute(() -> explorePage(chatId));
     }
 
@@ -323,6 +333,9 @@ public final class AutoSave implements ChatService.Listener {
         Path dir = folder(chat);
         for (Message m : old) {
             if (stopping.contains(chatId)) break;
+            Exploring e = exploring(chatId);
+            setExploring(chatId, new Exploring(true, m.timestamp(), e.start(), e.saved(), e.unavailable(), e.looked() + 1,
+                    new Now(Doing.LOOKING, m.timestamp(), null)));
             String noSpace = exploreOne(m, kinds, chatId, dir);
             savedUpTo.exploredBack(chatId, m.timestamp(), false);
             if (noSpace != null) {
@@ -331,6 +344,12 @@ public final class AutoSave implements ChatService.Listener {
                 return;
             }
         }
+        if (stopping.contains(chatId)) {
+            stopping.remove(chatId);
+            endExploring(chatId, chat, false);
+            return;
+        }
+        doing(chatId, Doing.ASKING_OLDER, exploring(chatId).back(), null);
         chats.loadOlder(chatId).whenComplete((more, err) -> worker.execute(() -> {
             if (err != null || !Boolean.TRUE.equals(more)) endExploring(chatId, chat, err == null);
             else explorePage(chatId);
@@ -341,12 +360,14 @@ public final class AutoSave implements ChatService.Listener {
     private String exploreOne(Message m, Set<SaveKind> kinds, String chatId, Path dir) {
         SaveKind kind = SaveKind.of(m);
         if (kind != null && kinds.contains(kind)) {
+            doing(chatId, Doing.DOWNLOADING, m.timestamp(), FileNames.forMessage(m, ZoneId.systemDefault()));
             String why = copyQuietly(m, dir);
             if (I18n.t("autosave.error.noSpace").equals(why)) return why;
             count(chatId, why == null);
         }
         if (!kinds.contains(SaveKind.LINKS)) return null;
         for (String url : links(m)) {
+            doing(chatId, Doing.DOWNLOADING, m.timestamp(), url);
             String why = linkQuietly(url, dir);
             if (I18n.t("autosave.error.noSpace").equals(why)) return why;
             count(chatId, why == null);
@@ -383,8 +404,12 @@ public final class AutoSave implements ChatService.Listener {
     }
 
     private void count(String chatId, boolean saved) {
+        setExploring(chatId, exploring(chatId).counted(saved));
+    }
+
+    private void doing(String chatId, Doing what, Instant at, String item) {
         Exploring e = exploring(chatId);
-        setExploring(chatId, new Exploring(true, e.back(), e.start(), e.saved() + (saved ? 1 : 0), e.unavailable() + (saved ? 0 : 1)));
+        setExploring(chatId, new Exploring(true, e.back(), e.start(), e.saved(), e.unavailable(), e.looked(), new Now(what, at, item)));
     }
 
     /** Done (or stopped): one notice for what this run saved, one for what was no longer there. */
@@ -393,7 +418,7 @@ public final class AutoSave implements ChatService.Listener {
         SavedUpTo.Back reached = savedUpTo.back(chatId);
         if (start) savedUpTo.exploredBack(chatId, reached == null ? Instant.EPOCH : reached.back(), true);
         SavedUpTo.Back b = savedUpTo.back(chatId);
-        setExploring(chatId, new Exploring(false, b == null ? null : b.back(), b != null && b.start(), e.saved(), e.unavailable()));
+        setExploring(chatId, new Exploring(false, b == null ? null : b.back(), b != null && b.start(), e.saved(), e.unavailable(), e.looked(), null));
         if (chat == null) return;
         if (e.saved() > 0) progress.finished(e.saved(), chat);
         if (e.unavailable() > 0) progress.failed(I18n.n("autosave.unavailable", e.unavailable()), chat, I18n.t("autosave.unavailableWhy"));

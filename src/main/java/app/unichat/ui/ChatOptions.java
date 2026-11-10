@@ -193,11 +193,15 @@ final class ChatOptions {
         state.setMinHeight(Region.USE_PREF_SIZE);
         Button go = new Button();
         go.getStyleClass().add("secondary-button");
+        javafx.scene.control.ProgressBar working = new javafx.scene.control.ProgressBar(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS);
+        working.setMaxWidth(Double.MAX_VALUE);
+        working.setAccessibleText(I18n.t("chatOptions.pastRunning"));
         Runnable redraw = () -> {
             AutoSave.Exploring e = save.exploring(chat.id());
             go.setText(I18n.t(e.running() ? "chatOptions.pastStop" : "chatOptions.pastStart"));
             state.setText(pastState(e));
             Nodes.show(state, !state.getText().isEmpty());
+            Nodes.show(working, e.running());
         };
         go.setOnAction(e -> {
             if (save.exploring(chat.id()).running()) save.stopExploring(chat.id());
@@ -211,19 +215,33 @@ final class ChatOptions {
             if (scene == null) save.removeExploringListener(listener);
         });
         redraw.run();
-        return new VBox(6, help, go, state);
+        return new VBox(6, help, go, working, state);
     }
 
+    /**
+     * Where exploring is, as a person follows it: what it's doing right now (going through the messages of a day,
+     * downloading a file from it, asking the server for older ones), then how many it looked at, saved and found gone.
+     */
     static String pastState(AutoSave.Exploring e) {
-        String counts = e.saved() + e.unavailable() == 0 ? "" : " " + I18n.t("chatOptions.pastCounts", e.saved(), e.unavailable());
-        if (e.running()) return I18n.t("chatOptions.pastRunning") + counts;
-        if (e.start()) return I18n.t("chatOptions.pastAtStart") + counts;
-        if (e.back() != null) {
-            String day = java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy").withLocale(I18n.locale())
-                    .format(e.back().atZone(java.time.ZoneId.systemDefault()));
-            return I18n.t("chatOptions.pastUntil", day) + counts;
-        }
-        return "";
+        String counts = e.looked() + e.saved() + e.unavailable() == 0 ? ""
+                : I18n.t("chatOptions.pastCounts", e.looked(), e.saved(), e.unavailable());
+        String doing;
+        if (e.running()) {
+            AutoSave.Now now = e.now();
+            doing = now == null ? I18n.t("chatOptions.pastRunning") : switch (now.doing()) {
+                case LOOKING -> I18n.t("chatOptions.pastLooking", day(now.at()));
+                case DOWNLOADING -> I18n.t("chatOptions.pastDownloading", now.what(), day(now.at()));
+                case ASKING_OLDER -> now.at() == null ? I18n.t("chatOptions.pastRunning") : I18n.t("chatOptions.pastAsking", day(now.at()));
+            };
+        } else if (e.start()) doing = I18n.t("chatOptions.pastAtStart");
+        else if (e.back() != null) doing = I18n.t("chatOptions.pastUntil", day(e.back()));
+        else doing = "";
+        return counts.isEmpty() ? doing : doing.isEmpty() ? counts : doing + "\n" + counts;
+    }
+
+    private static String day(java.time.Instant at) {
+        return java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy").withLocale(I18n.locale())
+                .format(at.atZone(java.time.ZoneId.systemDefault()));
     }
 
     /** "Carpeta: ~/Downloads/Unichat/Familia", to change for this chat alone or bring back under the general one. */
