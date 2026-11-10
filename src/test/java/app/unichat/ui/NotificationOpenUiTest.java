@@ -137,4 +137,24 @@ class NotificationOpenUiTest {
         clickNotification("!mama:demo");
         assertEquals(before, box());
     }
+
+    /**
+     * A notification's click opens its chat ready to answer: the cursor in that chat's message box, wherever it was
+     * before. (On macOS the window must also become the active app's: see UnichatBar.swift's yieldActivation.)
+     */
+    @Test
+    void theNotificationsChatOpensWithTheCursorInItsBox() throws Exception {
+        open();
+        FxWait.fx(() -> { scene.getRoot().lookup(".list-view").requestFocus(); return null; });
+        FxWait.fx(() -> { stage.hide(); return null; });
+        FxWait.settled();
+        clickNotification("!mama:demo");
+        assertEquals("!mama:demo", FxWait.fx(view::currentChatId));
+        Node box = FxWait.fx(() -> scene.getRoot().lookup(".composer-row").lookup(".text-area"));
+        FxWait.until("the cursor in the chat's message box", () -> {
+            Node owner = scene.getFocusOwner();
+            for (Node n = owner; n != null; n = n.getParent()) if (n == box) return true;
+            throw new AssertionError("the focus is on " + owner); // what a failure says
+        });
+    }
 }

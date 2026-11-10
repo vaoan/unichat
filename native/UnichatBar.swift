@@ -31,6 +31,16 @@ func emit(_ line: String) {
     }
 }
 
+/**
+ * Lets Unichat (this helper's parent, the Java process) become the active app. Since macOS 14 an app can't bring
+ * itself to the front: the active app has to yield first. A click on a notification or on the icon makes this helper
+ * the active one, so without this Unichat's window came up without the focus, or behind the app in use.
+ */
+func handBackActivation() {
+    guard #available(macOS 14.0, *), let unichat = NSRunningApplication(processIdentifier: getppid()) else { return }
+    NSApp.yieldActivation(to: unichat)
+}
+
 final class Notes: NSObject, UNUserNotificationCenterDelegate {
     private let center = UNUserNotificationCenter.current()
     /** Only touched on the output queue. */
@@ -85,7 +95,10 @@ final class Notes: NSObject, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler done: @escaping () -> Void) {
-        if let chat = response.notification.request.content.userInfo["chat"] as? String { emit("open\t\(chat)") }
+        if let chat = response.notification.request.content.userInfo["chat"] as? String {
+            handBackActivation()
+            emit("open\t\(chat)")
+        }
         done()
     }
 
@@ -262,6 +275,7 @@ final class Bar: NSObject, NSMenuDelegate {
         if leftOpensMenu || event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
             showMenu()
         } else {
+            handBackActivation()
             emit("show")
         }
     }

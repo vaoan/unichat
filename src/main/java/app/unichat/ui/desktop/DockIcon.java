@@ -51,7 +51,7 @@ public final class DockIcon {
     public static void show() {
         mainShowing = true;
         apply();
-        send("activateIgnoringOtherApps:", 1L);
+        activate();
     }
 
     /** Window hidden: remove the Dock icon unless another window is open; the menu bar icon stays. */
@@ -64,7 +64,25 @@ public final class DockIcon {
 
     /** Makes Unichat the active app (macOS), as a click on its window would; without it, its open menu can't be closed. */
     static void activate() {
-        send("activateIgnoringOtherApps:", 1L);
+        // macOS 14+ activates cooperatively: `activate` takes the turn the active app (the menu-bar helper, after a
+        // click on a notification or the icon) yielded; the old call is ignored there. macOS 13 only has the old one.
+        if (responds("activate")) send("activate", 0L);
+        else send("activateIgnoringOtherApps:", 1L);
+    }
+
+    /** Whether NSApplication answers {@code selector} (asked of the class: no app is made): calling one it doesn't ends the program. */
+    static boolean responds(String selector) {
+        if (!MAC || broken) return false;
+        try {
+            NativeLibrary.getInstance("AppKit"); // where NSApplication lives, loaded by JavaFX in the app but not before
+            NativeLibrary objc = NativeLibrary.getInstance("objc");
+            Function sel = objc.getFunction("sel_registerName");
+            Pointer cls = objc.getFunction("objc_getClass").invokePointer(new Object[]{"NSApplication"});
+            return objc.getFunction("objc_msgSend").invokeInt(new Object[]{cls,
+                    sel.invokePointer(new Object[]{"instancesRespondToSelector:"}), sel.invokePointer(new Object[]{selector})}) != 0;
+        } catch (Throwable e) {
+            return false;
+        }
     }
 
     /** "Mostrar en el Dock" changed elsewhere (the cloud): the icon follows, without bringing Unichat to the front. */
