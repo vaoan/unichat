@@ -184,15 +184,22 @@ public final class ThreadPane extends BorderPane {
         });
     }
 
-    private void redrawOnTranscriptProgress() {
-        // Transcript progress redraws the visible rows; coalesced so a model download doesn't flood the FX thread.
-        java.util.concurrent.atomic.AtomicBoolean refreshQueued = new java.util.concurrent.atomic.AtomicBoolean();
-        Transcripts.get().addListener(() -> {
-            if (refreshQueued.compareAndSet(false, true)) Platform.runLater(() -> {
-                refreshQueued.set(false);
-                list.refresh();
-            });
+    /** Transcript progress redraws the visible rows; coalesced so a model download doesn't flood the FX thread. */
+    private final java.util.concurrent.atomic.AtomicBoolean refreshQueued = new java.util.concurrent.atomic.AtomicBoolean();
+    private final Runnable onTranscript = () -> {
+        if (refreshQueued.compareAndSet(false, true)) Platform.runLater(() -> {
+            refreshQueued.set(false);
+            list.refresh();
         });
+    };
+
+    private void redrawOnTranscriptProgress() {
+        Transcripts.get().addListener(onTranscript);
+    }
+
+    /** Stops listening to what outlives this pane (the transcripts are the app's): the window is being rebuilt. */
+    void dispose() {
+        Transcripts.get().removeListener(onTranscript);
     }
 
     /** Selects and shows {@code target} (the message a reply quotes). */

@@ -180,12 +180,8 @@ public final class MainView extends StackPane {
         addEventFilter(KeyEvent.KEY_PRESSED, shortcuts);
         addEventHandler(KeyEvent.KEY_PRESSED, shortcuts::typeIntoComposer); // a handler: after anything that used the key
         addEventFilter(KeyEvent.KEY_RELEASED, e -> thread.composer().aiKeyReleased(e.getCode()));
-        stage.showingProperty().addListener((o, a, showing) -> {
-            if (showing) Platform.runLater(this::catchUp);
-        });
-        stage.focusedProperty().addListener((o, a, focused) -> {
-            if (focused && thread.chat() != null) svc.markRead(thread.chat().id());
-        });
+        stage.showingProperty().addListener(onShowing);
+        stage.focusedProperty().addListener(onFocused);
 
         svc.addListener(listener);
         showConnection(svc.connectionState());
@@ -196,7 +192,25 @@ public final class MainView extends StackPane {
         svc.onSaveFailure(text -> Platform.runLater(() -> toast(text)));
     }
 
+    /**
+     * The stage outlives this view (a language change or a logout builds another on it): what this view listens to
+     * there is removed in {@link #dispose}, or it kept marking its chat read on each focus and stayed in memory.
+     */
+    private final javafx.beans.value.ChangeListener<Boolean> onShowing = this::showingChanged;
+    private final javafx.beans.value.ChangeListener<Boolean> onFocused = this::focusChanged;
+
+    private void showingChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean showing) {
+        if (showing) Platform.runLater(this::catchUp);
+    }
+
+    private void focusChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean focused) {
+        if (focused && thread.chat() != null) svc.markRead(thread.chat().id());
+    }
+
     public void dispose() {
+        stage.showingProperty().removeListener(onShowing);
+        stage.focusedProperty().removeListener(onFocused);
+        thread.dispose();
         audio.stop();
         uploads.dispose();
         exploring.dispose();
