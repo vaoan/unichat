@@ -14,7 +14,8 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 $YqImage = "mikefarah/yq:4"
-$SynapseImage = "matrixdotorg/synapse:latest"
+# The same pinned image as docker-compose.yml.
+$SynapseImage = "matrixdotorg/synapse:v1.164.2@sha256:f0df87cff259872637b4b5e5174b9977e5e3046dd421505407803b5e45c5f842"
 $Ports = @{ whatsapp = 29318; telegram = 29317; signal = 29328; instagram = 29319; facebook = 29320;
             discord = 29334; slack = 29335; gmessages = 29336; twitter = 29327; linkedin = 29341 }
 

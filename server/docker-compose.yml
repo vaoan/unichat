@@ -1,6 +1,9 @@
 # Unichat self-hosted stack: Synapse + Postgres + mautrix bridges.
 # Run ./setup.sh (macOS/Linux) or .\setup.ps1 (Windows) once before `docker compose up -d`.
 # All state lives in ./data (git-ignored). Bridge bot / puppet names match app/unichat/model/Network.java.
+# Every image is pinned to a release and its digest (never :latest, which changes under you); the bridges to the
+# versions in src/main/resources/app/unichat/server/versions.env. Bump both together; a digest comes from
+# `docker buildx imagetools inspect <image>:<tag>`.
 
 x-bridge: &bridge
   restart: unless-stopped
@@ -12,7 +15,7 @@ x-bridge: &bridge
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139
     restart: unless-stopped
     environment:
       POSTGRES_USER: unichat
@@ -32,7 +35,7 @@ services:
     networks: [unichat]
 
   synapse:
-    image: matrixdotorg/synapse:latest
+    image: matrixdotorg/synapse:v1.164.2@sha256:f0df87cff259872637b4b5e5174b9977e5e3046dd421505407803b5e45c5f842
     restart: unless-stopped
     depends_on:
       postgres: {condition: service_healthy}
@@ -46,57 +49,57 @@ services:
 
   whatsapp:
     <<: *bridge
-    image: dock.mau.dev/mautrix/whatsapp:latest
+    image: dock.mau.dev/mautrix/whatsapp:v0.2610.0@sha256:c807054cb015d0f5c90d20d85aac216d062b4a6f4ae834b931fd5e7f03e27391
     volumes: ["./data/whatsapp:/data"]
 
   telegram:
     <<: *bridge
     # Needs api_id / api_hash from https://my.telegram.org (see docs/BRIDGES.md), so it only runs with the
     # "telegram" profile; setup adds COMPOSE_PROFILES=telegram to .env once TELEGRAM_API_ID/HASH are set.
-    image: dock.mau.dev/mautrix/telegram:latest
+    image: dock.mau.dev/mautrix/telegram:v0.2610.0@sha256:ed3f3b39289fae425a875311d8875729271c24f88ba03209bd1bfbaf31e6c78f
     profiles: [telegram]
     volumes: ["./data/telegram:/data"]
 
   signal:
     <<: *bridge
-    image: dock.mau.dev/mautrix/signal:latest
+    image: dock.mau.dev/mautrix/signal:v0.2610.0@sha256:39afa721aa69472b2e91c75bd7d81a739e47f7e480fc0ff5ac8247af28eb2d0a
     volumes: ["./data/signal:/data"]
 
-  # mautrix-meta runs twice. Instagram support was removed from mautrix-meta after v26.07, so the
-  # instagram instance is pinned to that release (network.mode: instagram); facebook tracks latest.
+  # mautrix-meta runs twice. Instagram support was removed from mautrix-meta after v26.07 (v0.2607.0), so the
+  # instagram instance stays on that release (network.mode: instagram); facebook follows versions.env.
   instagram:
     <<: *bridge
-    image: dock.mau.dev/mautrix/meta:v26.07
+    image: dock.mau.dev/mautrix/meta:v0.2607.0@sha256:c65eb7f10a3880933490972bed574678874d780df70458a5ab0568157f9cc15c
     volumes: ["./data/instagram:/data"]
 
   facebook:
     <<: *bridge
-    image: dock.mau.dev/mautrix/meta:latest
+    image: dock.mau.dev/mautrix/meta:v0.2610.0@sha256:22bfa54084b6855188f5146b325ee007a298443a9617caead06cc5fc0ba0d687
     volumes: ["./data/facebook:/data"]
 
   discord:
     <<: *bridge
-    image: dock.mau.dev/mautrix/discord:latest
+    image: dock.mau.dev/mautrix/discord:v0.7.7@sha256:065405ca2f961b2687ca577c4eb65592c139d641342a9611d98b5394f30cf84a
     volumes: ["./data/discord:/data"]
 
   slack:
     <<: *bridge
-    image: dock.mau.dev/mautrix/slack:latest
+    image: dock.mau.dev/mautrix/slack:v0.2610.0@sha256:0de822d47926b7077322a4fa9f349cd024af13107ab4bc63a0962dc53ef72a63
     volumes: ["./data/slack:/data"]
 
   gmessages:
     <<: *bridge
-    image: dock.mau.dev/mautrix/gmessages:latest
+    image: dock.mau.dev/mautrix/gmessages:v0.2610.0@sha256:afeca2d14a01fac919c8fb94b04bf812db78e29425ceafe042508d7aea9e50a8
     volumes: ["./data/gmessages:/data"]
 
   twitter:
     <<: *bridge
-    image: dock.mau.dev/mautrix/twitter:latest
+    image: dock.mau.dev/mautrix/twitter:v0.2609.0@sha256:7f70378b4bd00530f790c9282ff844cefd7900be955c998012b30ebbebc158cd
     volumes: ["./data/twitter:/data"]
 
   linkedin:
     <<: *bridge
-    image: dock.mau.dev/mautrix/linkedin:latest
+    image: dock.mau.dev/mautrix/linkedin:v0.2609.0@sha256:db88d8c2c4a0397d00777f856771a7d3174ee4ec0436a1fd5f56330cb91cb6b0
     volumes: ["./data/linkedin:/data"]
 
 networks:

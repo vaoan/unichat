@@ -151,12 +151,12 @@ public final class LocalServer {
         progress.accept(I18n.t("server.preparing"));
         installHomeserver();
         installLibolm();
-        writeDoublePuppet(secrets);
+        HomeserverConfig.writeDoublePuppet(dir, secrets.getProperty("double_puppet_token"), DOMAIN);
         if (activeBridges().contains("telegram") && !TelegramKeys.saved()) {
             System.err.println("Telegram not started: no valid API keys (Ajustes → Redes)");
         }
         for (String b : usableBridges()) prepareBridge(b, secrets, progress);
-        writeHomeserverConfig(secrets);
+        HomeserverConfig.write(dir, PORT, DOMAIN, secrets.getProperty("registration_token"));
 
         if (!supervisor.isRunning("tuwunel")) startHomeserver(progress);
         ensureAccount(secrets);
@@ -260,30 +260,6 @@ public final class LocalServer {
             }
         }
         throw new IOException(I18n.t("server.bridgeNoStart", port));
-    }
-
-    private void writeHomeserverConfig(Properties secrets) throws IOException {
-        Path hs = dir.resolve("tuwunel");
-        Files.createDirectories(hs.resolve("db"));
-        Files.writeString(hs.resolve("tuwunel.toml"), HomeserverConfig.toml(dir, PORT, DOMAIN, secrets.getProperty("registration_token")));
-    }
-
-    /** Lets bridges send what you write on your phone as you (written once, tokens must stay stable). */
-    private void writeDoublePuppet(Properties secrets) throws IOException {
-        Path f = dir.resolve("appservices").resolve("doublepuppet.yaml");
-        if (Files.exists(f)) return;
-        Files.writeString(f, """
-                id: doublepuppet
-                url:
-                as_token: "%s"
-                hs_token: "%s"
-                sender_localpart: doublepuppet
-                rate_limited: false
-                namespaces:
-                  users:
-                    - regex: '@.*:%s'
-                      exclusive: false
-                """.formatted(secrets.getProperty("double_puppet_token"), ServerSecrets.random(48), DOMAIN));
     }
 
     /** Registers the account the first time (registration-token flow, two requests). */

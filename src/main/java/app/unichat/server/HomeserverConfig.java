@@ -1,10 +1,43 @@
 package app.unichat.server;
 
+import app.unichat.settings.SyncedFile;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** tuwunel.toml for the personal server; rewritten on every start (nothing in it is edited by hand). */
+/** tuwunel.toml for the personal server, rewritten on every start (nothing in it is edited by hand), and the double-puppet registration. */
 final class HomeserverConfig {
     private HomeserverConfig() {}
+
+    /** {@code dataDir}/tuwunel/tuwunel.toml, only the person's: the registration token in it creates accounts. */
+    static void write(Path dataDir, int port, String domain, String registrationToken) throws IOException {
+        Path hs = dataDir.resolve("tuwunel");
+        Files.createDirectories(hs.resolve("db"));
+        SyncedFile.replace(hs.resolve("tuwunel.toml"), toml(dataDir, port, domain, registrationToken).getBytes(StandardCharsets.UTF_8), true);
+    }
+
+    /**
+     * Lets bridges send what you write on your phone as you (written once, tokens must stay stable). Only the person's: its
+     * as_token speaks as anyone on the server. One an older Unichat left readable is closed, tokens unchanged.
+     */
+    static void writeDoublePuppet(Path dataDir, String asToken, String domain) throws IOException {
+        Path f = dataDir.resolve("appservices").resolve("doublepuppet.yaml");
+        byte[] content = Files.exists(f) ? Files.readAllBytes(f) : """
+                id: doublepuppet
+                url:
+                as_token: "%s"
+                hs_token: "%s"
+                sender_localpart: doublepuppet
+                rate_limited: false
+                namespaces:
+                  users:
+                    - regex: '@.*:%s'
+                      exclusive: false
+                """.formatted(asToken, ServerSecrets.random(48), domain).getBytes(StandardCharsets.UTF_8);
+        SyncedFile.replace(f, content, true);
+    }
 
     static String toml(Path dataDir, int port, String domain, String registrationToken) {
         return """

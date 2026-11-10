@@ -85,9 +85,12 @@ jobs:
           GOOS: windows
           GOARCH: amd64
           CC: x86_64-w64-mingw32-gcc
+          # From versions.env: through the environment, never pasted into the script.
+          PREFIX: ${{ matrix.bridge.prefix }}
+          TAG: ${{ matrix.bridge.tag }}
         run: |
           # bridgev2 bridges have their main in cmd/<name>; the legacy Discord bridge at the root.
-          pkg=./cmd/${{ matrix.bridge.prefix }}; tags=goolm
+          pkg="./cmd/$PREFIX"; tags=goolm
           if [ ! -d "$pkg" ]; then
             # Legacy bridge (Discord): its mautrix-go has no goolm, only cgo libolm, so no crypto at all (Unichat turns
             # bridge encryption off anyway); and its zeroconfig 0.1 uses log/syslog, missing on Windows. The only
@@ -96,8 +99,8 @@ jobs:
             if grep -q 'go.mau.fi/zeroconfig v0\.1\.' go.mod; then go mod edit -require=go.mau.fi/zeroconfig@v0.2.0 && go mod download go.mau.fi/zeroconfig; fi
           fi
           go build -mod=mod -tags "$tags" -trimpath \
-            -ldflags "-s -w -X main.Tag=${{ matrix.bridge.tag }} -X main.Commit=$(git rev-parse HEAD) -X 'main.BuildTime=$(date -u '+%b %_d %Y, %H:%M:%S')'" \
-            -o "../out/${{ matrix.bridge.prefix }}-windows-amd64" "$pkg"
+            -ldflags "-s -w -X main.Tag=$TAG -X main.Commit=$(git rev-parse HEAD) -X 'main.BuildTime=$(date -u '+%b %_d %Y, %H:%M:%S')'" \
+            -o "../out/$PREFIX-windows-amd64" "$pkg"
       - uses: actions/upload-artifact@v5
         with:
           name: bridge-${{ matrix.bridge.name }}
@@ -137,12 +140,17 @@ jobs:
       - name: LLVM for rocksdb's bindings (Windows)
         if: runner.os == 'Windows'
         run: clang --version || choco install llvm -y --no-progress
-      - run: cargo build --release --locked ${{ matrix.features }}
+      # Unquoted on purpose: several flags, written in this file (not from data).
+      - run: cargo build --release --locked $FEATURES
+        env:
+          FEATURES: ${{ matrix.features }}
       - name: Collect
+        env:
+          PLATFORM: ${{ matrix.platform }}
         run: |
           exe=target/release/tuwunel; [ "$RUNNER_OS" = Windows ] && exe="$exe.exe"
           "$exe" --version
-          mkdir out && cp "$exe" "out/tuwunel-${{ matrix.platform }}"
+          mkdir out && cp "$exe" "out/tuwunel-$PLATFORM"
       - uses: actions/upload-artifact@v5
         with:
           name: tuwunel-${{ matrix.platform }}
@@ -185,6 +193,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.plan.outputs.tag }}
           BRIDGES: ${{ needs.plan.outputs.bridges }}
+          TUWUNEL: ${{ needs.plan.outputs.tuwunel }}
         run: |
           cd out
           sha256sum -- *-* > sha256sums.txt
@@ -194,7 +203,7 @@ jobs:
             echo "Unichat's local server and the bridges for Windows, built by natives.yml from their source, unmodified. Not a version of the app."
             echo
             echo "Source of each file:"
-            echo "- tuwunel-*: https://github.com/matrix-construct/tuwunel/tree/${{ needs.plan.outputs.tuwunel }} (Apache-2.0)"
+            echo "- tuwunel-*: https://github.com/matrix-construct/tuwunel/tree/$TUWUNEL (Apache-2.0)"
             echo "$BRIDGES" | jq -r '.[] | "- \(.prefix)-windows-amd64: https://github.com/\(.repo)/tree/\(.tag) (AGPL-3.0)"'
             echo
             echo "Only change: mautrix-discord is built with \`-tags goolm,nocrypto\` and \`go mod edit -require=go.mau.fi/zeroconfig@v0.2.0\` (0.1 uses log/syslog, which Windows lacks). Everything else as is."

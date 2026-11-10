@@ -26,7 +26,8 @@ Each bridge also uses the command prefix `!<network>` (`!whatsapp`, `!facebook`,
 `!gmessages`…): Unichat puts it in front of the commands it sends so they work in any chat with the bot.
 
 **Instagram**: mautrix-meta stopped supporting Instagram after version v26.07, so that
-container is pinned to `v26.07`. Messenger uses the latest version.
+container is pinned to `v26.07` (`v0.2607.0`). Every other image is pinned to a release and its digest in
+`docker-compose.yml`, the bridges to the versions in `versions.env`.
 
 ## Requirements
 

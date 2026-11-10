@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgePorts;
+import app.unichat.settings.SyncedFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -45,9 +46,13 @@ public final class BridgeConfig {
         return (ObjectNode) YAML.readTree(yaml);
     }
 
+    /**
+     * Whole or not at all (written in place, a crash or a full disk mid-write left it empty), and only the person's: it holds
+     * the bridge's as_token and hs_token and the double-puppet secret.
+     */
     public static void rewrite(Path file, Settings s) throws IOException {
         ObjectNode c = read(Files.readString(file));
-        Files.writeString(file, YAML.writeValueAsString(apply(c, s)));
+        SyncedFile.replace(file, YAML.writeValueAsBytes(apply(c, s)), true);
     }
 
     public static ObjectNode apply(ObjectNode c, Settings s) {

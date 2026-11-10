@@ -9,7 +9,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 YQ_IMAGE="mikefarah/yq:4"
-SYNAPSE_IMAGE="matrixdotorg/synapse:latest"
+# The same pinned image as docker-compose.yml.
+SYNAPSE_IMAGE="matrixdotorg/synapse:v1.164.2@sha256:f0df87cff259872637b4b5e5174b9977e5e3046dd421505407803b5e45c5f842"
 ALL_BRIDGES="whatsapp telegram signal instagram facebook discord slack gmessages twitter linkedin"
 BRIDGES="${BRIDGES:-$ALL_BRIDGES}"
 

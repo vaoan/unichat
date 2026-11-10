@@ -3,7 +3,9 @@ package app.unichat.server;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -203,5 +205,19 @@ class BridgeConfigTest {
         ObjectNode c = BridgeConfig.read(V2);
         assertFalse(BridgeConfig.setExisting(c, "/network/sync/create_limitt", 100));
         assertTrue(c.at("/network/sync").isMissingNode(), "nothing created for a key the bridge doesn't have");
+    }
+
+    /**
+     * Written beside and renamed over, never truncated in place: a crash or a full disk mid-write left an empty config.yaml.
+     * A hard link to the old file shows it: rewritten in place, the link would see the new text.
+     */
+    @Test
+    void theConfigIsReplacedWholeNeverRewrittenInPlace(@TempDir Path dir) throws Exception {
+        Path config = Files.writeString(dir.resolve("config.yaml"), V2);
+        Path before = Files.createLink(dir.resolve("before.yaml"), config);
+        BridgeConfig.rewrite(config, settings("whatsapp"));
+        assertEquals(V2, Files.readString(before));
+        assertTrue(Files.readString(config).contains("127.0.0.1:8008"));
+        assertFalse(Files.exists(dir.resolve("config.yaml.tmp")));
     }
 }

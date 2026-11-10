@@ -13,7 +13,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,8 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class ChromeLoginTest {
+    private static final Duration NO_LIMIT = Duration.ofMillis(Long.MAX_VALUE);
+
     @TempDir Path dir;
 
     private static BridgeLogin.CookieParams params(String url) {
@@ -81,6 +87,48 @@ class ChromeLoginTest {
         Map<String, String> v = login.values(feed, Map.of("JSESSIONID", "\"ajax:1\"", "li_at", "x", "bcookie", "b"));
         assertTrue(v.get("cookie_header").contains("bcookie=b"), "every cookie the browser has");
         assertTrue(v.get("cookie_header").contains("JSESSIONID=\"ajax:1\""));
+    }
+
+    /** Any program here can drive Chrome through its debugging port while it waits: no longer than a login takes. */
+    @Test
+    void chromeWaitsNoLongerThanALoginTakes() {
+        assertTrue(ChromeLogin.MAX_WAIT.compareTo(Duration.ofMinutes(5)) <= 0, ChromeLogin.MAX_WAIT.toString());
+    }
+
+    private ChromeLogin waiting(Duration maxWait) {
+        return new ChromeLogin(Network.LINKEDIN, params("https://www.linkedin.com/login"), Path.of("/x"), dir, true, maxWait, NO_LIMIT);
+    }
+
+    /** Cancelling ends the wait at once, however long the next look would be, so Chrome and its port close right away. */
+    @Test
+    void cancellingEndsTheWaitAtOnce() throws Exception {
+        ChromeLogin login = waiting(Duration.ofDays(1));
+        CountDownLatch looked = new CountDownLatch(1);
+        CompletableFuture<Map<String, String>> result = new CompletableFuture<>();
+        Thread.ofVirtual().start(() -> {
+            try {
+                result.complete(login.waitForLogin(() -> {
+                    looked.countDown();
+                    return null;
+                }));
+            } catch (Exception e) {
+                result.completeExceptionally(e);
+            }
+        });
+        looked.await();
+        login.cancel();
+        assertNull(result.get(), "get, not join: JUnit's timeout interrupts it, so a wait that never ends fails");
+    }
+
+    @Test
+    void outOfTimeItStopsWithoutLooking() throws Exception {
+        assertNull(waiting(Duration.ZERO).waitForLogin(() -> fail("no look after the deadline")));
+    }
+
+    @Test
+    void theValuesOrAClosedWindowEndTheWait() throws Exception {
+        assertEquals(Map.of("a", "b"), waiting(Duration.ofDays(1)).waitForLogin(() -> Map.of("a", "b")));
+        assertNull(waiting(Duration.ofDays(1)).waitForLogin(() -> ChromeLogin.CLOSED));
     }
 
     /** With the real browser, off screen: nothing of the person's is touched. */

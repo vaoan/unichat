@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /** A bridge's setup, with a child JVM in place of the bridge: portable on macOS and Windows. */
 class BridgeInstallerTest {
@@ -78,6 +80,16 @@ class BridgeInstallerTest {
         assertEquals(List.of("-c config.yaml", "-g -c config.yaml -r registration.yaml"), calls("discord"));
         assertEquals(LocalServer.URL, BridgeConfig.read(Files.readString(dir.resolve("discord/config.yaml"))).at("/homeserver/address").asText());
         assertFalse(Files.exists(dir.resolve("discord/logs")), "it was written unfiltered");
+    }
+
+    /** The config and the registration hold the bridge's as_token and hs_token: only the person reads them. */
+    @Test
+    void theBridgesSecretsAreOnlyTheOwners() throws Exception {
+        assumeTrue(dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
+        installer("bridge").prepare("whatsapp", "dp-token", "http://127.0.0.1:9/status/whatsapp", null, m -> { });
+        for (String f : List.of("whatsapp/config.yaml", "whatsapp/registration.yaml", "appservices/whatsapp.yaml")) {
+            assertEquals("rw-------", PosixFilePermissions.toString(Files.getPosixFilePermissions(dir.resolve(f))), f);
+        }
     }
 
     @Test

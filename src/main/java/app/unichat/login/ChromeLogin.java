@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -41,8 +42,14 @@ import java.util.regex.Pattern;
  */
 public final class ChromeLogin {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final long POLL_MS = 1_500;
-    private static final long MAX_WAIT_MS = 15 * 60_000;
+    private static final Duration POLL = Duration.ofMillis(1_500);
+    /**
+     * The debugging port is open while Chrome waits, and any program on this computer can drive the browser through it, so no
+     * longer than a login takes: email, password and a code or passkey on the phone are two or three minutes; five leave room.
+     */
+    static final Duration MAX_WAIT = Duration.ofMinutes(5);
+    /** What a look at Chrome returns when its last window is closed (compared by identity: never the step's values). */
+    static final Map<String, String> CLOSED = java.util.Collections.unmodifiableMap(new LinkedHashMap<>());
     private static final int NO_TABS_LIMIT = 3;
     private static final String BLANK = "about:blank";
 
@@ -55,13 +62,24 @@ public final class ChromeLogin {
     private volatile Process process;
     private volatile int debugPort;
     private volatile DevTools siteTab;
+    private final Duration maxWait;
+    private final Duration poll;
     private volatile boolean cancelled;
+    /** Opened by {@link #cancel}: every wait here ends at once, so Chrome closes now, not at the next look. */
+    private final CountDownLatch cancelSignal = new CountDownLatch(1);
 
     public ChromeLogin(Network network, BridgeLogin.CookieParams params, Path chrome, Path profile) {
         this(network, params, chrome, profile, false);
     }
 
     ChromeLogin(Network network, BridgeLogin.CookieParams params, Path chrome, Path profile, boolean headless) {
+        this(network, params, chrome, profile, headless, MAX_WAIT, POLL);
+    }
+
+    ChromeLogin(Network network, BridgeLogin.CookieParams params, Path chrome, Path profile, boolean headless, Duration maxWait,
+                Duration poll) {
+        this.maxWait = maxWait;
+        this.poll = poll;
         this.network = network;
         this.params = params;
         this.chrome = chrome;
@@ -156,26 +174,53 @@ public final class ChromeLogin {
             openSite(port);
             Pattern end = Pattern.compile(params.waitForUrlPattern() == null ? ".*" : params.waitForUrlPattern());
             String domain = BridgeCookies.cookieDomain(params);
-            long deadline = System.currentTimeMillis() + MAX_WAIT_MS;
-            int noTabs = 0;
-            while (!cancelled && process.isAlive() && System.currentTimeMillis() < deadline) {
+            int[] noTabs = {0};
+            return waitForLogin(() -> {
                 List<String> tabs = tabs(port);
                 // On a Mac, closing the last window leaves the program running.
-                noTabs = tabs.isEmpty() ? noTabs + 1 : 0;
-                if (noTabs >= NO_TABS_LIMIT) return null;
+                noTabs[0] = tabs.isEmpty() ? noTabs[0] + 1 : 0;
+                if (noTabs[0] >= NO_TABS_LIMIT) return CLOSED;
                 for (String url : tabs) {
                     if (!end.matcher(url).find()) continue;
                     Map<String, String> values = values(url, readCookies(port, domain));
                     if (values != null) return values;
                 }
-                Thread.sleep(POLL_MS);
-            }
-            return null;
+                return null;
+            });
         } finally {
+            // Read, cancelled, closed, out of time or failed: Chrome and its debugging port go now.
             DevTools tab = siteTab;
             if (tab != null) tab.close();
             stop();
         }
+    }
+
+    /** One look at Chrome: the step's values, {@link #CLOSED}, or null to look again. */
+    @FunctionalInterface
+    interface Look {
+        Map<String, String> next() throws IOException, InterruptedException;
+    }
+
+    /** Looks every {@code poll} until {@code look} has the values; null once cancelled, closed, Chrome gone or out of time. */
+    Map<String, String> waitForLogin(Look look) throws IOException, InterruptedException {
+        long deadline = System.nanoTime() + maxWait.toNanos();
+        while (!cancelled && chromeAlive() && System.nanoTime() - deadline < 0) {
+            Map<String, String> found = look.next();
+            if (found == CLOSED) return null;
+            if (found != null) return found;
+            if (pause(poll)) return null;
+        }
+        return null;
+    }
+
+    /** Waits {@code d}, or less if the login is cancelled meanwhile: true then. */
+    private boolean pause(Duration d) throws InterruptedException {
+        return cancelSignal.await(d.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    private boolean chromeAlive() {
+        Process p = process;
+        return p == null || p.isAlive();
     }
 
     /** The connection stays open during the login: the tab's identity lasts as long as it does. */
@@ -183,7 +228,7 @@ public final class ChromeLogin {
         String socket = null;
         for (int i = 0; i < 100 && socket == null && !cancelled; i++) {
             socket = blankTabSocketIn(get(port, "/json/list"));
-            if (socket == null) Thread.sleep(100);
+            if (socket == null) pause(Duration.ofMillis(100));
         }
         if (socket == null) throw new IOException(I18n.t("login.chrome.noStart"));
         DevTools tab = new DevTools(socket);
@@ -202,7 +247,11 @@ public final class ChromeLogin {
         return null;
     }
 
-    public void cancel() { cancelled = true; }
+    /** Stops waiting now: {@link #run} closes Chrome (and its debugging port) and returns null. */
+    public void cancel() {
+        cancelled = true;
+        cancelSignal.countDown();
+    }
 
     /** The step's values from these cookies, or null while the session isn't there yet. */
     Map<String, String> values(String url, Map<String, String> cookies) {
@@ -222,7 +271,7 @@ public final class ChromeLogin {
                 get(port, "/json/version");
                 return;
             } catch (java.net.ConnectException notYet) {
-                Thread.sleep(100);
+                pause(Duration.ofMillis(100));
             }
         }
         if (cancelled) throw new InterruptedException();

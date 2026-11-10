@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgePorts;
+import app.unichat.settings.SyncedFile;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
 import app.unichat.support.Processes;
@@ -9,7 +10,6 @@ import app.unichat.support.Redactor;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -64,7 +64,11 @@ final class BridgeInstaller {
                 isTelegram ? telegram.id() : null, isTelegram ? telegram.hash() : null, statusUrl));
         Path reg = bd.resolve("registration.yaml");
         if (!Files.exists(reg)) run(bd, command(b, "-g", "-c", "config.yaml", "-r", "registration.yaml"));
-        Files.copy(reg, dir.resolve("appservices").resolve(b + ".yaml"), StandardCopyOption.REPLACE_EXISTING);
+        // The bridge writes these with the default mode (and -g puts the tokens in config.yaml): only the person's.
+        byte[] registration = Files.readAllBytes(reg);
+        SyncedFile.replace(reg, registration, true);
+        SyncedFile.replace(config, Files.readAllBytes(config), true);
+        SyncedFile.replace(dir.resolve("appservices").resolve(b + ".yaml"), registration, true);
     }
 
     private void generateConfig(String b, Path bd, Path config) throws IOException, InterruptedException {

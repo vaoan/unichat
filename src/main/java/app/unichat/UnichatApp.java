@@ -12,6 +12,7 @@ import app.unichat.service.MockChatService;
 import app.unichat.service.PreferencesFile;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import app.unichat.ui.Browser;
 import app.unichat.ui.DockIcon;
 import app.unichat.ui.TrayReopen;
 import app.unichat.ui.LoginView;
@@ -162,7 +163,7 @@ public final class UnichatApp extends Application {
         scene.setRoot(new LoginView(svc -> showMain(svc), () -> {
             Settings.get().setBackend("demo");
             showMain(demoService());
-        }, this::openLink));
+        }, Browser::open));
         Theme.applyAll();
     }
 
@@ -218,7 +219,7 @@ public final class UnichatApp extends Application {
             }
             @Override public void failed(String what, app.unichat.model.Chat chat, String why) { notifier.downloadFailed(what, chat, why); }
         });
-        mainView = new MainView(svc, stage, notifier, this::logout, this::openLink);
+        mainView = new MainView(svc, stage, notifier, this::logout, Browser::open);
         // Never in the demo (its made-up chats would reach the person's account), but for a snapshot of Ajustes → Nube.
         if (!(svc instanceof app.unichat.service.MockChatService) || System.getProperty("unichat.snapshot") != null) {
             cloud = app.unichat.cloud.Cloud.create(Settings.dataDir(), svc::preferencesJson, svc::adoptPreferences,
@@ -250,7 +251,7 @@ public final class UnichatApp extends Application {
         String page = SettingsWindow.currentPage();
         if (SettingsWindow.current() != null) SettingsWindow.current().close();
         mainView.dispose();
-        mainView = new MainView(service, stage, notifier, this::logout, this::openLink);
+        mainView = new MainView(service, stage, notifier, this::logout, Browser::open);
         scene.setRoot(mainView);
         Theme.applyAll();
         if (chat != null) mainView.openChatId(chat);
@@ -277,10 +278,6 @@ public final class UnichatApp extends Application {
             }
             showLogin();
         }));
-    }
-
-    private void openLink(String url) {
-        getHostServices().showDocument(url);
     }
 
     private long hiddenAt;
