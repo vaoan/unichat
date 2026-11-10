@@ -40,17 +40,21 @@ public final class Notifier {
         this.onShow = onShow;
         if (GraphicsEnvironment.isHeadless()) { // tests, snapshot runs: no tray, and AWT menus can't be built
             this.menu = null;
+            this.windowItem = this.notificationsItem = this.quitItem = null;
             return;
         }
         PopupMenu menu = new PopupMenu();
         MenuItem window = new MenuItem();
+        this.windowItem = window;
         window.addActionListener(e -> (windowShown ? onHide : onShow).run());
         MenuItem notifications = new MenuItem();
+        this.notificationsItem = notifications;
         notifications.addActionListener(e -> {
             Settings.get().setNotificationsEnabled(!Settings.get().notificationsEnabled());
             relabel();
         });
         MenuItem quit = new MenuItem();
+        this.quitItem = quit;
         quit.addActionListener(e -> onQuit.run());
         menu.add(window);
         menu.add(notifications);
@@ -72,6 +76,13 @@ public final class Notifier {
     private static final int BADGE_HEIGHT = 20;
 
     private final PopupMenu menu;
+    /** The menu's own items, by name: the cloud's lines go above them, so their places change. */
+    private final MenuItem windowItem, notificationsItem, quitItem;
+    /** The cloud's lines shown at the menu's top (and their separator), and what they say. AWT thread. */
+    private final java.util.List<MenuItem> cloudItems = new java.util.ArrayList<>();
+    private java.util.List<String> cloudLines = java.util.List.of();
+    /** What uploading is doing, as the ring shows it when nothing is being saved: NaN nothing, else 0..1. AWT thread. */
+    private double upload = Double.NaN;
     private final Consumer<String> onOpen;
     private final Runnable onShow;
     private volatile NativeBar bar;
@@ -101,9 +112,9 @@ public final class Notifier {
     }
 
     private void labelNow() {
-        menu.getItem(0).setLabel(I18n.t(windowShown ? "notifier.hide" : "notifier.open"));
-        menu.getItem(1).setLabel(I18n.t(Settings.get().notificationsEnabled() ? "notifier.mute" : "notifier.unmute"));
-        menu.getItem(2).setLabel(I18n.t("notifier.quit"));
+        windowItem.setLabel(I18n.t(windowShown ? "notifier.hide" : "notifier.open"));
+        notificationsItem.setLabel(I18n.t(Settings.get().notificationsEnabled() ? "notifier.mute" : "notifier.unmute"));
+        quitItem.setLabel(I18n.t("notifier.quit"));
     }
 
     /**
@@ -255,14 +266,53 @@ public final class Notifier {
      * Saving what chats receive: {@code done} of {@code total}, a ring that fills on the icon's corner (spinning until
      * the first is done); total 0 puts the icon back. Off in Ajustes, the icon stays as it is. Any thread.
      */
+    /**
+     * What the cloud is doing: its lines at the top of the menu (what, how fast, how far, how many left; informative,
+     * not clickable), and the icon's ring while files go up and nothing is being saved. Any thread.
+     */
+    public void setCloud(app.unichat.cloud.Cloud.Status s) {
+        if (menu == null) return;
+        java.util.List<String> lines = CloudTexts.menuLines(s, java.time.Instant.now());
+        double ring = Settings.get().getBool(TRAY_PROGRESS, true) ? CloudTexts.ring(s) : Double.NaN;
+        awt(() -> {
+            if (!lines.equals(cloudLines)) {
+                cloudItems.forEach(menu::remove);
+                cloudItems.clear();
+                for (String line : lines) {
+                    MenuItem info = new MenuItem(line);
+                    info.setEnabled(false);
+                    cloudItems.add(info);
+                }
+                if (!lines.isEmpty()) cloudItems.add(new MenuItem("-"));
+                for (int i = 0; i < cloudItems.size(); i++) menu.insert(cloudItems.get(i), i);
+                cloudLines = lines;
+                NativeBar b = bar;
+                if (b != null) b.syncMenu();
+            }
+            if (Double.compare(ring, upload) != 0) {
+                upload = ring;
+                showProgress();
+            }
+        });
+    }
+
+    /** The ring shows saving first, else uploading. AWT thread. */
+    private double progress() {
+        return Double.isNaN(download) ? upload : download;
+    }
+
+    private void showProgress() {
+        if (tray != null) tray.setImage(icon());
+        NativeBar b = bar;
+        if (b != null) b.setProgress(progress());
+    }
+
     public void setDownloadProgress(int done, int total) {
         double f = total <= 0 || !Settings.get().getBool(TRAY_PROGRESS, true) ? Double.NaN : done == 0 ? -1 : (double) done / total;
         awt(() -> {
             if (Double.compare(f, download) == 0) return;
             download = f;
-            if (tray != null) tray.setImage(icon());
-            NativeBar b = bar;
-            if (b != null) b.setProgress(f);
+            showProgress();
         });
     }
 
@@ -289,7 +339,7 @@ public final class Notifier {
     }
 
     private BufferedImage icon() {
-        return withProgress(withCount(trayIcon, unread), download);
+        return withProgress(withCount(trayIcon, unread), progress());
     }
 
     /** The tray icon with a ring on its lower left corner, filled {@code f} (a quarter while unknown); NaN: as it is. */

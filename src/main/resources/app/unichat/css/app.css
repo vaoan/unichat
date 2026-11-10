@@ -919,3 +919,5 @@
 .settings-section-title { -fx-font-size: 1.15em; -fx-font-weight: bold; -fx-text-fill: -text; -fx-padding: 0.6em 0 0 0; }
 .profile-audio { -fx-padding: 4 8; -fx-background-radius: 8; }
 .profile-audio:hover { -fx-background-color: -surface-2; }
+/* The settings gear while files go up to the cloud: a ring filling around it, over it (the rail never moves). */
+.rail-cloud-ring { -fx-stroke: -accent; -fx-stroke-width: 2.5; -fx-stroke-line-cap: round; }

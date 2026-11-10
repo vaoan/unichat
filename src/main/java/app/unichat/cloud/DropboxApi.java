@@ -102,26 +102,36 @@ public final class DropboxApi implements Storage {
 
     @Override
     public void put(String path, Path file) throws IOException {
+        put(path, file, null);
+    }
+
+    @Override
+    public void put(String path, Path file, java.util.function.LongConsumer sent) throws IOException {
         long size = Files.size(file);
         if (size <= single) {
-            upload(path, HttpRequest.BodyPublishers.ofFile(file));
+            upload(path, CountingBody.of(HttpRequest.BodyPublishers.ofFile(file), sent));
             return;
         }
         try (InputStream in = Files.newInputStream(file)) {
             String session = send(content + "/2/files/upload_session/start", JSON.createObjectNode().put("close", false),
-                    HttpRequest.BodyPublishers.ofByteArray(in.readNBytes(chunk))).path("session_id").asText();
+                    piece(in.readNBytes(chunk), 0, sent)).path("session_id").asText();
             long offset = chunk;
             while (offset + chunk < size) {
                 ObjectNode arg = JSON.createObjectNode().put("close", false);
                 arg.putObject("cursor").put("session_id", session).put("offset", offset);
-                send(content + "/2/files/upload_session/append_v2", arg, HttpRequest.BodyPublishers.ofByteArray(in.readNBytes(chunk)));
+                send(content + "/2/files/upload_session/append_v2", arg, piece(in.readNBytes(chunk), offset, sent));
                 offset += chunk;
             }
             ObjectNode arg = JSON.createObjectNode();
             arg.putObject("cursor").put("session_id", session).put("offset", offset);
             arg.putObject("commit").put("path", abs(path)).put("mode", "overwrite").put("mute", true);
-            send(content + "/2/files/upload_session/finish", arg, HttpRequest.BodyPublishers.ofByteArray(in.readAllBytes()));
+            send(content + "/2/files/upload_session/finish", arg, piece(in.readAllBytes(), offset, sent));
         }
+    }
+
+    /** One piece of a session upload, counting on from the {@code before} bytes already gone. */
+    private static HttpRequest.BodyPublisher piece(byte[] data, long before, java.util.function.LongConsumer sent) {
+        return CountingBody.of(HttpRequest.BodyPublishers.ofByteArray(data), sent == null ? null : n -> sent.accept(before + n));
     }
 
     @Override

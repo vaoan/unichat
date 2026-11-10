@@ -47,7 +47,11 @@ public final class Cloud {
     private volatile boolean verifyNext;
 
     /** What a round is doing right now, for the page to say: checking a part, or uploading file {@code done} of {@code total}. */
-    public record Activity(Step step, int done, int total, String item) {}
+    public record Activity(Step step, int done, int total, String item, long sent, long size, long bytesPerSecond) {
+        public Activity(Step step, int done, int total, String item) {
+            this(step, done, total, item, 0, 0, 0);
+        }
+    }
 
     public enum Step { SETTINGS, LEARNED, UPLOADING, VERIFYING }
 
@@ -153,10 +157,10 @@ public final class Cloud {
                 parts.get(1).sync(dav, now);
             }
             if (CloudAccount.media()) {
-                uploaded += media.run(dav, (done, total, name) -> doing(new Activity(Step.UPLOADING, done, total, name)));
+                uploaded += media.run(dav, progressOf(Step.UPLOADING));
                 if (verifyNext || verifyDue(now)) {
                     verifyNext = false;
-                    uploaded += media.verify(dav, (done, total, name) -> doing(new Activity(Step.VERIFYING, done, total, name)));
+                    uploaded += media.verify(dav, progressOf(Step.VERIFYING));
                     Settings.get().set("cloud.lastVerify", now.toString());
                 }
             }
@@ -187,6 +191,35 @@ public final class Cloud {
     public CompletableFuture<Status> verifyNow() {
         verifyNext = true;
         return syncNow();
+    }
+
+    /**
+     * Files as they're handled, with their bytes as they go out and the round's speed (bytes since the round's first
+     * byte over the time since): told at most a few times a second.
+     */
+    private MediaUpload.Progress progressOf(Step step) {
+        long[] round = {0, 0, 0}; // bytes of finished files, the file in progress, when the first byte went (ns)
+        long[] told = {0};
+        Activity[] at = {null};
+        return new MediaUpload.Progress() {
+            @Override public void uploading(int done, int total, String name) {
+                round[0] += round[1];
+                round[1] = 0;
+                at[0] = new Activity(step, done, total, name);
+                doing(at[0]);
+            }
+
+            @Override public void sent(long bytes, long size) {
+                long now = System.nanoTime();
+                if (round[2] == 0) round[2] = now;
+                round[1] = bytes;
+                if (now - told[0] < 250_000_000L && bytes < size) return;
+                told[0] = now;
+                double secs = Math.max(0.001, (now - round[2]) / 1e9);
+                Activity a = at[0];
+                if (a != null) doing(new Activity(a.step(), a.done(), a.total(), a.item(), bytes, size, (long) ((round[0] + bytes) / secs)));
+            }
+        };
     }
 
     /** Mid-round: the status as it was, saying what it's doing now. */

@@ -22,6 +22,11 @@ public interface Storage {
 
     void put(String path, Path file) throws IOException;
 
+    /** The same, telling {@code sent} the running total of bytes gone out (null: nobody listens). */
+    default void put(String path, Path file, java.util.function.LongConsumer sent) throws IOException {
+        put(path, file);
+    }
+
     void put(String path, byte[] data) throws IOException;
 
     /** The file at {@code path}, or null when there's none. */

@@ -111,7 +111,12 @@ public final class WebDav implements Storage {
 
     @Override
     public void put(String path, Path file) throws IOException {
-        int code = send("PUT", path, HttpRequest.BodyPublishers.ofFile(file), false).statusCode();
+        put(path, file, null);
+    }
+
+    @Override
+    public void put(String path, Path file, java.util.function.LongConsumer sent) throws IOException {
+        int code = send("PUT", path, CountingBody.of(HttpRequest.BodyPublishers.ofFile(file), sent), false).statusCode();
         if (code != 201 && code != 204 && code != 200) throw failure(code);
     }
 

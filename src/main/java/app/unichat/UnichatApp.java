@@ -223,6 +223,13 @@ public final class UnichatApp extends Application {
             cloud = app.unichat.cloud.Cloud.create(Settings.dataDir(), svc::preferencesJson, svc::adoptPreferences,
                     () -> Platform.runLater(() -> { if (mainView != null) mainView.settingsSynced(); }),
                     () -> app.unichat.autosave.AutoSave.of(svc).folders());
+            app.unichat.cloud.Cloud c = cloud;
+            // What it's doing: on the tray (its menu's lines and ring) and on the settings gear.
+            c.addListener(() -> {
+                app.unichat.cloud.Cloud.Status st = c.status();
+                notifier.setCloud(st);
+                Platform.runLater(() -> { if (mainView != null) mainView.cloudChanged(st); });
+            });
             cloud.start(java.time.Duration.ofMinutes(1));
         }
         mainView.useCloud(cloud);

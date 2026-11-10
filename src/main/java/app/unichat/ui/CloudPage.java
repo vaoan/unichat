@@ -237,26 +237,9 @@ final class CloudPage {
                 new VBox(8, who, state, working, new FlowPane(8, 6, now, verify, off))));
     }
 
-    /** "Al día · hace 2 min · 28 archivos subidos", or the last round's error. Pure. */
+    /** "Al día · hace 2 min · 28 archivos subidos", or the step going on (CloudTexts). */
     static String statusText(Cloud.Status s, Instant now) {
-        Cloud.Activity a = s.now();
-        if (a != null) return switch (a.step()) {
-            case SETTINGS -> I18n.t("settings.cloud.doing.SETTINGS");
-            case LEARNED -> I18n.t("settings.cloud.doing.LEARNED");
-            case UPLOADING -> I18n.t("settings.cloud.doing.UPLOADING", a.done() + 1, a.total(), a.item());
-            case VERIFYING -> I18n.t("settings.cloud.doing.VERIFYING", a.done() + 1, a.total(), a.item());
-        };
-        if (!s.connected()) return I18n.t("settings.cloud.notYet");
-        String when = s.lastSync() == null ? I18n.t("settings.cloud.never")
-                : I18n.t("settings.cloud.ago", Math.max(0, Duration.between(s.lastSync(), now).toMinutes()));
-        String files = I18n.n("settings.cloud.uploaded", s.uploaded()) + (s.waiting() > 0 ? " · " + I18n.n("settings.cloud.waiting", s.waiting()) : "")
-                + (s.retrying() > 0 && s.nextRetry() != null ? " · " + I18n.n("settings.cloud.retrying", s.retrying(),
-                        java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(s.nextRetry().atZone(java.time.ZoneId.systemDefault()))) : "")
-                + (s.conflicts() > 0 ? " · " + I18n.n("settings.cloud.conflicts", s.conflicts()) : "")
-                + (s.lastVerified() != null ? " · " + I18n.t("settings.cloud.verified",
-                        I18n.t("settings.cloud.ago", Math.max(0, Duration.between(s.lastVerified(), now).toMinutes()))) : "");
-        if (s.error() != null) return I18n.t("settings.cloud.error", s.error()) + "\n" + when + " · " + files;
-        return I18n.t("settings.cloud.ok") + " · " + when + " · " + files;
+        return CloudTexts.status(s, now);
     }
 
     /** A row with no name of its own: the form's buttons. */

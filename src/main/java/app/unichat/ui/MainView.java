@@ -137,7 +137,7 @@ public final class MainView extends StackPane {
         thread.composer().setOnPanel(this::togglePanel);
         offerProtectedPhotos(svc);
         offerChatOptions(svc);
-        rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::showSettings);
+        rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::gearClicked);
 
         threadArea.setCenter(thread);
         SplitPane split = new SplitPane(listPane, threadArea);
@@ -567,6 +567,17 @@ public final class MainView extends StackPane {
         Theme.applyAll();
         refreshAll();
         thread.redraw();
+    }
+
+    /** The rail's gear: Ajustes, straight on Nube while files go up (their detail). */
+    private void gearClicked() {
+        showSettings();
+        if (rail.cloudActive()) SettingsWindow.select("cloud");
+    }
+
+    /** What the cloud is doing, on the settings gear. UI thread. */
+    public void cloudChanged(app.unichat.cloud.Cloud.Status s) {
+        rail.setCloud(s);
     }
 
     /** The person's cloud for Ajustes → Nube; null: none (the demo). */

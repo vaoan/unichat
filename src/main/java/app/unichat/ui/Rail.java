@@ -58,13 +58,27 @@ public final class Rail extends VBox {
         add.getStyleClass().add("rail-add");
         folders = railButton(Icons.icon(Icons.FOLDER, 20), I18n.t("rail.folders"), listPane::showFolders);
         Button settings = railButton(Icons.icon(Icons.SETTINGS, 20), I18n.t("rail.settings"), onSettings);
+        settingsButton = settings;
+        cloudRing.getStyleClass().add("rail-cloud-ring");
+        cloudRing.setFill(null);
+        cloudRing.setStartAngle(90);
+        cloudRing.setType(javafx.scene.shape.ArcType.OPEN);
+        cloudRing.setMouseTransparent(true);
+        cloudRing.setManaged(false); // drawn over the gear, never part of the layout: the rail doesn't move
+        cloudRing.setVisible(false);
+        StackPane gear = new StackPane(settings, cloudRing);
+        gear.setPickOnBounds(false);
+        cloudRing.centerXProperty().bind(gear.widthProperty().divide(2));
+        cloudRing.centerYProperty().bind(gear.heightProperty().divide(2));
+        cloudRing.radiusXProperty().bind(settings.heightProperty().divide(2).subtract(2));
+        cloudRing.radiusYProperty().bind(cloudRing.radiusXProperty());
 
         Region grow = new Region();
         VBox.setVgrow(grow, Priority.ALWAYS);
         networks.setAlignment(Pos.TOP_CENTER);
         Region sep = new Region();
         sep.getStyleClass().add("rail-separator");
-        getChildren().addAll(new StackPane(inbox), folders, sep, networkScroll(), archive, add, grow, settings);
+        getChildren().addAll(new StackPane(inbox), folders, sep, networkScroll(), archive, add, grow, gear);
         listPane.filterProperty().addListener((o, a, b) -> refresh());
         listPane.foldersOpenProperty().addListener((o, a, b) -> refresh());
         refresh();
@@ -97,6 +111,30 @@ public final class Rail extends VBox {
         double shown = scroll.getVvalue() * (content - view);
         if (top < shown) scroll.setVvalue(top / (content - view));
         else if (bottom > shown + view) scroll.setVvalue((bottom - view) / (content - view));
+    }
+
+    private Button settingsButton;
+    /** Over the settings gear while files go up to the cloud: how far the round got. */
+    private final javafx.scene.shape.Arc cloudRing = new javafx.scene.shape.Arc();
+    private boolean cloudActive;
+
+    /**
+     * What the cloud is doing, on the settings gear: a ring around it filling as files go up (drawn over it: the rail
+     * never changes), and in its tooltip what it's doing, how fast and how many are left. UI thread.
+     */
+    void setCloud(app.unichat.cloud.Cloud.Status s) {
+        double f = CloudTexts.ring(s);
+        cloudActive = !Double.isNaN(f);
+        cloudRing.setVisible(cloudActive);
+        cloudRing.setLength(cloudActive ? -360 * Math.max(0.02, f) : 0);
+        String tip = cloudActive ? String.join("\n", CloudTexts.menuLines(s, java.time.Instant.now())) : I18n.t("rail.settings");
+        settingsButton.getTooltip().setText(tip);
+        settingsButton.setAccessibleHelp(cloudActive ? tip : null);
+    }
+
+    /** Files are going up: the gear's click goes to Ajustes → Nube. */
+    boolean cloudActive() {
+        return cloudActive;
     }
 
     private Button railButton(Node graphic, String tip, Runnable action) {

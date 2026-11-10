@@ -95,7 +95,12 @@ public final class PCloudApi implements Storage {
 
     @Override
     public void put(String path, Path file) throws IOException {
-        upload(path, HttpRequest.BodyPublishers.ofFile(file));
+        put(path, file, null);
+    }
+
+    @Override
+    public void put(String path, Path file, java.util.function.LongConsumer sent) throws IOException {
+        upload(path, CountingBody.of(HttpRequest.BodyPublishers.ofFile(file), sent));
     }
 
     @Override

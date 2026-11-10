@@ -32,10 +32,12 @@ final class MediaUpload {
     /** A file that failed: how many times, when it's tried again, and why. */
     record Retry(int attempts, Instant next, String why) {}
 
-    /** Told before each file is handled: which of how many, and its name. */
+    /** Told before each file is handled (which of how many, its name and size), and as its bytes go out. */
     @FunctionalInterface
     interface Progress {
         void uploading(int done, int total, String name);
+
+        default void sent(long bytes, long size) { }
     }
 
     private final Path record;
@@ -72,7 +74,7 @@ final class MediaUpload {
         for (Map.Entry<String, Path> e : due.entrySet()) {
             progress.uploading(index++, due.size(), e.getValue().getFileName().toString());
             try {
-                if (settle(dav, e.getKey(), e.getValue())) sent++;
+                if (settle(dav, e.getKey(), e.getValue(), progress)) sent++;
                 remember(e.getKey());
                 retries.remove(e.getKey());
             } catch (IOException ex) {
@@ -100,7 +102,7 @@ final class MediaUpload {
         for (Map.Entry<String, Path> e : here.entrySet()) {
             progress.uploading(index++, here.size(), e.getValue().getFileName().toString());
             try {
-                if (settle(dav, e.getKey(), e.getValue())) repaired++;
+                if (settle(dav, e.getKey(), e.getValue(), progress)) repaired++;
             } catch (IOException ex) {
                 failed(e.getKey(), ex);
             }
@@ -109,7 +111,7 @@ final class MediaUpload {
     }
 
     /** One file against its copy there: true if it went up (or back up). */
-    private boolean settle(Storage dav, String key, Path file) throws IOException {
+    private boolean settle(Storage dav, String key, Path file, Progress progress) throws IOException {
         String dir = CloudAccount.MEDIA + "/" + key.substring(0, key.indexOf('/'));
         String remote = CloudAccount.MEDIA + "/" + key;
         Storage.RemoteFile there = dav.info(remote);
@@ -120,7 +122,8 @@ final class MediaUpload {
             }
             case UPLOAD -> {
                 dav.mkdirs(dir);
-                dav.put(remote, file);
+                long size = Files.size(file);
+                dav.put(remote, file, bytes -> progress.sent(bytes, size));
                 Storage.RemoteFile after = dav.info(remote);
                 if (Checksums.decide(Files.size(file), after == null ? null : localHash(file, after), after) != Checksums.Verdict.SAME) {
                     throw new IOException(I18n.t("cloud.error.mismatch"));
