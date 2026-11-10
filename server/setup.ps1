@@ -13,7 +13,8 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-$YqImage = "mikefarah/yq:4"
+# Pinned like the stack's images (a tag can be moved to anything): bump the version and its digest together.
+$YqImage = "mikefarah/yq:4.54.3@sha256:7834187596ad56fd5a81436114e0b0b9dd54c91bb43946d1f7145b2be5f9c3d2"
 # The same pinned image as docker-compose.yml.
 $SynapseImage = "matrixdotorg/synapse:v1.164.2@sha256:f0df87cff259872637b4b5e5174b9977e5e3046dd421505407803b5e45c5f842"
 $Ports = @{ whatsapp = 29318; telegram = 29317; signal = 29328; instagram = 29319; facebook = 29320;
