@@ -51,4 +51,33 @@ class BigWebpTest {
         assertArrayEquals(new int[]{2000, 3000}, AnimatedImage.webpSize(lossless));
         assertNull(AnimatedImage.webpSize(Files.write(dir.resolve("x.png"), new byte[40])));
     }
+
+    /** An animated WebP of {@code frames} frames on a {@code w}x{@code h} canvas: the chunk headers, no picture data. */
+    private Path animated(int w, int h, int frames) throws Exception {
+        var out = new java.io.ByteArrayOutputStream();
+        out.writeBytes("RIFF".getBytes());
+        out.writeBytes(new byte[4]);
+        out.writeBytes("WEBPVP8X".getBytes());
+        out.writeBytes(new byte[] {10, 0, 0, 0, 0x02, 0, 0, 0});
+        int a = w - 1, b = h - 1;
+        out.writeBytes(new byte[] {(byte) a, (byte) (a >> 8), (byte) (a >> 16), (byte) b, (byte) (b >> 8), (byte) (b >> 16)});
+        for (int i = 0; i < frames; i++) {
+            out.writeBytes("ANMF".getBytes());
+            out.writeBytes(new byte[] {16, 0, 0, 0});
+            out.writeBytes(new byte[] {0, 0, 0, 0, 0, 0, (byte) a, (byte) (a >> 8), (byte) (a >> 16), (byte) b, (byte) (b >> 8),
+                (byte) (b >> 16), 100, 0, 0, 0});
+        }
+        return Files.write(dir.resolve("anim" + w + "x" + frames + ".webp"), out.toByteArray());
+    }
+
+    /**
+     * A few hundred bytes from anyone can declare 300 frames of 8000x8000: decoded whole (anim_dump writes every frame
+     * to disk, then all are read into memory) it filled the disk or the heap each time it was shown.
+     */
+    @Test
+    void anAnimationTooBigToHoldIsNeverDecodedHere() throws Exception {
+        assertTrue(AnimatedImage.isBigWebp(animated(8000, 8000, 300)));
+        assertFalse(AnimatedImage.isBigWebp(animated(512, 512, 120)), "a sticker");
+        assertFalse(AnimatedImage.isBigWebp(animated(4000, 4000, 2)), "a big canvas with few frames still fits");
+    }
 }

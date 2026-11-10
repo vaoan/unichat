@@ -205,10 +205,24 @@ public final class AnimatedImage {
      */
     static final long MAX_WEBP_PIXELS = 3_000_000;
 
-    /** A still WebP too big to decode here; the size comes from the header, nothing is decoded. */
+    /**
+     * Canvas pixels times frames an animation may have to be decoded here: every frame is held whole (anim_dump writes
+     * each to disk first), about 4 bytes a pixel. A sticker (512x512, 120 frames) is half of it.
+     */
+    static final long MAX_ANIMATION_PIXELS = 64L << 20;
+
+    /**
+     * A WebP too big to decode here: a still one past {@link #MAX_WEBP_PIXELS}, or an animated one past
+     * {@link #MAX_ANIMATION_PIXELS} (a few hundred bytes from anyone can declare 300 frames of 8000x8000). Sizes come
+     * from the headers, nothing is decoded.
+     */
     static boolean isBigWebp(Path file) throws IOException {
         int[] wh = webpSize(file);
-        return wh != null && (long) wh[0] * wh[1] > MAX_WEBP_PIXELS && !webpAnimated(file);
+        if (wh == null) return false;
+        long pixels = (long) wh[0] * wh[1];
+        if (!webpAnimated(file)) return pixels > MAX_WEBP_PIXELS;
+        if (pixels <= MAX_ANIMATION_PIXELS / MAX_FRAMES) return false; // a sticker: no need to count
+        return pixels * parseLayout(Files.readAllBytes(file)).frames().size() > MAX_ANIMATION_PIXELS;
     }
 
     /** Width and height from a WebP's first chunk (VP8X, VP8 or VP8L), or null if it isn't one. */
