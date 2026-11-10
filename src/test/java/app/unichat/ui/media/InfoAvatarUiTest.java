@@ -44,14 +44,19 @@ class InfoAvatarUiTest {
     @AfterEach
     void close() throws Exception {
         FxWait.fx(() -> {
-            viewer().ifPresent(Window::hide);
+            Window.getWindows().stream().filter(w -> w.getScene() != null
+                    && w.getScene().getRoot().getStyleClass().contains("media-viewer")).toList().forEach(Window::hide);
             if (stage != null) stage.close();
             return null;
         });
     }
 
-    private static Optional<Window> viewer() {
-        return Window.getWindows().stream().filter(w -> w.getScene() != null
+    /**
+     * The photo viewer this test opened: the one titled with the chat's name. "The first media viewer" was, on Linux, a
+     * video viewer another test opened as it ended, and this test waited three minutes for a photo in it.
+     */
+    private static Optional<Window> viewer(String title) {
+        return Window.getWindows().stream().filter(w -> w instanceof Stage s && title.equals(s.getTitle()) && w.getScene() != null
                 && w.getScene().getRoot().getStyleClass().contains("media-viewer")).findFirst();
     }
 
@@ -79,17 +84,17 @@ class InfoAvatarUiTest {
             return null;
         });
         try {
-            FxWait.until("the photo viewer shows the photo", () -> viewer().map(w -> w.getScene().getRoot().lookupAll("*").stream()
+            FxWait.until("the photo viewer shows the photo", () -> viewer(mama.title()).map(w -> w.getScene().getRoot().lookupAll("*").stream()
                     .anyMatch(n -> n instanceof PhotoPane p && p.view().getImage() != null)).orElse(false));
         } catch (AssertionError | RuntimeException e) {
             // What it saw instead, for a machine where it doesn't (Linux CI): no viewer, or one with no picture, and why.
-            throw new AssertionError("viewer: " + FxWait.fx(() -> viewer().map(w -> w.getScene().getRoot().lookupAll("*").stream()
+            throw new AssertionError("viewer: " + FxWait.fx(() -> viewer(mama.title()).map(w -> w.getScene().getRoot().lookupAll("*").stream()
                     .filter(n -> n instanceof PhotoPane).map(n -> {
                         var img = ((PhotoPane) n).view().getImage();
                         return img == null ? "no image" : img.isError() ? "error " + img.getException() : "image";
                     }).toList().toString()).orElse("none")), e);
         }
-        assertEquals(mama.title(), FxWait.fx(() -> ((Stage) viewer().orElseThrow()).getTitle()));
+        assertEquals(mama.title(), FxWait.fx(() -> ((Stage) viewer(mama.title()).orElseThrow()).getTitle()));
     }
 
     @Test
