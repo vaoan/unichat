@@ -36,10 +36,13 @@ final class HtmlView {
     private static final double PICTURE_MAX_HEIGHT = 360;
     private static final double INLINE_PICTURE_MAX = 64;
     private static final double EMOJI_SIZE = 20;
+    /** Far deeper than any real message, far shallower than the UI thread's stack (and the scene graph's) can take. */
+    private static final int MAX_DEPTH = 64;
 
     private final double available;
     private final MessageMedia media;
     private final Consumer<String> openLink;
+    private int depth;
 
     private HtmlView(double available, MessageMedia media, Consumer<String> openLink) {
         this.available = available;
@@ -119,10 +122,21 @@ final class HtmlView {
         walk(parent, new Blocks(target, width), look);
     }
 
+    /** Each tag is one more call: past {@link #MAX_DEPTH} what's inside is just its text, so no message can overflow the stack. */
     private void walk(Element parent, Blocks b, Look look) {
-        for (org.jsoup.nodes.Node child : parent.childNodes()) {
-            if (child instanceof TextNode t) text(t, b, look);
-            else if (child instanceof Element e && !SKIPPED.contains(e.normalName())) element(e, b, look);
+        if (depth >= MAX_DEPTH) {
+            String s = look.pre() ? parent.wholeText() : parent.text();
+            if (!s.isBlank()) b.inline(styled(s, look));
+            return;
+        }
+        depth++;
+        try {
+            for (org.jsoup.nodes.Node child : parent.childNodes()) {
+                if (child instanceof TextNode t) text(t, b, look);
+                else if (child instanceof Element e && !SKIPPED.contains(e.normalName())) element(e, b, look);
+            }
+        } finally {
+            depth--;
         }
     }
 

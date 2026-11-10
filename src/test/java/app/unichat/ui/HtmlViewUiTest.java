@@ -73,6 +73,23 @@ class HtmlViewUiTest {
                 .findFirst().map(b -> !b.lookupAll(".file-chip").isEmpty()).orElse(false);
     }
 
+    private static int depthOf(Node n) {
+        int deepest = 0;
+        if (n instanceof javafx.scene.Parent p) for (Node c : p.getChildrenUnmodifiable()) deepest = Math.max(deepest, depthOf(c));
+        return deepest + 1;
+    }
+
+    /** A stranger's message fits ten thousand nested tags; walking them one call each would overflow the UI thread's stack. */
+    @Test
+    void aDeeplyNestedMessageIsDrawnAsPlainTextPastTheLimit() throws Exception {
+        for (String tag : List.of("b", "div", "blockquote")) {
+            String html = ("<" + tag + ">").repeat(10_000) + "hondo";
+            Node drawn = fx(() -> HtmlView.of(html, 400, null, url -> { }));
+            assertTrue(texts(drawn).contains("hondo"), tag);
+            assertTrue(fx(() -> depthOf(drawn)) < 200, tag + ": " + fx(() -> depthOf(drawn)) + " levels on screen");
+        }
+    }
+
     @Test
     void itDrawsWhatTheHtmlSaysAndLetsThroughNothingThatActsOnItsOwn() throws Exception {
         MockChatService svc = new MockChatService();

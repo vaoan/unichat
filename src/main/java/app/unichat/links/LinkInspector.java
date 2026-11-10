@@ -1,5 +1,6 @@
 package app.unichat.links;
 
+import app.unichat.support.BoundedBody;
 import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 import app.unichat.model.LinkMedia;
@@ -39,9 +40,13 @@ public final class LinkInspector {
     /** "compatible" gets the page with its metadata: sites like FixupX send a browser straight to the original. */
     private static final String AGENT = "Mozilla/5.0 (compatible; Unichat/1.0)";
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
+    /** The request's timeout stops at the headers: a server trickling a byte a minute would hold a worker for good. */
+    private static final Duration BODY_DEADLINE = Duration.ofSeconds(20);
     private static final int MAX_REDIRECTS = 5;
     private static final int MAX_PAGE_BYTES = 1024 * 1024;
     private static final long MAX_DOWNLOAD_BYTES = 1024L * 1024 * 1024;
+    /** A whole video may take long on a slow line; this only keeps a trickle from holding the download forever. */
+    private static final Duration DOWNLOAD_DEADLINE = Duration.ofHours(1);
     private static final int REMEMBERED = 1000;
     private static final int AT_ONCE = 4;
     private static final List<String> PAGE_MEDIA = List.of("og:video:secure_url", "og:video:url", "og:video",
@@ -50,6 +55,7 @@ public final class LinkInspector {
     private final HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(TIMEOUT).build();
     private final ExecutorService workers = Executors.newFixedThreadPool(AT_ONCE, Threads.daemon("link-inspector"));
     private final Predicate<InetAddress> allowed;
+    private final Duration bodyDeadline;
     private final Map<String, CompletableFuture<Optional<LinkMedia>>> seen = new LinkedHashMap<>(64, 0.75f, true) {
         @Override protected boolean removeEldestEntry(Map.Entry<String, CompletableFuture<Optional<LinkMedia>>> eldest) {
             return size() > REMEMBERED;
@@ -61,7 +67,12 @@ public final class LinkInspector {
     }
 
     LinkInspector(Predicate<InetAddress> allowed) {
+        this(allowed, BODY_DEADLINE);
+    }
+
+    LinkInspector(Predicate<InetAddress> allowed, Duration bodyDeadline) {
         this.allowed = allowed;
+        this.bodyDeadline = bodyDeadline;
     }
 
     /** What the link holds; each link is opened once however many messages or redraws ask. Empty on any failure. */
@@ -84,10 +95,10 @@ public final class LinkInspector {
     public String download(String url, Path target) throws IOException {
         try {
             Answer a = open(url);
-            try (InputStream in = a.response().body()) {
+            try (InputStream in = new BoundedBody(a.response().body(), MAX_DOWNLOAD_BYTES, DOWNLOAD_DEADLINE)) {
                 if (a.response().statusCode() != 200) throw new IOException("HTTP " + a.response().statusCode());
                 Files.deleteIfExists(target);
-                if (Files.copy(new Capped(in), target) > MAX_DOWNLOAD_BYTES) throw new IOException(I18n.t("link.tooBig"));
+                Files.copy(in, target);
             }
             return a.response().headers().firstValue("Content-Type").orElse(null);
         } catch (InterruptedException e) {
@@ -98,7 +109,7 @@ public final class LinkInspector {
 
     private Optional<LinkMedia> look(String url, boolean mayBePage) throws IOException, InterruptedException {
         Answer a = open(url);
-        try (InputStream in = a.response().body()) {
+        try (InputStream in = new BoundedBody(a.response().body(), MAX_PAGE_BYTES, bodyDeadline)) {
             if (a.response().statusCode() != 200) return Optional.empty();
             String mime = a.response().headers().firstValue("Content-Type").orElse("").split(";")[0].trim().toLowerCase(Locale.ROOT);
             LinkMedia.Kind kind = kindOf(mime, a.uri().getPath());
@@ -178,34 +189,36 @@ public final class LinkInspector {
     static boolean isPublic(InetAddress a) {
         if (a.isLoopbackAddress() || a.isAnyLocalAddress() || a.isLinkLocalAddress() || a.isSiteLocalAddress() || a.isMulticastAddress()) return false;
         byte[] b = a.getAddress();
-        if (b.length == 16) return (b[0] & 0xFE) != 0xFC; // unique local, fc00::/7
-        boolean sharedNat = (b[0] & 0xFF) == 100 && (b[1] & 0xC0) == 64;
-        return !sharedNat && b[0] != 0;
+        return b.length == 4 ? isPublicV4(b) : isPublicV6(b);
     }
 
-    /** Stops an endless file at the limit rather than filling the disk. */
-    private static final class Capped extends java.io.FilterInputStream {
-        private long total;
+    private static boolean isPublicV4(byte[] b) {
+        int first = b[0] & 0xFF;
+        int second = b[1] & 0xFF;
+        boolean sharedNat = first == 100 && (second & 0xC0) == 64; // 100.64.0.0/10
+        boolean benchmarking = first == 198 && (second & 0xFE) == 18; // 198.18.0.0/15
+        boolean protocolAssignments = first == 192 && second == 0 && b[2] == 0; // 192.0.0.0/24
+        return first != 0 && first < 240 && !sharedNat && !benchmarking && !protocolAssignments; // 240.0.0.0/4 and broadcast
+    }
 
-        Capped(InputStream in) {
-            super(in);
+    /** An IPv6 address that carries an IPv4 one is only as public as that one: NAT64 or 6to4 reach it all the same. */
+    private static boolean isPublicV6(byte[] b) {
+        if ((b[0] & 0xFE) == 0xFC) return false; // unique local, fc00::/7
+        byte[] v4 = carriedV4(b);
+        try {
+            return v4 == null || isPublic(InetAddress.getByAddress(v4));
+        } catch (UnknownHostException e) {
+            return false;
         }
+    }
 
-        @Override public int read() throws IOException {
-            int c = super.read();
-            count(c < 0 ? 0 : 1);
-            return c;
-        }
-
-        @Override public int read(byte[] b, int off, int len) throws IOException {
-            int n = super.read(b, off, len);
-            count(Math.max(n, 0));
-            return n;
-        }
-
-        private void count(int n) throws IOException {
-            total += n;
-            if (total > MAX_DOWNLOAD_BYTES) throw new IOException(I18n.t("link.tooBig"));
-        }
+    private static byte[] carriedV4(byte[] b) {
+        boolean sixToFour = (b[0] & 0xFF) == 0x20 && b[1] == 0x02; // 2002::/16, the IPv4 in bytes 2 to 5
+        if (sixToFour) return java.util.Arrays.copyOfRange(b, 2, 6);
+        byte[] nat64 = {0, 0x64, (byte) 0xFF, (byte) 0x9B, 0, 0, 0, 0, 0, 0, 0, 0}; // 64:ff9b::/96
+        byte[] compatible = new byte[12]; // ::/96, the old "IPv4-compatible" form
+        byte[] head = java.util.Arrays.copyOf(b, 12);
+        return java.util.Arrays.equals(head, nat64) || java.util.Arrays.equals(head, compatible)
+                ? java.util.Arrays.copyOfRange(b, 12, 16) : null;
     }
 }

@@ -39,12 +39,59 @@ class GifFilesTest {
         server.start();
         try {
             long t0 = System.currentTimeMillis();
-            assertThrows(Exception.class, () -> GifFiles.download("http://127.0.0.1:" + server.getAddress().getPort() + "/g", ".gif",
-                    Duration.ofMillis(500)));
+            assertThrows(Exception.class, () -> GifFiles.fetch(java.net.URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/g"), ".gif",
+                    Duration.ofMillis(500), GifFiles.MAX_BYTES));
             assertTrue(System.currentTimeMillis() - t0 < GifFiles.TIMEOUT.toMillis(), "the limit asked for, not the default");
         } finally {
             hang.countDown();
             server.stop(0);
+        }
+    }
+
+    @Test
+    void onlyHttpsGifsAreFetched() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger hits = new java.util.concurrent.atomic.AtomicInteger();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", ex -> {
+            hits.incrementAndGet();
+            ex.sendResponseHeaders(200, -1);
+            ex.close();
+        });
+        server.start();
+        try {
+            assertThrows(java.io.IOException.class, () -> GifFiles.download("http://127.0.0.1:" + server.getAddress().getPort() + "/g",
+                    ".gif", GifFiles.TIMEOUT));
+            assertThrows(java.io.IOException.class, () -> GifFiles.download("file:///etc/passwd", ".gif", GifFiles.TIMEOUT));
+            assertEquals(0, hits.get(), "refused before anything is sent");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void aGifPastTheLimitStopsAndLeavesNothingBehind() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", ex -> {
+            byte[] b = "GIF89a-and-much-more".getBytes();
+            ex.sendResponseHeaders(200, 0); // no length announced: only counting what arrives can stop it
+            ex.getResponseBody().write(b);
+            ex.close();
+        });
+        server.start();
+        try {
+            Path dir = app.unichat.settings.Settings.dataDir().resolve("gif-cache");
+            long before = Files.isDirectory(dir) ? countIn(dir) : 0;
+            assertThrows(java.io.IOException.class, () -> GifFiles.fetch(
+                    java.net.URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/g"), ".gif", GifFiles.TIMEOUT, 6));
+            assertEquals(before, countIn(dir));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    private static long countIn(Path dir) throws java.io.IOException {
+        try (var files = Files.list(dir)) {
+            return files.count();
         }
     }
 
@@ -59,7 +106,8 @@ class GifFilesTest {
         });
         server.start();
         try {
-            Path f = GifFiles.download("http://127.0.0.1:" + server.getAddress().getPort() + "/g", ".gif", GifFiles.TIMEOUT);
+            Path f = GifFiles.fetch(java.net.URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/g"), ".gif", GifFiles.TIMEOUT,
+                    GifFiles.MAX_BYTES);
             assertTrue(Files.exists(f));
             assertEquals("gif-cache", f.getParent().getFileName().toString());
             assertFalse(f.getFileName().toString().contains("/"));

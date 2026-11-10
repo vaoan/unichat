@@ -2,6 +2,8 @@ package app.unichat.gif;
 
 import app.unichat.model.MediaLibrary;
 import app.unichat.settings.Settings;
+import app.unichat.support.BoundedBody;
+import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -43,16 +45,34 @@ public final class GifFiles {
         return p != null ? p : "video/mp4".equals(i.mime()) ? null : i.url();
     }
 
+    /** Far above any GIF a provider serves (their mp4s are a few MB): only a stranger's endless file gets there. */
+    public static final long MAX_BYTES = 20L * 1024 * 1024;
+
+    /**
+     * The address comes from the provider's answer, so it's a stranger's: https only (redirects never drop to http) and at
+     * most {@link #MAX_BYTES}, within {@code timeout} for the headers and again for the body.
+     */
     public static Path download(String url, String ext, Duration timeout) throws IOException, InterruptedException {
-        HttpResponse<InputStream> r = HTTP.send(HttpRequest.newBuilder(URI.create(url)).timeout(timeout).build(),
+        URI uri = URI.create(url);
+        if (!"https".equalsIgnoreCase(uri.getScheme())) throw new IOException(I18n.t("link.notAllowed"));
+        return fetch(uri, ext, timeout, MAX_BYTES);
+    }
+
+    static Path fetch(URI url, String ext, Duration timeout, long maxBytes) throws IOException, InterruptedException {
+        HttpResponse<InputStream> r = HTTP.send(HttpRequest.newBuilder(url).timeout(timeout).build(),
                 HttpResponse.BodyHandlers.ofInputStream());
-        try (InputStream in = r.body()) {
+        try (InputStream in = new BoundedBody(r.body(), maxBytes, timeout)) {
             if (r.statusCode() != 200) throw new IOException("HTTP " + r.statusCode());
             Path dir = Settings.dataDir().resolve("gif-cache");
             Files.createDirectories(dir);
             prune(dir);
             Path f = Files.createTempFile(dir, "gif", ext);
-            Files.copy(in, f, StandardCopyOption.REPLACE_EXISTING);
+            try {
+                Files.copy(in, f, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                Files.deleteIfExists(f);
+                throw e;
+            }
             return f;
         }
     }
