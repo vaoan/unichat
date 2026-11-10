@@ -1,6 +1,7 @@
 package app.unichat.autosave;
 
 import app.unichat.model.Message;
+import app.unichat.model.MessageStatus;
 import app.unichat.model.SaveKind;
 import app.unichat.service.ChatPreferences;
 
@@ -15,9 +16,13 @@ record Wanted(Set<SaveKind> theirs, Set<SaveKind> mine) {
         return new Wanted(prefs.autoSaves(chatId, false), prefs.autoSaves(chatId, true));
     }
 
-    /** The kinds to save of {@code m}, by who sent it; empty: nothing. */
+    /**
+     * The kinds to save of {@code m}, by who sent it; empty: nothing. What I send counts once the server has it: while
+     * it's being sent it has a temporary id, and saving it then saved it twice (that id, then its real one).
+     */
     Set<SaveKind> of(Message m) {
-        return m.outgoing() ? mine : theirs;
+        if (!m.outgoing()) return theirs;
+        return m.status() == MessageStatus.SENDING || m.status() == MessageStatus.FAILED ? Set.of() : mine;
     }
 
     boolean none() {

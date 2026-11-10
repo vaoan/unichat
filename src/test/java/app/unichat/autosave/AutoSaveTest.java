@@ -374,6 +374,25 @@ class AutoSaveTest {
     }
 
     @Test
+    void whatISendIsSavedOnceTheServerHasItNotWhileItsBeingSent() throws Exception {
+        svc.setAutoSave(chat.id(), true, EnumSet.allOf(SaveKind.class)).get();
+        save.startNow(chat.id());
+        Message sending = media(MessageType.FILE, "nutricion.pdf", true, later(1));
+        Message echo = sending.withId("local:uc1794326012677.2");
+        echo.setStatus(app.unichat.model.MessageStatus.SENDING);
+        arrive(echo);
+        assertEquals(List.of(), saved(), "still being sent: not yet");
+        timeline.remove(echo);
+        Message real = echo.withId("$B3WbWcGB4mXOsHJyxwCtzO38Ao2fy");
+        real.setStatus(app.unichat.model.MessageStatus.SENT);
+        arrive(real);
+        assertEquals(List.of("nutricion.pdf"), saved(), "once, with its real id");
+        try (var s = Files.list(save.folder(chat))) {
+            assertTrue(s.anyMatch(p -> p.getFileName().toString().contains("[B3WbWcGB4mXOsHJyxwCtzO38Ao2fy]")), "the real id in the name");
+        }
+    }
+
+    @Test
     void whatsGoneIsCountedAndToldOnceNotFileByFile() throws Exception {
         svc.setAutoSave(chat.id(), EnumSet.allOf(SaveKind.class)).get();
         Instant t = Instant.now();
