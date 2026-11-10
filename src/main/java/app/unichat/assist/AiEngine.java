@@ -58,7 +58,10 @@ public enum AiEngine {
             }
         } else {
             if (web) c.add("--search");
-            c.addAll(List.of("exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral",
+            // Like Claude's: none of the person's config (its MCP servers run outside the sandbox), exec rules or the
+            // folder's AGENTS.md, which a message could turn to its ends.
+            c.addAll(List.of("exec", "--sandbox", "read-only", "--ignore-user-config", "--ignore-rules",
+                    "-c", "project_doc_max_bytes=0", "--skip-git-repo-check", "--ephemeral",
                     "-C", workDir.toString(), "-o", reply.toString(), "-"));
         }
         return c;

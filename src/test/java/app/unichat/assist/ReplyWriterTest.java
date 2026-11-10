@@ -40,6 +40,10 @@ class ReplyWriterTest {
         assertFalse(withFolder.contains("Read"));
         List<String> codex = AiEngine.CODEX.command(Path.of("/x/codex"), cv, cv, dir.resolve("r"));
         assertEquals("read-only", codex.get(codex.indexOf("--sandbox") + 1));
+        // Chats can carry instructions: the person's own config (MCP servers, which run outside the sandbox; profiles),
+        // their exec rules and the folder's AGENTS.md stay out, as Claude's settings and MCP servers do.
+        assertTrue(codex.contains("--ignore-user-config") && codex.contains("--ignore-rules"), String.join(" ", codex));
+        assertEquals("project_doc_max_bytes=0", codex.get(codex.indexOf("-c") + 1));
         assertEquals("-", codex.get(codex.size() - 1), "the prompt comes through stdin");
     }
 
