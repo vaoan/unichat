@@ -327,17 +327,24 @@ public final class UnichatApp extends Application {
         s.setWindowGeometry(stage.getWidth(), stage.getHeight(), stage.getX(), stage.getY());
     }
 
+    /** The window goes at once; what has to stop stops off the UI thread (it can take seconds per bridge), then the app ends. */
     private void quit() {
         Platform.runLater(() -> {
             if (stage.isShowing()) saveGeometry();
-            if (cloud != null) cloud.stop();
-            if (service != null) service.stop();
-            LocalServer local = Settings.get().localServer() ? LocalServer.get() : null;
-            if (local != null) local.stop();
+            stage.hide();
             notifier.dispose();
-            Platform.exit();
+            app.unichat.cloud.Cloud c = cloud;
+            ChatService s = service;
+            LocalServer local = Settings.get().localServer() ? LocalServer.get() : null;
+            java.util.List<Runnable> stops = new java.util.ArrayList<>();
+            if (c != null) stops.add(c::stop);
+            if (s != null) stops.add(s::stop);
+            if (local != null) stops.add(local::stop);
             // Exit off the FX thread: System.exit on it can deadlock with AWT's shutdown on macOS.
-            new Thread(() -> System.exit(0), "exit").start();
+            Shutdown.stopThenEnd(stops, () -> {
+                Platform.exit();
+                System.exit(0);
+            });
         });
     }
 }

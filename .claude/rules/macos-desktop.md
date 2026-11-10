@@ -19,6 +19,7 @@ paths:
 - The menu-bar helper and system notifications: `native/CLAUDE.md`.
 
 ## Lessons
+- Quitting stopped the cloud, the service and the local server on the FX thread: up to 10 s per bridge (or a whole install) of a frozen window. `UnichatApp.quit` hides the window and hands them to `Shutdown.stopThenEnd`, a thread of its own; nothing slow ever runs on the FX thread, not even on the way out.
 - AWT on the FX thread, or `System.exit` on the FX thread, hung the app on macOS. All `TrayIcon`/`SystemTray` calls go through `EventQueue.invokeLater`; exit happens on a separate thread. Tray/balloon callbacks run on the AWT thread: hop to FX with `Platform.runLater`.
 - macOS drops AWT tray notifications from a plain `java` process (usernoted: "dropping msg … app not found"); osascript ones show but clicking opens Script Editor. macOS uses the helper (or Unichat's own card, `DesktopToast`); Windows keeps the native balloon.
 - ⌘Q / "Salir" never quit: JavaFX turns the quit action into "close every window" and our close handler hides to the tray; `Desktop.setQuitHandler` is never called with JavaFX owning the app. `MacQuit` wraps JavaFX's glass `Application.EventHandler.handleQuitAction`. Test by AXPress on the app menu's Quit item (an `osascript 'quit app'` to a dev `java` process doesn't reach it).
