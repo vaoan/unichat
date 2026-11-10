@@ -5,6 +5,9 @@ Native builds and the no-Docker stack, and the macOS menu-bar helper.
 - `native/` — no-Docker stack (tuwunel + mautrix bridge binaries + SQLite): `versions.env` pins every component,
   `setup-mac.sh` / `run-mac.sh` are the reference for the installer Unichat will run at startup (install whatever
   is missing, start and supervise). Read `docs/NATIVE-SERVER.md` before touching it.
+  **Bump `versions.env` → run `native/pin-hashes.sh`** and commit the `sha256sums.txt` it writes beside it: the app,
+  `setup-mac.sh`, `fetch-natives.sh` and `package.ps1` install only files whose SHA-256 is pinned there (a release's
+  own sha256sums.txt would vouch for a swapped binary), and `ManifestTest` fails the build while one is missing.
   Bridges run with `direct_media` (`mxc://media-<bridge>.localhost/…`, nothing copied to the server); Unichat
   downloads those from the bridge's port (`LocalServer.directMediaBase`).
   `server/MediaPrune` deletes Discord attachments older than `discord.mediaDays` (default 30, 0 = never; Ajustes →

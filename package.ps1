@@ -26,18 +26,21 @@ try {
         $natives = (Select-String -Path src\main\resources\app\unichat\server\versions.env -Pattern '^NATIVES=(.+)$').Matches[0].Groups[1].Value
         $repo, $tag = $natives -split '@', 2
         $asset = "tuwunel-windows-amd64"
+        # Checked against the SHA-256 pinned in the app (native/pin-hashes.sh), never the release's own sha256sums.txt.
+        $key = "$natives/$asset"
+        $pin = Get-Content src\main\resources\app\unichat\server\sha256sums.txt |
+            Where-Object { ($_ -split '\s+', 2)[1] -ceq $key } | Select-Object -First 1
+        if (-not $pin) { throw "$key has no pinned SHA-256: run native/pin-hashes.sh" }
+        $want = ($pin -split '\s+')[0].ToLower()
         Remove-Item -Recurse -Force target\natives -ErrorAction SilentlyContinue
         New-Item -ItemType Directory -Force target\natives | Out-Null
         if ((Get-Command gh -ErrorAction SilentlyContinue) -and $env:GH_TOKEN) {
-            gh release download $tag -R $repo -D target\natives -p $asset -p sha256sums.txt
+            gh release download $tag -R $repo -D target\natives -p $asset
             if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
         } else {
-            foreach ($f in @($asset, "sha256sums.txt")) {
-                Invoke-WebRequest "https://github.com/$repo/releases/download/$tag/$f" -OutFile "target\natives\$f"
-            }
+            Invoke-WebRequest "https://github.com/$repo/releases/download/$tag/$asset" -OutFile "target\natives\$asset"
         }
-        $line = Get-Content target\natives\sha256sums.txt | Where-Object { $_ -match "^[0-9a-f]{64}\s+\*?$asset$" } | Select-Object -First 1
-        if (-not $line -or (Get-FileHash "target\natives\$asset" -Algorithm SHA256).Hash.ToLower() -ne ($line -split '\s+')[0]) {
+        if ((Get-FileHash "target\natives\$asset" -Algorithm SHA256).Hash.ToLower() -ne $want) {
             throw "tuwunel checksum mismatch"
         }
         Copy-Item "target\natives\$asset" target\pkg\server\tuwunel.exe

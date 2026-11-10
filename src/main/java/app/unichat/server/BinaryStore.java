@@ -4,35 +4,35 @@ import app.unichat.support.Downloads;
 import app.unichat.support.Processes;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.time.Duration;
 import java.util.List;
 import java.util.function.Function;
 
 /**
  * The {@code bin/} folder of the native server: one executable per bridge plus {@code <name>.version}. Bridges are
- * downloaded from their release and installed only if they match the release's sha256sums.txt.
+ * downloaded from their release and installed only if they match the SHA-256 the app ships pinned for them
+ * ({@link Manifest#sha256}): a release's own sha256sums.txt would vouch for whatever replaced the binary there.
  */
 public final class BinaryStore {
     private final Path bin;
     private final Platform platform;
     private final Function<Manifest.Component, String> releaseBase;
-    private final HttpClient http = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .connectTimeout(Duration.ofSeconds(20))
-            .build();
+    private final Function<Manifest.Component, String> pinned;
 
-    /** {@code releaseBase}: where a component's release files are ({@link Manifest#releaseUrl}; tests use a local server). */
-    public BinaryStore(Path bin, Platform platform, Function<Manifest.Component, String> releaseBase) {
+    /** Downloads from {@code manifest}'s releases, checked against its pinned hashes. */
+    public BinaryStore(Path bin, Platform platform, Manifest manifest) {
+        this(bin, platform, c -> manifest.releaseUrl(c, platform), c -> manifest.sha256(c, platform));
+    }
+
+    /** {@code releaseBase}: where a component's files are; {@code pinned}: its SHA-256, null when not pinned (tests). */
+    BinaryStore(Path bin, Platform platform, Function<Manifest.Component, String> releaseBase,
+                Function<Manifest.Component, String> pinned) {
         this.bin = bin;
         this.platform = platform;
         this.releaseBase = releaseBase;
+        this.pinned = pinned;
     }
 
     public Path path(String name) {
@@ -48,11 +48,10 @@ public final class BinaryStore {
         Path target = path(c.name());
         if (isInstalled(c)) return target;
         Files.createDirectories(bin);
-        String base = releaseBase.apply(c), asset = c.asset(platform);
-        String want = Manifest.parseSha256Sums(get(base + "/sha256sums.txt")).get(asset);
-        if (want == null) throw new IOException(asset + " is not in the release's sha256sums.txt");
+        String asset = c.asset(platform), want = pinned.apply(c);
+        if (want == null) throw new IOException(asset + " " + c.tag() + " has no pinned SHA-256 (native/pin-hashes.sh)");
 
-        Downloads.fetch(base + "/" + asset, 0, want, target, asset, p -> { }, part -> part.toFile().setExecutable(true, true));
+        Downloads.fetch(releaseBase.apply(c) + "/" + asset, 0, want, target, asset, p -> { }, part -> part.toFile().setExecutable(true, true));
         clearQuarantine(target);
         Files.writeString(bin.resolve(c.name() + ".version"), c.tag());
         return target;
@@ -77,12 +76,6 @@ public final class BinaryStore {
         } catch (IOException e) {
             return null;
         }
-    }
-
-    private String get(String url) throws IOException, InterruptedException {
-        HttpResponse<String> res = http.send(HttpRequest.newBuilder(URI.create(url)).build(), HttpResponse.BodyHandlers.ofString());
-        if (res.statusCode() != 200) throw new IOException("HTTP " + res.statusCode() + " for " + url);
-        return res.body();
     }
 
     /** Downloaded files carry macOS's quarantine flag, which can stop them from running. */

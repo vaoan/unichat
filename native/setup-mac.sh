@@ -43,6 +43,8 @@ bridge_port() {
   esac
 }
 manifest() { grep "^$1=" "$HERE/../src/main/resources/app/unichat/server/versions.env" | cut -d= -f2-; }
+# The SHA-256 pinned for "<owner/repo>@<tag>/<asset>" (native/pin-hashes.sh), never the release's own sha256sums.txt.
+pinned() { awk -v k="$1" '$2 == k {print $1}' "$HERE/../src/main/resources/app/unichat/server/sha256sums.txt"; }
 
 # --- Homeserver binary -----------------------------------------------------------------------
 TUWUNEL_VERSION="$(manifest TUWUNEL_VERSION)"
@@ -52,17 +54,17 @@ if [ -n "${TUWUNEL_BIN:-}" ]; then
 fi
 [ -x "$DIR/bin/tuwunel" ] || { echo "Falta bin/tuwunel (pasa TUWUNEL_BIN=<ruta>)." >&2; exit 1; }
 
-# --- Bridge binaries (official releases, checked against sha256sums.txt) ----------------------
+# --- Bridge binaries (official releases, checked against the pinned sha256sums.txt) ------------
 fetch_bridge() {
   local b="$1" spec repo tag prefix asset out
   spec="$(manifest "$b")"; repo="${spec%@*}"; tag="${spec#*@}"; tag="${tag%%:*}"; prefix="${spec##*:}"
   asset="$prefix-$OS-$ARCH"; out="$DIR/bin/$b"
   if [ -x "$out" ] && [ "$(cat "$out.version" 2>/dev/null)" = "$tag" ]; then return; fi
-  echo "Descargando $asset $tag..."
-  local base="https://github.com/$repo/releases/download/$tag"
-  curl -fsSL -o "$out.part" "$base/$asset"
   local want got
-  want="$(curl -fsSL "$base/sha256sums.txt" | awk -v a="$asset" '$2 == a || $2 == "*"a {print $1}')"
+  want="$(pinned "$repo@$tag/$asset")"
+  [ -n "$want" ] || { echo "$repo@$tag/$asset has no pinned SHA-256: run native/pin-hashes.sh" >&2; exit 1; }
+  echo "Descargando $asset $tag..."
+  curl -fsSL -o "$out.part" "https://github.com/$repo/releases/download/$tag/$asset"
   got="$(shasum -a 256 "$out.part" | awk '{print $1}')"
   [ -n "$want" ] && [ "$want" = "$got" ] || { rm -f "$out.part"; echo "Checksum mismatch for $asset" >&2; exit 1; }
   chmod 755 "$out.part"; xattr -c "$out.part" 2>/dev/null || true

@@ -29,11 +29,16 @@ class BinaryStoreTest {
     @TempDir Path dir;
     private HttpServer server;
     private final AtomicInteger downloads = new AtomicInteger();
+    /** What the fake release serves as the binary, and the sum its own sha256sums.txt gives for it. */
+    private volatile byte[] served = BINARY;
     private volatile String publishedSum;
+    /** The SHA-256 the app ships pinned for the asset (null: not pinned). */
+    private volatile String pinnedSum;
 
     @BeforeEach
     void fakeReleases() throws Exception {
         publishedSum = sha(BINARY);
+        pinnedSum = sha(BINARY);
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", ex -> {
             String path = ex.getRequestURI().getPath();
@@ -42,7 +47,7 @@ class BinaryStoreTest {
                 body = (publishedSum + "  mautrix-whatsapp-darwin-arm64\nffff  other\n").getBytes(StandardCharsets.UTF_8);
             } else if (path.endsWith("/mautrix-whatsapp-darwin-arm64")) {
                 downloads.incrementAndGet();
-                body = BINARY;
+                body = served;
             } else {
                 ex.sendResponseHeaders(404, -1);
                 ex.close();
@@ -63,7 +68,7 @@ class BinaryStoreTest {
 
     private BinaryStore store() {
         String base = "http://127.0.0.1:" + server.getAddress().getPort();
-        return new BinaryStore(dir, Platform.MAC_ARM64, c -> base + "/" + c.repo() + "/" + c.tag());
+        return new BinaryStore(dir, Platform.MAC_ARM64, c -> base + "/" + c.repo() + "/" + c.tag(), c -> pinnedSum);
     }
 
     @Test
@@ -90,7 +95,7 @@ class BinaryStoreTest {
     @Test
     void aHomeserverCopiedFromThePackageCountsAsInstalled() throws Exception {
         Path shipped = Files.write(dir.resolve("shipped"), BINARY);
-        BinaryStore store = new BinaryStore(dir.resolve("bin"), Platform.MAC_ARM64, c -> "http://127.0.0.1:1");
+        BinaryStore store = new BinaryStore(dir.resolve("bin"), Platform.MAC_ARM64, c -> "http://127.0.0.1:1", c -> null);
         store.installBundled("tuwunel", shipped, "v1.9.4");
         // A later package without it falls back to install(): the copy there is used, nothing downloaded.
         assertEquals(store.path("tuwunel"), store.install(new Manifest.Component("tuwunel", "", "v1.9.4", "tuwunel")));
@@ -98,11 +103,35 @@ class BinaryStoreTest {
 
     @Test
     void checksumMismatchInstallsNothing() {
-        publishedSum = "0".repeat(64);
+        pinnedSum = "0".repeat(64);
         IOException e = assertThrows(IOException.class, () -> store().install(WA));
         assertTrue(e.getMessage().contains("dañado"), e.getMessage());
+        assertNothingInstalled();
+    }
+
+    @Test
+    void aSwappedBinaryIsRefusedEvenWhenItsReleaseVouchesForIt() throws Exception {
+        // Whoever can edit the release replaces the binary and its sha256sums.txt line together.
+        served = "#!/bin/sh\necho tampered\n".getBytes(StandardCharsets.UTF_8);
+        publishedSum = sha(served);
+        IOException e = assertThrows(IOException.class, () -> store().install(WA));
+        assertTrue(e.getMessage().contains("dañado"), e.getMessage());
+        assertNothingInstalled();
+    }
+
+    @Test
+    void anAssetWithNoPinnedHashIsNeverDownloaded() {
+        pinnedSum = null;
+        IOException e = assertThrows(IOException.class, () -> store().install(WA));
+        assertTrue(e.getMessage().contains("mautrix-whatsapp-darwin-arm64"), e.getMessage());
+        assertEquals(0, downloads.get());
+        assertNothingInstalled();
+    }
+
+    private void assertNothingInstalled() {
         assertFalse(Files.exists(dir.resolve("whatsapp")));
         assertFalse(Files.exists(dir.resolve("whatsapp.part")));
+        assertFalse(Files.exists(dir.resolve("whatsapp.version")));
     }
 
     private static String sha(byte[] b) throws Exception {

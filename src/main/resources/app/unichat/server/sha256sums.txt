@@ -1,0 +1,23 @@
+# SHA-256 of every file the native server may download: <sha256>  <owner/repo>@<tag>/<asset>.
+# Written by native/pin-hashes.sh from versions.env; run it again whenever versions.env changes.
+8db5ce8eb239acb79e9231e76f551bffde59b0f1aa0c3b70edae81fa1c97c79b  mautrix/discord@v0.7.7/mautrix-discord-darwin-arm64
+114df92a10fd587af7136975f128c95590000d3c1cb8b8248fc998f273e22ffa  mautrix/gmessages@v0.2610.0/mautrix-gmessages-darwin-arm64
+21a462a59e2856be435968feaded2255fdc7377dd2b008a1c78fbccbf0b2456a  mautrix/linkedin@v0.2609.0/mautrix-linkedin-darwin-arm64
+c7bc6e81def6a23f0f2e8359d7079e86b82723dfb9082b22ad642a9a8912173b  mautrix/meta@v0.2607.0/mautrix-instagram-darwin-arm64
+984579d669fa14dfc3d6a76ed060daa88aeb671acb007d55bb8f50ef081b4e70  mautrix/meta@v0.2610.0/mautrix-meta-darwin-arm64
+0c4b1e0818614ebe21930dcf33ff93841f88ee7bcc8d1568762e52c9355bcdfd  mautrix/signal@v0.2610.0/mautrix-signal-darwin-arm64
+e613664e68afe9e32fbd25c00f76e568103fb330018fc427a70c0d6bd383e59f  mautrix/slack@v0.2610.0/mautrix-slack-darwin-arm64
+50a78bcc34a0ef06889c8c8d338f522a5c59d6329f529dd33bb5c289c0c5bc3c  mautrix/telegram@v0.2610.0/mautrix-telegram-darwin-arm64
+34d5ad1aadacd13b8d978300d2dc723b48b9c3cd3734e2fd329a279d139185b5  mautrix/twitter@v0.2609.0/mautrix-twitter-darwin-arm64
+482161caa7179c357dd802590cef5230c22968b01b61e7829df72ba764739865  mautrix/whatsapp@v0.2610.0/mautrix-whatsapp-darwin-arm64
+540e341116a8ea15430069140a46aeb98f305a83a88b70ab6b514704ef87fbba  vaoan/unichat@natives-1/mautrix-discord-windows-amd64
+eb3e156cfc975c4bd6c89257d79cb8398a524f1c842e3f70fd41acb1d1d2943c  vaoan/unichat@natives-1/mautrix-gmessages-windows-amd64
+9e4b6600c719e1cbebe254af6451b34029be997ac5b93fa37546c624628ae443  vaoan/unichat@natives-1/mautrix-instagram-windows-amd64
+75c9cf536a272f3587b933b3410f06f8504d27db369d9da32378fff2da70d09d  vaoan/unichat@natives-1/mautrix-linkedin-windows-amd64
+f11d60daa65f5aee5972991ab539581ca3d2b1882def8e6d620206fa10a8a3a3  vaoan/unichat@natives-1/mautrix-meta-windows-amd64
+4e0d9b87b9beebbe33839e4e846a4d4e3b4763652c35c663de7842e486c7f7d9  vaoan/unichat@natives-1/mautrix-slack-windows-amd64
+d414719831c25e5aeb9ab201ceb16f515b6481bcd169c9a0a2bf6dda68e9ef6b  vaoan/unichat@natives-1/mautrix-telegram-windows-amd64
+4333ec22636050722276625dd099558e848fd3e3a5b0c0e9442f4d41897b5e2b  vaoan/unichat@natives-1/mautrix-twitter-windows-amd64
+1fbe5171783569f0413e4a2a4279bf85caca7ac4518bb8fa5d00465b11d9c7d3  vaoan/unichat@natives-1/mautrix-whatsapp-windows-amd64
+a39bcd169d39c08adaed1c0937300eae3582e94c855047953a2eeb587bdae0ca  vaoan/unichat@natives-1/tuwunel-darwin-arm64
+82cc989b057a5721f1217996b22a64b53e8a6149f33b794e7af7f2a34d748e46  vaoan/unichat@natives-1/tuwunel-windows-amd64

@@ -31,7 +31,7 @@ class BridgeInstallerTest {
 
     @BeforeEach
     void marksTheBridgesInstalled() throws Exception {
-        store = new BinaryStore(dir.resolve("bin"), Platform.MAC_ARM64, c -> "http://127.0.0.1:1/nothing-here");
+        store = new BinaryStore(dir.resolve("bin"), Platform.MAC_ARM64, c -> "http://127.0.0.1:1/nothing-here", c -> null);
         Files.createDirectories(dir.resolve("appservices"));
         Path anything = Files.writeString(dir.resolve("anything"), "x");
         for (String b : List.of("whatsapp", "telegram", "discord")) store.installBundled(b, anything, "v1");

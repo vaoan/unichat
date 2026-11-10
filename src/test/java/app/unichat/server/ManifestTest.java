@@ -77,6 +77,49 @@ class ManifestTest {
     }
 
     @Test
+    void pinsAreKeyedByReleaseAndAssetSoAVersionBumpNeedsANewOne() {
+        String versions = """
+                whatsapp=mautrix/whatsapp@v0.2610.0:mautrix-whatsapp
+                TUWUNEL_VERSION=v1.9.4
+                NATIVES=vaoan/unichat@natives-3
+                """;
+        String sums = """
+                # pinned
+                aaa111  mautrix/whatsapp@v0.2610.0/mautrix-whatsapp-darwin-arm64
+                bbb222  vaoan/unichat@natives-3/mautrix-whatsapp-windows-amd64
+                ccc333  vaoan/unichat@natives-3/tuwunel-darwin-arm64
+                """;
+        Manifest m = Manifest.parse(versions, sums);
+        Manifest.Component wa = m.bridge("whatsapp");
+        assertEquals("mautrix/whatsapp@v0.2610.0/mautrix-whatsapp-darwin-arm64", m.pinKey(wa, Platform.MAC_ARM64));
+        assertEquals("aaa111", m.sha256(wa, Platform.MAC_ARM64));
+        assertEquals("bbb222", m.sha256(wa, Platform.WINDOWS_AMD64));
+        assertEquals("ccc333", m.sha256(m.tuwunel(), Platform.MAC_ARM64));
+        assertNull(m.sha256(m.tuwunel(), Platform.WINDOWS_AMD64));
+        Manifest bumped = Manifest.parse(versions.replace("v0.2610.0", "v0.2611.0"), sums);
+        assertNull(bumped.sha256(bumped.bridge("whatsapp"), Platform.MAC_ARM64), "the old version's pin doesn't count");
+        assertNull(Manifest.parse(versions).sha256(wa, Platform.MAC_ARM64), "nothing pinned");
+    }
+
+    @Test
+    void everythingTheBundledManifestCanInstallHasAPinnedHash() {
+        // Bumping versions.env without running native/pin-hashes.sh fails here, not on the person's machine.
+        Manifest m = Manifest.bundled();
+        for (Platform p : Platform.values()) {
+            assertPinned(m, m.tuwunel(), p);
+            for (Manifest.Component c : m.bridges().values()) {
+                if (m.builds(c.name(), p)) assertPinned(m, c, p);
+            }
+        }
+    }
+
+    private static void assertPinned(Manifest m, Manifest.Component c, Platform p) {
+        String sha = m.sha256(c, p);
+        assertTrue(sha != null && sha.matches("[0-9a-f]{64}"),
+                m.pinKey(c, p) + " has no pinned SHA-256: run native/pin-hashes.sh");
+    }
+
+    @Test
     void sha256SumsAcceptBothFormats() {
         Map<String, String> sums = Manifest.parseSha256Sums("""
                 aaa111  mautrix-whatsapp-amd64

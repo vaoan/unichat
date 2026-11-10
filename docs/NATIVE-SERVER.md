@@ -6,7 +6,7 @@ Docker (`server/`). The native server does the same with ordinary system program
 | Piece | What it is | Where it comes from |
 |---|---|---|
 | **tuwunel** | Matrix server (a single executable, in Rust) | Built in GitHub Actions and **ships inside the Unichat installer** |
-| **mautrix bridges** | One executable per network | **Downloaded** from mautrix's official releases, verified with `sha256sums.txt` |
+| **mautrix bridges** | One executable per network | **Downloaded** from mautrix's official releases, verified with the SHA-256 pinned in the app |
 | **SQLite** | Database (one file per component) | Built into the executables; nothing to install |
 | **libolm** (Mac only) | Library the official Mac bridges need in order to start | Built with `native/build-libolm.sh` and **ships inside Unichat**; copied next to the bridges |
 | **gif2webp** (libwebp 1.6.0, BSD license) | Converts animated GIF stickers to animated WebP for chats that only accept WebP (WhatsApp) | `package.sh` builds it with `native/build-gif2webp.sh` from the pinned source (with GIFLib; Google's binary requires macOS 15) and `package.ps1` downloads Google's official Windows binary, with its SHA-256 pinned, and it **ships inside Unichat**; without it, the sticker is sent still (PNG) |
@@ -57,11 +57,15 @@ server/
 ## Pinned versions: `native/versions.env`
 
 One line per component: `<network>=<repo>@<release>:<executable prefix>`. The file downloaded is
-`<prefix>-<os>-<architecture>` (for example `mautrix-whatsapp-darwin-arm64`) and it's checked against the
-`sha256sums.txt` of the same release; if it doesn't match, it isn't installed.
+`<prefix>-<os>-<architecture>` (for example `mautrix-whatsapp-darwin-arm64`) and it's checked against the SHA-256
+pinned for it in `sha256sums.txt` beside `versions.env` (one `<sha256>  <owner/repo>@<tag>/<asset>` line per file
+any platform may download); if it doesn't match, or isn't pinned, it isn't installed. The release's own
+`sha256sums.txt` isn't trusted: whoever could edit the release could swap the binary and its line together.
 
-**Updating a bridge = changing its version here** (and, if its changelog changed the configuration format,
-adjusting the keys the installer applies). The bridge maintenance skill will do that work:
+**Updating a bridge = changing its version here, then running `native/pin-hashes.sh`**, which writes the pinned
+file from each release's `sha256sums.txt` (review and commit the diff; `ManifestTest` fails the build while a file
+`versions.env` can install has no pin). If its changelog changed the configuration format, also adjust the keys
+the installer applies. The bridge maintenance skill will do that work:
 read official changelogs, bump versions, migrate configuration, test and publish.
 
 ## Configuration Unichat applies to each bridge
@@ -126,10 +130,11 @@ of each file, which the bridges' AGPL asks for):
 - `tuwunel-darwin-arm64` and `tuwunel-windows-amd64`: `package.sh` and `package.ps1` put them in the app
   (`native/fetch-natives.sh`; `TUWUNEL_BIN` wins).
 - `mautrix-<bridge>-windows-amd64`: Unichat downloads them on Windows when each network is connected (`Manifest.releaseUrl`),
-  verified with `sha256sums.txt` like the official ones.
+  verified with their pinned SHA-256 like the official ones.
 
 To update a bridge or tuwunel: change its version in `versions.env`, bump `NATIVES` (`natives-2`…) and push to
-`main`; the workflow only runs if that release doesn't exist. A new bridge for Windows needs nothing else: the list
+`main`; the workflow only runs if that release doesn't exist. Once it has published, run `native/pin-hashes.sh`
+and commit the new pins. A new bridge for Windows needs nothing else: the list
 comes from `versions.env`.
 
 What was learned while trying it (on a test branch, since deleted):

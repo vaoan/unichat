@@ -1,7 +1,7 @@
 # What Unichat builds itself for its no-Docker server, published as the release named by NATIVES in versions.env:
 #   tuwunel-darwin-arm64, tuwunel-windows-amd64   the homeserver (no official macOS/Windows builds)
 #   mautrix-<bridge>-windows-amd64                the bridges for Windows (mautrix publishes Linux and macOS only)
-#   sha256sums.txt                                checked by BinaryStore and the package scripts
+#   sha256sums.txt                                copied into the app's pins by native/pin-hashes.sh
 # Runs when versions.env changes and that release doesn't exist yet: bump NATIVES with any version there.
 name: natives
 

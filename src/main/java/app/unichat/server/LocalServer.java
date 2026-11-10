@@ -60,7 +60,7 @@ public final class LocalServer {
         this.platform = platform;
         this.dir = platform.dataDir();
         this.manifest = Manifest.bundled();
-        this.store = new BinaryStore(dir.resolve("bin"), platform, c -> manifest.releaseUrl(c, platform));
+        this.store = new BinaryStore(dir.resolve("bin"), platform, manifest);
         this.secretsFile = new ServerSecrets(dir);
         this.installer = new BridgeInstaller(dir, store, manifest);
         this.supervisor = new Supervisor(dir.resolve("run"));
