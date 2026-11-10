@@ -1,6 +1,6 @@
 package app.unichat.server;
 
-import app.unichat.settings.SyncedFile;
+import app.unichat.support.SafeFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -44,7 +44,7 @@ final class ServerSecrets {
         Files.createDirectories(dir);
         ByteArrayOutputStream content = new ByteArrayOutputStream();
         p.store(content, "Unichat local server - private");
-        SyncedFile.replace(dir.resolve("secrets.properties"), content.toByteArray(), true);
+        SafeFile.replace(dir.resolve("secrets.properties"), content.toByteArray(), true);
     }
 
     static String random(int n) {

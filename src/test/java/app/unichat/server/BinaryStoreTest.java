@@ -101,6 +101,18 @@ class BinaryStoreTest {
         assertEquals(store.path("tuwunel"), store.install(new Manifest.Component("tuwunel", "", "v1.9.4", "tuwunel")));
     }
 
+    /** A copy that can't be made (here the package holds a folder by that name) installs nothing, not even a temp file. */
+    @Test
+    void aBundledCopyThatFailsInstallsNothing() throws Exception {
+        Path shipped = Files.createDirectories(dir.resolve("shipped"));
+        Path bin = dir.resolve("bin");
+        BinaryStore store = new BinaryStore(bin, Platform.MAC_ARM64, c -> "http://127.0.0.1:1", c -> null);
+        assertThrows(IOException.class, () -> store.installBundled("tuwunel", shipped, "v1.9.4"));
+        try (var left = Files.list(bin)) {
+            assertEquals(java.util.List.of(), left.toList());
+        }
+    }
+
     @Test
     void checksumMismatchInstallsNothing() {
         pinnedSum = "0".repeat(64);

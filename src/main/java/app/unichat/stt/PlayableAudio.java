@@ -22,7 +22,7 @@ public final class PlayableAudio {
         Path tmp = wav.resolveSibling(wav.getFileName() + ".part");
         try {
             OggOpus.toPlayableWav(audio, tmp);
-            Files.move(tmp, wav, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            Files.move(tmp, wav, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); // lesson-ok: atomic-move (the decoder writes the temp)
         } finally {
             Files.deleteIfExists(tmp);
         }

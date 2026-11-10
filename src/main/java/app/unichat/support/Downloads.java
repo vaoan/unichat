@@ -7,9 +7,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -42,18 +40,18 @@ public final class Downloads {
      */
     public static void fetch(String url, long size, String sha256, Path target, String what, DoubleConsumer progress,
                              Consumer<Path> beforeMove) throws IOException, InterruptedException {
-        Files.createDirectories(target.getParent());
-        Path part = target.resolveSibling(target.getFileName() + ".part");
-        try {
-            HttpResponse<InputStream> res = HTTP.send(HttpRequest.newBuilder(URI.create(url)).build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            if (res.statusCode() != 200) {
-                res.body().close(); // left open, the connection stayed busy with a body nobody reads
-                throw new IOException(I18n.t("download.http", res.statusCode(), what));
-            }
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            try (InputStream in = new DigestInputStream(res.body(), md);
-                 var out = Files.newOutputStream(part)) {
+        HttpResponse<InputStream> res = HTTP.send(HttpRequest.newBuilder(URI.create(url)).build(),
+                HttpResponse.BodyHandlers.ofInputStream());
+        if (res.statusCode() != 200) {
+            res.body().close(); // left open, the connection stayed busy with a body nobody reads
+            throw new IOException(I18n.t("download.http", res.statusCode(), what));
+        }
+        MessageDigest md = sha256();
+        try (InputStream in = new DigestInputStream(res.body(), md)) {
+            SafeFile.at(target, ".part").beforeMove(part -> {
+                if (!HexFormat.of().formatHex(md.digest()).equals(sha256)) throw new IOException(I18n.t("download.corrupt", what));
+                beforeMove.accept(part);
+            }).write(out -> {
                 byte[] buf = new byte[1 << 16];
                 long done = 0;
                 for (int n; (n = in.read(buf)) > 0; ) {
@@ -61,15 +59,15 @@ public final class Downloads {
                     done += n;
                     if (size > 0) progress.accept(Math.min(1, (double) done / size));
                 }
-            }
-            String got = HexFormat.of().formatHex(md.digest());
-            if (!got.equals(sha256)) throw new IOException(I18n.t("download.corrupt", what));
-            beforeMove.accept(part);
-            Files.move(part, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            });
+        }
+    }
+
+    private static MessageDigest sha256() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
-        } finally {
-            Files.deleteIfExists(part);
         }
     }
 }

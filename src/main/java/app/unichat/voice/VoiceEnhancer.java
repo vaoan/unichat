@@ -72,7 +72,7 @@ public final class VoiceEnhancer {
                 }
             }
             VoiceNote clean = encode(cleanPcm, cleanOgg);
-            Files.move(cleanOgg, note.file(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            Files.move(cleanOgg, note.file(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); // lesson-ok: atomic-move (ffmpeg and the encoder write the temp)
             return new VoiceNote(note.file(), clean.durationMs(), clean.waveform());
         } catch (IOException e) {
             System.err.println("Voice note left as recorded: " + e.getClass().getSimpleName());

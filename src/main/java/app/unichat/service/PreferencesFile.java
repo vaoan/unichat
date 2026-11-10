@@ -1,6 +1,7 @@
 package app.unichat.service;
 
-import app.unichat.settings.SyncedFile;
+import app.unichat.support.BackgroundWriter;
+import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -13,7 +14,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -25,12 +25,11 @@ import java.util.UUID;
 /**
  * Per-chat preferences and folders, kept in Unichat's own {@code preferences.json} (it travels with the person) and
  * reconciled with what the server says. A field the person never touched follows the server in both directions; once
- * they choose, the file wins. {@code server-seen.json} (this machine only) remembers which flags this server has said
- * "true" about, so a fresh server's empty answers don't erase what was copied from the old one.
- * Disk errors are logged, never thrown: memory stays right and the old file stays whole. Each save keeps the version it
- * replaces as {@code preferences.json.bak}, the way back if the file turns up damaged.
+ * they choose, the file wins ({@link ServerSeen} remembers what this server said).
+ * Disk errors are logged, never thrown: memory stays right and the old file stays whole ({@link PreferencesRecovery}
+ * keeps the way back).
  * Changes never wait for the disk: callers change preferences on the UI thread or holding the sync lock, so what changed
- * is copied under this lock and written on a daemon thread, one write for however many changes came meanwhile.
+ * is copied under this lock and written by a {@link BackgroundWriter}, one write for however many changes came meanwhile.
  * {@link #flush} waits for it: whoever ends the app (or a session) must call it, a daemon thread doesn't outlive the JVM.
  */
 public final class PreferencesFile {
@@ -72,8 +71,8 @@ public final class PreferencesFile {
     public record Effective(boolean archived, boolean muted, boolean favorite, boolean lowPriority, boolean pinned,
                             Instant reminder, boolean muteChosenHere) {}
 
-    private static final int VERSION = 1;
-    private static final ObjectMapper JSON = new ObjectMapper();
+    static final int VERSION = 1;
+    static final ObjectMapper JSON = new ObjectMapper();
 
     /** One chat's entry; a flag missing from {@code values} was never set, a reminder is "touched" once {@code reminderSet}. */
     private static final class Entry {
@@ -100,39 +99,38 @@ public final class PreferencesFile {
     private final Path file, seenFile;
     private final Map<String, Entry> chats = new LinkedHashMap<>();
     private final List<MutableFolder> folders = new ArrayList<>();
-    private final Map<String, Set<Flag>> seen = new HashMap<>();
+    private final ServerSeen seen;
+    private final PreferencesRecovery recovery;
     private final ObjectNode extraRoot = JSON.createObjectNode();
-    private String setAside, server;
-    private boolean dirty, seenDirty, unreadable, recovered, saveFailing;
-    /** The main file is still the damaged one, and memory holds what came from the backup: it must not become the backup. */
-    private boolean damagedInPlace;
+    private final BackgroundWriter writer = new BackgroundWriter("preferences-save", this, this::writeOnce);
+    private boolean dirty, saveFailing;
     private Runnable onSaveFailure;
     private int announcements;
     private int batching;
-    private boolean writePending, writerRunning;
     /** Times the main file was replaced since this object was created. */
     private int mainWrites;
 
     public PreferencesFile(Path preferences, Path serverSeen) {
         this.file = preferences;
         this.seenFile = serverSeen;
+        this.recovery = new PreferencesRecovery(preferences);
+        this.seen = ServerSeen.load(seenFile);
         if (file != null) load();
-        if (seenFile != null) loadSeen();
     }
 
     public static PreferencesFile inMemory() { return new PreferencesFile(null, null); }
 
     /** The name the unreadable file was set aside under, or null. */
-    public String setAside() { return setAside; }
+    public synchronized String setAside() { return recovery.setAside(); }
 
     /**
      * True while an unreadable file could not be moved aside: nothing is written to it until the move works (every
      * change retries), so the original is never overwritten. The caller should warn the person.
      */
-    public synchronized boolean unreadable() { return unreadable; }
+    public synchronized boolean unreadable() { return recovery.blocked(); }
 
     /** True if the file was damaged and these preferences are the backup's: the last change may be missing. */
-    public synchronized boolean recoveredFromBackup() { return recovered; }
+    public synchronized boolean recoveredFromBackup() { return recovery.recovered(); }
 
     /**
      * Called when saves start failing, again only after one worked in between; right away if they already are. On a
@@ -158,17 +156,17 @@ public final class PreferencesFile {
         for (Flag f : Flag.values()) {
             Boolean said = server.of(f);
             if (said == null) continue;
-            if (said && seen.computeIfAbsent(key, k -> EnumSet.noneOf(Flag.class)).add(f)) seenDirty = true;
+            if (said) seen.saidTrue(key, f);
             Entry e = chats.get(key);
             if (e != null && e.touched(f)) continue;
             if (said) {
                 Entry target = entry(key);
                 if (!Boolean.TRUE.equals(target.values.put(f, true)) | target.fromServer.add(f)) dirty = true;
-            } else if (seen.getOrDefault(key, Set.of()).contains(f)) {
+            } else if (seen.saidTrueBefore(key, f)) {
                 Entry target = entry(key);
                 target.values.put(f, false);
                 target.fromServer.add(f);
-                forgetSeen(key, f);
+                seen.forget(key, f);
                 dirty = true;
             }
         }
@@ -286,11 +284,7 @@ public final class PreferencesFile {
                 }
             }
         }
-        Set<Flag> oldSeen = seen.remove(oldKey);
-        if (oldSeen != null) {
-            seen.computeIfAbsent(newKey, k -> EnumSet.noneOf(Flag.class)).addAll(oldSeen);
-            seenDirty = true;
-        }
+        seen.rekey(oldKey, newKey);
         for (MutableFolder f : folders) {
             if (!f.keys.remove(oldKey)) continue;
             f.keys.add(newKey);
@@ -303,11 +297,7 @@ public final class PreferencesFile {
      * rebuilt server, a different homeserver), so a change forgets it and that server's "false" can't erase anything.
      */
     public synchronized void useServer(String homeserver) {
-        if (java.util.Objects.equals(homeserver, server)) return;
-        server = homeserver;
-        seen.clear();
-        seenDirty = true;
-        saveLater();
+        if (seen.use(homeserver)) saveLater();
     }
 
     /** Muted = archived ({@link QuietRule}): the person's choice covers both. */
@@ -324,7 +314,7 @@ public final class PreferencesFile {
         try {
             changes.run();
         } finally {
-            if (--batching == 0 && (dirty || seenDirty)) saveLater();
+            if (--batching == 0 && (dirty || seen.dirty())) saveLater();
         }
     }
 
@@ -334,16 +324,8 @@ public final class PreferencesFile {
      * from inside {@link #batch}, and don't hold a lock that a batch's changes may need.
      */
     public synchronized void flush() {
-        if (dirty || seenDirty) saveLater();
-        boolean interrupted = false;
-        while (writerRunning) {
-            try {
-                wait();
-            } catch (InterruptedException e) {
-                interrupted = true; // the last change is worth more than a prompt answer
-            }
-        }
-        if (interrupted) Thread.currentThread().interrupt();
+        if (dirty || seen.dirty()) saveLater();
+        writer.flush();
     }
 
     synchronized int mainWrites() { return mainWrites; }
@@ -436,14 +418,6 @@ public final class PreferencesFile {
         return folders.stream().filter(f -> f.id.equals(id)).findFirst().orElse(null);
     }
 
-    private void forgetSeen(String key, Flag f) {
-        Set<Flag> flags = seen.get(key);
-        if (flags != null && flags.remove(f)) {
-            seenDirty = true;
-            if (flags.isEmpty()) seen.remove(key);
-        }
-    }
-
     private void changed() {
         dirty = true;
         if (batching == 0) saveLater();
@@ -452,13 +426,12 @@ public final class PreferencesFile {
     private void load() {
         if (!Files.exists(file)) return;
         if (readFrom(file)) return;
-        Path backup = backupOf(file);
-        recovered = Files.exists(backup) && readFrom(backup);
-        unreadable = true;
-        setAsideBadFile();
+        Path backup = PreferencesRecovery.backupOf(file);
+        boolean recovered = Files.exists(backup) && readFrom(backup);
+        recovery.damaged(recovered);
         if (!recovered) return;
         dirty = true; // what came back isn't in the main file yet
-        if (unreadable) return; // the warning says so; nothing touches the file until its copy exists
+        if (recovery.blocked()) return; // the warning says so; nothing touches the file until its copy exists
         writeMain();
         saveFailing = dirty;
     }
@@ -479,8 +452,6 @@ public final class PreferencesFile {
             return false;
         }
     }
-
-    private static Path backupOf(Path target) { return target.resolveSibling(target.getFileName() + ".bak"); }
 
     private void readRoot(JsonNode root) {
         if (root.has("chats") && !root.get("chats").isObject()) throw new IllegalArgumentException("chats");
@@ -531,92 +502,8 @@ public final class PreferencesFile {
         }
     }
 
-    /**
-     * Keeps the unreadable file so the next write can't destroy it. With nothing recovered it's renamed. With a recovery
-     * it's copied, and stays until the recovered content replaces it: if that never happens, the next start recovers again.
-     */
-    private void setAsideBadFile() {
-        try {
-            if (recovered) {
-                setAside = copyBadFile();
-                damagedInPlace = true;
-            } else {
-                String name = freeAsideName();
-                Files.move(file, file.resolveSibling(name));
-                setAside = name;
-            }
-            unreadable = false;
-        } catch (IOException e) {
-            System.err.println("Could not set aside the unreadable preferences: " + e);
-        }
-    }
-
-    /** The name of the copy on disk; repeated failed recoveries of the same damage share one. */
-    private String copyBadFile() throws IOException {
-        try (var copies = Files.newDirectoryStream(file.resolveSibling(""), file.getFileName() + ".bad-*")) {
-            for (Path copy : copies) {
-                if (Files.isRegularFile(copy) && Files.mismatch(file, copy) == -1) return copy.getFileName().toString();
-            }
-        }
-        String name = freeAsideName();
-        Path copy = file.resolveSibling(name);
-        try {
-            SyncedFile.write(copy, Files.readAllBytes(file));
-        } catch (IOException e) {
-            deleteQuietly(copy);
-            throw e;
-        }
-        return name;
-    }
-
-    private String freeAsideName() {
-        String stamp = file.getFileName() + ".bad-" + java.time.format.DateTimeFormatter
-                .ofPattern("yyyyMMdd-HHmmss-SSS").format(java.time.LocalDateTime.now());
-        String name = stamp;
-        for (int n = 2; Files.exists(file.resolveSibling(name)); n++) name = stamp + "-" + n;
-        return name;
-    }
-
-    private void loadSeen() {
-        if (!Files.exists(seenFile)) return;
-        try {
-            JsonNode root = JSON.readTree(seenFile.toFile());
-            server = root.path("server").asText(null);
-            for (Iterator<Map.Entry<String, JsonNode>> it = root.path("seen").fields(); it.hasNext(); ) {
-                var c = it.next();
-                Set<Flag> flags = EnumSet.noneOf(Flag.class);
-                for (JsonNode s : c.getValue()) for (Flag f : Flag.values()) if (f.json.equals(s.asText())) flags.add(f);
-                if (!flags.isEmpty()) seen.put(c.getKey(), flags);
-            }
-        } catch (IOException | RuntimeException e) {
-            seen.clear();
-        }
-    }
-
     private void saveLater() {
-        if (file == null) return;
-        writePending = true;
-        if (writerRunning) return;
-        writerRunning = true;
-        Thread.ofPlatform().daemon().name("preferences-save").start(this::writeWhilePending);
-    }
-
-    private void writeWhilePending() {
-        boolean more = true;
-        while (more) {
-            try {
-                writeOnce();
-            } finally {
-                // Decided in one step: a change between "nothing more" and "stopped" would start no writer and wait forever.
-                synchronized (this) {
-                    more = writePending;
-                    if (!more) {
-                        writerRunning = false;
-                        notifyAll();
-                    }
-                }
-            }
-        }
+        if (file != null) writer.request();
     }
 
     /** A copy under the lock, the disk outside it, the outcome under it again. A change made meanwhile asks for another round. */
@@ -624,37 +511,33 @@ public final class PreferencesFile {
         ObjectNode main = null, seenNow = null;
         boolean keepPrevious = false;
         synchronized (this) {
-            writePending = false;
-            if (unreadable) setAsideBadFile();
-            if (dirty && !unreadable) {
+            recovery.retry();
+            if (dirty && !recovery.blocked()) {
                 main = tree();
-                keepPrevious = !damagedInPlace;
+                keepPrevious = recovery.keepsPrevious();
                 dirty = false;
             }
-            if (seenDirty) {
-                seenNow = seenTree();
-                seenDirty = false;
-            }
+            if (seen.dirty()) seenNow = seen.take();
         }
         boolean mainSaved = main == null || write(file, main, keepPrevious);
         boolean seenSaved = seenNow == null || write(seenFile, seenNow, false);
         synchronized (this) {
             if (main != null && mainSaved) {
-                damagedInPlace = false;
+                recovery.replaced();
                 mainWrites++;
             }
             if (!mainSaved) dirty = true;
-            if (!seenSaved) seenDirty = true;
-            boolean failing = !mainSaved || !seenSaved || (dirty && unreadable);
+            if (!seenSaved) seen.notSaved();
+            boolean failing = !mainSaved || !seenSaved || (dirty && recovery.blocked());
             if (failing && !saveFailing && onSaveFailure != null) announce(onSaveFailure);
             saveFailing = failing;
         }
     }
 
     private void writeMain() {
-        if (!write(file, tree(), !damagedInPlace)) return;
+        if (!write(file, tree(), recovery.keepsPrevious())) return;
         dirty = false;
-        damagedInPlace = false;
+        recovery.replaced();
     }
 
     private ObjectNode tree() {
@@ -685,41 +568,17 @@ public final class PreferencesFile {
         return n;
     }
 
-    private ObjectNode seenTree() {
-        ObjectNode root = JSON.createObjectNode().put("version", VERSION);
-        if (server != null) root.put("server", server);
-        ObjectNode s = root.putObject("seen");
-        seen.forEach((k, flags) -> {
-            ArrayNode a = s.putArray(k);
-            for (Flag f : Flag.values()) if (flags.contains(f)) a.add(f.json);
-        });
-        return root;
-    }
-
     /** A failure or a power cut leaves the old file whole. */
     private static boolean write(Path target, ObjectNode content, boolean keepPrevious) {
         try {
             Files.createDirectories(target.getParent());
             byte[] bytes = JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(content);
-            if (keepPrevious) keepPrevious(target);
-            SyncedFile.replace(target, bytes, false);
+            if (keepPrevious) PreferencesRecovery.keepPrevious(target);
+            SafeFile.replace(target, bytes, false);
             return true;
         } catch (IOException | RuntimeException | Error e) { // out of memory included: the change stays pending
             System.err.println("Could not save " + target.getFileName() + ": " + e);
             return false;
         }
-    }
-
-    /** A backup that can't be made (Windows may hold the file) only costs the backup: the save goes on. */
-    private static void keepPrevious(Path target) {
-        try {
-            if (Files.exists(target)) SyncedFile.replace(backupOf(target), Files.readAllBytes(target), false);
-        } catch (IOException | RuntimeException e) {
-            System.err.println("Could not back up " + target.getFileName() + ": " + e);
-        }
-    }
-
-    private static void deleteQuietly(Path file) {
-        try { Files.deleteIfExists(file); } catch (IOException ignored) { /* nothing more to do */ }
     }
 }

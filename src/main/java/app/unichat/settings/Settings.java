@@ -1,6 +1,8 @@
 package app.unichat.settings;
 
+import app.unichat.support.BackgroundWriter;
 import app.unichat.support.Os;
+import app.unichat.support.SafeFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -14,6 +16,8 @@ import java.util.Properties;
  * ({@code session.properties}, see {@link #staysOnThisMachine}), in the per-OS app data folder:
  * Windows {@code %APPDATA%\Unichat}, macOS {@code ~/Library/Application Support/Unichat},
  * Linux {@code $XDG_CONFIG_HOME/unichat}.
+ * A change never waits for the disk: it's written on a thread of its own, once for many changes in a row
+ * ({@link #flush} waits for it, and quitting must call it).
  */
 public final class Settings {
     public enum Theme { SYSTEM, LIGHT, DARK }
@@ -38,6 +42,8 @@ public final class Settings {
     private final Properties props = new Properties();
     /** Session, secrets and per-machine state (see {@link #staysOnThisMachine}); never copied. */
     private final Properties machine = new Properties();
+    /** set() runs on the UI thread, and every reader needs this lock: the files are written and synced off both. */
+    private final BackgroundWriter writer = new BackgroundWriter("settings-save", this, this::writeOnce);
 
     Settings(Path dir) {
         this.dir = dir;
@@ -140,23 +146,43 @@ public final class Settings {
         return true;
     }
 
-    /** Writes session.properties first, then settings.properties; each through a temp file, so a failure keeps the old one. */
-    public synchronized void save() {
+    /** Saves on the writer's thread; see {@link #writeOnce}. */
+    private void save() { writer.request(); }
+
+    /**
+     * Returns once every change so far is on disk, or failed to be (logged as ever): for quitting and for tests that read
+     * the files. Blocks, so never on the UI thread during normal use.
+     */
+    public void flush() { writer.flush(); }
+
+    /**
+     * A copy under the lock, the disk outside it: session.properties first, then settings.properties; each through a
+     * temp file, so a failure keeps the old one.
+     */
+    private void writeOnce() {
+        Properties session = null, portable = null;
+        synchronized (this) {
+            if ((!machine.isEmpty() || Files.exists(sessionFile)) && readable(sessionFile, machine)) session = copy(machine);
+            if (readable(file, props)) portable = copy(props);
+        }
         try {
-            Files.createDirectories(dir);
-            if ((!machine.isEmpty() || Files.exists(sessionFile)) && readable(sessionFile, machine)) {
-                write(sessionFile, machine, "Unichat session and secrets: do not copy to another computer", true);
-            }
-            if (readable(file, props)) write(file, props, "Unichat settings", false);
+            if (session != null) write(sessionFile, session, "Unichat session and secrets: do not copy to another computer", true);
+            if (portable != null) write(file, portable, "Unichat settings", false);
         } catch (IOException e) {
             System.err.println("Could not save settings: " + e);
         }
     }
 
+    private static Properties copy(Properties from) {
+        Properties copy = new Properties();
+        copy.putAll(from);
+        return copy;
+    }
+
     private void write(Path target, Properties from, String comment, boolean ownerOnly) throws IOException {
         ByteArrayOutputStream content = new ByteArrayOutputStream();
         from.store(content, comment);
-        SyncedFile.replace(target, content.toByteArray(), ownerOnly);
+        SafeFile.replace(target, content.toByteArray(), ownerOnly);
     }
 
     /** The settings that may travel to another computer (none of this one's: those are apart). */

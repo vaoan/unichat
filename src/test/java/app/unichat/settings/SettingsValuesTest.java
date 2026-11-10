@@ -42,6 +42,7 @@ class SettingsValuesTest {
         s.set("privacy.readReceipts", "false");
         assertEquals(Settings.ReadReceipts.NEVER, s.readReceipts());
         s.setReadReceipts(Settings.ReadReceipts.ON_REPLY);
+        s.flush();
         assertEquals(Settings.ReadReceipts.ON_REPLY, new Settings(dir).readReceipts());
     }
 
@@ -61,7 +62,9 @@ class SettingsValuesTest {
 
     @Test
     void theWindowsPlaceStaysOnThisMachine() throws Exception {
-        new Settings(dir).setWindowGeometry(800, 600, 10, 20);
+        Settings s = new Settings(dir);
+        s.setWindowGeometry(800, 600, 10, 20);
+        s.flush();
         assertTrue(Files.readString(dir.resolve("session.properties")).contains("window.width=800.0"));
         assertFalse(Files.exists(dir.resolve("settings.properties")) && Files.readString(dir.resolve("settings.properties")).contains("window."));
         assertEquals(20.0, new Settings(dir).getDouble("window.y", 0));

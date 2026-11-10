@@ -41,7 +41,7 @@ final class PartFile {
                 List<String> command = way.command(part);
                 if (command != null && Processes.quiet(command, null, timeoutSeconds).ok() && Files.isRegularFile(part)
                         && Files.size(part) > 0) {
-                    Files.move(part, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                    Files.move(part, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); // a program wrote the part: lesson-ok: atomic-move
                     return out;
                 }
             }

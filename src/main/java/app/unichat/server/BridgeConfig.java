@@ -1,7 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgePorts;
-import app.unichat.settings.SyncedFile;
+import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -52,7 +52,7 @@ public final class BridgeConfig {
      */
     public static void rewrite(Path file, Settings s) throws IOException {
         ObjectNode c = read(Files.readString(file));
-        SyncedFile.replace(file, YAML.writeValueAsBytes(apply(c, s)), true);
+        SafeFile.replace(file, YAML.writeValueAsBytes(apply(c, s)), true);
     }
 
     public static ObjectNode apply(ObjectNode c, Settings s) {

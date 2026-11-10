@@ -32,7 +32,8 @@ class LessonsTest {
             Map.entry("test-future-join", new String[] {"src/test/java/X.java", "        svc.send(m).join();"}), // lesson-ok: test-future-join
             Map.entry("own-process", new String[] {"src/main/java/app/unichat/stt/X.java", "        Process p = new ProcessBuilder(cmd).start();"}),
             Map.entry("fx-coalesce-by-hand", new String[] {"src/main/java/app/unichat/ui/X.java",
-                    "        if (scheduled.compareAndSet(false, true)) Platform.runLater(() -> {"}));
+                    "        if (scheduled.compareAndSet(false, true)) Platform.runLater(() -> {"}),
+            Map.entry("atomic-move", new String[] {"src/main/java/X.java", "        Files.move(tmp, file, REPLACE_EXISTING, ATOMIC_MOVE);"}));
 
     @Test
     void theRepositoryKeepsEveryLesson() throws IOException {

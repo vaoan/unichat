@@ -1,6 +1,7 @@
 package app.unichat.assist;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -8,7 +9,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -134,10 +134,7 @@ public final class WritingStyle {
     /** Through a .part file, so a crash never leaves half a file. */
     private static void write(Path f, String text) {
         try {
-            Files.createDirectories(f.getParent());
-            Path part = f.resolveSibling(f.getFileName() + ".part");
-            Files.writeString(part, text, StandardCharsets.UTF_8);
-            Files.move(part, f, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            SafeFile.at(f, ".part").write(text.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             System.err.println("Could not save " + f.getFileName() + ": " + e.getClass().getSimpleName());
         }

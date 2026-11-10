@@ -80,7 +80,7 @@ A large window is split by what each piece does, not by screens:
 
 ## Saving preferences
 
-`PreferencesFile` doesn't write on the thread of whoever changes something: it copies the state under its lock and writes on a daemon thread, once for many changes in a row. `ChatSession.stop()` waits for that write, and `stop()` is reached on quitting (`UnichatApp.quit`, also from `MacQuit`), on logging out and from a shutdown hook.
+`PreferencesFile` and `Settings` don't write on the thread of whoever changes something: each copies its state under its lock and writes on a daemon thread, once for many changes in a row (`support/BackgroundWriter`). `ChatSession.stop()` waits for the preferences' write, and `stop()` is reached on quitting (`UnichatApp.quit`, also from `MacQuit`), on logging out and from a shutdown hook. `Settings.flush()` is the last thing `Shutdown.stopThenEnd` does before the end, and the shutdown hook calls it too. Every file is put in place by `support/SafeFile` (temp beside it, fsync, rename; the temp removed on failure).
 
 ## Code limits
 

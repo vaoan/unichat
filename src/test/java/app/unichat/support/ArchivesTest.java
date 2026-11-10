@@ -15,6 +15,7 @@ import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ArchivesTest {
@@ -64,6 +65,23 @@ class ArchivesTest {
         assertTrue(Archives.extractOne(zip, "uv.exe", target));
         assertEquals("right", Files.readString(target));
         assertFalse(Archives.extractOne(zip, "python.exe", dir.resolve("p.exe")));
+    }
+
+    /** An archive cut short replaces nothing and leaves no temp file behind. */
+    @Test
+    void aCutShortArchiveKeepsTheOldProgramAndLeavesNoTemp() throws IOException {
+        byte[] noise = new byte[200_000];
+        new java.util.Random(7).nextBytes(noise);
+        ByteArrayOutputStream whole = new ByteArrayOutputStream();
+        try (ZipOutputStream z = new ZipOutputStream(whole)) {
+            z.putNextEntry(new ZipEntry("uv.exe"));
+            z.write(noise);
+        }
+        Path zip = Files.write(dir.resolve("cut.zip"), java.util.Arrays.copyOf(whole.toByteArray(), whole.size() / 2));
+        Path target = Files.writeString(dir.resolve("uv.exe"), "the old one");
+        assertThrows(IOException.class, () -> Archives.extractOne(zip, "uv.exe", target));
+        assertEquals("the old one", Files.readString(target));
+        assertFalse(Files.exists(dir.resolve("uv.exe.part")));
     }
 
     /** A ustar header (the reader needs only name, size and type) and the data padded to 512. */

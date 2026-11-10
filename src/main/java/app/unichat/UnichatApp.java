@@ -124,6 +124,7 @@ public final class UnichatApp extends Application {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             ChatService svc = service;
             if (svc != null) svc.stop();
+            Settings.get().flush(); // last: stopping may still change a setting
         }, "preferences-shutdown"));
         LogFiles.scheduleCleanup();
         if (s.localServer()) startLocalServer();

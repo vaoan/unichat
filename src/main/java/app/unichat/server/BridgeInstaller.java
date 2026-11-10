@@ -1,11 +1,11 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgePorts;
-import app.unichat.settings.SyncedFile;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
 import app.unichat.support.Processes;
 import app.unichat.support.Redactor;
+import app.unichat.support.SafeFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -66,9 +66,9 @@ final class BridgeInstaller {
         if (!Files.exists(reg)) run(bd, command(b, "-g", "-c", "config.yaml", "-r", "registration.yaml"));
         // The bridge writes these with the default mode (and -g puts the tokens in config.yaml): only the person's.
         byte[] registration = Files.readAllBytes(reg);
-        SyncedFile.replace(reg, registration, true);
-        SyncedFile.replace(config, Files.readAllBytes(config), true);
-        SyncedFile.replace(dir.resolve("appservices").resolve(b + ".yaml"), registration, true);
+        SafeFile.replace(reg, registration, true);
+        SafeFile.replace(config, Files.readAllBytes(config), true);
+        SafeFile.replace(dir.resolve("appservices").resolve(b + ".yaml"), registration, true);
     }
 
     private void generateConfig(String b, Path bd, Path config) throws IOException, InterruptedException {

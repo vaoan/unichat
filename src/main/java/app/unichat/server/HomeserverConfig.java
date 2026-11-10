@@ -1,6 +1,6 @@
 package app.unichat.server;
 
-import app.unichat.settings.SyncedFile;
+import app.unichat.support.SafeFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -15,7 +15,7 @@ final class HomeserverConfig {
     static void write(Path dataDir, int port, String domain, String registrationToken) throws IOException {
         Path hs = dataDir.resolve("tuwunel");
         Files.createDirectories(hs.resolve("db"));
-        SyncedFile.replace(hs.resolve("tuwunel.toml"), toml(dataDir, port, domain, registrationToken).getBytes(StandardCharsets.UTF_8), true);
+        SafeFile.replace(hs.resolve("tuwunel.toml"), toml(dataDir, port, domain, registrationToken).getBytes(StandardCharsets.UTF_8), true);
     }
 
     /**
@@ -36,7 +36,7 @@ final class HomeserverConfig {
                     - regex: '@.*:%s'
                       exclusive: false
                 """.formatted(asToken, ServerSecrets.random(48), domain).getBytes(StandardCharsets.UTF_8);
-        SyncedFile.replace(f, content, true);
+        SafeFile.replace(f, content, true);
     }
 
     static String toml(Path dataDir, int port, String domain, String registrationToken) {

@@ -321,7 +321,7 @@ public final class AutoSave implements ChatService.Listener {
         Path target = FileNames.free(dir, FileNames.forSaving(m, ZoneId.systemDefault()));
         Path part = dir.resolve("." + target.getFileName() + ".part");
         Files.copy(downloaded[0], part, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
-        Files.move(part, target, StandardCopyOption.ATOMIC_MOVE);
+        Files.move(part, target, StandardCopyOption.ATOMIC_MOVE); // lesson-ok: atomic-move (never replaces: the name was chosen free)
         MarkOfTheWeb.mark(target);
         return true;
     }

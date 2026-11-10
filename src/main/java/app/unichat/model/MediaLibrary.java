@@ -189,7 +189,7 @@ public final class MediaLibrary {
             Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
             JSON.writeValue(tmp.toFile(), root);
-            Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE); // lesson-ok: atomic-move (model may not use support)
         } catch (IOException e) {
             System.err.println("Could not save the media library: " + e);
         }

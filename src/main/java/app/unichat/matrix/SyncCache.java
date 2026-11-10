@@ -1,8 +1,8 @@
 package app.unichat.matrix;
 
 import app.unichat.settings.Settings;
-import app.unichat.settings.SyncedFile;
 import app.unichat.support.Hashes;
+import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -91,7 +91,7 @@ final class SyncCache {
             synchronized (proc) {
                 for (MatrixRoom r : proc.rooms()) if (r.chat.bridgeBot()) botRoomIds.add(r.id);
             }
-            SyncedFile.replace(f, MatrixClient.JSON.writeValueAsBytes(redact(fullSync, botRoomIds)), true);
+            SafeFile.replace(f, MatrixClient.JSON.writeValueAsBytes(redact(fullSync, botRoomIds)), true);
         } catch (Exception e) {
             System.err.println("Could not save sync cache: " + e);
         }

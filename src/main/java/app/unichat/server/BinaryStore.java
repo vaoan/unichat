@@ -2,11 +2,11 @@ package app.unichat.server;
 
 import app.unichat.support.Downloads;
 import app.unichat.support.Processes;
+import app.unichat.support.SafeFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.function.Function;
 
@@ -62,10 +62,9 @@ public final class BinaryStore {
         Path target = path(name);
         if (Files.isExecutable(target) && version.equals(installedVersion(name))) return target;
         Files.createDirectories(bin);
-        Path part = bin.resolve(target.getFileName() + ".part");
-        Files.copy(source, part, StandardCopyOption.REPLACE_EXISTING);
-        part.toFile().setExecutable(true, true);
-        Files.move(part, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        try (var in = Files.newInputStream(source)) {
+            SafeFile.at(target, ".part").beforeMove(part -> part.toFile().setExecutable(true, true)).copy(in);
+        }
         Files.writeString(bin.resolve(name + ".version"), version);
         return target;
     }

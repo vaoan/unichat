@@ -1,12 +1,12 @@
 package app.unichat.service;
 
+import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -297,9 +297,7 @@ public final class UploadQueue {
                 Files.deleteIfExists(store);
                 return;
             }
-            Path tmp = store.resolveSibling(store.getFileName() + ".tmp");
-            JSON.writeValue(tmp.toFile(), left.stream().map(Saved::of).toList());
-            Files.move(tmp, store, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            SafeFile.at(store).write(out -> JSON.writeValue(out, left.stream().map(Saved::of).toList()));
         } catch (IOException e) {
             System.err.println("Could not keep the batch on disk: " + e);
         }

@@ -1,6 +1,7 @@
 package app.unichat.autosave;
 
 import app.unichat.model.Message;
+import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -8,7 +9,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -125,10 +125,7 @@ final class SavedUpTo {
             n.put("start", b.start());
         });
         try {
-            Files.createDirectories(file.getParent());
-            Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-            JSON.writeValue(tmp.toFile(), root);
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            SafeFile.at(file).write(out -> JSON.writeValue(out, root));
         } catch (IOException e) {
             System.err.println("Auto-save: couldn't keep where it got to: " + e.getMessage());
         }

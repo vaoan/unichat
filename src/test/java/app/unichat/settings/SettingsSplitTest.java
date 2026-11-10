@@ -16,6 +16,20 @@ class SettingsSplitTest {
 
     private String read(String name) throws IOException { return Files.readString(dir.resolve(name)); }
 
+    /**
+     * A change never waits for the disk: set() ran on the UI thread and wrote and synced two files holding the lock
+     * every reader needs. Holding that lock here, the writer can't have written anything yet.
+     */
+    @Test void aChangeIsWrittenOffTheCallersThreadAndFlushWaitsForIt() throws IOException {
+        var s = new Settings(dir);
+        synchronized (s) {
+            s.set("ui.theme", "DARK");
+            assertFalse(Files.exists(dir.resolve("settings.properties")), "written by the caller, holding the lock");
+        }
+        s.flush();
+        assertTrue(read("settings.properties").contains("ui.theme=DARK"));
+    }
+
     @Test void machineKeysLiveApart() throws IOException {
         var s = new Settings(dir);
         s.setMatrixSession("https://h", "@a:h", "TOKEN", "DEV");
@@ -25,6 +39,7 @@ class SettingsSplitTest {
         s.set("discord.guilds.paused", "1");
         s.set("window.width", "900");
         s.set("app.update.lastCheck", "1");
+        s.flush();
         assertFalse(read("settings.properties").contains("TOKEN"));
         assertTrue(read("settings.properties").contains("ui.theme"));
         assertTrue(read("settings.properties").contains("gif.tenor.enabled"));
@@ -45,6 +60,7 @@ class SettingsSplitTest {
         var s = new Settings(dir);
         s.setSttCommand("/usr/local/bin/whisper {file}");
         s.set("stt.engine", "CUSTOM");
+        s.flush();
         assertFalse(read("settings.properties").contains("stt."));
         assertTrue(read("session.properties").contains("stt.command"));
         assertEquals("/usr/local/bin/whisper {file}", new Settings(dir).sttCommand());
@@ -55,6 +71,7 @@ class SettingsSplitTest {
         Files.writeString(dir.resolve("settings.properties.docker-backup"), "matrix.accessToken=OLD\n");
         for (int i = 0; i < 2; i++) {
             var s = new Settings(dir);
+            s.flush();
             assertEquals("TOKEN", s.accessToken());
             assertEquals("DARK", s.getString("ui.theme", null));
             assertTrue(read("session.properties").contains("TOKEN"));
@@ -69,6 +86,7 @@ class SettingsSplitTest {
         Files.writeString(dir.resolve("session.properties"), "matrix.accessToken=NEW\n");
         Files.writeString(dir.resolve("settings.properties"), "matrix.accessToken=OLD\nui.theme=DARK\n");
         var s = new Settings(dir);
+        s.flush();
         assertEquals("NEW", s.accessToken());
         assertFalse(read("settings.properties").contains("matrix.accessToken"));
         assertEquals("NEW", new Settings(dir).accessToken());
@@ -77,10 +95,14 @@ class SettingsSplitTest {
     @Test void aFailedSaveKeepsThePreviousFile() throws IOException {
         var s = new Settings(dir);
         s.set("ui.theme", "DARK");
+        s.flush();
         String before = read("settings.properties");
         assumeTrue(dir.toFile().setWritable(false) && !Files.isWritable(dir));
         try {
-            assertDoesNotThrow(() -> s.set("ui.theme", "LIGHT"));
+            assertDoesNotThrow(() -> {
+                s.set("ui.theme", "LIGHT");
+                s.flush();
+            });
             assertEquals(before, read("settings.properties"));
         } finally {
             dir.toFile().setWritable(true);
@@ -91,7 +113,9 @@ class SettingsSplitTest {
         assumeTrue(dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
         Path leftover = Files.writeString(dir.resolve("session.properties.tmp"), "old");
         Files.setPosixFilePermissions(leftover, PosixFilePermissions.fromString("rw-r--r--"));
-        new Settings(dir).setMatrixSession("https://h", "@a:h", "TOKEN", null);
+        var s = new Settings(dir);
+        s.setMatrixSession("https://h", "@a:h", "TOKEN", null);
+        s.flush();
         assertEquals("rw-------", PosixFilePermissions.toString(Files.getPosixFilePermissions(dir.resolve("session.properties"))));
         assertFalse(Files.exists(leftover));
     }
@@ -100,7 +124,9 @@ class SettingsSplitTest {
         assumeTrue(dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
         Path elsewhere = Files.writeString(dir.resolve("elsewhere"), "");
         Files.createSymbolicLink(dir.resolve("session.properties.tmp"), elsewhere);
-        new Settings(dir).setMatrixSession("https://h", "@a:h", "TOKEN", null);
+        var s = new Settings(dir);
+        s.setMatrixSession("https://h", "@a:h", "TOKEN", null);
+        s.flush();
         assertEquals("", Files.readString(elsewhere));
         assertTrue(read("session.properties").contains("TOKEN"));
     }
@@ -108,7 +134,10 @@ class SettingsSplitTest {
     @Test void clearSessionEmptiesTheSessionFile() throws IOException {
         var s = new Settings(dir);
         s.setMatrixSession("https://h", "@a:h", "TOKEN", null);
+        s.flush();
+        assertTrue(read("session.properties").contains("TOKEN"));
         s.clearSession();
+        s.flush();
         assertFalse(read("session.properties").contains("TOKEN"));
         assertNull(new Settings(dir).accessToken());
     }
@@ -128,6 +157,7 @@ class SettingsSplitTest {
         var s = new Settings(dir);
         s.set("ui.accent", "#123456");
         s.set("window.width", "900");
+        s.flush();
         Files.setPosixFilePermissions(settings, open);
         Files.setPosixFilePermissions(session, open);
         assertEquals("DARK", new Settings(dir).getString("ui.theme", null));
@@ -138,6 +168,7 @@ class SettingsSplitTest {
         var later = new Settings(dir);
         Files.setPosixFilePermissions(settings, open);
         later.set("ui.accent", "#654321");
+        later.flush();
         var again = new Settings(dir);
         assertEquals("DARK", again.getString("ui.theme", null));
         assertEquals("#654321", again.getString("ui.accent", null));

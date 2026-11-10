@@ -1,10 +1,10 @@
 package app.unichat.cloud;
 
+import app.unichat.support.SafeFile;
+
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 
 /**
  * The person's storage, however it's reached: WebDAV ({@link WebDav}: Icedrive, Nextcloud…) or pCloud's own API
@@ -44,12 +44,8 @@ public interface Storage {
 
     /** {@code in} into {@code target} as {@link #get(String, Path)} says: through a hidden ".part", renamed once whole. */
     static void save(InputStream in, Path target) throws IOException {
-        Path part = target.resolveSibling("." + target.getFileName() + ".part");
         try (in) {
-            Files.copy(in, part, StandardCopyOption.REPLACE_EXISTING);
-            Files.move(part, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } finally {
-            Files.deleteIfExists(part);
+            SafeFile.at(target, ".part").hidden().copy(in);
         }
     }
 

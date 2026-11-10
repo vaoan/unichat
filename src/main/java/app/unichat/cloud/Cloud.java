@@ -2,12 +2,12 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
+import app.unichat.support.SafeFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -259,9 +259,7 @@ public final class Cloud {
 
     private static void write(Path file, String text) {
         try {
-            Path tmp = file.resolveSibling(file.getFileName() + ".cloud");
-            Files.writeString(tmp, text, StandardCharsets.UTF_8);
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            SafeFile.at(file, ".cloud").write(text.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }

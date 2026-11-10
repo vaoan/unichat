@@ -127,7 +127,7 @@ final class MatrixClient {
             try {
                 if (progress == null || size <= 0) Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
                 else copyTelling(in, tmp, size, progress);
-                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); // lesson-ok: atomic-move (the progress copy writes the temp)
             } catch (IOException | RuntimeException e) {
                 // Cut short (network gone, interrupted): the half file is never finished, and its name is this thread's.
                 Files.deleteIfExists(tmp);

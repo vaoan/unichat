@@ -1,7 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgeStates;
-import app.unichat.settings.SyncedFile;
+import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -198,6 +198,6 @@ final class MetaSessions implements Watchdog.SessionKeeper {
 
     /** As private as the database it comes from; written whole, so a crash can't leave half a session. */
     private void write(String bridge, Map<String, JsonNode> copy) throws IOException {
-        SyncedFile.replace(backupFile(bridge), JSON.writeValueAsBytes(copy), true);
+        SafeFile.replace(backupFile(bridge), JSON.writeValueAsBytes(copy), true);
     }
 }

@@ -7,7 +7,7 @@ You review Unichat's code (Java 25 + JavaFX). Read the root `CLAUDE.md`, `docs/A
 
 Scope: what you were asked (default: `git diff HEAD` plus untracked files). Report only what you verified in the code:
 1. Bugs: wrong behaviour, races (state shared across threads, the FX thread, `synchronized` held over I/O), leaks (listeners never removed, streams and processes not closed or drained), swallowed errors that hide a failure.
-2. DRY: logic that already exists elsewhere (grep `support/`, `ui/Nodes`, `ui/ListRows`, `model/MimeTypes`, `settings/SyncedFile` first). Name both places.
+2. DRY: logic that already exists elsewhere (grep `support/`, `ui/Nodes`, `ui/ListRows`, `model/MimeTypes`, `support/SafeFile` first). Name both places.
 3. SOLID/KISS: a class taking a second responsibility, a layer added "just in case", dead code (grep for callers).
 4. The repo's rules: a fix without a test that fails without it; a test that waits on time (`src/test/CLAUDE.md`); a user-facing text not through `I18n`; a control without an accessible text; a new connection not in `docs/PRIVACY.md`.
 
