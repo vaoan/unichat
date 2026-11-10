@@ -112,4 +112,34 @@ class SettingsSplitTest {
         assertFalse(read("session.properties").contains("TOKEN"));
         assertNull(new Settings(dir).accessToken());
     }
+
+    /**
+     * A file that couldn't be read at start (antivirus or OneDrive holding it a moment on Windows) was taken as empty,
+     * and the first setting changed wrote that emptiness over it: logged out, every choice gone.
+     */
+    @Test void aFileThatCouldntBeReadIsNeverWrittenOver() throws IOException {
+        assumeTrue(dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
+        Path settings = Files.writeString(dir.resolve("settings.properties"), "ui.theme=DARK\n");
+        Path session = Files.writeString(dir.resolve("session.properties"), "matrix.accessToken=TOKEN\n");
+        var locked = PosixFilePermissions.fromString("---------");
+        var open = PosixFilePermissions.fromString("rw-------");
+        Files.setPosixFilePermissions(settings, locked);
+        Files.setPosixFilePermissions(session, locked);
+        var s = new Settings(dir);
+        s.set("ui.accent", "#123456");
+        s.set("window.width", "900");
+        Files.setPosixFilePermissions(settings, open);
+        Files.setPosixFilePermissions(session, open);
+        assertEquals("DARK", new Settings(dir).getString("ui.theme", null));
+        assertEquals("TOKEN", new Settings(dir).accessToken());
+
+        // Readable again by the next save: what was there and what changed meanwhile, both kept.
+        Files.setPosixFilePermissions(settings, locked);
+        var later = new Settings(dir);
+        Files.setPosixFilePermissions(settings, open);
+        later.set("ui.accent", "#654321");
+        var again = new Settings(dir);
+        assertEquals("DARK", again.getString("ui.theme", null));
+        assertEquals("#654321", again.getString("ui.accent", null));
+    }
 }

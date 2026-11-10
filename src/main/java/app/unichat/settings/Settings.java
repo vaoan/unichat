@@ -106,23 +106,48 @@ public final class Settings {
     public Path dir() { return dir; }
     public Path cacheDir() { return dir.resolve("cache"); }
 
-    private static void load(Path from, Properties into) {
+    /**
+     * Files there that couldn't be read (on Windows an antivirus or OneDrive holds one for a moment): taken as empty,
+     * the next save would write that emptiness over the session and every setting.
+     */
+    private final java.util.Set<Path> unread = new java.util.HashSet<>();
+
+    private void load(Path from, Properties into) {
         if (!Files.exists(from)) return;
         try (InputStream in = Files.newInputStream(from)) {
             into.load(in);
         } catch (IOException e) {
+            unread.add(from);
             System.err.println("Could not read settings: " + e);
         }
+    }
+
+    /**
+     * Whether {@code target} may be written: yes unless it couldn't be read; then it is read again, and what it holds
+     * joins what changed meanwhile (which wins). Still unreadable: left alone.
+     */
+    private boolean readable(Path target, Properties into) {
+        if (!unread.contains(target)) return true;
+        Properties there = new Properties();
+        try (InputStream in = Files.newInputStream(target)) {
+            there.load(in);
+        } catch (IOException e) {
+            System.err.println("Settings not saved, " + target.getFileName() + " still can't be read: " + e);
+            return false;
+        }
+        there.forEach(into::putIfAbsent);
+        unread.remove(target);
+        return true;
     }
 
     /** Writes session.properties first, then settings.properties; each through a temp file, so a failure keeps the old one. */
     public synchronized void save() {
         try {
             Files.createDirectories(dir);
-            if (!machine.isEmpty() || Files.exists(sessionFile)) {
+            if ((!machine.isEmpty() || Files.exists(sessionFile)) && readable(sessionFile, machine)) {
                 write(sessionFile, machine, "Unichat session and secrets: do not copy to another computer", true);
             }
-            write(file, props, "Unichat settings", false);
+            if (readable(file, props)) write(file, props, "Unichat settings", false);
         } catch (IOException e) {
             System.err.println("Could not save settings: " + e);
         }
