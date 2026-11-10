@@ -38,6 +38,17 @@ final class MediaDownloader {
                 url -> Hashes.sha256(cacheKey(url, 0, 0)), io, 60);
     }
 
+    /**
+     * The {@code file:} addresses this computer may open: only files we sent (their local echo). A message's address is
+     * its sender's to choose, so any other {@code file:} one, a file of this computer or a share on another, is refused.
+     */
+    private final java.util.Set<String> ownFiles = ConcurrentHashMap.newKeySet();
+
+    /** {@code file} is one we are sending: its message shows it from disk until the server has it. */
+    void ownFile(Path file) {
+        ownFiles.add(file.toUri().toString());
+    }
+
     /** Who wants to know how far each download in flight got, by its cache key. */
     private final Map<String, java.util.List<java.util.function.DoubleConsumer>> watching = new ConcurrentHashMap<>();
 
@@ -56,7 +67,10 @@ final class MediaDownloader {
     /** The local file of {@code url}: from the cache, or downloaded once however many ask at the same time. */
     CompletableFuture<Path> media(String url, int width, int height) {
         if (url == null || url.isBlank()) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
-        if (url.startsWith("file:")) return CompletableFuture.completedFuture(Path.of(URI.create(url)));
+        if (url.startsWith("file:")) {
+            return ownFiles.contains(url) ? CompletableFuture.completedFuture(Path.of(URI.create(url)))
+                    : CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
+        }
         Path own = saved.find(url);
         if (own != null) return CompletableFuture.completedFuture(own);
         String key = cacheKey(url, width, height);

@@ -56,6 +56,9 @@ public final class Settings {
                 || key.startsWith("app.update.")
                 // Folders where chats' things are saved, and the AI's folder: paths of this computer.
                 || key.startsWith("autosave.") || key.equals("ai.folder")
+                // A command this computer runs, and the engine that says to run it: from the cloud, anyone able to
+                // write there would choose what runs here.
+                || key.equals("stt.command") || key.equals("stt.engine")
                 // The cloud account: its login, and what this computer last agreed on with it.
                 || key.startsWith("cloud.")
                 // Whether this computer's Telegram bridge already re-synced its chats: a marker, not a choice.

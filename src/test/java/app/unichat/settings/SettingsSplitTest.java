@@ -37,6 +37,19 @@ class SettingsSplitTest {
         assertEquals("DARK", new Settings(dir).getString("ui.theme", null));
     }
 
+    /**
+     * The transcription command is run as it is: kept in the portable settings it went to the person's cloud, where
+     * anyone able to write there chose what every computer of theirs runs (and a Mac's command broke Windows).
+     */
+    @Test void aCommandThisComputerRunsNeverTravels() throws IOException {
+        var s = new Settings(dir);
+        s.setSttCommand("/usr/local/bin/whisper {file}");
+        s.set("stt.engine", "CUSTOM");
+        assertFalse(read("settings.properties").contains("stt."));
+        assertTrue(read("session.properties").contains("stt.command"));
+        assertEquals("/usr/local/bin/whisper {file}", new Settings(dir).sttCommand());
+    }
+
     @Test void anOldFileIsMigratedOnceAndTwiceIsHarmless() throws IOException {
         Files.writeString(dir.resolve("settings.properties"), "matrix.accessToken=TOKEN\nui.theme=DARK\n");
         Files.writeString(dir.resolve("settings.properties.docker-backup"), "matrix.accessToken=OLD\n");

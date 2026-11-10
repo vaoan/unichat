@@ -37,7 +37,8 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
     ports:
-      - "8008:8008"
+      # Only this machine: on all interfaces anyone on the same Wi-Fi could reach the homeserver.
+      - "127.0.0.1:8008:8008"
     volumes:
       # Bridge registrations are copied to ./data/synapse/appservices by setup.
       - ./data/synapse:/data

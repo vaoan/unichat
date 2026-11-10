@@ -13,8 +13,9 @@ on:
       - src/main/resources/app/unichat/server/versions.env
       - .github/workflows/natives.yml
 
+# Read-only for the jobs that build third-party code (their build scripts run with this token): only publish writes.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: natives
@@ -30,6 +31,8 @@ jobs:
       tuwunel: ${{ steps.plan.outputs.tuwunel }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - id: plan
         env:
           GH_TOKEN: ${{ github.token }}
@@ -68,6 +71,7 @@ jobs:
         with:
           repository: ${{ matrix.bridge.repo }}
           ref: ${{ matrix.bridge.tag }}
+          persist-credentials: false
           path: src
       - uses: actions/setup-go@v6
         with:
@@ -124,6 +128,7 @@ jobs:
         with:
           repository: matrix-construct/tuwunel
           ref: ${{ needs.plan.outputs.tuwunel }}
+          persist-credentials: false
       - name: Rust (the version in rust-toolchain.toml)
         run: rustup toolchain install || rustup show
       - uses: Swatinem/rust-cache@v2
@@ -168,6 +173,8 @@ jobs:
   publish:
     needs: [plan, smoke-windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v5
         with:

@@ -84,10 +84,8 @@ class SyncedSettingsUiTest {
         p.put("ai.learnStyle", new Proof("false", AiSettings::learnStyle, false));
         p.put("ai.readySound", new Proof("BELL", () -> AiSettings.readyTone().name(), "BELL"));
         p.put("ai.readyVolume", new Proof("30", AiSettings::readyVolume, 30));
-        p.put("stt.engine", new Proof("CUSTOM", () -> app.unichat.stt.SttSettings.engine().name(), "CUSTOM"));
         p.put("stt.model", new Proof("BASE", () -> app.unichat.stt.SttSettings.model().name(), "BASE"));
         p.put("stt.language", new Proof("en", () -> Settings.get().sttLanguage(), "en"));
-        p.put("stt.command", new Proof("whisper {archivo}", () -> Settings.get().sttCommand(), "whisper {archivo}"));
         p.put("voice.enhance", new Proof("false", app.unichat.voice.VoiceEnhancer::enabled, false));
         p.put("video.ffmpegAuto", new Proof("false", app.unichat.video.Ffmpeg::autoInstall, false));
         p.put("cloak.level", new Proof("HIGH", () -> Settings.get().getString("cloak.level", null), "HIGH"));

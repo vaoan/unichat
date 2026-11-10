@@ -334,6 +334,7 @@ final class MessageSender {
             return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("send.unreadableFile")));
         }
         int[] wh = kind.width() > 0 ? new int[]{kind.width(), kind.height()} : type == MessageType.IMAGE ? imageSize(file) : new int[]{0, 0};
+        media.ownFile(file);
         synchronized (proc) {
             proc.addLocalEcho(chatId, txn, m -> {
                 m.setType(type);
