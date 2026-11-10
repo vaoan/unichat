@@ -139,10 +139,41 @@ final class Recovery {
             pool.setCollectionUsageThreshold((long) (max * NEARLY_FULL));
         }
         ((NotificationEmitter) ManagementFactory.getMemoryMXBean()).addNotificationListener((n, h) -> {
-            if (MemoryNotificationInfo.MEMORY_COLLECTION_THRESHOLD_EXCEEDED.equals(n.getType())) {
-                restart("memory still nearly full after a collection");
+            if (!MemoryNotificationInfo.MEMORY_COLLECTION_THRESHOLD_EXCEEDED.equals(n.getType()) || !CHECKING.compareAndSet(false, true)) return;
+            try {
+                MemoryPoolMXBean old = oldGeneration();
+                if (old != null && reallyFull(System::gc, () -> old.getUsage().getUsed(), old.getCollectionUsageThreshold())) {
+                    restart("memory still nearly full after a full collection");
+                } else {
+                    System.err.println("Memory: the old generation was mostly garbage; collected, not restarting.");
+                }
+            } finally {
+                CHECKING.set(false);
             }
         }, null, null);
+    }
+
+    /** One check at a time: a full collection can bring more notifications while it runs. */
+    private static final AtomicBoolean CHECKING = new AtomicBoolean();
+
+    /**
+     * Whether the heap is really nearly full: G1 measures the old generation after young collections too, which leave
+     * its garbage (only a mixed or full cycle sweeps it), so the threshold alone took garbage for use and restarted
+     * Unichat for nothing. A full collection ({@code collectAll}, a short pause, only when the threshold is crossed) decides.
+     */
+    static boolean reallyFull(Runnable collectAll, java.util.function.LongSupplier usedAfter, long limit) {
+        collectAll.run();
+        return usedAfter.getAsLong() >= limit;
+    }
+
+    private static MemoryPoolMXBean oldGeneration() {
+        for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
+            if (pool.getType() == MemoryType.HEAP && pool.isCollectionUsageThresholdSupported()
+                    && pool.getName().toLowerCase().contains("old") && pool.getCollectionUsageThreshold() > 0) {
+                return pool;
+            }
+        }
+        return null;
     }
 
     private static String threads() {

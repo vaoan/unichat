@@ -51,4 +51,19 @@ class RecoveryTest {
         assertTrue(Recovery.fatal(new StackOverflowError()));
         assertFalse(Recovery.fatal(new IllegalStateException("a bug in one thread")));
     }
+
+    /**
+     * Unichat restarted itself three times in a day on "memory still nearly full after a collection" while what it held
+     * was ~160 MB: G1 measures the old generation after young collections too, which leave its garbage (swept only by a
+     * mixed or full cycle), so 95 % "used" was mostly garbage. A full collection decides first.
+     */
+    @Test
+    void garbageInTheOldGenerationIsCollectedNotRestartedFor() {
+        java.util.concurrent.atomic.AtomicInteger collections = new java.util.concurrent.atomic.AtomicInteger();
+        long[] used = {950};
+        assertFalse(Recovery.reallyFull(() -> { collections.incrementAndGet(); used[0] = 160; }, () -> used[0], 950),
+                "mostly garbage: collected, no restart");
+        assertEquals(1, collections.get(), "a full collection ran first");
+        assertTrue(Recovery.reallyFull(() -> used[0] = 960, () -> used[0], 950), "still full after it: restart");
+    }
 }
