@@ -124,9 +124,15 @@ final class MatrixClient {
             Files.createDirectories(target.getParent());
             Path tmp = target.resolveSibling(target.getFileName() + ".part" + Thread.currentThread().threadId());
             long size = resp.headers().firstValueAsLong("Content-Length").orElse(-1);
-            if (progress == null || size <= 0) Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
-            else copyTelling(in, tmp, size, progress);
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            try {
+                if (progress == null || size <= 0) Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
+                else copyTelling(in, tmp, size, progress);
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (IOException | RuntimeException e) {
+                // Cut short (network gone, interrupted): the half file is never finished, and its name is this thread's.
+                Files.deleteIfExists(tmp);
+                throw e;
+            }
         }
         return resp.headers().firstValue("Content-Type").orElse(null);
     }

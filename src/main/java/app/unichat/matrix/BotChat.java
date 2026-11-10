@@ -174,7 +174,7 @@ final class BotChat {
         }
     }
 
-    private void addDirect(String otherUser, String roomId) throws IOException {
+    void addDirect(String otherUser, String roomId) throws IOException {
         ObjectNode cached;
         synchronized (proc) {
             cached = proc.directContentCopy();
@@ -183,8 +183,10 @@ final class BotChat {
         JsonNode server = null;
         try {
             server = client.get(path);
-        } catch (Exception e) {
-            // no m.direct on the server yet (404) or transient failure: fall back to the cached copy
+        } catch (MatrixException e) {
+            // Only "none on the server yet" may fall back to the cached copy: the PUT replaces the whole list, so
+            // writing it after any other failure would drop the direct chats the cache doesn't know of.
+            if (e.status() != 404 && !"M_NOT_FOUND".equals(e.errcode())) throw e;
         }
         client.put(path, mergeDirect(server, cached, otherUser, roomId));
     }

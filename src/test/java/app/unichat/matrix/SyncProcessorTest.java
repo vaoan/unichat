@@ -440,4 +440,22 @@ class SyncProcessorTest {
         assertNull(m.html(), "an edit that drops it");
         assertNull(m.htmlText());
     }
+
+    @Test
+    void eventsWaitingForAMessageThatNeverLoadsAreCapped() {
+        StringBuilder events = new StringBuilder();
+        int n = SyncProcessor.MAX_PENDING + 100;
+        for (int i = 0; i < n; i++) {
+            if (i > 0) events.append(',');
+            events.append("{'type':'m.reaction','event_id':'$r").append(i).append("','sender':'@bob:example.org','origin_server_ts':")
+                    .append(i).append(",'content':{'m.relates_to':{'rel_type':'m.annotation','event_id':'$gone").append(i)
+                    .append("','key':'x'}}}");
+        }
+        sync("!r:example.org", "{'state':{'events':[" + member(ME, "Me") + "]},'timeline':{'events':[" + events + "]}}", true);
+
+        MatrixRoom room = proc.room("!r:example.org");
+        assertEquals(SyncProcessor.MAX_PENDING, room.pending.values().stream().mapToInt(List::size).sum());
+        assertTrue(room.pending.containsKey("$gone" + (n - 1)), "the newest stay");
+        assertFalse(room.pending.containsKey("$gone0"), "the oldest go");
+    }
 }

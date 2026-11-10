@@ -52,16 +52,18 @@ final class MediaDownloader {
     /** Who wants to know how far each download in flight got, by its cache key. */
     private final Map<String, java.util.List<java.util.function.DoubleConsumer>> watching = new ConcurrentHashMap<>();
 
+    /** How many downloads someone watches (for tests). */
+    int watched() { return watching.size(); }
+
     /** {@link #media(String, int, int)}, telling {@code progress} how much has arrived while it downloads. */
     CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer progress) {
         String key = cacheKey(url, width, height);
         watching.computeIfAbsent(key, k -> new java.util.concurrent.CopyOnWriteArrayList<>()).add(progress);
-        CompletableFuture<Path> f = media(url, width, height);
-        f.whenComplete((p, e) -> {
-            var l = watching.get(key);
-            if (l != null) l.remove(progress);
-        });
-        return f;
+        // The key goes with its last watcher, before whoever waits hears the download is over.
+        return media(url, width, height).whenComplete((p, e) -> watching.computeIfPresent(key, (k, l) -> {
+            l.remove(progress);
+            return l.isEmpty() ? null : l;
+        }));
     }
 
     /** The local file of {@code url}: from the cache, or downloaded once however many ask at the same time. */

@@ -43,12 +43,27 @@ class MediaCacheTest {
 
     @Test
     void downloadsInProgressAreLeftAlone(@TempDir Path dir) throws Exception {
-        Path partial = file(dir, "a.jpg.part12", 1_000, 1_000);
-        Path downloading = file(dir, "b.download", 1_000, 1_000);
+        long now = System.currentTimeMillis();
+        Path partial = file(dir, "a.jpg.part12", 1_000, now);
+        Path downloading = file(dir, "b.download", 1_000, now);
 
         assertEquals(0, MediaCache.trim(dir, 0));
         assertTrue(Files.exists(partial));
         assertTrue(Files.exists(downloading));
+    }
+
+    @Test
+    void leftoversOfDownloadsCutShortGoAfterAnHour(@TempDir Path dir) throws Exception {
+        long twoHoursAgo = System.currentTimeMillis() - 2 * 3_600_000L;
+        Path partial = file(dir, "a.jpg.part12", 1_000, twoHoursAgo);
+        Path downloading = file(dir, "b.download", 1_000, twoHoursAgo);
+        Path kept = file(dir, "c.jpg", 1_000, twoHoursAgo);
+
+        MediaCache.trim(dir, 1_000_000);
+
+        assertFalse(Files.exists(partial), "an interrupted download's .part is never finished");
+        assertFalse(Files.exists(downloading));
+        assertTrue(Files.exists(kept), "under the limit, real files stay");
     }
 
     @Test

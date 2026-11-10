@@ -21,6 +21,8 @@ final class MediaCache {
     /** Above this a file is "big", and goes before any smaller one. */
     static final long SMALL_BYTES = 1024 * 1024;
     private static final int HASH_LENGTH = 64;
+    /** A download's temporary file untouched this long is the leftover of one that never finished. */
+    static final long LEFTOVER_MILLIS = 3_600_000L;
 
     private MediaCache() {}
 
@@ -44,11 +46,15 @@ final class MediaCache {
         if (!Files.isDirectory(dir)) return 0;
         List<Entry> entries = new ArrayList<>();
         long total = 0;
+        long leftovers = 0;
+        long staleBefore = System.currentTimeMillis() - LEFTOVER_MILLIS;
         try (Stream<Path> files = Files.list(dir)) {
             for (Path p : (Iterable<Path>) files::iterator) {
                 String n = p.getFileName().toString();
-                // Downloads in progress.
-                if (n.endsWith(".download") || n.contains(".part")) continue;
+                if (n.endsWith(".download") || n.contains(".part")) {
+                    leftovers += deleteIfLeftover(p, staleBefore);
+                    continue;
+                }
                 BasicFileAttributes a = Files.readAttributes(p, BasicFileAttributes.class);
                 if (!a.isRegularFile()) continue;
                 total += a.size();
@@ -57,9 +63,9 @@ final class MediaCache {
                 }
             }
         } catch (IOException e) {
-            return 0;
+            return leftovers;
         }
-        if (total <= maxBytes) return 0;
+        if (total <= maxBytes) return leftovers;
         entries.sort(Comparator.comparing((Entry e) -> e.size() <= SMALL_BYTES).thenComparingLong(Entry::used));
         long freed = 0;
         for (Entry e : entries) {
@@ -70,6 +76,20 @@ final class MediaCache {
                 // Open elsewhere (Windows): next time.
             }
         }
-        return freed;
+        return freed + leftovers;
+    }
+
+    /**
+     * A download in progress, or the leftover of one cut short (the app quit or crashed mid-way): deleted once untouched
+     * since {@code staleBefore}. Returns the bytes freed.
+     */
+    private static long deleteIfLeftover(Path p, long staleBefore) {
+        try {
+            BasicFileAttributes a = Files.readAttributes(p, BasicFileAttributes.class);
+            return a.lastModifiedTime().toMillis() < staleBefore && Files.deleteIfExists(p) ? a.size() : 0;
+        } catch (IOException finishedOrOpen) {
+            // Moved into place meanwhile, or open elsewhere (Windows): next time.
+            return 0;
+        }
     }
 }

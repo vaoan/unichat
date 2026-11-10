@@ -467,8 +467,24 @@ final class SyncProcessor {
         r.messagesChanged.add(room.id);
     }
 
+    /** Events kept per room waiting for their target; the oldest go past this. */
+    static final int MAX_PENDING = 500;
+
+    /** Waits for {@code targetId} to load; a target that never does (deleted, too far back) can't fill the memory. */
     private void addPending(MatrixRoom room, String targetId, JsonNode ev) {
-        room.pending.computeIfAbsent(targetId, k -> new ArrayList<>()).add(ev);
+        List<JsonNode> list = room.pending.remove(targetId);
+        if (list == null) list = new ArrayList<>();
+        list.add(ev);
+        room.pending.put(targetId, list); // last: waited for the shortest
+        int over = room.pending.values().stream().mapToInt(List::size).sum() - MAX_PENDING;
+        for (var it = room.pending.values().iterator(); over > 0 && it.hasNext(); ) {
+            List<JsonNode> oldest = it.next();
+            while (over > 0 && !oldest.isEmpty()) {
+                oldest.removeFirst();
+                over--;
+            }
+            if (oldest.isEmpty()) it.remove();
+        }
     }
 
     private void applyEdit(MatrixRoom room, JsonNode ev, Result r) {

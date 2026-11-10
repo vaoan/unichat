@@ -251,8 +251,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 try {
                     resp = client.request("GET", path, null, Duration.ofSeconds(initial || catchUp ? 180 : 75));
                 } catch (MatrixException e) {
-                    if (catchUp && !"M_UNKNOWN_TOKEN".equals(e.errcode())) {
-                        // The cached token was rejected (expired/purged): fall back to a full sync.
+                    if (catchUp && sinceRejected(e)) {
+                        // The cached token was rejected (expired/purged): fall back to a full sync. A busy or
+                        // restarting server (429, 5xx) goes to the backoff instead, keeping the cache.
                         catchUp = false;
                         nextBatch = null;
                         synchronized (proc) {
@@ -303,6 +304,11 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 failures = backoff(++failures, e);
             }
         }
+    }
+
+    /** The server's answer says the {@code since} token itself is no good (not that it's busy, down or rate limiting). */
+    static boolean sinceRejected(MatrixException e) {
+        return (e.status() == 400 || e.status() == 404) && !"M_UNKNOWN_TOKEN".equals(e.errcode());
     }
 
     /** What follows from a sync the server answered: see {@link QuietRule}, and the mute rules the file asks for. */
@@ -474,24 +480,30 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         synchronized (fetched) {
             CompletableFuture<Message> known = fetched.get(messageId);
             if (known != null) return known;
-            CompletableFuture<Message> f = CompletableFuture.supplyAsync(() -> {
-                try {
-                    JsonNode ev = client.get(CLIENT + "/rooms/" + enc(chatId) + "/event/" + enc(messageId));
-                    synchronized (proc) {
-                        return proc.standalone(chatId, ev);
-                    }
-                } catch (IOException e) {
-                    return null;
-                }
-            }, io);
+            CompletableFuture<Message> f = new CompletableFuture<>();
             fetched.put(messageId, f);
-            // Not had (the server didn't answer): asked again next time it's drawn.
-            f.thenAccept(m -> {
+            io.execute(() -> {
+                Message m = fetch(chatId, messageId);
+                // Not had (the server didn't answer): asked again next time it's drawn. Forgotten before anyone
+                // waiting hears of it, so whoever asks next asks the server.
                 if (m == null) synchronized (fetched) {
                     fetched.remove(messageId, f);
                 }
+                f.complete(m);
             });
             return f;
+        }
+    }
+
+    /** One message from the server; null when it isn't one or the server failed to answer (an error answer too). */
+    private Message fetch(String chatId, String messageId) {
+        try {
+            JsonNode ev = client.get(CLIENT + "/rooms/" + enc(chatId) + "/event/" + enc(messageId));
+            synchronized (proc) {
+                return proc.standalone(chatId, ev);
+            }
+        } catch (IOException | MatrixException e) {
+            return null;
         }
     }
 

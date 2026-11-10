@@ -27,8 +27,8 @@ final class MatrixRoom {
     final Map<String, Member> members = new LinkedHashMap<>();
     /** reaction event id -> reaction. */
     final Map<String, Reaction> reactionEvents = new HashMap<>();
-    /** Relation events (edits, reactions) whose target is not loaded yet, by target id. */
-    final Map<String, List<JsonNode>> pending = new HashMap<>();
+    /** Relation events (edits, reactions) whose target is not loaded yet, by target id; the last added for last. */
+    final Map<String, List<JsonNode>> pending = new LinkedHashMap<>();
     /** Timestamp of the newest edit applied per message, so out-of-order edits don't win. */
     final Map<String, Long> editTs = new HashMap<>();
 
