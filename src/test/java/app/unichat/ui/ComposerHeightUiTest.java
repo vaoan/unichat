@@ -17,7 +17,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** The message box grows to show all it holds (up to a limit), whatever the text size or width: nothing cut. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ComposerHeightUiTest {
-    private static final String LONG = "Una línea bastante larga que en una caja angosta ocupa dos líneas";
+    /**
+     * Two lines in the narrow box, one in the wide one, on every system: the first sentence (66 characters) still took
+     * two lines at 704 px on Linux, whose font is wider, so the box rightly never shrank there and the test failed.
+     */
+    private static final String LONG = "Una línea larga que en caja angosta ocupa dos";
 
     /** What decides the box's height, for a failure to say (Linux lays it out otherwise than the Mac). */
     private static String measures(TextArea box) {
