@@ -17,7 +17,23 @@
     <main.class>app.unichat.Launcher</main.class>
   </properties>
 
+  <!-- InstaTray's download engine (instatray.core: sites, per-site cookies, yt-dlp/gallery-dl): the user's own library,
+       built by JitPack from the tag. Only that artifact comes from there. -->
+  <repositories>
+    <repository>
+      <id>jitpack.io</id>
+      <url>https://jitpack.io</url>
+      <releases><enabled>true</enabled></releases>
+      <snapshots><enabled>false</enabled></snapshots>
+    </repository>
+  </repositories>
+
   <dependencies>
+    <dependency>
+      <groupId>com.github.vaoan</groupId>
+      <artifactId>InstaTray</artifactId>
+      <version>core-1.0.1</version>
+    </dependency>
     <dependency>
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>

@@ -1,0 +1,90 @@
+package app.unichat.autosave;
+
+import app.unichat.support.I18n;
+import instatray.core.Fetch;
+import instatray.core.Site;
+import instatray.core.Tools;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** A chat's link saved through InstaTray's engine: Unichat's folder, name and progress, the engine's sites and reasons. */
+class LinkSaverTest {
+    @TempDir
+    Path dir;
+
+    /** A yt-dlp that prints what the real one does with the engine's options, and saves a file; it says it ran. */
+    private Tools fakeYtDlp() throws Exception {
+        Path tool = dir.resolve("yt-dlp");
+        Files.writeString(tool, """
+                #!/bin/sh
+                touch "$FAKE_OUT/.ran"
+                f="$FAKE_OUT/clip [abc].mp4"
+                echo "TITLE Un video"
+                echo "[download] Destination: $f"
+                echo "PROG 512 1024 2048 3"
+                printf video > "$f"
+                echo "$f"
+                """);
+        Files.setPosixFilePermissions(tool, PosixFilePermissions.fromString("rwx------"));
+        Path out = Files.createDirectories(dir.resolve("Ana"));
+        return new Tools() {
+            @Override public String ytDlp() { return tool.toString(); }
+            @Override public String galleryDl() { return null; }
+            @Override public String ffmpeg() { return null; }
+            @Override public Map<String, String> environment() {
+                Map<String, String> env = new HashMap<>(Tools.super.environment());
+                env.put("FAKE_OUT", out.toString());
+                return env;
+            }
+        };
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS) // the fake tool is a shell script
+    void aLinkIsSavedInTheChatsFolderWithTheMessagesIdAndSaysHowFarItGot() throws Exception {
+        List<Double> progress = new ArrayList<>();
+        String why = LinkSaver.save("https://www.youtube.com/watch?v=dQw4w9WgXcQ", dir.resolve("Ana"), "abc", progress::add,
+                fakeYtDlp(), Files.createDirectories(dir.resolve("Downloads")));
+        assertNull(why, "saved");
+        assertTrue(Files.exists(dir.resolve("Ana/clip [abc].mp4")));
+        assertEquals(List.of(0.5), progress, "the engine's progress, as Unichat shows it");
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void textThatIsntAWebAddressNeverReachesATool() throws Exception {
+        Tools tools = fakeYtDlp();
+        String why = LinkSaver.save("--exec=rm -rf ~", dir.resolve("Ana"), "abc", p -> { }, tools, dir);
+        assertEquals(I18n.t("autosave.link.notALink"), why);
+        assertFalse(Files.exists(dir.resolve("Ana/.ran")), "yt-dlp never ran");
+    }
+
+    @Test
+    void theEnginesSitesOrAnyOtherAddress() {
+        assertEquals(Site.YOUTUBE, LinkSaver.linkOf("https://www.youtube.com/watch?v=dQw4w9WgXcQ").site());
+        assertEquals(Site.OTHER, LinkSaver.linkOf("https://example.org/un-video").site(), "anything else yt-dlp may know");
+    }
+
+    @Test
+    void theEnginesReasonsInThePersonsWords() {
+        assertEquals(I18n.t("autosave.link.login"), LinkSaver.reason(Fetch.LOGIN_NEEDED));
+        assertEquals(I18n.t("autosave.error.tooLong"), LinkSaver.reason(Fetch.TIMED_OUT));
+        assertEquals(I18n.t("autosave.link.missingTool", "gallery-dl"), LinkSaver.reason("gallery-dl" + Fetch.NOT_INSTALLED));
+        assertEquals("Unsupported URL: https://x.org", LinkSaver.reason("Unsupported URL: https://x.org"), "a tool's own words as they are");
+    }
+}

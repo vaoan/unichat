@@ -531,9 +531,7 @@ public final class AutoSave implements ChatService.Listener {
 
             @Override
             public String link(String url, Path dir, String tag, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
-                Path ytDlp = YtDlp.whenNeeded(p -> { });
-                if (ytDlp == null) return I18n.t("autosave.error.noYtDlp");
-                return YtDlp.download(ytDlp, Ffmpeg.whenNeeded(p -> { }), dir, url, tag, progress);
+                return LinkSaver.save(url, dir, tag, progress, LinkSaver.tools(), LinkSaver.COOKIES);
             }
         };
     }

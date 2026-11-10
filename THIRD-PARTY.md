@@ -21,6 +21,7 @@ Unichat's own code is [0BSD](LICENSE). Unichat's packages also carry the compone
 | JCodec (includes a decoder derived from JAAD) | 0.2.5 | BSD-2-Clause | videos from GIFs |
 | jsoup | 1.18.3 | MIT | reading messages' HTML |
 | Concentus | 1.0.2 | BSD-3-Clause | decoding Opus voice notes |
+| InstaTray core (instatray.core) | core-1.0.1 | 0BSD | saving what links in chats lead to (sites, cookies, yt-dlp/gallery-dl) |
 | Rust crates inside tuwunel | see list | several, see below | local Matrix server |
 | OpenJDK (Java runtime) | that of the packaging JDK | GPL-2.0 with classpath exception | running the app |
 
@@ -14215,6 +14216,27 @@ versions of the Opus C reference library, which is maintained by Xiph.org and th
 Opus open-source contributors. The source code for these libraries is freely available
 at https://gitlab.xiph.org/xiph/opus/-/tags/v1.5.2, and all binaries are being
 redistributed to you under the same terms of the general Opus license dictated above.
+```
+
+### InstaTray core (instatray.core)
+
+**LICENSE**
+
+```text
+BSD Zero Clause License
+
+Copyright (c) 2026 vaoan
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
 ```
 
 ### Apache License 2.0

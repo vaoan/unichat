@@ -77,6 +77,8 @@ COMPONENTS = [
      [("LICENSE", fetch(GH + "jcodec/jcodec/master/LICENSE"))]),
     ("jsoup", "1.18.3", "MIT", "reading messages' HTML", [("LICENSE", fetch(GH + "jhy/jsoup/master/LICENSE"))]),
     ("Concentus", "1.0.2", "BSD-3-Clause", "decoding Opus voice notes", [("LICENSE", fetch(GH + "lostromb/concentus/master/LICENSE"))]),
+    ("InstaTray core (instatray.core)", "core-1.0.1", "0BSD", "saving what links in chats lead to (sites, cookies, yt-dlp/gallery-dl)",
+     [("LICENSE", fetch(GH + "vaoan/InstaTray/core-1.0.1/LICENSE"))]),
 ]
 APACHE = fetch("https://www.apache.org/licenses/LICENSE-2.0.txt")
 
