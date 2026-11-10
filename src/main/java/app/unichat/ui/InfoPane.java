@@ -32,6 +32,7 @@ public final class InfoPane extends ScrollPane {
     private final Runnable close;
     private final Consumer<String> toast;
     private final ProfileMedia media;
+    private Consumer<Chat> onOptions;
     private Chat chat;
     /** What the panel was last built from ({@link #shown}): unchanged, it isn't built again. */
     private String built;
@@ -93,13 +94,14 @@ public final class InfoPane extends ScrollPane {
             ident.getChildren().add(topic);
         }
 
-        // Tiles as wide as the longest label (never cut to "Fav…"); four in a row, or two by two when four don't fit,
-        // never three and one left over. Decided at layout time, when the labels have their real (CSS) size.
+        // Six round icons (their names in a tooltip and for screen readers): all in a row when they fit, else three by
+        // three, never four and two. Decided at layout time, when the icons have their real (CSS, text-size) size.
         javafx.scene.layout.TilePane actions = new javafx.scene.layout.TilePane(8, 8) {
             @Override protected void layoutChildren() {
                 double tile = getChildren().stream().mapToDouble(n -> n.prefWidth(-1)).max().orElse(0);
                 double room = getParent() instanceof Region r ? r.getWidth() - r.getInsets().getLeft() - r.getInsets().getRight() : 0;
-                double max = room <= 0 || room >= 4 * tile + 3 * getHgap() ? Double.MAX_VALUE : 2 * tile + getHgap();
+                int n = getChildren().size();
+                double max = room <= 0 || room >= n * tile + (n - 1) * getHgap() ? Double.MAX_VALUE : 3 * tile + 2 * getHgap();
                 if (max != getMaxWidth()) setMaxWidth(max);
                 super.layoutChildren();
             }
@@ -108,11 +110,16 @@ public final class InfoPane extends ScrollPane {
                 action(Icons.BELL_OFF, c.muted() ? I18n.t("info.unmute") : I18n.t("info.mute"), c.muted(), () -> svc.setMuted(c.id(), !c.muted())),
                 action(Icons.STAR, I18n.t("info.favorite"), c.favorite(), () -> svc.setFavorite(c.id(), !c.favorite())),
                 action(Icons.PIN, I18n.t("info.pin"), c.pinned(), () -> svc.setPinned(c.id(), !c.pinned())),
-                action(Icons.ARCHIVE, c.archived() ? I18n.t("info.archived") : I18n.t("info.archive"), c.archived(), () -> svc.setArchived(c.id(), !c.archived())));
+                action(Icons.ARCHIVE, c.archived() ? I18n.t("info.archived") : I18n.t("info.archive"), c.archived(), () -> svc.setArchived(c.id(), !c.archived())),
+                action(Icons.LOW, c.lowPriority() ? I18n.t("info.toInbox") : I18n.t("info.toLowPriority"), c.lowPriority(),
+                        () -> svc.setLowPriority(c.id(), !c.lowPriority())),
+                action(Icons.SETTINGS, I18n.t("thread.chatOptions"), false, () -> {
+                    if (onOptions != null) onOptions.accept(c);
+                }));
         actions.setAlignment(Pos.CENTER);
-        actions.setPrefColumns(4);
+        actions.setPrefColumns(6);
 
-        box.getChildren().addAll(top, ident, new javafx.scene.layout.StackPane(actions)); // centred when two by two
+        box.getChildren().addAll(top, ident, new javafx.scene.layout.StackPane(actions)); // centred when three by three
 
         if (c.reminderAt() != null) {
             Label rem = new Label(I18n.t("info.reminder", Formats.listStamp(c.reminderAt(), Instant.now(), ZoneId.systemDefault()),
@@ -144,15 +151,6 @@ public final class InfoPane extends ScrollPane {
             box.getChildren().add(people);
         }
 
-        Button leave = new Button(c.group() ? I18n.t("info.leaveGroup") : I18n.t("info.deleteChat"));
-        leave.getStyleClass().add("danger-button");
-        leave.setMaxWidth(Double.MAX_VALUE);
-        leave.setOnAction(e -> svc.leaveChat(c.id()).thenRun(() -> Platform.runLater(() -> toast.accept(I18n.t("info.left", c.title())))));
-        Button lowPrio = new Button(c.lowPriority() ? I18n.t("info.toInbox") : I18n.t("info.toLowPriority"));
-        lowPrio.getStyleClass().add("secondary-button");
-        lowPrio.setMaxWidth(Double.MAX_VALUE);
-        lowPrio.setOnAction(e -> svc.setLowPriority(c.id(), !c.lowPriority()));
-        box.getChildren().addAll(new VBox(8, lowPrio, leave));
     }
 
     /** Everything the panel draws from {@code c}, as one string to compare. */
@@ -204,16 +202,20 @@ public final class InfoPane extends ScrollPane {
         return l;
     }
 
+    /** A round icon; its name in a tooltip and, with whether it's on, for screen readers. */
     private Node action(String icon, String text, boolean active, Runnable run) {
-        Button b = new Button(text);
-        b.setGraphic(Icons.icon(icon, 18));
-        b.setContentDisplay(javafx.scene.control.ContentDisplay.TOP);
+        Button b = new Button(null, Icons.icon(icon, 18));
         b.getStyleClass().add("info-action");
-        b.setMaxWidth(Double.MAX_VALUE); // fills its tile, so all four are the same width
         if (active) b.getStyleClass().add("active");
         b.setOnAction(e -> run.run());
+        b.setTooltip(new javafx.scene.control.Tooltip(active ? I18n.t("info.activated", text) : text));
         b.setAccessibleText(active ? I18n.t("info.activated", text) : text);
         return b;
+    }
+
+    /** The gear among the actions: the chat's own options ({@link ChatOptions}). */
+    void setOnOptions(Consumer<Chat> r) {
+        onOptions = r;
     }
 
 }

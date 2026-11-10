@@ -440,7 +440,8 @@
 .info-subtitle, .info-topic { -fx-text-fill: -text-3; -fx-text-alignment: center; }
 .info-reminder { -fx-background-color: -surface-2; -fx-background-radius: 10; -fx-padding: 8 12; }
 .info-section { -fx-font-weight: bold; -fx-text-fill: -text-2; -fx-font-size: 0.9em; }
-.info-action { -fx-background-color: -surface-2; -fx-background-radius: 12; -fx-font-size: 0.8em; -fx-text-fill: -text-2; -fx-padding: 8 6; -fx-graphic-text-gap: 4; }
+/* The profile's actions: round icons, their names in tooltips. */
+.info-action { -fx-background-color: -surface-2; -fx-background-radius: 999; -fx-padding: 0.6em; -fx-min-width: 2.6em; -fx-min-height: 2.6em; }
 .info-action.active .icon { -fx-background-color: -accent; }
 .member-row { -fx-padding: 4 6; -fx-background-radius: 10; }
 .member-row:hover { -fx-background-color: -hover; }
@@ -880,3 +881,24 @@
 /* A chat's options: the kinds it saves, under the switch that turns saving on. */
 .chat-options-kinds { -fx-padding: 0 0 0 1.8em; }
 .chat-options-scroll { -fx-padding: 0; -fx-background-insets: 0; }
+
+/* The profile's media: a segmented bar (icon and count; the name above what's shown), then the shelf. */
+.media-tabs { -fx-background-color: -surface-2; -fx-background-radius: 10; -fx-padding: 3; -fx-spacing: 2; }
+.media-tab {
+    -fx-background-color: transparent; -fx-background-radius: 8; -fx-text-fill: -text-2;
+    -fx-padding: 0.35em 0.4em; -fx-graphic-text-gap: 0.35em; -fx-font-size: 0.9em; -fx-cursor: hand;
+}
+.media-tab .icon { -fx-background-color: -text-2; }
+.media-tab:hover { -fx-background-color: -surface; }
+.media-tab:selected {
+    -fx-background-color: -surface; -fx-text-fill: -text; -fx-font-weight: bold;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 4, 0, 0, 1);
+}
+.media-tab:selected .icon { -fx-background-color: -accent; }
+.media-tab:focus-visible { -fx-border-color: -accent; -fx-border-width: 2; -fx-border-radius: 8; }
+.media-shelf-title { -fx-text-fill: -text-2; -fx-font-size: 0.85em; -fx-font-weight: bold; }
+.profile-file { -fx-background-color: transparent; -fx-background-radius: 8; -fx-alignment: center-left; -fx-padding: 6 8; }
+.profile-file:hover, .profile-file:focus-visible { -fx-background-color: -surface-2; }
+.profile-file .icon { -fx-background-color: -text-2; }
+.profile-file-name { -fx-text-fill: -text; }
+.profile-link { -fx-padding: 2 0; }

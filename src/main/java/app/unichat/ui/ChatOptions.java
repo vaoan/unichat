@@ -91,6 +91,7 @@ final class ChatOptions {
         VBox card = new VBox(12, title, sectionTitle(I18n.t("chatOptions.profileTitle")), showMedia,
                 sectionTitle(I18n.t("chatOptions.autoSaveTitle")), on, kindBoxes, help,
                 folderRow(chat), sectionTitle(I18n.t("chatOptions.pastTitle")), past(chat, on),
+                sectionTitle(I18n.t(chat.group() ? "info.leaveGroup" : "info.deleteChat")), leave(chat),
                 new HBox(10, openFolder, grow, done));
         card.getStyleClass().addAll("card", "folder-dialog", "chat-options");
         card.setPrefWidth(WIDTH);
@@ -105,6 +106,41 @@ final class ChatOptions {
         scroll.getStyleClass().addAll("side-panel-scroll", "chat-options-scroll");
         show.accept(scroll);
         Platform.runLater(on::requestFocus);
+    }
+
+    /**
+     * Leaving the group or deleting the chat: here, behind the options and a second "yes", so it never happens by a
+     * stray click (it sat at the foot of the profile).
+     */
+    private Node leave(Chat chat) {
+        String what = I18n.t(chat.group() ? "info.leaveGroup" : "info.deleteChat");
+        Button ask = new Button(what);
+        ask.getStyleClass().add("danger-button");
+        Label sure = new Label(I18n.t("chatOptions.leaveSure"));
+        sure.setWrapText(true);
+        sure.setMinHeight(Region.USE_PREF_SIZE);
+        Button yes = new Button(I18n.t("chatOptions.leaveYes", what.substring(0, 1).toLowerCase(I18n.locale()) + what.substring(1)));
+        yes.getStyleClass().add("danger-button");
+        Button no = new Button(I18n.t("folders.dialog.cancel"));
+        no.getStyleClass().add("secondary-button");
+        javafx.scene.layout.FlowPane answer = new javafx.scene.layout.FlowPane(8, 6, no, yes);
+        VBox confirm = new VBox(6, sure, answer);
+        Nodes.show(confirm, false);
+        ask.setOnAction(e -> {
+            Nodes.show(ask, false);
+            Nodes.show(confirm, true);
+            no.requestFocus(); // the safe answer first
+        });
+        no.setOnAction(e -> {
+            Nodes.show(confirm, false);
+            Nodes.show(ask, true);
+            ask.requestFocus();
+        });
+        yes.setOnAction(e -> {
+            hide.run();
+            svc.leaveChat(chat.id()).thenRun(() -> Platform.runLater(() -> toast.accept(I18n.t("info.left", chat.title()))));
+        });
+        return new VBox(6, ask, confirm);
     }
 
     /**

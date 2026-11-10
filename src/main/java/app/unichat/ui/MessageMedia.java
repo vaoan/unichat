@@ -291,7 +291,9 @@ final class MessageMedia {
     static java.util.concurrent.CompletableFuture<java.nio.file.Path> loadMedia(MediaSource svc, ImageView view, Message m, int pxW, int pxH) {
         if (!mayBeAnimated(m)) {
             java.util.concurrent.CompletableFuture<java.nio.file.Path> still = svc.media(m.mediaUrl(), pxW, pxH);
-            still.thenAcceptAsync(p -> showStill(view, p, pxW, pxH, false), AnimatedImage.DECODER);
+            Image known = Platform.isFxApplicationThread() ? Stills.get(m.mediaUrl(), pxW, pxH) : null;
+            if (known != null) view.setImage(known); // decoded before: no blank while it's decoded again
+            else still.thenAcceptAsync(p -> showStill(view, m.mediaUrl(), p, pxW, pxH, false), AnimatedImage.DECODER);
             return still;
         }
         java.util.concurrent.CompletableFuture<java.nio.file.Path> original = svc.media(m.mediaUrl(), 0, 0);
@@ -304,7 +306,7 @@ final class MessageMedia {
         }
         // Placeholder: a still picture shows at once; decoding a long animation takes seconds. (With direct media
         // the "thumbnail" is the original file, maybe an animated GIF: only its first frame is used.)
-        svc.media(m.mediaUrl(), pxW, pxH).thenAcceptAsync(p -> showStill(view, p, pxW, pxH, true), AnimatedImage.DECODER);
+        svc.media(m.mediaUrl(), pxW, pxH).thenAcceptAsync(p -> showStill(view, m.mediaUrl(), p, pxW, pxH, true), AnimatedImage.DECODER);
         original.thenAcceptAsync(p -> {
             try {
                 AnimatedImage.Frames frames = AnimatedImage.decode(p, pxW, pxH); // labelled as a sticker, maybe a plain PNG/JPEG
@@ -317,9 +319,10 @@ final class MessageMedia {
     }
 
     /** Decodes {@code p} as a still picture (off the FX thread) and shows it; {@code ifEmpty}: only if nothing's shown. */
-    private static void showStill(ImageView view, java.nio.file.Path p, int pxW, int pxH, boolean ifEmpty) {
+    private static void showStill(ImageView view, String url, java.nio.file.Path p, int pxW, int pxH, boolean ifEmpty) {
         try {
             Image img = AnimatedImage.still(p, pxW, pxH);
+            Stills.put(url, pxW, pxH, img);
             Platform.runLater(() -> {
                 if (!ifEmpty || view.getImage() == null) view.setImage(img);
             });

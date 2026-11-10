@@ -452,11 +452,11 @@ public final class MainView extends StackPane {
         toast.setTranslateX(b.getCenterX() - me.getCenterX());
     }
 
-    /** The gear in a chat's header: its own options, what it saves of what arrives among them. */
+    /** The gear among the profile's actions: the chat's own options, what it saves of what arrives among them. */
     private void offerChatOptions(ChatService svc) {
         ChatOptions options = new ChatOptions(svc, this::showOverlay, this::hideOverlay, this::toast);
         chatOptions = chat -> options.open(chat, () -> thread.composer().focus());
-        thread.setOnOptions(chatOptions);
+        info.setOnOptions(chatOptions);
     }
 
     /** A chat's options sheet, for the chat open (snapshot diagnostics). */

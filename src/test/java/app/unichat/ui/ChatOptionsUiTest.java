@@ -6,6 +6,7 @@ import app.unichat.service.MockChatService;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
@@ -67,6 +68,20 @@ class ChatOptionsUiTest {
         FxWait.fx(() -> { showMedia.fire(); return null; });
         assertTrue(svc.mediaHidden(id), "hidden for this chat");
         svc.setMediaHidden(id, false).get();
+        // Leaving asks first; "Cancelar" goes back, only the second yes leaves.
+        Button ask = FxWait.fx(() -> overlay.lookupAll(".danger-button").stream().map(n -> (Button) n)
+                .filter(Node::isVisible).findFirst().orElseThrow());
+        FxWait.fx(() -> { ask.fire(); return null; });
+        Button cancel = FxWait.fx(() -> overlay.lookupAll(".secondary-button").stream().map(n -> (Button) n)
+                .filter(b -> b.isVisible() && b.getText().equals("Cancelar")).findFirst().orElseThrow());
+        FxWait.fx(() -> { cancel.fire(); return null; });
+        assertTrue(svc.chat(id) != null, "not left: asked, then cancelled");
+        FxWait.fx(() -> { ask.fire(); return null; });
+        Button yes = FxWait.fx(() -> overlay.lookupAll(".danger-button").stream().map(n -> (Button) n)
+                .filter(b -> b.isVisible() && b.getText().startsWith("Sí,")).findFirst().orElseThrow());
+        FxWait.fx(() -> { yes.fire(); return null; });
+        FxWait.until("the chat is left", () -> svc.chat(id) == null);
+        assertTrue(overlay.getChildren().isEmpty(), "and the sheet closed");
         FxWait.fx(() -> { overlay.getScene().getWindow().hide(); return null; });
         svc.stop();
     }

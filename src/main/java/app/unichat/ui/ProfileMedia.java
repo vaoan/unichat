@@ -11,10 +11,12 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
@@ -103,19 +105,51 @@ final class ProfileMedia {
                 }
             }
         }
-        VBox body = new VBox(6);
+        VBox body = new VBox(8);
+        Label name = new Label();
+        name.getStyleClass().add("media-shelf-title");
         ToggleGroup group = new ToggleGroup();
-        FlowPane tabs = new FlowPane(6, 6);
-        tabs.getStyleClass().add("side-panel-tabs");
+        HBox tabs = new HBox();
+        tabs.getStyleClass().add("media-tabs");
+        Runnable show = () -> {
+            name.setText(I18n.t("info.shelf." + open.name(), contents.count(open)));
+            body.getChildren().setAll(name, shelf(open, contents));
+        };
         for (Shelf s : Shelf.values()) {
             if (contents.count(s) == 0) continue;
-            tabs.getChildren().add(Chips.sticky(I18n.t("info.shelf." + s.name(), contents.count(s)), group, s == open, () -> {
+            tabs.getChildren().add(tab(s, contents.count(s), group, () -> {
                 open = s;
-                body.getChildren().setAll(shelf(s, contents));
+                show.run();
             }));
         }
-        body.getChildren().setAll(shelf(open, contents));
+        show.run();
         return List.of(tabs, body);
+    }
+
+    /**
+     * One segment of the bar: the kind's icon and how many, filling its share of the width. The name is in the tooltip,
+     * for screen readers and above what's shown: at 160 % text four names don't fit the side panel side by side.
+     */
+    private ToggleButton tab(Shelf s, int count, ToggleGroup group, Runnable action) {
+        String label = I18n.t("info.shelf." + s.name(), count);
+        ToggleButton b = new ToggleButton(Integer.toString(count), Icons.icon(switch (s) {
+            case PHOTOS -> Icons.IMAGE;
+            case VIDEOS -> Icons.PLAY;
+            case LINKS -> Icons.EXTERNAL;
+            case FILES -> Icons.FILE;
+        }, 16));
+        b.getStyleClass().add("media-tab");
+        b.setToggleGroup(group);
+        b.setSelected(s == open);
+        b.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(b, javafx.scene.layout.Priority.ALWAYS);
+        b.setTooltip(new javafx.scene.control.Tooltip(label));
+        b.setAccessibleText(label);
+        b.setOnAction(e -> {
+            if (!b.isSelected()) b.setSelected(true); // a tab stays chosen: clicking it again changes nothing
+            action.run();
+        });
+        return b;
     }
 
     /** What the profile compares to know it must be drawn again: what each tab would show. */
@@ -178,22 +212,27 @@ final class ProfileMedia {
         Hyperlink h = RichText.link(l.url(), l.url(), Browser::open, 300);
         Label meta = new Label(byWhom(l.from()));
         meta.getStyleClass().add("settings-help");
-        return new VBox(0, h, meta);
+        VBox row = new VBox(1, h, meta);
+        row.getStyleClass().add("profile-link");
+        return row;
     }
 
     /** Name, size, who and when; opens with the system's app. */
     private Node file(Message m) {
         String name = m.fileName() == null || m.fileName().isBlank() ? MediaSaver.suggestedName(m, ZoneId.systemDefault()) : m.fileName();
-        Button b = new Button(name, Icons.icon(m.type() == MessageType.AUDIO ? Icons.PLAY : Icons.FILE, 18));
+        Label meta = new Label((m.fileSize() > 0 ? Formats.fileSize(m.fileSize()) + " · " : "") + byWhom(m));
+        meta.getStyleClass().add("settings-help");
+        Label title = new Label(name);
+        title.getStyleClass().add("profile-file-name");
+        Button b = new Button(null, new HBox(10, Icons.icon(m.type() == MessageType.AUDIO ? Icons.PLAY : Icons.FILE, 18), new VBox(1, title, meta)));
         b.getStyleClass().add("profile-file");
         b.setMaxWidth(Double.MAX_VALUE);
+        b.setAccessibleText(name + ", " + meta.getText());
         b.setOnAction(e -> svc.media(m.mediaUrl(), 0, 0).whenComplete((p, err) -> {
             if (err != null) Platform.runLater(() -> toast.accept(I18n.t("media.downloadFailed")));
             else Desktop.open(p);
         }));
-        Label meta = new Label((m.fileSize() > 0 ? Formats.fileSize(m.fileSize()) + " · " : "") + byWhom(m));
-        meta.getStyleClass().add("settings-help");
-        return new VBox(0, b, meta);
+        return b;
     }
 
     private String byWhom(Message m) {

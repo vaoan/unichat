@@ -41,7 +41,6 @@ public final class ThreadPane extends BorderPane {
     private final Composer composer;
     private final AudioPlayback audio;
     private final MessageMedia media;
-    private Consumer<Chat> onOptions;
     private final MessageActionsUi messageActions;
 
     /** The message actions (reacting), for tests. */
@@ -121,20 +120,23 @@ public final class ThreadPane extends BorderPane {
         emptyState.getStyleClass().add("thread-empty");
         setCenter(emptyState);
 
-        // Bubble widths come from the list's width when a cell is built: rebuild them once it settles (opening the side
-        // panel narrowed the list and cut outgoing bubbles at the right edge).
-        javafx.animation.PauseTransition rewrap = new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
+        // Bubble widths come from the list's width when a cell is built: rebuilt (after the layout that changed it) only
+        // when that width gives other bubbles. Opening the side panel used to rebuild every row, photos blinking, though
+        // in most windows the bubbles stay as they were (MessageRowView.bubbleWidth).
+        double[] built = {Double.NaN};
         boolean[] waiting = {false};
-        rewrap.setOnFinished(e -> {
-            list.refresh();
-            if (waiting[0]) Redraws.PENDING.decrementAndGet();
-            waiting[0] = false;
-        });
         list.widthProperty().addListener((o, a, w) -> {
-            if (Math.abs(w.doubleValue() - a.doubleValue()) <= 1) return;
-            if (!waiting[0]) Redraws.PENDING.incrementAndGet();
+            double now = MessageRowView.bubbleWidth(w.doubleValue());
+            if (now == built[0]) return;
+            built[0] = now;
+            if (waiting[0]) return;
             waiting[0] = true;
-            rewrap.playFromStart();
+            Redraws.PENDING.incrementAndGet();
+            Platform.runLater(() -> {
+                list.refresh();
+                waiting[0] = false;
+                Redraws.PENDING.decrementAndGet();
+            });
         });
     }
 
@@ -162,11 +164,7 @@ public final class ThreadPane extends BorderPane {
         infoButton.setAccessibleText(I18n.t("thread.chatInfo"));
         Button more = Icons.iconButton(Icons.MORE, I18n.t("thread.moreOptions"), null);
         more.setOnAction(e -> ChatMenus.forChat(chat, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4));
-        Button options = Icons.iconButton(Icons.SETTINGS, I18n.t("thread.chatOptions"), () -> {
-            if (chat != null && onOptions != null) onOptions.accept(chat);
-        });
-        options.getStyleClass().add("chat-options-button");
-        HBox header = new HBox(10, headerAvatar, titles, favButton, archiveButton, infoButton, options, more);
+        HBox header = new HBox(10, headerAvatar, titles, favButton, archiveButton, infoButton, more);
         header.getStyleClass().add("thread-header");
         header.setAlignment(Pos.CENTER_LEFT);
         titles.setOnMouseClicked(e -> toggleInfo.run());
@@ -223,8 +221,6 @@ public final class ThreadPane extends BorderPane {
     /** Called with a server's id when its name in the header is clicked. */
     public void setOnShowServer(Consumer<String> r) { this.onShowServer = r; }
 
-    /** The gear in the header: the chat's own options ({@link ChatOptions}). */
-    void setOnOptions(Consumer<Chat> r) { this.onOptions = r; }
 
     public void refreshHeader() {
         if (chat == null) return;

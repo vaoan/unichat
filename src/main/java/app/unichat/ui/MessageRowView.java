@@ -117,6 +117,11 @@ final class MessageRowView {
         return A11yText.message(m, replied(m), transcript, ZoneId.systemDefault());
     }
 
+    /** How wide a bubble may be in a list this wide: within 200 and 560, so most widths change nothing. */
+    static double bubbleWidth(double listWidth) {
+        return Math.max(200, Math.min(560, listWidth * 0.68));
+    }
+
     Node node(ThreadRows.MessageRow row, double width) {
         Message m = row.message();
         if (m.type() == MessageType.SYSTEM) {
@@ -129,7 +134,7 @@ final class MessageRowView {
         }
         boolean out = m.outgoing();
         boolean showSender = chat.get().group() && !out && row.first();
-        double maxBubble = Math.max(200, Math.min(560, width * 0.68));
+        double maxBubble = bubbleWidth(width);
 
         VBox column = new VBox(2);
         column.setAlignment(out ? Pos.TOP_RIGHT : Pos.TOP_LEFT);
