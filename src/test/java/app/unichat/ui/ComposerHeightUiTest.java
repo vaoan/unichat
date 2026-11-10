@@ -19,6 +19,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ComposerHeightUiTest {
     private static final String LONG = "Una línea bastante larga que en una caja angosta ocupa dos líneas";
 
+    /** What decides the box's height, for a failure to say (Linux lays it out otherwise than the Mac). */
+    private static String measures(TextArea box) {
+        StringBuilder out = new StringBuilder("box " + box.getHeight() + " (pref " + box.getPrefHeight() + ", min "
+                + box.getMinHeight() + ", max " + box.getMaxHeight() + ", width " + box.getWidth() + ")");
+        for (javafx.scene.Node n : box.lookupAll(".text")) {
+            if (n instanceof javafx.scene.text.Text t) {
+                out.append("; text in ").append(t.getParent().getClass().getSimpleName()).append(' ')
+                        .append(t.getLayoutBounds().getHeight()).append(" wrap ").append(t.getWrappingWidth());
+            }
+        }
+        out.append("; parent ").append(box.getParent().getStyleClass()).append(' ').append(box.getParent().getLayoutBounds().getHeight());
+        return out.toString();
+    }
+
     private static double hidden(TextArea box) {
         ScrollPane sp = (ScrollPane) box.lookup(".scroll-pane");
         Region content = (Region) sp.getContent();
@@ -62,7 +76,10 @@ class ComposerHeightUiTest {
         FxWait.settled();
         FxWait.until("all of it on screen, wider", () -> hidden(box) <= 1);
         // Measured after the layout that re-wraps it: one more pass on some systems (Linux), so wait for it, not a time.
-        FxWait.until("it shrinks back when it needs less", () -> box.getHeight() < tall);
+        FxWait.until("it shrinks back when it needs less", () -> {
+            if (box.getHeight() < tall) return true;
+            throw new AssertionError("still " + measures(box) + ", was " + tall + " narrow"); // what a failure reports
+        });
 
         FxWait.fx(() -> { box.setText("hola"); return null; });
         FxWait.settled();
