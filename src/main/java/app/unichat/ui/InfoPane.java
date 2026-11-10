@@ -94,18 +94,9 @@ public final class InfoPane extends ScrollPane {
             ident.getChildren().add(topic);
         }
 
-        // Six round icons (their names in a tooltip and for screen readers): all in a row when they fit, else three by
-        // three, never four and two. Decided at layout time, when the icons have their real (CSS, text-size) size.
-        javafx.scene.layout.TilePane actions = new javafx.scene.layout.TilePane(8, 8) {
-            @Override protected void layoutChildren() {
-                double tile = getChildren().stream().mapToDouble(n -> n.prefWidth(-1)).max().orElse(0);
-                double room = getParent() instanceof Region r ? r.getWidth() - r.getInsets().getLeft() - r.getInsets().getRight() : 0;
-                int n = getChildren().size();
-                double max = room <= 0 || room >= n * tile + (n - 1) * getHgap() ? Double.MAX_VALUE : 3 * tile + 2 * getHgap();
-                if (max != getMaxWidth()) setMaxWidth(max);
-                super.layoutChildren();
-            }
-        };
+        // Six round icons (their names in a tooltip and for screen readers): all in a row when they fit, else three and
+        // three (ActionGrid decides from the width it gets).
+        ActionGrid actions = new ActionGrid(8);
         actions.getChildren().addAll(
                 action(Icons.BELL_OFF, c.muted() ? I18n.t("info.unmute") : I18n.t("info.mute"), c.muted(), () -> svc.setMuted(c.id(), !c.muted())),
                 action(Icons.STAR, I18n.t("info.favorite"), c.favorite(), () -> svc.setFavorite(c.id(), !c.favorite())),
@@ -116,10 +107,7 @@ public final class InfoPane extends ScrollPane {
                 action(Icons.SETTINGS, I18n.t("thread.chatOptions"), false, () -> {
                     if (onOptions != null) onOptions.accept(c);
                 }));
-        actions.setAlignment(Pos.CENTER);
-        actions.setPrefColumns(6);
-
-        box.getChildren().addAll(top, ident, new javafx.scene.layout.StackPane(actions)); // centred when three by three
+        box.getChildren().addAll(top, ident, actions);
 
         if (c.reminderAt() != null) {
             Label rem = new Label(I18n.t("info.reminder", Formats.listStamp(c.reminderAt(), Instant.now(), ZoneId.systemDefault()),
