@@ -83,34 +83,85 @@ class EmojiPickerUiTest {
             // another UI test started the toolkit
         }
         Platform.setImplicitExit(false);
-        VBox grid = FxWait.fx(() -> {
-            VBox g = EmojiPicker.grid(e -> { }, 300);
+        FxWait.fx(() -> EmojiArt.pictures()).get(); // JUnit's own timeout catches one that never ends
+        EmojiGrid grid = FxWait.fx(() -> {
+            EmojiGrid g = new EmojiGrid(null, EmojiGrid.Mode.PLAIN, e -> { }, t -> { });
             Stage stage = new Stage();
-            ScrollPane sp = new ScrollPane(g);
-            sp.setFitToWidth(true);
-            Scene scene = new Scene(sp, 340, 600);
+            Scene scene = new Scene(g, 340, 600);
             scene.getStylesheets().add(EmojiPickerUiTest.class.getResource("/app/unichat/css/app.css").toExternalForm());
             stage.setScene(scene);
             stage.show();
             return g;
         });
-        FxWait.fx(() -> EmojiArt.pictures()).get(30, java.util.concurrent.TimeUnit.SECONDS);
-        FxWait.settled();
-        List<Button> buttons = FxWait.fx(() -> grid.lookupAll(".emoji-button").stream().map(n -> (Button) n).toList());
+        // The list itself: the box measuring a button is styled as the list too.
+        javafx.scene.control.ListView<EmojiRows.Row> list = FxWait.fx(() -> grid.lookupAll(".emoji-list").stream()
+                .filter(n -> n instanceof javafx.scene.control.ListView).map(n -> (javafx.scene.control.ListView<EmojiRows.Row>) n)
+                .findFirst().orElseThrow());
+        FxWait.until("the rows are laid out", () -> !list.getItems().isEmpty());
+        List<String> listed = FxWait.fx(() -> list.getItems().stream().filter(r -> r instanceof EmojiRows.Emojis)
+                .flatMap(r -> ((EmojiRows.Emojis) r).emoji().stream()).toList());
         int total = EmojiPicker.CATEGORIES.values().stream().mapToInt(List::size).sum();
-        assertEquals(total, buttons.size());
-        for (String e : List.of("🇨🇴", "👨‍🦰", "#️⃣", "❤️‍🔥", "🏳️‍🌈")) {
-            Button b = FxWait.fx(() -> buttons.stream().filter(x -> x.getAccessibleText().endsWith(" " + e)).findFirst().orElseThrow());
-            assertTrue(FxWait.fx(() -> b.isVisible() && b.getGraphic() instanceof ImageView), e + " drawn as a picture");
+        assertEquals(total, listed.size(), "the Mac's font joins all of them: none left out");
+        for (String e : List.of("🇨🇴", "👨‍🦰", "#️⃣", "❤️‍🔥", "🏳️‍🌈", "🫠")) {
+            int row = FxWait.fx(() -> {
+                for (int i = 0; i < list.getItems().size(); i++) {
+                    if (list.getItems().get(i) instanceof EmojiRows.Emojis r && r.emoji().contains(e)) return i;
+                }
+                return -1;
+            });
+            FxWait.fx(() -> { list.scrollTo(row); return null; });
+            FxWait.until(e + " on screen", () -> button(grid, e) != null);
+            Button b = FxWait.fx(() -> button(grid, e));
+            boolean picture = !e.equals("🫠");
+            assertEquals(picture, FxWait.fx(() -> b.getGraphic() instanceof ImageView), e + (picture ? " drawn as a picture" : " drawn as text"));
         }
-        long hidden = FxWait.fx(() -> buttons.stream().filter(b -> !b.isVisible()).count());
-        assertEquals(0, hidden, "the Mac's font joins all of them");
         String shot = System.getProperty("unichat.emojiShot");
         if (shot != null) {
-            // The people: emoji drawn as text beside those drawn as pictures, at the same size.
-            Node flags = FxWait.fx(() -> grid.getChildren().get(3));
-            var img = FxWait.fx(() -> flags.snapshot(null, null));
+            var img = FxWait.fx(() -> grid.snapshot(null, null));
             ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", new File(shot));
         }
+    }
+
+    /** Typing in the search keeps what's called that, in the language in use; Enter takes the first. */
+    @Test
+    void searchingFindsByNameAndEnterPicksTheFirst() throws Exception {
+        try {
+            CountDownLatch started = new CountDownLatch(1);
+            Platform.startup(started::countDown);
+            started.await();
+        } catch (IllegalStateException alreadyRunning) {
+            // another UI test started the toolkit
+        }
+        Platform.setImplicitExit(false);
+        java.util.concurrent.CompletableFuture<String> picked = new java.util.concurrent.CompletableFuture<>();
+        EmojiGrid grid = FxWait.fx(() -> {
+            EmojiGrid g = new EmojiGrid(null, EmojiGrid.Mode.PLAIN, picked::complete, t -> { });
+            Stage stage = new Stage();
+            stage.setScene(new Scene(g, 340, 500));
+            stage.show();
+            return g;
+        });
+        javafx.scene.control.ListView<EmojiRows.Row> list = FxWait.fx(() -> grid.lookupAll(".emoji-list").stream()
+                .filter(n -> n instanceof javafx.scene.control.ListView).map(n -> (javafx.scene.control.ListView<EmojiRows.Row>) n)
+                .findFirst().orElseThrow());
+        FxWait.until("laid out", () -> !list.getItems().isEmpty());
+        FxWait.fx(() -> { grid.searchField().setText("cara derrit"); return null; });
+        List<EmojiRows.Row> rows = FxWait.fx(() -> List.copyOf(list.getItems()));
+        assertEquals(new EmojiRows.Title("Resultados"), rows.get(0));
+        assertEquals(List.of("🫠"), rows.stream().filter(r -> r instanceof EmojiRows.Emojis).flatMap(r -> ((EmojiRows.Emojis) r).emoji().stream()).toList());
+        FxWait.fx(() -> {
+            javafx.event.Event.fireEvent(grid.searchField(), new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,
+                    "", "", javafx.scene.input.KeyCode.ENTER, false, false, false, false));
+            return null;
+        });
+        assertEquals("🫠", picked.get());
+        FxWait.fx(() -> { grid.searchField().setText("zzqx"); return null; });
+        assertEquals(new EmojiRows.Hint("Ningún emoji se llama así."), FxWait.fx(() -> list.getItems().get(1)));
+        FxWait.fx(() -> { grid.getScene().getWindow().hide(); return null; });
+    }
+
+    private static Button button(Node in, String e) {
+        return in.lookupAll(".emoji-button").stream().map(n -> (Button) n)
+                .filter(b -> b.isVisible() && e.equals(b.getProperties().get("emoji"))).findFirst().orElse(null);
     }
 }

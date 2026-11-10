@@ -204,9 +204,14 @@ final class MessageRowView {
             bubble.getChildren().add(media.fileNode(m));
         } else if ((m.type() == MessageType.TEXT) && RichText.isJumboEmoji(m.body()) && m.replyToId() == null) {
             bubble.getStyleClass().add("jumbo");
-            Label l = new Label(m.body().strip());
-            l.getStyleClass().add("jumbo-emoji");
-            bubble.getChildren().add(l);
+            // Big, and whole: a flag or joined emoji as its picture (EmojiInline), the rest as text.
+            javafx.scene.layout.HBox big = new javafx.scene.layout.HBox();
+            big.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            for (javafx.scene.Node n : EmojiInline.nodes(m.body().strip(), Label::new)) {
+                n.getStyleClass().add("jumbo-emoji");
+                big.getChildren().add(n);
+            }
+            bubble.getChildren().add(big);
         } else {
             String body = m.type() == MessageType.EMOTE ? "* " + m.senderName() + " " + m.body() : m.body();
             double textWidth = maxWidth - 24;

@@ -187,4 +187,20 @@ class MediaLibraryTest {
         assertEquals(1, lib.recents(MediaLibrary.Kind.STICKER).size());
         assertEquals(1, lib.recents(MediaLibrary.Kind.GIF).size());
     }
+
+    @Test
+    void theQuickReactionsAreTheOnesUsedMostAndTravelInTheFile(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) {
+        java.nio.file.Path f = dir.resolve("media-library.json");
+        MediaLibrary lib = new MediaLibrary(f);
+        java.util.List<String> usual = java.util.List.of("❤️", "👍", "😂", "😮", "😢", "🙏");
+        assertEquals(usual, lib.mostReacted(6, usual), "no history: the usual ones");
+        for (int i = 0; i < 3; i++) lib.reacted("🔥");
+        lib.reacted("🫠");
+        lib.reacted("👍");
+        lib.reacted("👍");
+        assertEquals(java.util.List.of("🔥", "👍", "🫠", "❤️", "😂", "😮"), lib.mostReacted(6, usual),
+                "most used first, ties newest first, then the usual ones not already there");
+        assertEquals(java.util.List.of("🔥", "👍", "🫠", "❤️", "😂", "😮"), new MediaLibrary(f).mostReacted(6, usual), "kept in the file");
+        assertEquals(java.util.List.of("🔥"), lib.mostReacted(1, usual));
+    }
 }

@@ -131,7 +131,7 @@ final class HtmlView {
         if (s.isBlank() && (b.run == null || !look.pre() && s.isEmpty())) return;
         for (RichText.Span span : RichText.addressSpans(s)) {
             if (span.kind() == RichText.Kind.LINK) b.inline(RichText.link(span.text(), span.text(), openLink, b.width));
-            else b.inline(styled(span.text(), look));
+            else for (javafx.scene.Node n : EmojiInline.nodes(span.text(), run -> styled(run, look))) b.inline(n);
         }
     }
 

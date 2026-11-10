@@ -25,7 +25,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
@@ -71,7 +70,7 @@ class ScrollPerfUiTest {
                 f.completeExceptionally(t);
             }
         });
-        return f.get(120, TimeUnit.SECONDS);
+        return f.get();
     }
 
     private static void paint(Graphics2D g, int w, int h, int frame, int seed) {
@@ -205,7 +204,9 @@ class ScrollPerfUiTest {
                         }
                     }
                     try {
-                        Thread.sleep(5); // the pace of a person's scrolling: what this test measures against
+                        // The sampling rate of this profiler, not a wait for the code: sampling the UI thread's stack
+                        // every 5 ms is the measurement itself (the one timed pause the testing rules allow).
+                        Thread.sleep(5);
                     } catch (InterruptedException e) {
                         return;
                     }
@@ -236,15 +237,24 @@ class ScrollPerfUiTest {
         return ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed() >> 20;
     }
 
+    /**
+     * Scrolls one step per frame for {@code seconds} worth of frames (at 60 a second) and, with {@code live}, brings a
+     * message every 6 frames: the load is counted in frames, not in time, so a slower machine does the same work.
+     */
     private static void run(String name, Node target, double delta, int seconds, Thread ui, Runnable live) throws Exception {
         List<Long> gaps = Collections.synchronizedList(new ArrayList<>());
         long[] last = {0};
         int[] direction = {-1};
         int[] frames = {0};
+        int frameCount = seconds * 60;
+        java.util.concurrent.Semaphore everySixth = new java.util.concurrent.Semaphore(0);
+        CountDownLatch over = new CountDownLatch(1);
         AnimationTimer timer = new AnimationTimer() {
             @Override public void handle(long now) {
                 if (last[0] != 0) gaps.add(now - last[0]);
                 last[0] = now;
+                if (gaps.size() % 6 == 0) everySixth.release();
+                if (gaps.size() >= frameCount) over.countDown();
                 if (delta == 0) return;
                 if (++frames[0] % 240 == 0) direction[0] = -direction[0];
                 double d = direction[0] * delta;
@@ -258,10 +268,13 @@ class ScrollPerfUiTest {
                 timer.start();
                 return null;
             });
-            long end = System.currentTimeMillis() + seconds * 1000L;
-            while (System.currentTimeMillis() < end) {
-                if (live != null) live.run();
-                Thread.sleep(live != null ? 100 : 200); // the scroll lasts `seconds` and messages arrive at this pace: the load being measured
+            if (live == null) {
+                over.await();
+            } else {
+                while (over.getCount() > 0) {
+                    everySixth.acquire();
+                    live.run();
+                }
             }
             fx(() -> {
                 timer.stop();
@@ -294,7 +307,7 @@ class ScrollPerfUiTest {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
-            started.await(10, TimeUnit.SECONDS);
+            started.await();
         } catch (IllegalStateException alreadyRunning) {
             // another UI test started the toolkit
         }

@@ -94,6 +94,7 @@ public final class PreferencesFile {
     /** The main file is still the damaged one, and memory holds what came from the backup: it must not become the backup. */
     private boolean damagedInPlace;
     private Runnable onSaveFailure;
+    private int announcements;
     private int batching;
     private boolean writePending, writerRunning;
     /** Times the main file was replaced since this object was created. */
@@ -129,9 +130,16 @@ public final class PreferencesFile {
         if (saveFailing && listener != null) announce(listener);
     }
 
-    private static void announce(Runnable listener) {
+    private void announce(Runnable listener) {
+        announcements++;
         Thread.ofPlatform().daemon().name("preferences-save-failed").start(listener);
     }
+
+    /**
+     * Failures announced so far. Decided under the lock (in {@link #flush} or {@link #onSaveFailure}); only the telling
+     * goes on another thread: a test reads here whether a warning went out, without waiting a while to see.
+     */
+    synchronized int announcements() { return announcements; }
 
     public synchronized Effective reconcile(String key, ServerValues server) {
         for (Flag f : Flag.values()) {

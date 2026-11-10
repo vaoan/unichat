@@ -28,6 +28,8 @@ public final class MediaLibrary {
     private final Path file;
     private final List<Item> favorites = new ArrayList<>();
     private final List<Item> recents = new ArrayList<>();
+    /** How often each emoji was used to react, most recent first among equals: the quick reactions are the top ones. */
+    private final java.util.LinkedHashMap<String, Integer> reactions = new java.util.LinkedHashMap<>();
     private final List<Runnable> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public MediaLibrary(Path file) {
@@ -92,6 +94,24 @@ public final class MediaLibrary {
         addRecent(item);
     }
 
+    /** The person reacted with {@code emoji} (added it, not took it away). */
+    public synchronized void reacted(String emoji) {
+        int n = reactions.getOrDefault(emoji, 0) + 1;
+        reactions.remove(emoji);
+        reactions.put(emoji, n); // last in order: the newest wins a tie
+        changed();
+    }
+
+    /** The {@code count} emoji most reacted with, most first; {@code usual} fills the places history doesn't yet. */
+    public synchronized List<String> mostReacted(int count, List<String> usual) {
+        List<String> keys = new ArrayList<>(reactions.keySet());
+        java.util.Collections.reverse(keys); // newest first, so a stable sort keeps the newest ahead among equals
+        keys.sort((a, b) -> reactions.get(b) - reactions.get(a));
+        List<String> out = new ArrayList<>(keys.subList(0, Math.min(count, keys.size())));
+        for (String u : usual) if (out.size() < count && !out.contains(u)) out.add(u);
+        return out;
+    }
+
     /** Adds or removes a favourite; true when it's now a favourite. */
     public synchronized boolean toggleFavorite(Item item) {
         boolean removed = favorites.removeIf(i -> same(i, item));
@@ -106,10 +126,12 @@ public final class MediaLibrary {
             JsonNode root = JSON.readTree(file.toFile());
             for (JsonNode n : root.path("favorites")) if (known(n)) favorites.add(item(n));
             for (JsonNode n : root.path("recents")) if (known(n)) recents.add(item(n));
+            root.path("reactions").fields().forEachRemaining(f -> reactions.put(f.getKey(), f.getValue().asInt()));
             if (dropCopies(favorites) | dropCopies(recents)) save();
         } catch (IOException | RuntimeException e) {
             favorites.clear();
             recents.clear();
+            reactions.clear();
         }
     }
 
@@ -161,6 +183,8 @@ public final class MediaLibrary {
         ArrayNode fav = root.putArray("favorites"), rec = root.putArray("recents");
         favorites.forEach(i -> fav.add(node(i)));
         recents.forEach(i -> rec.add(node(i)));
+        ObjectNode react = root.putObject("reactions");
+        reactions.forEach(react::put);
         try {
             Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");

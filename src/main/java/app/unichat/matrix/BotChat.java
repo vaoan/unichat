@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.Map;
@@ -76,36 +77,47 @@ final class BotChat {
 
     /** Sends a command to {@code n}'s bridge bot and returns its next reply (up to 20 s). */
     String query(Network n, String command) throws IOException, InterruptedException {
-        return query(n, command, 20);
+        return query(n, command, Duration.ofSeconds(20));
     }
 
-    String query(Network n, String command, int seconds) throws IOException, InterruptedException {
+    String query(Network n, String command, Duration patience) throws IOException, InterruptedException {
         synchronized (botLocks.computeIfAbsent(n, k -> new Object())) {
-            return queryLocked(n, command, seconds);
+            return queryLocked(n, command, patience);
         }
     }
 
     /** Sends a command through the existing bot chat and returns its next reply; null with no chat, or no reply in 10 s. */
     String ask(Network n, String command) throws IOException, InterruptedException {
-        return ask(n, command, 10);
+        return ask(n, command, Duration.ofSeconds(10));
     }
 
-    String ask(Network n, String command, int seconds) throws IOException, InterruptedException {
+    String ask(Network n, String command, Duration patience) throws IOException, InterruptedException {
         synchronized (botLocks.computeIfAbsent(n, k -> new Object())) {
             String roomId = find(n);
             if (roomId == null) return null;
             int before = messageCount(roomId);
             send(roomId, botCommand(n, command));
-            for (int i = 0; i < seconds * 2; i++) {
-                Thread.sleep(500);
-                String reply = replyAfter(roomId, before);
-                if (reply != null) return reply;
-            }
-            return null;
+            return awaitReply(roomId, before, patience);
         }
     }
 
-    private String queryLocked(Network n, String command, int seconds) throws IOException, InterruptedException {
+    /**
+     * The bot's next message in {@code roomId} (after {@code before} of its messages), as soon as a sync brings it
+     * ({@link SyncProcessor#process} wakes this); null if none comes within {@code patience}.
+     */
+    private String awaitReply(String roomId, int before, Duration patience) throws InterruptedException {
+        long deadline = System.nanoTime() + patience.toNanos();
+        synchronized (proc) {
+            for (String reply; (reply = replyAfter(roomId, before)) == null; ) {
+                long left = deadline - System.nanoTime();
+                if (left <= 0) return null;
+                java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(proc, left);
+            }
+            return replyAfter(roomId, before);
+        }
+    }
+
+    private String queryLocked(Network n, String command, Duration patience) throws IOException, InterruptedException {
         String roomId = room(n);
         int before = messageCount(roomId);
         try {
@@ -118,11 +130,8 @@ final class BotChat {
             before = messageCount(roomId);
             send(roomId, botCommand(n, command));
         }
-        for (int i = 0; i < seconds * 2; i++) {
-            Thread.sleep(500);
-            String reply = replyAfter(roomId, before);
-            if (reply != null) return reply;
-        }
+        String reply = awaitReply(roomId, before, patience);
+        if (reply != null) return reply;
         throw new MatrixException(0, null, I18n.t("bot.noReply", n.displayName()));
     }
 

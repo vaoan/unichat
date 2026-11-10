@@ -3,12 +3,8 @@ package app.unichat.ui;
 import app.unichat.model.MediaLibrary;
 import app.unichat.support.I18n;
 
-import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Popup;
 
@@ -20,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Popup emoji grid by category; also provides the quick-reaction set. */
+/** The emoji list, one emoji's button, and the reaction picker (a popup with the list); also the quick-reaction set. */
 public final class EmojiPicker {
     private EmojiPicker() {}
 
@@ -43,26 +39,6 @@ public final class EmojiPicker {
             throw new IllegalStateException("emoji list missing", e);
         }
         return out;
-    }
-
-    /** Every category as a grid of emoji buttons ({@code onPick} gets the emoji); used by the popup and the side panel. */
-    static VBox grid(Consumer<String> onPick, double wrap) {
-        return grid(onPick, wrap, null, null);
-    }
-
-    /** With a library: right-click adds to or removes from the favourites, and a pick counts as recent. */
-    static VBox grid(Consumer<String> onPick, double wrap, MediaLibrary library, Consumer<String> toast) {
-        VBox content = new VBox(6);
-        content.setPadding(new Insets(10));
-        for (Map.Entry<String, List<String>> cat : CATEGORIES.entrySet()) {
-            Label title = new Label(I18n.t(cat.getKey()));
-            title.getStyleClass().add("emoji-category");
-            FlowPane grid = new FlowPane(2, 2);
-            grid.setPrefWrapLength(wrap);
-            for (String e : cat.getValue()) grid.getChildren().add(button(e, onPick, library, toast));
-            content.getChildren().addAll(title, grid);
-        }
-        return content;
     }
 
     /** One emoji; {@code library} may be null (no menu, no recents). */
@@ -88,7 +64,7 @@ public final class EmojiPicker {
             javafx.scene.image.ImageView view = new javafx.scene.image.ImageView(img);
             view.setPreserveRatio(true);
             view.setSmooth(true);
-            view.fitHeightProperty().bind(b.fontProperty().map(f -> f.getSize() * 1.2));
+            view.fitHeightProperty().bind(b.fontProperty().map(f -> f.getSize() * EmojiArt.FIT));
             b.setText(null);
             b.setGraphic(view);
             Nodes.show(b, true);
@@ -97,23 +73,30 @@ public final class EmojiPicker {
 
     /** Shows the picker anchored above {@code anchor}; {@code onPick} receives the emoji. */
     public static void show(Node anchor, Consumer<String> onPick) {
+        popup(anchor, null, EmojiGrid.Mode.PLAIN, onPick);
+    }
+
+    /** To react: the ones reacted with most first, and the search box ready to type in. */
+    static void showForReaction(Node anchor, MediaLibrary library, Consumer<String> onPick) {
+        popup(anchor, library, EmojiGrid.Mode.REACTIONS, onPick);
+    }
+
+    private static void popup(Node anchor, MediaLibrary library, EmojiGrid.Mode mode, Consumer<String> onPick) {
         Popup popup = new Popup();
         popup.setAutoHide(true);
-        VBox content = grid(e -> {
+        EmojiGrid grid = new EmojiGrid(library, mode, e -> {
             onPick.accept(e);
             popup.hide();
-        }, 300);
-        ScrollPane scroll = new ScrollPane(content);
-        scroll.setFitToWidth(true);
-        scroll.setPrefSize(340, 320);
-        scroll.getStyleClass().add("emoji-picker");
-        scroll.getStylesheets().addAll(anchor.getScene().getStylesheets());
-        VBox wrap = new VBox(scroll);
+        }, t -> { });
+        grid.setPrefSize(340, 380);
+        grid.getStylesheets().addAll(anchor.getScene().getStylesheets());
+        VBox wrap = new VBox(grid);
         wrap.getStyleClass().add("popup-surface");
         wrap.getStyleClass().addAll(anchor.getScene().getRoot().getStyleClass());
         wrap.setStyle(anchor.getScene().getRoot().getStyle());
         popup.getContent().add(wrap);
         var b = anchor.localToScreen(anchor.getBoundsInLocal());
-        popup.show(anchor, b.getMinX(), b.getMinY() - 330);
+        popup.show(anchor, b.getMinX(), b.getMinY() - 390);
+        grid.searchField().requestFocus();
     }
 }

@@ -347,7 +347,7 @@ final class BridgeAccounts {
     CompletableFuture<String> syncChats(Network n) {
         if (n != Network.TELEGRAM) return CompletableFuture.failedFuture(new UnsupportedOperationException("syncChats"));
         return core.call(() -> {
-            String reply = bots.query(n, "sync-chats", 600);
+            String reply = bots.query(n, "sync-chats", java.time.Duration.ofMinutes(10));
             requireSuccess(reply);
             Settings.get().set("telegram.chatSyncLimit", Integer.toString(BridgePorts.TELEGRAM_CREATE_LIMIT));
             return reply;

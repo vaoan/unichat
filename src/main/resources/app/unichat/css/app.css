@@ -488,11 +488,22 @@
     -fx-padding: 4;
 }
 .emoji-picker { -fx-background-color: transparent; }
+.emoji-list, .emoji-list > .virtual-flow > .clipped-container > .sheet > .list-cell { -fx-background-color: transparent; }
+.emoji-list { -fx-padding: 0; -fx-background-insets: 0; }
+.emoji-search-box { -fx-padding: 8 10 0 10; }
+.emoji-list .list-cell { -fx-padding: 1 10; }
+.emoji-list .list-cell .emoji-category { -fx-padding: 6 0 2 0; }
 .emoji-category { -fx-text-fill: -text-3; -fx-font-size: 0.82em; -fx-font-weight: bold; }
 .emoji-button, .reaction-emoji, .jumbo-emoji, .quick-reactions .emoji-button {
     -fx-font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI", sans-serif;
 }
 .emoji-button { -fx-font-size: 1.45em; -fx-padding: 2 4; -fx-background-radius: 8; }
+/* One size for every emoji in the list, text or picture (flags and joined ones), so the rows line up; in em, it grows with the text. */
+.emoji-list .emoji-button {
+    -fx-padding: 0; -fx-alignment: center;
+    -fx-min-width: 1.35em; -fx-pref-width: 1.35em; -fx-max-width: 1.35em;
+    -fx-min-height: 1.35em; -fx-pref-height: 1.35em; -fx-max-height: 1.35em;
+}
 .quick-reactions .emoji-button { -fx-font-size: 1.6em; }
 
 .toast {

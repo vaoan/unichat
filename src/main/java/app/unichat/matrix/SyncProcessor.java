@@ -100,7 +100,14 @@ final class SyncProcessor {
 
     // ---------------------------------------------------------------- /sync
 
-    Result process(JsonNode sync, boolean live) { return process(sync, live, true); }
+    /** Wakes whoever waits on this object for what the next sync brings (a bot's reply: {@code BotChat}). */
+    Result process(JsonNode sync, boolean live) {
+        Result r = process(sync, live, true);
+        synchronized (this) {
+            notifyAll();
+        }
+        return r;
+    }
 
     /** The sync saved on disk: everything shows at once, but preferences only count when the server answers. */
     Result replay(JsonNode cached) { return process(cached, false, false); }

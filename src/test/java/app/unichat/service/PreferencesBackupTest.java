@@ -13,7 +13,6 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -197,8 +196,7 @@ class PreferencesBackupTest {
         assertEquals(good, Files.readString(bak()));
         var said = new LinkedBlockingQueue<String>();
         new FolderActions(first, () -> { }).onSaveFailure(said::add);
-        String text = said.poll(5, TimeUnit.SECONDS);
-        assertNotNull(text, "the person must hear the recovery isn't saved");
+        String text = said.take(); // the person must hear the recovery isn't saved
         assertTrue(text.contains("copia anterior") && text.contains("No se pudieron guardar"), text);
         first.choose(B, Flag.PINNED, true);
         first.choose(B, Flag.ARCHIVED, true);
@@ -258,8 +256,8 @@ class PreferencesBackupTest {
     void aSuccessfulRecoveryDoesNotWarnAboutSaving() throws Exception {
         twoSaves();
         Files.writeString(prefs(), "{roto");
-        var said = new LinkedBlockingQueue<String>();
-        new FolderActions(open(), () -> { }).onSaveFailure(said::add);
-        assertNull(said.poll(200, TimeUnit.MILLISECONDS));
+        var opened = open();
+        new FolderActions(opened, () -> { }).onSaveFailure(m -> { });
+        assertEquals(0, opened.announcements(), "nothing to warn about");
     }
 }

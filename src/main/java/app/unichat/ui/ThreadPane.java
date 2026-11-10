@@ -42,6 +42,9 @@ public final class ThreadPane extends BorderPane {
     private final AudioPlayback audio;
     private final MessageMedia media;
     private final MessageActionsUi messageActions;
+
+    /** The message actions (reacting), for tests. */
+    MessageActionsUi actions() { return messageActions; }
     private final Label typing = new Label();
     private final TimelineScroll scroll;
     private final MessageRowView messageRows;
@@ -380,9 +383,9 @@ public final class ThreadPane extends BorderPane {
             messageActions.messageMenu(m).show(cell, Side.BOTTOM, 40, -10);
         } else if (code.isDigitKey() && !e.isShortcutDown() && !m.deleted()) {
             int n = code.getCode() - javafx.scene.input.KeyCode.DIGIT1.getCode();
-            java.util.List<String> offered = chat.features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK));
-            if (n < 0 || n >= EmojiPicker.QUICK.length || !offered.contains(EmojiPicker.QUICK[n])) return;
-            svc.toggleReaction(chat.id(), m.id(), EmojiPicker.QUICK[n]);
+            java.util.List<String> quick = messageActions.quick(); // 1 to 6: the quick reactions, as the popup shows them
+            if (n < 0 || n >= quick.size()) return;
+            messageActions.react(m, quick.get(n));
         } else {
             return;
         }

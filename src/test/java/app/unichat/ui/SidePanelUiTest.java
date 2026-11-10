@@ -53,10 +53,13 @@ class SidePanelUiTest {
 
         fx(() -> { view[0].showPanel(SidePanel.Tab.EMOJIS); return null; });
         assertEquals(SidePanel.Tab.EMOJIS, fx(() -> panel(scene).current()), "switches tab without closing");
-        FxWait.until("the scroll pane builds its emojis", () -> panel(scene).lookup(".emoji-button") != null);
+        FxWait.until("the list builds its emojis", () -> panel(scene).lookupAll(".emoji-button").stream()
+                .anyMatch(n -> n.isVisible() && n.getProperties().containsKey("emoji")));
 
         fx(() -> {
-            Button smile = (Button) panel(scene).lookupAll(".emoji-button").iterator().next();
+            // A real one: the list also holds a hidden button that only measures the size.
+            Button smile = (Button) panel(scene).lookupAll(".emoji-button").stream()
+                    .filter(n -> n.isVisible() && n.getProperties().containsKey("emoji")).findFirst().orElseThrow();
             smile.fire();
             return null;
         });

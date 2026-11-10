@@ -127,11 +127,8 @@ public final class MainView extends StackPane {
         panel.setContent(SidePanel.Tab.STICKERS, stickers, stickers::refresh);
         GifGrid gifs = new GifGrid(svc, library, thread::chat, thread::takeReply, this::toast);
         panel.setContent(SidePanel.Tab.GIFS, gifs, gifs::refresh);
-        EmojiGrid emojiGrid = new EmojiGrid(library, text -> thread.composer().insert(text), 280, this::toast);
-        javafx.scene.control.ScrollPane emojis = new javafx.scene.control.ScrollPane(emojiGrid);
-        emojis.setFitToWidth(true);
-        emojis.getStyleClass().addAll("emoji-picker", "side-panel-scroll");
-        panel.setContent(SidePanel.Tab.EMOJIS, emojis, emojiGrid::refresh);
+        EmojiGrid.Tab emojis = EmojiGrid.panel(library, text -> thread.composer().insert(text), this::toast);
+        panel.setContent(SidePanel.Tab.EMOJIS, emojis.node(), emojis.refresh());
         FavoritesPane favorites = new FavoritesPane(library, stickers, gifs, text -> thread.composer().insert(text), this::toast);
         panel.setContent(SidePanel.Tab.FAVORITES, favorites, favorites::refresh);
         thread.composer().setOnPanel(this::togglePanel);

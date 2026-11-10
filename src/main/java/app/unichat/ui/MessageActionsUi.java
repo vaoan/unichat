@@ -92,7 +92,7 @@ final class MessageActionsUi {
         box.getStyleClass().add("hover-actions");
         box.setAlignment(Pos.CENTER);
         if (m.deleted()) return box;
-        if (!chat.get().features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK)).isEmpty() || chat.get().features().anyReaction()) {
+        if (!quick().isEmpty() || chat.get().features().anyReaction()) {
             Button react = Icons.iconButton(Icons.EMOJI, I18n.t("message.react"), null);
             react.setOnAction(e -> reactionPopup(m, react));
             box.getChildren().add(react);
@@ -114,11 +114,12 @@ final class MessageActionsUi {
         row.getStylesheets().addAll(scene.get().getStylesheets());
         row.getStyleClass().addAll(scene.get().getRoot().getStyleClass());
         row.setStyle(scene.get().getRoot().getStyle());
-        for (String e : chat.get().features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK))) {
+        for (String e : quick()) {
             Button b = new Button(e);
             b.getStyleClass().add("emoji-button");
+            b.setAccessibleText(I18n.t("message.reactWith", e));
             b.setOnAction(ev -> {
-                svc.toggleReaction(chat.get().id(), m.id(), e);
+                react(m, e);
                 p.hide();
             });
             row.getChildren().add(b);
@@ -127,13 +128,25 @@ final class MessageActionsUi {
             Button plus = Icons.iconButton(Icons.PLUS, I18n.t("message.moreEmojis"), null);
             plus.setOnAction(ev -> {
                 p.hide();
-                EmojiPicker.show(anchor, e -> svc.toggleReaction(chat.get().id(), m.id(), e));
+                EmojiPicker.showForReaction(anchor, library, e -> react(m, e));
             });
             row.getChildren().add(plus);
         }
         p.getContent().add(row);
         var b = anchor.localToScreen(anchor.getBoundsInLocal());
         p.show(anchor, b.getMinX() - 120, b.getMinY() - 52);
+    }
+
+    /** The quick reactions: the ones the person reacts with most (the usual six until there's history), as this chat allows. */
+    java.util.List<String> quick() {
+        return chat.get().features().reactionsOffered(library.mostReacted(EmojiPicker.QUICK.length, java.util.List.of(EmojiPicker.QUICK)));
+    }
+
+    /** Adds or takes away the person's {@code e} on {@code m}; an added one counts towards the quick ones. */
+    void react(Message m, String e) {
+        java.util.Set<String> who = m.reactions().get(e);
+        if (who == null || !who.contains(svc.myUserId())) library.reacted(e);
+        svc.toggleReaction(chat.get().id(), m.id(), e);
     }
 
     /** Same rules as the message menu, for the shortcuts and hover buttons. */
@@ -182,10 +195,10 @@ final class MessageActionsUi {
             }));
         }
         if (a.contains(MessageActions.Action.EDIT)) menu.getItems().add(ChatMenus.item(I18n.t("message.edit"), () -> composer.edit(m)));
-        java.util.List<String> reactions = chat.get().features().reactionsOffered(java.util.List.of(EmojiPicker.QUICK));
+        java.util.List<String> reactions = quick();
         if (!reactions.isEmpty()) {
             menu.getItems().add(new SeparatorMenuItem());
-            for (String e : reactions) menu.getItems().add(ChatMenus.item(I18n.t("message.reactWith", e), () -> svc.toggleReaction(chat.get().id(), m.id(), e)));
+            for (String e : reactions) menu.getItems().add(ChatMenus.item(I18n.t("message.reactWith", e), () -> react(m, e)));
         }
         if (a.contains(MessageActions.Action.DELETE_FOR_EVERYONE)) {
             menu.getItems().add(new SeparatorMenuItem());

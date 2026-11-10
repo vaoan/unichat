@@ -55,9 +55,12 @@ class TranscriptsTest {
         java.time.Duration wait = java.time.Duration.ofDays(1);
         assertEquals("nos vemos", t.await("mxc://s/ok", () -> CompletableFuture.completedFuture(dir.resolve("ok.ogg")), wait));
         assertNull(t.await("mxc://s/bad", () -> CompletableFuture.completedFuture(dir.resolve("bad.ogg")), wait));
-        assertNull(t.await("mxc://s/slow", () -> CompletableFuture.completedFuture(dir.resolve("slow.ogg")), java.time.Duration.ofMillis(100)));
+        // Held until released: with no time left to wait it can't be there, whatever the machine's speed.
+        assertNull(t.await("mxc://s/slow", () -> CompletableFuture.completedFuture(dir.resolve("slow.ogg")), java.time.Duration.ZERO));
         release.countDown();
         assertEquals("nos vemos", t.await("mxc://s/ok", () -> { throw new AssertionError("done already"); }, wait));
+        // The slow one still finishes and writes its file: waited for, or it raced the folder's deletion (a flaky test).
+        await(t, "mxc://s/slow");
     }
 
     @Test

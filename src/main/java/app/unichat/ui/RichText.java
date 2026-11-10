@@ -117,14 +117,14 @@ public final class RichText {
                 case LINK -> {
                     nodes.add(link(span.text(), span.text(), openLink, width));
                 }
-                default -> {
-                    Text t = new Text(span.text());
+                default -> nodes.addAll(EmojiInline.nodes(span.text(), run -> {
+                    Text t = new Text(run);
                     t.getStyleClass().add("msg-text");
                     if (span.kind() == Kind.BOLD) t.getStyleClass().add("bold");
                     if (span.kind() == Kind.ITALIC) t.getStyleClass().add("italic");
                     if (span.kind() == Kind.CODE) t.getStyleClass().add("code");
-                    nodes.add(t);
-                }
+                    return t;
+                }));
             }
         }
         return nodes;

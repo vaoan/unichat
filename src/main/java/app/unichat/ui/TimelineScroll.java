@@ -20,12 +20,15 @@ final class TimelineScroll {
     private final Button jumpDown;
     private ScrollBar vbar;
     /**
-     * True while the viewport follows new messages. Only the person scrolling (wheel, keys, the scrollbar) unpins it:
-     * the scrollbar also moves when a photo or sticker finishes loading and a bubble grows, which isn't "scrolled up".
+     * True while the viewport follows new messages. Only the person going towards older messages (wheel or trackpad up,
+     * the keys up, dragging the scrollbar) unpins it, at once; it pins again when the newest message is wholly in view,
+     * measured in pixels. The scrollbar also moves when a photo finishes loading and a bubble grows: that decides
+     * nothing. (A time window after the wheel and a "near the bottom" of 0.2 % of the whole chat, hundreds of pixels in
+     * a long one, pulled the person back down after a small scroll up.)
      */
     private boolean pinnedBottom = true;
-    /** When the person last scrolled by hand (ms); scrollbar moves shortly after count as theirs. */
-    private long userScrollAt;
+    /** The scrollbar's thumb is being dragged: where it ends up is the person's choice. */
+    private boolean dragging;
 
     /** {@code atTop} runs each time the list reaches its first row. {@code owner}'s scene is watched for layouts. */
     TimelineScroll(ListView<ThreadRows.Row> list, ObservableList<ThreadRows.Row> rows, Node owner, BooleanSupplier chatOpen, Runnable atTop) {
@@ -36,10 +39,12 @@ final class TimelineScroll {
         jumpDown = Icons.iconButton(Icons.LOW, I18n.t("timeline.jumpDown"), this::scrollToBottom);
         jumpDown.getStyleClass().add("jump-down");
         jumpDown.setVisible(false);
-        list.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> userScrolled());
+        list.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> {
+            if (e.getDeltaY() > 0) unpin(); // towards older messages
+        });
         list.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, e -> {
             switch (e.getCode()) {
-                case PAGE_UP, PAGE_DOWN, HOME, END, UP, DOWN -> userScrolled();
+                case PAGE_UP, HOME, UP -> unpin();
                 default -> { }
             }
         });
@@ -69,8 +74,8 @@ final class TimelineScroll {
         if (!lastRowFullyVisible()) list.scrollTo(rows.size() - 1);
     }
 
-    private void userScrolled() {
-        userScrollAt = System.currentTimeMillis();
+    private void unpin() {
+        pinnedBottom = false;
     }
 
     private boolean lastRowFullyVisible() {
@@ -86,38 +91,25 @@ final class TimelineScroll {
         for (Node n : list.lookupAll(".scroll-bar")) {
             if (n instanceof ScrollBar sb && sb.getOrientation() == javafx.geometry.Orientation.VERTICAL) {
                 vbar = sb;
-                sb.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> userScrolled());
-                sb.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, e -> userScrolled());
+                sb.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> dragging = true);
+                sb.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e -> dragging = false);
                 sb.valueProperty().addListener((o, a, v) -> {
-                    // Only the person's own scrolling changes whether we follow the bottom.
-                    if (System.currentTimeMillis() - userScrollAt < 600) pinnedBottom = atBottom();
-                    jumpDown.setVisible(!pinnedBottom && !atBottom());
+                    if (dragging && v.doubleValue() < a.doubleValue()) unpin();
+                    // Down to the newest message by any means (the wheel, the keys, the thumb): following it again.
+                    if (!pinnedBottom && lastRowFullyVisible()) pinnedBottom = true;
+                    jumpDown.setVisible(!pinnedBottom);
                     if (v.doubleValue() <= sb.getMin() + 0.0001) atTop.run();
                 });
             }
         }
     }
 
-    private boolean atBottom() {
-        return vbar == null || !vbar.isVisible() || vbar.getValue() >= vbar.getMax() - 0.002;
-    }
-
+    /** Down to the newest message and following it; the layouts after (cell heights become known) keep it in view. */
     void scrollToBottom() {
         pinnedBottom = true;
-        userScrollAt = 0; // our own scroll: don't let a recent wheel turn unpin it again
         jumpDown.setVisible(false);
         if (rows.isEmpty()) return;
         list.scrollTo(rows.size() - 1);
-        // Cell heights are only known after layout; settle twice so the last row ends fully visible.
-        Platform.runLater(() -> {
-            list.scrollTo(rows.size() - 1);
-            if (vbar != null) vbar.setValue(vbar.getMax());
-            javafx.animation.PauseTransition settle = new javafx.animation.PauseTransition(javafx.util.Duration.millis(80));
-            settle.setOnFinished(e -> {
-                if (vbar != null && pinnedBottom) vbar.setValue(vbar.getMax());
-            });
-            settle.play();
-        });
     }
 
     /** The message to stay on when older ones arrive above it. */
@@ -146,7 +138,6 @@ final class TimelineScroll {
             if (rows.get(i) instanceof ThreadRows.MessageRow mr && mr.message() == target) {
                 // Stop following the bottom, or the next layout pulse (keepBottom) brings the list straight back down.
                 pinnedBottom = false;
-                userScrollAt = 0;
                 list.getSelectionModel().select(i);
                 list.scrollTo(Math.max(0, i - 2));
                 jumpDown.setVisible(true);

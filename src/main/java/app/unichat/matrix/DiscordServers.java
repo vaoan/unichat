@@ -168,7 +168,7 @@ final class DiscordServers {
     private CompletableFuture<Void> guildCommand(String command, int seconds, Runnable after) {
         return CompletableFuture.runAsync(() -> {
             try {
-                requireSuccess(bots.query(Network.DISCORD, command, seconds));
+                requireSuccess(bots.query(Network.DISCORD, command, java.time.Duration.ofSeconds(seconds)));
                 after.run();
             } catch (MatrixException e) {
                 throw new CompletionException(e);

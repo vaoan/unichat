@@ -40,8 +40,12 @@ class AutoScrollUiTest {
 
     /** A chat taller than the window but with fewer than 20 messages (so opening it also loads older ones). */
     private Scene start() throws Exception {
+        return start(12);
+    }
+
+    private Scene start(int messages) throws Exception {
         svc = new MockChatService();
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < messages; i++) {
             svc.sendText(CHAT, "Mensaje largo " + i + "\nsegunda línea\ntercera línea\ncuarta línea", null).get();
         }
         Scene scene = fx(() -> {
@@ -182,6 +186,29 @@ class AutoScrollUiTest {
         FxWait.until("the sent message shows", () -> showsLast(scene, CHAT));
         untilAtBottom(scene);
         assertTrue("bottom".equals(bottomState(scene)), bottomState(scene));
+        svc.stop();
+    }
+
+    /**
+     * A small turn of the wheel up in a long chat stays where it is: the list used to count itself "at the bottom"
+     * within 0.2 % of the whole chat (hundreds of pixels in a long one) and pulled straight back down.
+     */
+    @Test
+    void aSmallScrollUpInALongChatIsNotUndone() throws Exception {
+        Scene scene = start(200);
+        untilAtBottom(scene);
+        fx(() -> {
+            javafx.scene.Node flow = timeline(scene).lookup(".virtual-flow");
+            javafx.event.Event.fireEvent(flow, new javafx.scene.input.ScrollEvent(javafx.scene.input.ScrollEvent.SCROLL,
+                    200, 200, 200, 200, false, false, false, false, false, false, 0, 30, 0, 30,
+                    javafx.scene.input.ScrollEvent.HorizontalTextScrollUnits.NONE, 0,
+                    javafx.scene.input.ScrollEvent.VerticalTextScrollUnits.NONE, 0, 0, null));
+            return null;
+        });
+        FxWait.settled();
+        FxWait.pulses(10); // the frames in which it used to be pulled back
+        assertTrue(!"bottom".equals(bottomState(scene)), "stays scrolled up: " + bottomState(scene));
+        assertTrue(fx(() -> scene.getRoot().lookup(".jump-down").isVisible()), "and offers the way back down");
         svc.stop();
     }
 

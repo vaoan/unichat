@@ -263,6 +263,7 @@ public final class UnichatApp extends Application {
      * is watched while it's on screen: hidden ones leave {@code Window.getWindows()}, and come back when shown.
      */
     private void watchFocus() {
+        app.unichat.ui.AppWindows.install(stage);
         javafx.beans.value.ChangeListener<Boolean> focus = (o, a, b) -> Platform.runLater(() ->
                 notifier.setWindowFocused(javafx.stage.Window.getWindows().stream().anyMatch(javafx.stage.Window::isFocused)));
         for (javafx.stage.Window w : javafx.stage.Window.getWindows()) w.focusedProperty().addListener(focus);

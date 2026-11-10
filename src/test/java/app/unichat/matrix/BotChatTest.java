@@ -5,7 +5,6 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -15,8 +14,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,7 +21,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Replies are matched by order in the bot chat, so a command waits for the one before it. */
-@Timeout(30)
 class BotChatTest {
     private static final String ME = "@me:example.org";
     private static final String BOT = "@whatsappbot:example.org";
@@ -33,7 +29,7 @@ class BotChatTest {
     private final SyncProcessor proc = new SyncProcessor(ME);
     private final List<String> log = Collections.synchronizedList(new ArrayList<>());
     private final AtomicInteger events = new AtomicInteger();
-    private final ScheduledExecutorService botThread = Executors.newSingleThreadScheduledExecutor();
+    private final java.util.concurrent.ExecutorService botThread = Executors.newSingleThreadExecutor();
     private volatile boolean botAnswers = true;
     private HttpServer server;
     private BotChat bots;
@@ -49,7 +45,7 @@ class BotChatTest {
             String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             String command = MatrixClient.JSON.readTree(body).path("body").asText();
             log.add("sent " + command);
-            if (botAnswers) botThread.schedule(() -> reply(command), 700, TimeUnit.MILLISECONDS);
+            if (botAnswers) botThread.execute(() -> reply(command)); // on its own thread, after the send returns
             byte[] out = ("{\"event_id\":\"$e" + events.incrementAndGet() + "\"}").getBytes(StandardCharsets.UTF_8);
             ex.sendResponseHeaders(200, out.length);
             try (OutputStream o = ex.getResponseBody()) {
@@ -100,7 +96,8 @@ class BotChatTest {
     @Test
     void aBotThatDoesntAnswerIsNull() throws Exception {
         botAnswers = false;
-        assertNull(bots.ask(Network.WHATSAPP, "list-logins", 1));
+        // No patience at all: the answer that never comes isn't waited for, whatever the machine.
+        assertNull(bots.ask(Network.WHATSAPP, "list-logins", java.time.Duration.ZERO));
         assertEquals(1, log.size());
     }
 
@@ -120,7 +117,7 @@ class BotChatTest {
 
     private String ask(String command) {
         try {
-            return bots.ask(Network.WHATSAPP, command, 10);
+            return bots.ask(Network.WHATSAPP, command);
         } catch (Exception e) {
             throw new AssertionError(e);
         }

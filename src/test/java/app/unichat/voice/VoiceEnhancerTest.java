@@ -129,7 +129,7 @@ class VoiceEnhancerTest {
 
     private static void run(String... command) throws Exception {
         Process p = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-        assumeTrue(p.waitFor(60, java.util.concurrent.TimeUnit.SECONDS) && p.exitValue() == 0, command[0] + " can't make the sample");
+        assumeTrue(p.waitFor() == 0, command[0] + " can't make the sample");
     }
 
     /** Average power in dB of the 100 ms windows where the clean speech is ({@code speech}) or isn't talking. */

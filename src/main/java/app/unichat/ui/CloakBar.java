@@ -37,6 +37,7 @@ final class CloakBar extends HBox {
         setAlignment(Pos.CENTER_LEFT);
         what.getStyleClass().add("audio-who");
         what.setMinWidth(0);
+        what.setWrapText(true); // a long name at a big text size takes two lines rather than losing its end
         stage.getStyleClass().add("audio-time");
         stage.setMinWidth(0);
         stage.setWrapText(true);
@@ -47,6 +48,8 @@ final class CloakBar extends HBox {
         middle.setMinWidth(80);
         HBox.setHgrow(middle, Priority.ALWAYS);
         percent.getStyleClass().add("upload-percent");
+        percent.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+        eta.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         eta.getStyleClass().add("audio-time");
         VBox numbers = new VBox(0, percent, eta);
         numbers.setAlignment(Pos.CENTER_LEFT);

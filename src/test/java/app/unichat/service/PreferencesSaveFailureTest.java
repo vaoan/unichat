@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,9 +35,10 @@ class PreferencesSaveFailureTest {
         if (yes) assumeTrue(!Files.isWritable(dir));
     }
 
-    private void assertSaidOnce() throws InterruptedException {
-        assertNotNull(said.poll(5, TimeUnit.SECONDS), "should have warned");
-        assertNull(said.poll(200, TimeUnit.MILLISECONDS), "should have warned only once");
+    /** One more warning than {@code before}: decided by the time flush() returned, then delivered on its own thread. */
+    private void assertSaidOnce(int before) throws InterruptedException {
+        assertEquals(before + 1, p.announcements(), "should have warned once, not more");
+        assertNotNull(said.take(), "and the listener hears it");
     }
 
     @Test
@@ -49,17 +49,17 @@ class PreferencesSaveFailureTest {
             p.choose(K, Flag.MUTED, true);
             p.choose(K, Flag.FAVORITE, true);
             p.flush();
-            assertSaidOnce();
+            assertSaidOnce(0);
 
             readOnly(false);
             p.choose(K, Flag.PINNED, true);
             p.flush();
-            assertNull(said.poll(200, TimeUnit.MILLISECONDS), "a success says nothing");
+            assertEquals(1, p.announcements(), "a success says nothing");
 
             readOnly(true);
             p.choose(K, Flag.ARCHIVED, true);
             p.flush();
-            assertSaidOnce();
+            assertSaidOnce(1);
         } finally {
             readOnly(false);
         }
@@ -70,7 +70,7 @@ class PreferencesSaveFailureTest {
         p.onSaveFailure(() -> said.add("failed"));
         p.choose(K, Flag.MUTED, true);
         p.flush();
-        assertNull(said.poll(200, TimeUnit.MILLISECONDS));
+        assertEquals(0, p.announcements());
     }
 
     @Test
@@ -80,7 +80,7 @@ class PreferencesSaveFailureTest {
             p.choose(K, Flag.MUTED, true);
             p.flush();
             p.onSaveFailure(() -> said.add("failed"));
-            assertSaidOnce();
+            assertSaidOnce(0);
         } finally {
             readOnly(false);
         }
@@ -100,7 +100,7 @@ class PreferencesSaveFailureTest {
                 p.choose(K, Flag.MUTED, true);
                 p.flush();
                 assertTrue(Thread.holdsLock(p));
-                assertNotNull(said.poll(5, TimeUnit.SECONDS), "must arrive while the lock is held by the caller");
+                assertNotNull(said.take(), "must arrive while the lock is held by the caller");
             }
             assertFalse(heldLock.get());
         } finally {
@@ -116,17 +116,17 @@ class PreferencesSaveFailureTest {
             readOnly(true);
             p.choose(K, Flag.MUTED, true);
             p.flush();
-            String text = said.poll(5, TimeUnit.SECONDS);
-            assertNotNull(text);
+            String text = said.take();
             assertTrue(text.startsWith("No se pudieron guardar tus preferencias"), text);
 
             readOnly(false);
             p.flush();
             folders.onSaveFailure(null);
             readOnly(true);
+            int before = p.announcements();
             p.choose(K, Flag.PINNED, true);
             p.flush();
-            assertNull(said.poll(200, TimeUnit.MILLISECONDS));
+            assertEquals(before, p.announcements(), "nobody listening: nothing announced");
         } finally {
             readOnly(false);
         }

@@ -28,17 +28,47 @@ public final class DockIcon {
     /** Whether the Dock icon goes with the window: the person's choice, unless it's the only way in. */
     static boolean wanted(boolean setting, boolean tray) { return setting || !tray; }
 
+    /**
+     * The Dock icon also comes while a photo, video or settings window is open, so ⌘Tab reaches Unichat (macOS lists only
+     * apps with one), and App Exposé shows its windows.
+     */
+    private static volatile boolean otherWindows;
+    private static volatile boolean mainShowing;
+
+    /** Whether there's a Dock icon: with any window besides the main one, or with the main one if wanted. */
+    static boolean regular(boolean main, boolean others, boolean setting, boolean tray) {
+        return others || main && wanted(setting, tray);
+    }
+
     /** Window about to be shown (or the setting changed while it is): the Dock icon if wanted, and the active app. */
     public static void show() {
-        setPolicy(wanted(Settings.get().showInDock(), trayAvailable) ? POLICY_REGULAR : POLICY_ACCESSORY);
+        mainShowing = true;
+        apply();
         send("activateIgnoringOtherApps:", 1L);
     }
 
-    /** Window hidden: remove the Dock icon; the menu bar icon stays. */
+    /** Window hidden: remove the Dock icon unless another window is open; the menu bar icon stays. */
     public static void hide() {
-        setPolicy(POLICY_ACCESSORY);
+        mainShowing = false;
+        apply();
         // Otherwise it stays the active app, and a click on the Dock icon wouldn't activate it: nothing would happen.
-        send("deactivate", 0L);
+        if (!otherWindows) send("deactivate", 0L);
+    }
+
+    /** Makes Unichat the active app (macOS), as a click on its window would; without it, its open menu can't be closed. */
+    static void activate() {
+        send("activateIgnoringOtherApps:", 1L);
+    }
+
+    /** A window besides the main one opened, or the last of them closed. */
+    static void setOtherWindows(boolean open) {
+        if (open == otherWindows) return;
+        otherWindows = open;
+        apply();
+    }
+
+    private static void apply() {
+        setPolicy(regular(mainShowing, otherWindows, Settings.get().showInDock(), trayAvailable) ? POLICY_REGULAR : POLICY_ACCESSORY);
     }
 
     private static boolean setPolicy(long policy) {

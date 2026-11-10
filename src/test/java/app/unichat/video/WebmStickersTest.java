@@ -7,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -22,7 +21,7 @@ class WebmStickersTest {
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi",
                 "-i", "testsrc=s=128x128:d=1:r=10,format=yuva420p,colorchannelmixer=aa=0.5", "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", webm.toString())
                 .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-        assumeTrue(p.waitFor(30, TimeUnit.SECONDS) && p.exitValue() == 0, "this ffmpeg can't make a WebM");
+        assumeTrue(p.waitFor() == 0, "this ffmpeg can't make a WebM");
         return webm;
     }
 
@@ -62,7 +61,7 @@ class WebmStickersTest {
         Path gif = dir.resolve("out.gif");
         Process p = new ProcessBuilder(WebmStickers.command(ffmpeg, webm, gif, "gif", true)).redirectErrorStream(true)
                 .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-        assertTrue(p.waitFor(30, TimeUnit.SECONDS) && p.exitValue() == 0);
+        assertEquals(0, p.waitFor());
         assertAnimatedWithTransparency(gif);
     }
 

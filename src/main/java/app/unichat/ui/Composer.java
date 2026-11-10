@@ -437,7 +437,8 @@ public final class Composer extends VBox {
     }
 
     /** Into the box of the chat it was for: what was written there went into the prompt as the idea. */
-    private void aiDraft(String forChat, String draft) {
+    /** A draft for {@code forChat} has arrived (package-visible for tests). */
+    void aiDraft(String forChat, String draft) {
         aiDrafts.drafted(forChat, draft); // what's sent instead teaches how the person writes
         learnAfter(forChat);
         if (!forChat.equals(chatId)) {
@@ -445,11 +446,13 @@ public final class Composer extends VBox {
             onError.accept(I18n.t("composer.draftElsewhere"));
             return;
         }
-        input.setText(draft);
+        // As an edit, not setText (which forgets the undo history): ⌘Z brings back what was written before, since a
+        // draft built on it can still change what the person meant.
+        input.replaceText(0, input.getLength(), draft);
         int[] gap = app.unichat.assist.ReplyPrompt.firstGap(draft); // one it couldn't fill: selected, to type it in
         if (gap != null) input.selectRange(gap[0], gap[1]);
         else input.positionCaret(input.getLength());
-        onError.accept(I18n.t("composer.draftReady"));
+        onError.accept(I18n.t("composer.draftReady", Shortcuts.key("Z")));
     }
 
     /**
