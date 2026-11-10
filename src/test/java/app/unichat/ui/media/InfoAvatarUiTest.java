@@ -83,17 +83,23 @@ class InfoAvatarUiTest {
             Event.fireEvent(avatar, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
             return null;
         });
-        try {
-            FxWait.until("the photo viewer shows the photo", () -> viewer(mama.title()).map(w -> w.getScene().getRoot().lookupAll("*").stream()
-                    .anyMatch(n -> n instanceof PhotoPane p && p.view().getImage() != null)).orElse(false));
-        } catch (AssertionError | RuntimeException e) {
-            // What it saw instead, for a machine where it doesn't (Linux CI): no viewer, or one with no picture, and why.
-            throw new AssertionError("viewer: " + FxWait.fx(() -> viewer(mama.title()).map(w -> w.getScene().getRoot().lookupAll("*").stream()
+        var file = svc.media("mxc://demo/mama.png", 0, 0);
+        FxWait.until("the photo viewer shows the photo", () -> {
+            boolean shown = viewer(mama.title()).map(w -> w.getScene().getRoot().lookupAll("*").stream()
+                    .anyMatch(n -> n instanceof PhotoPane p && p.view().getImage() != null)).orElse(false);
+            if (shown) return true;
+            // What it sees instead, as the failure's cause (Linux CI fails here, the Mac doesn't): asked inside the wait,
+            // since a call to the FX thread after the timeout's interrupt never answers.
+            throw new AssertionError("windows " + Window.getWindows().stream().filter(Window::isShowing)
+                    .map(w -> (w instanceof Stage st ? "\"" + st.getTitle() + "\"" : w.getClass().getSimpleName())
+                            + (w.getScene() == null ? "" : " " + w.getScene().getRoot().getStyleClass()))
+                    .toList() + "; photo panes " + viewer(mama.title()).map(w -> w.getScene().getRoot().lookupAll("*").stream()
                     .filter(n -> n instanceof PhotoPane).map(n -> {
                         var img = ((PhotoPane) n).view().getImage();
                         return img == null ? "no image" : img.isError() ? "error " + img.getException() : "image";
-                    }).toList().toString()).orElse("none")), e);
-        }
+                    }).toList().toString()).orElse("no viewer titled " + mama.title())
+                    + "; the photo's file " + (file.isDone() ? (file.isCompletedExceptionally() ? "failed" : file.getNow(null)) : "not yet"));
+        });
         assertEquals(mama.title(), FxWait.fx(() -> ((Stage) viewer(mama.title()).orElseThrow()).getTitle()));
     }
 
