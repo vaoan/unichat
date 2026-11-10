@@ -60,7 +60,7 @@ case "$(uname -s)" in
     done
     iconutil -c icns "$ICONSET" -o target/Unichat.icns
     jpackage $COMMON --type app-image --icon target/Unichat.icns --mac-package-identifier app.unichat
-    # A menu bar app: no Dock icon at launch nor among the Dock's recent apps (Ajustes can show one, see ui/DockIcon).
+    # A menu bar app: no Dock icon at launch nor among the Dock's recent apps (Ajustes can show one, see ui/desktop/DockIcon).
     plutil -insert LSUIElement -bool true release/Unichat.app/Contents/Info.plist
     # The oldest macOS it runs on is the newest any binary inside asks for (whisper-cli: 13.3); jpackage says 10.11.
     plutil -replace LSMinimumSystemVersion -string "$MACOS_MIN" release/Unichat.app/Contents/Info.plist

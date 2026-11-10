@@ -13,20 +13,20 @@ import javafx.scene.layout.StackPane;
  * Esc does the same ({@link #clearOnEscape}, called by {@link WindowShortcuts} before Esc closes anything), so the
  * button stays out of the Tab order.
  */
-final class SearchFields {
+public final class SearchFields {
     private static final String CLEARABLE = "clearable";
 
     private SearchFields() {}
 
     /** {@code field} in a box of its own with its ✕. */
-    static StackPane clearable(TextField field) {
+    public static StackPane clearable(TextField field) {
         StackPane box = new StackPane(field);
         addClear(box, field);
         return box;
     }
 
     /** Adds the ✕ to the box that already holds {@code field} (with its magnifying glass, say). */
-    static void addClear(StackPane box, TextField field) {
+    public static void addClear(StackPane box, TextField field) {
         Button clear = Icons.iconButton(Icons.CLOSE, I18n.t("search.clear"), () -> {
             field.clear();
             field.requestFocus();

@@ -13,13 +13,13 @@ import app.unichat.service.PreferencesFile;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import app.unichat.ui.Browser;
-import app.unichat.ui.DockIcon;
-import app.unichat.ui.TrayReopen;
-import app.unichat.ui.LoginView;
-import app.unichat.ui.SettingsWindow;
-import app.unichat.ui.MacQuit;
+import app.unichat.ui.desktop.DockIcon;
+import app.unichat.ui.desktop.TrayReopen;
+import app.unichat.ui.login.LoginView;
+import app.unichat.ui.settings.SettingsWindow;
+import app.unichat.ui.desktop.MacQuit;
 import app.unichat.ui.MainView;
-import app.unichat.ui.Notifier;
+import app.unichat.ui.desktop.Notifier;
 import app.unichat.ui.Theme;
 import app.unichat.update.UpdateChecker;
 import javafx.application.Application;
@@ -301,7 +301,7 @@ public final class UnichatApp extends Application {
      * is watched while it's on screen: hidden ones leave {@code Window.getWindows()}, and come back when shown.
      */
     private void watchFocus() {
-        app.unichat.ui.AppWindows.install(stage);
+        app.unichat.ui.desktop.AppWindows.install(stage);
         javafx.beans.value.ChangeListener<Boolean> focus = (o, a, b) -> Platform.runLater(() ->
                 notifier.setWindowFocused(javafx.stage.Window.getWindows().stream().anyMatch(javafx.stage.Window::isFocused)));
         for (javafx.stage.Window w : javafx.stage.Window.getWindows()) w.focusedProperty().addListener(focus);

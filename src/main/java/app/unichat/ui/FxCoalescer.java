@@ -9,15 +9,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * width changing): one redraw for the lot. Counted in {@link Redraws#PENDING} until it has run, so tests can wait for it.
  * {@link #request} takes any thread.
  */
-final class FxCoalescer {
+public final class FxCoalescer {
     private final Runnable job;
     private final AtomicBoolean queued = new AtomicBoolean();
 
-    FxCoalescer(Runnable job) {
+    public FxCoalescer(Runnable job) {
         this.job = job;
     }
 
-    void request() {
+    public void request() {
         if (!queued.compareAndSet(false, true)) return;
         Redraws.PENDING.incrementAndGet();
         Platform.runLater(() -> {

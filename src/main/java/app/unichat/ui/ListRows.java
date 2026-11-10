@@ -13,16 +13,16 @@ import java.util.function.Function;
  * hands them out again in another order: each row then draws another item (avatar, photo, icons), the whole list
  * repaints although nothing in it moved.
  */
-final class ListRows {
+public final class ListRows {
     /** A cell that can draw its item again, keeping it. */
-    interface Redrawable {
+    public interface Redrawable {
         void redraw();
     }
 
     private ListRows() {}
 
     /** {@code next} into {@code items}: replaced whole only when the rows themselves (by {@code id}) or their order changed. */
-    static <T> void show(ObservableList<T> items, List<T> next, Function<T, ?> id) {
+    public static <T> void show(ObservableList<T> items, List<T> next, Function<T, ?> id) {
         boolean same = items.size() == next.size();
         for (int i = 0; same && i < next.size(); i++) same = Objects.equals(id.apply(items.get(i)), id.apply(next.get(i)));
         if (!same) {
@@ -33,7 +33,7 @@ final class ListRows {
     }
 
     /** Each row on screen draws its item again (its fields changed), in place. */
-    static void redraw(ListView<?> list) {
+    public static void redraw(ListView<?> list) {
         for (Node n : list.lookupAll(".list-cell")) if (n instanceof Redrawable r) r.redraw();
     }
 }

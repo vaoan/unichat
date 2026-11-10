@@ -1,5 +1,8 @@
 package app.unichat.ui;
 
+import app.unichat.ui.desktop.Notifier;
+import app.unichat.ui.settings.SyncedSettings;
+import app.unichat.ui.timeline.AiReplyButton;
 import app.unichat.assist.AiSettings;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;

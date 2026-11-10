@@ -7,7 +7,7 @@ You review Unichat for security. Everything a chat brings (text, HTML, names, li
 
 Check, with evidence in the code:
 - Media and file addresses: only `mxc://` from messages; `file:` only for our own sends (`MediaDownloader.ownFile`); a file name never escapes its folder (`autosave/FileNames`), nor hides its extension (RTL override, `\p{Cf}`), nor lands as a Windows device name.
-- HTML (`ui/HtmlView`): no scripts, frames or non-http(s) links; pictures only `mxc://`; depth of nesting bounded.
+- HTML (`ui/timeline/HtmlView`): no scripts, frames or non-http(s) links; pictures only `mxc://`; depth of nesting bounded.
 - Links fetched (`links/LinkInspector`, `gif/GifFiles`, `MediaDownloader`): no hop to this machine or its network, a deadline on the body, a size cap.
 - Processes (ffmpeg, yt-dlp, gallery-dl, whisper, claude/codex, Chrome): argument lists only, `--` before untrusted values, ffmpeg with `-protocol_whitelist`/`-format_whitelist`; output drained; killed with children.
 - The AI CLI (`assist/AiEngine`): chat text can carry instructions; tools, MCP servers and settings of the person's config stay off.

@@ -13,11 +13,11 @@ import java.util.concurrent.atomic.AtomicReference;
  * condition is checked now and again after every pulse (each frame JavaFX lays out and draws). There's no time limit
  * here: JUnit's default timeout (junit-platform.properties) fails a wait that never comes, and says what it waited for.
  */
-final class FxWait {
+public final class FxWait {
     private FxWait() {}
 
     /** Runs {@code c} on the FX thread and returns its result (or rethrows what it threw). */
-    static <T> T fx(Callable<T> c) throws Exception {
+    public static <T> T fx(Callable<T> c) throws Exception {
         if (Platform.isFxApplicationThread()) return c.call();
         CompletableFuture<T> f = new CompletableFuture<>();
         Platform.runLater(() -> {
@@ -39,7 +39,7 @@ final class FxWait {
      * Until {@code condition}, run on the FX thread, is true: checked now and after every pulse. A condition that throws
      * (a node not there yet) counts as not yet.
      */
-    static void until(String what, Callable<Boolean> condition) throws Exception {
+    public static void until(String what, Callable<Boolean> condition) throws Exception {
         CompletableFuture<Void> met = new CompletableFuture<>();
         AtomicReference<Throwable> last = new AtomicReference<>();
         AnimationTimer[] timer = new AnimationTimer[1];
@@ -77,7 +77,7 @@ final class FxWait {
      * Until the window has done all it was asked: what's queued on the FX thread so far has run, no redraw is waiting
      * ({@link Redraws}), and a pulse has laid it out. The point to check that something did <em>not</em> happen.
      */
-    static void settled() throws Exception {
+    public static void settled() throws Exception {
         fx(() -> null);
         do {
             until("the window's redraws to run", () -> Redraws.PENDING.get() == 0);

@@ -2,8 +2,8 @@ package app.unichat;
 
 import app.unichat.model.Network;
 import app.unichat.ui.MainView;
-import app.unichat.ui.SettingsWindow;
-import app.unichat.ui.SidePanel;
+import app.unichat.ui.settings.SettingsWindow;
+import app.unichat.ui.chats.SidePanel;
 import javafx.animation.PauseTransition;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Scene;

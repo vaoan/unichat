@@ -13,13 +13,13 @@ import javafx.util.Duration;
  * A line above the message box while something takes a while and nothing else shows it (a voice note being cleaned up):
  * what it is and the seconds so far. Several at once share it; it goes when the last one ends. FX thread only.
  */
-final class WorkingLine {
+public final class WorkingLine {
     private final Label text = new Label();
     private final HBox node;
     private Timeline ticking;
     private int running;
 
-    WorkingLine() {
+    public WorkingLine() {
         ProgressIndicator spinner = new ProgressIndicator();
         spinner.setMaxSize(14, 14);
         Nodes.show(spinner, !Theme.reduceMotion());
@@ -30,9 +30,9 @@ final class WorkingLine {
         Nodes.show(node, false);
     }
 
-    Node node() { return node; }
+    public Node node() { return node; }
 
-    void start(String what) {
+    public void start(String what) {
         running++;
         if (ticking != null) ticking.stop();
         long since = System.currentTimeMillis();
@@ -45,7 +45,7 @@ final class WorkingLine {
         Nodes.show(node, true);
     }
 
-    void stop() {
+    public void stop() {
         running = Math.max(0, running - 1);
         if (running > 0) return;
         if (ticking != null) ticking.stop();

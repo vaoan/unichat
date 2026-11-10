@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.ui.chats.AccountAlertBar;
 import app.unichat.support.I18n;
 import app.unichat.update.Release;
 import app.unichat.update.UpdateChecker;

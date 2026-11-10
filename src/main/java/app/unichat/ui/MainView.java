@@ -1,5 +1,36 @@
 package app.unichat.ui;
 
+import app.unichat.ui.chats.AccountAlertBar;
+import app.unichat.ui.chats.AccountAlerts;
+import app.unichat.ui.chats.ChatFilter;
+import app.unichat.ui.chats.ChatListPane;
+import app.unichat.ui.chats.ChatOptions;
+import app.unichat.ui.chats.CommandBar;
+import app.unichat.ui.chats.ExploreBar;
+import app.unichat.ui.chats.FolderDialogs;
+import app.unichat.ui.chats.InfoPane;
+import app.unichat.ui.chats.NewChatPane;
+import app.unichat.ui.chats.Rail;
+import app.unichat.ui.chats.SidePanel;
+import app.unichat.ui.chats.SpaceTree;
+import app.unichat.ui.desktop.NotificationPolicy;
+import app.unichat.ui.desktop.Notifier;
+import app.unichat.ui.emoji.EmojiGrid;
+import app.unichat.ui.emoji.FavoritesPane;
+import app.unichat.ui.emoji.GifGrid;
+import app.unichat.ui.emoji.MediaItems;
+import app.unichat.ui.emoji.StickerGrid;
+import app.unichat.ui.login.AccountsPane;
+import app.unichat.ui.media.AudioBar;
+import app.unichat.ui.media.AudioPlayback;
+import app.unichat.ui.media.ImageCache;
+import app.unichat.ui.settings.CloudPage;
+import app.unichat.ui.settings.SettingsWindow;
+import app.unichat.ui.settings.SyncedSettings;
+import app.unichat.ui.timeline.CloakBar;
+import app.unichat.ui.timeline.CloakSend;
+import app.unichat.ui.timeline.ThreadPane;
+import app.unichat.ui.timeline.UploadBar;
 import app.unichat.model.Chat;
 import app.unichat.model.ConnectionState;
 import app.unichat.model.MediaLibrary;
@@ -357,11 +388,11 @@ public final class MainView extends StackPane {
 
     // ------------------------------------------------------------------ navigation
 
-    AudioPlayback audio() { return audio; }
+    public AudioPlayback audio() { return audio; }
 
-    ThreadPane thread() { return thread; }
+    public ThreadPane thread() { return thread; }
 
-    ChatListPane list() { return listPane; }
+    public ChatListPane list() { return listPane; }
 
     public void openChat(Chat c) {
         openChat(c, false);

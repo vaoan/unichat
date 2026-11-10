@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.ui.chats.InfoPane;
+import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
 import javafx.application.Platform;
 import javafx.event.Event;

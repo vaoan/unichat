@@ -30,7 +30,7 @@ Each package may only depend on the ones below it. `ArchitectureTest` checks thi
 
 Accepted exceptions:
 
-- `ui/LoginView` uses `MatrixChatService`: logging in is what creates the service.
+- `ui/login/LoginView` uses `MatrixChatService`: logging in is what creates the service.
 - `ui` uses `server` for what isn't about chats (Telegram keys, logs, local server).
 
 What exists only with bridges goes in `BridgeAccess`, which the demo doesn't implement. The UI asks
@@ -64,15 +64,20 @@ receives `MediaSource`, not the whole service.
 
 ## `ui`
 
-A large window is split by what each piece does, not by screens:
+One subpackage per area, each with its own `CLAUDE.md`. `ui` itself holds the window and what every area shares;
+the areas use it, and `MainView` puts them together. A member is `public` only when another package uses it.
+`ArchitectureTest` treats `ui` and all its subpackages as the UI layer.
 
-| Class | Responsibility |
+| Package | What it holds |
 |---|---|
-| `MainView`, `WindowShortcuts`, `Throttle` | The window and its layers; the keys of the whole window, F6 and zoom; how many times per second it redraws |
-| `ChatListPane`, `ChatRowCell`, `SpaceChannelsView` | The chat column; how each row is drawn; a server's channels |
-| `ThreadPane`, `TimelineScroll`, `MessageRowView`, `MessageLine` | The open chat; where the list looks; how a message is drawn; its buttons on mouse hover |
-| `A11yText` | What the screen reader and the voice say (pure text, with tests) |
-| `SettingsWindow`, `SettingsForm` and the pages (`NetworksPage`, `AiReplyPage`…) | The settings window; the pieces of a form; each family of pages |
+| `ui` | `MainView` (the window and its layers), `WindowShortcuts` (keys of the whole window, F6 and zoom), `Throttle`, `Redraws`, `FxCoalescer`; shared bits: `Nodes`, `Icons`, `Labels`, `Chips`, `Theme`, `Formats`, `A11yText` (what the screen reader and the voice say), `ListRows`, `SearchFields`, `WorkingLine`, `Browser` |
+| `ui.chats` | The chat column (`ChatListPane`, `ChatRowCell`, `SpaceChannelsView`), rail, folders, favorites, new chat, avatars; the info and side panels |
+| `ui.timeline` | The open chat (`ThreadPane`, `TimelineScroll`, `MessageRowView`, `MessageLine`), message HTML, the composer and its parts, message actions |
+| `ui.media` | Photos, video, audio and animations: viewers, players, caches, tiles, the profile's media |
+| `ui.emoji` | Emoji picker, search and inline pictures, reactions, sticker and GIF grids, the media library |
+| `ui.settings` | `SettingsWindow`, `SettingsForm` and the pages (`NetworksPage`, `AiReplyPage`…); settings applied live from the cloud |
+| `ui.desktop` | Dock, tray, menu bar, notifications, window switching, quitting |
+| `ui.login` | Signing in, bridge logins, accounts, Telegram keys, Discord servers |
 
 ## `server`
 

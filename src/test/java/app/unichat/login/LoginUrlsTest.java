@@ -1,7 +1,7 @@
 package app.unichat.login;
 
 import app.unichat.model.Network;
-import app.unichat.ui.LoginUrls;
+import app.unichat.ui.login.LoginUrls;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

@@ -33,7 +33,8 @@ The `learn` skill walks through it. Don't keep a lesson here, nor one that the c
 ## Where the details are
 - `src/main/java/app/unichat/<package>/CLAUDE.md` — each package's notes (ui, matrix, service, server, model, support, bridge, video, voice, stt, assist, cloak, autosave, cloud, login, links, gif, update, settings).
 - `src/test/CLAUDE.md` — how tests wait, UI tests headless, CI on Linux.
-- `.claude/rules/` — topics across folders: i18n, CSS and icons, emoji, media viewers, the timeline, macOS window/tray/Dock, settings pages, Java comments.
+- `src/main/java/app/unichat/ui/*/CLAUDE.md` — each UI area's notes: `chats`, `timeline` (message HTML), `media` (viewers, animations), `emoji`, `settings` (the window), `desktop` (macOS window/tray/Dock, quitting), `login`.
+- `.claude/rules/` — topics across folders: i18n, CSS and icons, Java comments.
 - `native/`, `server/`, `packaging/`, `.github/` — the no-Docker stack and native builds; the Docker server; packages, releases and signing; CI.
 - `.claude/agents/` (reviewer, security-reviewer), `.claude/skills/` (snapshot, learn, health), `.claude/settings.json` (hooks) — how Claude works here.
 - `docs/REVIEW.md` — open findings of the last whole-app review: check it before working on an area.

@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.ui.desktop.Notifier;
+import app.unichat.ui.settings.SettingsWindow;
 import app.unichat.cloud.Cloud;
 import app.unichat.service.MockChatService;
 import javafx.application.Platform;

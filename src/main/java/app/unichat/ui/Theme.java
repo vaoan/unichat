@@ -111,7 +111,7 @@ public final class Theme {
     }
 
     /** Windows high-contrast theme / macOS "Aumentar contraste". */
-    static boolean systemHighContrast() {
+    public static boolean systemHighContrast() {
         if (systemContrast != null) return systemContrast;
         try {
             if (Os.windows()) {
@@ -130,7 +130,7 @@ public final class Theme {
     }
 
     /** Windows "Mostrar animaciones" off / macOS "Reducir movimiento". */
-    static boolean systemReducedMotion() {
+    public static boolean systemReducedMotion() {
         if (systemReducedMotion != null) return systemReducedMotion;
         try {
             if (Os.windows()) {

@@ -10,11 +10,11 @@ import java.time.Instant;
 import java.time.ZoneId;
 
 /** What a screen reader or the voice says for messages and chats. Text only: whatever it depends on arrives as a parameter. */
-final class A11yText {
+public final class A11yText {
     private A11yText() { }
 
     /** A message row. {@code replied} is the message it answers if loaded, {@code transcript} its voice note's text if done. */
-    static String message(Message m, Message replied, String transcript, ZoneId zone) {
+    public static String message(Message m, Message replied, String transcript, ZoneId zone) {
         StringBuilder sb = new StringBuilder(m.outgoing() ? I18n.t("common.you") : m.senderName());
         sb.append(", ").append(Formats.time(m.timestamp(), zone)).append(": ");
         if (m.type() == MessageType.SYSTEM) return m.body();
@@ -44,7 +44,7 @@ final class A11yText {
     }
 
     /** A chat; {@code account} names the login when the network has several. */
-    static String chat(Chat c, String account, Instant now, ZoneId zone) {
+    public static String chat(Chat c, String account, Instant now, ZoneId zone) {
         StringBuilder sb = new StringBuilder(c.title()).append(", ").append(c.network().displayName());
         if (account != null) sb.append(" (").append(account).append(')');
         if (c.group()) sb.append(", ").append(I18n.t("a11y.group"));
@@ -63,18 +63,18 @@ final class A11yText {
     }
 
     /** A server you're in that isn't in Unichat yet; {@code busy} while it's being added. */
-    static String offer(Chat c, boolean busy) {
+    public static String offer(Chat c, boolean busy) {
         return I18n.t("a11y.offer", c.title(), c.network().displayName(), I18n.t(busy ? "a11y.adding" : "a11y.add"));
     }
 
     /** A server's row: {@code unread} sums its channels, {@code latest} is the channel that spoke last, if any. */
-    static String server(Chat c, int unread, Chat latest) {
+    public static String server(Chat c, int unread, Chat latest) {
         return I18n.t(c.network() == Network.DISCORD ? "a11y.serverDiscord" : "a11y.serverGroup", c.title(), c.network().displayName())
                 + (unread > 0 ? ", " + I18n.t("a11y.unreadCount", unread) : "") + (c.muted() ? ", " + I18n.t("a11y.muted") : "")
                 + (latest == null ? "" : ". " + latest.title() + ": " + latest.lastPreview()) + ". " + I18n.t("a11y.opensChannels");
     }
 
-    static String unjoined(Chat c) {
+    public static String unjoined(Chat c) {
         return I18n.t("a11y.unjoined", c.title());
     }
 

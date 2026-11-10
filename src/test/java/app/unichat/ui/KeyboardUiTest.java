@@ -1,5 +1,10 @@
 package app.unichat.ui;
 
+import app.unichat.ui.chats.ChatListPane;
+import app.unichat.ui.chats.Rail;
+import app.unichat.ui.desktop.Notifier;
+import app.unichat.ui.emoji.EmojiPicker;
+import app.unichat.ui.timeline.Composer;
 import app.unichat.model.Message;
 import app.unichat.service.MockChatService;
 import app.unichat.settings.Settings;

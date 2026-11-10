@@ -9,7 +9,7 @@ public final class Icons {
     private Icons() {}
 
     /** A button showing only an icon; {@code tooltip} is also what a screen reader says. */
-    static javafx.scene.control.Button iconButton(String icon, String tooltip, Runnable action) {
+    public static javafx.scene.control.Button iconButton(String icon, String tooltip, Runnable action) {
         javafx.scene.control.Button b = new javafx.scene.control.Button();
         b.setGraphic(icon(icon, 18));
         b.getStyleClass().add("icon-button");
@@ -87,7 +87,7 @@ public final class Icons {
      * The text size (Ajustes → Accesibilidad, ⌘+ and ⌘−), set by {@link Theme}: icons grow with the text, or at 160 % they
      * look small and off-centre beside it. FX thread.
      */
-    static final javafx.beans.property.DoubleProperty SCALE = new javafx.beans.property.SimpleDoubleProperty(1);
+    public static final javafx.beans.property.DoubleProperty SCALE = new javafx.beans.property.SimpleDoubleProperty(1);
 
     /** An icon at exactly {@code size} px whatever the text size: for glyphs inside a box of fixed size (a network's tile). */
     public static Node fixedIcon(String path, double size) {

@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import app.unichat.ui.media.AudioPlayback;
+import app.unichat.ui.media.MessageMedia;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.service.MediaSource;

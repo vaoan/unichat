@@ -1,5 +1,8 @@
 package app.unichat.ui;
 
+import app.unichat.ui.chats.ChatFilter;
+import app.unichat.ui.chats.Rail;
+import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
 import javafx.application.Platform;
 import javafx.scene.Node;

@@ -102,7 +102,8 @@ class ArchitectureTest {
         noClasses().that().resideInAnyPackage("..model..", "..support..", "..bridge..")
                 .should().dependOnClassesThat().resideInAnyPackage("..settings..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..assist..", "..gif..", "..update..", "..cloak..", "..autosave..")
                 .check(APP);
-        noClasses().that().resideInAPackage("..settings..")
+        // The preferences package, not the settings window (ui.settings), which is UI and may use them all.
+        noClasses().that().resideInAPackage("app.unichat.settings..")
                 .should().dependOnClassesThat().resideInAnyPackage("..model..", "..service..", "..matrix..", "..server..", "..login..", "..stt..", "..gif..", "..update..", "..cloak..", "..autosave..")
                 .check(APP);
     }

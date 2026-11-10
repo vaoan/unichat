@@ -1,5 +1,10 @@
 package app.unichat.ui;
 
+import app.unichat.ui.chats.ChatFilter;
+import app.unichat.ui.chats.ChatListPane;
+import app.unichat.ui.chats.Rail;
+import app.unichat.ui.chats.SidePanel;
+import app.unichat.ui.timeline.ThreadPane;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;

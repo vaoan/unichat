@@ -49,7 +49,7 @@ public final class Browser {
      * Opens {@code file} with the system's app for it, through AWT's own thread (mistakes.md): called from wherever a
      * download finished, it did nothing at all on macOS. {@code failed} on the FX thread when there's no way.
      */
-    static void openFile(java.nio.file.Path file, Runnable failed) {
+    public static void openFile(java.nio.file.Path file, Runnable failed) {
         java.awt.EventQueue.invokeLater(() -> {
             try {
                 opener.open(file);
@@ -73,7 +73,7 @@ public final class Browser {
     }
 
     /** Shows {@code folder} in Finder / Explorer (created if missing), through AWT's thread; {@code failed} on the FX thread. */
-    static void openFolder(java.nio.file.Path folder, Runnable failed) {
+    public static void openFolder(java.nio.file.Path folder, Runnable failed) {
         java.awt.EventQueue.invokeLater(() -> {
             try {
                 java.nio.file.Files.createDirectories(folder);
