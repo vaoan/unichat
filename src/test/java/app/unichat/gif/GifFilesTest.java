@@ -80,18 +80,21 @@ class GifFilesTest {
         server.start();
         try {
             Path dir = app.unichat.settings.Settings.dataDir().resolve("gif-cache");
-            long before = Files.isDirectory(dir) ? countIn(dir) : 0;
+            java.util.Set<Path> before = Files.isDirectory(dir) ? filesIn(dir) : java.util.Set.of();
             assertThrows(java.io.IOException.class, () -> GifFiles.fetch(
                     java.net.URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/g"), ".gif", GifFiles.TIMEOUT, 6));
-            assertEquals(before, countIn(dir));
+            // Nothing new left behind; counting files failed when the fetch's own pruning took a day-old one away.
+            java.util.Set<Path> left = filesIn(dir);
+            left.removeAll(before);
+            assertEquals(java.util.Set.of(), left);
         } finally {
             server.stop(0);
         }
     }
 
-    private static long countIn(Path dir) throws java.io.IOException {
+    private static java.util.Set<Path> filesIn(Path dir) throws java.io.IOException {
         try (var files = Files.list(dir)) {
-            return files.count();
+            return files.collect(java.util.stream.Collectors.toCollection(java.util.HashSet::new));
         }
     }
 
