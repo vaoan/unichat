@@ -19,16 +19,17 @@ class LessonsTest {
     private static final Path ROOT = Path.of("").toAbsolutePath();
 
     /** A line each lesson must catch, and the file it would be in. A new lesson comes with one. */
-    private static final Map<String, String[]> CAUGHT = Map.of(
-            "test-sleep", new String[] {"src/test/java/X.java", "        Thread.sleep(200);"}, // lesson-ok: test-sleep
-            "test-timed-wait", new String[] {"src/test/java/X.java", "        assertTrue(done.await(5, TimeUnit.SECONDS));"}, // lesson-ok: test-timed-wait
-            "static-text", new String[] {"src/main/java/X.java", "    private static final String TITLE = I18n.t(\"x\");"},
-            "gif-as-image", new String[] {"src/main/java/X.java", "        view.setImage(new Image(file + \".gif\"));"},
-            "css-accent-loop", new String[] {"src/main/resources/x.css", ".root { -accent: derive(-accent, 20%); }"},
-            "css-label-min-width", new String[] {"src/main/resources/x.css", ".unread-badge { -fx-min-width: 20; }"},
-            "ffmpeg-input", new String[] {"src/main/java/X.java", "List.of(bin, \"-protocol_whitelist\", \"file\", \"-i\", in)"},
-            "oauth-state-equals", new String[] {"src/main/java/app/unichat/cloud/X.java", "        if (!state.equals(q.get(\"state\"))) {"},
-            "http-client-per-call", new String[] {"src/main/java/X.java", "        HttpClient http = HttpClient.newBuilder().build();"});
+    private static final Map<String, String[]> CAUGHT = Map.ofEntries(
+            Map.entry("test-sleep", new String[] {"src/test/java/X.java", "        Thread.sleep(200);"}), // lesson-ok: test-sleep
+            Map.entry("test-timed-wait", new String[] {"src/test/java/X.java", "        assertTrue(done.await(5, TimeUnit.SECONDS));"}), // lesson-ok: test-timed-wait
+            Map.entry("static-text", new String[] {"src/main/java/X.java", "    private static final String TITLE = I18n.t(\"x\");"}),
+            Map.entry("gif-as-image", new String[] {"src/main/java/X.java", "        view.setImage(new Image(file + \".gif\"));"}),
+            Map.entry("css-accent-loop", new String[] {"src/main/resources/x.css", ".root { -accent: derive(-accent, 20%); }"}),
+            Map.entry("css-label-min-width", new String[] {"src/main/resources/x.css", ".unread-badge { -fx-min-width: 20; }"}),
+            Map.entry("ffmpeg-input", new String[] {"src/main/java/X.java", "List.of(bin, \"-protocol_whitelist\", \"file\", \"-i\", in)"}),
+            Map.entry("oauth-state-equals", new String[] {"src/main/java/app/unichat/cloud/X.java", "        if (!state.equals(q.get(\"state\"))) {"}),
+            Map.entry("http-client-per-call", new String[] {"src/main/java/X.java", "        HttpClient http = HttpClient.newBuilder().build();"}),
+            Map.entry("test-future-join", new String[] {"src/test/java/X.java", "        svc.send(m).join();"})); // lesson-ok: test-future-join
 
     @Test
     void theRepositoryKeepsEveryLesson() throws IOException {

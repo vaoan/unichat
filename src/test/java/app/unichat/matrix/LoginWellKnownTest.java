@@ -35,7 +35,7 @@ class LoginWellKnownTest {
         server.start();
         try {
             String local = "http://127.0.0.1:" + server.getAddress().getPort();
-            MatrixLogin.login(local, "ana", "pw").join();
+            MatrixLogin.login(local, "ana", "pw").get();
             assertEquals(local, Settings.get().homeserver());
         } finally {
             server.stop(0);

@@ -112,7 +112,7 @@ class CloakJobTest {
         });
         running.await();
         t.interrupt();
-        t.join();
+        t.join(); // lesson-ok: test-future-join (a thread)
         assertTrue(ended.get() instanceof InterruptedException, String.valueOf(ended.get()));
     }
 

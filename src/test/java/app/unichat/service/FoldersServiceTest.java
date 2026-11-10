@@ -28,12 +28,12 @@ class FoldersServiceTest {
     }
 
     @AfterEach
-    void stopAll() {
+    void stopAll() throws Exception {
         opened.forEach(MockChatService::stop);
     }
 
     @Test
-    void foldersNotifyAndHoldChatKeys() {
+    void foldersNotifyAndHoldChatKeys() throws Exception {
         MockChatService svc = service();
         AtomicInteger changes = new AtomicInteger();
         svc.addListener(new ChatService.Listener() {
@@ -51,7 +51,7 @@ class FoldersServiceTest {
     }
 
     @Test
-    void foldersSurviveRecreatingTheService() {
+    void foldersSurviveRecreatingTheService() throws Exception {
         MockChatService a = service();
         String id = a.createFolder("Trabajo");
         a.setInFolder(id, a.chat("!mama:demo"), true);
@@ -62,11 +62,11 @@ class FoldersServiceTest {
     }
 
     @Test
-    void demoChoicesAreKeptAndEmptyFileKeepsDemoValues() {
+    void demoChoicesAreKeptAndEmptyFileKeepsDemoValues() throws Exception {
         MockChatService a = service();
         boolean before = a.chat("!mama:demo").favorite();
-        a.setFavorite("!mama:demo", !before).join();
-        a.setMuted("!andrea:demo", true).join();
+        a.setFavorite("!mama:demo", !before).get();
+        a.setMuted("!andrea:demo", true).get();
         a.stop();
         MockChatService b = service();
         assertEquals(!before, b.chat("!mama:demo").favorite());
@@ -77,9 +77,9 @@ class FoldersServiceTest {
     }
 
     @Test
-    void mutedServerSpaceSurvivesRecreatingTheService() {
+    void mutedServerSpaceSurvivesRecreatingTheService() throws Exception {
         MockChatService a = service();
-        a.setMuted("!servidor:demo", true).join();
+        a.setMuted("!servidor:demo", true).get();
         assertNotNull(a.chat("!servidor:demo").prefKey());
         a.stop();
         MockChatService b = service();
@@ -87,15 +87,15 @@ class FoldersServiceTest {
     }
 
     @Test
-    void loggingOutSavesTheLastChange() {
+    void loggingOutSavesTheLastChange() throws Exception {
         MockChatService a = service();
         a.createFolder("Trabajo");
-        a.logout().join();
+        a.logout().get();
         assertEquals("Trabajo", new PreferencesFile(dir.resolve("preferences.json"), dir.resolve("server-seen.json")).folders().get(0).name());
     }
 
     @Test
-    void noWarningWhenFileIsFine() {
+    void noWarningWhenFileIsFine() throws Exception {
         assertNull(service().preferencesWarning());
     }
 

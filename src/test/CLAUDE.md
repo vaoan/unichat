@@ -3,6 +3,7 @@
 Tests run in Spanish (`unichat.language=es` in the pom), with `unichat.dataDir`, `unichat.autosaveDir` and `unichat.silent` set by surefire: never the real data dir.
 
 ## Waiting
+- Wait on a future with `get()`, never `join()`: `join()` can't be interrupted, so JUnit's timeout never ends it and a future that never completes hangs the build for good (two agents lost an hour to it; lesson `test-future-join`).
 - Tests never wait for a length of time nor carry a timeout of their own: no `Thread.sleep`, no `await(5, SECONDS)`, `poll(200, MILLISECONDS)`, `join(5000)`, `waitFor(30, …)` or `get(30, …)` (`.claude/lessons.tsv` catches them). They wait on what the code actually does: a latch or future the code completes, a listener, `FxWait.until` / `FxWait.settled` on screen, the code's own `flush()`. JUnit's global timeout (`junit-platform.properties`) is the only limit.
 - To check that something did *not* happen, first wait for the point where it would have (flush, settled, the call that would have caused it returned). If the code gives no way to know when it's done, change the code so it does (a listener, a returned future, a flush) rather than guess a time.
 - A time the code under test takes as input is given as zero or as no limit (`Duration.ZERO` with a program that never ends shows the timeout path; `NO_LIMIT` when it ends by itself), never a guess of how long something takes. The one timed pause allowed is a profiler's sampling rate (`ScrollPerfUiTest`'s sampler): it measures, it doesn't wait.

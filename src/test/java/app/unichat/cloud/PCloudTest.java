@@ -107,7 +107,7 @@ class PCloudTest {
         Map<String, String> asked = signIn(opened[0], "access_token=T0K&token_type=bearer&uid=1&state=STATE&hostname=eapi.pcloud.com");
         assertEquals("APP", asked.get("client_id"));
         assertEquals("token", asked.get("response_type"));
-        CloudAccount a = login.join();
+        CloudAccount a = login.get();
         assertEquals(CloudAccount.Service.PCLOUD, a.service());
         assertEquals("https://eapi.pcloud.com", a.url(), "the host pCloud named: Europe's here");
         assertEquals("T0K", a.secret());

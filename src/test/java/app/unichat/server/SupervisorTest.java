@@ -97,7 +97,8 @@ class SupervisorTest {
         // Unichat dies without stopping its children (forced quit, crash): the next run cleans up.
         Supervisor next = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run);
         next.reapOrphans();
-        ProcessHandle.of(orphan).ifPresent(h -> h.onExit().join());
+        var left = ProcessHandle.of(orphan);
+        if (left.isPresent()) left.get().onExit().get();
         assertFalse(Files.exists(run.resolve("svc.pid")));
     }
 

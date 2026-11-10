@@ -45,7 +45,7 @@ class MatrixLiveIT {
 
     @Test
     void fullConversationRoundTrip() throws Exception {
-        MatrixChatService alice = MatrixLogin.login(hs, "alice", "pass1234").join();
+        MatrixChatService alice = MatrixLogin.login(hs, "alice", "pass1234").get();
         List<Message> notified = new CopyOnWriteArrayList<>();
         alice.addListener(new ChatService.Listener() {
             @Override public void incomingMessage(Chat chat, Message m) { notified.add(m); }
@@ -73,32 +73,32 @@ class MatrixLiveIT {
             alice.markRead(roomId);
             await("read", () -> !chat.isUnread());
 
-            alice.sendText(roomId, "hola bob", incoming.id()).join();
+            alice.sendText(roomId, "hola bob", incoming.id()).get();
             await("sent", () -> body(alice, roomId, "hola bob") != null && body(alice, roomId, "hola bob").status() != MessageStatus.SENDING);
             Message mine = body(alice, roomId, "hola bob");
             assertEquals(incoming.id(), mine.replyToId());
 
-            alice.toggleReaction(roomId, incoming.id(), "👍").join();
+            alice.toggleReaction(roomId, incoming.id(), "👍").get();
             await("reaction added", () -> incoming.reactions().getOrDefault("👍", java.util.Set.of()).contains(alice.myUserId()));
-            alice.toggleReaction(roomId, incoming.id(), "👍").join();
+            alice.toggleReaction(roomId, incoming.id(), "👍").get();
             await("reaction removed", () -> !incoming.reactions().containsKey("👍"));
 
-            alice.editMessage(roomId, mine.id(), "hola bob (editado)").join();
+            alice.editMessage(roomId, mine.id(), "hola bob (editado)").get();
             await("edited", () -> mine.edited() && mine.body().equals("hola bob (editado)"));
-            alice.deleteMessage(roomId, mine.id()).join();
+            alice.deleteMessage(roomId, mine.id()).get();
             await("deleted", mine::deleted);
 
-            alice.setFavorite(roomId, true).join();
-            alice.setArchived(roomId, true).join();
-            alice.setMarkedUnread(roomId, true).join();
+            alice.setFavorite(roomId, true).get();
+            alice.setArchived(roomId, true).get();
+            alice.setMarkedUnread(roomId, true).get();
             await("tags", () -> chat.favorite() && chat.archived() && chat.markedUnread());
-            alice.setArchived(roomId, false).join();
+            alice.setArchived(roomId, false).get();
             alice.markRead(roomId);
             await("untagged", () -> !chat.archived() && !chat.markedUnread());
 
             Path png = Files.createTempFile("it", ".png");
             ImageIO.write(new BufferedImage(40, 30, BufferedImage.TYPE_INT_RGB), "png", png.toFile());
-            alice.sendFile(roomId, png, null).join();
+            alice.sendFile(roomId, png, null).get();
             await("image sent", () -> alice.messages(roomId).stream()
                     .anyMatch(m -> m.type() == MessageType.IMAGE && m.outgoing() && m.status() == MessageStatus.SENT));
             Message sentImg = alice.messages(roomId).stream().filter(m -> m.type() == MessageType.IMAGE).reduce((a, b) -> b).orElseThrow();
@@ -111,9 +111,9 @@ class MatrixLiveIT {
             Message img = body(alice, roomId, "bob.png");
             assertEquals(MessageType.IMAGE, img.type());
             assertEquals(mxc, img.mediaUrl());
-            Path downloaded = alice.media(img.mediaUrl(), 0, 0).join();
+            Path downloaded = alice.media(img.mediaUrl(), 0, 0).get();
             assertTrue(Files.size(downloaded) > 0);
-            Path thumb = alice.media(img.mediaUrl(), 32, 32).join();
+            Path thumb = alice.media(img.mediaUrl(), 32, 32).get();
             assertTrue(Files.exists(thumb));
 
             bobPut(bob, "/rooms/" + enc(roomId) + "/typing/" + enc("@bob:" + alice.myUserId().split(":", 2)[1]),
@@ -122,13 +122,13 @@ class MatrixLiveIT {
 
             for (int i = 0; i < 40; i++) bobSend(bob, roomId, "relleno " + i);
             await("burst", () -> body(alice, roomId, "relleno 39") != null);
-            alice.loadOlder(roomId).join();
+            alice.loadOlder(roomId).get();
             assertNotNull(alice.messages(roomId));
 
-            alice.leaveChat(roomId).join();
+            alice.leaveChat(roomId).get();
             await("left", () -> alice.chat(roomId) == null || alice.chat(roomId).archived());
         } finally {
-            alice.logout().join();
+            alice.logout().get();
             alice.stop();
         }
     }

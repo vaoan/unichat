@@ -41,9 +41,9 @@ class ReplyLookupRetryTest {
     }
 
     @Test
-    void aFailedLookupIsAskedAgain() {
-        assertNull(svc.message("!r:example.org", "$original").join(), "not had: shown as not loaded");
-        assertNull(svc.message("!r:example.org", "$original").join());
+    void aFailedLookupIsAskedAgain() throws Exception {
+        assertNull(svc.message("!r:example.org", "$original").get(), "not had: shown as not loaded");
+        assertNull(svc.message("!r:example.org", "$original").get());
         assertEquals(2, asked.get(), "the failure wasn't kept as the answer");
     }
 }

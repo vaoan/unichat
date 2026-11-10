@@ -116,7 +116,7 @@ class StyleLearnerTest {
         java.util.concurrent.CompletableFuture<String> read = java.util.concurrent.CompletableFuture.supplyAsync(s::text);
         assertEquals("", read.get(), "not blocked by the AI call");
         release.countDown();
-        t.join();
+        t.join(); // a thread: interruptible, lesson-ok: test-future-join
     }
 
     @Test
@@ -161,8 +161,8 @@ class StyleLearnerTest {
         // While the first is inside, the second either queues up at the lock or, wrongly, gets in too.
         while (b.getState() != Thread.State.BLOCKED && most.get() < 2 && b.isAlive()) Thread.onSpinWait();
         release.countDown();
-        a.join();
-        b.join();
+        a.join(); // lesson-ok: test-future-join (a thread)
+        b.join(); // lesson-ok: test-future-join (a thread)
         assertEquals(1, most.get());
     }
 }

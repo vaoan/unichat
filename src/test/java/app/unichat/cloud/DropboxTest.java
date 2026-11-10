@@ -142,7 +142,7 @@ class DropboxTest {
             HttpResponse<String> back = HTTP.send(HttpRequest.newBuilder(URI.create(asked.get("redirect_uri")
                     + "?code=the-code&state=" + asked.get("state"))).build(), HttpResponse.BodyHandlers.ofString());
             assertEquals(200, back.statusCode());
-            CloudAccount a = login.join();
+            CloudAccount a = login.get();
             assertEquals(CloudAccount.Service.DROPBOX, a.service());
             assertEquals("REFRESH-1", a.secret(), "the lasting permission, exchanged with the verifier only Unichat had");
         }

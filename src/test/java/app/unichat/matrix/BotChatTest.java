@@ -105,8 +105,8 @@ class BotChatTest {
     void oneCommandAtATime() throws Exception {
         CompletableFuture<String> a = CompletableFuture.supplyAsync(() -> ask("uno"));
         CompletableFuture<String> b = CompletableFuture.supplyAsync(() -> ask("dos"));
-        String first = a.join();
-        String second = b.join();
+        String first = a.get();
+        String second = b.get();
 
         assertTrue(first.endsWith("uno ok"), first);
         assertTrue(second.endsWith("dos ok"), second);

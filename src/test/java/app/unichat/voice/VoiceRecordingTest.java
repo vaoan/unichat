@@ -66,7 +66,7 @@ class VoiceRecordingTest {
         // VoiceRecorder offers no way to wait for its end; a future it completed on ending would spare this reflection.
         Field thread = VoiceRecorder.class.getDeclaredField("thread");
         thread.setAccessible(true);
-        ((Thread) thread.get(r)).join();
+        ((Thread) thread.get(r)).join(); // lesson-ok: test-future-join (a thread)
     }
 
     private static double rms(Path wav) throws Exception {

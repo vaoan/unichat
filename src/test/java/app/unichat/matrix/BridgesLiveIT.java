@@ -26,7 +26,7 @@ class BridgesLiveIT {
     @Test
     void everyBridgeAnswersLogin() throws Exception {
         MatrixChatService svc = MatrixLogin.login(System.getenv("UNICHAT_IT_BRIDGES"),
-                System.getenv("UNICHAT_IT_USER"), System.getenv("UNICHAT_IT_PASSWORD")).join();
+                System.getenv("UNICHAT_IT_USER"), System.getenv("UNICHAT_IT_PASSWORD")).get();
         app.unichat.service.Changes changes = app.unichat.service.Changes.of(svc);
         svc.start();
         try {
@@ -40,7 +40,7 @@ class BridgesLiveIT {
 
             StringBuilder failures = new StringBuilder();
             for (Network n : available) {
-                String roomId = svc.connectNetwork(n).join();
+                String roomId = svc.connectNetwork(n).get();
                 String cmd = BridgeProtocol.botCommand(n, BridgeProtocol.loginCommand(n));
                 String reply = awaitBotReply(svc, changes, roomId, cmd);
                 System.out.println("=== " + n + " <- " + cmd + "\n" + reply);
@@ -48,13 +48,13 @@ class BridgesLiveIT {
                 if (reply == null || lower.contains("invalid login flow") || lower.contains("unknown command")) {
                     failures.append(n).append(": ").append(reply).append('\n');
                 }
-                svc.sendText(roomId, BridgeProtocol.botCommand(n, "cancel"), null).join();
+                svc.sendText(roomId, BridgeProtocol.botCommand(n, "cancel"), null).get();
             }
             System.out.println("accounts = " + svc.accounts());
             assertFalse(available.isEmpty(), "no bridge bots found");
             if (!failures.isEmpty()) fail(failures.toString());
         } finally {
-            svc.logout().join();
+            svc.logout().get();
             svc.stop();
         }
     }
