@@ -3,8 +3,14 @@
 # A small, imperceptible-as-possible change moves what Stable Diffusion's image encoder sees toward a target pattern,
 # so models trained on, or editing from, the picture get the pattern instead of it.
 #
+# What keeps it hard to see: each pixel may change only as much as its neighbourhood's texture hides (smooth skin and
+# sky barely move), the change is mostly in brightness (coloured specks show most), it starts from the picture itself
+# (Mist's random start was most of the visible noise at few steps), and the tile grid moves half a tile every other
+# step, so no tile edge stays put long enough to show. The change is worked out at up to 768 px and then laid,
+# enlarged, over the photo at its own size (up to MAX_OUTPUT): models shrink pictures before using them, which brings it back.
+#
 # Only the encoder is loaded (34M parameters), and the picture goes in tiles of at most 256 px: memory stays near
-# 1 GB whatever the size. Prints "progress <done> <total>" after each step, then "done".
+# 1.5 GB whatever the size. Prints "progress <done> <total>" (in pixels) after each tile, then "done".
 #
 # python cloak.py --weights vae.safetensors --target target.png --input in.png --output out.png --steps 30
 import argparse
@@ -15,13 +21,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from PIL import Image
+from PIL import Image, ImageOps
 from safetensors.torch import load_file
 
 TILE = 256
 MAX_MEMORY = 4 * 1024 ** 3  # never more than this: it stops instead of taking the computer's memory (it needs ~1.5 GB)
-EPS = 16 / 255 * 2   # the largest change per channel, in the [-1, 1] range (Mist's default strength)
+EPS = 12 / 255 * 2   # the largest change per channel, in the [-1, 1] range, where the texture hides it best
+SMOOTH_SHARE = 0.15  # what the smoothest areas may take of it
+TEXTURE = 10         # local spread of brightness (0..255) that hides the whole of EPS
+COLOUR = 0.3         # the change in colour, against the one in brightness
 STEP = 1 / 255 * 2
+MAX_OUTPUT = 4096    # the long side sent at most: a bigger PNG would pass the server's 100 MB upload limit
 
 
 def norm(c):
@@ -117,9 +127,8 @@ class Vae(nn.Module):
         return mean + torch.exp(0.5 * logvar.clamp(-30, 20)) * torch.randn_like(mean)
 
 
-def load(path, size):
+def tensor(img):
     """As [-1, 1] floats, 1×3×h×w."""
-    img = Image.open(path).convert("RGB").resize(size, Image.BICUBIC)
     return torch.from_numpy(np.asarray(img, dtype=np.float32) / 127.5 - 1).permute(2, 0, 1)[None]
 
 
@@ -134,6 +143,32 @@ def cuts(n):
     k = math.ceil(n / TILE)
     step = math.ceil(n / k / 8) * 8
     return [(a, min(a + step, n)) for a in range(0, n, step)]
+
+
+def shifted(n):
+    """The same tiles moved half a tile: each edge of cuts(n) falls in the middle of one of these."""
+    if n <= TILE:
+        return cuts(n)
+    edges = sorted({0, n, *((a + b) // 16 * 8 for a, b in cuts(n))})
+    return list(zip(edges, edges[1:]))
+
+
+def blur(x, sigma):
+    """Gaussian, channel by channel, the edges repeated."""
+    r = max(1, int(3 * sigma))
+    g = torch.exp(-torch.arange(-r, r + 1, dtype=torch.float32) ** 2 / (2 * sigma ** 2))
+    g = g / g.sum()
+    c = x.shape[1]
+    x = F.conv2d(F.pad(x, (r, r, 0, 0), mode="replicate"), g.view(1, 1, 1, -1).repeat(c, 1, 1, 1), groups=c)
+    return F.conv2d(F.pad(x, (0, 0, r, r), mode="replicate"), g.view(1, 1, -1, 1).repeat(c, 1, 1, 1), groups=c)
+
+
+def budget(x):
+    """How much each pixel may change: EPS where the brightness around it varies by TEXTURE or more, less where smooth."""
+    luma = (0.299 * x[:, 0:1] + 0.587 * x[:, 1:2] + 0.114 * x[:, 2:3]) * 127.5
+    mean = blur(luma, 2)
+    spread = (blur(luma * luma, 2) - mean * mean).clamp_min(0).sqrt()
+    return blur((spread / TEXTURE).clamp(SMOOTH_SHARE, 1), 2) * EPS
 
 
 def peak_memory():
@@ -166,20 +201,35 @@ def check_memory():
 
 
 def protect(vae, x, target, steps, tell):
-    delta = (torch.rand_like(x) * 2 - 1) * EPS  # a random start, as Mist's
-    delta = ((x + delta).clamp(-1, 1) - x).requires_grad_()
+    """The change to x (same shape) that moves its tiles' latents toward the target's."""
+    limit = budget(x)
+    grids = [[(y, x0) for y in tiles(x.shape[2]) for x0 in tiles(x.shape[3])] for tiles in (cuts, shifted)]
     with torch.no_grad():
-        goal = vae.latent(target)
-    for _ in range(steps):
-        loss = F.mse_loss(vae.latent(x + delta), goal, reduction="sum")
-        grad, = torch.autograd.grad(loss, delta)
+        goals = [[vae.latent(target[..., y0:y1, x0:x1]) for (y0, y1), (x0, x1) in g] for g in grids]
+    delta = torch.zeros_like(x)
+    for i in range(steps):
+        grad = torch.zeros_like(x)
+        for ((y0, y1), (x0, x1)), goal in zip(grids[i % 2], goals[i % 2]):
+            d = delta[..., y0:y1, x0:x1].clone().requires_grad_()
+            loss = F.mse_loss(vae.latent(x[..., y0:y1, x0:x1] + d), goal, reduction="sum")
+            grad[..., y0:y1, x0:x1], = torch.autograd.grad(loss, d)
+            check_memory()
+            tell((y1 - y0) * (x1 - x0))
         with torch.no_grad():
-            delta -= STEP * grad.sign()
-            delta.clamp_(-EPS, EPS)
-            delta.copy_((x + delta).clamp(-1, 1) - x)
-        check_memory()
-        tell()
-    return (x + delta).detach()
+            grey = grad.mean(1, keepdim=True)
+            delta -= STEP * (grey + COLOUR * (grad - grey)).sign()
+            delta = torch.maximum(torch.minimum(delta, limit), -limit)
+            delta = (x + delta).clamp(-1, 1) - x
+    return delta
+
+
+def enlarged(delta, size):
+    """The change, h×w×3 in 0..255 units, at the photo's size."""
+    channels = []
+    for c in delta[0].numpy() * 127.5:
+        d = Image.fromarray(c)
+        channels.append(np.asarray(d.resize(size, Image.BICUBIC) if d.size != size else d))
+    return np.stack(channels, axis=-1)
 
 
 def main():
@@ -200,20 +250,23 @@ def main():
     vae.eval().requires_grad_(False)
 
     with Image.open(a.input) as im:
-        size = working_size(*im.size, a.max_side)
-    x, target = load(a.input, size), load(a.target, size)
-    tiles = [(y, x0) for y in cuts(size[1]) for x0 in cuts(size[0])]
-    total, done = len(tiles) * a.steps, [0]
+        photo = ImageOps.exif_transpose(im).convert("RGB")  # as it's shown: the PNG keeps no orientation tag
+    if max(photo.size) > MAX_OUTPUT:
+        s = MAX_OUTPUT / max(photo.size)
+        photo = photo.resize((round(photo.width * s), round(photo.height * s)), Image.LANCZOS)
+    size = working_size(*photo.size, a.max_side)
+    x = tensor(photo.resize(size, Image.BICUBIC) if size != photo.size else photo)
+    with Image.open(a.target) as t:
+        target = tensor(t.convert("RGB").resize(size, Image.BICUBIC))
+    total, done = size[0] * size[1] * a.steps, [0]
 
-    def tell():
-        done[0] += 1
+    def tell(pixels):
+        done[0] += pixels
         print(f"progress {done[0]} {total}", flush=True)
 
-    out = x.clone()
-    for (y0, y1), (x0, x1) in tiles:
-        out[..., y0:y1, x0:x1] = protect(vae, x[..., y0:y1, x0:x1], target[..., y0:y1, x0:x1], a.steps, tell)
-    pixels = ((out[0].permute(1, 2, 0).numpy() + 1) * 127.5).round().clip(0, 255).astype(np.uint8)
-    Image.fromarray(pixels).save(a.output, format="PNG")
+    delta = protect(vae, x, target, a.steps, tell)
+    out = np.asarray(photo, dtype=np.float32) + enlarged(delta, photo.size)
+    Image.fromarray(out.round().clip(0, 255).astype(np.uint8)).save(a.output, format="PNG")
     print("done", flush=True)
 
 

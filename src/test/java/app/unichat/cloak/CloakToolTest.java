@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
 
@@ -67,18 +68,31 @@ class CloakToolTest {
         tool.install((key, f) -> { if (steps.isEmpty() || !steps.get(steps.size() - 1).equals(key)) steps.add(key); });
         assertTrue(tool.isInstalled(), steps.toString());
         assertFalse(Files.exists(dir.resolve("cloak").resolve("cache")), "uv's cache is gone");
+        // left half smooth, right half rough: the change hides in the rough half
         BufferedImage img = new BufferedImage(300, 200, BufferedImage.TYPE_INT_RGB);
-        for (int y = 0; y < 200; y++) for (int x = 0; x < 300; x++) img.setRGB(x, y, (x * 255 / 300) << 16 | (y * 255 / 200) << 8 | 90);
+        Random random = new Random(1);
+        for (int y = 0; y < 200; y++) for (int x = 0; x < 300; x++) {
+            int v = x < 150 ? 60 + x / 2 : 40 + random.nextInt(170);
+            img.setRGB(x, y, v << 16 | (y / 2 + 40) << 8 | 90);
+        }
         Path in = dir.resolve("in.png"), out = dir.resolve("out.png");
         ImageIO.write(img, "png", in.toFile());
         List<Double> progress = new ArrayList<>();
         CloakJob.run(tool.protectCommand(in, out, CloakLevel.LIGHT), out, progress::add);
         BufferedImage got = ImageIO.read(out.toFile());
-        assertEquals(296, got.getWidth(), "multiples of 8");
+        assertEquals(300, got.getWidth(), "the photo's own size");
         assertEquals(200, got.getHeight());
         assertEquals(1.0, progress.get(progress.size() - 1), 1e-9);
+        long smooth = 0, rough = 0;
         int changed = 0;
-        for (int y = 0; y < 200; y++) for (int x = 0; x < 296; x++) if (got.getRGB(x, y) != img.getRGB(x * 300 / 296, y)) changed++;
-        assertTrue(changed > 296 * 200 / 2, "most pixels moved: " + changed);
+        for (int y = 0; y < 200; y++) for (int x = 0; x < 300; x++) {
+            int a = img.getRGB(x, y), b = got.getRGB(x, y), d = 0;
+            for (int shift = 0; shift <= 16; shift += 8) d += Math.abs((a >> shift & 255) - (b >> shift & 255));
+            if (d > 0) changed++;
+            if (x < 140) smooth += d;
+            else if (x >= 160) rough += d;
+        }
+        assertTrue(changed > 300 * 200 / 2, "most pixels moved: " + changed);
+        assertTrue(rough > 2 * smooth, "smooth areas change less: smooth " + smooth + ", rough " + rough);
     }
 }
