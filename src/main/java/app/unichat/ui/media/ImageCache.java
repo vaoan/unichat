@@ -42,11 +42,21 @@ public final class ImageCache {
      * Completes with null when it can't be loaded (then the initials stay; retried after a while, not per click).
      */
     public static CompletableFuture<Image> load(String url, MediaSource svc) {
+        return load(url, svc, AnimatedImage.DECODER);
+    }
+
+    /** {@code decoder}: where the picture is decoded (a test decodes on its own thread). */
+    static CompletableFuture<Image> load(String url, MediaSource svc, java.util.concurrent.Executor decoder) {
         Image cached = CACHE.get(url);
         if (cached != null) return CompletableFuture.completedFuture(cached);
         Long failedAt = FAILED.get(url);
         if (failedAt != null && System.currentTimeMillis() - failedAt < RETRY_AFTER_MS) return CompletableFuture.completedFuture(null);
-        return LOADING.computeIfAbsent(url, u -> svc.media(u, PX, PX).thenApplyAsync(path -> {
+        // Registered first and started after: a load finished at once used to remove itself inside computeIfAbsent,
+        // which the map refuses ("Recursive update"), leaving a failed load there for good (ImageCacheUiTest).
+        CompletableFuture<Image> mine = new CompletableFuture<>();
+        CompletableFuture<Image> running = LOADING.putIfAbsent(url, mine);
+        if (running != null) return running;
+        svc.media(url, PX, PX).thenApplyAsync(path -> {
             // Decoded completely here, so a view never shows a half-loaded (blank) image.
             // Animated avatars (Discord) stay still: JavaFX's own GIF animation never lets the image go.
             Image img;
@@ -59,16 +69,20 @@ public final class ImageCache {
                 img = null;
             }
             if (img == null || img.isError()) {
-                FAILED.put(u, System.currentTimeMillis());
+                FAILED.put(url, System.currentTimeMillis());
                 return (Image) null;
             }
-            CACHE.put(u, img);
-            FAILED.remove(u);
+            CACHE.put(url, img);
+            FAILED.remove(url);
             return img;
-        }, AnimatedImage.DECODER).exceptionally(err -> {
-            FAILED.put(u, System.currentTimeMillis());
+        }, decoder).exceptionally(err -> {
+            FAILED.put(url, System.currentTimeMillis());
             return null;
-        }).whenComplete((img, err) -> LOADING.remove(u)));
+        }).whenComplete((img, err) -> {
+            LOADING.remove(url, mine);
+            mine.complete(img);
+        });
+        return mine;
     }
 
     /** Telegram's custom emoji can be WebM, which only becomes a picture through ffmpeg. */
