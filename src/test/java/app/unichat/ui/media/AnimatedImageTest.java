@@ -93,18 +93,7 @@ class AnimatedImageTest {
 
     /** A {@code frames}-frame 20x20 GIF. */
     private static void writeGif(Path out, int frames) throws Exception {
-        javax.imageio.ImageWriter w = javax.imageio.ImageIO.getImageWritersByFormatName("gif").next();
-        try (var ios = javax.imageio.ImageIO.createImageOutputStream(out.toFile())) {
-            w.setOutput(ios);
-            w.prepareWriteSequence(null);
-            for (int i = 0; i < frames; i++) {
-                BufferedImage img = new BufferedImage(20, 20, BufferedImage.TYPE_INT_RGB);
-                img.setRGB(i, i, 0xFFFFFF);
-                w.writeToSequence(new javax.imageio.IIOImage(img, null, null), null);
-            }
-            w.endWriteSequence();
-        }
-        w.dispose();
+        app.unichat.TestPictures.gif(out, 20, 20, frames);
     }
 
     @Test

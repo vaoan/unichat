@@ -4,6 +4,7 @@ import app.unichat.model.Chat;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
 
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,13 +12,15 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * The demo with nobody acting on their own and no pauses: the test plays the others in the chat (writing, typing, the
- * history the server still has).
+ * history the server still has) and decides when pictures and files finish downloading.
  */
 public final class ScriptedChatService extends MockChatService {
     private final Map<String, Integer> olderToLoad = new ConcurrentHashMap<>();
+    private volatile CompletableFuture<Void> downloads = CompletableFuture.completedFuture(null);
 
     public ScriptedChatService() {
         noAutoReplies();
@@ -29,15 +32,59 @@ public final class ScriptedChatService extends MockChatService {
         incoming(chats.get(chatId), someoneElse(chatId), text, true);
     }
 
+    /** Someone else in {@code chatId} sends a message {@code fill} makes (a photo, a sticker, a file…); its id. */
+    public String receive(String chatId, Consumer<Message> fill) {
+        Member from = someoneElse(chatId);
+        Message m = new Message(UUID.randomUUID().toString(), chatId, from.id(), from.displayName(), false, Instant.now());
+        fill.accept(m);
+        append(chats.get(chatId), m);
+        return m.id();
+    }
+
+    /**
+     * Downloads wait from now on, until the returned gate says how they end: what's asked meanwhile shows as it does on
+     * a slow connection, and the test then sees it arrive (or fail).
+     */
+    public Gate holdDownloads() {
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        downloads = gate;
+        return new Gate(gate);
+    }
+
+    /** Ends the downloads held by {@link #holdDownloads}. */
+    public static final class Gate {
+        private final CompletableFuture<Void> gate;
+
+        private Gate(CompletableFuture<Void> gate) {
+            this.gate = gate;
+        }
+
+        public void release() { gate.complete(null); }
+
+        public void fail() { gate.completeExceptionally(new java.io.IOException("download failed (test)")); }
+    }
+
+    @Override
+    public CompletableFuture<Path> media(String url, int width, int height) {
+        CompletableFuture<Void> gate = downloads;
+        return gate.isDone() && !gate.isCompletedExceptionally() ? super.media(url, width, height)
+                : gate.thenCompose(x -> super.media(url, width, height));
+    }
+
     /** Someone else in {@code chatId} starts or stops writing. */
     public void othersTyping(String chatId, boolean typing) {
         setTyping(chats.get(chatId), someoneElse(chatId), typing);
     }
 
-    /** Message {@code id} now says {@code text}, whoever wrote it (an answer streaming in, an embed arriving). */
+    /** Message {@code id} now says {@code text}, whoever wrote it (an answer streaming in). */
     public void rewrite(String chatId, String id, String text) {
+        rewrite(chatId, id, m -> m.setBody(text));
+    }
+
+    /** Message {@code id} changed by {@code change}, whoever wrote it (an embed or a link preview arriving later). */
+    public void rewrite(String chatId, String id, Consumer<Message> change) {
         for (Message m : messages(chatId)) {
-            if (m.id().equals(id)) m.setBody(text);
+            if (m.id().equals(id)) change.accept(m);
         }
         fireMessages(chatId);
     }

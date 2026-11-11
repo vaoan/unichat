@@ -248,9 +248,17 @@ final class TimelineWindow {
                 false, false, false, false, true, false, false, true, false, true, null);
     }
 
+    /**
+     * Closes the window and lets its view go: a view left registered on the app's singletons stays in memory with
+     * everything it drew, and eighty of them ran the test run out of heap.
+     */
     void close() throws Exception {
         svc.stop();
-        FxWait.fx(() -> { stage.close(); return null; });
+        FxWait.fx(() -> {
+            view.dispose();
+            stage.close();
+            return null;
+        });
     }
 
     /** Every frame drawn from now on, until {@link Frames#stop}. */

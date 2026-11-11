@@ -746,7 +746,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         if (!chat.muted()) listeners.forEach(l -> l.incomingMessage(chat, m));
     }
 
-    private void append(Chat chat, Message m) {
+    protected void append(Chat chat, Message m) {
         List<Message> list = messages.computeIfAbsent(chat.id(), k -> new ArrayList<>());
         synchronized (list) {
             list.add(m);

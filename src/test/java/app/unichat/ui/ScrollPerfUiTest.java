@@ -34,14 +34,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.input.ScrollEvent;
 import javafx.stage.Stage;
-import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
-import javax.imageio.ImageTypeSpecifier;
-import javax.imageio.ImageWriteParam;
-import javax.imageio.ImageWriter;
-import javax.imageio.metadata.IIOMetadata;
-import javax.imageio.metadata.IIOMetadataNode;
-import javax.imageio.stream.ImageOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
@@ -86,27 +79,7 @@ class ScrollPerfUiTest {
     }
 
     private static Path gif(Path dir, String name, int w, int h, int frames, int seed) throws Exception {
-        Path p = dir.resolve(name);
-        ImageWriter writer = ImageIO.getImageWritersByFormatName("gif").next();
-        try (ImageOutputStream out = ImageIO.createImageOutputStream(p.toFile())) {
-            writer.setOutput(out);
-            writer.prepareWriteSequence(null);
-            for (int f = 0; f < frames; f++) {
-                BufferedImage b = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_INDEXED);
-                Graphics2D g = b.createGraphics();
-                paint(g, w, h, f, seed);
-                g.dispose();
-                ImageWriteParam param = writer.getDefaultWriteParam();
-                IIOMetadata meta = writer.getDefaultImageMetadata(ImageTypeSpecifier.createFromRenderedImage(b), param);
-                String format = meta.getNativeMetadataFormatName();
-                IIOMetadataNode root = (IIOMetadataNode) meta.getAsTree(format);
-                ((IIOMetadataNode) root.getElementsByTagName("GraphicControlExtension").item(0)).setAttribute("delayTime", "4");
-                meta.setFromTree(format, root);
-                writer.writeToSequence(new IIOImage(b, null, meta), param);
-            }
-            writer.endWriteSequence();
-        }
-        return p;
+        return app.unichat.TestPictures.gif(dir.resolve(name), w, h, frames, (g, f) -> paint(g, w, h, f, seed));
     }
 
     private static Path photo(Path dir, String name, int seed) throws Exception {
