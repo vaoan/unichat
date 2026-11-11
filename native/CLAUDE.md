@@ -21,3 +21,4 @@ Native builds and the no-Docker stack, and the macOS menu-bar helper (the Java s
 
 ## Lessons
 - Appending to a generated YAML without a trailing newline glued `rc_message:` to a comment line (Synapse test config). Use `printf '\n...'` when appending.
+- A notification's first click often didn't open its chat (no "Notification click" line in the log: it never reached Unichat): each message posted a notification of its own, so a busy chat stacked them, and the first click on a stack only unfolds it. One request per chat now (`identifier: chat`), which replaces the last and alerts again: nothing to unfold. Only a real click can check it.

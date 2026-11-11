@@ -81,7 +81,9 @@ final class Notes: NSObject, UNUserNotificationCenterDelegate {
         c.threadIdentifier = chat // grouped per chat in Notification Center
         c.userInfo = ["chat": chat]
         if sound { c.sound = .default }
-        center.add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil)) { error in
+        // One notification per chat: the chat's id as the request's replaces the last one (it alerts again). A new id per
+        // message stacked them, and the first click on a stack only unfolds it: the chat didn't open until a second click.
+        center.add(UNNotificationRequest(identifier: chat, content: c, trigger: nil)) { error in
             if let error { emit("notify-error\t\(error.localizedDescription)") }
         }
     }
