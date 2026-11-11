@@ -19,6 +19,14 @@ public interface MediaSource {
     }
 
     /**
+     * A sticker's file, kept in a room of its own (Ajustes → Privacidad: how many, how many MB), so photos and videos
+     * never push the chats' stickers out and they don't load again and again.
+     */
+    default CompletableFuture<Path> sticker(String url, java.util.function.DoubleConsumer progress) {
+        return media(url, 0, 0, progress);
+    }
+
+    /**
      * Whether {@code error}, from {@link #media}, means the file will never come: deleted, expired, not an address it
      * can open. Otherwise (the network, the server for now) asking again later may work.
      */

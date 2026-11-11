@@ -15,6 +15,8 @@
 
 - WhatsApp Business messages with buttons (orders to pay, links, template replies): the bridge marks them (`fi.mau.whatsapp.business_message_type`) and writes each button as a `<label>` line before "Use the WhatsApp app to click buttons"; `BusinessMessages` takes those out of the body and HTML into `Message.buttons` (labels as the bridge wrote them, often an internal name like `review_and_pay`) and names "Unsupported thumbnail message" (an order's picture) `business.order`. Only with the mark: someone's own `<text>` stays. The bridge can't pass a press on, so `ui/timeline/BusinessButtons` draws them as chips with a note.
 
+- Stickers have a cache of their own (`MediaSource.sticker`, `cache/sticker-cache`): the newest seen `cache.stickerCount` (500) within `cache.stickerMb` (1 GB), the one seen longest ago first whatever its size (`MediaCache.trimOldest`), Ajustes → Privacidad; a sticker the media folder held moves in instead of downloading again (`StickerCacheTest`).
+
 ## Lessons
 - An address a server suggests for itself (`.well-known`, the login's `well_known`) is a stranger's: taken as it came, a plain http one became the session's and the token went out in clear. `MatrixLogin.safeBase` (https, or http on this machine or its network) and `isHomeserver` both decide (`LoginWellKnownTest`).
 - A message's addresses are its sender's to choose: a `file:` media URL from a message was opened as a local path (autosave copied `~/.ssh` keys to the cloud; on Windows a `file://host/share` leaks the login's hash). `MediaDownloader.media` opens a `file:` address only if `MessageSender` registered it as ours (`ownFile`, our local echo); `LocalFileUrlTest`.

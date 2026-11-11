@@ -332,6 +332,12 @@ public final class Settings {
     /** Size limit of the downloaded media (photos, videos, files) in MB; the least recently seen go first. */
     public int mediaCacheMb() { return getInt("cache.mediaMb", 1024, 100); }
     public void setMediaCacheMb(int mb) { set("cache.mediaMb", Integer.toString(mb)); }
+    /** Stickers have their own room, apart from photos and videos: the newest seen this many at most… */
+    public int stickerCacheCount() { return getInt("cache.stickerCount", 500, 50); }
+    public void setStickerCacheCount(int n) { set("cache.stickerCount", Integer.toString(n)); }
+    /** …and this many MB at most (Telegram's animated ones arrive as GIFs of several MB). */
+    public int stickerCacheMb() { return getInt("cache.stickerMb", 1024, 50); }
+    public void setStickerCacheMb(int mb) { set("cache.stickerMb", Integer.toString(mb)); }
 
     // Voice notes to text (engine and model: stt/SttSettings).
     /** Whisper language code ("es", "en"…) or "auto". */

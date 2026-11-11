@@ -3,6 +3,7 @@ package app.unichat.ui.settings;
 import app.unichat.server.LogFiles;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import app.unichat.ui.Labels;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -29,7 +30,9 @@ final class PrivacyPage {
                         toggle(s.sendTypingNotifications(), s::setSendTypingNotifications))),
                 group(I18n.t("settings.privacy.groupLocal"), row(I18n.t("settings.privacy.dataFolder"), s.dir().toString(), new Label()),
                         row(I18n.t("settings.privacy.mediaSpace"), I18n.t("settings.privacy.mediaSpaceHelp"),
-                                mediaCacheChoice())),
+                                mediaCacheChoice()),
+                        row(I18n.t("settings.privacy.stickerSpace"), I18n.t("settings.privacy.stickerSpaceHelp"),
+                                stickerCacheChoice())),
                 logsGroup(s),
                 group(I18n.t("settings.privacy.groupUpdates"), row(I18n.t("settings.privacy.checkUpdates"), I18n.t("settings.privacy.checkUpdatesHelp"),
                         toggle(s.checkUpdates(), v -> {
@@ -50,6 +53,18 @@ final class PrivacyPage {
         Function<Integer, String> label = mb -> mb < 1024 ? mb + " MB" : mb / 1024 + " GB";
         return chips(I18n.t("settings.privacy.mediaSpaceAccessible"), List.of(500, 1024, 5120), label,
                 mb -> I18n.t("settings.privacy.mediaSpaceUse", label.apply(mb)), s.mediaCacheMb(), s::setMediaCacheMb);
+    }
+
+    /** The stickers' own room: how many of the newest seen, and how many MB at most. */
+    private static Node stickerCacheChoice() {
+        Settings s = Settings.get();
+        Function<Integer, String> size = mb -> mb < 1024 ? mb + " MB" : mb / 1024 + " GB";
+        Node count = chips(I18n.t("settings.privacy.stickerCountAccessible"), List.of(200, 500, 1000, 2000), String::valueOf,
+                n -> I18n.t("settings.privacy.stickerCountUse", n), s.stickerCacheCount(), s::setStickerCacheCount);
+        Node mb = chips(I18n.t("settings.privacy.stickerMbAccessible"), List.of(256, 1024, 2048, 5120), size,
+                v -> I18n.t("settings.privacy.stickerMbUse", size.apply(v)), s.stickerCacheMb(), s::setStickerCacheMb);
+        return new javafx.scene.layout.VBox(4, Labels.help(I18n.t("settings.privacy.stickerCount")), count,
+                Labels.help(I18n.t("settings.privacy.stickerMb")), mb);
     }
 
     /** Logs never hold personal data (Redactor) and are deleted after the chosen days (LogFiles). */

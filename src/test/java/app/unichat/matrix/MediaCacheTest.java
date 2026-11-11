@@ -96,4 +96,20 @@ class MediaCacheTest {
         assertEquals(MediaDownloader.cacheKey("https://x/y.gif", 0, 0), MediaDownloader.cacheKey("https://x/y.gif", 200, 200));
         assertFalse(MediaDownloader.cacheKey("mxc://local/abc", 0, 0).equals(MediaDownloader.cacheKey("mxc://local/abc", 152, 152)));
     }
+
+    @Test
+    void theStickersRoomKeepsTheNewestSeenWithinItsCountAndSize(@TempDir Path dir) throws Exception {
+        Path oldest = file(dir, "a.gif", 100, 1_000);
+        Path pinned = file(dir, "p".repeat(64) + ".gif", 100, 1_500);
+        Path middle = file(dir, "b.gif", 5_000, 2_000); // big, but seen after the oldest: not first to go
+        Path newest = file(dir, "c.gif", 100, 3_000);
+        MediaCache.trimOldest(dir, 1_000_000, 3, java.util.Set.of("p".repeat(64)));
+        assertFalse(Files.exists(oldest), "four files, three allowed: the one seen longest ago goes");
+        assertTrue(Files.exists(pinned) && Files.exists(middle) && Files.exists(newest));
+
+        MediaCache.trimOldest(dir, 1_000, 10, java.util.Set.of("p".repeat(64)));
+        assertFalse(Files.exists(middle), "over the size: the oldest of the rest goes");
+        assertTrue(Files.exists(newest));
+        assertTrue(Files.exists(pinned), "a saved sticker always stays");
+    }
 }

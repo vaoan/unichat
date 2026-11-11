@@ -73,6 +73,8 @@ class SyncedSettingsUiTest {
         p.put("privacy.readReceipts", new Proof("false", () -> Settings.get().getString("privacy.readReceipts", null), "false"));
         p.put("privacy.linkPreviews", new Proof("false", () -> Settings.get().linkPreviews(), false));
         p.put("cache.mediaMb", new Proof("5000", () -> Settings.get().mediaCacheMb(), 5000));
+        p.put("cache.stickerCount", new Proof("2000", () -> Settings.get().stickerCacheCount(), 2000));
+        p.put("cache.stickerMb", new Proof("2048", () -> Settings.get().stickerCacheMb(), 2048));
         p.put("logs.retentionDays", new Proof("30", () -> Settings.get().logRetentionDays(), 30));
         p.put("notify.preview", new Proof("false", () -> Settings.get().notificationPreview(), false));
         p.put("notify.sound", new Proof("false", () -> Settings.get().notificationSound(), false));

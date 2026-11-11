@@ -21,13 +21,19 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
-/** Downloads media on demand into {@code cache/media} and keeps that folder under its limit ({@link MediaCache}); favourites have their own copy ({@link SavedMedia}). */
+/**
+ * Downloads media on demand into {@code cache/media} and keeps that folder under its limit ({@link MediaCache}); stickers
+ * into {@code cache/sticker-cache}, with limits of their own (Ajustes → Privacidad), so photos and videos never push them
+ * out; favourites have their own copy ({@link SavedMedia}).
+ */
 final class MediaDownloader {
     private final MatrixClient client;
     private final LinkInspector links = new LinkInspector();
     private final ExecutorService io;
     private final Map<String, CompletableFuture<Path>> mediaInFlight = new ConcurrentHashMap<>();
-    private final java.util.concurrent.atomic.AtomicLong lastCacheTrim = new java.util.concurrent.atomic.AtomicLong();
+    /** When each folder was last trimmed. */
+    private final Map<String, java.util.concurrent.atomic.AtomicLong> lastTrim = new ConcurrentHashMap<>();
+    private static final String MEDIA = "media", STICKERS = "sticker-cache";
 
     private volatile java.util.Set<String> pinned = java.util.Set.of();
     private final SavedMedia saved;
@@ -58,17 +64,36 @@ final class MediaDownloader {
 
     /** {@link #media(String, int, int)}, telling {@code progress} how much has arrived while it downloads. */
     CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer progress) {
-        String key = cacheKey(url, width, height);
+        return watched(key(MEDIA, url, width, height), progress, () -> media(url, width, height));
+    }
+
+    /** A sticker's original, in the stickers' own folder, telling {@code progress} how much has arrived. */
+    CompletableFuture<Path> sticker(String url, java.util.function.DoubleConsumer progress) {
+        return watched(key(STICKERS, url, 0, 0), progress, () -> fetch(url, 0, 0, STICKERS));
+    }
+
+    private CompletableFuture<Path> watched(String key, java.util.function.DoubleConsumer progress,
+                                            java.util.function.Supplier<CompletableFuture<Path>> start) {
         watching.computeIfAbsent(key, k -> new java.util.concurrent.CopyOnWriteArrayList<>()).add(progress);
         // The key goes with its last watcher, before whoever waits hears the download is over.
-        return media(url, width, height).whenComplete((p, e) -> watching.computeIfPresent(key, (k, l) -> {
+        return start.get().whenComplete((p, e) -> watching.computeIfPresent(key, (k, l) -> {
             l.remove(progress);
             return l.isEmpty() ? null : l;
         }));
     }
 
+    /** A download's key in flight: the media folder's as it always was, another folder's apart. */
+    private static String key(String folder, String url, int width, int height) {
+        String k = cacheKey(url, width, height);
+        return folder.equals(MEDIA) ? k : folder + ":" + k;
+    }
+
     /** The local file of {@code url}: from the cache, or downloaded once however many ask at the same time. */
     CompletableFuture<Path> media(String url, int width, int height) {
+        return fetch(url, width, height, MEDIA);
+    }
+
+    private CompletableFuture<Path> fetch(String url, int width, int height, String folder) {
         if (url == null || url.isBlank()) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
         if (url.startsWith("file:")) {
             return ownFiles.contains(url) ? CompletableFuture.completedFuture(Path.of(URI.create(url)))
@@ -76,10 +101,11 @@ final class MediaDownloader {
         }
         Path own = saved.find(url);
         if (own != null) return CompletableFuture.completedFuture(own);
-        String key = cacheKey(url, width, height);
-        Path dir = Settings.get().cacheDir().resolve("media");
-        String hash = Hashes.sha256(key);
+        String key = key(folder, url, width, height);
+        Path dir = Settings.get().cacheDir().resolve(folder);
+        String hash = Hashes.sha256(cacheKey(url, width, height));
         Path cached = findCached(dir, hash);
+        if (cached == null && folder.equals(STICKERS)) cached = adopt(hash, dir);
         if (cached != null) {
             MediaCache.touch(cached);
             return CompletableFuture.completedFuture(cached);
@@ -93,7 +119,7 @@ final class MediaDownloader {
                     var l = watching.get(key);
                     if (l != null) l.forEach(c -> c.accept(done));
                 }));
-                trimMediaCache(dir);
+                trim(folder, dir);
             } catch (Throwable t) {
                 f.completeExceptionally(t);
             } finally {
@@ -101,6 +127,18 @@ final class MediaDownloader {
             }
         });
         return f;
+    }
+
+    /** A sticker the media folder holds from before it had its own: moved into the stickers' folder, not downloaded again. */
+    private Path adopt(String hash, Path stickers) {
+        Path old = findCached(Settings.get().cacheDir().resolve(MEDIA), hash);
+        if (old == null) return null;
+        try {
+            Files.createDirectories(stickers);
+            return Files.move(old, stickers.resolve(old.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            return old;
+        }
     }
 
     /**
@@ -148,11 +186,17 @@ final class MediaDownloader {
         return url + "|" + (scalable ? Math.max(0, width) + "x" + Math.max(0, height) : "0x0");
     }
 
-    /** At most once a minute: listing thousands of files after every thumbnail would cost more than it saves. */
-    private void trimMediaCache(Path dir) {
-        long now = System.currentTimeMillis(), last = lastCacheTrim.get();
-        if (now - last < 60_000 || !lastCacheTrim.compareAndSet(last, now)) return;
-        MediaCache.trim(dir, Settings.get().mediaCacheMb() * 1024L * 1024L, pinned);
+    /** At most once a minute per folder: listing thousands of files after every thumbnail would cost more than it saves. */
+    private void trim(String folder, Path dir) {
+        var at = lastTrim.computeIfAbsent(folder, f -> new java.util.concurrent.atomic.AtomicLong());
+        long now = System.currentTimeMillis(), last = at.get();
+        if (now - last < 60_000 || !at.compareAndSet(last, now)) return;
+        Settings s = Settings.get();
+        if (folder.equals(STICKERS)) {
+            MediaCache.trimOldest(dir, s.stickerCacheMb() * 1024L * 1024L, s.stickerCacheCount(), pinned);
+        } else {
+            MediaCache.trim(dir, s.mediaCacheMb() * 1024L * 1024L, pinned);
+        }
     }
 
     private Path download(String url, int w, int h, Path dir, String hash, java.util.function.DoubleConsumer progress) throws IOException {
