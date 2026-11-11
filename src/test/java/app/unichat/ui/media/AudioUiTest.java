@@ -198,13 +198,18 @@ class AudioUiTest {
             return null;
         });
 
+        // Paused first: the demo note lasts 2 s, so "still playing" after changing chats depended on how loaded the
+        // machine was (it failed in a full run). Paused, it must still be there, and the bar must start it again.
+        fx(() -> { audio.pause(); return null; });
+        await(() -> audio.state() == AudioPlayback.State.PAUSED, "paused");
         fx(() -> { view.openChatId("!andres:demo"); return null; });
         FxWait.settled(); // the other chat fully shown
-        assertEquals(AudioPlayback.State.PLAYING, fx(audio::state), "changing chats doesn't stop it");
+        assertEquals(AudioPlayback.State.PAUSED, fx(audio::state), "changing chats doesn't stop it");
+        assertEquals("!familia:demo", fx(() -> audio.chat().id()));
         Node bar = fx(() -> view.lookup(".audio-bar"));
         assertTrue(fx(bar::isVisible));
         fx(() -> { ((Button) bar.lookup(".audio-toggle")).fire(); return null; });
-        await(() -> audio.state() == AudioPlayback.State.PAUSED, "the bar controls it from the other chat");
+        await(() -> audio.state() == AudioPlayback.State.PLAYING, "the bar controls it from the other chat");
         fx(() -> { audio.stop(); stage[0].close(); svc.stop(); return null; });
     }
 

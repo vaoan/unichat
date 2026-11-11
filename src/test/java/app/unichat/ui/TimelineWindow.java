@@ -122,6 +122,20 @@ final class TimelineWindow {
         return last.localToScene(last.getBoundsInLocal()).getMaxY() - flow.localToScene(flow.getBoundsInLocal()).getMaxY();
     }
 
+    /** What the list draws last, for a failure to say why the newest message isn't there. */
+    private String lastDrawn() {
+        VirtualFlow<?> flow = flow();
+        IndexedCell<?> last = flow.getLastVisibleCell();
+        int n = list().getItems().size();
+        if (last == null) return "no cells, " + n + " rows";
+        double bottom = last.localToScene(last.getBoundsInLocal()).getMaxY() - flow.localToScene(flow.getBoundsInLocal()).getMaxY();
+        Object item = n == 0 ? null : list().getItems().get(n - 1);
+        String newest = item instanceof ThreadRows.MessageRow mr ? mr.message().type() + " '" + mr.message().body() + "'"
+                : String.valueOf(item);
+        return "last drawn row " + last.getIndex() + " of " + n + ", " + Math.round(last.getHeight()) + " px tall, bottom "
+                + Math.round(bottom) + " px off; viewport " + Math.round(flow.getHeight()) + " px; newest " + newest;
+    }
+
     /** Where the row of message {@code id} is drawn (its top, in the scene), or null when it isn't on screen. */
     Double yOf(String id) {
         VirtualFlow<?> flow = flow();
@@ -310,7 +324,7 @@ final class TimelineWindow {
     Frames.Probe atBottom(double gap) {
         return () -> {
             Double now = newestGap();
-            if (now == null) return "the newest message isn't drawn";
+            if (now == null) return "the newest message isn't drawn (" + lastDrawn() + ")";
             return Math.abs(now - gap) <= 1 ? null : "the newest message's bottom is " + Math.round(now - gap) + " px off";
         };
     }
@@ -319,7 +333,7 @@ final class TimelineWindow {
     Frames.Probe inView() {
         return () -> {
             Double now = newestGap();
-            if (now == null) return "the newest message isn't drawn";
+            if (now == null) return "the newest message isn't drawn (" + lastDrawn() + ")";
             return now <= 1 ? null : "the newest message is cut off by " + Math.round(now) + " px";
         };
     }
