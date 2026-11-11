@@ -1,5 +1,7 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.autosave.AutoSave;
+import app.unichat.autosave.SaveFolders;
 import app.unichat.ui.Clipboards;
 import app.unichat.ui.Icons;
 import app.unichat.ui.chats.ChatMenus;
@@ -169,6 +171,16 @@ final class MessageActionsUi {
         return null;
     }
 
+    /**
+     * Saves what {@code url} leads to into the chat's folder, as auto-save would, on or off for this chat; the menu-bar
+     * ring and the notices tell how it went ({@link AutoSave.Progress}), this only where it's going.
+     */
+    private void saveLink(Message m, String url) {
+        AutoSave save = AutoSave.of(svc);
+        toast.accept(I18n.t("message.savingLink", SaveFolders.shown(save.folder(chat.get()))));
+        save.saveLink(m, url);
+    }
+
     ContextMenu messageMenu(Message m) {
         ContextMenu menu = new ContextMenu();
         java.util.Set<MessageActions.Action> a = MessageActions.of(m, chat.get().features(), Instant.now());
@@ -178,6 +190,11 @@ final class MessageActionsUi {
         if (replied != null) menu.getItems().add(ChatMenus.item(I18n.t("message.goToReplied"), () -> jumpTo.accept(replied)));
         for (String url : RichText.addresses(m.body()).stream().distinct().limit(MENU_LINKS).toList()) {
             menu.getItems().add(ChatMenus.item(I18n.t("message.openLink", RichText.shown(url, 40)), () -> media.openLink(url)));
+        }
+        if (a.contains(MessageActions.Action.SAVE_LINK)) {
+            for (String url : AutoSave.links(m).stream().limit(MENU_LINKS).toList()) {
+                menu.getItems().add(ChatMenus.item(I18n.t("message.saveLink", RichText.shown(url, 40)), () -> saveLink(m, url)));
+            }
         }
         if (a.contains(MessageActions.Action.REPLY)) menu.getItems().add(ChatMenus.item(I18n.t("message.reply"), () -> composer.reply(m)));
         if (a.contains(MessageActions.Action.REPLY) && AiReplyButton.SHOWN.get()) {

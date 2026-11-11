@@ -154,8 +154,18 @@ public final class AutoSave implements ChatService.Listener {
         return onWorker(() -> SavedMove.toOwn(chat, folder));
     }
 
-    private java.util.concurrent.CompletableFuture<Integer> onWorker(java.util.concurrent.Callable<Integer> work) {
-        java.util.concurrent.CompletableFuture<Integer> f = new java.util.concurrent.CompletableFuture<>();
+    /**
+     * Saves what {@code url} in {@code m} leads to now, because the person asked (the message's menu), whether or not the
+     * chat saves by itself: into the chat's folder, named with the message's id, as saving as it arrives would, so that
+     * later knows it's there. On the saving thread, counted on the menu-bar ring, its failure always told
+     * ({@link Progress#failed}, with the message). Gives whether it was saved.
+     */
+    public java.util.concurrent.CompletableFuture<Boolean> saveLink(Message m, String url) {
+        return onWorker(() -> live.saveAsked(m, url) == null);
+    }
+
+    private <T> java.util.concurrent.CompletableFuture<T> onWorker(java.util.concurrent.Callable<T> work) {
+        java.util.concurrent.CompletableFuture<T> f = new java.util.concurrent.CompletableFuture<>();
         worker.execute(() -> {
             try {
                 f.complete(work.call());
@@ -180,8 +190,8 @@ public final class AutoSave implements ChatService.Listener {
         worker.execute(() -> live.catchUp(chatId, false));
     }
 
-    /** The links in what it says, and the page a reel shown as a picture points to. */
-    static Set<String> links(Message m) {
+    /** The links in what it says, and the page a reel shown as a picture points to: what saving a message's links takes. */
+    public static Set<String> links(Message m) {
         Set<String> out = new LinkedHashSet<>(Urls.in(m.body()));
         // A video that came with its page (Instagram's reels) is that page's video: downloading the page again saved
         // the same reel twice, the second one in VP9, which a Mac doesn't open.

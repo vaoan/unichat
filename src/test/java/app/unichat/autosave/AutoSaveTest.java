@@ -36,6 +36,10 @@ class AutoSaveTest {
     private final java.util.Deque<List<Message>> older = new java.util.concurrent.ConcurrentLinkedDeque<>();
     private final List<String> links = new CopyOnWriteArrayList<>();
     private final List<String> told = new CopyOnWriteArrayList<>();
+    /** Where each link went and the name tag it got: "folder tag". */
+    private final List<String> linkedInto = new CopyOnWriteArrayList<>();
+    /** The message each failure told came in. */
+    private final List<String> failedIn = new CopyOnWriteArrayList<>();
     /** A link that has no video, and a file that can't be downloaded. */
     private static final String NO_VIDEO = "https://example.org/sin-video", BROKEN = "mxc://s/roto.jpg", ENDLESS = "mxc://s/enorme.mov";
     /** A file and a link that fail for {@link #flaky}'s reason while it's set, and are saved once it isn't. */
@@ -100,6 +104,7 @@ class AutoSaveTest {
                 String why = flaky;
                 if (url.equals(FLAKY_LINK) && why != null) return Failure.forNow(why);
                 links.add(url);
+                linkedInto.add(folder + " " + tag);
                 return null;
             }
         });
@@ -109,7 +114,10 @@ class AutoSaveTest {
                 told.add("finished " + saved + " " + c.id());
                 roundFinished.countDown();
             }
-            @Override public void failed(String what, Chat c, String messageId, String why) { told.add("failed " + what + ": " + why); }
+            @Override public void failed(String what, Chat c, String messageId, String why) {
+                told.add("failed " + what + ": " + why);
+                failedIn.add(messageId);
+            }
         });
         return a;
     }
@@ -239,6 +247,36 @@ class AutoSaveTest {
         text.setBody("mira https://youtu.be/abc123 y https://www.instagram.com/reel/XYZ/.");
         arrive(text);
         assertEquals(List.of("https://youtu.be/abc123", "https://www.instagram.com/reel/XYZ/"), links);
+    }
+
+    private Message textWith(String id, String body) {
+        Message text = new Message(id, chat.id(), "@ana", "Ana", false, later(1));
+        text.setType(MessageType.TEXT);
+        text.setBody(body);
+        timeline.add(text);
+        return text;
+    }
+
+    @Test
+    void aLinkAskedForIsSavedIntoTheChatsFolderWithTheMessagesIdEvenWithSavingOff() throws Exception {
+        Message text = textWith("$t1", "mira https://youtu.be/abc123");
+        assertTrue(save.saveLink(text, "https://youtu.be/abc123").get(), "saved");
+        assertEquals(List.of("https://youtu.be/abc123"), links);
+        assertEquals(List.of(save.folder(chat) + " " + FileNames.tag(text)), linkedInto, "as auto-save names it, so it's known later");
+        assertEquals(List.of("progress 0/1", "progress 1/1", "finished 1 " + chat.id(), "progress 0/0"), told,
+                "the menu-bar ring and the notice, as any round");
+    }
+
+    @Test
+    void aLinkAskedForThatFailsIsToldEachTimeWithItsMessage() throws Exception {
+        Message text = textWith("$t2", FLAKY_LINK);
+        flaky = "sin red";
+        assertFalse(save.saveLink(text, FLAKY_LINK).get());
+        assertFalse(save.saveLink(text, FLAKY_LINK).get());
+        assertEquals(List.of("failed " + FLAKY_LINK + ": sin red", "failed " + FLAKY_LINK + ": sin red"),
+                told.stream().filter(t -> t.startsWith("failed")).toList(), "asked again, told again: the person is waiting for it");
+        assertEquals(List.of("$t2", "$t2"), failedIn, "the notice goes to its message");
+        assertTrue(told.getLast().equals("progress 0/0"), "the ring ends: " + told);
     }
 
     @Test

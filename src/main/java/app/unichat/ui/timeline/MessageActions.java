@@ -1,6 +1,8 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.autosave.AutoSave;
 import app.unichat.model.Message;
+import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
 import app.unichat.model.RoomFeatures;
 
@@ -12,7 +14,7 @@ import java.util.Set;
 public final class MessageActions {
     private MessageActions() {}
 
-    enum Action { REPLY, COPY, OPEN_FILE, SAVE_AS, TRANSCRIBE, EDIT, DELETE_FOR_EVERYONE, DELETE_FOR_ME, FAVORITE }
+    enum Action { REPLY, COPY, OPEN_FILE, SAVE_AS, SAVE_LINK, TRANSCRIBE, EDIT, DELETE_FOR_EVERYONE, DELETE_FOR_ME, FAVORITE }
 
     static Set<Action> of(Message m, RoomFeatures f, Instant now) {
         Set<Action> out = EnumSet.noneOf(Action.class);
@@ -24,6 +26,10 @@ public final class MessageActions {
             out.add(Action.SAVE_AS);
             if (m.type() == MessageType.AUDIO) out.add(Action.TRANSCRIBE);
         }
+        // What a link leads to, saved into the chat's folder as auto-save would: the links auto-save takes. Not while mine
+        // has only its temporary id (sending, failed): the name would carry that one, and auto-save save it again.
+        boolean onServer = m.status() != MessageStatus.SENDING && m.status() != MessageStatus.FAILED;
+        if (onServer && !AutoSave.links(m).isEmpty()) out.add(Action.SAVE_LINK);
         if (isStickerOrGif(m)) out.add(Action.FAVORITE);
         if (m.outgoing()) {
             if (!m.isMedia() && f.canEdit(m.timestamp(), now)) out.add(Action.EDIT);

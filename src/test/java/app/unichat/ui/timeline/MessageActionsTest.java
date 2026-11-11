@@ -87,4 +87,22 @@ class MessageActionsTest {
         Set<MessageActions.Action> a = MessageActions.of(msg(true, MessageType.TEXT, null), RoomFeatures.UNKNOWN, SENT.plusSeconds(99999));
         assertTrue(a.containsAll(Set.of(REPLY, COPY, EDIT, DELETE_FOR_EVERYONE)));
     }
+
+    @Test
+    void aMessageWithALinkOrAReelsPageOffersSavingItOthersDont() throws Exception {
+        Message link = msg(false, MessageType.TEXT, null);
+        link.setBody("mira https://youtu.be/abc123");
+        assertTrue(MessageActions.of(link, f(WHATSAPP), SENT).contains(SAVE_LINK));
+        assertFalse(MessageActions.of(msg(false, MessageType.TEXT, null), f(WHATSAPP), SENT).contains(SAVE_LINK), "no link");
+        Message reel = msg(false, MessageType.IMAGE, "image/jpeg");
+        reel.setExternalUrl("https://www.instagram.com/reel/XYZ/");
+        assertTrue(MessageActions.of(reel, f(WHATSAPP), SENT).contains(SAVE_LINK), "a reel shown as its picture: its page");
+        Message video = msg(false, MessageType.VIDEO, "video/mp4");
+        video.setExternalUrl("https://www.instagram.com/reel/XYZ/");
+        assertFalse(MessageActions.of(video, f(WHATSAPP), SENT).contains(SAVE_LINK), "a reel that came as its video is its file");
+        Message sending = msg(true, MessageType.TEXT, null);
+        sending.setBody("mira https://youtu.be/abc123");
+        sending.setStatus(app.unichat.model.MessageStatus.SENDING);
+        assertFalse(MessageActions.of(sending, f(WHATSAPP), SENT).contains(SAVE_LINK), "only its temporary id yet");
+    }
 }

@@ -1,6 +1,7 @@
 package app.unichat.autosave;
 
 import app.unichat.support.I18n;
+import app.unichat.support.MarkOfTheWeb;
 import app.unichat.video.Ffmpeg;
 import app.unichat.video.GalleryDl;
 import app.unichat.video.VideoTranscoder;
@@ -64,8 +65,10 @@ final class LinkSaver {
                 });
         return switch (r.outcome()) {
             case DONE -> {
-                if (tools.ffmpeg() != null) {
-                    for (Path f : r.files()) if (Files.isRegularFile(f)) VideoTranscoder.makePlayable(Path.of(tools.ffmpeg()), f);
+                for (Path f : r.files()) {
+                    if (!Files.isRegularFile(f)) continue;
+                    if (tools.ffmpeg() != null) VideoTranscoder.makePlayable(Path.of(tools.ffmpeg()), f);
+                    MarkOfTheWeb.mark(f); // from the internet, as a file received in the chat is (SavedFile)
                 }
                 yield null;
             }
