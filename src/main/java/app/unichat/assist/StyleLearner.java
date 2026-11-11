@@ -69,12 +69,24 @@ public final class StyleLearner {
                     System.err.println("Writing style not learned: " + v.problem());
                     return current;
                 }
-                return store.commit(current, v.file(), corrections.size(), chatId, newest) ? v.file() : store.text();
+                if (!store.commit(current, v.file(), corrections.size(), chatId, newest)) return store.text();
+                System.out.println(learned(StyleDiff.between(current, v.file()), corrections.size(), mine.size()));
+                return v.file();
             } catch (ReplyWriter.Failure e) {
                 System.err.println("Writing style not learned: the AI program failed");
                 return current;
             }
         }
+    }
+
+    /** The log's line for a learning: counts only, never a trait (the log goes into error reports). */
+    static String learned(StyleDiff changes, int corrections, int messages) {
+        return "Writing style learned: " + count(changes.added().size(), "trait") + " added, " + changes.removed().size()
+                + " changed/removed, from " + count(corrections, "correction") + " and " + count(messages, "message");
+    }
+
+    private static String count(int n, String noun) {
+        return n + " " + noun + (n == 1 ? "" : "s");
     }
 
     /** My last text messages of the chat, oldest first. */

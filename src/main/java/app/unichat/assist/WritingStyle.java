@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +18,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * What's known of how the person writes ({@code writing-style.md}, which travels with them) and the corrections to
- * drafts not learned from yet ({@code writing-style-corrections.json}, this computer's; the last {@link #MAX_PENDING}).
+ * drafts not learned from yet ({@code writing-style-corrections.json}, this computer's; the last {@link #MAX_PENDING}),
+ * with the versions learning replaced ({@link StyleHistory}, this computer's too).
  */
 public final class WritingStyle {
     static final int MAX_PENDING = 20;
@@ -27,12 +30,19 @@ public final class WritingStyle {
     private final Path styleFile;
     private final Path correctionsFile;
     private final List<StylePrompt.Correction> pending;
+    private final StyleHistory history;
     /** Per chat, the newest message of mine already learned from; kept in memory, so a restart learns once again. */
     private final Map<String, String> learnedUpTo = new ConcurrentHashMap<>();
     /** What was sent from drafts lately; in memory. */
     private final java.util.Set<String> aiTexts = new java.util.LinkedHashSet<>();
 
-    WritingStyle(Path dir) {
+    /** What learning changed last: {@code when}, and the traits it added and removed since (hand edits count too). */
+    public record LastLearned(Instant when, StyleDiff changes) {}
+
+    WritingStyle(Path dir) { this(dir, Clock.systemUTC()); }
+
+    WritingStyle(Path dir, Clock clock) {
+        history = new StyleHistory(dir.resolve(StyleHistory.FOLDER), clock);
         styleFile = dir.resolve("writing-style.md");
         correctionsFile = dir.resolve("writing-style-corrections.json");
         pending = new ArrayList<>(load(correctionsFile));
@@ -78,6 +88,7 @@ public final class WritingStyle {
     /** Everything learned and pending goes. */
     public synchronized void forget() {
         save("");
+        history.clear();
         pending.clear();
         learnedUpTo.clear();
         aiTexts.clear();
@@ -101,9 +112,30 @@ public final class WritingStyle {
      */
     synchronized boolean commit(String readAs, String learned, int correctionsUsed, String chatId, String newest) {
         if (!text().equals(readAs)) return false;
+        history.replaced(readAs);
         save(learned);
         used(correctionsUsed);
         learnedUpTo(chatId, newest);
+        return true;
+    }
+
+    /** The last change learning made, against the file as it is now; null when there's none kept. */
+    public synchronized LastLearned lastLearned() {
+        StyleHistory.Version v = history.lastLearned();
+        return v == null ? null : new LastLearned(v.when(), StyleDiff.between(v.text(), text()));
+    }
+
+    /**
+     * Back to the version before the last learning; the one undone stays in the history (as undone), so nothing is
+     * lost. False when there's nothing to undo.
+     */
+    public synchronized boolean undoLast() {
+        StyleHistory.Version v = history.lastLearned();
+        if (v == null) return false;
+        String previous = v.text();
+        history.undone(text());
+        save(previous);
+        history.remove(v);
         return true;
     }
 

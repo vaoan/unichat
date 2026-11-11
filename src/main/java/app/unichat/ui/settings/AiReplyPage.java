@@ -94,14 +94,16 @@ final class AiReplyPage {
         learned.setPrefRowCount(6);
         learned.setAccessibleText(I18n.t("settings.ai.learnedAccessible"));
         learned.textProperty().addListener((o, a, t) -> style.save(t));
+        LastLearnedBox last = new LastLearnedBox(style, learned::setText);
         Button forget = new Button(I18n.t("settings.ai.forget"));
         forget.getStyleClass().add("secondary-button");
         forget.setOnAction(e -> {
             style.forget();
             learned.clear();
+            last.refresh();
         });
         Label help = Labels.help(I18n.t("settings.ai.learnedHelp"));
-        return new VBox(6, new Label(I18n.t("settings.ai.learned")), learned, help, forget);
+        return new VBox(16, new VBox(6, new Label(I18n.t("settings.ai.learned")), learned, help, forget), last.node());
     }
 
     private static Node folderControl() {

@@ -41,6 +41,13 @@ class SettingsLayoutUiTest {
         MockChatService svc = new MockChatService();
         String scale = Settings.get().getString("ui.fontScale", null);
         List<String> bad = new ArrayList<>();
+        // Something learned, so Escribir con IA shows its last change filled in (dates, traits, pending corrections).
+        app.unichat.assist.WritingStyle style = app.unichat.assist.WritingStyle.get();
+        style.forget();
+        style.save("- frases cortas\n- ríe con jajaja");
+        style.addCorrection("jajaja", "hahaha");
+        new app.unichat.assist.StyleLearner(style, p -> "- frases cortas\n- ríe con hahaha, nunca con jajaja ni con emojis de risa").learn("!c", List.of());
+        style.addCorrection("nos vemos mañana", "nos vemos");
         try {
             for (double fontScale : new double[] {1.0, 1.6}) {
                 Settings.get().setFontScale(fontScale);
@@ -61,6 +68,7 @@ class SettingsLayoutUiTest {
             }
         } finally {
             Settings.get().set("ui.fontScale", scale);
+            style.forget();
             svc.stop();
         }
         assertTrue(bad.isEmpty(), "cut or squeezed:\n" + String.join("\n", bad));

@@ -144,6 +144,25 @@ class StyleLearnerTest {
     }
 
     @Test
+    void aLearningIsKeptInTheHistory() {
+        WritingStyle s = new WritingStyle(dir);
+        s.save("- viejo");
+        s.addCorrection("jajaja", "hahaha");
+        new StyleLearner(s, p -> "- viejo\n- ríe con hahaha").learn("!c", CHAT);
+        assertEquals(List.of("ríe con hahaha"), s.lastLearned().changes().added());
+    }
+
+    @Test
+    void theLogLineHasCountsOnly() {
+        StyleDiff d = StyleDiff.between("- secreto viejo\n- a", "- a\n- secreto nuevo\n- otro");
+        String line = StyleLearner.learned(d, 3, 1);
+        assertEquals("Writing style learned: 2 traits added, 1 changed/removed, from 3 corrections and 1 message", line);
+        assertTrue(!line.contains("secreto"), "never the text");
+        assertEquals("Writing style learned: 1 trait added, 0 changed/removed, from 1 correction and 30 messages",
+                StyleLearner.learned(StyleDiff.between("", "- x"), 1, 30));
+    }
+
+    @Test
     void oneAtATime() throws Exception {
         AtomicInteger now = new AtomicInteger(), most = new AtomicInteger();
         CountDownLatch inside = new CountDownLatch(1), release = new CountDownLatch(1);
