@@ -441,6 +441,21 @@ public final class MainView extends StackPane {
         thread.composer().sendFiles(files, as);
     }
 
+    /**
+     * What a notification's click led to, for the log (no ids: the kind of chat, whether it was known, what's open now).
+     * Clicks on some Discord channels' notifications left another chat open; this says which and why.
+     */
+    public String openOutcome(String id) {
+        Chat c = svc.chat(id);
+        if (c == null) return "a chat not loaded yet" + (pendingOpenId != null ? " (waiting for it)" : "");
+        Chat server = SpaceTree.serverOf(c, svc.chats());
+        String kind = c.network() + (c.space() ? " server" : server != null ? " channel of a server" : " chat")
+                + (c.archived() ? ", archived" : "") + (server != null && server.archived() ? ", its server archived" : "");
+        Chat open = thread.chat();
+        return kind + "; " + (open == null ? "nothing open" : open.id().equals(id) ? "opened" : "another chat open (" + open.network()
+                + (SpaceTree.serverOf(open, svc.chats()) != null ? " channel" : " chat") + ")");
+    }
+
     public void openChatId(String id) {
         if (id == null) return;
         Chat c = svc.chat(id);

@@ -157,4 +157,23 @@ class NotificationOpenUiTest {
             throw new AssertionError("the focus is on " + owner); // what a failure says
         });
     }
+
+    /** A Discord channel's notification opens that channel, inside its server, whatever chat was open. */
+    @Test
+    void aChannelsNotificationOpensThatChannel() throws Exception {
+        open();
+        FxWait.fx(() -> { stage.hide(); return null; });
+        FxWait.settled();
+        FxWait.fx(() -> {
+            Platform.runLater(() -> { stage.show(); stage.toFront(); });
+            Platform.runLater(() -> view.openChatId("!srv-memes:demo"));
+            return null;
+        });
+        FxWait.settled();
+        FxWait.until("the channel is the open chat", () -> {
+            if ("!srv-memes:demo".equals(view.currentChatId())) return true;
+            throw new AssertionError("open: " + view.currentChatId()); // what a failure says
+        });
+        assertEquals("DISCORD channel of a server; opened", FxWait.fx(() -> view.openOutcome("!srv-memes:demo")));
+    }
 }

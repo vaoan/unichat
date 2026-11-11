@@ -82,12 +82,7 @@ public final class UnichatApp extends Application {
         notifier = new Notifier(this::showWindow, () -> Platform.runLater(() -> {
             saveGeometry();
             hideToTray();
-        }), id -> {
-            showWindow();
-            Platform.runLater(() -> {
-                if (mainView != null) mainView.openChatId(id);
-            });
-        }, this::quit);
+        }), this::openFromNotification, this::quit);
         // The tray is built on AWT's thread: what depends on it waits until it exists.
         notifier.ready().thenAccept(tray -> Platform.runLater(() -> {
             Platform.setImplicitExit(!tray);
@@ -310,6 +305,16 @@ public final class UnichatApp extends Application {
                 for (javafx.stage.Window w : c.getRemoved()) w.focusedProperty().removeListener(focus);
                 for (javafx.stage.Window w : c.getAddedSubList()) w.focusedProperty().addListener(focus);
             }
+        });
+    }
+
+    /** A notification's click: the window, then its chat; the log says what it led to (after the open's own runLaters). */
+    private void openFromNotification(String id) {
+        showWindow();
+        Platform.runLater(() -> {
+            if (mainView == null) return;
+            mainView.openChatId(id);
+            Platform.runLater(() -> System.err.println("Notification click: " + mainView.openOutcome(id)));
         });
     }
 
