@@ -4,7 +4,7 @@
 # so models trained on, or editing from, the picture get the pattern instead of it.
 #
 # What keeps it hard to see: each pixel may change only as much as its neighbourhood's texture hides (smooth skin and
-# sky barely move), the change is mostly in brightness (coloured specks show most), it starts from the picture itself
+# sky move less), the change is mostly in brightness (coloured specks show most), it starts from the picture itself
 # (Mist's random start was most of the visible noise at few steps), and the tile grid moves half a tile every other
 # step, so no tile edge stays put long enough to show. The change is worked out at up to 768 px and then laid,
 # enlarged, over the photo at its own size (up to MAX_OUTPUT): models shrink pictures before using them, which brings it back.
@@ -12,7 +12,11 @@
 # Only the encoder is loaded (34M parameters), and the picture goes in tiles of at most 256 px: memory stays near
 # 1.5 GB whatever the size. Prints "progress <done> <total>" (in pixels) after each tile, then "done".
 #
-# python cloak.py --weights vae.safetensors --target target.png --input in.png --output out.png --steps 30
+# How much is a trade the level makes (CloakLevel): --eps, --smooth-share and --colour. Flat artwork (cel shading) is
+# mostly smooth areas, so what they may take decides how much it's protected there.
+#
+# python cloak.py --weights vae.safetensors --target target.png --input in.png --output out.png --steps 30 \
+#                 --eps 12 --smooth-share 0.7 --colour 0.3
 import argparse
 import math
 import sys
@@ -26,10 +30,7 @@ from safetensors.torch import load_file
 
 TILE = 256
 MAX_MEMORY = 4 * 1024 ** 3  # never more than this: it stops instead of taking the computer's memory (it needs ~1.5 GB)
-EPS = 12 / 255 * 2   # the largest change per channel, in the [-1, 1] range, where the texture hides it best
-SMOOTH_SHARE = 0.15  # what the smoothest areas may take of it
-TEXTURE = 10         # local spread of brightness (0..255) that hides the whole of EPS
-COLOUR = 0.3         # the change in colour, against the one in brightness
+TEXTURE = 10         # local spread of brightness (0..255) that hides the whole of the largest change
 STEP = 1 / 255 * 2
 MAX_OUTPUT = 4096    # the long side sent at most: a bigger PNG would pass the server's 100 MB upload limit
 
@@ -163,12 +164,13 @@ def blur(x, sigma):
     return F.conv2d(F.pad(x, (0, 0, r, r), mode="replicate"), g.view(1, 1, -1, 1).repeat(c, 1, 1, 1), groups=c)
 
 
-def budget(x):
-    """How much each pixel may change: EPS where the brightness around it varies by TEXTURE or more, less where smooth."""
+def budget(x, eps, smooth_share):
+    """How much each pixel may change: eps where the brightness around it varies by TEXTURE or more, down to
+    smooth_share of it where smooth."""
     luma = (0.299 * x[:, 0:1] + 0.587 * x[:, 1:2] + 0.114 * x[:, 2:3]) * 127.5
     mean = blur(luma, 2)
     spread = (blur(luma * luma, 2) - mean * mean).clamp_min(0).sqrt()
-    return blur((spread / TEXTURE).clamp(SMOOTH_SHARE, 1), 2) * EPS
+    return blur((spread / TEXTURE).clamp(smooth_share, 1), 2) * eps
 
 
 def peak_memory():
@@ -200,9 +202,10 @@ def check_memory():
         raise MemoryError(f"used {peak // 1024 ** 2} MB, more than {MAX_MEMORY // 1024 ** 2} MB")
 
 
-def protect(vae, x, target, steps, tell):
-    """The change to x (same shape) that moves its tiles' latents toward the target's."""
-    limit = budget(x)
+def protect(vae, x, target, steps, tell, eps, smooth_share, colour):
+    """The change to x (same shape) that moves its tiles' latents toward the target's; colour is the change in colour
+    against the one in brightness."""
+    limit = budget(x, eps, smooth_share)
     grids = [[(y, x0) for y in tiles(x.shape[2]) for x0 in tiles(x.shape[3])] for tiles in (cuts, shifted)]
     with torch.no_grad():
         goals = [[vae.latent(target[..., y0:y1, x0:x1]) for (y0, y1), (x0, x1) in g] for g in grids]
@@ -217,7 +220,7 @@ def protect(vae, x, target, steps, tell):
             tell((y1 - y0) * (x1 - x0))
         with torch.no_grad():
             grey = grad.mean(1, keepdim=True)
-            delta -= STEP * (grey + COLOUR * (grad - grey)).sign()
+            delta -= STEP * (grey + colour * (grad - grey)).sign()
             delta = torch.maximum(torch.minimum(delta, limit), -limit)
             delta = (x + delta).clamp(-1, 1) - x
     return delta
@@ -239,6 +242,9 @@ def main():
     p.add_argument("--steps", type=int, required=True)
     p.add_argument("--max-side", type=int, default=768)
     p.add_argument("--threads", type=int, default=0)
+    p.add_argument("--eps", type=float, default=12, help="the largest change per channel, in 0..255")
+    p.add_argument("--smooth-share", type=float, default=0.15, help="what the smoothest areas may take of it")
+    p.add_argument("--colour", type=float, default=0.3, help="the change in colour, against the one in brightness")
     a = p.parse_args()
     if a.threads > 0:
         torch.set_num_threads(a.threads)
@@ -264,7 +270,7 @@ def main():
         done[0] += pixels
         print(f"progress {done[0]} {total}", flush=True)
 
-    delta = protect(vae, x, target, a.steps, tell)
+    delta = protect(vae, x, target, a.steps, tell, a.eps / 255 * 2, a.smooth_share, a.colour)
     out = np.asarray(photo, dtype=np.float32) + enlarged(delta, photo.size)
     Image.fromarray(out.round().clip(0, 255).astype(np.uint8)).save(a.output, format="PNG")
     print("done", flush=True)

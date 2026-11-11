@@ -54,6 +54,14 @@ class CloakToolTest {
         assertFalse(tool.isInstalled());
         List<String> c = tool.protectCommand(dir.resolve("in.jpg"), dir.resolve("out.png"), CloakLevel.STRONG);
         assertEquals("100", c.get(c.indexOf("--steps") + 1));
+        assertEquals("16.0", c.get(c.indexOf("--eps") + 1), "strong: more change, also in colour and on smooth areas");
+        assertEquals("1.0", c.get(c.indexOf("--smooth-share") + 1));
+        assertEquals("1.0", c.get(c.indexOf("--colour") + 1));
+        List<String> light = tool.protectCommand(dir.resolve("in.jpg"), dir.resolve("out.png"), CloakLevel.LIGHT);
+        assertEquals("0.15", light.get(light.indexOf("--smooth-share") + 1), "light: smooth areas barely touched");
+        List<String> medium = tool.protectCommand(dir.resolve("in.jpg"), dir.resolve("out.png"), CloakLevel.MEDIUM);
+        assertEquals("0.7", medium.get(medium.indexOf("--smooth-share") + 1),
+                "medium: flat artwork (mostly smooth) is protected half as much again as with light's share");
         assertTrue(Files.isRegularFile(dir.resolve("cloak.py")), "the script is written out");
         assertTrue(c.contains("-I"), "isolated: nothing from the folder it runs in is imported");
     }

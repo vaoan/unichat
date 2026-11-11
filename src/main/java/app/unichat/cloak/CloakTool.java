@@ -111,9 +111,11 @@ public final class CloakTool {
     /** The command that protects {@code in} into {@code out} (a PNG), with the script written out first. */
     public List<String> protectCommand(Path in, Path out, CloakLevel level) throws IOException {
         Path script = copyResource("cloak.py");
-        return List.of(python().toString(), "-I", script.toString(), "--weights", dir.resolve("vae.safetensors").toString(),
-                "--target", dir.resolve("target.png").toString(), "--input", in.toString(), "--output", out.toString(),
-                "--steps", String.valueOf(level.steps()));
+        List<String> c = new java.util.ArrayList<>(List.of(python().toString(), "-I", script.toString(),
+                "--weights", dir.resolve("vae.safetensors").toString(), "--target", dir.resolve("target.png").toString(),
+                "--input", in.toString(), "--output", out.toString()));
+        c.addAll(level.options());
+        return c;
     }
 
     List<String> venvCommand() {
