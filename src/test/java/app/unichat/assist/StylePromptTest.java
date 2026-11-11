@@ -21,6 +21,16 @@ class StylePromptTest {
     }
 
     @Test
+    void aCorrectionShowsWhatItAnsweredThenTheDraftThenWhatWasSent() {
+        String p = StylePrompt.learn("", List.of(), List.of(
+                new StylePrompt.Correction("Claro, nos vemos a las 5", "va, a las 5", "¿nos vemos hoy?\n¿a qué hora?"),
+                new StylePrompt.Correction("jajaja", "hahaha")));
+        assertTrue(p.contains("- «¿nos vemos hoy? ¿a qué hora?» → «Claro, nos vemos a las 5» → «va, a las 5»"), p);
+        assertTrue(p.contains("- «jajaja» → «hahaha»"), "an old one, with no context: " + p);
+        assertTrue(p.contains("separar el estilo del contenido"), "what the context is for");
+    }
+
+    @Test
     void aReplyTooLongOrEmptyIsRefused() {
         assertNull(file("  "));
         assertNull(file("x".repeat(3001)));

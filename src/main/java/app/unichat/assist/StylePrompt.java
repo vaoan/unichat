@@ -12,8 +12,14 @@ public final class StylePrompt {
     static final int MAX_CHARS = 3000;
     static final int MAX_BULLETS = 40;
 
-    /** A draft the AI wrote, and what the person actually sent instead. */
-    public record Correction(String draft, String sent) {}
+    /**
+     * A draft the AI wrote, and what the person actually sent instead.
+     * @param context what the others had written, that the draft answered (so style can be told from content); null
+     *                when unknown, as in corrections kept before it was
+     */
+    public record Correction(String draft, String sent, String context) {
+        public Correction(String draft, String sent) { this(draft, sent, null); }
+    }
 
     private StylePrompt() {}
 
@@ -32,9 +38,12 @@ public final class StylePrompt {
             for (String m : mine) p.append("- ").append(m.strip().replace('\n', ' ')).append('\n');
         }
         if (!corrections.isEmpty()) {
-            p.append("\nCorrecciones: lo que la IA escribió por ella → lo que de verdad envió:\n");
+            p.append("\nCorrecciones: lo que le escribieron (si se sabe) → lo que la IA escribió por ella → lo que de verdad ")
+                    .append("envió. Lo que le escribieron es solo para separar el estilo del contenido: de ahí no se aprende nada.\n");
             for (Correction c : corrections) {
-                p.append("- «").append(oneLine(c.draft())).append("» → «").append(oneLine(c.sent())).append("»\n");
+                p.append("- ");
+                if (c.context() != null && !c.context().isBlank()) p.append("«").append(oneLine(c.context())).append("» → ");
+                p.append("«").append(oneLine(c.draft())).append("» → «").append(oneLine(c.sent())).append("»\n");
             }
         }
         p.append("</").append(mark).append(">\n\n")

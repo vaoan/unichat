@@ -67,9 +67,13 @@ public final class WritingStyle {
     }
 
     /** What the person sent instead of {@code draft}; the same text, give or take spaces, teaches nothing. */
-    public synchronized void addCorrection(String draft, String sent) {
+    public void addCorrection(String draft, String sent) { addCorrection(new StylePrompt.Correction(draft, sent)); }
+
+    /** As {@link #addCorrection(String, String)}, with what the draft answered. */
+    public synchronized void addCorrection(StylePrompt.Correction c) {
+        String draft = c.draft(), sent = c.sent();
         if (draft == null || sent == null || draft.strip().equals(sent.strip())) return;
-        pending.add(new StylePrompt.Correction(draft.strip(), sent.strip()));
+        pending.add(new StylePrompt.Correction(draft.strip(), sent.strip(), c.context()));
         while (pending.size() > MAX_PENDING) pending.remove(0);
         savePending();
     }

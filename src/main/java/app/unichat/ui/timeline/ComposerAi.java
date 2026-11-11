@@ -6,6 +6,7 @@ import app.unichat.assist.DraftCorrections;
 import app.unichat.assist.FixPrompt;
 import app.unichat.assist.ReplyPrompt;
 import app.unichat.assist.StyleLearner;
+import app.unichat.assist.StyleLearning;
 import app.unichat.assist.StylePrompt;
 import app.unichat.assist.WritingStyle;
 import app.unichat.model.Message;
@@ -19,7 +20,6 @@ import javafx.scene.layout.Pane;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -52,7 +52,6 @@ final class ComposerAi {
     private final DraftCorrections aiDrafts = new DraftCorrections();
     /** The program that learns how the person writes; tests put theirs, as for drafts. */
     private volatile Supplier<StyleLearner.Program> learning = () -> StyleLearner.program(AiSettings.engine());
-    private final AtomicBoolean learningNow = new AtomicBoolean();
     private AiReplyButton ai;
     private AiReplyButton fix;
     private String fixing;
@@ -151,20 +150,16 @@ final class ComposerAi {
     }
 
     /**
-     * After a draft (never before: it would wait ~10 s), the program updates how the person writes from what's new in that
-     * chat and the corrections so far; the next draft uses it. One at a time; nothing when learning is off.
+     * After a draft (never before: it would wait ~10 s) and once a corrected draft is sent, the program updates how the
+     * person writes from what's new in that chat and the corrections so far; the next draft uses it. In the background,
+     * one at a time ({@code StyleLearning}); nothing when learning is off.
      */
     private void learnAfter(String forChat) {
-        if (!AiSettings.learnStyle() || !learningNow.compareAndSet(false, true)) return;
-        List<Message> chat = List.copyOf(svc.messages(forChat));
-        StyleLearner.Program program = learning.get();
-        Thread.ofVirtual().name("learn-style").start(() -> {
-            try {
-                new StyleLearner(WritingStyle.get(), program).learn(forChat, chat);
-            } finally {
-                learningNow.set(false);
-            }
-        });
+        learnFrom(forChat, List.copyOf(svc.messages(forChat)));
+    }
+
+    private void learnFrom(String chatId, List<Message> chat) {
+        if (AiSettings.learnStyle()) StyleLearning.shared().request(chatId, chat, learning.get());
     }
 
     /**
@@ -212,11 +207,14 @@ final class ComposerAi {
 
     /** {@code text} was sent in {@code chatId}: if it came from a draft, how it was changed teaches how the person writes. */
     void sent(String chatId, String text) {
-        StylePrompt.Correction c = aiDrafts.sent(chatId, text);
+        // What it answered goes with it, so learning can tell how they write from what they meant to say.
+        List<Message> chat = List.copyOf(svc.messages(chatId));
+        StylePrompt.Correction c = aiDrafts.sent(chatId, text, DraftCorrections.context(chat));
         if (c != null) Thread.ofVirtual().start(() -> {
             WritingStyle style = WritingStyle.get();
-            style.addCorrection(c.draft(), c.sent());
+            style.addCorrection(c);
             style.writtenByAi(c.sent()); // came from a draft: not to be learned from as their own writing
+            learnFrom(chatId, chat); // now, not at the next draft
         });
     }
 

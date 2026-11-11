@@ -388,8 +388,64 @@ class AiReplyUiTest {
             write("Claro, ya voy");
             send();
             FxWait.until("the real correction saved", () -> !style.pending().isEmpty());
-            assertEquals(List.of(new app.unichat.assist.StylePrompt.Correction("Claro, voy", "Claro, ya voy")), style.pending(),
-                    "no false correction");
+            assertEquals(1, style.pending().size(), "no false correction: " + style.pending());
+            app.unichat.assist.StylePrompt.Correction c = style.pending().get(0);
+            assertEquals(List.of("Claro, voy", "Claro, ya voy"), List.of(c.draft(), c.sent()));
+            assertTrue(c.context() != null && !c.context().isBlank(), "what it answered goes with it");
+        } finally {
+            app.unichat.assist.AiSettings.setLearnStyle(learns);
+            style.forget();
+        }
+    }
+
+    @Test
+    void aCorrectedDraftIsLearnedFromOnceSent() throws Exception {
+        app.unichat.assist.WritingStyle style = app.unichat.assist.WritingStyle.get();
+        boolean learns = app.unichat.assist.AiSettings.learnStyle();
+        app.unichat.assist.AiSettings.setLearnStyle(true);
+        try {
+            style.forget();
+            List<String> learned = new java.util.concurrent.CopyOnWriteArrayList<>();
+            writer(p -> {
+                if (p.startsWith("Redacta")) return "Claro, voy";
+                learned.add(p);
+                // Only the run with the correction writes this: once it's saved, that run (the last one) is done.
+                return p.contains("«Claro, voy» → «Claro, ya voy»") ? "- escribe ya voy" : "- frases cortas";
+            });
+            press();
+            FxWait.until("the draft in the box", () -> text().equals("Claro, voy"));
+            write("Claro, ya voy");
+            send();
+            FxWait.until("learned from the correction, with no other draft asked", () -> learned.stream()
+                    .anyMatch(p -> p.contains("«Claro, voy» → «Claro, ya voy»")));
+            FxWait.until("the style saved", () -> style.text().equals("- escribe ya voy"));
+            assertTrue(style.pending().isEmpty(), "used up");
+        } finally {
+            app.unichat.assist.AiSettings.setLearnStyle(learns);
+            style.forget();
+        }
+    }
+
+    @Test
+    void anotherMessageSentInsteadOfTheDraftIsNotACorrection() throws Exception {
+        app.unichat.assist.WritingStyle style = app.unichat.assist.WritingStyle.get();
+        boolean learns = app.unichat.assist.AiSettings.learnStyle();
+        app.unichat.assist.AiSettings.setLearnStyle(false); // learning would use up the corrections this test looks at
+        try {
+            style.forget();
+            writer(p -> "Perfecto, nos vemos a las 5 en el café");
+            press();
+            FxWait.until("the draft in the box", () -> text().equals("Perfecto, nos vemos a las 5 en el café"));
+            write("oye, ¿viste el partido de anoche?");
+            send();
+            // Saved off the FX thread: "none" is only known once a later, real correction arrives.
+            press();
+            FxWait.until("the second draft in the box", () -> text().equals("Perfecto, nos vemos a las 5 en el café"));
+            write("perfecto, nos vemos a las 5 en el café!!");
+            send();
+            FxWait.until("the real correction saved", () -> !style.pending().isEmpty());
+            assertEquals(List.of("perfecto, nos vemos a las 5 en el café!!"), style.pending().stream()
+                    .map(app.unichat.assist.StylePrompt.Correction::sent).toList(), "the other message isn't a correction");
         } finally {
             app.unichat.assist.AiSettings.setLearnStyle(learns);
             style.forget();

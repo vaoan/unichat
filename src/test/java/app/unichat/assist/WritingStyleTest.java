@@ -28,6 +28,15 @@ class WritingStyleTest {
     }
 
     @Test
+    void correctionsKeepTheirContextAndOldOnesWithoutItStillLoad() throws Exception {
+        java.nio.file.Files.writeString(dir.resolve("writing-style-corrections.json"), "[{\"draft\":\"jajaja\",\"sent\":\"hahaha\"}]");
+        WritingStyle s = new WritingStyle(dir);
+        assertEquals(java.util.List.of(new StylePrompt.Correction("jajaja", "hahaha")), s.pending());
+        s.addCorrection(new StylePrompt.Correction(" Claro, voy ", "Claro, ya voy", "¿vienes?"));
+        assertEquals(new StylePrompt.Correction("Claro, voy", "Claro, ya voy", "¿vienes?"), new WritingStyle(dir).pending().get(1));
+    }
+
+    @Test
     void usedCorrectionsLeaveAndForgetEmptiesAll() {
         WritingStyle s = new WritingStyle(dir);
         for (int i = 0; i < 3; i++) s.addCorrection("b" + i, "e" + i);
