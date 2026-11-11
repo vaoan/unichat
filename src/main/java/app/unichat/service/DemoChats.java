@@ -85,6 +85,13 @@ final class DemoChats {
                 .in(-120, I18n.t("demo.mom.6"))
                 .unread(2).favorite().done();
 
+        // A shop on WhatsApp Business: its buttons only work in the phone's app (ui/timeline/BusinessButtons).
+        ChatBuilder.dm(svc, "tienda", Network.WHATSAPP, I18n.t("demo.title.shop"))
+                .out(-90_000, I18n.t("demo.shop.1"))
+                .in(-89_900, I18n.t("demo.shop.2")).buttons("review_and_pay")
+                .in(-89_800, I18n.t("demo.shop.3")).buttons(I18n.t("demo.shop.button"))
+                .account(WA_WORK).done();
+
         ChatBuilder.group(svc, "familia", Network.WHATSAPP, I18n.t("demo.title.family"), I18n.t("demo.name.dad"), "Laura", I18n.t("demo.name.uncleJorge"))
                 .in(-7200, I18n.t("demo.name.dad"), I18n.t("demo.family.1"))
                 .in(-7100, "Laura", I18n.t("demo.family.2"))
@@ -250,6 +257,12 @@ final class DemoChats {
             msg.setFileName(I18n.t("demo.voiceNoteFile"));
             msg.setMimeType("audio/ogg");
             msg.setFileSize(18_400);
+            return this;
+        }
+
+        /** The last message's WhatsApp Business buttons. */
+        ChatBuilder buttons(String... labels) {
+            list.get(list.size() - 1).setButtons(List.of(labels));
             return this;
         }
 

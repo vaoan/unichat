@@ -38,9 +38,17 @@ final class SyncEvents {
             default -> MessageType.TEXT;
         };
         String b = body == null ? "" : body;
+        String html = MessageHtml.of(content);
+        List<String> buttons = List.of();
+        if (BusinessMessages.is(content)) {
+            BusinessMessages.Parsed p = BusinessMessages.parse(b, html, I18n.t("business.order"));
+            b = p.body();
+            html = p.html();
+            buttons = p.buttons();
+        }
+        m.setButtons(buttons);
         m.setType(t);
         if (!m.isMedia()) {
-            String html = MessageHtml.of(content);
             String previews = MessageHtml.previews(content);
             String own = MessageHtml.withoutEmbedText(b, html);
             m.setBody(own);

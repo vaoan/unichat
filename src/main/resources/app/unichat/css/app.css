@@ -336,6 +336,18 @@
     -fx-cursor: hand;
 }
 .bubble.out .reply-quote { -fx-background-color: rgba(255, 255, 255, 0.16); -fx-border-color: transparent transparent transparent white; }
+.business-buttons { -fx-padding: 0.4em 0 0 0; }
+.business-button {
+    -fx-background-color: rgba(0, 0, 0, 0.07);
+    -fx-background-radius: 0.6em;
+    -fx-padding: 0.35em 0.9em;
+    -fx-text-fill: -accent;
+    -fx-font-weight: bold;
+}
+.bubble.out .business-button { -fx-background-color: rgba(255, 255, 255, 0.18); -fx-text-fill: white; }
+.business-note { -fx-font-size: 0.85em; -fx-text-fill: -text-2; }
+.bubble.out .business-note { -fx-text-fill: rgba(255, 255, 255, 0.8); }
+.root.contrast .business-button { -fx-border-color: -border; -fx-border-width: 1.5; -fx-border-radius: 0.6em; }
 .html-quote {
     -fx-background-color: rgba(0, 0, 0, 0.09);
     -fx-background-radius: 8;

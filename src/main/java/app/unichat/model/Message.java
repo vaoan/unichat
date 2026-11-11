@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -144,7 +145,7 @@ public final class Message {
     /** Changes when anything drawn from this message does. Rows ask it for every message each time one arrives, so it stays cheap. */
     public int revision() {
         return java.util.Objects.hash(type, body, senderName, mediaUrl, fileName, mimeType, fileSize, width, height, replyToId, edited,
-                deleted, status, reactions, reactionNames, html, previewHtml, htmlText, externalUrl, mediaInfo);
+                deleted, status, reactions, reactionNames, html, previewHtml, htmlText, externalUrl, mediaInfo, buttons);
     }
 
     /** The same message under another id, the way a local echo becomes the event the server gave it. */
@@ -178,8 +179,18 @@ public final class Message {
         m.html = html;
         m.previewHtml = previewHtml;
         m.htmlText = htmlText;
+        m.buttons = buttons;
         return m;
     }
+
+    private List<String> buttons = List.of();
+
+    /**
+     * A WhatsApp Business message's buttons (pay an order, open a link, a template's replies), as the bridge names
+     * them: only the phone's app can press them.
+     */
+    public List<String> buttons() { return buttons; }
+    public void setButtons(List<String> buttons) { this.buttons = List.copyOf(buttons); }
 
     private volatile Map<String, String> reactionNames = Map.of();
 

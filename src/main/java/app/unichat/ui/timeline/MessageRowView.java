@@ -242,6 +242,8 @@ final class MessageRowView {
             if (!followedByItsOwnMedia(m)) bubble.getChildren().add(media.linkPlayers(links(m), chat.get(), textWidth));
         }
 
+        if (!m.deleted() && !m.buttons().isEmpty()) bubble.getChildren().add(BusinessButtons.of(m.buttons(), maxWidth - 24));
+
         HBox meta = new HBox(4);
         meta.getStyleClass().add("bubble-meta");
         meta.setAlignment(Pos.CENTER_RIGHT);
