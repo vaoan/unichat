@@ -24,6 +24,7 @@ class LessonsTest {
             Map.entry("test-timed-wait", new String[] {"src/test/java/X.java", "        assertTrue(done.await(5, TimeUnit.SECONDS));"}), // lesson-ok: test-timed-wait
             Map.entry("static-text", new String[] {"src/main/java/X.java", "    private static final String TITLE = I18n.t(\"x\");"}),
             Map.entry("gif-as-image", new String[] {"src/main/java/X.java", "        view.setImage(new Image(file + \".gif\"));"}),
+            Map.entry("stop-on-scene-null", new String[] {"src/main/java/app/unichat/ui/X.java", "            if (scene == null) ticks.stop();"}),
             Map.entry("css-accent-loop", new String[] {"src/main/resources/x.css", ".root { -accent: derive(-accent, 20%); }"}),
             Map.entry("css-label-min-width", new String[] {"src/main/resources/x.css", ".unread-badge { -fx-min-width: 20; }"}),
             Map.entry("ffmpeg-input", new String[] {"src/main/java/X.java", "List.of(bin, \"-protocol_whitelist\", \"file\", \"-i\", in)"}),

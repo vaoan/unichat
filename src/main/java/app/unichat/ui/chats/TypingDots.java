@@ -1,5 +1,6 @@
 package app.unichat.ui.chats;
 
+import app.unichat.ui.Showing;
 import app.unichat.ui.Theme;
 import app.unichat.ui.media.AnimatedImage;
 import javafx.animation.Animation;
@@ -42,10 +43,7 @@ public final class TypingDots extends HBox {
         }
         ticks = new Timeline(new KeyFrame(Duration.millis(220), e -> tick()));
         ticks.setCycleCount(Animation.INDEFINITE);
-        sceneProperty().addListener((o, a, scene) -> {
-            if (scene == null) ticks.stop();
-            else if (!Theme.reduceMotion()) ticks.play();
-        });
+        Showing.whileShowing(this, () -> { if (!Theme.reduceMotion()) ticks.play(); }, ticks::stop);
     }
 
     /**

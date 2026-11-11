@@ -1,5 +1,6 @@
 package app.unichat.ui.media;
 
+import app.unichat.ui.Showing;
 import app.unichat.ui.Icons;
 import app.unichat.ui.Theme;
 import app.unichat.service.MediaSource;
@@ -49,10 +50,8 @@ final class InlineVideo extends StackPane {
             getChildren().add(Icons.icon(Icons.PLAY, 28));
             return;
         }
-        sceneProperty().addListener((o, a, scene) -> {
-            if (scene == null) release();
-            else start.playFromStart();
-        });
+        // Its native player only while it can be seen: a closed window keeps its scene, and the video played on.
+        Showing.whileShowing(this, start::playFromStart, this::release);
     }
 
     MediaPlayer player() { return player; }
@@ -60,7 +59,7 @@ final class InlineVideo extends StackPane {
     private void load() {
         long mine = ++generation;
         svc.media(url, 0, 0).whenComplete((p, err) -> Platform.runLater(() -> {
-            if (mine != generation || getScene() == null) return;
+            if (mine != generation || getScene() == null) return; // released meanwhile
             if (err != null || p == null) failed();
             else play(p);
         }));

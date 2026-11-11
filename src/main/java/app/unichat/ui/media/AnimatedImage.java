@@ -1,5 +1,6 @@
 package app.unichat.ui.media;
 
+import app.unichat.ui.Showing;
 import app.unichat.ui.Theme;
 import app.unichat.support.I18n;
 import app.unichat.support.Threads;
@@ -405,7 +406,7 @@ public final class AnimatedImage {
      */
     public static void play(ImageView view, Frames frames) {
         // A view that gets a new animation (cell reused, thumbnail then original) stops the previous one.
-        if (view.getProperties().remove(TIMELINE) instanceof Playing old) old.stop();
+        if (view.getProperties().remove(TIMELINE) instanceof Playing old) old.end();
         view.setImage(frames.images().get(0));
         if (!frames.animated() || Theme.reduceMotion()) return;
         Timeline t = new Timeline();
@@ -423,18 +424,25 @@ public final class AnimatedImage {
         }
         t.getKeyFrames().add(new KeyFrame(Duration.millis(at)));
         t.setCycleCount(Timeline.INDEFINITE);
-        view.sceneProperty().addListener((o, a, scene) -> {
-            if (view.getProperties().get(TIMELINE) != playing) return;
-            if (scene == null) playing.stop(); else playing.start();
-        });
-        if (view.getScene() != null) playing.start();
+        // Only while it can be seen: a closed viewer keeps its scene, and its GIF ran on for good, holding the budget.
+        playing.watch = Showing.whileShowing(view, playing::start, playing::stop);
     }
 
     /**
      * A view's animation and the memory its frames take while it runs ({@link AnimationBudget}): past the budget it
      * shows its first frame, still, rather than run the heap out.
      */
-    private record Playing(Timeline timeline, long bytes) {
+    private static final class Playing {
+        private final Timeline timeline;
+        private final long bytes;
+        /** Whether it can be seen; cancelled when the view is handed another animation. */
+        private Showing.Watch watch;
+
+        Playing(Timeline timeline, long bytes) {
+            this.timeline = timeline;
+            this.bytes = bytes;
+        }
+
         void start() {
             if (timeline.getStatus() != Animation.Status.RUNNING && AnimationBudget.SHARED.take(bytes)) timeline.play();
         }
@@ -442,6 +450,12 @@ public final class AnimatedImage {
         void stop() {
             if (timeline.getStatus() == Animation.Status.RUNNING) AnimationBudget.SHARED.release(bytes);
             timeline.stop();
+        }
+
+        /** Replaced by another animation: stopped, and no longer following the view's window. */
+        void end() {
+            if (watch != null) watch.cancel();
+            stop();
         }
     }
 }

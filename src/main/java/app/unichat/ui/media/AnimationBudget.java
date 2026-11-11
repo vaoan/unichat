@@ -25,4 +25,7 @@ final class AnimationBudget {
     synchronized void release(long bytes) {
         used = Math.max(0, used - bytes);
     }
+
+    /** Bytes taken by the animations playing now. */
+    synchronized long used() { return used; }
 }

@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.ui.Showing;
 import app.unichat.ui.Formats;
 import app.unichat.ui.Icons;
 import app.unichat.support.I18n;
@@ -63,10 +64,7 @@ final class VoiceBar extends HBox {
         });
         ticks = new Timeline(new KeyFrame(Duration.millis(100), e -> tick()));
         ticks.setCycleCount(Timeline.INDEFINITE);
-        ticks.play();
-        sceneProperty().addListener((o, a, scene) -> {
-            if (scene == null) ticks.stop();
-        });
+        Showing.whileShowing(this, ticks::play, ticks::stop);
     }
 
     void focusSend() { getChildren().get(getChildren().size() - 1).requestFocus(); }

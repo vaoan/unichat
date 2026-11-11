@@ -20,14 +20,34 @@ public final class Theme {
     private static Boolean systemContrast;
     private static Boolean systemReducedMotion;
 
+    /**
+     * Styles {@code scene} and keeps it in step with theme changes while its window shows. A closed window keeps its
+     * scene (its window never goes back to null), so the scene leaves the list when the window hides: before, every
+     * photo viewer, video, toast and settings window ever opened stayed in memory with all it drew.
+     */
     public static void register(Scene scene) {
         SCENES.add(scene);
         scene.getStylesheets().add(CSS);
         scene.windowProperty().addListener((o, a, w) -> {
             if (w == null) SCENES.remove(scene);
+            else followShowing(w, scene);
         });
+        if (scene.getWindow() != null) followShowing(scene.getWindow(), scene);
         apply(scene);
     }
+
+    /** In the list while {@code w} shows; shown again (from the tray, say), it's styled anew. */
+    private static void followShowing(javafx.stage.Window w, Scene scene) {
+        w.addEventHandler(javafx.stage.WindowEvent.WINDOW_HIDDEN, e -> SCENES.remove(scene));
+        w.addEventHandler(javafx.stage.WindowEvent.WINDOW_SHOWN, e -> {
+            if (scene.getWindow() != w || SCENES.contains(scene)) return;
+            SCENES.add(scene);
+            apply(scene);
+        });
+    }
+
+    /** How many scenes follow the theme now (tests). */
+    static int registered() { return SCENES.size(); }
 
     public static void applyAll() {
         systemDark = null;
