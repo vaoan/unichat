@@ -163,6 +163,34 @@ class AutoScrollUiTest {
         svc.stop();
     }
 
+    /**
+     * A chat opened before its embed's picture loaded (Discord's embeds, link previews: HTML pictures, size unknown):
+     * the picture took its shape after the chat was at its newest message, and what it added stayed below the view.
+     */
+    @Test
+    void anEmbedsPictureLoadingAfterTheChatOpenedKeepsTheBottomInView() throws Exception {
+        svc = new MockChatService();
+        for (int i = 0; i < 6; i++) svc.sendText(CHAT, "Mensaje " + i + "\nsegunda línea", null).get();
+        svc.sendText(CHAT, "mira esto", null).get();
+        svc.messages(CHAT).getLast().setHtml("<p>mira esto</p><img src=\"mxc://demo/embed-" + System.nanoTime() + "\">");
+        Scene scene = fx(() -> {
+            Stage stage = new Stage();
+            stage.setOpacity(0);
+            view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            Scene sc = new Scene(view, 1000, 520);
+            Theme.register(sc);
+            stage.setScene(sc);
+            stage.show();
+            view.openChatId(CHAT);
+            return sc;
+        });
+        FxWait.until("the chat's timeline shows", () -> showsLast(scene, CHAT));
+        FxWait.until("the embed's picture loaded", () -> scene.getRoot().lookupAll(".timeline ImageView").stream()
+                .anyMatch(n -> n instanceof javafx.scene.image.ImageView v && v.getImage() != null));
+        endsAtBottom(scene);
+        svc.stop();
+    }
+
     @Test
     void sendingWhileScrolledUpJumpsToYourMessage() throws Exception {
         Scene scene = start();
