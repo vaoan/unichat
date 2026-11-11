@@ -21,5 +21,17 @@ if pgrep -f "/Applications/Unichat.app/" >/dev/null; then
 fi
 rm -rf /Applications/Unichat.app
 cp -R release/Unichat.app /Applications/
+# Every other copy macOS knew showed up beside the installed one in Spotlight and the Apps view (two Unichats and a
+# "UnichatBar"): the build's own, jpackage's temporary ones, the menu-bar helper's build cache. All but the installed one
+# are unregistered, and the build's copies removed (package.sh makes them again; the .dmg stays).
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$LSREGISTER" -dump 2>/dev/null | sed -n 's/^path: *\(.*\.app\) (0x[0-9a-f]*)$/\1/p' | grep -i unichat | sort -u |
+  while IFS= read -r app; do
+    case "$app" in
+      /Applications/Unichat.app|/Applications/Unichat.app/*) ;;
+      *) "$LSREGISTER" -u "$app" 2>/dev/null || true ;;
+    esac
+  done
+rm -rf release/Unichat.app target/pkg
 echo "Instalado en /Applications/Unichat.app"
 echo "Log: tail -f \"\$HOME/Library/Application Support/Unichat/logs/unichat.log\""
