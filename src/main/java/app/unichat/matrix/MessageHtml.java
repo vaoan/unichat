@@ -28,7 +28,13 @@ final class MessageHtml {
                 out.append("<p><a href=\"").append(Entities.escape(url)).append("\"><strong>").append(Entities.escape(title)).append("</strong></a></p>");
             }
             if (!text.isEmpty()) out.append("<p>").append(Entities.escape(text)).append("</p>");
-            if (!image.isEmpty()) out.append("<img src=\"").append(Entities.escape(image)).append("\">");
+            if (!image.isEmpty()) {
+                // Its size when the bridge gives it, so the box is the picture's shape before it loads (no jump).
+                int w = p.path("og:image:width").asInt(0), h = p.path("og:image:height").asInt(0);
+                out.append("<img src=\"").append(Entities.escape(image)).append('"');
+                if (w > 0 && h > 0) out.append(" width=\"").append(w).append("\" height=\"").append(h).append('"');
+                out.append('>');
+            }
             out.append("</blockquote>");
         }
         return out.isEmpty() ? null : out.toString();

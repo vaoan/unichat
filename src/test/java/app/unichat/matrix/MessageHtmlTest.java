@@ -43,4 +43,17 @@ class MessageHtmlTest {
         assertFalse(html.contains("vacio"), "nothing to show for the second");
         assertNull(MessageHtml.previews(json(Map.of("com.beeper.linkpreviews", List.of()))));
     }
+
+    /**
+     * A preview's picture is sized before it loads when the bridge says how big it is: without it the box started as
+     * 16:9 and grew when the picture came, moving the chat (the chat apps' "reserve the space" rule).
+     */
+    @Test
+    void aPreviewsPictureCarriesItsSize() {
+        String html = MessageHtml.previews(json(Map.of("com.beeper.linkpreviews", List.of(Map.of("og:title", "Reel",
+                "og:image", "mxc://s/p", "og:image:width", 1080, "og:image:height", 1920)))));
+        assertTrue(html.contains("<img src=\"mxc://s/p\" width=\"1080\" height=\"1920\">"), html);
+        String unsized = MessageHtml.previews(json(Map.of("com.beeper.linkpreviews", List.of(Map.of("og:image", "mxc://s/q")))));
+        assertTrue(unsized.contains("<img src=\"mxc://s/q\">"), "no size given: none written");
+    }
 }

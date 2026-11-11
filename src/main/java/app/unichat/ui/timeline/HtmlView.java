@@ -282,7 +282,8 @@ final class HtmlView {
         if (e.hasAttr("data-mx-emoticon") || (h > 0 && h <= INLINE_PICTURE_MAX)) {
             b.inline(media.inlinePicture(src, h > 0 ? Math.min(h, INLINE_PICTURE_MAX) : EMOJI_SIZE, e.attr("alt")));
         } else {
-            b.block(media.htmlPicture(src, b.width, PICTURE_MAX_HEIGHT));
+            double w = number(e.attr("width")); // its shape before it loads, when the HTML says (a preview's size)
+            b.block(media.htmlPicture(src, b.width, PICTURE_MAX_HEIGHT, w > 0 && h > 0 ? w / h : 0));
         }
     }
 

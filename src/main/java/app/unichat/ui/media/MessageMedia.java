@@ -56,7 +56,6 @@ public final class MessageMedia {
     private static final int MAX_LINKS_OPENED = 5;
     private static final int MAX_LINK_PLAYERS = 3;
     /** Width over height of the pictures seen so far in messages' HTML. */
-    private final java.util.Map<String, Double> pictureShapes = new java.util.HashMap<>();
 
     public Node imageNode(Message m) {
         boolean sticker = m.type() == MessageType.STICKER;
@@ -90,8 +89,11 @@ public final class MessageMedia {
      * A picture in a message's HTML. Its size isn't known beforehand, so it takes its shape once loaded; that's
      * remembered, or the row would grow again each time it scrolls back into view.
      */
-    public Node htmlPicture(String url, double width, double maxHeight) {
-        StackPane box = mediaBox(width, Math.min(maxHeight, width / pictureShapes.getOrDefault(url, DEFAULT_SHAPE)), false);
+    public Node htmlPicture(String url, double width, double maxHeight, double knownShape) {
+        // Its shape before it loads (the chat apps' rule: reserve the space, or the row grows and the chat moves): the
+        // HTML's own size, else the one seen last time, kept across restarts (PictureShapes), else 16:9.
+        double shape = knownShape > 0 ? knownShape : PictureShapes.get().shape(url, DEFAULT_SHAPE);
+        StackPane box = mediaBox(width, Math.min(maxHeight, width / shape), false);
         ImageView view = new ImageView();
         view.setFitWidth(width);
         view.setFitHeight(maxHeight);
@@ -99,9 +101,9 @@ public final class MessageMedia {
         box.getChildren().add(view);
         whenLoaded(url, (int) (Math.max(width, maxHeight) * 2), img -> {
             view.setImage(img);
-            double shape = img.getWidth() / img.getHeight();
-            pictureShapes.put(url, shape);
-            double h = Math.min(maxHeight, width / shape);
+            double real = img.getWidth() / img.getHeight();
+            PictureShapes.get().remember(url, real);
+            double h = Math.min(maxHeight, width / real);
             box.setPrefHeight(h);
             box.setMinHeight(h);
             box.setMaxHeight(h);

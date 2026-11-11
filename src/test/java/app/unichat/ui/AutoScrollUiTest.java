@@ -19,6 +19,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The open chat follows the newest message: on open, when content grows late, and when you send. */
@@ -188,6 +189,65 @@ class AutoScrollUiTest {
         FxWait.until("the embed's picture loaded", () -> scene.getRoot().lookupAll(".timeline ImageView").stream()
                 .anyMatch(n -> n instanceof javafx.scene.image.ImageView v && v.getImage() != null));
         endsAtBottom(scene);
+        svc.stop();
+    }
+
+    /**
+     * The newest message grew taller than the window (a long embed loading): following the bottom showed its top and
+     * left the rest below. Its end is what's in view.
+     */
+    @Test
+    void aNewestMessageTallerThanTheWindowShowsItsEnd() throws Exception {
+        Scene scene = start();
+        Region grown = fx(() -> {
+            VirtualFlow<?> flow = (VirtualFlow<?>) timeline(scene).lookup(".virtual-flow");
+            Region r = (Region) flow.getLastVisibleCell().getGraphic();
+            r.setMinHeight(flow.getHeight() + 400);
+            return r;
+        });
+        FxWait.until("the bubble is laid out taller than the window", () -> grown.getHeight() >= grown.getMinHeight());
+        endsAtBottom(scene);
+        svc.stop();
+    }
+
+    /**
+     * Reading older messages, a picture above loads and grows: what's being read stays where it was, as chat apps anchor on
+     * the message in view and make up for the height that came above it.
+     */
+    @Test
+    void readingOlderMessagesAPictureGrowingAboveDoesntMoveThem() throws Exception {
+        Scene scene = start(30);
+        for (int i = 0; i < 10; i++) {
+            fx(() -> {
+                javafx.scene.Node flow = timeline(scene).lookup(".virtual-flow");
+                javafx.event.Event.fireEvent(flow, new javafx.scene.input.ScrollEvent(javafx.scene.input.ScrollEvent.SCROLL,
+                        200, 200, 200, 200, false, false, false, false, false, false, 0, 120, 0, 120,
+                        javafx.scene.input.ScrollEvent.HorizontalTextScrollUnits.NONE, 0,
+                        javafx.scene.input.ScrollEvent.VerticalTextScrollUnits.NONE, 0, 0, null));
+                return null;
+            });
+            FxWait.pulses(1);
+        }
+        FxWait.until("the list stops following the bottom", () -> scene.getRoot().lookup(".jump-down").isVisible());
+        FxWait.settled();
+        // The first cell wholly in view is what's being read; the one above it grows.
+        Object[] read = fx(() -> {
+            VirtualFlow<?> flow = (VirtualFlow<?>) timeline(scene).lookup(".virtual-flow");
+            IndexedCell<?> above = flow.getFirstVisibleCell();
+            IndexedCell<?> reading = flow.getVisibleCell(above.getIndex() + 1);
+            ((Region) above.getGraphic()).setMinHeight(above.getHeight() + 200);
+            return new Object[] {reading.getItem(), reading.localToScene(0, 0).getY()};
+        });
+        FxWait.settled();
+        double now = fx(() -> {
+            VirtualFlow<?> flow = (VirtualFlow<?>) timeline(scene).lookup(".virtual-flow");
+            for (int i = flow.getFirstVisibleCell().getIndex(); i <= flow.getLastVisibleCell().getIndex(); i++) {
+                IndexedCell<?> c = flow.getVisibleCell(i);
+                if (c != null && c.getItem() == read[0]) return c.localToScene(0, 0).getY();
+            }
+            return Double.NaN;
+        });
+        assertEquals((double) read[1], now, 2, "the message being read stayed put");
         svc.stop();
     }
 
