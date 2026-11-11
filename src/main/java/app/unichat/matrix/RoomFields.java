@@ -81,7 +81,10 @@ final class RoomFields {
             }
         }
         if (last != null) {
+            Instant kept = c.lastActivity();
             c.applyLastMessage(last);
+            // Someone joining or a new group picture isn't something to read: it never moves the chat up the list.
+            if (last.type() == MessageType.SYSTEM) c.setLastActivity(kept);
         } else if (room.invite) {
             String inviter = room.inviter;
             c.setLastActivity(room.invitedAt);

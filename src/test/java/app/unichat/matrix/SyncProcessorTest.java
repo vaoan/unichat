@@ -297,6 +297,31 @@ class SyncProcessorTest {
     }
 
     @Test
+    void someoneJoiningOrChangingTheirPictureDoesntMoveTheChatUp() {
+        String room = "!grande:example.org";
+        String people = "{'state':{'events':[%s,%s,%s]},".formatted(member(ME, "Me"), member("@bob:example.org", "Bob"),
+                member("@dan:example.org", "Dan"));
+        sync(room, people + "'timeline':{'events':[" + text("$m", "@bob:example.org", 1000, "hola") + "]}}", false);
+        sync(room, """
+                {'timeline':{'events':[
+                 {'type':'m.room.member','state_key':'@carl:example.org','event_id':'$j','sender':'@carl:example.org','origin_server_ts':5000,
+                  'content':{'membership':'join','displayname':'Carl'}},
+                 {'type':'m.room.member','state_key':'@dan:example.org','event_id':'$a','sender':'@dan:example.org','origin_server_ts':6000,
+                  'content':{'membership':'join','displayname':'Dan','avatar_url':'mxc://example.org/new'}}]}}
+                """, true);
+        assertEquals(java.time.Instant.ofEpochMilli(1000), proc.room(room).chat.lastActivity(), "where its last message put it");
+
+        String quiet = "!solo-cambios:example.org";
+        sync(quiet, people.replace("!grande", "!solo") + """
+                'timeline':{'events':[
+                 {'type':'m.room.member','state_key':'@carl:example.org','event_id':'$k','sender':'@carl:example.org','origin_server_ts':7000,
+                  'content':{'membership':'join','displayname':'Carl'}}]}}
+                """, false);
+        assertEquals(java.time.Instant.EPOCH, proc.room(quiet).chat.lastActivity(), "nothing to read: not on top");
+        assertEquals("Carl se unió", proc.room(quiet).chat.lastPreview(), "the line still shows");
+    }
+
+    @Test
     void localEchoReplacedBySyncAndReadReceipts() {
         String room = "!l:example.org";
         sync(room, "{'timeline':{'events':[]}}", false);
