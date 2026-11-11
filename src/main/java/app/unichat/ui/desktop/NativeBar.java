@@ -185,6 +185,10 @@ public final class NativeBar {
                     onOpenChat.accept(line.substring(5).strip());
                     continue;
                 }
+                if (line.startsWith("log\t")) { // what the helper wants on record (how bringing Unichat forward went)
+                    System.err.println("Menu bar helper: " + line.substring(4));
+                    continue;
+                }
                 if (line.startsWith("notify-auth\t")) {
                     notificationsAllowed = line.endsWith("1");
                     System.err.println("System notifications: " + (notificationsAllowed ? "allowed" : "not allowed (Unichat's own cards instead)"));

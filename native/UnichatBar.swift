@@ -32,13 +32,26 @@ func emit(_ line: String) {
 }
 
 /**
- * Lets Unichat (this helper's parent, the Java process) become the active app. Since macOS 14 an app can't bring
- * itself to the front: the active app has to yield first. A click on a notification or on the icon makes this helper
- * the active one, so without this Unichat's window came up without the focus, or behind the app in use.
+ * Brings Unichat (this helper's parent, the Java process) to the front after a click on a notification or the icon.
+ * Since macOS 14 an app can't bring itself forward and only the active app can yield its turn, and a click on the icon
+ * doesn't make this helper active: the window opened its chat behind the app in use. LaunchServices can:
+ * `openApplication` on Unichat's own running bundle activates it (and yields for us), no new copy. Says how it went.
  */
-func handBackActivation() {
-    guard #available(macOS 14.0, *), let unichat = NSRunningApplication(processIdentifier: getppid()) else { return }
-    NSApp.yieldActivation(to: unichat)
+func bringUnichatForward() {
+    guard let unichat = NSRunningApplication(processIdentifier: getppid()) else { return }
+    if #available(macOS 14.0, *) { NSApp.yieldActivation(to: unichat) } // when this helper is the active one, it helps
+    guard let url = unichat.bundleURL, url.pathExtension == "app" else {
+        unichat.activate(options: []) // run from sources: a plain java, no bundle to open
+        return
+    }
+    let config = NSWorkspace.OpenConfiguration()
+    config.activates = true
+    config.createsNewApplicationInstance = false
+    config.addsToRecentItems = false
+    config.promptsUserIfNeeded = false
+    NSWorkspace.shared.openApplication(at: url, configuration: config) { app, error in
+        emit("log\tbring forward: \(error.map { "\($0.localizedDescription)" } ?? "ok"), active \(app?.isActive ?? false)")
+    }
 }
 
 final class Notes: NSObject, UNUserNotificationCenterDelegate {
@@ -98,8 +111,8 @@ final class Notes: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler done: @escaping () -> Void) {
         if let chat = response.notification.request.content.userInfo["chat"] as? String {
-            handBackActivation()
             emit("open\t\(chat)")
+            bringUnichatForward()
         }
         done()
     }
@@ -277,8 +290,8 @@ final class Bar: NSObject, NSMenuDelegate {
         if leftOpensMenu || event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
             showMenu()
         } else {
-            handBackActivation()
             emit("show")
+            bringUnichatForward()
         }
     }
 
