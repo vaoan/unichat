@@ -47,6 +47,8 @@ import java.util.function.Consumer;
  */
 public final class Composer extends VBox {
     private final ChatService svc;
+    /** Shift+↑ / Shift+↓: a line at a time ({@link LineSelection}). */
+    private final LineSelection lineSelection;
     private final TextArea input = new TextArea() {
         @Override public void paste() { // ⌘V and the menu's Paste alike
             if (!pasteMedia()) super.paste();
@@ -104,6 +106,7 @@ public final class Composer extends VBox {
         input.setPrefRowCount(1);
         input.getStyleClass().add("composer-input");
         input.addEventFilter(KeyEvent.KEY_PRESSED, this::onKey);
+        lineSelection = new LineSelection(input);
         input.setContextMenu(FormatMenu.of(input, this::features));
         input.textProperty().addListener((o, a, t) -> onTyped(t));
 
@@ -421,9 +424,8 @@ public final class Composer extends VBox {
             }
         } else if ((e.getCode() == KeyCode.UP || e.getCode() == KeyCode.DOWN) && e.isShiftDown()
                 && !e.isShortcutDown() && !e.isAltDown()) {
-            // The anchor stays: the other arrow then runs from the same place to the other end.
             e.consume();
-            input.selectRange(input.getAnchor(), e.getCode() == KeyCode.UP ? 0 : input.getLength());
+            lineSelection.step(e.getCode() == KeyCode.UP);
         } else if (e.getCode() == KeyCode.ESCAPE && (replyTo != null || editing != null)) {
             e.consume();
             cancelMode();
