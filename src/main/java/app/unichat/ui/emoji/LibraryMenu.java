@@ -16,7 +16,7 @@ import java.util.function.Consumer;
  * Right-click (or the menu key / Shift+F10) on an emoji, sticker or GIF of the side panel: use it, see it big, add it
  * to or take it out of the favourites, and drop it from the recents.
  */
-final class LibraryMenu {
+public final class LibraryMenu {
     private LibraryMenu() {}
 
     /** {@code use}: sends the sticker/GIF or inserts the emoji; null when it can't be used here. */
@@ -45,7 +45,11 @@ final class LibraryMenu {
 
     /** In its own window, as big as it is: the picture viewer, or the video one for an mp4 GIF or a WebM sticker. */
     static void enlarge(Node from, app.unichat.service.MediaSource svc, MediaLibrary.Item item, Consumer<String> toast) {
-        javafx.stage.Window owner = from.getScene().getWindow();
+        enlarge(from.getScene().getWindow(), svc, item, toast);
+    }
+
+    /** The same from a chat's message (a sticker's menu), over {@code owner}. */
+    public static void enlarge(javafx.stage.Window owner, app.unichat.service.MediaSource svc, MediaLibrary.Item item, Consumer<String> toast) {
         app.unichat.model.Message m = MediaItems.message(item);
         String title = I18n.t(item.kind() == MediaLibrary.Kind.STICKER ? "library.kind.sticker" : "library.kind.gif");
         if (item.mime() != null && item.mime().startsWith("video/")) {

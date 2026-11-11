@@ -65,10 +65,25 @@ class StickerSetMenuUiTest {
             FxWait.until("why it's not there", () -> FxWait.fx(() -> text(panel)).contains("No se pudo traer este set"));
             assertTrue(FxWait.fx(() -> text(panel)).contains("Sets de Telegram"));
             assertEquals(SidePanel.Tab.STICKERS, FxWait.fx(panel::current));
+
+            // "Ver en grande" was only in the side panel's menus, never in the chat's: a sticker's menu has it too.
+            MenuItem big = FxWait.fx(() -> thread.actions().messageMenu(sticker).getItems().stream()
+                    .filter(i -> "Ver en grande".equals(i.getText())).findFirst().orElse(null));
+            assertTrue(big != null, "the chat's sticker menu offers Ver en grande");
+            FxWait.fx(() -> { big.fire(); return null; });
+            // The viewer is a window of its own (no owner, by design): found by its title.
+            FxWait.until("the viewer", () -> FxWait.fx(() -> viewer() != null));
+            FxWait.fx(() -> { viewer().close(); return null; });
         } finally {
             svc.stop();
             FxWait.fx(() -> { window[0].close(); return null; });
         }
+    }
+
+    private static Stage viewer() {
+        return javafx.stage.Window.getWindows().stream()
+                .filter(w -> w instanceof Stage st && st.isShowing() && "Sticker".equals(st.getTitle()))
+                .map(Stage.class::cast).findFirst().orElse(null);
     }
 
     private static <T> T find(Node n, Class<T> type) {

@@ -6,6 +6,7 @@ import app.unichat.ui.Clipboards;
 import app.unichat.ui.Icons;
 import app.unichat.ui.chats.ChatMenus;
 import app.unichat.ui.emoji.EmojiPicker;
+import app.unichat.ui.emoji.LibraryMenu;
 import app.unichat.ui.emoji.MediaItems;
 import app.unichat.ui.emoji.ReactionEmoji;
 import app.unichat.ui.media.MediaSaver;
@@ -190,6 +191,11 @@ final class MessageActionsUi {
         java.util.Set<MessageActions.Action> a = MessageActions.of(m, chat.get().features(), Instant.now());
         if (a.isEmpty()) return menu;
         if (media.canView(m)) menu.getItems().add(ChatMenus.item(I18n.t("message.view"), () -> media.view(m)));
+        if (m.type() == app.unichat.model.MessageType.STICKER && m.mediaUrl() != null && !m.deleted()) {
+            menu.getItems().add(ChatMenus.item(I18n.t("library.enlarge"), () -> {
+                if (scene.get() != null) LibraryMenu.enlarge(scene.get().getWindow(), svc, MediaItems.of(m), toast);
+            }));
+        }
         Message replied = replied(m);
         if (replied != null) menu.getItems().add(ChatMenus.item(I18n.t("message.goToReplied"), () -> jumpTo.accept(replied)));
         for (String url : RichText.addresses(m.body()).stream().distinct().limit(MENU_LINKS).toList()) {
