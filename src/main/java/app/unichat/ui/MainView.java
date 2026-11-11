@@ -456,6 +456,12 @@ public final class MainView extends StackPane {
                 + (SpaceTree.serverOf(open, svc.chats()) != null ? " channel" : " chat") + ")");
     }
 
+    /** Goes to message {@code messageId} of the open chat {@code chatId}, if it's loaded (a notice about it was clicked). */
+    public void showMessage(String chatId, String messageId) {
+        if (thread.chat() == null || !thread.chat().id().equals(chatId)) return;
+        svc.messages(chatId).stream().filter(m -> messageId.equals(m.id())).findFirst().ifPresent(thread::jumpToMessage);
+    }
+
     public void openChatId(String id) {
         if (id == null) return;
         Chat c = svc.chat(id);

@@ -125,7 +125,7 @@ final class LiveSaving {
             SavedFile.copyInto(saver, m, dir, file, arrived -> { });
             return null;
         } catch (IOException | RuntimeException e) {
-            return failed(name, chat, new Failure(AutoSave.why(e, dir, file[0]), e instanceof AutoSave.Gone));
+            return failed(name, chat, m, new Failure(AutoSave.why(e, dir, file[0]), e instanceof AutoSave.Gone));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Failure.forNow(e.toString());
@@ -136,9 +136,9 @@ final class LiveSaving {
     private Failure saveLink(String url, Message m, Chat chat, Path dir) {
         try {
             Failure f = saver.link(url, dir, FileNames.tag(m), arrived -> { });
-            return f == null ? null : failed(url, chat, f);
+            return f == null ? null : failed(url, chat, m, f);
         } catch (IOException | RuntimeException e) {
-            return failed(url, chat, Failure.forNow(AutoSave.why(e, dir, null)));
+            return failed(url, chat, m, Failure.forNow(AutoSave.why(e, dir, null)));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Failure.forNow(e.toString());
@@ -146,11 +146,11 @@ final class LiveSaving {
     }
 
     /** Tells and logs it (a failure for now only the first time); gives it back. */
-    private Failure failed(String what, Chat chat, Failure f) {
+    private Failure failed(String what, Chat chat, Message m, Failure f) {
         if (!f.permanent() && !holds.firstTime(chat.id(), what, f.why())) return f;
         System.err.println("Auto-save: " + what + " from " + chat.id() + " not saved" + (f.permanent() ? "" : " (tried again later)")
                 + ": " + f.why());
-        progress.failed(what, chat, f.why());
+        progress.failed(what, chat, m.id(), f.why());
         return f;
     }
 }

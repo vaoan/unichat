@@ -134,7 +134,7 @@ final class PastExplorer {
             if (STOPPED.equals(noSpace)) break; // this one wasn't finished: the next run looks at it again
             savedUpTo.exploredBack(chatId, m.timestamp(), false);
             if (noSpace != null) {
-                progress.failed(I18n.t("autosave.exploring"), chat, noSpace);
+                progress.failed(I18n.t("autosave.exploring"), chat, null, noSpace);
                 end(chatId, chat, false);
                 return;
             }
@@ -239,6 +239,6 @@ final class PastExplorer {
         set(chatId, new Exploring(false, b == null ? null : b.back(), b != null && b.start(), e.saved(), e.unavailable(), e.looked(), null));
         if (chat == null) return;
         if (e.saved() > 0) progress.finished(e.saved(), chat);
-        if (e.unavailable() > 0) progress.failed(I18n.n("autosave.unavailable", e.unavailable()), chat, I18n.t("autosave.unavailableWhy"));
+        if (e.unavailable() > 0) progress.failed(I18n.n("autosave.unavailable", e.unavailable()), chat, null, I18n.t("autosave.unavailableWhy"));
     }
 }

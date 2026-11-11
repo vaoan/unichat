@@ -14,6 +14,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import app.unichat.ui.Browser;
 import app.unichat.ui.desktop.DockIcon;
+import app.unichat.ui.desktop.NotificationTarget;
 import app.unichat.ui.desktop.TrayReopen;
 import app.unichat.ui.login.LoginView;
 import app.unichat.ui.settings.SettingsWindow;
@@ -216,7 +217,9 @@ public final class UnichatApp extends Application {
                 notifier.downloadsDone(saved, chat);
                 if (cloud != null) cloud.syncNow(); // what was just saved goes up now, not at the next round
             }
-            @Override public void failed(String what, app.unichat.model.Chat chat, String why) { notifier.downloadFailed(what, chat, why); }
+            @Override public void failed(String what, app.unichat.model.Chat chat, String messageId, String why) {
+                notifier.downloadFailed(what, chat, messageId, why);
+            }
         });
         mainView = new MainView(svc, stage, notifier, this::logout, Browser::open);
         // Never in the demo (its made-up chats would reach the person's account), but for a snapshot of Ajustes → Nube.
@@ -309,11 +312,13 @@ public final class UnichatApp extends Application {
     }
 
     /** A notification's click: the window, then its chat; the log says what it led to (after the open's own runLaters). */
-    private void openFromNotification(String id) {
+    private void openFromNotification(String target) {
         showWindow();
+        String id = NotificationTarget.chat(target), message = NotificationTarget.message(target);
         Platform.runLater(() -> {
             if (mainView == null) return;
             mainView.openChatId(id);
+            if (message != null) mainView.showMessage(id, message); // a notice about one message (a file not saved)
             Platform.runLater(() -> System.err.println("Notification click: " + mainView.openOutcome(id)));
         });
     }

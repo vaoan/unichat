@@ -109,7 +109,7 @@ class AutoSaveTest {
                 told.add("finished " + saved + " " + c.id());
                 roundFinished.countDown();
             }
-            @Override public void failed(String what, Chat c, String why) { told.add("failed " + what + ": " + why); }
+            @Override public void failed(String what, Chat c, String messageId, String why) { told.add("failed " + what + ": " + why); }
         });
         return a;
     }

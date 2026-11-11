@@ -356,7 +356,8 @@ public final class ThreadPane extends BorderPane {
         }
     }
 
-    private Message selectedMessage() {
+    /** The message selected in the timeline (the keyboard's, or one gone to), or null. */
+    public Message selectedMessage() {
         return list.getSelectionModel().getSelectedItem() instanceof ThreadRows.MessageRow mr ? mr.message() : null;
     }
 

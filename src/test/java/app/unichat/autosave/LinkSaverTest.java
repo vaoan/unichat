@@ -100,4 +100,23 @@ class LinkSaverTest {
         assertTrue(LinkSaver.failure(new Fetch.Result(Fetch.Outcome.FAILED, "gallery-dl" + Fetch.NOT_INSTALLED, List.of(), null))
                 .permanent());
     }
+
+    /**
+     * A page no site knows (yt-dlp's [generic]) that refuses or isn't there has nothing to save: a Linktree profile
+     * answered 403 every time, and taken as "for now" it held every later file of its chat (five tries in a day's log).
+     * The network failing on a known site is still tried again.
+     */
+    @Test
+    void aPageNoSiteKnowsThatRefusesHasNothingToSave() {
+        String linktree = "[generic] katsudoggo: Unable to download webpage: HTTP Error 403: Forbidden (caused by <HTTPError 403: Forbidden>)";
+        assertTrue(LinkSaver.failure(new Fetch.Result(Fetch.Outcome.FAILED, linktree, List.of(), null)).permanent());
+        assertTrue(LinkSaver.failure(new Fetch.Result(Fetch.Outcome.FAILED,
+                "[generic] x: Unable to download webpage: HTTP Error 404: Not Found", List.of(), null)).permanent());
+        assertFalse(LinkSaver.failure(new Fetch.Result(Fetch.Outcome.FAILED,
+                "[generic] x: Unable to download webpage: HTTP Error 503: Service Unavailable", List.of(), null)).permanent(),
+                "a server busy for now");
+        assertFalse(LinkSaver.failure(new Fetch.Result(Fetch.Outcome.FAILED,
+                "[Instagram] abc: Unable to download webpage: HTTP Error 403: Forbidden", List.of(), null)).permanent(),
+                "a known site refusing may be rate limiting");
+    }
 }

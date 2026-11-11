@@ -176,4 +176,25 @@ class NotificationOpenUiTest {
         });
         assertEquals("DISCORD channel of a server; opened", FxWait.fx(() -> view.openOutcome("!srv-memes:demo")));
     }
+
+    /**
+     * A notice that a file couldn't be saved goes to the message it came in: its click led nowhere (the chat at most,
+     * where the person had to look for it).
+     */
+    @Test
+    void aNoticeAboutAMessageGoesToThatMessage() throws Exception {
+        open();
+        String older = FxWait.fx(() -> svc.messages("!mama:demo").get(0).id()); // far from the newest the chat opens at
+        FxWait.fx(() -> {
+            view.openChatId("!mama:demo");
+            view.showMessage("!mama:demo", older);
+            return null;
+        });
+        FxWait.settled();
+        FxWait.until("the message is selected", () -> {
+            var m = view.thread().selectedMessage();
+            if (m != null && older.equals(m.id())) return true;
+            throw new AssertionError("selected: " + (m == null ? "none" : m.id())); // what a failure says
+        });
+    }
 }

@@ -338,8 +338,10 @@ public final class Notifier {
     }
 
     /** Something couldn't be saved: always told, with what, why and from where, whatever the other notices. Any thread. */
-    public void downloadFailed(String what, Chat chat, String why) {
-        system(chat.id(), I18n.t("notifier.downloadFailed", what), why + " · " + chat.title(), TrayIcon.MessageType.ERROR);
+    /** {@code messageId}: where the click goes (null: the chat). */
+    public void downloadFailed(String what, Chat chat, String messageId, String why) {
+        system(NotificationTarget.of(chat.id(), messageId), I18n.t("notifier.downloadFailed", what), why + " · " + chat.title(),
+                TrayIcon.MessageType.ERROR);
     }
 
     /** A notice of Unichat's own (not a message): macOS's own when allowed, else the card or the tray's balloon. */

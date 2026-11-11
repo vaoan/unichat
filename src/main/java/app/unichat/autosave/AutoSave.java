@@ -68,8 +68,11 @@ public final class AutoSave implements ChatService.Listener {
         /** A round ended with {@code saved} files saved; {@code chat} is where the last came from. */
         void finished(int saved, Chat chat);
 
-        /** {@code what} (a file's name, a link) from {@code chat} couldn't be saved, because {@code why}. */
-        void failed(String what, Chat chat, String why);
+        /**
+         * {@code what} (a file's name, a link) from {@code chat} couldn't be saved, because {@code why}; {@code messageId}
+         * is the message it came in (null when it's no one message: exploring stopped, files gone), for the notice to go to.
+         */
+        void failed(String what, Chat chat, String messageId, String why);
     }
 
     private static final Map<ChatSession, AutoSave> BY_SERVICE = new WeakHashMap<>();
@@ -80,13 +83,13 @@ public final class AutoSave implements ChatService.Listener {
     private volatile Progress progress = new Progress() {
         @Override public void changed(int done, int total) { }
         @Override public void finished(int saved, Chat chat) { }
-        @Override public void failed(String what, Chat chat, String why) { }
+        @Override public void failed(String what, Chat chat, String messageId, String why) { }
     };
     /** What {@link #progress} is now: the parts keep this one, {@link #setProgress} may change it later. */
     private final Progress tell = new Progress() {
         @Override public void changed(int done, int total) { progress.changed(done, total); }
         @Override public void finished(int saved, Chat chat) { progress.finished(saved, chat); }
-        @Override public void failed(String what, Chat chat, String why) { progress.failed(what, chat, why); }
+        @Override public void failed(String what, Chat chat, String messageId, String why) { progress.failed(what, chat, messageId, why); }
     };
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "autosave");

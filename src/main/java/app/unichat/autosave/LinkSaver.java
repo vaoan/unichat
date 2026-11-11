@@ -75,11 +75,18 @@ final class LinkSaver {
     }
 
     /** A failed run in the person's words, and whether it's for good. */
+    /**
+     * A page no site knows (yt-dlp's {@code [generic]}) that refuses or isn't there (4xx): nothing to save there, ever (a
+     * Linktree profile answered 403 each time and, tried again, held its chat's later files). A known site refusing may
+     * be rate limiting, and a 5xx is a server busy for now: those are tried again.
+     */
+    private static final java.util.regex.Pattern NOTHING_THERE = java.util.regex.Pattern.compile("^\\[generic\\].*HTTP Error 4\\d\\d");
+
     static Failure failure(Fetch.Result r) {
         // Tried again at each change of the chat, a run that took the whole LIMIT would hold all saving that long each
         // time, and a missing tool is still missing at the next change: neither is worth holding the chat's later files.
         boolean forGood = r.outcome() == Fetch.Outcome.FAILED_PERMANENT || Fetch.TIMED_OUT.equals(r.reason())
-                || r.reason().endsWith(Fetch.NOT_INSTALLED);
+                || r.reason().endsWith(Fetch.NOT_INSTALLED) || NOTHING_THERE.matcher(r.reason()).find();
         return new Failure(reason(r.reason()), forGood);
     }
 
