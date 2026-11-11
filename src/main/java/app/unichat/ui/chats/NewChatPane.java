@@ -229,11 +229,15 @@ public final class NewChatPane extends VBox {
             show(rows, all.isEmpty() && support.search() ? I18n.t("newChat.typeToSearch", account.network().displayName()) : null);
             return;
         }
+        // The contacts already here that match a part of it come first, at once; the bridge's search (exact where it
+        // wants a whole username or number) only adds to them.
+        List<Contact> local = matching(all, q);
+        local.forEach(c -> rows.add(new Row(c, null)));
         if (!support.search()) {
-            filterLocally(q).forEach(c -> rows.add(new Row(c, null)));
             show(rows, rows.isEmpty() ? I18n.t("newChat.noResults") : null);
             return;
         }
+        show(List.copyOf(rows), null);
         setStatus(I18n.t("newChat.searching"));
         svc.searchContacts(account, q).whenComplete((found, err) -> Platform.runLater(() -> {
             if (gen != generation) return;
@@ -241,22 +245,33 @@ public final class NewChatPane extends VBox {
                 Throwable cause = Errors.unwrap(err);
                 if (cause instanceof UnsupportedOperationException) {
                     support = new ChatService.ContactSupport(support.list(), false);
-                    filterLocally(q).forEach(c -> rows.add(new Row(c, null)));
                     show(rows, rows.isEmpty() ? I18n.t("newChat.noSearchShort", account.network().displayName()) : null);
                 } else {
-                    show(rows, I18n.t("newChat.searchFailed"));
+                    show(rows, rows.isEmpty() ? I18n.t("newChat.searchFailed") : null);
                 }
                 return;
             }
-            found.forEach(c -> rows.add(new Row(c, null)));
+            merged(local, found).stream().skip(local.size()).forEach(c -> rows.add(new Row(c, null)));
             show(rows, rows.isEmpty() ? I18n.t("newChat.noResults") : null);
         }));
     }
 
-    private List<Contact> filterLocally(String q) {
-        String n = ChatFilter.normalize(q);
+    /**
+     * The contacts {@code q} finds by a part of their name, a username or a number, ignoring case and accents (and a
+     * number's spaces and signs). It was exact where the network searches, and case-sensitive on usernames.
+     */
+    static List<Contact> matching(List<Contact> all, String q) {
+        String n = ChatFilter.normalize(q), digits = q.replaceAll("\\D", "");
         return all.stream().filter(c -> ChatFilter.normalize(c.name()).contains(n)
-                || c.identifiers().stream().anyMatch(i -> i.contains(q))).toList();
+                || c.identifiers().stream().anyMatch(i -> ChatFilter.normalize(i).contains(n)
+                        || digits.length() >= 3 && i.replaceAll("\\D", "").contains(digits))).toList();
+    }
+
+    /** {@code local} first, then what {@code found} adds, each contact once. */
+    static List<Contact> merged(List<Contact> local, List<Contact> found) {
+        List<Contact> out = new ArrayList<>(local);
+        for (Contact c : found) if (out.stream().noneMatch(o -> o.id().equals(c.id()))) out.add(c);
+        return out;
     }
 
     /** The status line, also given to the search field so a screen reader hears it where the focus is. */
