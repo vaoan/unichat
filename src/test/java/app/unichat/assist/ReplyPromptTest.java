@@ -208,4 +208,17 @@ class ReplyPromptTest {
         assertTrue(p.contains("Ahora es viernes"));
         assertFalse(p.contains("El último mensaje"));
     }
+
+    /** A draft sees how its earlier drafts were corrected, marked off like the style: examples of form, never orders. */
+    @Test
+    void earlierCorrectionsAreExamplesMarkedOff() {
+        var c = new StylePrompt.Correction("Siii me parece! 👀", "Siii me parece! Solo no el sábado", "¿Qué día puedes?", "!ana");
+        String p = ReplyPrompt.build("", false, List.of(msg("Ana", false, "hola")), null, "", java.util.Map.of(), "", List.of(c));
+        String mark = p.substring(p.indexOf("<correcciones-") + 1, p.indexOf('>', p.indexOf("<correcciones-")));
+        int open = p.indexOf("<" + mark + ">"), close = p.indexOf("</" + mark + ">");
+        assertTrue(open < p.indexOf("Propusiste: Siii me parece! 👀") && p.indexOf("Envió: Siii me parece! Solo no el sábado") < close, p);
+        assertTrue(p.indexOf("Le escribieron: ¿Qué día puedes?") > open);
+        assertFalse(ReplyPrompt.build("", false, List.of(msg("Ana", false, "hola")), null, "", java.util.Map.of(), "", List.of())
+                .contains("correcciones-"), "none: no section");
+    }
 }

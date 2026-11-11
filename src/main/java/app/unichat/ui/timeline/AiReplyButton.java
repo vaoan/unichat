@@ -227,7 +227,13 @@ public final class AiReplyButton {
     /** {@code style}: how the person writes ({@code writing-style.md}). */
     static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.Message target, String idea,
                          java.util.Map<String, String> heard, String style) {
-        return ReplyPrompt.build(AiSettings.instructions(), AiSettings.folder() != null, chat, target, idea, heard, style);
+        return prompt(chat, target, idea, heard, style, java.util.List.of());
+    }
+
+    /** {@code examples}: how earlier drafts were corrected, the chat's own first. */
+    static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.Message target, String idea,
+                         java.util.Map<String, String> heard, String style, java.util.List<app.unichat.assist.StylePrompt.Correction> examples) {
+        return ReplyPrompt.build(AiSettings.instructions(), AiSettings.folder() != null, chat, target, idea, heard, style, examples);
     }
 
 

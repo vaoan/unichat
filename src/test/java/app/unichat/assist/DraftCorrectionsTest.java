@@ -17,7 +17,7 @@ class DraftCorrectionsTest {
         DraftCorrections d = new DraftCorrections();
         d.drafted("A", "hola");
         assertNull(d.sent("B", "x", null));
-        assertEquals(new StylePrompt.Correction("hola", "hola!", "¿hay alguien?"), d.sent("A", "hola!", "¿hay alguien?"));
+        assertEquals(new StylePrompt.Correction("hola", "hola!", "¿hay alguien?", "A"), d.sent("A", "hola!", "¿hay alguien?"));
         assertNull(d.sent("A", "hola!!", null), "used once");
     }
 

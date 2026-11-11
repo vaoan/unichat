@@ -48,7 +48,7 @@ public final class DraftCorrections {
     public StylePrompt.Correction sent(String chatId, String text, String context) {
         String draft = drafts.remove(chatId);
         if (draft == null || text == null || similarity(draft, text) < MIN_SIMILARITY) return null;
-        return new StylePrompt.Correction(draft, text, context);
+        return new StylePrompt.Correction(draft, text, context, chatId);
     }
 
     /** The newest messages from others before {@code chat}'s last ones of mine, oldest first, one line each; null with none. */

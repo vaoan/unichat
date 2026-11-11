@@ -28,6 +28,9 @@ import java.util.function.Supplier;
  * learned from what they send instead of a draft. Only ever text in the box, never sent by itself.
  */
 final class ComposerAi {
+    /** Earlier corrections a draft sees as examples: a few, the chat's own first (a long list costs time and tokens). */
+    private static final int EXAMPLES = 6;
+
     /** What the AI needs from the message box it writes in. */
     interface Box {
         /** The open chat; null with none. */
@@ -146,7 +149,7 @@ final class ComposerAi {
         List<Message> toHear = AiSettings.hearVoiceNotes() ? ReplyPrompt.voiceNotesToHear(chat, target) : List.of();
         // The style learned so far: learning takes a call of its own (~10 s), so it comes after the draft (learnAfter).
         return new AiReplyButton.Request(chatId, () -> AiReplyButton.prompt(chat, target, idea, AiReplyButton.heard(svc, chat, toHear),
-                WritingStyle.get().text()), () -> { }, ReplyPrompt.hasGaps(idea));
+                WritingStyle.get().text(), WritingStyle.get().examples(chatId, EXAMPLES)), () -> { }, ReplyPrompt.hasGaps(idea));
     }
 
     /**
