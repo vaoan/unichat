@@ -28,7 +28,10 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import javafx.scene.shape.Rectangle;
 import java.awt.Desktop;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
 import javafx.scene.Scene;
 import java.util.function.Supplier;
 
@@ -68,7 +71,7 @@ public final class MessageMedia {
         view.setPreserveRatio(sticker);
         box.getChildren().add(view);
         if (m.mediaUrl() != null) {
-            loadMedia(svc, view, m, (int) (dw * 2), (int) (dh * 2));
+            MediaLoading.track(box, progress -> loadMedia(svc, view, m, (int) (dw * 2), (int) (dh * 2), progress));
             if (MessageActions.isStickerOrGif(m)) library.rememberSeen(MediaItems.of(m));
             if (m.isReelLink()) {
                 box.getChildren().add(playBadge());
@@ -297,46 +300,77 @@ public final class MessageMedia {
     }
 
     /** Thumbnail first, then the (possibly animated) original; shared with the sticker and GIF grids. */
-    public static java.util.concurrent.CompletableFuture<java.nio.file.Path> loadMedia(MediaSource svc, ImageView view, Message m, int pxW, int pxH) {
+    public static CompletableFuture<Void> loadMedia(MediaSource svc, ImageView view, Message m, int pxW, int pxH) {
+        return loadMedia(svc, view, m, pxW, pxH, p -> { });
+    }
+
+    /**
+     * The same, telling {@code progress} how much of the file has arrived (0 to 1). The future is done once the picture
+     * is drawn, and fails when it couldn't be downloaded or opened ({@link MediaLoading} offers to try again).
+     */
+    public static CompletableFuture<Void> loadMedia(MediaSource svc, ImageView view, Message m, int pxW, int pxH,
+                                                    DoubleConsumer progress) {
+        CompletableFuture<Void> shown = new CompletableFuture<>();
         if (!mayBeAnimated(m)) {
-            java.util.concurrent.CompletableFuture<java.nio.file.Path> still = svc.media(m.mediaUrl(), pxW, pxH);
             Image known = Platform.isFxApplicationThread() ? Stills.get(m.mediaUrl(), pxW, pxH) : null;
-            if (known != null) view.setImage(known); // decoded before: no blank while it's decoded again
-            else still.thenAcceptAsync(p -> showStill(view, m.mediaUrl(), p, pxW, pxH, false), AnimatedImage.DECODER);
-            return still;
+            if (known != null) { // decoded before: no blank while it's decoded again
+                view.setImage(known);
+                return CompletableFuture.completedFuture(null);
+            }
+            svc.media(m.mediaUrl(), pxW, pxH, progress)
+                    .thenAcceptAsync(p -> showStill(view, m.mediaUrl(), p, pxW, pxH, false, shown), AnimatedImage.DECODER)
+                    .exceptionally(e -> failed(shown, e));
+            return shown;
         }
-        java.util.concurrent.CompletableFuture<java.nio.file.Path> original = svc.media(m.mediaUrl(), 0, 0);
+        // A sticker comes from the stickers' own room, so photos and videos never push the chats' stickers out.
+        boolean sticker = m.type() == MessageType.STICKER;
+        CompletableFuture<Path> original = sticker ? svc.sticker(m.mediaUrl(), progress) : svc.media(m.mediaUrl(), 0, 0, progress);
         if (Platform.isFxApplicationThread() && original.isDone() && !original.isCompletedExceptionally()) {
             AnimatedImage.Frames ready = AnimatedImage.decoded(original.join(), pxW, pxH);
             if (ready != null) {
                 AnimatedImage.play(view, ready);
-                return original;
+                return CompletableFuture.completedFuture(null);
             }
         }
         // Placeholder: a still picture shows at once; decoding a long animation takes seconds. (With direct media
         // the "thumbnail" is the original file, maybe an animated GIF: only its first frame is used.)
-        svc.media(m.mediaUrl(), pxW, pxH).thenAcceptAsync(p -> showStill(view, m.mediaUrl(), p, pxW, pxH, true), AnimatedImage.DECODER);
+        CompletableFuture<Path> placeholder = sticker ? original : svc.media(m.mediaUrl(), pxW, pxH);
+        placeholder.thenAcceptAsync(p -> showStill(view, m.mediaUrl(), p, pxW, pxH, true, null), AnimatedImage.DECODER);
         original.thenAcceptAsync(p -> {
             try {
                 AnimatedImage.Frames frames = AnimatedImage.decode(p, pxW, pxH); // labelled as a sticker, maybe a plain PNG/JPEG
-                Platform.runLater(() -> AnimatedImage.play(view, frames));
+                Platform.runLater(() -> {
+                    AnimatedImage.play(view, frames);
+                    shown.complete(null);
+                });
             } catch (Exception e) {
                 System.err.println("Could not decode " + m.mediaUrl() + ": " + e);
+                shown.completeExceptionally(e);
             }
-        }, AnimatedImage.DECODER);
-        return original;
+        }, AnimatedImage.DECODER).exceptionally(e -> failed(shown, e));
+        return shown;
     }
 
-    /** Decodes {@code p} as a still picture (off the FX thread) and shows it; {@code ifEmpty}: only if nothing's shown. */
-    private static void showStill(ImageView view, String url, java.nio.file.Path p, int pxW, int pxH, boolean ifEmpty) {
+    private static Void failed(CompletableFuture<Void> shown, Throwable e) {
+        shown.completeExceptionally(e);
+        return null;
+    }
+
+    /**
+     * Decodes {@code p} as a still picture (off the FX thread) and shows it; {@code ifEmpty}: only if nothing's shown.
+     * {@code shown}, when given, hears how it went.
+     */
+    private static void showStill(ImageView view, String url, Path p, int pxW, int pxH, boolean ifEmpty, CompletableFuture<Void> shown) {
         try {
             Image img = AnimatedImage.still(p, pxW, pxH);
             Stills.put(url, pxW, pxH, img);
             Platform.runLater(() -> {
                 if (!ifEmpty || view.getImage() == null) view.setImage(img);
+                if (shown != null) shown.complete(null);
             });
         } catch (Exception e) {
             System.err.println("Could not decode " + p.getFileName() + ": " + e);
+            if (shown != null) shown.completeExceptionally(e);
         }
     }
 

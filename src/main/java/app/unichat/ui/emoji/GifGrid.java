@@ -3,6 +3,7 @@ package app.unichat.ui.emoji;
 import app.unichat.ui.Labels;
 import app.unichat.ui.SearchFields;
 import app.unichat.ui.media.MediaTile;
+import app.unichat.ui.media.MediaLoading;
 import app.unichat.ui.media.MessageMedia;
 import app.unichat.gif.Gif;
 import app.unichat.gif.GifFiles;
@@ -161,14 +162,13 @@ public final class GifGrid extends VBox {
         ImageView probe = new ImageView();
         String preview = GifFiles.preview(i);
         // A provider's preview, through the media service too, so it's on disk from then on.
-        java.util.concurrent.CompletableFuture<java.nio.file.Path> loading;
-        if (preview != null && preview.startsWith("http")) {
-            loading = MessageMedia.loadMedia(svc, probe, MediaItems.message(new MediaLibrary.Item(MediaLibrary.Kind.STICKER, preview, "image/gif", i.width(), i.height(), null)),
-                    TILE_W * 2, TILE_H * 2);
-        } else loading = MessageMedia.loadMedia(svc, probe, MediaItems.message(i), TILE_W * 2, TILE_H * 2);
+        MediaLibrary.Item shown = preview != null && preview.startsWith("http")
+                ? new MediaLibrary.Item(MediaLibrary.Kind.STICKER, preview, "image/gif", i.width(), i.height(), null) : i;
         Node tile = tile(probe, what, accepted, () -> sendFromLibrary(i));
+        if (tile instanceof javafx.scene.layout.StackPane box) {
+            MediaLoading.track(box, progress -> MessageMedia.loadMedia(svc, probe, MediaItems.message(shown), TILE_W * 2, TILE_H * 2, progress));
+        }
         LibraryMenu.attach(tile, library, i, accepted ? () -> sendFromLibrary(i) : null, toast, svc);
-        if (tile instanceof javafx.scene.layout.StackPane box) MediaItems.markIfLost(loading, box);
         return tile;
     }
 

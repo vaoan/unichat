@@ -48,20 +48,35 @@ public final class ScriptedChatService extends MockChatService {
     public Gate holdDownloads() {
         CompletableFuture<Void> gate = new CompletableFuture<>();
         downloads = gate;
-        return new Gate(gate);
+        progress.clear();
+        return new Gate(gate, progress);
     }
 
-    /** Ends the downloads held by {@link #holdDownloads}. */
+    /** Who listens to the held downloads' progress. */
+    private final List<java.util.function.DoubleConsumer> progress = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Ends the downloads held by {@link #holdDownloads}, or says how far they got meanwhile. */
     public static final class Gate {
         private final CompletableFuture<Void> gate;
+        private final List<java.util.function.DoubleConsumer> listeners;
 
-        private Gate(CompletableFuture<Void> gate) {
+        private Gate(CompletableFuture<Void> gate, List<java.util.function.DoubleConsumer> listeners) {
             this.gate = gate;
+            this.listeners = listeners;
         }
 
         public void release() { gate.complete(null); }
 
         public void fail() { gate.completeExceptionally(new java.io.IOException("download failed (test)")); }
+
+        /** The held downloads have {@code fraction} of their file (0 to 1). */
+        public void report(double fraction) { listeners.forEach(l -> l.accept(fraction)); }
+    }
+
+    @Override
+    public CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer listener) {
+        if (!downloads.isDone()) progress.add(listener);
+        return media(url, width, height);
     }
 
     @Override
@@ -97,7 +112,7 @@ public final class ScriptedChatService extends MockChatService {
         CompletableFuture<Void> gate = new CompletableFuture<>();
         olderToLoad.put(chatId, count);
         history = gate;
-        return new Gate(gate);
+        return new Gate(gate, List.of());
     }
 
     /** Whether the window asked {@code chatId}'s history since {@link #olderToLoad}. */

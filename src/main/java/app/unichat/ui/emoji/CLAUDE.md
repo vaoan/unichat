@@ -13,3 +13,4 @@ Emoji, reactions and the media library's palettes: `EmojiPicker`, `EmojiGrid` (+
 ## Lessons
 - JavaFX 21 rendered emoji monochrome → JavaFX 23+, with emoji font families forced on emoji-only controls.
 - A set's name showed "otro_set" as "otroset": a Button parses `_` as its shortcut mark. Text that comes from a network (names, titles) goes in a control with `setMnemonicParsing(false)`.
+- Telegram's sticker sets "didn't load": its bridge turns each animated sticker (Lottie or WebM) into a GIF as it's asked, 2–3 s and 5–9 MB each, with no thumbnail; a set of 50 was hundreds of MB, and the media cache (1 GB, files over 1 MB first) threw them out again and again. Stickers got their own cache (`matrix/CLAUDE.md`), and every tile shows its real progress and a way to try again (`ui/media/MediaLoading`). Measure a bridge's answer (size, time, `Content-Length`) before guessing why media is slow.

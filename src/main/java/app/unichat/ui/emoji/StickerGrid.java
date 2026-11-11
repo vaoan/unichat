@@ -2,6 +2,7 @@ package app.unichat.ui.emoji;
 
 import app.unichat.ui.Labels;
 import app.unichat.ui.media.MediaTile;
+import app.unichat.ui.media.MediaLoading;
 import app.unichat.ui.media.MessageMedia;
 import app.unichat.model.Chat;
 import app.unichat.model.MediaLibrary;
@@ -110,12 +111,11 @@ public final class StickerGrid extends ScrollPane {
 
     private Node tile(MediaLibrary.Item item, String what, boolean accepted) {
         ImageView view = new ImageView();
-        var loading = MessageMedia.loadMedia(svc, view, MediaItems.message(item), TILE * 2, TILE * 2);
         Runnable send = () -> send(item, accepted);
         StackPane tile = MediaTile.of(view, TILE, TILE, "sticker-tile",
                 I18n.t(accepted ? "library.tileSend" : "library.stickerTileRefused", what), accepted, send);
+        MediaLoading.track(tile, progress -> MessageMedia.loadMedia(svc, view, MediaItems.message(item), TILE * 2, TILE * 2, progress));
         LibraryMenu.attach(tile, library, item, accepted ? send : null, toast, svc, this::showPack);
-        MediaItems.markIfLost(loading, tile);
         return tile;
     }
 

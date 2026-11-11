@@ -403,6 +403,17 @@
 }
 .hover-actions .icon-button { -fx-min-width: 28; -fx-min-height: 28; -fx-padding: 5; }
 
+/* A picture's download as it goes (MediaLoading): a ring, then a way to try again. */
+.media-loading { -fx-background-color: -surface; -fx-background-radius: 999; -fx-effect: dropshadow(gaussian, -shadow, 8, 0, 0, 1); }
+.media-loading-track { -fx-fill: transparent; -fx-stroke: -border; -fx-stroke-width: 3; }
+.media-loading-arc { -fx-fill: transparent; -fx-stroke: -accent; -fx-stroke-width: 3; -fx-stroke-line-cap: round; }
+.media-retry {
+    -fx-background-color: -surface;
+    -fx-background-radius: 999;
+    -fx-border-color: -border;
+    -fx-border-radius: 999;
+    -fx-effect: dropshadow(gaussian, -shadow, 8, 0, 0, 1);
+}
 .follow-indicator { -fx-translate-x: -20; -fx-translate-y: -12; }
 .jump-down {
     -fx-background-color: -surface;
