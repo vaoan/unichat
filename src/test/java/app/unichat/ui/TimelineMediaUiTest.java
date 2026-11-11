@@ -91,7 +91,7 @@ class TimelineMediaUiTest {
      * and their files then come in (or fail): the newest message never leaves the bottom edge.
      */
     private void arrivesAtTheNewest(String what, boolean fails, Runnable arrive) throws Exception {
-        w = TimelineWindow.open(20);
+        if (w == null) w = TimelineWindow.open(20);
         double gap = w.untilAtBottom();
         int before = FxWait.fx(this::picturesShown);
         ScriptedChatService.Gate downloads = w.svc.holdDownloads();
@@ -208,6 +208,26 @@ class TimelineMediaUiTest {
     void aDocument() throws Exception {
         Path doc = Files.writeString(Files.createTempFile(dir, "informe", ".txt"), "hola");
         arrivesWithoutPicture("a document arriving", file(MessageType.FILE, doc.toUri().toString(), "text/plain", "informe.txt", 4, null));
+    }
+
+    /**
+     * In a short list (Linux's taller fonts leave 416 px) a file arriving was never drawn: the list's estimate of its
+     * rows' heights said it already ended above it, and moving to it by that estimate went nowhere.
+     */
+    @Test
+    void aDocumentInAShortWindow() throws Exception {
+        w = TimelineWindow.open(20, "Mensaje largo %d\nsegunda línea\ntercera línea\ncuarta línea", svc -> { }, TimelineWindow.SHORT);
+        Path doc = Files.writeString(Files.createTempFile(dir, "informe", ".txt"), "hola");
+        arrivesWithoutPicture("a document arriving in a short window",
+                file(MessageType.FILE, doc.toUri().toString(), "text/plain", "informe.txt", 4, null));
+    }
+
+    @Test
+    void aPictureSentAsADocumentInAShortWindow() throws Exception {
+        w = TimelineWindow.open(20, "Mensaje largo %d\nsegunda línea\ntercera línea\ncuarta línea", svc -> { }, TimelineWindow.SHORT);
+        String url = still("png", 1200, 900);
+        // Its own name: previews are kept by name and size, and another test's would show at once.
+        arrives("a picture sent as a document in a short window", file(MessageType.FILE, url, "image/png", "plano-corto.png", 50_000, null));
     }
 
     @Test

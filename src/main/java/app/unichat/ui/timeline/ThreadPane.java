@@ -78,7 +78,6 @@ public final class ThreadPane extends BorderPane {
     private boolean reachedStart;
     private int drawnWith;
     /** Newest message shown, to notice your own new message (always jumps to it). */
-    private String lastMessageId;
 
     private final FolderDialogs folderDialogs;
 
@@ -104,8 +103,8 @@ public final class ThreadPane extends BorderPane {
         scroll = new TimelineScroll(list, rows, this, () -> chat != null, this::loadOlder);
         messageRows = new MessageRowView(svc, media, messageActions, openLink, () -> chat, this::member, scroll::jumpTo);
         redrawOnTranscriptProgress();
-        StackPane.setAlignment(scroll.jumpDown(), Pos.BOTTOM_RIGHT);
-        StackPane timeline = new StackPane(list, scroll.jumpDown());
+        StackPane.setAlignment(scroll.indicator(), Pos.BOTTOM_RIGHT);
+        StackPane timeline = new StackPane(list, scroll.indicator());
         composer.acceptDrops(timeline);
 
         typing.getStyleClass().add("typing-line");
@@ -214,7 +213,6 @@ public final class ThreadPane extends BorderPane {
         chat = c;
         reachedStart = false;
         loadingOlder = false;
-        lastMessageId = null;
         scroll.pin();
         setCenter(c == null ? emptyState : content);
         composer.setChat(c == null ? null : c.id());
@@ -262,14 +260,8 @@ public final class ThreadPane extends BorderPane {
         boolean wasAtBottom = forceBottom || scroll.pinned();
         Message selected = selectedMessage();
         List<Message> msgs = svc.messages(chat.id());
-        Message newest = msgs.isEmpty() ? null : msgs.get(msgs.size() - 1);
-        // Your own new message always brings you down to it, wherever you were reading.
-        boolean ownNew = newest != null && newest.outgoing() && lastMessageId != null && !newest.id().equals(lastMessageId);
-        if (ownNew) {
-            wasAtBottom = true;
-            selected = null;
-        }
-        lastMessageId = newest == null ? null : newest.id();
+        // Only being at the newest message follows it: sending one of yours while reading older ones leaves you there
+        // (the indicator counts it among the new ones below), as the person asked.
         composer.refreshVoice(); // what the chat takes can arrive after it was opened
         composer.hearAhead(); // a voice note that just arrived is ready when a draft answers it
         messageRows.index(msgs);

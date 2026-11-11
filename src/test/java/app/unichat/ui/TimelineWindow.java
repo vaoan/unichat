@@ -69,6 +69,15 @@ final class TimelineWindow {
 
     /** {@code before} changes the chat before the window opens (a message's HTML, say). */
     static TimelineWindow open(int messages, String format, java.util.function.Consumer<ScriptedChatService> before) throws Exception {
+        return open(messages, format, before, HEIGHT);
+    }
+
+    /** The window's usual height; {@link #SHORT} leaves a list as short as Linux's taller fonts do (416 px there). */
+    static final int HEIGHT = 560, SHORT = 480;
+
+    /** {@code height}: the window's. */
+    static TimelineWindow open(int messages, String format, java.util.function.Consumer<ScriptedChatService> before,
+                               int height) throws Exception {
         toolkit();
         ScriptedChatService svc = new ScriptedChatService();
         for (int i = 0; i < messages; i++) svc.sendText(CHAT, format.formatted(i), null).get();
@@ -77,7 +86,7 @@ final class TimelineWindow {
             Stage stage = new Stage();
             stage.setOpacity(0);
             MainView view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
-            Scene sc = new Scene(view, 1000, 560);
+            Scene sc = new Scene(view, 1000, height);
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();
@@ -107,6 +116,11 @@ final class TimelineWindow {
     TextArea input() { return (TextArea) scene.getRoot().lookup(".composer .text-area"); }
 
     boolean jumpDownShown() { return scene.getRoot().lookup(".jump-down").isVisible(); }
+
+    javafx.scene.control.Button jumpDown() { return (javafx.scene.control.Button) scene.getRoot().lookup(".jump-down"); }
+
+    /** The "Al día" sign: the list follows the newest message. */
+    boolean followingShown() { return scene.getRoot().lookup(".following-badge").isVisible(); }
 
     /** The newest message in the service is a row of the list. */
     boolean showsNewest() {
@@ -263,14 +277,16 @@ final class TimelineWindow {
     }
 
     /**
-     * Closes the window and lets its view go: a view left registered on the app's singletons stays in memory with
-     * everything it drew, and eighty of them ran the test run out of heap.
+     * Closes the window and lets its view go: disposed, and out of its scene. A closed window keeps its scene, and
+     * the message box's caret, focused when it closed, kept blinking (JavaFX's own timeline) with the whole view held:
+     * eighty of them ran the test run out of heap. In the app a window that closes loses the focus; here it doesn't.
      */
     void close() throws Exception {
         svc.stop();
         FxWait.fx(() -> {
             view.dispose();
             stage.close();
+            scene.setRoot(new javafx.scene.layout.Pane());
             return null;
         });
     }

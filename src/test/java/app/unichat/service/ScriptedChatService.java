@@ -89,15 +89,37 @@ public final class ScriptedChatService extends MockChatService {
         fireMessages(chatId);
     }
 
-    /** The next history load of {@code chatId} brings {@code count} older messages, of a few lines each. */
-    public void olderToLoad(String chatId, int count) {
+    /**
+     * The next history load of {@code chatId} brings {@code count} older messages, of a few lines each, once the
+     * returned gate lets it through: the test sees it asked for ({@link #historyAsked}), then decides when it comes.
+     */
+    public Gate olderToLoad(String chatId, int count) {
+        CompletableFuture<Void> gate = new CompletableFuture<>();
         olderToLoad.put(chatId, count);
+        history = gate;
+        return new Gate(gate);
     }
+
+    /** Whether the window asked {@code chatId}'s history since {@link #olderToLoad}. */
+    public boolean historyAsked(String chatId) {
+        return asked.contains(chatId);
+    }
+
+    private volatile CompletableFuture<Void> history = CompletableFuture.completedFuture(null);
+    private final java.util.Set<String> asked = ConcurrentHashMap.newKeySet();
 
     @Override
     public CompletableFuture<Boolean> loadOlder(String chatId) {
         Integer count = olderToLoad.remove(chatId);
         if (count == null) return CompletableFuture.completedFuture(false);
+        asked.add(chatId);
+        return history.thenApply(x -> {
+            prepend(chatId, count);
+            return true;
+        });
+    }
+
+    private void prepend(String chatId, int count) {
         List<Message> list = messages.get(chatId);
         Member from = someoneElse(chatId);
         synchronized (list) {
@@ -112,7 +134,6 @@ public final class ScriptedChatService extends MockChatService {
             list.addAll(0, older);
         }
         fireMessages(chatId);
-        return CompletableFuture.completedFuture(true);
     }
 
     private Member someoneElse(String chatId) {

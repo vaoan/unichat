@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.model.Message;
+import app.unichat.service.ScriptedChatService;
 import javafx.scene.input.KeyCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -9,7 +10,9 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.util.List;
 
 import static app.unichat.ui.TimelineWindow.CHAT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -121,11 +124,15 @@ class TimelineReadingUiTest {
     @Test
     void olderMessagesLoadAbove() throws Exception {
         w = TimelineWindow.open(30);
-        w.svc.olderToLoad(CHAT, 20);
-        for (int i = 0; i < 80 && FxWait.fx(() -> w.flow().getFirstVisibleCell().getIndex() > 0); i++) w.wheel(240);
-        // At the very top now: what's read is the first message, and the history coming above it mustn't move it.
+        ScriptedChatService.Gate history = w.svc.olderToLoad(CHAT, 20);
+        // Up to the very top, where the history is asked for (the first message in view isn't enough: on Linux it
+        // showed with the list not quite at its top). It arrives only when let through, with every frame watched.
+        for (int i = 0; i < 100 && !w.svc.historyAsked(CHAT); i++) w.wheel(240);
+        assertTrue(w.svc.historyAsked(CHAT), "precondition: at the top, the history is asked for");
+        FxWait.settled();
         String read = FxWait.fx(w::readMessage);
         TimelineWindow.Frames frames = w.watch(w.stays(read, FxWait.fx(() -> w.yOf(read))));
+        history.release();
         FxWait.until("the older messages arrived", () -> w.svc.messages(CHAT).getFirst().body().startsWith("Antiguo"));
         FxWait.until("and are listed", () -> w.list().getItems().size() > 40);
         frames.stop("twenty older messages loaded above the one read");
@@ -208,16 +215,37 @@ class TimelineReadingUiTest {
 
     // ---------------------------------------------------------------- back to the newest message
 
+    /**
+     * The person's rule: only being at the end of the chat follows it. Writing and sending while reading older messages
+     * leaves the list where it is; what was sent counts among the new ones below.
+     */
     @Test
-    void sendingGoesToWhatWasSent() throws Exception {
-        w = TimelineWindow.open(30);
-        w.scrollUp();
-        w.type("lo que acabo de escribir");
+    void writingAndSendingWhileReadingOlderOnesStaysThere() throws Exception {
+        TimelineWindow.Frames frames = readingOlder();
+        w.type("lo que acabo\nde escribir");
         w.key(KeyCode.ENTER, false);
-        FxWait.until("it's sent", () -> w.newest().body().startsWith("lo que") && w.showsNewest());
-        double gap = w.untilAtBottom();
-        assertFalse(FxWait.fx(w::jumpDownShown), "following the newest again");
-        followsFromHere(gap);
+        FxWait.until("it's sent and listed", () -> w.newest().body().startsWith("lo que") && w.showsNewest());
+        frames.stop("writing and sending while reading older ones");
+        assertTrue(FxWait.fx(w::jumpDownShown), "still reading older ones");
+        assertEquals("1 nuevo", FxWait.fx(() -> w.jumpDown().getText()), "what was sent is new below");
+    }
+
+    @Test
+    void theIndicatorSaysWhetherTheListFollows() throws Exception {
+        w = TimelineWindow.open(30);
+        assertTrue(FxWait.fx(w::followingShown), "at the newest: up to date");
+        assertEquals("Al día", FxWait.fx(() -> ((javafx.scene.control.Label) w.scene.getRoot().lookup(".following-badge")).getText()));
+        w.scrollUp();
+        assertFalse(FxWait.fx(w::followingShown), "reading older ones");
+        assertNull(FxWait.fx(() -> w.jumpDown().getText()), "nothing new yet");
+        w.svc.receive(CHAT, "uno");
+        w.svc.receive(CHAT, "dos");
+        w.svc.sendText(CHAT, "y el mío", null).get();
+        FxWait.until("three new below", () -> "3 nuevos".equals(w.jumpDown().getText()));
+        assertTrue(FxWait.fx(() -> w.jumpDown().getAccessibleText()).contains("3"), "a screen reader hears how many");
+        FxWait.fx(() -> { w.jumpDown().fire(); return null; });
+        w.untilAtBottom();
+        assertTrue(FxWait.fx(w::followingShown), "down at the newest: up to date again");
     }
 
     @Test

@@ -29,7 +29,9 @@ final class TimelineScroll {
     private final ObservableList<ThreadRows.Row> rows;
     private final BooleanSupplier chatOpen;
     private final Runnable atTop;
-    private final Button jumpDown;
+    private final FollowIndicator indicator;
+    /** The newest message when the person went up to older ones: what arrives after it is counted as new below. */
+    private String seenId;
     /**
      * True while the viewport follows new messages. Only the person going towards older messages (wheel or trackpad up,
      * the keys up, dragging the scrollbar) unpins it, at once; it pins again when the newest message is wholly in view,
@@ -51,9 +53,10 @@ final class TimelineScroll {
         this.rows = rows;
         this.chatOpen = chatOpen;
         this.atTop = atTop;
-        jumpDown = Icons.iconButton(Icons.LOW, I18n.t("timeline.jumpDown"), this::scrollToBottom);
-        jumpDown.getStyleClass().add("jump-down");
-        jumpDown.setVisible(false);
+        indicator = new FollowIndicator(this::scrollToBottom);
+        rows.addListener((javafx.collections.ListChangeListener<ThreadRows.Row>) c -> {
+            if (!pinnedBottom) indicator.show(false, newBelow());
+        });
         list.addEventFilter(ScrollEvent.SCROLL, e -> {
             moved = true;
             if (e.getDeltaY() > 0) unpin(); // towards older messages
@@ -73,7 +76,10 @@ final class TimelineScroll {
         });
     }
 
-    Button jumpDown() { return jumpDown; }
+    /** The indicator at the list's bottom right ({@link FollowIndicator}). */
+    Node indicator() { return indicator.node(); }
+
+    Button jumpDown() { return indicator.jumpDown(); }
 
     boolean pinned() { return pinnedBottom; }
 
@@ -81,11 +87,29 @@ final class TimelineScroll {
     void pin() {
         pinnedBottom = true;
         anchorId = null;
-        jumpDown.setVisible(false);
+        indicator.show(true, 0);
     }
 
     private void unpin() {
+        if (pinnedBottom) seenId = newestId();
         pinnedBottom = false;
+        indicator.show(false, newBelow());
+    }
+
+    private String newestId() {
+        for (int i = rows.size() - 1; i >= 0; i--) {
+            if (rows.get(i) instanceof ThreadRows.MessageRow mr) return mr.message().id();
+        }
+        return null;
+    }
+
+    /** Messages listed after the one that was newest when the person went up. */
+    private int newBelow() {
+        int seen = seenId == null ? -1 : indexOf(seenId);
+        if (seen < 0) return 0;
+        int n = 0;
+        for (int i = seen + 1; i < rows.size(); i++) if (rows.get(i) instanceof ThreadRows.MessageRow) n++;
+        return n;
     }
 
     /** After every layout, before the frame is drawn. */
@@ -99,7 +123,6 @@ final class TimelineScroll {
         } else {
             if (moved || anchorId == null) holdWhatsInView(flow);
             else keepAnchor(flow);
-            jumpDown.setVisible(true);
         }
         moved = false;
     }
@@ -112,11 +135,14 @@ final class TimelineScroll {
 
     /** The newest message's end on the bottom edge, also when it's taller than the window. */
     private void keepBottom(VirtualFlow<?> flow) {
-        for (int i = 0; i < ROUNDS; i++) {
+        for (int i = 0; i < 2 * ROUNDS; i++) {
             Double gap = newestGap(flow);
             if (gap != null && gap <= 1) return; // in view (space under it only when the chat is shorter than the window)
-            if (gap == null) list.scrollTo(rows.size() - 1);
-            else flow.scrollPixels(gap); // its end, not its top, when taller than the window
+            if (gap != null) flow.scrollPixels(gap); // its end, not its top, when taller than the window
+            else if (i == 0) list.scrollTo(rows.size() - 1); // near it, by the list's estimate of the rows' heights
+            // Still not drawn: the estimate thought the list already ended there (a file row, a short window: the
+            // newest stayed below for good on Linux). Moving by pixels measures the real rows on the way.
+            else flow.scrollPixels(flow.getHeight());
             list.layout();
         }
     }
@@ -143,7 +169,7 @@ final class TimelineScroll {
 
     /** The message read back on the pixel it was on, whatever grew or shrank around it. */
     private void keepAnchor(VirtualFlow<?> flow) {
-        for (int round = 0; round < ROUNDS; round++) {
+        for (int round = 0; round < 2 * ROUNDS; round++) {
             IndexedCell<?> cell = cellOf(flow, anchorId);
             if (cell == null) {
                 int i = indexOf(anchorId);
@@ -151,8 +177,9 @@ final class TimelineScroll {
                     holdWhatsInView(flow);
                     return;
                 }
-                flow.scrollToTop(i); // out of view (much grew above it): its top at the top, then down to its place
-                flow.scrollPixels(-anchorY);
+                // Out of view (history loaded above it): its top at the top first, laid out, and the next round
+                // moves it down to its place. Moving by pixels before that layout undid the jump (it stayed out of view).
+                flow.scrollToTop(i);
             } else {
                 double off = top(cell, flow) - anchorY;
                 if (Math.abs(off) < 0.5) return;
@@ -227,10 +254,9 @@ final class TimelineScroll {
         int i = indexOf(target.id());
         if (i < 0) return;
         // Stop following the bottom, or the next layout brings the list straight back down; where it lands is held.
-        pinnedBottom = false;
+        unpin();
         moved = true;
         list.getSelectionModel().select(i);
         list.scrollTo(Math.max(0, i - 2));
-        jumpDown.setVisible(true);
     }
 }
