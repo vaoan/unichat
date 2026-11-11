@@ -17,6 +17,7 @@ Off by default, only the person runs them: `-Dunichat.networkTests=true` (real d
 - They run with no display or windows: JavaFX's own headless platform (`-Dglass.platform=Headless`, since JavaFX 25; Monocle was never published past JavaFX 21). All of them run there. It proves logic, not focus, tray or Dock.
 - Its virtual screen is a fixed 1000×1000 and a window drawn outside it (moved off-screen, or taller than the rest) throws on every frame, on the UI thread, into whatever test comes next: keep test windows on it, hidden with opacity 0, and close them when done.
 - CI runs them on Linux (`build.yml`, ui-headless): a test mustn't assume the Mac. The shortcut key is Ctrl there (press Ctrl and ⌘ together), the fonts are taller (leave room before a size cap), and there's no sound card (PulseAudio's null sink).
+- How the message list scrolls is checked frame by frame: `ui/TimelineWindow` (the window with `service/ScriptedChatService`, a demo where the test plays the others: messages arriving, typing, history to load) and its `watch(probe)`, which fails with every frame drawn wrong. Add a case there for any scroll complaint.
 - `KeyboardUiTest` checks F6 zones, timeline keys, zoom and screen-reader texts; `FilterUiTest` that the rail keeps the chosen chip when switching network.
 
 ## Lessons

@@ -295,7 +295,6 @@ public final class ThreadPane extends BorderPane {
         String id = chat.id();
         // Loaded because the chat is short (not because you scrolled to the top): keep showing the newest.
         boolean followBottom = scroll.pinned();
-        Message firstBefore = scroll.firstMessage();
         svc.loadOlder(id).whenComplete((more, err) -> Platform.runLater(() -> {
             loadingOlder = false;
             if (chat == null || !chat.id().equals(id)) return;
@@ -303,7 +302,7 @@ public final class ThreadPane extends BorderPane {
             List<Message> all = svc.messages(id);
             messageRows.index(all);
             rows.setAll(ThreadRows.build(all, ZoneId.systemDefault()));
-            scroll.afterOlder(followBottom, firstBefore);
+            scroll.afterOlder(followBottom);
         }));
     }
 

@@ -3,6 +3,7 @@ package app.unichat.service;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Chat;
+import app.unichat.model.Contact;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
@@ -28,6 +29,17 @@ final class DemoChats {
      * Gives a demo chat its key and applies what the file has chosen. Only fields the file has override the demo's own
      * values ({@link PreferencesFile#preview} falls back to them), so an empty file changes nothing.
      */
+    /** The phone's contacts the demo's WhatsApp offers. */
+    static List<Contact> contacts() {
+        return List.of(
+                new Contact("c-mama", I18n.t("demo.title.mom"), List.of("tel:+573001110001"), null, "!mama:demo"),
+                new Contact("c-ana", "Ana Restrepo", List.of("tel:+573001110002"), null, null),
+                new Contact("c-anamaria", "Ana María", List.of("tel:+573001110003"), null, null),
+                new Contact("c-carlos", "Carlos Peña", List.of("tel:+573001110004"), null, null),
+                new Contact("c-dentista", I18n.t("demo.contact.dentist"), List.of("tel:+573001110005"), null, null),
+                new Contact("c-pedro", "Pedro", List.of("tel:+573001110006"), null, null));
+    }
+
     static void adopt(PreferencesFile prefs, Chat c) {
         c.setPrefKey(ChatKeys.of(null, null, c.id()));
         var demo = new PreferencesFile.ServerValues(c.archived(), c.muted(), c.favorite(), c.lowPriority(), c.pinned(),

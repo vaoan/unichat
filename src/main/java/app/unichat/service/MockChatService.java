@@ -39,7 +39,7 @@ import java.util.function.Consumer;
  * Offline demo backend: a believable multi-network inbox that lives in memory. Incoming messages,
  * typing and read receipts are simulated so every UI state can be exercised without a server.
  */
-public final class MockChatService implements ChatService, FolderForwarding {
+public class MockChatService implements ChatService, FolderForwarding {
     private final Map<String, app.unichat.model.LinkMedia> demoLinks = new java.util.concurrent.ConcurrentHashMap<>();
     static final String ME = "@yo:demo.unichat";
     static final String WA_PERSONAL = "whatsapp:personal";
@@ -51,8 +51,8 @@ public final class MockChatService implements ChatService, FolderForwarding {
     private static final int AUTO_REPLY_COUNT = 10;
 
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
-    final Map<String, Chat> chats = new ConcurrentHashMap<>();
-    final Map<String, List<Message>> messages = new ConcurrentHashMap<>();
+    protected final Map<String, Chat> chats = new ConcurrentHashMap<>();
+    protected final Map<String, List<Message>> messages = new ConcurrentHashMap<>();
     /** Account id -> account, in connection order. */
     final Map<String, Account> accounts = new LinkedHashMap<>();
     private final Random random = new Random(7);
@@ -209,20 +209,9 @@ public final class MockChatService implements ChatService, FolderForwarding {
         return CompletableFuture.completedFuture("!servidor:demo".equals(spaceId) ? Map.of(UNJOINED_CHANNEL_ID, I18n.t("demo.title.announcements")) : Map.of());
     }
 
-    private static List<Contact> demoContacts() {
-        return List.of(
-                new Contact("c-mama", I18n.t("demo.title.mom"), List.of("tel:+573001110001"), null, "!mama:demo"),
-                new Contact("c-ana", "Ana Restrepo", List.of("tel:+573001110002"), null, null),
-                new Contact("c-anamaria", "Ana María", List.of("tel:+573001110003"), null, null),
-                new Contact("c-carlos", "Carlos Peña", List.of("tel:+573001110004"), null, null),
-                new Contact("c-dentista", I18n.t("demo.contact.dentist"), List.of("tel:+573001110005"), null, null),
-                new Contact("c-pedro", "Pedro", List.of("tel:+573001110006"), null, null));
-    }
-
     /** Open unless a test holds the bridge ({@link #holdBridge}): what the bridge does then waits for it. */
     private volatile CompletableFuture<Void> bridgeGate = CompletableFuture.completedFuture(null);
 
-    /** Demo/tests: the contacts API answers after {@code ms} and new DMs arrive that much later, like a real bridge. */
     /**
      * A slow bridge, for tests: its answers, the rooms it joins and the chats it creates wait until the returned
      * Runnable lets them through, so a test decides what happens first instead of racing two times.
@@ -256,7 +245,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
 
     @Override
     public CompletableFuture<List<Contact>> contacts(Account account) {
-        return CompletableFuture.completedFuture(account.network() == Network.WHATSAPP ? demoContacts() : List.of());
+        return CompletableFuture.completedFuture(account.network() == Network.WHATSAPP ? DemoChats.contacts() : List.of());
     }
 
     @Override
@@ -264,7 +253,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
         if (account.network() != Network.WHATSAPP && account.network() != Network.TELEGRAM
                 && account.network() != Network.INSTAGRAM && account.network() != Network.MESSENGER) return CompletableFuture.failedFuture(new UnsupportedOperationException("search"));
         String q = query.toLowerCase(java.util.Locale.ROOT);
-        return CompletableFuture.completedFuture(demoContacts().stream()
+        return CompletableFuture.completedFuture(DemoChats.contacts().stream()
                 .filter(c -> c.name().toLowerCase(java.util.Locale.ROOT).contains(q)).toList());
     }
 
@@ -318,10 +307,15 @@ public final class MockChatService implements ChatService, FolderForwarding {
         Chat chat = chats.get(chatId);
         if (chat != null) {
             if (chat.bridgeBot()) answerBridgeBot(chat, text.trim());
-            else if (random.nextInt(3) == 0) replyLater(chat, 3 + random.nextInt(4));
+            else if (autoReplies && random.nextInt(3) == 0) replyLater(chat, 3 + random.nextInt(4));
         }
         return sent;
     }
+
+    /** Whether someone answers now and then what's sent (the demo's life); tests turn it off and play the others. */
+    private volatile boolean autoReplies = true;
+
+    public void noAutoReplies() { autoReplies = false; }
 
     @Override
     public CompletableFuture<List<app.unichat.model.StickerPack.Ref>> stickerPacks() { return DemoStickers.packs(); }
@@ -716,7 +710,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
         }, seconds, TimeUnit.SECONDS);
     }
 
-    private void setTyping(Chat chat, Member who, boolean typing) {
+    protected void setTyping(Chat chat, Member who, boolean typing) {
         java.util.Set<String> names = new java.util.LinkedHashSet<>(chat.typing());
         if (typing) names.add(who.displayName()); else names.remove(who.displayName());
         chat.setTyping(names);
@@ -743,7 +737,7 @@ public final class MockChatService implements ChatService, FolderForwarding {
         }
     }
 
-    private void incoming(Chat chat, Member from, String text, boolean countUnread) {
+    protected void incoming(Chat chat, Member from, String text, boolean countUnread) {
         Message m = new Message(UUID.randomUUID().toString(), chat.id(), from.id(), from.displayName(), false, Instant.now());
         m.setBody(text);
         append(chat, m);
@@ -788,5 +782,5 @@ public final class MockChatService implements ChatService, FolderForwarding {
         fireChats();
         return true;
     }
-    private void fireMessages(String chatId) { listeners.forEach(l -> l.messagesChanged(chatId)); }
+    protected void fireMessages(String chatId) { listeners.forEach(l -> l.messagesChanged(chatId)); }
 }
