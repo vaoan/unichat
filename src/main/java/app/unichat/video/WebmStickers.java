@@ -14,7 +14,8 @@ import java.util.function.DoubleConsumer;
 
 /**
  * Stickers that came as WebM (Telegram's), which JavaFX can't play, as an animated WebP or GIF, which Unichat can. The
- * result stays beside the original in the media cache, so its limit covers it and it's converted once.
+ * result stays beside the original in the media cache, so its limit covers it and it's converted once. And the other
+ * way: an animated GIF sticker as the WebM Telegram takes ({@link #fromGif}).
  */
 public final class WebmStickers {
     /** Conversions and the first install, one at a time: never on the FX thread. */
@@ -25,6 +26,8 @@ public final class WebmStickers {
     private static final String MAX_SIDE = "512";
     private static final String WEBP = "webp";
     private static final List<String> FORMATS = List.of(WEBP, "gif");
+    /** Telegram's video stickers: VP9 with transparency, 512 px on the long side, at most 3 s and 30 fps, no sound. */
+    private static final String TELEGRAM_SIDE = "512", TELEGRAM_SECONDS = "3", TELEGRAM_FPS = "30";
 
     private WebmStickers() {}
 
@@ -62,6 +65,24 @@ public final class WebmStickers {
             }
         }
         throw new IOException(I18n.t("video.stickerFailed"));
+    }
+
+    /** {@code gif} as a Telegram video sticker at {@code out}. Blocking; {@link NoConverter} without ffmpeg. */
+    public static Path fromGif(Path gif, Path out, DoubleConsumer installProgress) throws IOException, InterruptedException {
+        Path ffmpeg = Ffmpeg.whenNeeded(installProgress);
+        if (ffmpeg == null) throw new NoConverter();
+        if (PartFile.firstOf(out, TIMEOUT_SECONDS, List.of(into -> fromGifCommand(ffmpeg, gif, into))) == null) {
+            throw new IOException(I18n.t("video.stickerFailed"));
+        }
+        return out;
+    }
+
+    static List<String> fromGifCommand(Path ffmpeg, Path gif, Path out) {
+        return List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
+                // The file comes from other people: only itself may be read, as what it claims to be.
+                "-protocol_whitelist", "file", "-f", "gif", "-i", gif.toString(), "-t", TELEGRAM_SECONDS, "-an",
+                "-vf", "scale=" + TELEGRAM_SIDE + ":" + TELEGRAM_SIDE + ":force_original_aspect_ratio=decrease,fps=" + TELEGRAM_FPS,
+                "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "40", "-f", "webm", out.toString());
     }
 
     static List<String> command(Path ffmpeg, Path webm, Path out, String format, boolean libvpx) {

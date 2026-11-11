@@ -75,4 +75,32 @@ class WebmStickersTest {
         assertEquals("webp", c.get(c.size() - 2));
         assertTrue(WebmStickers.command(Path.of("ffmpeg"), Path.of("a.webm"), Path.of("b"), "gif", false).stream().noneMatch(a -> a.contains("libvpx")));
     }
+
+    @Test
+    void anAnimatedGifBecomesATelegramVideoSticker() throws Exception {
+        Path ffmpeg = Ffmpeg.find();
+        assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path gif = dir.resolve("in.gif");
+        Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=160x120:d=5:r=10",
+                gif.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        assumeTrue(p.waitFor() == 0, "this ffmpeg can't make a GIF");
+        Path out = dir.resolve("out.webm");
+        assertEquals(out, WebmStickers.fromGif(gif, out, f -> { }));
+        byte[] bytes = Files.readAllBytes(out);
+        assertTrue(bytes[0] == 0x1A && bytes[1] == 0x45 && (bytes[2] & 0xFF) == 0xDF && (bytes[3] & 0xFF) == 0xA3, "a WebM (EBML)");
+        assertTrue(new String(bytes, StandardCharsets.ISO_8859_1).contains("webm"));
+        assertTrue(bytes.length < 256 * 1024, "within Telegram's limit: " + bytes.length);
+    }
+
+    @Test
+    void theTelegramCommandReadsOnlyTheGifAndFollowsTelegramsRules() {
+        List<String> c = WebmStickers.fromGifCommand(Path.of("ffmpeg"), Path.of("a.gif"), Path.of("b.webm"));
+        assertEquals("file", c.get(c.indexOf("-protocol_whitelist") + 1));
+        assertEquals("gif", c.get(c.indexOf("-f") + 1), "a forced format: nothing probed");
+        assertEquals("3", c.get(c.indexOf("-t") + 1));
+        assertTrue(c.contains("-an"));
+        assertEquals("yuva420p", c.get(c.indexOf("-pix_fmt") + 1), "transparent, as a sticker");
+        assertTrue(c.get(c.indexOf("-vf") + 1).contains("scale=512:512"));
+        assertEquals("webm", c.get(c.size() - 2));
+    }
 }

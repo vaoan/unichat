@@ -155,24 +155,28 @@ final class MessageSender {
             });
         }
         fireLocal(chatId);
-        String target = StickerConverter.target(info.path("mimetype").asText(null), features);
-        if (target == null && !copy) return sendEvent(chatId, "m.sticker", txn, content);
+        String mimeType = info.path("mimetype").asText(null);
+        Chat chat = core.chat(chatId);
+        boolean own = chat != null && ownSticker(info, chat.network());
+        boolean telegram = chat != null && !own && StickerConverter.forTelegram(chat.network(), mimeType);
+        String target = StickerConverter.target(mimeType, features);
+        if (target == null && !copy && !telegram) return sendEvent(chatId, "m.sticker", txn, content);
         return media.media(item.url(), 0, 0).thenApplyAsync(src -> {
             try {
-                if (target == null) {
+                Path dir = Settings.get().cacheDir().resolve("stickers");
+                StickerConverter.Result r = telegram ? StickerConverter.toTelegram(src, mimeType, dir)
+                        : target != null ? StickerConverter.convert(src, target, dir) : null;
+                if (r == null) {
                     String mime = info.path("mimetype").asText("application/octet-stream");
                     content.put("url", client.upload(src, mime, "sticker." + mime.replaceAll(".*/", "")));
                     info.remove(java.util.List.of("thumbnail_url", "thumbnail_info")); // on the same bridge as the sticker
                 } else {
-                    StickerConverter.Result r = StickerConverter.convert(src, target, Settings.get().cacheDir().resolve("stickers"));
-                    String ext = r.mime().equals(StickerConverter.WEBP) ? ".webp" : ".png";
-                    content.put("url", client.upload(r.file(), r.mime(), "sticker" + ext));
+                    content.put("url", client.upload(r.file(), r.mime(), "sticker" + StickerConverter.extension(r.mime())));
                     info.put("mimetype", r.mime());
                     info.put("size", Files.size(r.file()));
                     Files.deleteIfExists(r.file());
                 }
-                Chat chat = core.chat(chatId);
-                if (chat == null || !ownSticker(info, chat.network())) info.remove("fi.mau.bridged_sticker"); // no longer that network's own sticker
+                if (!own) info.remove("fi.mau.bridged_sticker"); // no longer that network's own sticker
                 return content;
             } catch (IOException e) {
                 throw new CompletionException(e);

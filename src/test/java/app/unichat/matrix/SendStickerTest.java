@@ -170,6 +170,44 @@ class SendStickerTest {
         assertEquals("$q", sent.path("m.relates_to").path("m.in_reply_to").path("event_id").asText());
     }
 
+    private MatrixChatService telegramChat() throws Exception {
+        MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
+        svc.processor().process(MatrixClient.JSON.readTree("""
+                {"rooms":{"join":{"!c:example.org":{"state":{"events":[
+                  {"type":"m.bridge","state_key":"x","sender":"@telegrambot:example.org","event_id":"$b","origin_server_ts":1,
+                   "content":{"protocol":{"id":"telegram"},"com.beeper.room_type":"dm"}}]}}}}}"""), false);
+        return svc;
+    }
+
+    /** Telegram's own capabilities: WebP "fully supported", yet its bridge passes a WebP through an ffmpeg that may lack WebP. */
+    private static final String TELEGRAM_FEATURES =
+            "{\"id\":\"tg\",\"file\":{\"m.sticker\":{\"mime_types\":{\"image/webp\":2,\"video/webm\":2,\"image/png\":1,\"image/jpeg\":1}}}}";
+
+    @Test
+    void aStickerFromAnotherNetworkGoesToTelegramAsAPngItsBridgeEncodesWithoutFfmpeg() throws Exception {
+        MatrixChatService svc = telegramChat();
+        app.unichat.model.RoomFeatures tg = app.unichat.model.RoomFeatures.parse(MatrixClient.JSON.readTree(TELEGRAM_FEATURES));
+        JsonNode info = MatrixClient.JSON.readTree("""
+                {"mimetype":"image/webp","w":190,"h":190,"fi.mau.bridged_sticker":{"network":"whatsapp","id":"9"}}""");
+        svc.sender().sendStickerFor("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/wa", "image/webp", 190, 190, info), tg, null)
+                .get();
+        assertEquals("image/png", uploadedType);
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("mxc://s/converted", sent.path("url").asText());
+        assertEquals("image/png", sent.path("info").path("mimetype").asText());
+        assertTrue(sent.path("info").path("fi.mau.bridged_sticker").isMissingNode());
+    }
+
+    @Test
+    void aStillGifFromDiscordGoesToTelegramAsAPng() throws Exception {
+        MatrixChatService svc = telegramChat();
+        app.unichat.model.RoomFeatures tg = app.unichat.model.RoomFeatures.parse(MatrixClient.JSON.readTree(TELEGRAM_FEATURES));
+        svc.sender().sendStickerFor("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER,
+                "mxc://s/discord", "image/gif", 160, 160, null), tg, null).get();
+        assertEquals("image/png", uploadedType, "one frame: nothing to animate");
+        assertEquals("image/png", MatrixClient.JSON.readTree(body).path("info").path("mimetype").asText());
+    }
+
     @Test
     void aStickerFromAnotherBridgeGoesAsACopyOnOurServer() throws Exception {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");

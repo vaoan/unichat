@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Assumptions;
@@ -12,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,6 +26,17 @@ class StickerConverterTest {
     private static RoomFeatures features(String stickerMimes) throws Exception {
         return RoomFeatures.parse(new ObjectMapper().readTree(
                 "{\"id\":\"x\",\"file\":{\"m.sticker\":{\"mime_types\":" + stickerMimes + "}}}"));
+    }
+
+    @Test
+    void telegramsBridgeTakesAsTheyArePngJpegWebmAndLottieOnly() {
+        for (String m : new String[] {"image/gif", "image/webp", "image/apng", "application/octet-stream"}) {
+            assertTrue(StickerConverter.forTelegram(Network.TELEGRAM, m), m);
+        }
+        for (String m : new String[] {"image/png", "image/jpeg", "video/webm", "video/lottie+json"}) {
+            assertFalse(StickerConverter.forTelegram(Network.TELEGRAM, m), m);
+        }
+        assertFalse(StickerConverter.forTelegram(Network.WHATSAPP, "image/gif"), "only Telegram's bridge");
     }
 
     @Test

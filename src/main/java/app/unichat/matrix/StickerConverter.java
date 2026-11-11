@@ -1,10 +1,12 @@
 package app.unichat.matrix;
 
 import app.unichat.gif.GifFrames;
+import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
 import app.unichat.support.BundledTools;
 import app.unichat.support.I18n;
 import app.unichat.support.Processes;
+import app.unichat.video.WebmStickers;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -19,7 +21,13 @@ import java.util.List;
  * inside the app; without it the first frame goes out as a still PNG.
  */
 public final class StickerConverter {
-    static final String WEBP = "image/webp", PNG = "image/png";
+    static final String WEBP = "image/webp", PNG = "image/png", WEBM = "video/webm";
+    /**
+     * What Telegram's bridge sends on as a sticker without its ffmpeg: PNG and JPEG it encodes to WebP itself, WebM and
+     * Lottie go as they are. Anything else, WebP included, goes through ffmpeg, which fails without a WebP encoder
+     * (Homebrew's has none), whatever the chat's room_features say.
+     */
+    private static final List<String> TELEGRAM_AS_IS = List.of(PNG, "image/jpeg", WEBM, "video/lottie+json");
 
     record Result(Path file, String mime) {}
 
@@ -65,6 +73,42 @@ public final class StickerConverter {
         if (f.acceptsMime(RoomFeatures.STICKER, WEBP)) return WEBP;
         if (f.acceptsMime(RoomFeatures.STICKER, PNG)) return PNG;
         return null;
+    }
+
+    /** Whether a {@code mime} sticker, not from Telegram's own packs, has to be converted before Telegram's bridge gets it. */
+    static boolean forTelegram(Network network, String mime) {
+        return network == Network.TELEGRAM && !TELEGRAM_AS_IS.contains(mime);
+    }
+
+    /**
+     * {@code in} as Telegram's bridge takes it: an animated GIF as a video sticker (WebM), the rest, or a GIF when
+     * there's no ffmpeg to convert with, as a still PNG.
+     */
+    static Result toTelegram(Path in, String mime, Path dir) throws IOException {
+        if ("image/gif".equals(mime) && GifFrames.count(in) > 1) {
+            Files.createDirectories(dir);
+            Path out = Files.createTempFile(dir, "sticker", ".webm");
+            try {
+                return new Result(WebmStickers.fromGif(in, out, p -> { }), WEBM);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                Files.deleteIfExists(out);
+                throw new IOException(I18n.t("sticker.interrupted"), e);
+            } catch (IOException e) {
+                Files.deleteIfExists(out);
+                System.err.println("Sticker to WebM failed (" + e.getClass().getSimpleName() + "); sending a still sticker");
+            }
+        }
+        return convert(in, PNG, dir, null);
+    }
+
+    /** The file name's extension for a converted sticker. */
+    static String extension(String mime) {
+        return switch (mime) {
+            case WEBP -> ".webp";
+            case WEBM -> ".webm";
+            default -> ".png";
+        };
     }
 
     /**
