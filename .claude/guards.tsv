@@ -5,4 +5,4 @@ ui-tests-on-screen	unichat\.uiTests=true	headless-ui|glass\.platform=Headless	de
 real-display-tests	unichat\.(realInputTests|perfTests)=true		deny	Tests on the real display, mouse or keyboard are only for the person to run.
 app-window	run-dev\.sh	unichat\.snapshot=	deny	run-dev.sh without -Dunichat.snapshot opens the real window on the person's screen: use the snapshot skill.
 open-installed-app	\bopen\b[^|;&]*Unichat\.app		ask	Opens Unichat on the person's screen.
-real-data-dir	Library/Application\\? Support/Unichat|AppData[/\\]+(Roaming|Local)[/\\]+Unichat		ask	The person's real data folder (chats, session, secrets).
+real-data-write	^(?=.*(\b(rm|rmdir|mv|cp|tee|truncate|chmod|chown|dd|ln|touch|mkdir|unzip|tar|sqlite3)\b|\bsed\s+(-\w*\s+)*-i|(?<![0-9&>])>(?!\s*/dev/null|&|>))).*(Library/Application\\? Support/Unichat|AppData[/\\]+(Roaming|Local)[/\\]+Unichat)		ask	Changes in the person's real data folder (chats, session, secrets); reading it needs no asking.
