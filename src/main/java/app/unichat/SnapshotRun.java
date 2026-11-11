@@ -48,6 +48,8 @@ final class SnapshotRun {
         if (Boolean.getBoolean("unichat.info")) mainView.toggleInfo();
         String panelTab = System.getProperty("unichat.panel");
         if (panelTab != null) mainView.showPanel(SidePanel.Tab.valueOf(panelTab));
+        String stickerSet = System.getProperty("unichat.stickerSet");
+        if (stickerSet != null) mainView.showStickerSet(stickerSet);
         String net = System.getProperty("unichat.network");
         if (net != null) mainView.showNetwork(Network.fromProtocolId(net));
         String space = System.getProperty("unichat.openSpace");

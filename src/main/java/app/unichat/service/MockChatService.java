@@ -324,6 +324,12 @@ public final class MockChatService implements ChatService, FolderForwarding {
     }
 
     @Override
+    public CompletableFuture<List<app.unichat.model.StickerPack.Ref>> stickerPacks() { return DemoStickers.packs(); }
+
+    @Override
+    public CompletableFuture<app.unichat.model.StickerPack> stickerPack(String url) { return DemoStickers.pack(url); }
+
+    @Override
     public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) {
         return sendLocal(chatId, replyToId, m -> {
             m.setType(MessageType.STICKER);

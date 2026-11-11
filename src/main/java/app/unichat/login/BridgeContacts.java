@@ -24,17 +24,11 @@ public final class BridgeContacts {
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
-    private final String base;
-    private final String accessToken;
-    private final String userId;
-    private final String loginId;
+    private final LoginApi api;
 
     /** @param base e.g. {@code http://127.0.0.1:29318/_matrix/provision} */
     public BridgeContacts(String base, String accessToken, String userId, String loginId) {
-        this.base = base;
-        this.accessToken = accessToken;
-        this.userId = userId;
-        this.loginId = loginId;
+        this.api = new LoginApi(base, accessToken, userId, loginId);
     }
 
     public Optional<List<Contact>> list() throws IOException, InterruptedException {
@@ -86,9 +80,6 @@ public final class BridgeContacts {
 
     /** The response, or null when the bridge doesn't have this endpoint. */
     private JsonNode call(String method, String path, JsonNode body) throws IOException, InterruptedException {
-        String q = "?user_id=" + enc(userId) + (loginId == null ? "" : "&login_id=" + enc(loginId));
-        Provisioning.Answer a = Provisioning.call(HTTP, method, base + path + q, accessToken, body, TIMEOUT);
-        if (a.status() == 404 && "M_UNRECOGNIZED".equals(a.json().path("errcode").asText())) return null;
-        return a.orThrow();
+        return api.call(HTTP, method, path, "", body, TIMEOUT);
     }
 }

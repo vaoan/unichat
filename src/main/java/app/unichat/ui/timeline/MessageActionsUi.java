@@ -46,8 +46,12 @@ final class MessageActionsUi {
     private final Supplier<Scene> scene;
     private final Function<String, Member> member;
     private final Consumer<Message> jumpTo;
+    private Consumer<String> onShowStickerSet = url -> { };
     /** Links offered in a message's menu: the keyboard has no other way to them. */
     private static final int MENU_LINKS = 5;
+
+    /** Where "see this sticker's set" opens it (the side panel's Stickers tab). */
+    void setOnShowStickerSet(Consumer<String> c) { this.onShowStickerSet = c; }
 
     MessageActionsUi(ChatService svc, Consumer<String> toast, Composer composer, MessageMedia media, Supplier<Chat> chat,
                      MediaLibrary library, Supplier<Scene> scene, Function<String, Member> member, Consumer<Message> jumpTo) {
@@ -218,6 +222,8 @@ final class MessageActionsUi {
                 boolean now = library.toggleFavorite(MediaItems.of(m));
                 toast.accept(I18n.t(now ? "message.favoriteAdded" : "message.favoriteRemoved"));
             }));
+            String set = m.type() == app.unichat.model.MessageType.STICKER ? app.unichat.model.StickerPack.urlOf(m.mediaInfo()) : null;
+            if (set != null) menu.getItems().add(ChatMenus.item(I18n.t("sticker.showSet"), () -> onShowStickerSet.accept(set)));
         }
         if (a.contains(MessageActions.Action.EDIT)) menu.getItems().add(ChatMenus.item(I18n.t("message.edit"), () -> composer.edit(m)));
         java.util.List<String> reactions = quick();

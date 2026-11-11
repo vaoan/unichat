@@ -23,11 +23,19 @@ final class LibraryMenu {
     /** {@code svc}: where the sticker or GIF comes from, for "see it big". */
     static void attach(Node tile, MediaLibrary library, MediaLibrary.Item item, Runnable use, Consumer<String> toast,
                        app.unichat.service.MediaSource svc) {
+        attach(tile, library, item, use, toast, svc, null);
+    }
+
+    /** {@code showSet}: opens a sticker's set (Telegram's), when it has one; null where there's nowhere to show it. */
+    static void attach(Node tile, MediaLibrary library, MediaLibrary.Item item, Runnable use, Consumer<String> toast,
+                       app.unichat.service.MediaSource svc, Consumer<String> showSet) {
         tile.setOnContextMenuRequested(e -> {
             ContextMenu menu = menu(library, item, use, toast);
             if (item.kind() != MediaLibrary.Kind.EMOJI && item.url() != null) {
                 menu.getItems().add(use == null ? 0 : 1, ChatMenus.item(I18n.t("library.enlarge"), () -> enlarge(tile, svc, item, toast)));
             }
+            String set = showSet == null ? null : app.unichat.model.StickerPack.urlOf(item.info());
+            if (set != null) menu.getItems().add(use == null ? 1 : 2, ChatMenus.item(I18n.t("sticker.showSet"), () -> showSet.accept(set)));
             // Owned by the window, not the tile: a menu takes its owner's styles, and an emoji's (1.45 em, the emoji
             // font) made it huge, with the emoji font's wide spaces between words.
             menu.show(tile.getScene().getRoot(), e.getScreenX(), e.getScreenY());

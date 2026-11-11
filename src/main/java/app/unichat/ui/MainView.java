@@ -92,6 +92,7 @@ public final class MainView extends StackPane {
     private long pendingOpenUntil;
     private boolean infoVisible;
     private SidePanel panel;
+    private StickerGrid stickers;
     /** Favourite and recent stickers/GIFs, shared by every chat. */
     private final MediaLibrary library =
             new MediaLibrary(Settings.dataDir().resolve("media-library.json"));
@@ -155,10 +156,11 @@ public final class MainView extends StackPane {
             listPane.showSpace(id);
             listPane.setSelected(thread.chat() == null ? null : thread.chat().id());
         });
-        StickerGrid stickers = new StickerGrid(svc, library, thread::chat, thread::takeReply, this::toast);
+        stickers = new StickerGrid(svc, library, thread::chat, thread::takeReply, this::toast);
         MediaItems.keepCached(svc, library);
         library.addListener(() -> MediaItems.keepCached(svc, library));
         panel.setContent(SidePanel.Tab.STICKERS, stickers, stickers::refresh);
+        thread.setOnShowStickerSet(this::showStickerSet);
         GifGrid gifs = new GifGrid(svc, library, thread::chat, thread::takeReply, this::toast);
         panel.setContent(SidePanel.Tab.GIFS, gifs, gifs::refresh);
         EmojiGrid.Tab emojis = EmojiGrid.panel(library, text -> thread.composer().insert(text), this::toast);
@@ -488,6 +490,12 @@ public final class MainView extends StackPane {
     public void togglePanel(SidePanel.Tab t) {
         if (infoVisible && panel.current() == t) setInfo(false);
         else showPanel(t);
+    }
+
+    /** The side panel's Stickers tab with {@code url}'s set open (a sticker's menu, the snapshot's {@code unichat.stickerSet}). */
+    public void showStickerSet(String url) {
+        showPanel(SidePanel.Tab.STICKERS);
+        stickers.showPack(url);
     }
 
     public void showPanel(SidePanel.Tab t) {

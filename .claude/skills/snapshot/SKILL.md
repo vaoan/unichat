@@ -10,7 +10,7 @@ description: Look at a Unichat screen after a visual change, headless (writes a 
 2. Run: `JAVA_OPTS="-Dunichat.snapshot=$TMPDIR/out.png -Dunichat.dataDir=$TMPDIR/unichat-demo <options>" ./run-dev.sh`, then Read the PNG.
 
 Options:
-- `-Dunichat.openChat=<id>` (demo ids like `!familia:demo`), `-Dunichat.openSpace=<id>` (a server's channels, e.g. `!servidor:demo`), `-Dunichat.info=true`, `-Dunichat.panel=EMOJIS|STICKERS|GIFS`.
+- `-Dunichat.openChat=<id>` (demo ids like `!familia:demo`), `-Dunichat.openSpace=<id>` (a server's channels, e.g. `!servidor:demo`), `-Dunichat.info=true`, `-Dunichat.panel=EMOJIS|STICKERS|GIFS`, `-Dunichat.stickerSet=<link>` (that sticker set open in Stickers; the demo's is `https://t.me/addstickers/unichat_demo`).
 - `-Dunichat.overlay=command|newchat|add|folderNew|folderDelete|settings:<Página>` (a page id works too: `settings:ai`; `-Dunichat.settingsFull=true` captures the whole page, top to bottom), `-Dunichat.network=<protocolo>` (settings snapshots the settings window).
 - `-Dunichat.openFolders=true` (folder list), `-Dunichat.openFolder=<name>` (inside one).
 - `-Dunichat.snapshotScale=2` to check icon alignment; `-Dunichat.demoAccounts=WHATSAPP:NEEDS_LOGIN,...` for account alerts; `-Dunichat.upload=<file>,<file>` (+ `-Dunichat.uploadAs=PHOTO|DOCUMENT`) sends a batch to the open chat.

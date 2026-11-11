@@ -841,6 +841,9 @@
 .side-panel .info-pane { -fx-border-width: 0; }
 .sticker-grid { -fx-padding: 10; }
 .sticker-tile { -fx-background-radius: 10; -fx-padding: 2; }
+/* A set's header in the Stickers tab: its name, opened or closed, the whole width. */
+.sticker-set { -fx-text-fill: -text-2; -fx-font-weight: bold; -fx-padding: 0.35em 0.5em; -fx-graphic-text-gap: 0.4em; -fx-alignment: center-left; -fx-max-width: infinity; }
+.sticker-set .icon { -fx-background-color: -text-3; }
 .sticker-tile:hover, .sticker-tile:focused { -fx-background-color: -hover; }
 .root.contrast .sticker-tile:focused { -fx-border-color: -text; -fx-border-radius: 10; }
 .gif-grid { -fx-padding: 10; }

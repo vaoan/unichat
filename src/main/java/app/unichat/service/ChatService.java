@@ -15,7 +15,7 @@ import app.unichat.model.Message;
  * <p>Model objects returned here are live: the service mutates them and then notifies listeners.
  */
 public interface ChatService extends ChatSession, ChatReader, MediaSource, ChatMessaging, ChatPreferences, NetworkAccounts,
-        ContactDirectory, GroupDirectory, ChatFolders {
+        ContactDirectory, GroupDirectory, ChatFolders, StickerSets {
 
     interface Listener {
         /** Chat list membership, order or any chat field changed. */

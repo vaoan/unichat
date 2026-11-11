@@ -35,6 +35,7 @@ public final class StickerGrid extends ScrollPane {
     private final Consumer<String> toast;
     private final VBox content = new VBox(10);
     private final TileCache tiles = new TileCache();
+    private final StickerSetSection sets;
 
     public StickerGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Supplier<String> takeReply, Consumer<String> toast) {
         this.takeReply = takeReply;
@@ -42,6 +43,7 @@ public final class StickerGrid extends ScrollPane {
         this.library = library;
         this.chat = chat;
         this.toast = toast;
+        this.sets = new StickerSetSection(svc, this::refresh);
         setUp(this, content, library, this::refresh);
     }
 
@@ -65,9 +67,25 @@ public final class StickerGrid extends ScrollPane {
         if (!accepted) content.getChildren().add(Labels.help(I18n.t("sticker.networkRefuses")));
         section(I18n.t("library.favorites"), library.favorites(MediaLibrary.Kind.STICKER), I18n.t("library.stickerFavorite"), accepted);
         section(I18n.t("library.recents"), library.recents(MediaLibrary.Kind.STICKER), I18n.t("library.stickerRecent"), accepted);
-        if (library.favorites(MediaLibrary.Kind.STICKER).isEmpty() && library.recents(MediaLibrary.Kind.STICKER).isEmpty()) {
+        List<Node> setNodes = sets.nodes((item, what) -> tiles.get(what + accepted + item.url(), () -> tile(item, what, accepted)),
+                this::bringIntoView);
+        if (library.favorites(MediaLibrary.Kind.STICKER).isEmpty() && library.recents(MediaLibrary.Kind.STICKER).isEmpty()
+                && setNodes.isEmpty()) {
             content.getChildren().add(Labels.help(I18n.t("sticker.none")));
         }
+        content.getChildren().addAll(setNodes);
+    }
+
+    /** Opens {@code url}'s sticker set in this tab (from one of its stickers' menu). */
+    public void showPack(String url) {
+        sets.show(url);
+    }
+
+    private void bringIntoView(Node n) {
+        applyCss();
+        layout();
+        double max = content.getHeight() - getViewportBounds().getHeight();
+        if (max > 0) setVvalue(Math.min(1, n.getBoundsInParent().getMinY() / max));
     }
 
     private void section(String title, List<MediaLibrary.Item> items, String what, boolean accepted) {
@@ -96,7 +114,7 @@ public final class StickerGrid extends ScrollPane {
         Runnable send = () -> send(item, accepted);
         StackPane tile = MediaTile.of(view, TILE, TILE, "sticker-tile",
                 I18n.t(accepted ? "library.tileSend" : "library.stickerTileRefused", what), accepted, send);
-        LibraryMenu.attach(tile, library, item, accepted ? send : null, toast, svc);
+        LibraryMenu.attach(tile, library, item, accepted ? send : null, toast, svc, this::showPack);
         MediaItems.markIfLost(loading, tile);
         return tile;
     }

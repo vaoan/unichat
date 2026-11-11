@@ -227,6 +227,8 @@ public final class ThreadPane extends BorderPane {
 
     /** Called with a server's id when its name in the header is clicked. */
     public void setOnShowServer(Consumer<String> r) { this.onShowServer = r; }
+    /** Opens a sticker's set (its link) from the sticker's menu. */
+    public void setOnShowStickerSet(Consumer<String> c) { messageActions.setOnShowStickerSet(c); }
 
 
     public void refreshHeader() {
