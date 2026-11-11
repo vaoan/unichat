@@ -578,7 +578,8 @@
 .audio-bar { -fx-padding: 4 12; -fx-background-color: -surface-2; -fx-border-color: transparent transparent -border transparent; }
 .upload-thumb { -fx-background-color: -selected; -fx-background-radius: 6; }
 .upload-where { -fx-padding: 0; -fx-font-size: 0.8em; }
-.upload-percent { -fx-text-fill: -text; -fx-font-weight: bold; -fx-font-size: 0.9em; }
+/* Room after the number: the Mac draws bold "%" a little wider than JavaFX measures it, and the label cut its end. */
+.upload-percent { -fx-text-fill: -text; -fx-font-weight: bold; -fx-font-size: 0.9em; -fx-padding: 0 0.2em 0 0; }
 .audio-who { -fx-font-weight: bold; -fx-font-size: 0.9em; -fx-text-fill: -text; -fx-padding: 0; }
 .audio-time { -fx-font-size: 0.8em; -fx-text-fill: -text-2; }
 .bubble.out .audio-time { -fx-text-fill: white; }

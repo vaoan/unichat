@@ -67,6 +67,10 @@ class CloakBarUiTest {
                 String full = FxWait.fx(l::getText);
                 assertEquals(full.replace("\n", ""), FxWait.fx(drawn::getText).replace("\n", ""), "cut at " + px + "px");
             }
+            // "55 %" lost the end of its "%" on a Mac at 160 %: it draws bold glyphs a little wider than JavaFX measures
+            // them (headless measures and draws alike, so the cut doesn't show here). The number keeps room after it.
+            javafx.scene.control.Label percent = FxWait.fx(() -> (javafx.scene.control.Label) bar.lookup(".upload-percent"));
+            assertTrue(FxWait.fx(() -> percent.snappedRightInset() >= 0.15 * percent.getFont().getSize()), "room after the number at " + px + "px");
             FxWait.fx(() -> { bar.getScene().getWindow().hide(); return null; });
         }
         job.cancel();

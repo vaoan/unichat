@@ -19,3 +19,4 @@ paths:
 - `-fx-background-radius: 999` on a thin Slider track made it report ~2000 px bounds and draw across the whole settings row. Use small fixed radii on thin shapes.
 - A self-referencing looked-up color (`-accent: derive(-accent, …)`) is a loop; compute derived colors in code (`Theme.accessibleAccent`).
 - A Region with an SVG shape stretches it to fill the box, so non-square glyphs (⋯, chevrons) were distorted. `Icons` appends two invisible specks at (0,0) and (24,24) *after* the path (prepending broke paths starting with a relative `m`).
+- A bold number in a label sized to its text ("55 %" in the protecting bar, 160 % text) lost the end of its "%": the Mac draws bold glyphs a little wider than JavaFX measures them, and the label clipped what didn't fit. Give such a label room after its text (`.upload-percent`'s right padding, `CloakBarUiTest.nothingIsCutAtAnyTextSize`); headless measures and draws alike, so a snapshot can't show it.
