@@ -73,10 +73,15 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   de canales. Al abrir una notificación de un canal, la lista muestra su servidor con el canal marcado.
 - **Favoritos**: clic derecho (o la tecla de menú) sobre un emoji, sticker o GIF, en el chat o en el panel lateral,
   para agregarlo o quitarlo de favoritos o de recientes. La pestaña **Favoritos** del panel los junta todos.
+- **Stickers entre redes**: los sets de stickers de Telegram en el panel lateral (los tuyos y cualquiera que abras desde
+  el menú de un sticker). Un sticker llega a cualquier red en un formato que acepte: un GIF animado llega a Telegram como
+  sticker animado (un WebP animado, como los de WhatsApp, llega quieto).
 - **Escribir con IA**: en Ajustes → Escribir con IA puedes activar dos botones que usan Claude Code o Codex, si tienes
   alguno instalado. Uno escribe un borrador siguiendo tus instrucciones y con el chat como contexto; al pulsarlo, ese chat
   va al servicio de ese programa. El otro corrige la ortografía, las tildes y la redacción de lo que escribiste, cambiando
   lo mínimo; solo envía ese texto. El resultado queda en el cuadro de texto para que lo revises: nunca se envía solo.
+  Con «Aprender cómo escribo», los borradores siguen tu estilo y aprenden de lo que les cambias; Ajustes muestra lo
+  aprendido y te deja deshacerlo.
 - **Notas de voz a texto**: "Transcribir" bajo cada audio (o la tecla T). Usa Whisper, que viene con Unichat y
   corre en tu computador, gratis y sin enviar el audio a ningún servicio; el modelo (60 o 190 MB) se descarga
   la primera vez. En Ajustes → Voz a texto puedes elegir modelo e idioma, o poner tu propio comando
@@ -84,11 +89,28 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
 - **Medios bajo demanda**: fotos, videos y archivos se descargan solo cuando los abres; lo descargado ocupa como
   máximo lo que elijas en Ajustes → Privacidad (1 GB por defecto).
 - Estados de entrega (enviando → enviado → entregado → leído) e indicador de "escribiendo…".
+- **Un scroll que no se mueve solo**: el chat sigue los mensajes nuevos solo mientras estás al final («● Al día» abajo a
+  la derecha). Si subes, nada lo mueve, ni escribir ni enviar; el botón ↓ dice cuántos llegaron mientras tanto.
+- Los mensajes de **WhatsApp Business** muestran sus botones (pagar un pedido, abrir un enlace) como chips. Se pulsan en
+  WhatsApp en tu teléfono: el puente no puede pasar una pulsación.
 - Compositor: Enter envía (configurable), adjuntar o arrastrar archivos, selector de emojis,
   ↑ edita tu último mensaje, borradores por chat. El clip ofrece archivo, **fotos o videos** (se envían como foto aunque sean
   WebP o de 24 MP: Unichat las pasa a JPEG de 2560 px, como hacen las apps oficiales; si no, Telegram las manda como
   archivo), documento (el original, sin comprimir), **muchos archivos** o **muchas fotos** (como foto): van uno por uno, en orden, con una barra arriba (como la del audio) que dice
   cuál va, a qué chat, cuánto falta y muestra la foto; se puede cancelar lo que falta.
+  **Formato** (*negrita*, _cursiva_, ~tachado~, `código`, citas) como lo muestra cada red, también desde el menú del
+  clic derecho en el cuadro o con ⌘B ⌘U ⌘⇧X; pega una imagen copiada o archivos para enviarlos.
+- **Fotos protegidas contra la IA** (clip → «Foto protegida contra IA…»): el método de Mist, en tu computador, cambia la
+  foto casi sin que se note para que una IA que la use para entrenar o editarla vea un patrón en su lugar. Tres niveles
+  (unos 3, 8 o 25 minutos); se envía como PNG de su propio tamaño, hasta 4096 px. La primera vez descarga lo que
+  necesita (~330 MB en Mac, ~500 MB en Windows). Macs con chip de Apple y Windows de 64 bits. Ninguna protección de
+  este tipo es segura: una recompresión fuerte puede deshacer parte.
+- **Guardar lo que envíen**: en las opciones de un chat (el engranaje de su perfil), fotos, videos, audios, documentos,
+  GIFs y los videos de los enlaces se guardan en cuanto llegan, aunque el chat esté cerrado, en una carpeta por chat;
+  también se puede guardar su pasado. «Guardar enlace» en el menú de un mensaje guarda uno cuando quieras. Los enlaces
+  pasan por yt-dlp (y gallery-dl si lo tienes).
+- **Tu propia nube**: Ajustes → Nube guarda tus ajustes, las opciones de los chats, lo que aprendió la IA y los archivos
+  guardados en tu pCloud, Dropbox o WebDAV (Icedrive, Nextcloud…), iguales en cada computador.
 - Acciones por chat: marcar leído/no leído, favorito, fijar, silenciar, prioridad baja, archivar,
   **recordatorios** (1 h, 3 h, mañana, el lunes), salir.
 - Panel de información: participantes, multimedia compartida, descripción.
@@ -175,16 +197,18 @@ UNICHAT_IT_HOMESERVER=http://localhost:8008 ./mvnw test -Dtest=MatrixLiveIT
 Ajustes y sesión en `%APPDATA%\Unichat` (Windows), `~/Library/Application Support/Unichat` (macOS) o
 `~/.config/unichat` (Linux). El token de acceso se guarda en texto plano en `session.properties`, que no se copia entre equipos. Para
 llevarte tus datos a otro equipo copia `settings.properties`, `preferences.json` (archivados, silenciados, favoritos y
-carpetas) y `media-library.json`. Ahí mismo:
-`cache/media` (fotos y videos vistos, con límite), `models/` (modelo de voz) y `transcripts/` (transcripciones).
+carpetas), `media-library.json` con `media-library/` (tus stickers y GIFs favoritos) y `writing-style.md` (lo que la IA
+aprendió de cómo escribes); con Ajustes → Nube esto pasa solo. Ahí mismo:
+`cache/media` (fotos y videos vistos, con límite), `models/` (modelo de voz), `transcripts/` (transcripciones),
+`tools/` (ffmpeg, yt-dlp, lo que necesita proteger fotos) y `logs/`.
 Si vuelves a una versión anterior de Unichat te pedirá iniciar sesión otra vez, porque la sesión pasó a
 `session.properties`; no se pierde nada.
 
 ## Limitaciones conocidas
 
 - Sin cifrado de extremo a extremo de Matrix: configura los bridges sin cifrado (el `setup` ya lo hace).
-- El estado de cada cuenta conectada es aproximado (se deduce de los mensajes del bot del bridge).
-- Cada arranque hace una sincronización inicial completa.
+- Lo que un puente no puede pasar se queda en el teléfono, como los botones de WhatsApp Business: Unichat los muestra y
+  se pulsan en la app de la red.
 
 ## Code signing policy
 

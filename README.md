@@ -73,10 +73,15 @@ memory, with simulated incoming messages, "typing…" and read receipts.
   of channels. When you open a notification from a channel, the list shows its server with the channel marked.
 - **Favorites**: right-click (or the menu key) on an emoji, sticker or GIF, in the chat or in the side panel,
   to add it to or remove it from favorites or recents. The panel's **Favorites** tab gathers them all.
+- **Stickers between networks**: Telegram's sticker sets in the side panel (yours, and any opened from a sticker's
+  menu). A sticker goes to any network in a format it takes: an animated GIF reaches Telegram as an animated sticker (an
+  animated WebP, WhatsApp's, arrives still).
 - **Write with AI**: in Settings → Write with AI you can turn on two buttons that use Claude Code or Codex, if you have
   either installed. One writes a draft following your instructions, with the chat as context; when you click it, that chat
   goes to that program's service. The other corrects the spelling, accents and wording of what you wrote, changing
   as little as possible; it only sends that text. The result stays in the text box for you to review: it's never sent by itself.
+  With "Learn how I write", drafts follow your style and learn from what you change in them; Settings shows what was
+  learned and lets you undo it.
 - **Voice notes to text**: "Transcribe" under each audio (or the T key). It uses Whisper, which comes with Unichat and
   runs on your computer, free and without sending the audio to any service; the model (60 or 190 MB) is downloaded
   the first time. In Settings → Voice to text you can choose the model and language, or set your own command
@@ -84,11 +89,27 @@ memory, with simulated incoming messages, "typing…" and read receipts.
 - **Media on demand**: photos, videos and files are downloaded only when you open them; what's downloaded takes up at
   most what you choose in Settings → Privacy (1 GB by default).
 - Delivery states (sending → sent → delivered → read) and a "typing…" indicator.
+- **Scrolling that stays put**: the chat follows new messages only while you're at its end ("● Up to date" at the bottom
+  right). Scrolled up, nothing moves it, not even writing or sending; the ↓ button says how many arrived meanwhile.
+- **WhatsApp Business** messages show their buttons (pay an order, open a link) as chips. They're pressed in WhatsApp
+  on your phone: the bridge can't pass a press on.
 - Composer: Enter sends (configurable), attach or drag files, emoji picker,
   ↑ edits your last message, drafts per chat. The clip offers file, **photos or videos** (sent as a photo even if they're
   WebP or 24 MP: Unichat turns them into a 2560 px JPEG, as the official apps do; otherwise Telegram sends them as a
   file), document (the original, uncompressed), **many files** or **many photos** (as photos): they go one by one, in order, with a bar on top (like the audio one) that says
   which one is going, to which chat, how much is left, and shows the photo; what's left can be cancelled.
+  **Formatting** (*bold*, _italic_, ~strike~, `code`, quotes) as each network shows it, also from the box's right-click
+  menu or ⌘B ⌘U ⌘⇧X; paste a copied picture or files to send them.
+- **Photos protected from AI** (clip → "Photo protected from AI…"): Mist's method, run on your computer, changes the
+  photo almost invisibly so an AI that trains on it or edits it sees a pattern instead. Three levels (about 3, 8 or 25
+  minutes); it's sent as a PNG at its own size, up to 4096 px. The first time it downloads what it needs (~330 MB on a
+  Mac, ~500 MB on Windows). Macs with Apple chips and 64-bit Windows. No protection of this kind is certain: a strong
+  re-compression can undo part of it.
+- **Save what they send**: in a chat's options (the gear in its profile), photos, videos, audio, documents, GIFs and the
+  videos behind links are saved as they arrive, even with the chat closed, in a folder per chat; its past can be saved
+  too. "Save link" in a message's menu saves one on demand. Links go through yt-dlp (and gallery-dl if you have it).
+- **Your own cloud**: Settings → Cloud keeps your settings, chat options, what the AI learned and the saved files in
+  your pCloud, Dropbox or WebDAV storage (Icedrive, Nextcloud…), the same on every computer.
 - Chat actions: mark read/unread, favorite, pin, mute, low priority, archive,
   **reminders** (1 h, 3 h, tomorrow, Monday), leave.
 - Info panel: participants, shared media, description.
@@ -175,16 +196,18 @@ UNICHAT_IT_HOMESERVER=http://localhost:8008 ./mvnw test -Dtest=MatrixLiveIT
 Settings and session in `%APPDATA%\Unichat` (Windows), `~/Library/Application Support/Unichat` (macOS) or
 `~/.config/unichat` (Linux). The access token is stored in plain text in `session.properties`, which isn't copied between computers. To
 take your data to another computer copy `settings.properties`, `preferences.json` (archived, muted, favorites and
-folders) and `media-library.json`. In the same place:
-`cache/media` (photos and videos you've seen, with a limit), `models/` (voice model) and `transcripts/` (transcriptions).
+folders), `media-library.json` with `media-library/` (your favourite stickers and GIFs) and `writing-style.md` (what the AI
+learned of how you write); with Settings → Cloud this happens by itself. In the same place:
+`cache/media` (photos and videos you've seen, with a limit), `models/` (voice model), `transcripts/` (transcriptions),
+`tools/` (ffmpeg, yt-dlp, what protecting photos needs) and `logs/`.
 If you go back to an older version of Unichat it will ask you to sign in again, because the session moved to
 `session.properties`; nothing is lost.
 
 ## Known limitations
 
 - No Matrix end-to-end encryption: set up the bridges without encryption (`setup` already does).
-- The status of each connected account is approximate (it's deduced from the bridge bot's messages).
-- Each start does a full initial sync.
+- What a bridge can't pass on stays on the phone, like WhatsApp Business buttons: Unichat shows them, the network's app
+  presses them.
 
 ## Code signing policy
 
