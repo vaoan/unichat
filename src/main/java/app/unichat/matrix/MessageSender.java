@@ -106,7 +106,7 @@ final class MessageSender {
     /** Sends {@code item}; when the chat refuses its format (a GIF on WhatsApp) a converted copy is uploaded first. */
     CompletableFuture<Void> sendStickerFor(String chatId, MediaLibrary.Item item, RoomFeatures features, String replyToId) {
         Chat c = core.chat(chatId);
-        return sendStickerEvent(chatId, item, features, c != null && needsCopy(item.url(), c.network()), replyToId);
+        return sendStickerEvent(chatId, item, features, c != null && needsCopy(item.url()), replyToId);
     }
 
     /**
@@ -122,14 +122,15 @@ final class MessageSender {
     }
 
     /**
-     * Direct media is only readable from the bridge it came from: another bridge asks the server, which answers "Remote media
-     * not found" (no federation), and the sticker is lost. So what goes to another network goes as a copy on our server.
+     * A bridge's direct media (mxc://media-<bridge>.localhost/…) is served by that bridge alone, and our server can't reach
+     * it (no federation): a bridge that asks the server for it gets "Remote media not found" and the sticker is lost.
+     * Telegram's reads its own, Discord's (the older mautrix-discord) doesn't, and any other network's never can, so it
+     * always goes as a copy on our server, whatever the chat: no guessing which bridge reads what. A network's own sticker
+     * is still known by its {@code fi.mau.bridged_sticker} mark, not by its address.
      */
-    static boolean needsCopy(String url, Network network) {
+    static boolean needsCopy(String url) {
         Mxc mxc = Mxc.parse(url);
-        if (mxc == null || BridgePorts.directMediaBase(mxc.server()) == null) return false;
-        String bot = network.botLocalpart();
-        return bot == null || !mxc.server().equals(BridgePorts.mediaServerName(bot.replaceAll("bot$", "")));
+        return mxc != null && BridgePorts.directMediaBase(mxc.server()) != null;
     }
 
     /** {@code copy}: uploads the file to our server first, whatever the chat accepts ({@link #needsCopy}). */

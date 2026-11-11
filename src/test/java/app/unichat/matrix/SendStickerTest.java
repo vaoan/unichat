@@ -136,17 +136,13 @@ class SendStickerTest {
     }
 
     @Test
-    void aBridgeOnlyReadsItsOwnDirectMedia() {
-        String telegram = "mxc://media-telegram.localhost/abc";
-        assertFalse(MessageSender.needsCopy(telegram, Network.TELEGRAM), "its own sticker: the bridge resends it natively");
-        assertTrue(MessageSender.needsCopy(telegram, Network.DISCORD), "the error: Remote media not found");
-        assertTrue(MessageSender.needsCopy(telegram, Network.MATRIX), "a native room can't reach any bridge");
-        assertTrue(MessageSender.needsCopy("mxc://media-facebook.localhost/abc", Network.WHATSAPP));
-        assertFalse(MessageSender.needsCopy("mxc://media-facebook.localhost/abc", Network.MESSENGER), "bridge names differ from networks");
-        assertFalse(MessageSender.needsCopy("mxc://media-twitter.localhost/abc", Network.X));
-        assertFalse(MessageSender.needsCopy("mxc://media-discord.localhost/abc", Network.DISCORD));
-        assertFalse(MessageSender.needsCopy("mxc://localhost/abc", Network.DISCORD), "on our server: every bridge reads it");
-        assertFalse(MessageSender.needsCopy("https://example.org/a.webp", Network.DISCORD));
+    void aBridgesDirectMediaAlwaysGoesAsACopy() {
+        for (String bridge : new String[] {"telegram", "discord", "whatsapp", "facebook", "twitter"}) {
+            assertTrue(MessageSender.needsCopy("mxc://media-" + bridge + ".localhost/abc"), bridge
+                    + ": served by its bridge alone (Discord's asks our server even for its own: Remote media not found)");
+        }
+        assertFalse(MessageSender.needsCopy("mxc://localhost/abc"), "on our server: every bridge reads it");
+        assertFalse(MessageSender.needsCopy("https://example.org/a.webp"));
     }
 
     @Test
