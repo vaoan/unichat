@@ -22,6 +22,12 @@ public final class MediaLibrary {
     /** {@code info}: the original event's info (keeps e.g. fi.mau.bridged_sticker so bridges resend the native sticker). */
     public record Item(Kind kind, String url, String mime, int width, int height, JsonNode info) {}
 
+    /**
+     * In the info of a sticker sent as a converted copy (a GIF for Discord, a copy on our server): the item it was made
+     * from. Seen back in the chat, the copy is that sticker ({@link #original}), not a new recent.
+     */
+    public static final String ORIGINAL = "app.unichat.original";
+
     static final int MAX_RECENTS = 60;
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -195,6 +201,21 @@ public final class MediaLibrary {
         }
     }
 
+    /** {@code i} as the library stores it, to name it in a converted copy's info ({@link #ORIGINAL}). */
+    public static ObjectNode json(Item i) {
+        ObjectNode n = node(i);
+        if (n.get("info") instanceof ObjectNode info) info.remove(ORIGINAL); // the first one, never a chain of copies
+        return n;
+    }
+
+    /** The item {@code sent} was converted from, when its info names one with a media address; else {@code sent}. */
+    public static Item original(Item sent) {
+        JsonNode o = sent.info() == null ? null : sent.info().get(ORIGINAL);
+        if (o == null || !o.isObject() || !known(o) || Mxc.parse(o.path("url").asText()) == null) return sent;
+        Item i = item(o);
+        return i.kind() == sent.kind() ? i : sent;
+    }
+
     private static Item item(JsonNode n) {
         return new Item(Kind.valueOf(n.path("kind").asText()), n.path("url").asText(), n.path("mime").asText(null),
                 n.path("width").asInt(), n.path("height").asInt(), n.has("info") ? n.get("info") : null);
@@ -203,7 +224,7 @@ public final class MediaLibrary {
     private static ObjectNode node(Item i) {
         ObjectNode n = JSON.createObjectNode().put("kind", i.kind().name()).put("url", i.url()).put("mime", i.mime())
                 .put("width", i.width()).put("height", i.height());
-        if (i.info() != null) n.set("info", i.info());
+        if (i.info() != null) n.set("info", i.info().deepCopy());
         return n;
     }
 }

@@ -110,6 +110,8 @@ class SendStickerTest {
         assertEquals(mime, uploadedType);
         assertTrue(sent.path("info").path("fi.mau.bridged_sticker").isMissingNode(), "it's no longer that network's sticker");
         assertTrue(sent.path("info").path("size").asLong() != 999, "size describes the new file");
+        assertEquals("mxc://s/gif", sent.path("info").path(MediaLibrary.ORIGINAL).path("url").asText(),
+                "the copy names what it was made from: seen back in the chat, it's that sticker, not a new recent");
     }
 
     private JsonNode sendAs(StickerMode mode) throws Exception {

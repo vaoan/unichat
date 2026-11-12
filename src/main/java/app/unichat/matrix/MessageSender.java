@@ -178,6 +178,7 @@ final class MessageSender {
                 }
                 info.remove(java.util.List.of("thumbnail_url", "thumbnail_info")); // on the same bridge as the sticker
                 if (!own) info.remove("fi.mau.bridged_sticker"); // no longer that network's own sticker
+                info.set(MediaLibrary.ORIGINAL, MediaLibrary.json(item)); // seen back, it's still this sticker
                 return content;
             } catch (IOException e) {
                 throw new CompletionException(e);

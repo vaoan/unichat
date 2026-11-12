@@ -10,9 +10,11 @@ import java.time.Instant;
 public final class MediaItems {
     private MediaItems() {}
 
+    /** One's own sticker sent as a converted copy is the sticker it was made from; what others write there isn't trusted. */
     public static MediaLibrary.Item of(Message m) {
         MediaLibrary.Kind kind = m.type() == MessageType.STICKER ? MediaLibrary.Kind.STICKER : MediaLibrary.Kind.GIF;
-        return new MediaLibrary.Item(kind, m.mediaUrl(), m.mimeType(), m.width(), m.height(), m.mediaInfo());
+        MediaLibrary.Item item = new MediaLibrary.Item(kind, m.mediaUrl(), m.mimeType(), m.width(), m.height(), m.mediaInfo());
+        return m.outgoing() ? MediaLibrary.original(item) : item;
     }
 
     /** A stand-in message so a library item loads like any chat media (thumbnail, then the animation). */

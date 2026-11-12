@@ -114,6 +114,32 @@ class MediaLibraryTest {
         assertEquals(List.of("mxc://t/3", "mxc://t/2"), r.stream().map(MediaLibrary.Item::url).toList(), "the newest address stays");
     }
 
+    /**
+     * A sticker converted to send (a GIF for Discord, a copy on our server) has another address, format and size, and no
+     * bridge mark: seen back in the chat it was a new recent, and the panel pushed the copy instead of the original.
+     */
+    @Test
+    void aConvertedCopyNamesItsOriginalAndIsThatSticker() {
+        MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
+        MediaLibrary.Item original = telegram("mxc://t/1", "doc-1", 100);
+        lib.addRecent(original);
+        com.fasterxml.jackson.databind.node.ObjectNode info = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode()
+                .put("mimetype", "image/gif").put("size", 7777);
+        info.set(MediaLibrary.ORIGINAL, MediaLibrary.json(original));
+        MediaLibrary.Item copy = new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://ours/gif", "image/gif", 100, 100, info);
+        assertEquals(original, MediaLibrary.original(copy));
+        lib.rememberSeen(MediaLibrary.original(copy));
+        assertEquals(List.of("mxc://t/1"), lib.recents(MediaLibrary.Kind.STICKER).stream().map(MediaLibrary.Item::url).toList());
+    }
+
+    @Test
+    void anOriginalThatIsNoMediaAddressIsIgnored() {
+        com.fasterxml.jackson.databind.node.ObjectNode info = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+        info.set(MediaLibrary.ORIGINAL, MediaLibrary.json(sticker("file:///etc/passwd")));
+        MediaLibrary.Item copy = new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://ours/gif", "image/gif", 100, 100, info);
+        assertEquals(copy, MediaLibrary.original(copy));
+    }
+
     @Test
     void seeingACopyDoesNotMoveOrRepeatIt() {
         MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
