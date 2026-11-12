@@ -52,12 +52,10 @@ final class MessageActionsUi {
     private static final int MENU_LINKS = 5;
 
     private Consumer<Message> onForward = m -> { };
-    private Consumer<Message> onSelect = m -> { };
 
-    /** "Reenviar…": asks where {@code m} goes; "Seleccionar varios": picking starts with it. */
-    void setOnForward(Consumer<Message> forward, Consumer<Message> select) {
+    /** "Reenviar…": picking messages to forward starts with {@code m}. */
+    void setOnForward(Consumer<Message> forward) {
         this.onForward = forward;
-        this.onSelect = select;
     }
 
     /** Where "see this sticker's set" opens it (the side panel's Stickers tab). */
@@ -222,7 +220,6 @@ final class MessageActionsUi {
         if (a.contains(MessageActions.Action.COPY)) menu.getItems().add(ChatMenus.item(I18n.t("message.copyText"), () -> Clipboards.copy(m.body())));
         if (a.contains(MessageActions.Action.FORWARD)) {
             menu.getItems().add(ChatMenus.item(I18n.t("message.forward"), () -> onForward.accept(m)));
-            menu.getItems().add(ChatMenus.item(I18n.t("message.selectMany"), () -> onSelect.accept(m)));
         }
         if (a.contains(MessageActions.Action.OPEN_FILE)) menu.getItems().add(ChatMenus.item(I18n.t("message.openFile"), () -> media.openFile(m)));
         if (a.contains(MessageActions.Action.SAVE_AS)) menu.getItems().add(ChatMenus.item(I18n.t("message.saveAs"), () -> {

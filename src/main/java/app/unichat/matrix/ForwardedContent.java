@@ -52,6 +52,16 @@ final class ForwardedContent {
         return c;
     }
 
+    /** {@code content} (a video's) made the GIF of {@code size} bytes it's sent as instead ({@code video/GifVideos}). */
+    static void becomeGif(ObjectNode content, long size) {
+        String name = app.unichat.video.GifVideos.gifName(content.path("filename").asText(content.path("body").asText("gif")));
+        if (content.path("body").asText().equals(content.path("filename").asText())) content.put("body", name);
+        content.put("msgtype", "m.image").put("filename", name);
+        ObjectNode info = content.with("info");
+        info.put("mimetype", StickerConverter.GIF).put("size", size);
+        info.remove(List.of("duration", "thumbnail_url", "thumbnail_info"));
+    }
+
     /** A file's name, its invisible marks taken out, or "file". */
     static String fileName(Message m) {
         return m.fileName() == null ? "file" : m.fileName().replaceAll("\\p{Cf}", "");

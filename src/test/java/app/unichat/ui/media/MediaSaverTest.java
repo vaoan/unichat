@@ -67,4 +67,12 @@ class MediaSaverTest {
         assertTrue(MediaSaver.suggestedName(media(MessageType.FILE, "x".repeat(400) + ".pdf", null), BOGOTA).length() <= 200);
         assertTrue(MediaSaver.suggestedName(media(MessageType.FILE, "x".repeat(400) + ".pdf", null), BOGOTA).endsWith(".pdf"));
     }
+
+    @Test
+    void aGifThatCouldntBeMadeIsSavedAsTheVideoItIs() {
+        java.nio.file.Path chosen = java.nio.file.Path.of("/tmp/x/gif.gif");
+        assertEquals(chosen, MediaSaver.withExtensionOf(chosen, java.nio.file.Path.of("/cache/abc.gif")));
+        assertEquals(java.nio.file.Path.of("/tmp/x/gif.mp4"), MediaSaver.withExtensionOf(chosen, java.nio.file.Path.of("/cache/abc.mp4")),
+                "never an MP4 under a .gif name");
+    }
 }

@@ -584,6 +584,7 @@ public final class MainView extends StackPane {
         StackPane.setAlignment(card, Pos.TOP_CENTER);
         card.setTranslateY(90);
         overlay.setVisible(true);
+        app.unichat.ui.media.AnimatedImage.cover(getScene(), overlay);
     }
 
     boolean overlayOpen() { return overlay.isVisible(); }
@@ -591,6 +592,7 @@ public final class MainView extends StackPane {
     void hideOverlay() {
         overlay.setVisible(false);
         overlay.getChildren().clear();
+        app.unichat.ui.media.AnimatedImage.cover(getScene(), null);
         if (thread.chat() != null) thread.composer().focus();
     }
 

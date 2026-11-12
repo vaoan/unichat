@@ -82,7 +82,6 @@ public final class ThreadPane extends BorderPane {
     private final FolderDialogs folderDialogs;
     /** Picking messages to forward several at once. */
     private final MessageSelection selection;
-    private final VBox bottom;
     private ForwardSheet forwardSheet;
 
     public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast, AudioPlayback audio,
@@ -103,7 +102,7 @@ public final class ThreadPane extends BorderPane {
                 () -> svc.setArchived(chat.id(), !chat.archived()));
         configureTimeline();
         selection = new MessageSelection(list, m -> messageActions.allows(m, MessageActions.Action.FORWARD), this::forward, this::showSelectionBar);
-        messageActions.setOnForward(m -> forward(List.of(m)), selection::start);
+        messageActions.setOnForward(selection::start);
         scroll = new TimelineScroll(list, rows, this, () -> chat != null, this::loadOlder);
         Node header = buildHeader();
         messageRows = new MessageRowView(svc, media, messageActions, openLink, () -> chat, this::member, scroll::jumpTo);
@@ -113,7 +112,7 @@ public final class ThreadPane extends BorderPane {
         composer.acceptDrops(timeline);
 
         typing.getStyleClass().add("typing-line");
-        bottom = new VBox(typing, composer);
+        VBox bottom = new VBox(typing, composer);
 
         content.setTop(header);
         content.setCenter(timeline);
@@ -143,6 +142,8 @@ public final class ThreadPane extends BorderPane {
         });
     }
 
+    private HBox header, headerButtons;
+
     private Node buildHeader() {
         headerTitle.getStyleClass().add("thread-title");
         headerSubtitle.getStyleClass().add("thread-subtitle");
@@ -167,7 +168,9 @@ public final class ThreadPane extends BorderPane {
         infoButton.setAccessibleText(I18n.t("thread.chatInfo"));
         Button more = Icons.iconButton(Icons.MORE, I18n.t("thread.moreOptions"), null);
         more.setOnAction(e -> ChatMenus.forChat(chat, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4));
-        HBox header = new HBox(10, headerAvatar, titles, scroll.following(), favButton, archiveButton, infoButton, more);
+        headerButtons = new HBox(10, scroll.following(), favButton, archiveButton, infoButton, more);
+        headerButtons.setAlignment(Pos.CENTER_LEFT);
+        header = new HBox(10, headerAvatar, titles, headerButtons);
         header.getStyleClass().add("thread-header");
         header.setAlignment(Pos.CENTER_LEFT);
         titles.setOnMouseClicked(e -> toggleInfo.run());
@@ -236,8 +239,9 @@ public final class ThreadPane extends BorderPane {
         three.subList(1, three.size()).forEach(selection::toggle);
     }
 
+    /** While picking, the bar takes the header's buttons' place; the message box stays. */
     private void showSelectionBar(boolean shown) {
-        bottom.getChildren().setAll(typing, shown ? selection.bar() : composer);
+        header.getChildren().set(2, shown ? selection.bar() : headerButtons);
         if (!shown) composer.focus();
     }
     public Composer composer() { return composer; }

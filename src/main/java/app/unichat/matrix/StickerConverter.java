@@ -103,7 +103,16 @@ public final class StickerConverter {
         return convert(in, PNG, dir, null);
     }
 
-    /**
+        /**
+     * Whether a GIF that came as a video (an MP4 marked {@code fi.mau.gif}) must go to {@code network} as a real GIF:
+     * Telegram's and WhatsApp's bridges send the mark on (both show such an MP4 as a GIF); others, like Discord's, show
+     * a video with a play button.
+     */
+    static boolean gifAsGif(Network network) {
+        return network != Network.TELEGRAM && network != Network.WHATSAPP;
+    }
+
+/**
      * Whether a {@code mime} sticker goes to {@code network} as a GIF: a WebM (Telegram's video stickers) is a video to
      * press play on everywhere but Telegram, Discord included, and a GIF plays by itself.
      */

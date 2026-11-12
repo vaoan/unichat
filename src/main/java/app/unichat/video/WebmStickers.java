@@ -21,7 +21,7 @@ import java.util.function.DoubleConsumer;
 public final class WebmStickers {
     /** Conversions and the first install, one at a time: never on the FX thread. */
     public static final ExecutorService WORKER = Executors.newSingleThreadExecutor(Threads.daemon("video-convert"));
-    private static final long TIMEOUT_SECONDS = 60;
+    static final long TIMEOUT_SECONDS = 60;
     /** A sticker is seconds long and small: a file claiming more isn't one, and it shouldn't cost more than one. */
     private static final String MAX_SECONDS = "30";
     private static final String MAX_SIDE = "512";
@@ -119,11 +119,16 @@ public final class WebmStickers {
     }
 
     static List<String> command(Path ffmpeg, Path webm, Path out, String format, boolean libvpx) {
+        return command(ffmpeg, webm, "matroska", out, format, libvpx);
+    }
+
+    /** {@code in} read as {@code inFormat} only (ffmpeg's demuxer: "matroska" for WebM, "mov" for MP4), as an animation. */
+    static List<String> command(Path ffmpeg, Path in, String inFormat, Path out, String format, boolean libvpx) {
         List<String> c = new ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
                 // The file comes from other people: only itself may be read, as what it claims to be.
-                "-protocol_whitelist", "file", "-f", "matroska"));
+                "-protocol_whitelist", "file", "-f", inFormat));
         if (libvpx) c.addAll(List.of("-c:v", "libvpx-vp9"));
-        c.addAll(List.of("-i", webm.toString(), "-t", MAX_SECONDS, "-an"));
+        c.addAll(List.of("-i", in.toString(), "-t", MAX_SECONDS, "-an"));
         String scale = "scale=w='min(" + MAX_SIDE + ",iw)':h=-2";
         if (format.equals(WEBP)) c.addAll(List.of("-vf", scale, "-c:v", "libwebp_anim", "-q:v", "75"));
         else c.addAll(List.of("-vf", scale + ",split[a][b];[a]palettegen=reserve_transparent=1[p];[b][p]paletteuse"));

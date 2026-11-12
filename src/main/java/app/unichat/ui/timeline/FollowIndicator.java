@@ -11,7 +11,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 
 /**
- * Whether the message list follows the newest message: a green dot in the chat's header, beside the star, while it does
+ * Whether the message list follows the newest message: a chevron on a line in the chat's header, beside the star, while it does
  * (a badge over the messages took the chat's room); reading older messages, the way down at the list's bottom right,
  * with how many arrived below meanwhile.
  */
@@ -21,9 +21,8 @@ final class FollowIndicator {
     private final StackPane node;
 
     FollowIndicator(Runnable toNewest) {
-        Region dot = new Region();
-        dot.getStyleClass().add("live-dot");
-        live.setGraphic(dot);
+        // Not a green dot: that reads as "online", which Unichat can't know.
+        live.setGraphic(Icons.icon(Icons.AT_NEWEST, 16));
         live.getStyleClass().add("following-badge");
         live.setMinWidth(Region.USE_PREF_SIZE);
         live.setFocusTraversable(false);
@@ -41,7 +40,7 @@ final class FollowIndicator {
     /** The way down, at the list's bottom right. */
     Node node() { return node; }
 
-    /** The dot for the chat's header. */
+    /** The sign for the chat's header. */
     Node live() { return live; }
 
     Button jumpDown() { return down; }

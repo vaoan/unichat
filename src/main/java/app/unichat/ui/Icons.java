@@ -46,6 +46,8 @@ public final class Icons {
     public static final String CHAT = "M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2Zm0 2v11.2L7.2 16H20V6H4Z";
     public static final String UNREAD = "M12 6a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z";
     public static final String LOW = "M12 16 6 10l1.4-1.4 4.6 4.6 4.6-4.6L18 10l-6 6Z";
+    /** A chevron resting on a line: the chat's list is at its newest and follows it. */
+    public static final String AT_NEWEST = "M6 8.6 7.4 7.2l4.6 4.6 4.6-4.6L18 8.6l-6 6-6-6ZM5 17h14v2H5v-2Z";
     public static final String FILE = "M6 2h8l6 6v14H6V2Zm7 1.5V9h5.5L13 3.5ZM8 4v16h10V11h-7V4H8Z";
     public static final String IMAGE = "M3 4h18v16H3V4Zm2 2v8.6l4-4 4 4 2.5-2.5 3.5 3.5V6H5Zm10.5 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z";
     public static final String UPLOAD = "M11 16V6.8L7.4 10.4 6 9l6-6 6 6-1.4 1.4L13 6.8V16h-2Zm-7 2h16v2H4v-2Z";

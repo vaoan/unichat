@@ -213,7 +213,9 @@ final class MessageSender {
             MediaLibrary.Item item = new MediaLibrary.Item(MediaLibrary.Kind.STICKER, m.mediaUrl(), m.mimeType(), m.width(), m.height(), info);
             return sendSticker(chatId, m.outgoing() ? MediaLibrary.original(item) : item, null);
         }
-        boolean copy = m.isMedia() && needsCopy(m.mediaUrl());
+        Chat chat = core.chat(chatId);
+        boolean gif = chat != null && StickerConverter.gifAsGif(chat.network()) && app.unichat.video.GifVideos.is(m);
+        boolean copy = m.isMedia() && (gif || needsCopy(m.mediaUrl()));
         ObjectNode content = ForwardedContent.of(m, copy);
         String txn = core.newTxnId();
         synchronized (proc) {
@@ -223,7 +225,13 @@ final class MessageSender {
         if (!copy) return sendEvent(chatId, "m.room.message", txn, content);
         return media.media(m.mediaUrl(), 0, 0).thenApplyAsync(src -> {
             try {
-                content.put("url", client.upload(src, m.mimeType() != null ? m.mimeType() : "application/octet-stream", ForwardedContent.fileName(m)));
+                Path file = gif ? app.unichat.video.GifVideos.gifOr(src) : src;
+                if (file != src) {
+                    ForwardedContent.becomeGif(content, Files.size(file));
+                    content.put("url", client.upload(file, StickerConverter.GIF, content.path("filename").asText("gif.gif")));
+                } else {
+                    content.put("url", client.upload(src, m.mimeType() != null ? m.mimeType() : "application/octet-stream", ForwardedContent.fileName(m)));
+                }
                 return content;
             } catch (IOException e) {
                 throw new CompletionException(e);

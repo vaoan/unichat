@@ -69,6 +69,29 @@ public final class AnimatedImage {
     }
 
     private static final String TIMELINE = "unichat.animation";
+    private static final String COVER = "unichat.cover";
+    /** Animations that can be seen now, to look again when a sheet covers their window or leaves. */
+    private static final java.util.Set<Playing> SHOWN = new java.util.HashSet<>();
+
+    /**
+     * {@code over} (the window's overlay with a sheet in it) covers {@code scene}, or nothing does (null): what's behind
+     * stands still meanwhile, dimmed anyway. Each of its frames made JavaFX draw the card's shadow again over it, and on
+     * the Mac stickers behind a sheet flashed black.
+     */
+    public static void cover(javafx.scene.Scene scene, javafx.scene.Node over) {
+        if (scene == null) return;
+        if (over == null) scene.getProperties().remove(COVER);
+        else scene.getProperties().put(COVER, over);
+        for (Playing p : List.copyOf(SHOWN)) if (p.view.getScene() == scene) p.recheck.request();
+    }
+
+    /** Behind what covers its window ({@link #cover}). */
+    private static boolean covered(javafx.scene.Node n) {
+        javafx.scene.Scene sc = n.getScene();
+        if (sc == null || !(sc.getProperties().get(COVER) instanceof javafx.scene.Node over)) return false;
+        for (javafx.scene.Node p = n; p != null; p = p.getParent()) if (p == over) return false;
+        return true;
+    }
 
     /** Whether {@code n} can be seen now: its window showing and not minimized, every ancestor visible, inside the window. */
     public static boolean onScreen(javafx.scene.Node n) {
@@ -464,12 +487,14 @@ public final class AnimatedImage {
 
         void shown() {
             showing = true;
+            SHOWN.add(this);
             view.localToSceneTransformProperty().addListener(moved); // scrolled into or out of view
             follow();
         }
 
         void hidden() {
             showing = false;
+            SHOWN.remove(this);
             view.localToSceneTransformProperty().removeListener(moved);
             follow();
         }
@@ -477,7 +502,7 @@ public final class AnimatedImage {
         /** Moves when it can be seen and fits the budget; otherwise stops, and lets its frames go if they can be read again. */
         private void follow() {
             if (ended) return;
-            boolean wanted = showing && onScreen(view);
+            boolean wanted = showing && onScreen(view) && !covered(view);
             if (wanted && !running()) {
                 if (frames == null) reload();
                 else if (AnimationBudget.SHARED.take(bytes)) timeline().play();

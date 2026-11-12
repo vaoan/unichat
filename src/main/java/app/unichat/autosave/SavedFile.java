@@ -2,6 +2,7 @@ package app.unichat.autosave;
 
 import app.unichat.model.Message;
 import app.unichat.support.MarkOfTheWeb;
+import app.unichat.video.GifVideos;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -24,10 +25,14 @@ final class SavedFile {
             throws IOException, InterruptedException {
         if (FileNames.savedIn(dir, m)) return false;
         downloaded[0] = saver.media(m.mediaUrl(), progress);
+        // A GIF that came as a video (Telegram keeps every GIF as an MP4) is saved as the GIF it was sent as.
+        Path file = GifVideos.is(m) ? GifVideos.gifOr(downloaded[0]) : downloaded[0];
+        String name = FileNames.forSaving(m, ZoneId.systemDefault());
+        if (file != downloaded[0]) name = GifVideos.gifName(name);
         Files.createDirectories(dir);
-        Path target = FileNames.free(dir, FileNames.forSaving(m, ZoneId.systemDefault()));
+        Path target = FileNames.free(dir, name);
         Path part = dir.resolve("." + target.getFileName() + ".part");
-        Files.copy(downloaded[0], part, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(file, part, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
         Files.move(part, target, StandardCopyOption.ATOMIC_MOVE); // lesson-ok: atomic-move (never replaces: the name was chosen free)
         MarkOfTheWeb.mark(target);
         return true;

@@ -25,8 +25,9 @@ import java.util.function.Predicate;
 
 /**
  * Picking several messages to forward at once: a click (or Space, Enter) picks or unpicks one, Shift+click the ones in
- * between, Esc ends. While it lasts, a click on a message only picks it (no photo opens, no link), and a bar in the
- * message box's place says how many and forwards them, in the chat's order.
+ * between, Esc ends. "Reenviar…" in a message's menu starts it with that one. While it lasts, a click on a message only
+ * picks it (no photo opens, no link), and a bar in the header's buttons' place says how many and forwards them, in
+ * the chat's order, or cancels.
  */
 final class MessageSelection {
     static final PseudoClass PICKED = PseudoClass.getPseudoClass("picked");
@@ -50,7 +51,7 @@ final class MessageSelection {
     private static final Set<KeyCode> MOVING = Set.of(KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME,
             KeyCode.END, KeyCode.TAB, KeyCode.F6);
 
-    /** {@code showBar}: the bar in the message box's place (true) or the box back (false). */
+    /** {@code showBar}: the bar in the header's buttons' place (true) or the buttons back (false). */
     MessageSelection(ListView<ThreadRows.Row> list, Predicate<Message> pickable, Consumer<List<Message>> forward, Consumer<Boolean> showBar) {
         this.list = list;
         this.pickable = pickable;

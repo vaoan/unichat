@@ -284,6 +284,36 @@ class SendStickerTest {
         assertEquals("m.image", sent.path("msgtype").asText());
     }
 
+    /** Telegram's GIFs are silent MP4s marked as GIFs: Discord showed them as videos to press play on. */
+    @Test
+    void aGifThatCameAsAVideoGoesToDiscordAsAGifAndToTelegramAsItIs(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        java.nio.file.Path ffmpeg = app.unichat.video.Ffmpeg.find();
+        org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        served = dir.resolve("gif.mp4");
+        Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
+                "-pix_fmt", "yuv420p", "-an", served.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        org.junit.jupiter.api.Assumptions.assumeTrue(p.waitFor() == 0, "this ffmpeg can't make an MP4");
+        app.unichat.model.Message m = new app.unichat.model.Message("$g", "!x:example.org", "@telegram_1:example.org", "Buga", false, java.time.Instant.EPOCH);
+        m.setType(app.unichat.model.MessageType.VIDEO);
+        m.setFileName("gif.mp4");
+        m.setMediaUrl("mxc://s/gifvideo");
+        m.setMimeType("video/mp4");
+        m.setSize(64, 64);
+        m.setMediaInfo(MatrixClient.JSON.readTree("{\"mimetype\":\"video/mp4\",\"duration\":1000,\"fi.mau.gif\":true,\"fi.mau.loop\":true}"));
+
+        chatOn("discord").forward("!c:example.org", m).get();
+        assertEquals("image/gif", uploadedType, "a GIF Discord plays by itself");
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("m.image", sent.path("msgtype").asText());
+        assertEquals("image/gif", sent.path("info").path("mimetype").asText());
+        assertEquals("gif.gif", sent.path("filename").asText());
+
+        uploadedType = null;
+        chatOn("telegram").forward("!c:example.org", m).get();
+        assertNull(uploadedType, "Telegram shows its own as a GIF: it goes as it is");
+        assertEquals("m.video", MatrixClient.JSON.readTree(body).path("msgtype").asText());
+    }
+
     @Test
     void aForwardedFileMustBeAtAMediaAddress() throws Exception {
         MatrixChatService svc = chatOn("telegram");

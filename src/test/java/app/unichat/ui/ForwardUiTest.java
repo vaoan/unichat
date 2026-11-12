@@ -50,6 +50,9 @@ class ForwardUiTest {
         Message theirs = w.newest();
         FxWait.until("it's listed", () -> cellOf(theirs) != null);
         fire(menuItem(theirs, "Reenviar…"));
+        assertEquals("1 seleccionado", FxWait.fx(() -> ((Label) w.scene.getRoot().lookup(".selection-count")).getText()),
+                "Reenviar starts picking with it");
+        forwardPicked();
         Node sheet = FxWait.fx(() -> w.scene.getRoot().lookup(".forward-sheet"));
         assertNotNull(sheet, "the sheet asks where");
         assertEquals("Reenviar 1 mensaje", FxWait.fx(() -> ((Label) sheet.lookup(".sheet-title")).getText()));
@@ -81,9 +84,11 @@ class ForwardUiTest {
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("mensaje")).toList());
         Message first = mine.get(1), third = mine.get(3), last = mine.get(4);
         FxWait.until("they're listed", () -> cellOf(first) != null && cellOf(last) != null);
-        fire(menuItem(first, "Seleccionar varios…"));
-        assertTrue(FxWait.fx(() -> w.scene.getRoot().lookup(".selection-bar") != null), "the bar takes the message box's place");
-        assertTrue(FxWait.fx(() -> w.scene.getRoot().lookup(".composer") == null));
+        fire(menuItem(first, "Reenviar…"));
+        assertTrue(FxWait.fx(() -> w.scene.getRoot().lookup(".thread-header .selection-bar") != null), "the bar is in the header");
+        assertTrue(FxWait.fx(() -> w.scene.getRoot().lookup(".thread-header").lookupAll(".icon-button").isEmpty()),
+                "in the place of the star and the other buttons");
+        assertNotNull(FxWait.fx(() -> w.scene.getRoot().lookup(".composer")), "the message box stays");
         FxWait.fx(() -> {
             press(cellOf(last), false);  // picks the newest
             press(cellOf(third), true);  // and with Shift, what's between them
@@ -92,10 +97,7 @@ class ForwardUiTest {
         assertEquals("3 seleccionados", FxWait.fx(() -> ((Label) w.scene.getRoot().lookup(".selection-count")).getText()));
         assertTrue(FxWait.fx(() -> cellOf(third).getPseudoClassStates().stream().anyMatch(p -> p.getPseudoClassName().equals("picked"))),
                 "a picked message looks picked");
-        FxWait.fx(() -> {
-            ((Button) w.scene.getRoot().lookup(".selection-bar .primary-button")).fire();
-            return null;
-        });
+        forwardPicked();
         Node sheet = FxWait.fx(() -> w.scene.getRoot().lookup(".forward-sheet"));
         assertEquals("Reenviar 3 mensajes", FxWait.fx(() -> ((Label) sheet.lookup(".sheet-title")).getText()));
         choose(sheet, "Familia");
@@ -107,7 +109,7 @@ class ForwardUiTest {
         FxWait.until("all three arrive", () -> w.svc.messages(TO).size() == before + 3);
         assertEquals(List.of(first.body(), third.body(), last.body()),
                 w.svc.messages(TO).subList(before, before + 3).stream().map(Message::body).toList(), "in the chat's order, nothing added");
-        FxWait.until("picking ended, the box is back", () -> w.scene.getRoot().lookup(".composer") != null);
+        FxWait.until("picking ended, the header's buttons are back", () -> w.scene.getRoot().lookup(".selection-bar") == null);
         assertFalse(FxWait.fx(() -> cellOf(third).getPseudoClassStates().stream().anyMatch(p -> p.getPseudoClassName().equals("picked"))));
     }
 
@@ -121,7 +123,7 @@ class ForwardUiTest {
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("mensaje")).toList());
         Message a = mine.get(2), b = mine.get(3);
         FxWait.until("they're listed", () -> cellOf(a) != null && cellOf(b) != null);
-        fire(menuItem(a, "Seleccionar varios…"));
+        fire(menuItem(a, "Reenviar…"));
         FxWait.fx(() -> {
             press(cellOf(b), false);
             for (KeyCode k : List.of(KeyCode.R, KeyCode.E, KeyCode.DIGIT1)) {
@@ -137,7 +139,7 @@ class ForwardUiTest {
             w.list().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
             return null;
         });
-        FxWait.until("the box is back", () -> w.scene.getRoot().lookup(".composer") != null);
+        FxWait.until("picking ended", () -> w.scene.getRoot().lookup(".selection-bar") == null);
         assertFalse(FxWait.fx(() -> w.scene.getRoot().lookup(".composer-banner").isVisible()), "R or E while picking started no answer or edit");
     }
 
@@ -160,6 +162,14 @@ class ForwardUiTest {
             MenuItem item = menu.getItems().stream().filter(i -> text.equals(i.getText())).findFirst().orElseThrow();
             menu.hide();
             return item;
+        });
+    }
+
+    /** The header's "Reenviar", which asks where the picked ones go. */
+    private void forwardPicked() throws Exception {
+        FxWait.fx(() -> {
+            ((Button) w.scene.getRoot().lookup(".thread-header .selection-bar .primary-button")).fire();
+            return null;
         });
     }
 
