@@ -79,6 +79,9 @@ final class TimelineScroll {
     /** The indicator at the list's bottom right ({@link FollowIndicator}). */
     Node indicator() { return indicator.node(); }
 
+    /** The "up to date" dot, for the chat's header. */
+    Node following() { return indicator.live(); }
+
     Button jumpDown() { return indicator.jumpDown(); }
 
     boolean pinned() { return pinnedBottom; }

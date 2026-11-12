@@ -97,10 +97,9 @@ public final class ThreadPane extends BorderPane {
         favButton = Icons.iconButton(Icons.STAR, I18n.t("thread.favorite"), () -> svc.setFavorite(chat.id(), !chat.favorite()));
         archiveButton = Icons.iconButton(Icons.ARCHIVE, I18n.t("thread.archive", Shortcuts.key("E")),
                 () -> svc.setArchived(chat.id(), !chat.archived()));
-        Node header = buildHeader();
-
         configureTimeline();
         scroll = new TimelineScroll(list, rows, this, () -> chat != null, this::loadOlder);
+        Node header = buildHeader();
         messageRows = new MessageRowView(svc, media, messageActions, openLink, () -> chat, this::member, scroll::jumpTo);
         redrawOnTranscriptProgress();
         StackPane.setAlignment(scroll.indicator(), Pos.BOTTOM_RIGHT);
@@ -162,7 +161,7 @@ public final class ThreadPane extends BorderPane {
         infoButton.setAccessibleText(I18n.t("thread.chatInfo"));
         Button more = Icons.iconButton(Icons.MORE, I18n.t("thread.moreOptions"), null);
         more.setOnAction(e -> ChatMenus.forChat(chat, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4));
-        HBox header = new HBox(10, headerAvatar, titles, favButton, archiveButton, infoButton, more);
+        HBox header = new HBox(10, headerAvatar, titles, scroll.following(), favButton, archiveButton, infoButton, more);
         header.getStyleClass().add("thread-header");
         header.setAlignment(Pos.CENTER_LEFT);
         titles.setOnMouseClicked(e -> toggleInfo.run());

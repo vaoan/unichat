@@ -12,6 +12,7 @@ import java.util.List;
 import static app.unichat.ui.TimelineWindow.CHAT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -234,7 +235,13 @@ class TimelineReadingUiTest {
     void theIndicatorSaysWhetherTheListFollows() throws Exception {
         w = TimelineWindow.open(30);
         assertTrue(FxWait.fx(w::followingShown), "at the newest: up to date");
-        assertEquals("Al día", FxWait.fx(() -> ((javafx.scene.control.Label) w.scene.getRoot().lookup(".following-badge")).getText()));
+        // An icon beside the star in the header, not a badge over the messages: it takes none of the chat's room.
+        javafx.scene.control.Label badge = FxWait.fx(() -> (javafx.scene.control.Label) w.scene.getRoot().lookup(".following-badge"));
+        assertNotNull(FxWait.fx(() -> w.scene.getRoot().lookup(".thread-header .following-badge")), "in the chat's header");
+        assertNull(FxWait.fx(() -> w.list().getParent().lookup(".following-badge")), "not over the messages");
+        assertTrue(FxWait.fx(() -> badge.getText() == null || badge.getText().isEmpty()), "an icon, no words");
+        assertTrue(FxWait.fx(badge::getAccessibleText).startsWith("Al día"), "a screen reader still hears it");
+        assertEquals("Al día", FxWait.fx(() -> badge.getTooltip().getText().split("\\.")[0]), "and the pointer reads it");
         w.scrollUp();
         assertFalse(FxWait.fx(w::followingShown), "reading older ones");
         assertNull(FxWait.fx(() -> w.jumpDown().getText()), "nothing new yet");

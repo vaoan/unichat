@@ -11,8 +11,9 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 
 /**
- * Whether the message list follows the newest message, always at its bottom right: "Al día" while it does (writing
- * brings it there), and reading older messages the way down, with how many arrived below meanwhile.
+ * Whether the message list follows the newest message: a green dot in the chat's header, beside the star, while it does
+ * (a badge over the messages took the chat's room); reading older messages, the way down at the list's bottom right,
+ * with how many arrived below meanwhile.
  */
 final class FollowIndicator {
     private final Label live = new Label();
@@ -25,31 +26,33 @@ final class FollowIndicator {
         live.setGraphic(dot);
         live.getStyleClass().add("following-badge");
         live.setMinWidth(Region.USE_PREF_SIZE);
+        live.setFocusTraversable(false);
         down = Icons.iconButton(Icons.LOW, I18n.t("timeline.jumpDown"), toNewest);
         down.getStyleClass().add("jump-down");
         down.setMinWidth(Region.USE_PREF_SIZE);
-        node = new StackPane(live, down);
+        node = new StackPane(down);
         node.setPickOnBounds(false);
         node.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
         node.getStyleClass().add("follow-indicator");
-        StackPane.setAlignment(live, Pos.BOTTOM_RIGHT);
         StackPane.setAlignment(down, Pos.BOTTOM_RIGHT);
         show(true, 0);
     }
 
+    /** The way down, at the list's bottom right. */
     Node node() { return node; }
+
+    /** The dot for the chat's header. */
+    Node live() { return live; }
 
     Button jumpDown() { return down; }
 
     /** {@code newBelow}: messages that arrived under what's being read. */
     void show(boolean following, int newBelow) {
-        live.setVisible(following);
-        live.setManaged(following);
+        live.setVisible(following); // still managed: the header's buttons don't move when it goes
         down.setVisible(!following);
         down.setManaged(!following);
         if (following) {
-            live.setText(I18n.t("timeline.following"));
-            live.setTooltip(new Tooltip(I18n.t("timeline.followingHelp")));
+            live.setTooltip(new Tooltip(I18n.t("timeline.following") + ". " + I18n.t("timeline.followingHelp")));
             live.setAccessibleText(I18n.t("timeline.following") + ". " + I18n.t("timeline.followingHelp"));
             return;
         }

@@ -119,7 +119,7 @@ final class TimelineWindow {
 
     javafx.scene.control.Button jumpDown() { return (javafx.scene.control.Button) scene.getRoot().lookup(".jump-down"); }
 
-    /** The "Al día" sign: the list follows the newest message. */
+    /** The "Al día" dot in the header: the list follows the newest message. */
     boolean followingShown() { return scene.getRoot().lookup(".following-badge").isVisible(); }
 
     /** The newest message in the service is a row of the list. */
