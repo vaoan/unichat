@@ -5,7 +5,6 @@ import app.unichat.support.Processes;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -18,9 +17,6 @@ public final class VideoFrames {
 
     private static final long TIMEOUT_SECONDS = 60;
 
-    /** {@code count} frames of {@code width}x{@code height}, RGBA, {@code delayMs} each. */
-    public record Frames(int width, int height, int delayMs, List<byte[]> rgba) {}
-
     /**
      * What a video is to be decoded as: its size, frames a second and length ({@link AnimatedWebp.Probe}). Blocking;
      * {@link WebmStickers.NoConverter} without ffmpeg.
@@ -29,23 +25,32 @@ public final class VideoFrames {
         return AnimatedWebp.probe(ffmpeg(), video, AnimatedWebp.Source.WEBM);
     }
 
+    /** Takes each frame as it's decoded: RGBA, {@code width}x{@code height}; the array is reused for the next one. */
+    @FunctionalInterface
+    public interface Frame {
+        void take(byte[] rgba);
+    }
+
     /**
-     * {@code video}'s frames at {@code width}x{@code height}, at most {@code maxFrames} (fewer a second when it has more).
-     * Blocking; an IOException when ffmpeg can't read it.
+     * {@code video}'s frames at {@code width}x{@code height}, at most {@code maxFrames} (fewer a second when it has more),
+     * handed to {@code each} one at a time, never all held here: they were, and with the output's own buffer the peak
+     * was three times the frames. How long each stays, in ms. Blocking; an IOException when ffmpeg can't read it.
      */
-    public static Frames read(Path video, AnimatedWebp.Probe probe, int width, int height, int maxFrames)
+    public static int read(Path video, AnimatedWebp.Probe probe, int width, int height, int maxFrames, Frame each)
             throws IOException, InterruptedException {
         double natural = probe.fps() > 0 ? probe.fps() : 30;
         double fps = probe.seconds() > 0 && probe.seconds() * natural > maxFrames ? Math.max(1, maxFrames / probe.seconds()) : natural;
-        byte[] all = Processes.bytes(new ProcessBuilder(command(ffmpeg(), video, width, height, fps, maxFrames))
-                .redirectError(ProcessBuilder.Redirect.DISCARD), TIMEOUT_SECONDS);
-        List<byte[]> frames = new ArrayList<>();
-        int size = width * height * 4;
-        for (int at = 0; at + size <= all.length && frames.size() < maxFrames; at += size) {
-            frames.add(java.util.Arrays.copyOfRange(all, at, at + size));
-        }
-        if (frames.isEmpty()) throw new IOException(I18n.t("video.stickerFailed"));
-        return new Frames(width, height, (int) Math.round(1000 / fps), frames);
+        byte[] frame = new byte[width * height * 4];
+        int[] count = {0};
+        Processes.read(new ProcessBuilder(command(ffmpeg(), video, width, height, fps, maxFrames))
+                .redirectError(ProcessBuilder.Redirect.DISCARD), TIMEOUT_SECONDS, out -> {
+            while (count[0] < maxFrames && out.readNBytes(frame, 0, frame.length) == frame.length) {
+                each.take(frame);
+                count[0]++;
+            }
+        });
+        if (count[0] == 0) throw new IOException(I18n.t("video.stickerFailed"));
+        return (int) Math.round(1000 / fps);
     }
 
     /** ffmpeg decoding {@code in} (read as a WebM only, by libvpx, which keeps the transparency) to raw RGBA on its output. */

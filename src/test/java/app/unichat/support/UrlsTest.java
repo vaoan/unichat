@@ -31,4 +31,13 @@ class UrlsTest {
                 Urls.in("mira https://youtu.be/abc, y http://x.org/a?b=1."));
         org.junit.jupiter.api.Assertions.assertEquals(java.util.List.of(), Urls.in(null));
     }
+
+    /** A Markdown link ("[address](address?query)") is two addresses: it was one of both, given to yt-dlp as it was. */
+    @org.junit.jupiter.api.Test
+    void aMarkdownLinkIsTwoAddressesNotOneOfBoth() {
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.List.of("https://www.instagram.com/reel/X1/", "https://www.instagram.com/reel/X1/?igsh=a"),
+                Urls.in("[https://www.instagram.com/reel/X1/](https://www.instagram.com/reel/X1/?igsh=a)"));
+        org.junit.jupiter.api.Assertions.assertTrue(Urls.samePage("https://www.instagram.com/reel/X1/", "https://www.instagram.com/reel/X1?igsh=a"));
+        org.junit.jupiter.api.Assertions.assertFalse(Urls.samePage("https://www.instagram.com/reel/X1/", "https://www.instagram.com/reel/X2/"));
+    }
 }

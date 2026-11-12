@@ -90,4 +90,31 @@ class SendStatusTest {
         assertEquals(MessageStatus.SENT, byId("$m").status());
     }
 
+
+    private static String refused(String id, String target, String error) {
+        return "{'type':'com.beeper.message_send_status','event_id':'" + id + "','sender':'" + BOT + "','origin_server_ts':2,"
+                + "'content':{'network':'discord','status':'FAIL_PERMANENT','reason':'m.no_permission','error':'" + error + "',"
+                + "'m.relates_to':{'rel_type':'m.reference','event_id':'" + target + "'}}}";
+    }
+
+    /**
+     * A sticker sent as Unichat restarted reached Discord's bridge while it was still connecting: "user is not logged in"
+     * and failed for good. That's the bridge not ready, not the network refusing: it's told, so the message goes again.
+     */
+    @Test
+    void aSendRefusedWhileTheBridgeConnectsIsToldApart() throws Exception {
+        SyncProcessor.Result r = proc.process(MatrixClient.JSON.readTree(("{'rooms':{'join':{'" + ROOM + "':{'timeline':{'events':["
+                + message("$m", ME) + "," + refused("$s", "$m", "user is not logged in and portal does not have webhook")
+                + "," + message("$n", ME) + "," + refused("$t", "$n", "the network refused it") + "]}}}}}").replace('\'', '"')), true);
+        assertEquals(java.util.Map.of("$m", ROOM), r.bridgeNotReady, "only the one the bridge wasn't ready for");
+    }
+
+    /** Sent again once the bridge was ready, the failed one is redacted: it leaves the chat, it isn't a "deleted" message. */
+    @Test
+    void aFailedMessageOfMineRedactedLeavesTheChat() {
+        sync(message("$m", ME), status("$s", "$m", "FAIL_PERMANENT"));
+        sync("{'type':'m.room.redaction','event_id':'$r','sender':'" + ME + "','origin_server_ts':3,'redacts':'$m','content':{'redacts':'$m'}}");
+        assertEquals(null, byId("$m"));
+        assertEquals(0, proc.room(ROOM).timeline.size());
+    }
 }

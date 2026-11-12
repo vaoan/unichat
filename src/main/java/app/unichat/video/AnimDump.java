@@ -31,6 +31,14 @@ public final class AnimDump {
 
     /** The frames, oldest first, each the whole canvas; null when there's no anim_dump or it can't read the file. */
     public static List<BufferedImage> frames(Path webp) {
+        return frames(webp, f -> f);
+    }
+
+    /**
+     * The frames, oldest first, each made {@code each} (smaller) as it's read: a 512 px sticker's frames all whole at
+     * once (1 MB each) were the peak that filled the memory when the sticker panel opened. Null as {@link #frames(Path)}.
+     */
+    public static List<BufferedImage> frames(Path webp, java.util.function.UnaryOperator<BufferedImage> each) {
         Path tool = find();
         if (tool == null) return null;
         Path dir = null;
@@ -45,7 +53,7 @@ public final class AnimDump {
             }
             if (files.isEmpty()) return null;
             List<BufferedImage> out = new ArrayList<>();
-            for (Path f : files) out.add(readPam(f));
+            for (Path f : files) out.add(each.apply(readPam(f)));
             return out;
         } catch (IOException e) {
             return null;

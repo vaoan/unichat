@@ -196,6 +196,9 @@ public final class AutoSave implements ChatService.Listener {
         // A video that came with its page (Instagram's reels) is that page's video: downloading the page again saved
         // the same reel twice, the second one in VP9, which a Mac doesn't open.
         if (m.externalUrl() != null && m.externalUrl().startsWith("http") && m.type() != app.unichat.model.MessageType.VIDEO) out.add(m.externalUrl());
+        // The same page in its text too (a reel one sends comes back as its video, its link written out): that's the
+        // video it already is, and every reel was saved twice.
+        if (m.type() == app.unichat.model.MessageType.VIDEO && m.externalUrl() != null) out.removeIf(u -> Urls.samePage(u, m.externalUrl()));
         return out;
     }
 

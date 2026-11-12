@@ -162,10 +162,9 @@ public final class AnimatedImage {
             int count = probe.seconds() > 0 ? (int) Math.min(maxFrames, Math.ceil(probe.seconds() * (probe.fps() > 0 ? probe.fps() : 30))) : maxFrames;
             double s = fit * shrinkToKeep(count, (int) Math.round(probe.width() * fit), (int) Math.round(probe.height() * fit));
             int w = Math.max(1, (int) Math.round(probe.width() * s)), h = Math.max(1, (int) Math.round(probe.height() * s));
-            app.unichat.video.VideoFrames.Frames f = app.unichat.video.VideoFrames.read(file, probe, w, h, maxFrames);
             List<Image> images = new ArrayList<>();
-            for (byte[] rgba : f.rgba()) images.add(fromRgba(rgba, w, h));
-            return new Frames(List.copyOf(images), java.util.Collections.nCopies(images.size(), f.delayMs()), new Source(file, maxW, maxH));
+            int ms = app.unichat.video.VideoFrames.read(file, probe, w, h, maxFrames, rgba -> images.add(fromRgba(rgba, w, h)));
+            return new Frames(List.copyOf(images), java.util.Collections.nCopies(images.size(), ms), new Source(file, maxW, maxH));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException(I18n.t("image.invalid"), e);
@@ -276,10 +275,19 @@ public final class AnimatedImage {
 
     /** All the frames of an animated WebP, GIF or video sticker (WebM), or the one of a plain picture, whatever the file claims to be. Blocking. */
     public static Frames decode(Path file, int maxW, int maxH) throws IOException {
-        if (app.unichat.support.ImageHeaders.isWebm(file)) return decodeVideo(file, maxW, maxH);
-        if (isWebp(file)) return decodeWebp(file, maxW, maxH);
-        if (isGif(file)) return decodeGif(file, maxW, maxH);
-        return decodePlain(file, maxW, maxH);
+        boolean webm = app.unichat.support.ImageHeaders.isWebm(file), webp = !webm && isWebp(file), gif = !webm && !webp && isGif(file);
+        if (!webm && !webp && !gif) return decodePlain(file, maxW, maxH);
+        Frames hit = decoded(file, maxW, maxH);
+        if (hit != null) return hit;
+        // What it may hold while it's decoded: its frames (capped) and the raw ones they're made from.
+        long need = 2 * Math.min((long) maxW * maxH * 4 * MAX_FRAMES, MAX_ANIMATION_BYTES);
+        try (DecodeBudget.Lease lease = DecodeBudget.SHARED.take(need)) {
+            if (webm) return decodeVideo(file, maxW, maxH);
+            return webp ? decodeWebp(file, maxW, maxH) : decodeGif(file, maxW, maxH);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(I18n.t("image.invalid"), e);
+        }
     }
 
     /**
@@ -422,38 +430,52 @@ public final class AnimatedImage {
     }
 
     /** {@link #composeWebp} with {@code decoder} as the Java decoder; when it fails, libwebp's anim_dump reads the file. */
-    static RawFrames composeWebp(Path file, int maxW, int maxH, WebpReader decoder) throws IOException {
+    static RawFrames composeWebp(Path file, int maxW, int maxH, WebpOpener decoder) throws IOException {
         try {
             return composeWithJava(file, maxW, maxH, decoder);
         } catch (IOException e) {
             // TwelveMonkeys' VP8 decoder runs out of data on some files libwebp reads fine (Discord's link previews):
             // nothing showed at all. libwebp's anim_dump reads them, still ones too.
-            List<BufferedImage> libwebp = app.unichat.video.AnimDump.frames(file);
-            if (libwebp == null || libwebp.isEmpty()) throw e;
-            List<BufferedImage> images = new ArrayList<>();
-            for (BufferedImage f : libwebp) images.add(scale(f, maxW, maxH));
-            int ms = libwebp.size() > 1 ? 100 : 0;
+            List<BufferedImage> images = app.unichat.video.AnimDump.frames(file, f -> scale(f, maxW, maxH));
+            if (images == null || images.isEmpty()) throw e;
+            int ms = images.size() > 1 ? 100 : 0;
             return new RawFrames(List.copyOf(images), java.util.Collections.nCopies(images.size(), ms));
         }
     }
 
-    /** Reads a WebP's frame {@code i} in Java (TwelveMonkeys); a test hands one that fails as it did. */
-    @FunctionalInterface
-    interface WebpReader {
-        BufferedImage read(Path file, int i) throws IOException;
+    /** A WebP's frames read in Java (TwelveMonkeys), one reader for the whole file; a test hands one that fails as it did. */
+    interface WebpReader extends AutoCloseable {
+        BufferedImage read(int i) throws IOException;
+
+        @Override
+        void close() throws IOException;
     }
 
-    private static final WebpReader JAVA_WEBP = (file, i) -> {
+    /** Opens a {@link WebpReader} on a file. */
+    @FunctionalInterface
+    interface WebpOpener {
+        WebpReader open(Path file) throws IOException;
+    }
+
+    private static final WebpOpener JAVA_WEBP = file -> {
         ImageReader reader = new WebPImageReaderSpi().createReaderInstance();
-        try (ImageInputStream in = ImageIO.createImageInputStream(file.toFile())) {
-            reader.setInput(in);
-            return reader.read(i);
-        } finally {
-            reader.dispose();
-        }
+        ImageInputStream in = ImageIO.createImageInputStream(file.toFile());
+        reader.setInput(in);
+        return new WebpReader() {
+            @Override
+            public BufferedImage read(int i) throws IOException {
+                return reader.read(i);
+            }
+
+            @Override
+            public void close() throws IOException {
+                reader.dispose();
+                in.close();
+            }
+        };
     };
 
-    private static RawFrames composeWithJava(Path file, int maxW, int maxH, WebpReader decoder) throws IOException {
+    private static RawFrames composeWithJava(Path file, int maxW, int maxH, WebpOpener decoder) throws IOException {
         if (isBigWebp(file)) { // a phone's photo, not a sticker: never decoded here (see BigPictures)
             BufferedImage small = ImageIO.read(shrunk(file).toFile());
             if (small == null) throw new IOException(I18n.t("image.invalid"));
@@ -463,23 +485,23 @@ public final class AnimatedImage {
         if (!layout.frames().isEmpty()) {
             // libwebp composites it as a browser does; the Java decoder below gets some lossy frames' colours wrong (black
             // blotches over a sticker). It's only the fallback when anim_dump is missing or fails.
-            List<BufferedImage> libwebp = app.unichat.video.AnimDump.frames(file);
+            List<BufferedImage> libwebp = app.unichat.video.AnimDump.frames(file, f -> scale(f, maxW, maxH));
             if (libwebp != null && libwebp.size() == layout.frames().size()) {
                 List<BufferedImage> images = new ArrayList<>();
                 List<Integer> durations = new ArrayList<>();
                 for (int i = 0; i < libwebp.size(); i++) {
-                    images.add(scale(libwebp.get(i), maxW, maxH));
+                    images.add(libwebp.get(i));
                     int ms = layout.frames().get(i).durationMs();
                     durations.add(ms <= 10 ? 100 : ms); // like browsers: very short/zero durations play at 100 ms
                 }
                 return new RawFrames(List.copyOf(images), List.copyOf(durations));
             }
         }
-        {
+        try (WebpReader reader = decoder.open(file)) {
             List<BufferedImage> images = new ArrayList<>();
             List<Integer> durations = new ArrayList<>();
             if (layout.frames().isEmpty()) {
-                images.add(scale(decoder.read(file, 0), maxW, maxH));
+                images.add(scale(reader.read(0), maxW, maxH));
                 durations.add(0);
             } else {
                 BufferedImage canvas = new BufferedImage(layout.canvasWidth(), layout.canvasHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -488,7 +510,7 @@ public final class AnimatedImage {
                 for (int i = 0; i < layout.frames().size(); i++) {
                     if (previous != null && previous.disposeToBackground()) clear(g, previous);
                     AnimFrame f = layout.frames().get(i);
-                    BufferedImage patch = decoder.read(file, i);
+                    BufferedImage patch = reader.read(i);
                     if (f.noBlend()) clear(g, f);
                     g.setComposite(AlphaComposite.SrcOver);
                     g.drawImage(patch, f.x(), f.y(), null);

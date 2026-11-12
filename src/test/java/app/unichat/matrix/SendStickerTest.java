@@ -24,6 +24,7 @@ class SendStickerTest {
     private HttpServer server;
     private volatile String path;
     private volatile String body;
+    private final java.util.List<String> puts = new java.util.concurrent.CopyOnWriteArrayList<>();
     private volatile String uploadedType;
     /** What the fake server serves as any media; null = a 16 px GIF. */
     private volatile java.nio.file.Path served;
@@ -54,6 +55,7 @@ class SendStickerTest {
         server.createContext("/", ex -> {
             if ("PUT".equals(ex.getRequestMethod())) {
                 path = ex.getRequestURI().getPath();
+                puts.add(path);
                 body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             }
             byte[] b = "{\"event_id\":\"$s1\"}".getBytes(StandardCharsets.UTF_8);
@@ -335,6 +337,22 @@ class SendStickerTest {
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("nos vemos", sent.path("body").asText());
         assertNull(uploadedType, "nothing to upload");
+    }
+
+    /** A message a bridge refused only because it wasn't connected yet goes again, and the failed one is redacted. */
+    @Test
+    void aMessageTheBridgeWasntReadyForGoesAgainAndTheFailedOneIsRedacted() throws Exception {
+        MatrixChatService svc = chatOn("discord");
+        svc.sendText("!c:example.org", "hola", null).get();
+        puts.clear();
+        svc.sender().retrySeconds(0);
+        svc.sender().sendAgainWhenReady("$s1").get();
+        assertEquals(2, puts.size(), puts.toString());
+        assertTrue(puts.get(0).contains("/send/m.room.message/"), "sent again: " + puts);
+        assertTrue(puts.get(1).contains("/redact/") && puts.get(1).contains("s1"), "the failed one redacted: " + puts);
+        puts.clear();
+        svc.sender().sendAgainWhenReady("$unknown").get();
+        assertTrue(puts.isEmpty(), "only what was sent from here");
     }
 
     @Test

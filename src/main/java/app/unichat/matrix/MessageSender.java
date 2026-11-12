@@ -270,6 +270,7 @@ final class MessageSender {
             try {
                 JsonNode resp = client.sendEvent(chatId, type, txn, content);
                 String id = resp.path("event_id").asText(null);
+                if (id != null) recent.put(id, new Sent(chatId, type, content.deepCopy(), 0));
                 synchronized (proc) {
                     proc.confirmLocalEcho(chatId, txn, id);
                 }
@@ -283,6 +284,43 @@ final class MessageSender {
                 throw new CompletionException(e);
             }
         }, core.io);
+    }
+
+    /** What was sent lately, by its event id: sent again when a bridge refused it only because it wasn't connected yet. */
+    private record Sent(String chatId, String type, ObjectNode content, int tries) {}
+
+    private static final int REMEMBERED = 200, MOST_TRIES = 3;
+    private final Map<String, Sent> recent = java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>(16, 0.75f, false) {
+        @Override protected boolean removeEldestEntry(Map.Entry<String, Sent> eldest) {
+            return size() > REMEMBERED;
+        }
+    });
+    /** Seconds before each try again: a bridge that restarts with Unichat connects within seconds. Tests pass zeros. */
+    private long[] retrySeconds = {15, 30, 60};
+
+    void retrySeconds(long... seconds) { this.retrySeconds = seconds; }
+
+    /**
+     * {@code eventId}, refused by its bridge only because it wasn't connected yet (a sticker sent as Unichat restarted
+     * reached Discord's bridge 3 s before it was: "not logged in", failed for good), goes again after a while; once
+     * through, the failed one is redacted and leaves the chat. At most {@link #MOST_TRIES}; completes when done or given up.
+     */
+    CompletableFuture<Void> sendAgainWhenReady(String eventId) {
+        Sent s = recent.remove(eventId);
+        if (s == null || s.tries() >= MOST_TRIES) return CompletableFuture.completedFuture(null);
+        long wait = retrySeconds[Math.min(s.tries(), retrySeconds.length - 1)];
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                String again = client.sendEvent(s.chatId(), s.type(), core.newTxnId(), s.content()).path("event_id").asText(null);
+                if (again != null) recent.put(again, new Sent(s.chatId(), s.type(), s.content(), s.tries() + 1));
+                redactEvent(s.chatId(), eventId);
+                System.err.println("Sent again once the bridge was ready (try " + (s.tries() + 1) + ")");
+                return null;
+            } catch (Exception e) {
+                System.err.println("Sending again failed: " + e);
+                return null;
+            }
+        }, CompletableFuture.delayedExecutor(wait, java.util.concurrent.TimeUnit.SECONDS, core.io));
     }
 
     /** Per chat, the last message a public receipt went out for when sending, so a batch of files sends one. */

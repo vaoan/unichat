@@ -429,6 +429,20 @@ class AutoSaveTest {
                 "a reel shown as a picture still gets its video");
     }
 
+    /**
+     * A reel one sends comes back as its video with its link in the text too ("[https://…/reel/X/](…?igsh=…)"): the
+     * text's link was saved again from the page, every reel twice (Pablo BM's folder).
+     */
+    @Test
+    void aReelsLinkInItsOwnTextIsntDownloadedAgain() {
+        Message video = media(MessageType.VIDEO, "AQN8.mp4", true, Instant.now());
+        video.setExternalUrl("https://www.instagram.com/reel/DflrCtXgNxQ/?igsh=abc");
+        video.setBody("[https://www.instagram.com/reel/DflrCtXgNxQ/](https://www.instagram.com/reel/DflrCtXgNxQ/?igsh=abc) mira esto");
+        assertTrue(AutoSave.links(video).isEmpty(), "the video is that reel: " + AutoSave.links(video));
+        video.setBody("https://www.instagram.com/reel/DflrCtXgNxQ/ y https://www.instagram.com/reel/Otro123/");
+        assertEquals(java.util.Set.of("https://www.instagram.com/reel/Otro123/"), AutoSave.links(video), "another page still goes");
+    }
+
     @Test
     void whatISendIsSavedOnceTheServerHasItNotWhileItsBeingSent() throws Exception {
         svc.setAutoSave(chat.id(), true, EnumSet.allOf(SaveKind.class)).get();

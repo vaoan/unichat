@@ -75,14 +75,35 @@ public final class Processes {
         return new Result(r.finished(), r.exit(), r.out().toString(StandardCharsets.UTF_8));
     }
 
-    /**
-     * Its output as the bytes it wrote (a video's frames), within {@code seconds}: empty when it didn't end well. As
-     * {@link #capture}, it's stopped with its children past the limit or when the waiting thread is interrupted.
-     */
-    public static byte[] bytes(ProcessBuilder command, long seconds) throws IOException, InterruptedException {
-        Ran r = run(command, Limit.of(seconds), null, null);
-        return r.finished() && r.exit() == 0 ? r.out().toByteArray() : new byte[0];
+    /** Reads a program's output as it comes. */
+    @FunctionalInterface
+    public interface Reader {
+        void read(InputStream out) throws IOException;
     }
+
+    /**
+     * Hands {@code reader} its output as it comes (a video's frames, one at a time: kept whole they were the peak that
+     * filled the memory), within {@code seconds}. Stopped with its children past the limit, when the reader is done or
+     * fails, or when this thread is interrupted. Whether it ended well.
+     */
+    public static boolean read(ProcessBuilder command, long seconds, Reader reader) throws IOException, InterruptedException {
+        Process p = command.start();
+        closeInput(p);
+        java.util.concurrent.ScheduledFuture<?> limit = LIMITS.schedule(() -> {
+            p.descendants().forEach(ProcessHandle::destroyForcibly);
+            p.destroyForcibly();
+        }, seconds, TimeUnit.SECONDS);
+        try (InputStream out = p.getInputStream()) {
+            reader.read(out);
+            return p.waitFor(seconds, TimeUnit.SECONDS) && p.exitValue() == 0;
+        } finally {
+            limit.cancel(false);
+            if (p.isAlive()) stop(p);
+        }
+    }
+
+    private static final java.util.concurrent.ScheduledExecutorService LIMITS =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(Threads.daemon("process-limit"));
 
     private record Ran(boolean finished, int exit, ByteArrayOutputStream out) {}
 

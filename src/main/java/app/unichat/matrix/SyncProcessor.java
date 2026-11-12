@@ -51,6 +51,8 @@ final class SyncProcessor {
         boolean hasMore = true;
         /** What bridges said about messages (event id → status), for {@link SendStatuses}. */
         final Map<String, String> sendStatuses = new HashMap<>();
+        /** Our events a bridge refused only because it wasn't connected yet ("not logged in"), with their room: they go again. */
+        final Map<String, String> bridgeNotReady = new HashMap<>();
     }
 
     private final String me;
@@ -459,6 +461,7 @@ final class SyncProcessor {
         if (target == null) return;
         String status = String.valueOf(text(content, "status"));
         r.sendStatuses.put(target, status);
+        if (status.startsWith("FAIL") && bridgeNotReady(text(content, "error"))) r.bridgeNotReady.put(target, room.id);
         Message t = room.byId.get(target);
         if (t == null) {
             addPending(room, target, ev);
@@ -470,6 +473,14 @@ final class SyncProcessor {
         if (next == null || next == t.status()) return;
         t.setStatus(next);
         r.messagesChanged.add(room.id);
+    }
+
+    /**
+     * Whether a bridge's refusal only means it wasn't connected yet: a message sent as Unichat restarted its bridges got
+     * "user is not logged in" from Discord's and failed for good, three seconds before it was connected again.
+     */
+    static boolean bridgeNotReady(String error) {
+        return error != null && error.toLowerCase(java.util.Locale.ROOT).contains("not logged in");
     }
 
     /** Events kept per room waiting for their target; the oldest go past this. */
@@ -560,6 +571,15 @@ final class SyncProcessor {
             return;
         }
         Message m = room.byId.get(targetId);
+        if (m != null && m.outgoing() && m.status() == app.unichat.model.MessageStatus.FAILED) {
+            // One of ours that never got through, redacted because it went again: it leaves, no "deleted" in its place.
+            room.byId.remove(targetId);
+            room.timeline.remove(m);
+            r.messagesChanged.add(room.id);
+            r.chatsChanged = true;
+            fields.refresh(room);
+            return;
+        }
         if (m != null && !m.deleted()) {
             m.markDeleted();
             r.messagesChanged.add(room.id);

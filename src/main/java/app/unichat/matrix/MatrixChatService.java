@@ -354,6 +354,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
 
     private void dispatch(SyncProcessor.Result r, boolean notify) {
         r.sendStatuses.forEach(core.statuses::heard);
+        r.bridgeNotReady.keySet().forEach(sender::sendAgainWhenReady);
         if (r.chatsChanged) core.fire(Listener::chatsChanged);
         for (String id : r.messagesChanged) core.fire(l -> l.messagesChanged(id));
         // Read elsewhere (the phone, another client): nothing up to there is news any more.

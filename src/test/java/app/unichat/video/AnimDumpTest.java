@@ -73,4 +73,20 @@ class AnimDumpTest {
         assertEquals(0xFFFF0000, img.getRGB(0, 0));
         assertEquals(0x800000FF, img.getRGB(1, 0));
     }
+
+    /**
+     * Each frame is made small as it's read: all of a 512 px sticker's frames whole at once (1 MB each) were the peak
+     * that filled the memory when the sticker panel opened.
+     */
+    @Test
+    void eachFrameIsMadeSmallAsItsRead() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(AnimDump.find() != null, "no anim_dump");
+        List<int[]> sizes = new java.util.ArrayList<>();
+        List<BufferedImage> frames = AnimDump.frames(asset(), f -> {
+            sizes.add(new int[] {f.getWidth(), f.getHeight()});
+            return new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB);
+        });
+        assertEquals(sizes.size(), frames.size(), "every frame through it");
+        assertTrue(frames.stream().allMatch(f -> f.getWidth() == 8), "only the small ones kept");
+    }
 }

@@ -135,7 +135,10 @@ class AnimatedImageTest {
     void aWebpTheJavaDecoderCantReadIsReadByLibwebp() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.video.AnimDump.find() != null, "no anim_dump");
         Path still = Path.of(AnimatedImageTest.class.getResource("/app/unichat/ui/still.webp").toURI());
-        AnimatedImage.WebpReader failing = (file, i) -> { throw new java.io.EOFException(); };
+        AnimatedImage.WebpOpener failing = file -> new AnimatedImage.WebpReader() {
+            @Override public java.awt.image.BufferedImage read(int i) throws java.io.IOException { throw new java.io.EOFException(); }
+            @Override public void close() { }
+        };
         AnimatedImage.RawFrames frames = AnimatedImage.composeWebp(still, 64, 64, failing);
         assertEquals(1, frames.images().size(), "libwebp read it");
         assertEquals(32, frames.images().getFirst().getWidth());
