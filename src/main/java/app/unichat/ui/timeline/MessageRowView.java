@@ -196,6 +196,8 @@ final class MessageRowView {
         }
         bubble.setMaxWidth(maxWidth);
         bubble.setFillWidth(false);
+        // What's narrower than the bubble (a sticker under a longer quote) keeps to the chat's side, not the quote's text.
+        if (out) bubble.setAlignment(Pos.TOP_RIGHT);
 
         if (m.replyToId() != null) bubble.getChildren().add(replyQuote(m, maxWidth));
 
