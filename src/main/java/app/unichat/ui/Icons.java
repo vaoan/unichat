@@ -28,6 +28,8 @@ public final class Icons {
     public static final String ATTACH = "M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6h-1.5Z";
     public static final String EMOJI = "M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm-3.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm7 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM7.5 13.5h9a4.5 4.5 0 0 1-9 0Z";
     public static final String REPLY = "M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11Z";
+    /** The reply arrow turned the other way: a message passed on. */
+    public static final String FORWARD = "M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11Z";
     public static final String MORE = "M5 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z";
     public static final String STAR = "m12 2.5 2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8L12 2.5Z";
     public static final String BELL_OFF = "M20.8 19.4 4.6 3.2 3.2 4.6l3.1 3.1A6 6 0 0 0 6 9.5V15l-2 2v1h12.6l2.8 2.8 1.4-1.4ZM18 15V9.5a6 6 0 0 0-8.7-5.4L18 12.8V15Zm-6 7a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Z";

@@ -30,47 +30,62 @@ class StickerConverterTest {
 
     @Test
     void telegramsBridgeTakesAsTheyArePngJpegWebmAndLottieOnly() {
-        for (String m : new String[] {"image/gif", "image/webp", "image/apng", "application/octet-stream"}) {
-            assertTrue(StickerConverter.forTelegram(Network.TELEGRAM, m), m);
-        }
         for (String m : new String[] {"image/png", "image/jpeg", "video/webm", "video/lottie+json"}) {
-            assertFalse(StickerConverter.forTelegram(Network.TELEGRAM, m), m);
+            assertNull(NetworkFormats.sticker(Network.TELEGRAM, m, true, false, RoomFeatures.UNKNOWN), m);
         }
-        assertFalse(StickerConverter.forTelegram(Network.WHATSAPP, "image/gif"), "only Telegram's bridge");
+        assertEquals("video/webm", NetworkFormats.sticker(Network.TELEGRAM, "image/gif", true, false, RoomFeatures.UNKNOWN),
+                "an animated GIF: a video sticker");
+        assertEquals("image/png", NetworkFormats.sticker(Network.TELEGRAM, "image/webp", false, false, RoomFeatures.UNKNOWN),
+                "a WebP would go through an ffmpeg that may not write WebP: a PNG it encodes itself");
+        assertNull(NetworkFormats.sticker(Network.TELEGRAM, "image/gif", true, true, RoomFeatures.UNKNOWN),
+                "its own sticker: the bridge sends it from its pack");
     }
 
+    /** One table, every network: a WebM there is a video to press play on, so it goes as an animated WebP. */
     @Test
-    void aWebmStickerGoesAsAGifEverywhereButTelegram() {
+    void aWebmStickerGoesAsAnAnimatedWebpEverywhereButTelegram() {
         for (Network n : new Network[] {Network.DISCORD, Network.WHATSAPP, Network.INSTAGRAM}) {
-            assertTrue(StickerConverter.asGif(n, "video/webm"), n + ": a WebM there is a video to press play on");
+            assertEquals("image/webp", NetworkFormats.sticker(n, "video/webm", true, false, RoomFeatures.UNKNOWN), n.name());
         }
-        assertFalse(StickerConverter.asGif(Network.TELEGRAM, "video/webm"), "Telegram's own video stickers");
-        assertFalse(StickerConverter.asGif(Network.DISCORD, "image/webp"), "Discord plays an animated WebP by itself");
-        assertFalse(StickerConverter.asGif(Network.DISCORD, "image/gif"));
+        assertNull(NetworkFormats.sticker(Network.TELEGRAM, "video/webm", true, false, RoomFeatures.UNKNOWN), "Telegram's own video stickers");
+        assertNull(NetworkFormats.sticker(Network.DISCORD, "image/webp", true, false, RoomFeatures.UNKNOWN), "Discord plays an animated WebP by itself");
+        assertNull(NetworkFormats.sticker(Network.DISCORD, "image/gif", true, false, RoomFeatures.UNKNOWN));
+        assertEquals("image/webp", NetworkFormats.sticker(Network.DISCORD, "video/webm", null, false, RoomFeatures.UNKNOWN),
+                "not read yet: it will change");
     }
 
     @Test
-    void aWebmBecomesAnAnimatedGif() throws Exception {
+    void gifsThatCameAsVideosGoAsTheyAreOnlyWhereTheBridgeSaysSo() {
+        assertTrue(NetworkFormats.of(Network.TELEGRAM).gifVideosAsIs());
+        assertTrue(NetworkFormats.of(Network.WHATSAPP).gifVideosAsIs());
+        assertFalse(NetworkFormats.of(Network.DISCORD).gifVideosAsIs(), "Discord shows the MP4 as a video to press play on");
+    }
+
+    @Test
+    void aWebmBecomesAnAnimatedWebpWithItsTransparency() throws Exception {
         Path ffmpeg = app.unichat.video.Ffmpeg.find();
         Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        Assumptions.assumeTrue(app.unichat.video.AnimatedWebp.img2webp() != null, "no img2webp");
         Path webm = dir.resolve("s.webm");
-        Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
-                "-c:v", "libvpx-vp9", webm.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10,format=yuva420p",
+                "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", webm.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
         Assumptions.assumeTrue(p.waitFor() == 0, "this ffmpeg can't make a WebM");
-        StickerConverter.Result r = StickerConverter.forChat(webm, "video/webm", false, true, RoomFeatures.UNKNOWN, dir);
+        StickerConverter.Result r = StickerConverter.forChat(webm, "video/webm", Network.DISCORD, false, RoomFeatures.UNKNOWN, dir);
         assertNotNull(r);
-        assertEquals("image/gif", r.mime());
-        assertTrue(app.unichat.gif.GifFrames.count(r.file()) > 1, "it still moves");
+        assertEquals("image/webp", r.mime());
+        String b = new String(Files.readAllBytes(r.file()), java.nio.charset.StandardCharsets.ISO_8859_1);
+        assertTrue(b.contains("ANIM") && b.contains("ALPH"), "it still moves, and keeps its transparency");
     }
 
     @Test
     void picksWebpThenPngAndLeavesAcceptedStickersAlone() throws Exception {
         RoomFeatures wa = features("{\"image/webp\":2,\"image/png\":1}");
-        assertEquals("image/webp", StickerConverter.target("image/gif", wa));
-        assertNull(StickerConverter.target("image/webp", wa), "already fine");
-        assertEquals("image/png", StickerConverter.target("image/gif", features("{\"image/png\":2}")));
-        assertNull(StickerConverter.target("image/gif", features("{\"video/lottie+json\":2}")), "nothing better to offer");
-        assertNull(StickerConverter.target("image/gif", RoomFeatures.UNKNOWN));
+        assertEquals("image/webp", NetworkFormats.byFeatures("image/gif", wa));
+        assertNull(NetworkFormats.byFeatures("image/webp", wa), "already fine");
+        assertEquals("image/png", NetworkFormats.byFeatures("image/gif", features("{\"image/png\":2}")));
+        assertNull(NetworkFormats.byFeatures("image/gif", features("{\"video/lottie+json\":2}")), "nothing better to offer");
+        assertNull(NetworkFormats.byFeatures("image/gif", RoomFeatures.UNKNOWN));
+        assertEquals("image/webp", NetworkFormats.sticker(Network.WHATSAPP, "image/gif", true, false, wa), "WhatsApp: what its bridge says");
     }
 
     private Path gif() throws Exception {
@@ -102,9 +117,4 @@ class StickerConverterTest {
         assertTrue(r.file().getFileName().toString().endsWith(".png"));
     }
 
-    @Test
-    void aGifOverDiscordsLimitGoesAsItsVideo() {
-        assertTrue(StickerConverter.fitsAsGif(9L << 20));
-        assertFalse(StickerConverter.fitsAsGif(11L << 20), "Discord refuses files over 10 MB without Nitro");
-    }
 }

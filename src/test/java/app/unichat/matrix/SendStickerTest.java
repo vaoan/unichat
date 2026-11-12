@@ -173,9 +173,10 @@ class SendStickerTest {
     }
 
     @Test
-    void aTelegramVideoStickerGoesToDiscordAsAGifThatPlaysByItself(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+    void aTelegramVideoStickerGoesToDiscordAsAnAnimatedWebpThatPlaysByItself(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
         java.nio.file.Path ffmpeg = app.unichat.video.Ffmpeg.find();
         org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.video.AnimatedWebp.img2webp() != null, "no img2webp");
         served = dir.resolve("s.webm");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
                 "-c:v", "libvpx-vp9", served.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
@@ -185,10 +186,10 @@ class SendStickerTest {
                 {"mimetype":"video/webm","w":64,"h":64,"fi.mau.bridged_sticker":{"network":"telegram","id":"7","pack_url":"https://t.me/addstickers/X"}}""");
         svc.sender().sendStickerFor("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/webm", "video/webm", 64, 64, info),
                 app.unichat.model.RoomFeatures.UNKNOWN, null).get();
-        assertEquals("image/gif", uploadedType, "Discord shows a WebM as a video to press play on");
+        assertEquals("image/webp", uploadedType, "Discord shows a WebM as a video to press play on; an animated WebP plays by itself");
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("mxc://s/converted", sent.path("url").asText());
-        assertEquals("image/gif", sent.path("info").path("mimetype").asText());
+        assertEquals("image/webp", sent.path("info").path("mimetype").asText());
     }
 
     @Test
@@ -286,9 +287,10 @@ class SendStickerTest {
 
     /** Telegram's GIFs are silent MP4s marked as GIFs: Discord showed them as videos to press play on. */
     @Test
-    void aGifThatCameAsAVideoGoesToDiscordAsAGifAndToTelegramAsItIs(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+    void aGifThatCameAsAVideoGoesToDiscordAsAnAnimatedWebpAndToTelegramAsItIs(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
         java.nio.file.Path ffmpeg = app.unichat.video.Ffmpeg.find();
         org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.support.BundledTools.find("unichat.img2webp", null, "img2webp") != null, "no img2webp");
         served = dir.resolve("gif.mp4");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
                 "-pix_fmt", "yuv420p", "-an", served.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
@@ -302,11 +304,11 @@ class SendStickerTest {
         m.setMediaInfo(MatrixClient.JSON.readTree("{\"mimetype\":\"video/mp4\",\"duration\":1000,\"fi.mau.gif\":true,\"fi.mau.loop\":true}"));
 
         chatOn("discord").forward("!c:example.org", m, true).get();
-        assertEquals("image/gif", uploadedType, "a GIF Discord plays by itself");
+        assertEquals("image/webp", uploadedType, "an animated WebP, which Discord plays by itself");
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("m.image", sent.path("msgtype").asText());
-        assertEquals("image/gif", sent.path("info").path("mimetype").asText());
-        assertEquals("gif.gif", sent.path("filename").asText());
+        assertEquals("image/webp", sent.path("info").path("mimetype").asText());
+        assertEquals("gif.webp", sent.path("filename").asText());
 
         uploadedType = null;
         chatOn("telegram").forward("!c:example.org", m, true).get();

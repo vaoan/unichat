@@ -100,6 +100,22 @@ public final class WebmStickers {
         }
     }
 
+    /**
+     * {@code webm} as an animated WebP at {@code out}, its transparency kept (smooth edges, where a GIF's are all or
+     * nothing) and lighter than a GIF ({@link AnimatedWebp}). Blocking; {@link NoConverter} without ffmpeg, an
+     * IOException without img2webp or when it can't be made.
+     */
+    public static Path toWebp(Path webm, Path out, DoubleConsumer installProgress) throws IOException, InterruptedException {
+        Path ffmpeg = Ffmpeg.whenNeeded(installProgress);
+        if (ffmpeg == null) throw new NoConverter();
+        Path img2webp = AnimatedWebp.img2webp();
+        if (img2webp == null) throw new IOException("img2webp isn't there");
+        double seconds = AnimatedWebp.probe(ffmpeg, webm, AnimatedWebp.Source.WEBM).seconds();
+        AnimatedWebp.make(ffmpeg, img2webp, webm, AnimatedWebp.Source.WEBM, out, Integer.parseInt(TELEGRAM_FPS),
+                Integer.parseInt(MAX_SIDE), 80, Math.min(seconds, Integer.parseInt(MAX_SECONDS)));
+        return out;
+    }
+
     /** {@code gif} as a Telegram video sticker at {@code out}. Blocking; {@link NoConverter} without ffmpeg. */
     public static Path fromGif(Path gif, Path out, DoubleConsumer installProgress) throws IOException, InterruptedException {
         Path ffmpeg = Ffmpeg.whenNeeded(installProgress);
@@ -119,23 +135,12 @@ public final class WebmStickers {
     }
 
     static List<String> command(Path ffmpeg, Path webm, Path out, String format, boolean libvpx) {
-        return command(ffmpeg, webm, "matroska", out, format, libvpx, Integer.parseInt(MAX_SIDE), MAX_SECONDS);
-    }
-
-    /**
-     * {@code in} read as {@code inFormat} only (ffmpeg's demuxer: "matroska" for WebM, "mov" for MP4), as an animation at
-     * most {@code maxSide} wide and {@code maxSeconds} long (null: all of it).
-     */
-    static List<String> command(Path ffmpeg, Path in, String inFormat, Path out, String format, boolean libvpx, int maxSide,
-                                String maxSeconds) {
         List<String> c = new ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
                 // The file comes from other people: only itself may be read, as what it claims to be.
-                "-protocol_whitelist", "file", "-f", inFormat));
+                "-protocol_whitelist", "file", "-f", "matroska"));
         if (libvpx) c.addAll(List.of("-c:v", "libvpx-vp9"));
-        c.addAll(List.of("-i", in.toString()));
-        if (maxSeconds != null) c.addAll(List.of("-t", maxSeconds)); // a sticker; a GIF that came as a video keeps all of it
-        c.add("-an");
-        String scale = "scale=w='min(" + maxSide + ",iw)':h=-2";
+        c.addAll(List.of("-i", webm.toString(), "-t", MAX_SECONDS, "-an"));
+        String scale = "scale=w='min(" + MAX_SIDE + ",iw)':h=-2";
         if (format.equals(WEBP)) c.addAll(List.of("-vf", scale, "-c:v", "libwebp_anim", "-q:v", "75"));
         else c.addAll(List.of("-vf", scale + ",split[a][b];[a]palettegen=reserve_transparent=1[p];[b][p]paletteuse"));
         c.addAll(List.of("-loop", "0", "-f", format, out.toString()));

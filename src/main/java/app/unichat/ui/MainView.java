@@ -170,7 +170,7 @@ public final class MainView extends StackPane {
         panel.setContent(SidePanel.Tab.FAVORITES, favorites, favorites::refresh);
         thread.composer().setOnPanel(this::togglePanel);
         offerProtectedPhotos(svc);
-        forwards = new app.unichat.ui.timeline.ForwardBar(svc);
+        forwards = new app.unichat.ui.timeline.ForwardBar(svc, this::openChatId);
         thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(svc, this::showOverlay, this::hideOverlay, forwards::show));
         offerChatOptions(svc);
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::gearClicked);

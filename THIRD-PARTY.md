@@ -7,7 +7,7 @@ Unichat's own code is [0BSD](LICENSE). Unichat's packages also carry the compone
 | Component | Version | License | What for |
 |---|---|---|---|
 | whisper.cpp (whisper-cli) | 1.9.5 | MIT | transcribing voice notes |
-| libwebp (gif2webp, anim_dump) | 1.6.0 | BSD-3-Clause + patent grant | animated stickers |
+| libwebp (gif2webp, img2webp, anim_dump) | 1.6.0 | BSD-3-Clause + patent grant | animated stickers |
 | GIFLib (inside gif2webp) | 5.2.2 | MIT | reading GIFs |
 | libolm | 3.2.16 | Apache-2.0 | needed by the bridges on macOS |
 | tuwunel | v1.9.4 | Apache-2.0 | local Matrix server |
@@ -476,7 +476,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### libwebp (gif2webp, anim_dump)
+### libwebp (gif2webp, img2webp, anim_dump)
 
 **COPYING**
 

@@ -8,15 +8,9 @@ import app.unichat.support.I18n;
 import app.unichat.ui.FxCoalescer;
 import app.unichat.ui.Icons;
 import app.unichat.ui.Nodes;
+import app.unichat.ui.TaskBar;
 import javafx.animation.PauseTransition;
-import javafx.geometry.Pos;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
 /**
@@ -24,43 +18,30 @@ import javafx.util.Duration;
  * now, and a way to stop what's left. Forwards go one at a time (a GIF made from a video takes seconds), and nothing
  * said so. Stays after the end to say how it went: a few seconds when all went, until closed when some didn't.
  */
-public final class ForwardBar extends HBox {
+public final class ForwardBar extends TaskBar {
     private static final Duration DONE_SHOWN = Duration.seconds(5);
 
     private final ChatReader chats;
-    private final Label what = new Label();
-    private final Label now = new Label();
-    private final ProgressBar bar = new ProgressBar(0);
-    private final Label count = new Label();
     private final Button stop;
     private final Button close;
     private final FxCoalescer redraw = new FxCoalescer(this::refresh);
     private final PauseTransition hideLater = new PauseTransition(DONE_SHOWN);
     private Forwarding.Job job;
+    private String chatId;
 
-    public ForwardBar(ChatReader chats) {
-        super(10);
+    public ForwardBar(ChatReader chats, java.util.function.Consumer<String> openChat) {
+        super("forward-bar");
         this.chats = chats;
-        getStyleClass().addAll("audio-bar", "upload-bar", "forward-bar");
-        setAlignment(Pos.CENTER_LEFT);
-        what.getStyleClass().add("audio-who");
-        what.setMinWidth(0);
-        now.getStyleClass().add("audio-time");
-        now.setMinWidth(0);
-        VBox texts = new VBox(0, what, now);
-        texts.setAlignment(Pos.CENTER_LEFT);
-        texts.setMinWidth(0);
-        HBox.setHgrow(texts, Priority.ALWAYS);
-        bar.setPrefWidth(160);
-        bar.setMinWidth(80);
-        count.getStyleClass().add("upload-percent");
-        count.setMinWidth(Region.USE_PREF_SIZE);
+        lead.getChildren().setAll(Icons.icon(Icons.FORWARD, 20));
+        where.setOnAction(e -> {
+            if (chatId != null) openChat.accept(chatId);
+        });
         stop = Icons.iconButton(Icons.CLOSE, I18n.t("forwardBar.stop"), () -> {
             if (job != null) job.cancel();
         });
         close = Icons.iconButton(Icons.CLOSE, I18n.t("forwardBar.close"), this::dismiss);
         hideLater.setOnFinished(e -> dismiss());
-        getChildren().addAll(texts, bar, count, stop, close);
+        actions(stop, close);
         Nodes.show(this, false);
     }
 
@@ -68,6 +49,7 @@ public final class ForwardBar extends HBox {
     public void show(Forwarding.Job forwarding) {
         hideLater.stop();
         job = forwarding;
+        lead.getChildren().setAll(Icons.icon(Icons.FORWARD, 20));
         forwarding.addListener(() -> {
             if (forwarding == job) redraw.request();
         });
@@ -86,19 +68,28 @@ public final class ForwardBar extends HBox {
         if (j == null) return;
         int went = j.sent() + j.failed();
         bar.setProgress(j.total() == 0 ? 1 : went / (double) j.total());
-        count.setText(I18n.t("forwardBar.count", went, j.total()));
+        big.setText(I18n.t("forwardBar.count", went, j.total()));
         Nodes.show(stop, !j.finished());
         Nodes.show(close, j.finished());
+        chatId = j.currentChat() != null ? j.currentChat() : j.chatIds().getFirst();
+        Chat c = chats.chat(chatId);
+        where.setText(I18n.t("uploadBar.where", c == null ? "" : c.title()));
         if (!j.finished()) {
             what.setText(I18n.t(j.cancelled() ? "forwardBar.stopping" : "forwardBar.going", where(j)));
-            now.setText(j.current() == null ? "" : shown(j.current()));
-            return;
+            detail.setText(j.current() == null ? "" : shown(j.current()));
+            stage.setText("");
+            hideLater.stop();
+        } else {
+            what.setText(j.failed() > 0 ? I18n.n("forwardBar.failed", j.failed(), j.sent())
+                    : I18n.t(j.cancelled() ? "forwardBar.stopped" : "forwardBar.done", j.sent(), where(j)));
+            detail.setText("");
+            where.setText("");
+            lead.getChildren().setAll(Icons.icon(j.failed() > 0 ? Icons.ERROR : Icons.CHECK, 22));
+            if (j.failed() == 0) hideLater.playFromStart();
+            else hideLater.stop();
         }
-        what.setText(j.failed() > 0 ? I18n.n("forwardBar.failed", j.failed(), j.sent())
-                : I18n.t(j.cancelled() ? "forwardBar.stopped" : "forwardBar.done", j.sent(), where(j)));
-        now.setText("");
-        if (j.failed() == 0) hideLater.playFromStart();
-        else hideLater.stop();
+        tidy();
+        bar.setAccessibleText(what.getText() + ". " + big.getText());
     }
 
     /** "Buga", or "Buga y 2 más". */

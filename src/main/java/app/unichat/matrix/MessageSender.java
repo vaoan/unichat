@@ -158,15 +158,15 @@ final class MessageSender {
         fireLocal(chatId);
         String mimeType = info.path("mimetype").asText(null);
         Chat chat = core.chat(chatId);
-        boolean own = chat != null && ownSticker(info, chat.network());
-        boolean telegram = chat != null && !own && StickerConverter.forTelegram(chat.network(), mimeType);
-        boolean gif = chat != null && !own && StickerConverter.asGif(chat.network(), mimeType);
-        String target = StickerConverter.target(mimeType, features);
-        if (target == null && !copy && !telegram && !gif) return sendEvent(chatId, "m.sticker", txn, content);
+        Network network = chat == null ? null : chat.network();
+        boolean own = network != null && ownSticker(info, network);
+        // Whether it may change (NetworkFormats decides with the file, once downloaded); a copy goes up anyway.
+        String may = network == null ? NetworkFormats.byFeatures(mimeType, features) : NetworkFormats.sticker(network, mimeType, null, own, features);
+        if (may == null && !copy) return sendEvent(chatId, "m.sticker", txn, content);
         return media.media(item.url(), 0, 0).thenApplyAsync(src -> {
             try {
                 Path dir = Settings.get().cacheDir().resolve("stickers");
-                StickerConverter.Result r = StickerConverter.forChat(src, mimeType, telegram, gif, features, dir);
+                StickerConverter.Result r = StickerConverter.forChat(src, mimeType, network, own, features, dir);
                 if (r == null) {
                     String mime = info.path("mimetype").asText("application/octet-stream");
                     content.put("url", client.upload(src, mime, "sticker." + mime.replaceAll(".*/", "")));
@@ -214,7 +214,7 @@ final class MessageSender {
             return sendSticker(chatId, m.outgoing() ? MediaLibrary.original(item) : item, null);
         }
         Chat chat = core.chat(chatId);
-        boolean gif = gifs && chat != null && StickerConverter.gifAsGif(chat.network()) && app.unichat.video.GifVideos.fits(m);
+        boolean gif = gifs && chat != null && !NetworkFormats.of(chat.network()).gifVideosAsIs() && app.unichat.video.GifVideos.fits(m);
         boolean copy = m.isMedia() && (gif || needsCopy(m.mediaUrl()));
         ObjectNode content = ForwardedContent.of(m, copy);
         String txn = core.newTxnId();
@@ -225,11 +225,11 @@ final class MessageSender {
         if (!copy) return sendEvent(chatId, "m.room.message", txn, content);
         return media.media(m.mediaUrl(), 0, 0).thenApplyAsync(src -> {
             try {
-                Path file = gif ? app.unichat.video.GifVideos.gifOr(src) : src;
-                if (file != src && !StickerConverter.fitsAsGif(Files.size(file))) file = src; // too heavy: the video, which still plays
+                // An animated WebP, as small as it takes to fit (Discord: 10 MB without Nitro), else the video, which still plays.
+                Path file = gif ? app.unichat.video.GifVideos.webpUnder(src, app.unichat.video.GifVideos.maxBytes()) : src;
                 if (file != src) {
-                    ForwardedContent.becomeGif(content, Files.size(file));
-                    content.put("url", client.upload(file, StickerConverter.GIF, content.path("filename").asText("gif.gif")));
+                    ForwardedContent.becomeWebp(content, Files.size(file));
+                    content.put("url", client.upload(file, StickerConverter.WEBP, content.path("filename").asText("gif.webp")));
                 } else {
                     content.put("url", client.upload(src, m.mimeType() != null ? m.mimeType() : "application/octet-stream", ForwardedContent.fileName(m)));
                 }
