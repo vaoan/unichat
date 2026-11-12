@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -63,6 +64,18 @@ class WebmStickersTest {
                 .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
         assertEquals(0, p.waitFor());
         assertAnimatedWithTransparency(gif);
+    }
+
+    @Test
+    void aWebmThatCantBeAGifSaysWhatFfmpegSaid() throws Exception {
+        assumeTrue(Ffmpeg.find() != null, "no ffmpeg");
+        Path notWebm = Files.writeString(dir.resolve("x.webm"), "not a video");
+        IOException e = org.junit.jupiter.api.Assertions.assertThrows(IOException.class,
+                () -> WebmStickers.toGif(notWebm, dir.resolve("x.gif"), p -> { }));
+        assertTrue(e.getMessage().contains("(exit "), "the log can tell why: " + e.getMessage());
+        try (var left = Files.list(dir)) {
+            assertTrue(left.noneMatch(p -> p.getFileName().toString().contains(".why.")), "nothing left behind");
+        }
     }
 
     @Test

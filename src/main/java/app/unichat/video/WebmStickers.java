@@ -1,6 +1,7 @@
 package app.unichat.video;
 
 import app.unichat.support.ConvertedFiles;
+import app.unichat.support.Processes;
 import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 
@@ -76,9 +77,27 @@ public final class WebmStickers {
         if (ffmpeg == null) throw new NoConverter();
         if (PartFile.firstOf(out, TIMEOUT_SECONDS, List.of(into -> command(ffmpeg, webm, into, "gif", true),
                 into -> command(ffmpeg, webm, into, "gif", false))) == null) {
-            throw new IOException(I18n.t("video.stickerFailed"));
+            throw new IOException(I18n.t("video.stickerFailed") + " (" + ffmpegSays(ffmpeg, webm, out) + ")");
         }
         return out;
+    }
+
+    /** What ffmpeg says when the GIF can't be made (its last line, or how it ended), for the log. */
+    private static String ffmpegSays(Path ffmpeg, Path webm, Path out) throws InterruptedException {
+        Path probe = out.resolveSibling(out.getFileName() + ".why.gif");
+        try {
+            Processes.Result r = Processes.capture(new ProcessBuilder(command(ffmpeg, webm, probe, "gif", true))
+                    .redirectErrorStream(true), TIMEOUT_SECONDS);
+            return (r.finished() ? "exit " + r.exit() : "timed out") + ": " + Processes.lastLines(r.out(), 1).strip();
+        } catch (IOException e) {
+            return e.getClass().getSimpleName() + ": " + e.getMessage();
+        } finally {
+            try {
+                java.nio.file.Files.deleteIfExists(probe);
+            } catch (IOException ignored) {
+                // a leftover in the stickers folder
+            }
+        }
     }
 
     /** {@code gif} as a Telegram video sticker at {@code out}. Blocking; {@link NoConverter} without ffmpeg. */
