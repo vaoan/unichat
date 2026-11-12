@@ -137,7 +137,7 @@ public final class StickerConverter {
             throw new IOException(I18n.t("sticker.interrupted"), e);
         } catch (IOException e) {
             Files.deleteIfExists(out);
-            System.err.println("Sticker to GIF failed (" + e.getClass().getSimpleName() + "); sending the WebM");
+            System.err.println("Sticker to GIF failed (" + e.getClass().getSimpleName() + ": " + e.getMessage() + "); sending the WebM");
             return null;
         }
     }
