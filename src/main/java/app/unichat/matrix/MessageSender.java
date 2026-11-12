@@ -214,7 +214,7 @@ final class MessageSender {
             return sendSticker(chatId, m.outgoing() ? MediaLibrary.original(item) : item, null);
         }
         Chat chat = core.chat(chatId);
-        boolean gif = chat != null && StickerConverter.gifAsGif(chat.network()) && app.unichat.video.GifVideos.is(m);
+        boolean gif = chat != null && StickerConverter.gifAsGif(chat.network()) && app.unichat.video.GifVideos.becomesGif(m);
         boolean copy = m.isMedia() && (gif || needsCopy(m.mediaUrl()));
         ObjectNode content = ForwardedContent.of(m, copy);
         String txn = core.newTxnId();
@@ -226,6 +226,7 @@ final class MessageSender {
         return media.media(m.mediaUrl(), 0, 0).thenApplyAsync(src -> {
             try {
                 Path file = gif ? app.unichat.video.GifVideos.gifOr(src) : src;
+                if (file != src && !StickerConverter.fitsAsGif(Files.size(file))) file = src; // too heavy: the video, which still plays
                 if (file != src) {
                     ForwardedContent.becomeGif(content, Files.size(file));
                     content.put("url", client.upload(file, StickerConverter.GIF, content.path("filename").asText("gif.gif")));

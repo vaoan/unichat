@@ -2,6 +2,7 @@ package app.unichat.video;
 
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import app.unichat.settings.Settings;
 import app.unichat.support.ConvertedFiles;
 import app.unichat.support.I18n;
 
@@ -22,6 +23,24 @@ public final class GifVideos {
     public static boolean is(Message m) {
         return m.isGif() && m.type() == MessageType.VIDEO;
     }
+
+    /** Past this a "GIF" is a silent video Telegram marked as one: made a GIF it would lose its end (cut at 30 s) or weigh too much. */
+    static final long LONGEST_MS = 15_000;
+
+    /**
+     * Whether {@code m} goes (saved, forwarded where an MP4 is a video) as a GIF: one that came as a video and is short
+     * ({@link #LONGEST_MS}; a GIF whose length isn't said is taken as short). A longer one stays its video, whole.
+     */
+    public static boolean becomesGif(Message m) {
+        return on() && is(m) && m.durationMs() <= LONGEST_MS;
+    }
+
+    private static final String KEY = "video.gifVideosAsGif";
+
+    /** Ajustes → Redes: off, such a GIF is saved and forwarded as the video it came as, always. */
+    public static boolean on() { return Settings.get().getBool(KEY, true); }
+
+    public static void setOn(boolean on) { Settings.get().setBool(KEY, on); }
 
     /** {@code name} with ".gif" in place of its extension. */
     public static String gifName(String name) {

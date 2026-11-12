@@ -32,7 +32,7 @@ public final class MediaSaver {
      */
     public static void save(Window owner, MediaSource svc, Message m, Consumer<String> toast) {
         String name = suggestedName(m, ZoneId.systemDefault());
-        if (GifVideos.is(m)) save(owner, svc, m.mediaUrl(), GifVideos.gifName(name), GifVideos::gifOr, toast);
+        if (GifVideos.becomesGif(m)) save(owner, svc, m.mediaUrl(), GifVideos.gifName(name), GifVideos::gifOr, toast);
         else save(owner, svc, m.mediaUrl(), name, p -> p, toast);
     }
 

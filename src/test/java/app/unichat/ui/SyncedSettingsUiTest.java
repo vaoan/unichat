@@ -93,6 +93,7 @@ class SyncedSettingsUiTest {
         p.put("stt.language", new Proof("en", () -> Settings.get().sttLanguage(), "en"));
         p.put("voice.enhance", new Proof("false", app.unichat.voice.VoiceEnhancer::enabled, false));
         p.put("video.ffmpegAuto", new Proof("false", app.unichat.video.Ffmpeg::autoInstall, false));
+        p.put("video.gifVideosAsGif", new Proof("false", app.unichat.video.GifVideos::on, false));
         p.put("cloak.level", new Proof("HIGH", () -> Settings.get().getString("cloak.level", null), "HIGH"));
         p.put("whatsapp.animatedStickers", new Proof("GIF",
                 () -> app.unichat.service.StickerMode.of(app.unichat.model.Network.WHATSAPP).name(), "GIF"));

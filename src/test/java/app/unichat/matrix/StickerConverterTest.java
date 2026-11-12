@@ -101,4 +101,10 @@ class StickerConverterTest {
         assertEquals(32, back.getWidth());
         assertTrue(r.file().getFileName().toString().endsWith(".png"));
     }
+
+    @Test
+    void aGifOverDiscordsLimitGoesAsItsVideo() {
+        assertTrue(StickerConverter.fitsAsGif(9L << 20));
+        assertFalse(StickerConverter.fitsAsGif(11L << 20), "Discord refuses files over 10 MB without Nitro");
+    }
 }

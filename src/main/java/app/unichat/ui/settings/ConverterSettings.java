@@ -94,6 +94,8 @@ final class ConverterSettings {
                         toggle(Ffmpeg.autoInstall(), v -> {
                             Ffmpeg.setAutoInstall(v);
                             refresh.run();
-                        })));
+                        })),
+                row(I18n.t("settings.converter.gifs"), I18n.t("settings.converter.gifsHelp"),
+                        toggle(app.unichat.video.GifVideos.on(), app.unichat.video.GifVideos::setOn)));
     }
 }

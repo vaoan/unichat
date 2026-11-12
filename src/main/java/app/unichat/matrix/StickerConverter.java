@@ -112,6 +112,14 @@ public final class StickerConverter {
         return network != Network.TELEGRAM && network != Network.WHATSAPP;
     }
 
+    /** The most a GIF made from a video may weigh: Discord refuses files over 10 MB without Nitro. */
+    private static final long GIF_MAX_BYTES = 10L << 20;
+
+    /** Whether a GIF of {@code bytes} can go; a heavier one goes as the video it was made from. */
+    static boolean fitsAsGif(long bytes) {
+        return bytes <= GIF_MAX_BYTES;
+    }
+
 /**
      * Whether a {@code mime} sticker goes to {@code network} as a GIF: a WebM (Telegram's video stickers) is a video to
      * press play on everywhere but Telegram, Discord included, and a GIF plays by itself.

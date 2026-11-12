@@ -26,7 +26,7 @@ final class SavedFile {
         if (FileNames.savedIn(dir, m)) return false;
         downloaded[0] = saver.media(m.mediaUrl(), progress);
         // A GIF that came as a video (Telegram keeps every GIF as an MP4) is saved as the GIF it was sent as.
-        Path file = GifVideos.is(m) ? GifVideos.gifOr(downloaded[0]) : downloaded[0];
+        Path file = GifVideos.becomesGif(m) ? GifVideos.gifOr(downloaded[0]) : downloaded[0];
         String name = FileNames.forSaving(m, ZoneId.systemDefault());
         if (file != downloaded[0]) name = GifVideos.gifName(name);
         Files.createDirectories(dir);

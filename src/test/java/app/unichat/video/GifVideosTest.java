@@ -39,6 +39,31 @@ class GifVideosTest {
         assertFalse(GifVideos.is(message(MessageType.STICKER, "video/webm", true)), "stickers go their own way");
     }
 
+    /** The GIF made is cut at 30 s and loses colours: a long "GIF" (a silent video Telegram marked) stays its video. */
+    @Test
+    void onlyAShortOneBecomesAGif() throws Exception {
+        Message shortOne = message(MessageType.VIDEO, "video/mp4", true);
+        assertTrue(GifVideos.becomesGif(shortOne), "no length known: a GIF is short");
+        shortOne.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true,\"duration\":5000}"));
+        assertTrue(GifVideos.becomesGif(shortOne));
+        Message longOne = message(MessageType.VIDEO, "video/mp4", true);
+        longOne.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true,\"duration\":20000}"));
+        assertFalse(GifVideos.becomesGif(longOne), "past 15 s it would lose its end, or weigh too much");
+        assertFalse(GifVideos.becomesGif(message(MessageType.VIDEO, "video/mp4", false)));
+    }
+
+    @Test
+    void turnedOffTheyGoAsTheyCame() throws Exception {
+        Message m = message(MessageType.VIDEO, "video/mp4", true);
+        GifVideos.setOn(false);
+        try {
+            assertFalse(GifVideos.becomesGif(m), "Ajustes says: as it came");
+        } finally {
+            GifVideos.setOn(true);
+        }
+        assertTrue(GifVideos.becomesGif(m));
+    }
+
     @Test
     void itsNameEndsInGif() {
         assertEquals("gif.gif", GifVideos.gifName("gif.mp4"));

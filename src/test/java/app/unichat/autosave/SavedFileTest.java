@@ -49,4 +49,26 @@ class SavedFileTest {
         assertEquals("GIF89a", new String(Files.readAllBytes(into.resolve(names.getFirst())), 0, 6, java.nio.charset.StandardCharsets.US_ASCII));
         assertTrue(FileNames.savedIn(into, m), "known again: not saved twice");
     }
+
+    @Test
+    void aLongOneIsSavedAsItsVideoWhole() throws Exception {
+        Path mp4 = Files.createDirectories(dir.resolve("cache")).resolve("long.mp4");
+        Files.writeString(mp4, "not decoded: never converted");
+        Message m = new Message("$long", "!c", "@telegram_1", "Buga", false, Instant.EPOCH);
+        m.setType(MessageType.VIDEO);
+        m.setFileName("IMG_0448.MP4");
+        m.setMimeType("video/mp4");
+        m.setMediaUrl("mxc://s/l");
+        m.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true,\"duration\":40000}"));
+        AutoSave.Saver saver = new AutoSave.Saver() {
+            @Override public Path media(String url, java.util.function.DoubleConsumer progress) { return mp4; }
+            @Override public Failure link(String url, Path into, String tag, java.util.function.DoubleConsumer progress) { return null; }
+        };
+        Path into = dir.resolve("Buga");
+        assertTrue(SavedFile.copyInto(saver, m, into, new Path[1], x -> { }));
+        try (var in = Files.list(into)) {
+            String name = in.map(f -> f.getFileName().toString()).findFirst().orElseThrow();
+            assertTrue(name.endsWith("].MP4"), "40 s as a GIF would be cut at 30: " + name);
+        }
+    }
 }
