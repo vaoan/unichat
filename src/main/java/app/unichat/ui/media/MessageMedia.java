@@ -324,7 +324,10 @@ public final class MessageMedia {
         }
         // A sticker comes from the stickers' own room, so photos and videos never push the chats' stickers out.
         boolean sticker = m.type() == MessageType.STICKER;
-        CompletableFuture<Path> original = sticker ? svc.sticker(m.mediaUrl(), progress) : svc.media(m.mediaUrl(), 0, 0, progress);
+        CompletableFuture<Path> fetched = sticker ? svc.sticker(m.mediaUrl(), progress) : svc.media(m.mediaUrl(), 0, 0, progress);
+        // A WebM (Telegram's video stickers) is no picture: converted first, as in the chat (showConverted).
+        CompletableFuture<Path> original = isWebm(m)
+                ? fetched.thenApplyAsync(p -> isPicture(p) ? p : converted(p), WebmStickers.WORKER) : fetched;
         if (Platform.isFxApplicationThread() && original.isDone() && !original.isCompletedExceptionally()) {
             AnimatedImage.Frames ready = AnimatedImage.decoded(original.join(), pxW, pxH);
             if (ready != null) {
