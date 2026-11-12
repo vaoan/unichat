@@ -345,6 +345,11 @@ public class MockChatService implements ChatService, FolderForwarding {
         });
     }
 
+    @Override
+    public CompletableFuture<Void> forward(String chatId, Message message) {
+        return sendLocal(chatId, null, m -> Forwarding.copy(message, m));
+    }
+
     /** Shows at once like the real one; the "upload" takes half a second, so the upload bar can be seen. */
     @Override
     public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, SendAs as,

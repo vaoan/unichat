@@ -7,6 +7,7 @@ You review Unichat for security. Everything a chat brings (text, HTML, names, li
 
 Check, with evidence in the code:
 - Media and file addresses: only `mxc://` from messages; `file:` only for our own sends (`MediaDownloader.ownFile`); a file name never escapes its folder (`autosave/FileNames`), nor hides its extension (RTL override, `\p{Cf}`), nor lands as a Windows device name.
+- A stranger's words sent as the person's own (forwarding, quoting, AI drafts): bridges run any of one's messages starting with their prefix (`!whatsapp …`) as an admin command, in any room, and everything in a bot's chat; such text goes through `matrix/ForwardedContent` (no leading "!", no mentions, no hidden HTML, no `app.unichat.original`).
 - HTML (`ui/timeline/HtmlView`): no scripts, frames or non-http(s) links; pictures only `mxc://`; depth of nesting bounded.
 - Links fetched (`links/LinkInspector`, `gif/GifFiles`, `MediaDownloader`): no hop to this machine or its network, a deadline on the body, a size cap.
 - Processes (ffmpeg, yt-dlp, gallery-dl, whisper, claude/codex, Chrome): argument lists only, `--` before untrusted values, ffmpeg with `-protocol_whitelist`/`-format_whitelist`; output drained; killed with children.

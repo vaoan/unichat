@@ -77,7 +77,10 @@ final class AppearancePages {
                         row(I18n.t("settings.appearance.compact"), I18n.t("settings.appearance.compactHelp"), toggle(s.compactList(), v -> { s.setCompactList(v); changed.run(); })),
                         row(I18n.t("settings.appearance.badges"), I18n.t("settings.appearance.badgesHelp"), toggle(s.showNetworkBadges(), v -> { s.setShowNetworkBadges(v); changed.run(); }))),
                 group(I18n.t("settings.appearance.groupWriting"),
-                        row(I18n.t("settings.appearance.enterSends"), I18n.t("settings.appearance.enterSendsHelp", Shortcuts.key("Enter")), toggle(s.sendOnEnter(), s::setSendOnEnter))));
+                        row(I18n.t("settings.appearance.enterSends"), I18n.t("settings.appearance.enterSendsHelp", Shortcuts.key("Enter")), toggle(s.sendOnEnter(), s::setSendOnEnter)),
+                        row(I18n.t("settings.appearance.forwardWho"), I18n.t("settings.appearance.forwardHelp"), toggle(s.forwardSaysWho(), s::setForwardSaysWho)),
+                        row(I18n.t("settings.appearance.forwardWhere"), null, toggle(s.forwardSaysWhere(), s::setForwardSaysWhere)),
+                        row(I18n.t("settings.appearance.forwardWhen"), null, toggle(s.forwardSaysWhen(), s::setForwardSaysWhen))));
     }
 
     private static Slider fontSlider(Runnable changed) {

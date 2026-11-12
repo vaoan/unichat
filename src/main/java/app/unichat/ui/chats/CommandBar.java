@@ -57,14 +57,14 @@ public final class CommandBar extends VBox {
                     setGraphic(null);
                     return;
                 }
+                if (it.chat() != null) {
+                    ChatLine line = new ChatLine(media);
+                    line.show(it.chat(), it.hint());
+                    setGraphic(line);
+                    return;
+                }
                 HBox row = new HBox(10);
                 row.setAlignment(Pos.CENTER_LEFT);
-                if (it.chat() != null) {
-                    Avatar a = new Avatar(26);
-                    a.set(it.chat().title(), it.chat().id(), it.chat().avatarUrl(), media);
-                    a.setNetwork(it.chat().network(), Settings.get().showNetworkBadges());
-                    row.getChildren().add(a);
-                }
                 Label l = new Label(it.label());
                 l.getStyleClass().add("command-label");
                 Region grow = new Region();
@@ -97,12 +97,7 @@ public final class CommandBar extends VBox {
 
     /** Chats offered for {@code q}: never a space (a server/forum container, not a chat you can write in). */
     static List<Chat> chatsFor(List<Chat> all, String q) {
-        String nq = ChatFilter.normalize(q);
-        return all.stream()
-                .filter(c -> !c.space())
-                .filter(c -> !c.bridgeBot() || !nq.isEmpty())
-                .filter(c -> nq.isEmpty() || ChatFilter.normalize(c.title()).contains(nq))
-                .sorted(ChatFilter.ORDER).limit(nq.isEmpty() ? 6 : 30).toList();
+        return ChatFilter.writable(all, q, true).stream().limit(ChatFilter.normalize(q).isEmpty() ? 6 : 30).toList();
     }
 
     private void filter(String q) {

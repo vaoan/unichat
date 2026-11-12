@@ -314,6 +314,13 @@ public final class Settings {
     public void setCompactList(boolean v) { setBool("ui.compact", v); }
     public boolean showNetworkBadges() { return getBool("ui.networkBadges", true); }
     public void setShowNetworkBadges(boolean v) { setBool("ui.networkBadges", v); }
+    /** What a forward says about where it came from (who, the chat, when): none by default, changed per forward too. */
+    public boolean forwardSaysWho() { return getBool("forward.who", false); }
+    public void setForwardSaysWho(boolean v) { setBool("forward.who", v); }
+    public boolean forwardSaysWhere() { return getBool("forward.where", false); }
+    public void setForwardSaysWhere(boolean v) { setBool("forward.where", v); }
+    public boolean forwardSaysWhen() { return getBool("forward.when", false); }
+    public void setForwardSaysWhen(boolean v) { setBool("forward.when", v); }
     public boolean sendOnEnter() { return getBool("compose.sendOnEnter", true); }
     public void setSendOnEnter(boolean v) { setBool("compose.sendOnEnter", v); }
     public boolean notificationsEnabled() { return getBool("notify.enabled", true); }

@@ -169,6 +169,7 @@ public final class MainView extends StackPane {
         panel.setContent(SidePanel.Tab.FAVORITES, favorites, favorites::refresh);
         thread.composer().setOnPanel(this::togglePanel);
         offerProtectedPhotos(svc);
+        thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(svc, this::showOverlay, this::hideOverlay, this::toast));
         offerChatOptions(svc);
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::gearClicked);
 
@@ -552,6 +553,11 @@ public final class MainView extends StackPane {
             if (thread.chat() != null) cloak.open(thread.chat().id(), () -> thread.composer().focus());
         };
         thread.composer().setOnProtect(protectPhoto);
+    }
+
+    /** Forwarding for the open chat: the sheet, or several messages picked (snapshot diagnostics). */
+    public void showForwarding(boolean several) {
+        if (thread.chat() != null) thread.showForwarding(several);
     }
 
     /** The sheet that asks how hard to protect a photo, for the open chat (snapshot diagnostics). */

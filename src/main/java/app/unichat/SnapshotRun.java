@@ -16,7 +16,7 @@ import java.io.File;
  * and exits; {@code -Dunichat.openChat=<id>} opens a chat first, {@code -Dunichat.info=true} the info panel,
  * {@code -Dunichat.openSpace=<id>} a server's channels,
  * {@code -Dunichat.openFolders=true} the list of folders, {@code -Dunichat.openFolder=<name>} inside one,
- * {@code -Dunichat.overlay=command|newchat|add|picker|folder|folderDelete|cloak|chatOptions|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
+ * {@code -Dunichat.overlay=command|newchat|add|picker|folder|folderDelete|cloak|chatOptions|forward|select|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
  * {@code -Dunichat.network=<protocol id>} filters the inbox to one network, {@code -Dunichat.search=<text>} searches it.
  */
 final class SnapshotRun {
@@ -73,6 +73,7 @@ final class SnapshotRun {
         if (overlay.equals("picker")) mainView.showAccounts().showPicker();
         if (overlay.equals("cloak")) mainView.showProtectPhoto();
         if (overlay.equals("chatOptions")) mainView.showChatOptions();
+        if (overlay.equals("forward") || overlay.equals("select")) mainView.showForwarding(overlay.equals("select"));
         if (overlay.startsWith("login:")) mainView.addAccount(Network.fromProtocolId(overlay.substring(6)));
         if (overlay.startsWith("settings")) {
             mainView.showSettings();

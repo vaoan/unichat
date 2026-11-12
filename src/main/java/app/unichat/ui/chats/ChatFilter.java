@@ -71,6 +71,19 @@ public record ChatFilter(View view, Network network, String accountId, boolean u
         return chats.stream().filter(this::matches).sorted(ORDER).toList();
     }
 
+    /**
+     * The chats one can write in whose name has {@code q}, in the list's order: never a space (a server or forum holds
+     * chats, it isn't one); a bridge's bot only when searched for and {@code bots} (every message there is a command).
+     */
+    public static List<Chat> writable(List<Chat> all, String q, boolean bots) {
+        String nq = normalize(q);
+        return all.stream()
+                .filter(c -> !c.space())
+                .filter(c -> !c.bridgeBot() || bots && !nq.isEmpty())
+                .filter(c -> nq.isEmpty() || normalize(c.title()).contains(nq))
+                .sorted(ORDER).toList();
+    }
+
     /** Lower-case, accent-insensitive form for search. */
     public static String normalize(String s) {
         if (s == null) return "";

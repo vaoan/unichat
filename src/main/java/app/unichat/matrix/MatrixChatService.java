@@ -482,6 +482,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
 
     @Override public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) { return sender.sendText(chatId, text, replyToId); }
     @Override public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) { return sender.sendSticker(chatId, item, replyToId); }
+    @Override public CompletableFuture<Void> forward(String chatId, Message message) { return sender.forward(chatId, message); }
     @Override public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) { return sender.sendVoice(chatId, note, replyToId); }
     @Override public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, app.unichat.service.SendAs as,
                                                       java.util.function.DoubleConsumer progress) {

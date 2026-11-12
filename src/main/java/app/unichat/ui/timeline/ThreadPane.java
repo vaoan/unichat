@@ -80,6 +80,10 @@ public final class ThreadPane extends BorderPane {
     /** Newest message shown, to notice your own new message (always jumps to it). */
 
     private final FolderDialogs folderDialogs;
+    /** Picking messages to forward several at once. */
+    private final MessageSelection selection;
+    private final VBox bottom;
+    private ForwardSheet forwardSheet;
 
     public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast, AudioPlayback audio,
                       FolderDialogs folderDialogs, MediaLibrary library) {
@@ -98,6 +102,8 @@ public final class ThreadPane extends BorderPane {
         archiveButton = Icons.iconButton(Icons.ARCHIVE, I18n.t("thread.archive", Shortcuts.key("E")),
                 () -> svc.setArchived(chat.id(), !chat.archived()));
         configureTimeline();
+        selection = new MessageSelection(list, m -> messageActions.allows(m, MessageActions.Action.FORWARD), this::forward, this::showSelectionBar);
+        messageActions.setOnForward(m -> forward(List.of(m)), selection::start);
         scroll = new TimelineScroll(list, rows, this, () -> chat != null, this::loadOlder);
         Node header = buildHeader();
         messageRows = new MessageRowView(svc, media, messageActions, openLink, () -> chat, this::member, scroll::jumpTo);
@@ -107,7 +113,7 @@ public final class ThreadPane extends BorderPane {
         composer.acceptDrops(timeline);
 
         typing.getStyleClass().add("typing-line");
-        VBox bottom = new VBox(typing, composer);
+        bottom = new VBox(typing, composer);
 
         content.setTop(header);
         content.setCenter(timeline);
@@ -204,11 +210,42 @@ public final class ThreadPane extends BorderPane {
     }
 
     public Chat chat() { return chat; }
+
+    /** Where forwarding asks which chats (the window's overlay). */
+    public void setForwardSheet(ForwardSheet sheet) { this.forwardSheet = sheet; }
+
+    /** Asks where {@code messages} go; once they're sent, picking ends. */
+    private void forward(List<Message> messages) {
+        if (forwardSheet == null || chat == null || messages.isEmpty()) return;
+        forwardSheet.open(messages, chat, selection::end, () -> {
+            if (selection.active()) list.requestFocus();
+            else composer.focus();
+        });
+    }
+
+    /** Snapshot diagnostics: the sheet for the newest message, or ({@code several}) the newest three picked. */
+    public void showForwarding(boolean several) {
+        List<Message> last = svc.messages(chat.id()).stream().filter(m -> messageActions.allows(m, MessageActions.Action.FORWARD)).toList();
+        if (last.isEmpty()) return;
+        if (!several) {
+            forward(List.of(last.getLast()));
+            return;
+        }
+        List<Message> three = last.subList(Math.max(0, last.size() - 3), last.size());
+        selection.start(three.getFirst());
+        three.subList(1, three.size()).forEach(selection::toggle);
+    }
+
+    private void showSelectionBar(boolean shown) {
+        bottom.getChildren().setAll(typing, shown ? selection.bar() : composer);
+        if (!shown) composer.focus();
+    }
     public Composer composer() { return composer; }
 
     public void setInfoSelected(boolean selected) { infoButton.setSelected(selected); }
 
     public void open(Chat c) {
+        selection.end();
         chat = c;
         reachedStart = false;
         loadingOlder = false;
@@ -305,7 +342,7 @@ public final class ThreadPane extends BorderPane {
 
     // ------------------------------------------------------------------ rendering
 
-    private final class RowCell extends ListCell<ThreadRows.Row> {
+    private final class RowCell extends ListCell<ThreadRows.Row> implements MessageSelection.Shows {
         RowCell() {
             getStyleClass().add("row-cell");
             // Sized to the viewport, not to the widest row (mistakes.md): otherwise one wide row stretched every cell
@@ -320,6 +357,7 @@ public final class ThreadPane extends BorderPane {
             if (empty || row == null) {
                 setGraphic(null);
                 setAccessibleText(null);
+                pseudoClassStateChanged(MessageSelection.PICKED, false);
                 return;
             }
             if (row instanceof ThreadRows.DayRow d) {
@@ -332,8 +370,18 @@ public final class ThreadPane extends BorderPane {
                 setAccessibleText(l.getText());
             } else if (row instanceof ThreadRows.MessageRow mr) {
                 setGraphic(messageRows.node(mr, getListView().getWidth()));
-                setAccessibleText(messageRows.describe(mr.message()));
                 showActions(isSelected());
+            }
+            showPicked();
+        }
+
+        @Override
+        public void showPicked() {
+            boolean picked = getItem() instanceof ThreadRows.MessageRow mr && selection.picked(mr.message());
+            pseudoClassStateChanged(MessageSelection.PICKED, picked);
+            showActions(isSelected());
+            if (getItem() instanceof ThreadRows.MessageRow mr) {
+                setAccessibleText(messageRows.describe(mr.message()) + (picked ? ". " + I18n.t("select.picked") : ""));
             }
         }
 
@@ -365,6 +413,7 @@ public final class ThreadPane extends BorderPane {
     /** Keyboard control of the focused timeline. Arrow keys move the selection (ListView default). */
     private void onTimelineKey(javafx.scene.input.KeyEvent e) {
         Message m = selectedMessage();
+        if (selection.key(e, m)) return;
         javafx.scene.input.KeyCode code = e.getCode();
         if (code == javafx.scene.input.KeyCode.ESCAPE) {
             composer.focus();

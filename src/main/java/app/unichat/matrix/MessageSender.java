@@ -183,16 +183,52 @@ final class MessageSender {
             } catch (IOException e) {
                 throw new CompletionException(e);
             }
-        }, core.io).handle((c, err) -> {
-            if (err == null) return sendEvent(chatId, "m.sticker", txn, c);
-            Throwable root = err instanceof CompletionException && err.getCause() != null ? err.getCause() : err;
-            System.err.println("Sticker conversion failed: " + root.getClass().getSimpleName());
-            synchronized (proc) {
-                proc.failLocalEcho(chatId, txn);
+        }, core.io).handle((c, err) -> sendPrepared(chatId, txn, "m.sticker", c, err, "Sticker conversion")).thenCompose(f -> f);
+    }
+
+    /** {@code content} once its file is ready, or the echo failed with why, for the log. */
+    private CompletableFuture<Void> sendPrepared(String chatId, String txn, String type, ObjectNode content, Throwable err, String what) {
+        if (err == null) return sendEvent(chatId, type, txn, content);
+        Throwable root = err instanceof CompletionException && err.getCause() != null ? err.getCause() : err;
+        System.err.println(what + " failed: " + root.getClass().getSimpleName() + ": " + root.getMessage());
+        synchronized (proc) {
+            proc.failLocalEcho(chatId, txn);
+        }
+        fireLocal(chatId);
+        return CompletableFuture.failedFuture(root);
+    }
+
+    /**
+     * A copy of {@code m} as one's own ({@link ForwardedContent}). A sticker goes as stickers do, converted for the chat;
+     * a file on another bridge's direct media goes as a copy on our server ({@link #needsCopy}).
+     */
+    CompletableFuture<Void> forward(String chatId, Message m) {
+        // Only a media address goes on: a stranger's message may name any other (a file: one, a web page).
+        if (m.isMedia() && Mxc.parse(m.mediaUrl()) == null) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
+        if (m.type() == MessageType.STICKER) {
+            JsonNode info = m.mediaInfo();
+            if (!m.outgoing() && info instanceof ObjectNode o && o.has(MediaLibrary.ORIGINAL)) {
+                info = o.deepCopy().without(MediaLibrary.ORIGINAL); // a stranger's mark would be trusted once it's mine
             }
-            fireLocal(chatId);
-            return CompletableFuture.<Void>failedFuture(root);
-        }).thenCompose(f -> f);
+            MediaLibrary.Item item = new MediaLibrary.Item(MediaLibrary.Kind.STICKER, m.mediaUrl(), m.mimeType(), m.width(), m.height(), info);
+            return sendSticker(chatId, m.outgoing() ? MediaLibrary.original(item) : item, null);
+        }
+        boolean copy = m.isMedia() && needsCopy(m.mediaUrl());
+        ObjectNode content = ForwardedContent.of(m, copy);
+        String txn = core.newTxnId();
+        synchronized (proc) {
+            proc.addLocalEcho(chatId, txn, echo -> app.unichat.service.Forwarding.copy(m, echo));
+        }
+        fireLocal(chatId);
+        if (!copy) return sendEvent(chatId, "m.room.message", txn, content);
+        return media.media(m.mediaUrl(), 0, 0).thenApplyAsync(src -> {
+            try {
+                content.put("url", client.upload(src, m.mimeType() != null ? m.mimeType() : "application/octet-stream", ForwardedContent.fileName(m)));
+                return content;
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            }
+        }, core.io).handle((c, err) -> sendPrepared(chatId, txn, "m.room.message", c, err, "Forward")).thenCompose(f -> f);
     }
 
     /**

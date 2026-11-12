@@ -105,4 +105,21 @@ class MessageActionsTest {
         sending.setStatus(app.unichat.model.MessageStatus.SENDING);
         assertFalse(MessageActions.of(sending, f(WHATSAPP), SENT).contains(SAVE_LINK), "only its temporary id yet");
     }
+
+    @Test
+    void whatsOnTheServerCanBeForwardedAnywhere() throws Exception {
+        assertTrue(MessageActions.of(msg(false, MessageType.TEXT, null), RoomFeatures.UNKNOWN, SENT).contains(FORWARD));
+        assertTrue(MessageActions.of(msg(false, MessageType.IMAGE, "image/jpeg"), f(WHATSAPP), SENT).contains(FORWARD));
+        Message sending = msg(true, MessageType.TEXT, null);
+        sending.setStatus(app.unichat.model.MessageStatus.SENDING);
+        assertFalse(MessageActions.of(sending, f(WHATSAPP), SENT).contains(FORWARD), "only what the server has: its copy is what goes");
+        Message system = msg(false, MessageType.SYSTEM, null);
+        assertFalse(MessageActions.of(system, f(WHATSAPP), SENT).contains(FORWARD), "someone joining isn't a message to pass on");
+        Message noFile = msg(false, MessageType.FILE, "application/pdf");
+        noFile.setMediaUrl(null);
+        assertFalse(MessageActions.of(noFile, f(WHATSAPP), SENT).contains(FORWARD));
+        Message local = msg(false, MessageType.FILE, "application/pdf");
+        local.setMediaUrl("file:///Users/x/.ssh/id_rsa");
+        assertFalse(MessageActions.of(local, f(WHATSAPP), SENT).contains(FORWARD), "a stranger's message chooses its address: only a media one goes on");
+    }
 }

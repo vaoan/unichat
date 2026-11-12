@@ -25,8 +25,13 @@ final class MessageLine extends HBox {
         });
     }
 
+    /** Never while picking messages ({@link MessageSelection}): a click there only picks. */
     void showActions(boolean selected) {
-        actions.setVisible(selected || Settings.get().alwaysShowMessageActions() || hovered);
+        actions.setVisible(!picking() && (selected || Settings.get().alwaysShowMessageActions() || hovered));
+    }
+
+    private boolean picking() {
+        return getParent() instanceof ListCell<?> cell && cell.getListView() != null && cell.getListView().getStyleClass().contains("picking");
     }
 
     private boolean inSelectedCell() {

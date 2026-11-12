@@ -428,6 +428,15 @@
 /* The header's "up to date" dot, beside the star (FollowIndicator). */
 .following-badge { -fx-padding: 0 0.3em; }
 .live-dot { -fx-background-color: -success; -fx-background-radius: 999; -fx-min-width: 0.55em; -fx-min-height: 0.55em; -fx-max-width: 0.55em; -fx-max-height: 0.55em; }
+/* Forwarding: picked messages, the bar in the box's place, the sheet's line as it will go. */
+.timeline .row-cell:picked, .timeline .row-cell:picked:selected {
+    -fx-background-color: -selected;
+    -fx-border-color: transparent transparent transparent -accent;
+    -fx-border-width: 0 0 0 3;
+}
+.selection-bar { -fx-padding: 10 14 14 14; -fx-background-color: -bg; }
+.selection-count { -fx-font-weight: bold; }
+.forward-preview { -fx-text-fill: -text-2; -fx-font-style: italic; }
 .typing-dot { -fx-background-color: -text-3; -fx-background-radius: 3; }
 .chat-preview.typing .typing-dot { -fx-background-color: -accent; }
 .typing-line { -fx-text-fill: -text-3; -fx-font-size: 0.86em; -fx-font-style: italic; -fx-padding: 0 22 2 22; }

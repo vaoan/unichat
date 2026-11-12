@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A favourite sticker goes out as m.sticker keeping its info (bridges resend the native sticker from it). */
@@ -260,6 +261,48 @@ class SendStickerTest {
         assertTrue(sent.path("info").path("fi.mau.bridged_sticker").isMissingNode(), "no longer that network's own sticker");
         assertTrue(sent.path("info").path("thumbnail_url").isMissingNode(), "the other bridge couldn't read it either");
         assertEquals(512, sent.path("info").path("w").asInt());
+    }
+
+    @Test
+    void aForwardedPhotoFromAnotherBridgeGoesAsACopyOnOurServer() throws Exception {
+        MatrixChatService svc = chatOn("discord");
+        app.unichat.model.Message m = new app.unichat.model.Message("$p", "!x:example.org", "@telegram_1:example.org", "Ana", false, java.time.Instant.EPOCH);
+        m.setType(app.unichat.model.MessageType.IMAGE);
+        m.setFileName("foto.gif");
+        m.setMediaUrl("mxc://media-telegram.localhost/foto");
+        m.setMimeType("image/gif");
+        // Seen in the chat already: in the media cache, as the bridge served it (no bridge runs here).
+        java.nio.file.Path media = app.unichat.settings.Settings.get().cacheDir().resolve("media");
+        java.nio.file.Files.createDirectories(media);
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(8, 8, java.awt.image.BufferedImage.TYPE_INT_RGB), "gif",
+                media.resolve(app.unichat.support.Hashes.sha256(MediaDownloader.cacheKey(m.mediaUrl(), 0, 0)) + ".gif").toFile());
+        svc.forward("!c:example.org", m).get();
+        assertTrue(path.contains("/send/m.room.message/"), path);
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("mxc://s/converted", sent.path("url").asText(), "Discord's bridge can't read Telegram's direct media");
+        assertEquals("image/gif", uploadedType);
+        assertEquals("m.image", sent.path("msgtype").asText());
+    }
+
+    @Test
+    void aForwardedFileMustBeAtAMediaAddress() throws Exception {
+        MatrixChatService svc = chatOn("telegram");
+        app.unichat.model.Message m = new app.unichat.model.Message("$f", "!x:example.org", "@whatsapp_1:example.org", "Ana", false, java.time.Instant.EPOCH);
+        m.setType(app.unichat.model.MessageType.FILE);
+        m.setMediaUrl("file:///etc/passwd");
+        assertTrue(svc.forward("!c:example.org", m).isCompletedExceptionally());
+        assertNull(path, "nothing went");
+    }
+
+    @Test
+    void aForwardedTextGoesAsItIs() throws Exception {
+        MatrixChatService svc = chatOn("telegram");
+        app.unichat.model.Message m = new app.unichat.model.Message("$t", "!x:example.org", "@whatsapp_1:example.org", "Ana", false, java.time.Instant.EPOCH);
+        m.setBody("nos vemos");
+        svc.forward("!c:example.org", m).get();
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("nos vemos", sent.path("body").asText());
+        assertNull(uploadedType, "nothing to upload");
     }
 
     @Test
