@@ -21,7 +21,7 @@ import java.util.List;
  * inside the app; without it the first frame goes out as a still PNG.
  */
 public final class StickerConverter {
-    static final String WEBP = "image/webp", PNG = "image/png", WEBM = "video/webm";
+    static final String WEBP = "image/webp", PNG = "image/png", WEBM = "video/webm", GIF = "image/gif";
     /**
      * What Telegram's bridge sends on as a sticker without its ffmpeg: PNG and JPEG it encodes to WebP itself, WebM and
      * Lottie go as they are. Anything else, WebP included, goes through ffmpeg, which fails without a WebP encoder
@@ -85,7 +85,7 @@ public final class StickerConverter {
      * there's no ffmpeg to convert with, as a still PNG.
      */
     static Result toTelegram(Path in, String mime, Path dir) throws IOException {
-        if ("image/gif".equals(mime) && GifFrames.count(in) > 1) {
+        if (GIF.equals(mime) && GifFrames.count(in) > 1) {
             Files.createDirectories(dir);
             Path out = Files.createTempFile(dir, "sticker", ".webm");
             try {
@@ -102,11 +102,52 @@ public final class StickerConverter {
         return convert(in, PNG, dir, null);
     }
 
+    /**
+     * Whether a {@code mime} sticker goes to {@code network} as a GIF: a WebM (Telegram's video stickers) is a video to
+     * press play on everywhere but Telegram, Discord included, and a GIF plays by itself.
+     */
+    static boolean asGif(Network network, String mime) {
+        return network != Network.TELEGRAM && WEBM.equals(mime);
+    }
+
+    /**
+     * What to upload instead of the {@code mime} sticker {@code src}, null for the file as it is: Telegram's format
+     * ({@code telegram}), a WebM as a GIF ({@code gif}), then whatever the chat's {@code f} asks for (a GIF as WebP on
+     * WhatsApp). A WebM that can't be made a GIF (no ffmpeg) goes on as it is.
+     */
+    static Result forChat(Path src, String mime, boolean telegram, boolean gif, RoomFeatures f, Path dir) throws IOException {
+        if (telegram) return toTelegram(src, mime, dir);
+        Result r = gif ? webmToGif(src, dir) : null;
+        String target = target(r == null ? mime : r.mime(), f);
+        if (target == null) return r;
+        Result c = convert(r == null ? src : r.file(), target, dir);
+        if (r != null) Files.deleteIfExists(r.file());
+        return c;
+    }
+
+    /** {@code in}, a WebM, as an animated GIF; null when it can't be (no ffmpeg, or it failed). */
+    static Result webmToGif(Path in, Path dir) throws IOException {
+        Files.createDirectories(dir);
+        Path out = Files.createTempFile(dir, "sticker", ".gif");
+        try {
+            return new Result(WebmStickers.toGif(in, out, p -> { }), GIF);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            Files.deleteIfExists(out);
+            throw new IOException(I18n.t("sticker.interrupted"), e);
+        } catch (IOException e) {
+            Files.deleteIfExists(out);
+            System.err.println("Sticker to GIF failed (" + e.getClass().getSimpleName() + "); sending the WebM");
+            return null;
+        }
+    }
+
     /** The file name's extension for a converted sticker. */
     static String extension(String mime) {
         return switch (mime) {
             case WEBP -> ".webp";
             case WEBM -> ".webm";
+            case GIF -> ".gif";
             default -> ".png";
         };
     }

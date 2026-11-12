@@ -40,6 +40,30 @@ class StickerConverterTest {
     }
 
     @Test
+    void aWebmStickerGoesAsAGifEverywhereButTelegram() {
+        for (Network n : new Network[] {Network.DISCORD, Network.WHATSAPP, Network.INSTAGRAM}) {
+            assertTrue(StickerConverter.asGif(n, "video/webm"), n + ": a WebM there is a video to press play on");
+        }
+        assertFalse(StickerConverter.asGif(Network.TELEGRAM, "video/webm"), "Telegram's own video stickers");
+        assertFalse(StickerConverter.asGif(Network.DISCORD, "image/webp"), "Discord plays an animated WebP by itself");
+        assertFalse(StickerConverter.asGif(Network.DISCORD, "image/gif"));
+    }
+
+    @Test
+    void aWebmBecomesAnAnimatedGif() throws Exception {
+        Path ffmpeg = app.unichat.video.Ffmpeg.find();
+        Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path webm = dir.resolve("s.webm");
+        Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
+                "-c:v", "libvpx-vp9", webm.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        Assumptions.assumeTrue(p.waitFor() == 0, "this ffmpeg can't make a WebM");
+        StickerConverter.Result r = StickerConverter.forChat(webm, "video/webm", false, true, RoomFeatures.UNKNOWN, dir);
+        assertNotNull(r);
+        assertEquals("image/gif", r.mime());
+        assertTrue(app.unichat.gif.GifFrames.count(r.file()) > 1, "it still moves");
+    }
+
+    @Test
     void picksWebpThenPngAndLeavesAcceptedStickersAlone() throws Exception {
         RoomFeatures wa = features("{\"image/webp\":2,\"image/png\":1}");
         assertEquals("image/webp", StickerConverter.target("image/gif", wa));

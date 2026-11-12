@@ -24,14 +24,17 @@ class SendStickerTest {
     private volatile String path;
     private volatile String body;
     private volatile String uploadedType;
+    /** What the fake server serves as any media; null = a 16 px GIF. */
+    private volatile java.nio.file.Path served;
 
     @BeforeEach
     void fakeHomeserver() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/_matrix/client/v1/media/download/", ex -> {
             java.io.ByteArrayOutputStream gif = new java.io.ByteArrayOutputStream();
-            javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_RGB), "gif", gif);
-            ex.getResponseHeaders().add("Content-Type", "image/gif");
+            if (served != null) gif.write(java.nio.file.Files.readAllBytes(served));
+            else javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_RGB), "gif", gif);
+            ex.getResponseHeaders().add("Content-Type", served != null ? "video/webm" : "image/gif");
             ex.sendResponseHeaders(200, gif.size());
             try (OutputStream o = ex.getResponseBody()) {
                 o.write(gif.toByteArray());
@@ -166,12 +169,35 @@ class SendStickerTest {
         assertEquals("$q", sent.path("m.relates_to").path("m.in_reply_to").path("event_id").asText());
     }
 
+    @Test
+    void aTelegramVideoStickerGoesToDiscordAsAGifThatPlaysByItself(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        java.nio.file.Path ffmpeg = app.unichat.video.Ffmpeg.find();
+        org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        served = dir.resolve("s.webm");
+        Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
+                "-c:v", "libvpx-vp9", served.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        org.junit.jupiter.api.Assumptions.assumeTrue(p.waitFor() == 0, "this ffmpeg can't make a WebM");
+        MatrixChatService svc = chatOn("discord");
+        JsonNode info = MatrixClient.JSON.readTree("""
+                {"mimetype":"video/webm","w":64,"h":64,"fi.mau.bridged_sticker":{"network":"telegram","id":"7","pack_url":"https://t.me/addstickers/X"}}""");
+        svc.sender().sendStickerFor("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/webm", "video/webm", 64, 64, info),
+                app.unichat.model.RoomFeatures.UNKNOWN, null).get();
+        assertEquals("image/gif", uploadedType, "Discord shows a WebM as a video to press play on");
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("mxc://s/converted", sent.path("url").asText());
+        assertEquals("image/gif", sent.path("info").path("mimetype").asText());
+    }
+
     private MatrixChatService telegramChat() throws Exception {
+        return chatOn("telegram");
+    }
+
+    private MatrixChatService chatOn(String protocol) throws Exception {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
         svc.processor().process(MatrixClient.JSON.readTree("""
                 {"rooms":{"join":{"!c:example.org":{"state":{"events":[
-                  {"type":"m.bridge","state_key":"x","sender":"@telegrambot:example.org","event_id":"$b","origin_server_ts":1,
-                   "content":{"protocol":{"id":"telegram"},"com.beeper.room_type":"dm"}}]}}}}}"""), false);
+                  {"type":"m.bridge","state_key":"x","sender":"@%sbot:example.org","event_id":"$b","origin_server_ts":1,
+                   "content":{"protocol":{"id":"%s"},"com.beeper.room_type":"dm"}}]}}}}}""".formatted(protocol, protocol)), false);
         return svc;
     }
 

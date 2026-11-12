@@ -160,13 +160,13 @@ final class MessageSender {
         Chat chat = core.chat(chatId);
         boolean own = chat != null && ownSticker(info, chat.network());
         boolean telegram = chat != null && !own && StickerConverter.forTelegram(chat.network(), mimeType);
+        boolean gif = chat != null && !own && StickerConverter.asGif(chat.network(), mimeType);
         String target = StickerConverter.target(mimeType, features);
-        if (target == null && !copy && !telegram) return sendEvent(chatId, "m.sticker", txn, content);
+        if (target == null && !copy && !telegram && !gif) return sendEvent(chatId, "m.sticker", txn, content);
         return media.media(item.url(), 0, 0).thenApplyAsync(src -> {
             try {
                 Path dir = Settings.get().cacheDir().resolve("stickers");
-                StickerConverter.Result r = telegram ? StickerConverter.toTelegram(src, mimeType, dir)
-                        : target != null ? StickerConverter.convert(src, target, dir) : null;
+                StickerConverter.Result r = StickerConverter.forChat(src, mimeType, telegram, gif, features, dir);
                 if (r == null) {
                     String mime = info.path("mimetype").asText("application/octet-stream");
                     content.put("url", client.upload(src, mime, "sticker." + mime.replaceAll(".*/", "")));

@@ -67,6 +67,20 @@ public final class WebmStickers {
         throw new IOException(I18n.t("video.stickerFailed"));
     }
 
+    /**
+     * {@code webm} as an animated GIF at {@code out}, for networks that show a WebM as a video to press play on (Discord).
+     * Blocking; {@link NoConverter} without ffmpeg.
+     */
+    public static Path toGif(Path webm, Path out, DoubleConsumer installProgress) throws IOException, InterruptedException {
+        Path ffmpeg = Ffmpeg.whenNeeded(installProgress);
+        if (ffmpeg == null) throw new NoConverter();
+        if (PartFile.firstOf(out, TIMEOUT_SECONDS, List.of(into -> command(ffmpeg, webm, into, "gif", true),
+                into -> command(ffmpeg, webm, into, "gif", false))) == null) {
+            throw new IOException(I18n.t("video.stickerFailed"));
+        }
+        return out;
+    }
+
     /** {@code gif} as a Telegram video sticker at {@code out}. Blocking; {@link NoConverter} without ffmpeg. */
     public static Path fromGif(Path gif, Path out, DoubleConsumer installProgress) throws IOException, InterruptedException {
         Path ffmpeg = Ffmpeg.whenNeeded(installProgress);
