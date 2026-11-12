@@ -4,6 +4,7 @@ import app.unichat.gif.GifFrames;
 import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
 import app.unichat.support.BundledTools;
+import app.unichat.support.ImageHeaders;
 import app.unichat.support.I18n;
 import app.unichat.support.Processes;
 import app.unichat.video.WebmStickers;
@@ -116,6 +117,11 @@ public final class StickerConverter {
      * WhatsApp). A WebM that can't be made a GIF (no ffmpeg) goes on as it is.
      */
     static Result forChat(Path src, String mime, boolean telegram, boolean gif, RoomFeatures f, Path dir) throws IOException {
+        String real = ImageHeaders.pictureMime(src);
+        if (real != null && !real.equals(mime)) { // labelled one thing, really a picture: it goes as what it is
+            Result as = forChat(src, real, telegram && forTelegram(Network.TELEGRAM, real), false, f, dir);
+            return as != null ? as : copy(src, real, dir);
+        }
         if (telegram) return toTelegram(src, mime, dir);
         Result r = gif ? webmToGif(src, dir) : null;
         String target = target(r == null ? mime : r.mime(), f);
@@ -123,6 +129,14 @@ public final class StickerConverter {
         Result c = convert(r == null ? src : r.file(), target, dir);
         if (r != null) Files.deleteIfExists(r.file());
         return c;
+    }
+
+    /** A copy of {@code src} to upload as {@code mime} (the caller deletes what it uploads; {@code src} is the cache's). */
+    private static Result copy(Path src, String mime, Path dir) throws IOException {
+        Files.createDirectories(dir);
+        Path out = Files.createTempFile(dir, "sticker", extension(mime));
+        Files.copy(src, out, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        return new Result(out, mime);
     }
 
     /** {@code in}, a WebM, as an animated GIF; null when it can't be (no ffmpeg, or it failed). */
@@ -148,6 +162,7 @@ public final class StickerConverter {
             case WEBP -> ".webp";
             case WEBM -> ".webm";
             case GIF -> ".gif";
+            case "image/jpeg" -> ".jpg";
             default -> ".png";
         };
     }

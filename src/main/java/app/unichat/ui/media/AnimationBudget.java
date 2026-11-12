@@ -6,7 +6,7 @@ package app.unichat.ui.media;
  * stops. One alone always plays: it was already decoded to fit {@code AnimatedImage.MAX_ANIMATION_BYTES}.
  */
 final class AnimationBudget {
-    static final AnimationBudget SHARED = new AnimationBudget(192L << 20);
+    static final AnimationBudget SHARED = new AnimationBudget(128L << 20);
 
     private final long limit;
     private long used;

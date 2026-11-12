@@ -1,5 +1,6 @@
 package app.unichat.ui.media;
 
+import app.unichat.ui.FxCoalescer;
 import app.unichat.ui.Showing;
 import app.unichat.ui.Theme;
 import app.unichat.support.I18n;
@@ -45,7 +46,11 @@ public final class AnimatedImage {
     public static final java.util.concurrent.ExecutorService DECODER = java.util.concurrent.Executors.newFixedThreadPool(2, Threads.daemon("image-decoder"));
 
     /** Decoded animation: equal-size frames and how long each one stays, in ms. */
-    public record Frames(List<Image> images, List<Integer> durationsMs) {
+    public record Frames(List<Image> images, List<Integer> durationsMs, Source source) {
+        public Frames(List<Image> images, List<Integer> durationsMs) {
+            this(images, durationsMs, null);
+        }
+
         public boolean animated() { return images.size() > 1; }
 
         /** Pixel memory (4 bytes per pixel). */
@@ -53,6 +58,13 @@ public final class AnimatedImage {
             long b = 0;
             for (Image i : images) b += (long) i.getWidth() * (long) i.getHeight() * 4;
             return b;
+        }
+    }
+
+    /** The file and size frames were decoded from, so they can be let go and read again from disk. */
+    public record Source(Path file, int maxW, int maxH) {
+        Frames decode() throws IOException {
+            return AnimatedImage.decode(file, maxW, maxH);
         }
     }
 
@@ -66,7 +78,12 @@ public final class AnimatedImage {
         if (w == null || !w.isShowing() || (w instanceof javafx.stage.Stage st && st.isIconified())) return false;
         for (javafx.scene.Node p = n; p != null; p = p.getParent()) if (!p.isVisible() || p.getOpacity() == 0) return false;
         javafx.geometry.Bounds b = n.localToScene(n.getBoundsInLocal());
-        return b.getMaxX() > 0 && b.getMaxY() > 0 && b.getMinX() < sc.getWidth() && b.getMinY() < sc.getHeight();
+        if (!(b.getMaxX() > 0 && b.getMaxY() > 0 && b.getMinX() < sc.getWidth() && b.getMinY() < sc.getHeight())) return false;
+        // Inside the window but clipped away: scrolled out of a ScrollPane's or list's viewport.
+        for (javafx.scene.Node p = n.getParent(); p != null; p = p.getParent()) {
+            if (p.getClip() != null && !p.localToScene(p.getClip().getBoundsInParent()).intersects(b)) return false;
+        }
+        return true;
     }
 
     /** Most frames kept of one animation; longer ones keep every n-th frame (same total duration). */
@@ -74,7 +91,7 @@ public final class AnimatedImage {
     /** Most pixel memory for one animation: big or long ones drop frames until they fit. */
     static final long MAX_ANIMATION_BYTES = 24L << 20;
     /** Every decoded animation together; the least recently used go first. */
-    static final long CACHE_BYTES = 128L << 20;
+    static final long CACHE_BYTES = 64L << 20;
 
     /** One ANMF chunk of an animated WebP. */
     record AnimFrame(int x, int y, int width, int height, int durationMs, boolean noBlend, boolean disposeToBackground) {}
@@ -96,7 +113,7 @@ public final class AnimatedImage {
         if (hit != null) return hit;
         Image img = new Image(file.toUri().toString(), maxW, maxH, true, true, false);
         if (img.isError()) throw new IOException(I18n.t("image.invalid"));
-        return remember(file + "|" + maxW + "x" + maxH, new Frames(List.of(img), List.of(0)));
+        return remember(file + "|" + maxW + "x" + maxH, new Frames(List.of(img), List.of(0), new Source(file, maxW, maxH)));
     }
 
     private static Frames cached(String key) {
@@ -178,7 +195,7 @@ public final class AnimatedImage {
             if (scaled != null) images.add(toFx(scaled));
         });
         if (images.isEmpty()) throw new IOException(I18n.t("image.gifEmpty"));
-        return remember(key, new Frames(List.copyOf(images), sample(delays, step[0])));
+        return remember(key, new Frames(List.copyOf(images), sample(delays, step[0]), new Source(file, maxW, maxH)));
     }
 
     /** All the frames of an animated WebP or GIF, or the one of a plain picture, whatever the file claims to be. Blocking. */
@@ -263,19 +280,11 @@ public final class AnimatedImage {
     }
 
     public static boolean isGif(Path file) throws IOException {
-        try (var in = Files.newInputStream(file)) {
-            byte[] h = in.readNBytes(4);
-            return h.length == 4 && h[0] == 'G' && h[1] == 'I' && h[2] == 'F' && h[3] == '8';
-        }
+        return "image/gif".equals(app.unichat.support.ImageHeaders.pictureMime(file));
     }
 
     public static boolean isWebp(Path file) throws IOException {
-        byte[] head = new byte[12];
-        try (var in = Files.newInputStream(file)) {
-            if (in.readNBytes(head, 0, 12) < 12) return false;
-        }
-        return head[0] == 'R' && head[1] == 'I' && head[2] == 'F' && head[3] == 'F'
-                && head[8] == 'W' && head[9] == 'E' && head[10] == 'B' && head[11] == 'P';
+        return "image/webp".equals(app.unichat.support.ImageHeaders.pictureMime(file));
     }
 
     /** Reads the RIFF chunk list. Pure function of the bytes (unit-tested). */
@@ -321,7 +330,7 @@ public final class AnimatedImage {
         int sw = (int) Math.round(w * s), sh = (int) Math.round(h * s);
         int step = count == 0 ? 1 : step(count, sw, sh);
         for (int i = 0; i < count; i += step) images.add(toFx(s < 1 ? scale(raw.images().get(i), sw, sh) : raw.images().get(i)));
-        return remember(key, new Frames(List.copyOf(images), sample(raw.durationsMs(), step)));
+        return remember(key, new Frames(List.copyOf(images), sample(raw.durationsMs(), step), new Source(file, maxW, maxH)));
     }
 
     static RawFrames composeWebp(Path file, int maxW, int maxH) throws IOException {
@@ -401,61 +410,139 @@ public final class AnimatedImage {
     }
 
     /**
-     * Shows {@code frames} in {@code view}, looping, unless motion is reduced (then the first frame only).
-     * The timeline stops by itself when the view leaves the scene.
+     * Shows {@code frames} in {@code view}, moving only while it's on screen and fits {@link AnimationBudget}. Frames
+     * read from a file ({@link Frames#source}) are let go while it doesn't move (scrolled away, hidden, past the budget),
+     * keeping the picture it shows, and read again (the cache, else the disk) when it comes back: a sticker set kept
+     * every tile's frames, still or not, and ran a 1 GB heap out.
      */
     public static void play(ImageView view, Frames frames) {
         // A view that gets a new animation (cell reused, thumbnail then original) stops the previous one.
         if (view.getProperties().remove(TIMELINE) instanceof Playing old) old.end();
         view.setImage(frames.images().get(0));
         if (!frames.animated() || Theme.reduceMotion()) return;
-        Timeline t = new Timeline();
-        Playing playing = new Playing(t, frames.bytes());
+        Playing playing = new Playing(view, frames);
         view.getProperties().put(TIMELINE, playing);
-        double at = 0;
-        for (int i = 0; i < frames.images().size(); i++) {
-            Image img = frames.images().get(i);
-            t.getKeyFrames().add(new KeyFrame(Duration.millis(at), e -> {
-                // Off screen (scrolled away, hidden tab, window minimized): no new frame, so nothing gets redrawn.
-                // Every running animation used to repaint the window ~60 times a second (a third of a core).
-                if (onScreen(view)) view.setImage(img);
-            }));
-            at += frames.durationsMs().get(i);
-        }
-        t.getKeyFrames().add(new KeyFrame(Duration.millis(at)));
-        t.setCycleCount(Timeline.INDEFINITE);
         // Only while it can be seen: a closed viewer keeps its scene, and its GIF ran on for good, holding the budget.
-        playing.watch = Showing.whileShowing(view, playing::start, playing::stop);
+        playing.watch = Showing.whileShowing(view, playing::shown, playing::hidden);
+    }
+
+    /** Whether {@code view} holds an animation's frames now (moving, or one that can't be read again). */
+    static boolean holdsFrames(ImageView view) {
+        return view.getProperties().get(TIMELINE) instanceof Playing p && p.frames != null;
+    }
+
+    /** Whether {@code view}'s animation is moving now. */
+    static boolean moving(ImageView view) {
+        return view.getProperties().get(TIMELINE) instanceof Playing p && p.timeline != null
+                && p.timeline.getStatus() == Animation.Status.RUNNING;
     }
 
     /**
-     * A view's animation and the memory its frames take while it runs ({@link AnimationBudget}): past the budget it
-     * shows its first frame, still, rather than run the heap out.
+     * A view's animation: moving while its window shows it on screen and {@link AnimationBudget} has room, its frames let
+     * go otherwise (when they can be read again) and read again on coming back.
      */
     private static final class Playing {
-        private final Timeline timeline;
+        private final ImageView view;
+        private final Source source;
         private final long bytes;
+        private final FxCoalescer recheck;
+        private final javafx.beans.value.ChangeListener<javafx.scene.transform.Transform> moved;
+        private Frames frames;
+        private Timeline timeline;
+        private boolean showing, loading, ended;
         /** Whether it can be seen; cancelled when the view is handed another animation. */
         private Showing.Watch watch;
 
-        Playing(Timeline timeline, long bytes) {
-            this.timeline = timeline;
-            this.bytes = bytes;
+        Playing(ImageView view, Frames frames) {
+            this.view = view;
+            this.frames = frames;
+            this.source = frames.source();
+            this.bytes = frames.bytes();
+            this.recheck = new FxCoalescer(this::follow);
+            this.moved = (o, before, now) -> recheck.request();
         }
 
-        void start() {
-            if (timeline.getStatus() != Animation.Status.RUNNING && AnimationBudget.SHARED.take(bytes)) timeline.play();
+        void shown() {
+            showing = true;
+            view.localToSceneTransformProperty().addListener(moved); // scrolled into or out of view
+            follow();
         }
 
-        void stop() {
-            if (timeline.getStatus() == Animation.Status.RUNNING) AnimationBudget.SHARED.release(bytes);
-            timeline.stop();
+        void hidden() {
+            showing = false;
+            view.localToSceneTransformProperty().removeListener(moved);
+            follow();
+        }
+
+        /** Moves when it can be seen and fits the budget; otherwise stops, and lets its frames go if they can be read again. */
+        private void follow() {
+            if (ended) return;
+            boolean wanted = showing && onScreen(view);
+            if (wanted && !running()) {
+                if (frames == null) reload();
+                else if (AnimationBudget.SHARED.take(bytes)) timeline().play();
+                else letGo();
+            } else if (!wanted) {
+                if (running()) AnimationBudget.SHARED.release(bytes);
+                if (timeline != null) timeline.stop();
+                letGo();
+            }
+        }
+
+        private boolean running() {
+            return timeline != null && timeline.getStatus() == Animation.Status.RUNNING;
+        }
+
+        private Timeline timeline() {
+            if (timeline != null) return timeline;
+            timeline = new Timeline();
+            double at = 0;
+            for (int i = 0; i < frames.images().size(); i++) {
+                Image img = frames.images().get(i);
+                timeline.getKeyFrames().add(new KeyFrame(Duration.millis(at), e -> {
+                    // Off screen (scrolled away, hidden tab, window minimized): no new frame, so nothing gets redrawn.
+                    // Every running animation used to repaint the window ~60 times a second (a third of a core).
+                    if (onScreen(view)) view.setImage(img);
+                }));
+                at += frames.durationsMs().get(i);
+            }
+            timeline.getKeyFrames().add(new KeyFrame(Duration.millis(at)));
+            timeline.setCycleCount(Timeline.INDEFINITE);
+            return timeline;
+        }
+
+        /** Keeps only the picture on screen; nothing to let go when the frames can't be read again. */
+        private void letGo() {
+            if (source == null) return;
+            timeline = null;
+            frames = null;
+        }
+
+        private void reload() {
+            if (loading) return;
+            loading = true;
+            DECODER.execute(() -> {
+                Frames again;
+                try {
+                    again = source.decode();
+                } catch (IOException e) {
+                    again = null; // the file went (cache trimmed): it stays still
+                }
+                Frames read = again;
+                javafx.application.Platform.runLater(() -> {
+                    loading = false;
+                    if (read == null || !read.animated() || ended) return;
+                    frames = read;
+                    follow();
+                });
+            });
         }
 
         /** Replaced by another animation: stopped, and no longer following the view's window. */
         void end() {
             if (watch != null) watch.cancel();
-            stop();
+            hidden();
+            ended = true;
         }
     }
 }

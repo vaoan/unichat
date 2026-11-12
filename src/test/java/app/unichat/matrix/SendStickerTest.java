@@ -188,6 +188,19 @@ class SendStickerTest {
         assertEquals("image/gif", sent.path("info").path("mimetype").asText());
     }
 
+    @Test
+    void aStickerLabelledWebmThatIsReallyAGifGoesAsTheGifItIs() throws Exception {
+        // Telegram's bridge converts its WebM stickers (convert_from_webm) and still calls them video/webm: ffmpeg,
+        // told to read a WebM, said "Invalid data found when processing input" and the label went on to Discord.
+        MatrixChatService svc = chatOn("discord");
+        JsonNode info = MatrixClient.JSON.readTree("""
+                {"mimetype":"video/webm","w":16,"h":16,"fi.mau.bridged_sticker":{"network":"telegram","id":"8","pack_url":"https://t.me/addstickers/X"}}""");
+        svc.sender().sendStickerFor("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/labelled", "video/webm", 16, 16, info),
+                app.unichat.model.RoomFeatures.UNKNOWN, null).get();
+        assertEquals("image/gif", uploadedType, "what the file is, not its label");
+        assertEquals("image/gif", MatrixClient.JSON.readTree(body).path("info").path("mimetype").asText());
+    }
+
     private MatrixChatService telegramChat() throws Exception {
         return chatOn("telegram");
     }
@@ -237,7 +250,7 @@ class SendStickerTest {
                 {"mimetype":"image/webp","w":512,"h":512,"thumbnail_url":"mxc://s/t","fi.mau.bridged_sticker":{"network":"telegram","id":"123"}}""");
         svc.sender().sendStickerEvent("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/abc", "image/webp", 512, 512, info),
                 app.unichat.model.RoomFeatures.UNKNOWN, true, null).get();
-        assertEquals("image/webp", uploadedType);
+        assertEquals("image/gif", uploadedType, "the fake server's file is a GIF: it goes as what it is, whatever the label");
         assertTrue(path.contains("/send/m.sticker/"), path);
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertNotEquals("mxc://s/abc", sent.path("url").asText());

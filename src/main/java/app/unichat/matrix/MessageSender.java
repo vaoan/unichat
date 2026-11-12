@@ -170,13 +170,13 @@ final class MessageSender {
                 if (r == null) {
                     String mime = info.path("mimetype").asText("application/octet-stream");
                     content.put("url", client.upload(src, mime, "sticker." + mime.replaceAll(".*/", "")));
-                    info.remove(java.util.List.of("thumbnail_url", "thumbnail_info")); // on the same bridge as the sticker
                 } else {
                     content.put("url", client.upload(r.file(), r.mime(), "sticker" + StickerConverter.extension(r.mime())));
                     info.put("mimetype", r.mime());
                     info.put("size", Files.size(r.file()));
                     Files.deleteIfExists(r.file());
                 }
+                info.remove(java.util.List.of("thumbnail_url", "thumbnail_info")); // on the same bridge as the sticker
                 if (!own) info.remove("fi.mau.bridged_sticker"); // no longer that network's own sticker
                 return content;
             } catch (IOException e) {
