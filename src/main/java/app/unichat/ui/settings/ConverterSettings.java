@@ -107,6 +107,7 @@ final class ConverterSettings {
                                 mb -> mb + " MB", app.unichat.video.GifVideos.maxMb(), app.unichat.video.GifVideos::setMaxMb)),
                 row(I18n.t("settings.converter.gifSide"), I18n.t("settings.converter.gifSideHelp"),
                         SettingsForm.chips(I18n.t("settings.converter.gifSide"), app.unichat.video.GifVideos.SIDE_CHOICES,
-                                px -> px + " px", app.unichat.video.GifVideos.maxSide(), app.unichat.video.GifVideos::setMaxSide)));
+                                px -> px + " px",
+                                app.unichat.video.GifVideos.largestSide(), app.unichat.video.GifVideos::setLargestSide)));
     }
 }

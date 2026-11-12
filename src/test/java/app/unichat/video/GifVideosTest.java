@@ -63,6 +63,27 @@ class GifVideosTest {
         }
     }
 
+    /** Telegram marks any silent video up to 10 MB as a GIF: one the size of a camera's is a real video, and stays one. */
+    @Test
+    void oneTheSizeOfACamerasIsARealVideo() throws Exception {
+        Message clip = message(MessageType.VIDEO, "video/mp4", true);
+        clip.setSize(1080, 1920);
+        assertFalse(GifVideos.fits(clip), "an iPhone's clip, standing up");
+        clip.setSize(720, 720);
+        assertTrue(GifVideos.fits(clip), "up to 720 by default: a GIF can be that big");
+        clip.setSize(0, 0);
+        assertTrue(GifVideos.fits(clip), "size not said: the file is looked at before it's made");
+        clip.setSize(480, 480);
+        GifVideos.setLargestSide(320);
+        try {
+            assertFalse(GifVideos.fits(clip), "320 chosen in Ajustes");
+        } finally {
+            GifVideos.setLargestSide(720);
+        }
+        Path big = mp4("camera.mp4", "1280x720", false);
+        assertEquals(big, GifVideos.webpUnder(big, Long.MAX_VALUE), "the file is a camera's size: it stays the video");
+    }
+
     @Test
     void itsNameEndsInWebp() {
         assertEquals("gif.webp", GifVideos.webpName("gif.mp4"));
@@ -70,12 +91,15 @@ class GifVideosTest {
         assertEquals("sin extension.webp", GifVideos.webpName("sin extension"));
     }
 
-    /** ffmpeg reads only the file, as an MP4; the longest side is limited standing up too; img2webp gets short names. */
+    /** ffmpeg reads only the file, as an MP4, and takes it as it comes; img2webp gets short names. */
     @Test
     void theCommandsReadOnlyTheFileAndLimitTheLongestSide() {
-        String frames = String.join(" ", AnimatedWebp.frames(Path.of("ffmpeg"), Path.of("a.mp4"), AnimatedWebp.Source.MP4, Path.of("d"), 15, 480));
+        String frames = String.join(" ", AnimatedWebp.frames(Path.of("ffmpeg"), Path.of("a.mp4"), AnimatedWebp.Source.MP4, Path.of("d"),
+                AnimatedWebp.AS_IT_COMES, AnimatedWebp.AS_IT_COMES));
         assertTrue(frames.contains("-protocol_whitelist file") && frames.contains("-f mov"), frames);
-        assertTrue(frames.contains("fps=15") && frames.contains("min(480,ih)") && frames.contains("min(480,iw)"), frames);
+        assertFalse(frames.contains("fps=") || frames.contains("scale="), "as it comes: " + frames);
+        String sticker = String.join(" ", AnimatedWebp.frames(Path.of("ffmpeg"), Path.of("a.webm"), AnimatedWebp.Source.WEBM, Path.of("d"), 30, 512));
+        assertTrue(sticker.contains("min(512,ih)") && sticker.contains("min(512,iw)") && sticker.contains("libvpx-vp9"), "a sticker: limited standing up too");
         List<String> webp = AnimatedWebp.webp(Path.of("img2webp"), List.of("f00001.pam", "f00002.pam"), 66, 70);
         assertTrue(webp.containsAll(List.of("-loop", "0", "-lossy", "f00001.pam", "f00002.pam")) && webp.getLast().equals("out.webp"), webp.toString());
     }
@@ -106,14 +130,23 @@ class GifVideosTest {
         assertEquals(webp, GifVideos.webpUnder(mp4, Long.MAX_VALUE), "made once, beside the video");
     }
 
-    /** Too heavy for the limit, each smaller way is tried; past them all, the video goes. */
+    /** As it comes: its size and frames kept; over the weight limit the video goes. */
     @Test
-    void forALimitItGetsSmallerOrStaysTheVideo() throws Exception {
-        Path mp4 = mp4("big.mp4", "720x720", false);
-        Path first = GifVideos.webpUnder(mp4, Long.MAX_VALUE);
-        Path smaller = GifVideos.webpUnder(mp4, Files.size(first) - 1);
-        assertTrue(!smaller.equals(mp4) && Files.size(smaller) < Files.size(first), "a smaller way fitted");
-        assertEquals(mp4, GifVideos.webpUnder(mp4, 10), "nothing fits 10 bytes: the video goes");
+    void itKeepsItsSizeAndFramesAndOverTheLimitTheVideoGoes() throws Exception {
+        Path mp4 = mp4("big.mp4", "720x720", false); // the largest a GIF may be
+        Path webp = GifVideos.webpUnder(mp4, Long.MAX_VALUE);
+        byte[] b = Files.readAllBytes(webp);
+        int w = 1 + ((b[24] & 0xff) | (b[25] & 0xff) << 8 | (b[26] & 0xff) << 16), h = 1 + ((b[27] & 0xff) | (b[28] & 0xff) << 8 | (b[29] & 0xff) << 16);
+        assertEquals(List.of(720, 720), List.of(w, h), "its own size");
+        assertEquals(30, new String(b, StandardCharsets.ISO_8859_1).split("ANMF", -1).length - 1, "its own 30 frames of a second");
+        assertEquals(mp4, GifVideos.webpUnder(mp4, 10), "over 10 bytes: the video goes");
+    }
+
+    @Test
+    void onlyAVeryLongOneGetsFewerFramesASecond() {
+        assertEquals(AnimatedWebp.AS_IT_COMES, AnimatedWebp.rate(AnimatedWebp.AS_IT_COMES, new AnimatedWebp.Probe(false, 3, 30)), "a GIF's few seconds: as it comes");
+        assertEquals(15, AnimatedWebp.rate(AnimatedWebp.AS_IT_COMES, new AnimatedWebp.Probe(false, 60, 30)), "a minute at 30: 900 frames, at most");
+        assertEquals(30, AnimatedWebp.rate(30, new AnimatedWebp.Probe(false, 3, 0)), "a sticker's rate stays");
     }
 
     /** A video with sound would lose it as a picture: marked so by the bridge or found in the file, it stays a video. */

@@ -104,7 +104,10 @@ class BridgeConfigTest {
         ObjectNode c = BridgeConfig.apply(BridgeConfig.read(V2), settings("telegram"));
         assertEquals(123, c.at("/network/api_id").asInt());
         assertEquals("hash", c.at("/network/api_hash").asText());
-        assertEquals("gif", c.at("/network/animated_sticker/target").asText());
+        assertEquals("gif", c.at("/network/animated_sticker/target").asText(), "Lottie, which Unichat can't draw, as a GIF");
+        // Video stickers as they are: the bridge made each a GIF of 5-9 MB in 2-3 s (still labelled video/webm), and a
+        // GIF forwarded to Discord can't become the animated WebP the WebM would, transparency and all.
+        assertFalse(c.at("/network/animated_sticker/convert_from_webm").asBoolean(true));
     }
 
     @Test

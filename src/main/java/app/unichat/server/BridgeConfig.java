@@ -114,7 +114,10 @@ public final class BridgeConfig {
                     ObjectNode net = obj(c, "/network");
                     net.put("api_id", Integer.parseInt(s.telegramApiId()));
                     net.put("api_hash", s.telegramApiHash());
-                    obj(c, "/network/animated_sticker").put("target", "gif").put("convert_from_webm", true);
+                    // Lottie, which Unichat can't draw, as a GIF; video stickers as the WebM they are (Unichat shows them
+                    // converted, and forwards them as an animated WebP with their transparency): made a GIF by the
+                    // bridge, each took 2-3 s and 5-9 MB, still labelled video/webm.
+                    obj(c, "/network/animated_sticker").put("target", "gif").put("convert_from_webm", false);
                     // 15 by default: most chats never showed up. The bridge paces itself on Telegram's flood waits.
                     setExisting(c, "/network/sync/create_limit", BridgePorts.TELEGRAM_CREATE_LIMIT);
                     setExisting(c, "/network/sync/login_sync_limit", BridgePorts.TELEGRAM_CREATE_LIMIT);

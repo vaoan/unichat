@@ -30,8 +30,13 @@ public final class AnimatedWebp {
         public static final Source WEBM = new Source("matroska", true, true);
     }
 
-    /** The most frames one may have (a long one gets fewer a second instead): each is a whole picture on disk while it's made. */
-    static final int MAX_FRAMES = 600;
+    /**
+     * The most frames one may have, about 30 s at 30 fps (a longer one gets fewer a second instead): each is a whole
+     * picture on disk while it's made.
+     */
+    static final int MAX_FRAMES = 900;
+    /** For {@link #make}'s rate or side: as the video has it. */
+    public static final int AS_IT_COMES = 0;
     private static final long TIMEOUT_SECONDS = 180;
     private static final String OUT = "out.webp";
 
@@ -41,12 +46,14 @@ public final class AnimatedWebp {
     }
 
     /**
-     * {@code in} as an animated WebP at {@code out}: up to {@code fps} frames a second (fewer when it's long),
-     * {@code side} on the longest side, lossy at {@code quality}. Blocking; an IOException with what went wrong.
+     * {@code in} as an animated WebP at {@code out}: up to {@code fps} frames a second and {@code side} on the longest
+     * side ({@link #AS_IT_COMES}: as the video has them; a very long one gets fewer frames a second), lossy at
+     * {@code quality}. Blocking; an IOException with what went wrong.
      */
-    public static void make(Path ffmpeg, Path img2webp, Path in, Source src, Path out, int fps, int side, int quality, double seconds)
+    public static void make(Path ffmpeg, Path img2webp, Path in, Source src, Path out, int fps, int side, int quality, Probe probe)
             throws IOException, InterruptedException {
-        int rate = seconds > 0 ? (int) Math.max(1, Math.min(fps, Math.floor(MAX_FRAMES / seconds))) : fps;
+        int rate = rate(fps, probe);
+        double seconds = probe.seconds();
         // A hidden ".part" folder beside it: the cache trims one left by a crash.
         Path frames = Files.createDirectories(out.resolveSibling("." + out.getFileName() + ".frames.part"));
         try {
@@ -57,7 +64,8 @@ public final class AnimatedWebp {
             }
             if (names.isEmpty()) throw new IOException(I18n.t("video.webpFailed"));
             // Short names, run where they are: hundreds of frames as whole paths would pass Windows' command-line limit.
-            run(new ProcessBuilder(webp(img2webp, names, 1000 / rate, quality)).directory(frames.toFile()), "img2webp");
+            int ms = rate != AS_IT_COMES ? 1000 / rate : seconds > 0 ? (int) Math.round(seconds * 1000 / names.size()) : 40;
+            run(new ProcessBuilder(webp(img2webp, names, ms, quality)).directory(frames.toFile()), "img2webp");
             Path made = frames.resolve(OUT);
             SafeFile.at(out).write(o -> Files.copy(made, o));
         } finally {
@@ -68,6 +76,17 @@ public final class AnimatedWebp {
         }
     }
 
+    /**
+     * The frames a second to take: {@code fps}, or as they come ({@link #AS_IT_COMES}); fewer only when that many would
+     * pass {@link #MAX_FRAMES} (a video's own rate is 30 when it doesn't say).
+     */
+    static int rate(int fps, Probe probe) {
+        if (probe.seconds() <= 0) return fps;
+        double natural = fps != AS_IT_COMES ? fps : probe.fps() > 0 ? probe.fps() : 30;
+        if (probe.seconds() * natural <= MAX_FRAMES) return fps;
+        return (int) Math.max(1, Math.floor(MAX_FRAMES / probe.seconds()));
+    }
+
     private static void run(ProcessBuilder pb, String what) throws IOException, InterruptedException {
         Processes.Result r = Processes.capture(pb.redirectErrorStream(true), TIMEOUT_SECONDS);
         if (!r.ok()) {
@@ -76,14 +95,19 @@ public final class AnimatedWebp {
         }
     }
 
-    /** ffmpeg writing {@code in}'s frames into {@code dir}, {@code fps} a second, at most {@code side} on the longest side. */
+    /** ffmpeg writing {@code in}'s frames into {@code dir}: {@code fps} a second and at most {@code side} on the longest side, or as they come. */
     static List<String> frames(Path ffmpeg, Path in, Source src, Path dir, int fps, int side) {
         String s = Integer.toString(side);
-        String scale = "scale=w='if(gt(iw,ih),min(" + s + ",iw),-2)':h='if(gt(iw,ih),-2,min(" + s + ",ih))':flags=lanczos";
+        List<String> filters = new ArrayList<>();
+        if (fps != AS_IT_COMES) filters.add("fps=" + fps);
+        if (side != AS_IT_COMES) filters.add("scale=w='if(gt(iw,ih),min(" + s + ",iw),-2)':h='if(gt(iw,ih),-2,min(" + s + ",ih))':flags=lanczos");
         List<String> c = new ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
                 "-protocol_whitelist", "file", "-f", src.format()));
         if (src.libvpx()) c.addAll(List.of("-c:v", "libvpx-vp9"));
-        c.addAll(List.of("-i", in.toString(), "-an", "-vf", "fps=" + fps + "," + scale, "-frames:v", Integer.toString(MAX_FRAMES),
+        c.addAll(List.of("-i", in.toString(), "-an"));
+        if (!filters.isEmpty()) c.addAll(List.of("-vf", String.join(",", filters)));
+        // As it comes: a variable rate keeps each frame once (no copies to fill a fixed rate).
+        c.addAll(List.of("-fps_mode", "passthrough", "-frames:v", Integer.toString(MAX_FRAMES),
                 "-f", "image2", "-c:v", "pam", "-pix_fmt", src.alpha() ? "rgba" : "rgb24", dir.resolve("f%05d.pam").toString()));
         return c;
     }
@@ -97,8 +121,12 @@ public final class AnimatedWebp {
         return c;
     }
 
-    /** What ffmpeg reads of a video: whether it has sound, and how long it lasts (0 when it doesn't say). */
-    public record Probe(boolean sound, double seconds) {}
+    /** What ffmpeg reads of a video: whether it has sound, how long it lasts, its frames a second and size (0 when it doesn't say). */
+    public record Probe(boolean sound, double seconds, double fps, int width, int height) {
+        public Probe(boolean sound, double seconds, double fps) {
+            this(sound, seconds, fps, 0, 0);
+        }
+    }
 
     /** {@link Probe} of {@code in}, read as {@code src} only. */
     public static Probe probe(Path ffmpeg, Path in, Source src) throws IOException, InterruptedException {
@@ -106,6 +134,10 @@ public final class AnimatedWebp {
                 "-protocol_whitelist", "file", "-f", src.format(), "-i", in.toString()).redirectErrorStream(true), 60);
         Matcher d = Pattern.compile("Duration: (\\d+):(\\d+):(\\d+(?:\\.\\d+)?)").matcher(r.out());
         double seconds = d.find() ? Integer.parseInt(d.group(1)) * 3600 + Integer.parseInt(d.group(2)) * 60 + Double.parseDouble(d.group(3)) : 0;
-        return new Probe(r.out().contains(" Audio: "), seconds);
+        Matcher f = Pattern.compile("([0-9]+(?:\\.[0-9]+)?) fps").matcher(r.out());
+        Matcher wh = Pattern.compile("Video: .*?, ([0-9]{2,5})x([0-9]{2,5})").matcher(r.out());
+        boolean sized = wh.find();
+        return new Probe(r.out().contains(" Audio: "), seconds, f.find() ? Double.parseDouble(f.group(1)) : 0,
+                sized ? Integer.parseInt(wh.group(1)) : 0, sized ? Integer.parseInt(wh.group(2)) : 0);
     }
 }

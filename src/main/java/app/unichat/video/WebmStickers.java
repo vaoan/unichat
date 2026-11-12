@@ -110,9 +110,8 @@ public final class WebmStickers {
         if (ffmpeg == null) throw new NoConverter();
         Path img2webp = AnimatedWebp.img2webp();
         if (img2webp == null) throw new IOException("img2webp isn't there");
-        double seconds = AnimatedWebp.probe(ffmpeg, webm, AnimatedWebp.Source.WEBM).seconds();
         AnimatedWebp.make(ffmpeg, img2webp, webm, AnimatedWebp.Source.WEBM, out, Integer.parseInt(TELEGRAM_FPS),
-                Integer.parseInt(MAX_SIDE), 80, Math.min(seconds, Integer.parseInt(MAX_SECONDS)));
+                Integer.parseInt(MAX_SIDE), 80, AnimatedWebp.probe(ffmpeg, webm, AnimatedWebp.Source.WEBM));
         return out;
     }
 
