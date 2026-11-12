@@ -102,7 +102,7 @@ class FfmpegTest {
         try {
             assertNull(Ffmpeg.find());
             assertNull(Ffmpeg.whenNeeded(p -> { }), "off: nothing is downloaded");
-            assertThrows(WebmStickers.NoConverter.class, () -> WebmStickers.animated(Files.writeString(dir.resolve("s.webm"), "x"), p -> { }));
+            assertThrows(WebmStickers.NoConverter.class, () -> WebmStickers.toWebp(Files.writeString(dir.resolve("s.webm"), "x"), dir.resolve("s.webp"), p -> { }));
         } finally {
             Ffmpeg.setAutoInstall(true);
         }

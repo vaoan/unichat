@@ -126,4 +126,18 @@ class AnimatedImageTest {
         }
         assertEquals(List.of(40, 40, 40, 40, 40, 40), raw.durationsMs());
     }
+
+    /**
+     * TwelveMonkeys' VP8 decoder ran out of data on a WebP libwebp reads fine (Discord's preview of a link to an animated
+     * WebP): nothing showed but a retry button. libwebp's anim_dump reads it instead.
+     */
+    @Test
+    void aWebpTheJavaDecoderCantReadIsReadByLibwebp() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.video.AnimDump.find() != null, "no anim_dump");
+        Path still = Path.of(AnimatedImageTest.class.getResource("/app/unichat/ui/still.webp").toURI());
+        AnimatedImage.WebpReader failing = (file, i) -> { throw new java.io.EOFException(); };
+        AnimatedImage.RawFrames frames = AnimatedImage.composeWebp(still, 64, 64, failing);
+        assertEquals(1, frames.images().size(), "libwebp read it");
+        assertEquals(32, frames.images().getFirst().getWidth());
+    }
 }

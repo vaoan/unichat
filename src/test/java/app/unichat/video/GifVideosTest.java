@@ -25,6 +25,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GifVideosTest {
     @TempDir Path dir;
 
+    /** Ajustes as they come: what a test chose (or an older run left in the data folder) never decides another. */
+    @org.junit.jupiter.api.BeforeEach
+    void defaults() {
+        GifVideos.setOn(true);
+        GifVideos.setLongestSeconds(GifVideos.NO_LIMIT);
+        GifVideos.setMaxMb(10);
+        GifVideos.setLargestSide(720);
+    }
+
     private static Message message(MessageType type, String mime, boolean gifMark) throws Exception {
         Message m = new Message("$1", "!c", "@x", "X", false, Instant.EPOCH);
         m.setType(type);
@@ -133,11 +142,11 @@ class GifVideosTest {
     /** As it comes: its size and frames kept; over the weight limit the video goes. */
     @Test
     void itKeepsItsSizeAndFramesAndOverTheLimitTheVideoGoes() throws Exception {
-        Path mp4 = mp4("big.mp4", "720x720", false); // the largest a GIF may be
+        Path mp4 = mp4("big.mp4", "320x320", false); // within any largest side Ajustes offers (another test may be choosing one)
         Path webp = GifVideos.webpUnder(mp4, Long.MAX_VALUE);
         byte[] b = Files.readAllBytes(webp);
         int w = 1 + ((b[24] & 0xff) | (b[25] & 0xff) << 8 | (b[26] & 0xff) << 16), h = 1 + ((b[27] & 0xff) | (b[28] & 0xff) << 8 | (b[29] & 0xff) << 16);
-        assertEquals(List.of(720, 720), List.of(w, h), "its own size");
+        assertEquals(List.of(320, 320), List.of(w, h), "its own size");
         assertEquals(30, new String(b, StandardCharsets.ISO_8859_1).split("ANMF", -1).length - 1, "its own 30 frames of a second");
         assertEquals(mp4, GifVideos.webpUnder(mp4, 10), "over 10 bytes: the video goes");
     }

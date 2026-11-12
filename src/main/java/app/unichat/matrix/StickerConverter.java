@@ -18,8 +18,8 @@ import java.util.List;
 
 /**
  * A sticker made the format a chat gets it as ({@link NetworkFormats} decides which): WebM → animated WebP (img2webp,
- * transparency kept), animated GIF → WebM video sticker, GIF → animated WebP (gif2webp), anything → a still PNG. Each
- * falls back to the next best when its tool isn't there or fails. It knows formats, not networks.
+ * transparency kept), animated GIF → WebM video sticker, GIF → animated WebP (gif2webp), anything → a still PNG. A way
+ * whose tool isn't there or fails gives the sticker as it is, or a still PNG. It knows formats, not networks.
  */
 public final class StickerConverter {
     static final String WEBP = NetworkFormats.WEBP, PNG = NetworkFormats.PNG, WEBM = NetworkFormats.WEBM, GIF = NetworkFormats.GIF;
@@ -84,15 +84,8 @@ public final class StickerConverter {
 
     /** {@code src} ({@code from}) made {@code want}, each way falling back to the next best; null: it goes as it is. */
     static Result to(Path src, String from, String want, Path dir) throws IOException {
-        if (WEBM.equals(from)) {
-            Result webp = WEBP.equals(want) ? fromVideo(src, dir, ".webp", WEBP, WebmStickers::toWebp, "WebP") : null;
-            if (webp != null) return webp;
-            Result gif = fromVideo(src, dir, ".gif", GIF, WebmStickers::toGif, "GIF");
-            if (gif == null || GIF.equals(want) || !WEBP.equals(want)) return gif;
-            Result c = convert(gif.file(), want, dir); // a chat that only takes WebP: the GIF made one
-            Files.deleteIfExists(gif.file());
-            return c;
-        }
+        // A video sticker only becomes an animated WebP; without img2webp it goes as the WebM it is.
+        if (WEBM.equals(from)) return WEBP.equals(want) ? fromVideo(src, dir, ".webp", WEBP, WebmStickers::toWebp, "WebP") : null;
         if (WEBM.equals(want)) {
             Result webm = fromVideo(src, dir, ".webm", WEBM, WebmStickers::fromGif, "WebM");
             if (webm != null) return webm;

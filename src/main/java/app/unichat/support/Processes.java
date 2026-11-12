@@ -71,6 +71,23 @@ public final class Processes {
      */
     public static Result capture(ProcessBuilder command, Limit limit, String input, Consumer<String> eachLine)
             throws IOException, InterruptedException {
+        Ran r = run(command, limit, input, eachLine);
+        return new Result(r.finished(), r.exit(), r.out().toString(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Its output as the bytes it wrote (a video's frames), within {@code seconds}: empty when it didn't end well. As
+     * {@link #capture}, it's stopped with its children past the limit or when the waiting thread is interrupted.
+     */
+    public static byte[] bytes(ProcessBuilder command, long seconds) throws IOException, InterruptedException {
+        Ran r = run(command, Limit.of(seconds), null, null);
+        return r.finished() && r.exit() == 0 ? r.out().toByteArray() : new byte[0];
+    }
+
+    private record Ran(boolean finished, int exit, ByteArrayOutputStream out) {}
+
+    private static Ran run(ProcessBuilder command, Limit limit, String input, Consumer<String> eachLine)
+            throws IOException, InterruptedException {
         Process p = command.start();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         AtomicLong heard = new AtomicLong(System.nanoTime());
@@ -81,7 +98,7 @@ public final class Processes {
             boolean finished = waitFor(p, limit, heard);
             if (!finished) stop(p);
             reader.join(READER_GRACE_MS);
-            return new Result(finished, finished ? p.exitValue() : -1, out.toString(StandardCharsets.UTF_8));
+            return new Ran(finished, finished ? p.exitValue() : -1, out);
         } finally {
             if (p.isAlive()) stop(p);
         }

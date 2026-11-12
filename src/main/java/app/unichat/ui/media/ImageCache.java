@@ -1,6 +1,5 @@
 package app.unichat.ui.media;
 
-import app.unichat.video.WebmStickers;
 import app.unichat.service.MediaSource;
 import javafx.scene.image.Image;
 
@@ -61,11 +60,8 @@ public final class ImageCache {
             // Animated avatars (Discord) stay still: JavaFX's own GIF animation never lets the image go.
             Image img;
             try {
-                img = AnimatedImage.still(isWebm(path) ? WebmStickers.animated(path, done -> { }) : path, PX, PX);
+                img = AnimatedImage.still(path, PX, PX); // a video sticker's first frame too
             } catch (java.io.IOException e) {
-                img = null;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
                 img = null;
             }
             if (img == null || img.isError()) {
@@ -85,15 +81,7 @@ public final class ImageCache {
         return mine;
     }
 
-    /** Telegram's custom emoji can be WebM, which only becomes a picture through ffmpeg. */
-    private static boolean isWebm(java.nio.file.Path file) throws java.io.IOException {
-        try (java.io.InputStream in = java.nio.file.Files.newInputStream(file)) {
-            byte[] head = in.readNBytes(4);
-            return head.length == 4 && (head[0] & 0xFF) == 0x1A && head[1] == 0x45 && (head[2] & 0xFF) == 0xDF && (head[3] & 0xFF) == 0xA3;
-        }
-    }
-
-    static int size() {
+        static int size() {
         return CACHE.size();
     }
 

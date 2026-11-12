@@ -13,6 +13,14 @@ import java.util.Iterator;
 public final class ImageHeaders {
     private ImageHeaders() {}
 
+    /** Whether {@code file} is a WebM (Matroska's EBML header), whatever its name or label says. */
+    public static boolean isWebm(Path file) throws java.io.IOException {
+        try (java.io.InputStream in = java.nio.file.Files.newInputStream(file)) {
+            byte[] head = in.readNBytes(4);
+            return head.length == 4 && (head[0] & 0xFF) == 0x1A && head[1] == 0x45 && (head[2] & 0xFF) == 0xDF && (head[3] & 0xFF) == 0xA3;
+        }
+    }
+
     /**
      * The picture's type told by its first bytes (GIF, WebP, PNG, JPEG), or null for anything else. Labels lie: a
      * bridge that converts a WebM sticker to a GIF can still call it video/webm.

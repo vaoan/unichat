@@ -66,4 +66,12 @@ class RecoveryTest {
         assertEquals(1, collections.get(), "a full collection ran first");
         assertTrue(Recovery.reallyFull(() -> used[0] = 960, () -> used[0], 950), "still full after it: restart");
     }
+
+    /** A restart for memory says what filled it, so the next one can be fixed without guessing. */
+    @Test
+    void whenMemoryIsFullTheLogSaysWhatFillsIt() {
+        String h = Recovery.heaviest(5);
+        org.junit.jupiter.api.Assertions.assertTrue(h.contains("#instances") && h.contains("java."), h);
+        org.junit.jupiter.api.Assertions.assertTrue(h.lines().count() <= 5 + 4, "only the heaviest: " + h.lines().count());
+    }
 }

@@ -6,7 +6,6 @@ import app.unichat.ui.emoji.MediaItems;
 import app.unichat.ui.timeline.MessageActions;
 import app.unichat.model.Chat;
 import app.unichat.support.I18n;
-import app.unichat.video.WebmStickers;
 import javafx.scene.control.ProgressIndicator;
 import app.unichat.service.MediaSource;
 import app.unichat.model.MediaLibrary;
@@ -181,7 +180,7 @@ public final class MessageMedia {
         MediaSizes.Size size = sticker ? MediaSizes.sticker(m.width(), m.height()) : MediaSizes.media(m.width(), m.height());
         double dw = size.width(), dh = size.height();
         StackPane box = mediaBox(dw, dh, sticker);
-        if (isWebm(m)) showConverted(box, m, dw, dh);
+        if (isWebm(m)) showAnimated(box, m, dw, dh);
         else box.getChildren().add(new InlineVideo(svc, m.mediaUrl(), dw, dh, () -> fileNode(m)));
         if (MessageActions.isStickerOrGif(m)) library.rememberSeen(MediaItems.of(m));
         clickable(box, I18n.t(sticker ? "media.stickerOpen" : "media.videoOpen"), () -> openVideo(m));
@@ -193,10 +192,11 @@ public final class MessageMedia {
     }
 
     /**
-     * Labelled WebM, which JavaFX can't play: converted once to an animated picture (WebmStickers), and a file chip if that
-     * can't be. The label isn't the file: with ffmpeg at hand bridges deliver a GIF and still call it video/webm.
+     * Labelled WebM, which JavaFX can't play: its frames decoded as an animation ({@link AnimatedImage#decode}: ffmpeg
+     * straight into memory, or what the file really is, since bridges may deliver a GIF and still call it video/webm),
+     * and a file chip when it can't be.
      */
-    private void showConverted(StackPane box, Message m, double width, double height) {
+    private void showAnimated(StackPane box, Message m, double width, double height) {
         ImageView view = new ImageView();
         view.setFitWidth(width);
         view.setFitHeight(height);
@@ -207,7 +207,6 @@ public final class MessageMedia {
         box.getChildren().addAll(view, wait);
         int px = (int) (Math.max(width, height) * 2);
         svc.media(m.mediaUrl(), 0, 0)
-                .thenApplyAsync(p -> isPicture(p) ? p : converted(p), WebmStickers.WORKER)
                 .thenAcceptAsync(p -> {
                     AnimatedImage.Frames frames = decoded(p, px);
                     Platform.runLater(() -> {
@@ -219,25 +218,6 @@ public final class MessageMedia {
                     Platform.runLater(() -> box.getChildren().setAll(fileNode(m)));
                     return null;
                 });
-    }
-
-    private static boolean isPicture(java.nio.file.Path file) {
-        try {
-            return AnimatedImage.isGif(file) || AnimatedImage.isWebp(file);
-        } catch (java.io.IOException e) {
-            throw new java.io.UncheckedIOException(e);
-        }
-    }
-
-    private static java.nio.file.Path converted(java.nio.file.Path webm) {
-        try {
-            return WebmStickers.animated(webm, done -> { });
-        } catch (java.io.IOException e) {
-            throw new java.io.UncheckedIOException(e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException(e);
-        }
     }
 
     private static AnimatedImage.Frames decoded(java.nio.file.Path picture, int px) {
@@ -325,9 +305,8 @@ public final class MessageMedia {
         // A sticker comes from the stickers' own room, so photos and videos never push the chats' stickers out.
         boolean sticker = m.type() == MessageType.STICKER;
         CompletableFuture<Path> fetched = sticker ? svc.sticker(m.mediaUrl(), progress) : svc.media(m.mediaUrl(), 0, 0, progress);
-        // A WebM (Telegram's video stickers) is no picture: converted first, as in the chat (showConverted).
-        CompletableFuture<Path> original = isWebm(m)
-                ? fetched.thenApplyAsync(p -> isPicture(p) ? p : converted(p), WebmStickers.WORKER) : fetched;
+        // A WebM (Telegram's video stickers) is decoded like any animation (AnimatedImage.decode).
+        CompletableFuture<Path> original = fetched;
         if (Platform.isFxApplicationThread() && original.isDone() && !original.isCompletedExceptionally()) {
             AnimatedImage.Frames ready = AnimatedImage.decoded(original.join(), pxW, pxH);
             if (ready != null) {

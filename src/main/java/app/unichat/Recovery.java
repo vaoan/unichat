@@ -130,6 +130,26 @@ final class Recovery {
         halt.start();
     }
 
+    /** How many classes the log names when memory is full. */
+    static final int HEAVIEST_SHOWN = 25;
+
+    /**
+     * What fills the memory: the {@code count} classes taking most of it (the JVM's class histogram, as
+     * {@code jcmd GC.class_histogram} gives it). A restart for memory said only that it was full, and a probe of the
+     * sticker panel with real stickers couldn't find what had filled it.
+     */
+    static String heaviest(int count) {
+        try {
+            Object out = ManagementFactory.getPlatformMBeanServer().invoke(
+                    new javax.management.ObjectName("com.sun.management:type=DiagnosticCommand"), "gcClassHistogram",
+                    new Object[] {new String[0]}, new String[] {String[].class.getName()});
+            String[] lines = String.valueOf(out).split("\n");
+            return "Memory: what fills it\n" + String.join("\n", java.util.Arrays.copyOf(lines, Math.min(lines.length, count + 3)));
+        } catch (Exception e) {
+            return "Memory: no class histogram (" + e + ")";
+        }
+    }
+
     /** Restarts when the heap is still {@link #NEARLY_FULL} right after a collection: the step before running out. */
     private static void watchMemory() {
         for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
@@ -143,6 +163,7 @@ final class Recovery {
             try {
                 MemoryPoolMXBean old = oldGeneration();
                 if (old != null && reallyFull(System::gc, () -> old.getUsage().getUsed(), old.getCollectionUsageThreshold())) {
+                    System.err.println(heaviest(HEAVIEST_SHOWN));
                     restart("memory still nearly full after a full collection");
                 } else {
                     System.err.println("Memory: the old generation was mostly garbage; collected, not restarting.");
