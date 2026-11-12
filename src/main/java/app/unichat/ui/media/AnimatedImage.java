@@ -83,6 +83,19 @@ public final class AnimatedImage {
         if (over == null) scene.getProperties().remove(COVER);
         else scene.getProperties().put(COVER, over);
         for (Playing p : List.copyOf(SHOWN)) if (p.view.getScene() == scene) p.recheck.request();
+        for (Runnable r : List.copyOf(COVER_WATCHERS)) r.run();
+    }
+
+    /** What else stops behind a sheet (the inline videos' players), told when one opens or closes. FX thread. */
+    private static final java.util.Set<Runnable> COVER_WATCHERS = new java.util.LinkedHashSet<>();
+
+    static void watchCover(Runnable r) { COVER_WATCHERS.add(r); }
+
+    static void unwatchCover(Runnable r) { COVER_WATCHERS.remove(r); }
+
+    /** Whether {@code n} can be seen now: on screen ({@link #onScreen}) and not behind a sheet ({@link #cover}). */
+    static boolean seen(javafx.scene.Node n) {
+        return onScreen(n) && !covered(n);
     }
 
     /** Behind what covers its window ({@link #cover}). */
@@ -502,7 +515,7 @@ public final class AnimatedImage {
         /** Moves when it can be seen and fits the budget; otherwise stops, and lets its frames go if they can be read again. */
         private void follow() {
             if (ended) return;
-            boolean wanted = showing && onScreen(view) && !covered(view);
+            boolean wanted = showing && seen(view);
             if (wanted && !running()) {
                 if (frames == null) reload();
                 else if (AnimationBudget.SHARED.take(bytes)) timeline().play();

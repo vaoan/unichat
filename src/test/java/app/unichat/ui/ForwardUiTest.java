@@ -107,6 +107,11 @@ class ForwardUiTest {
             return null;
         });
         FxWait.until("all three arrive", () -> w.svc.messages(TO).size() == before + 3);
+        FxWait.until("the bar on top says how it went", () -> {
+            Node bar = w.scene.getRoot().lookup(".forward-bar");
+            return bar != null && bar.isVisible() && ((Label) bar.lookup(".audio-who")).getText().equals("3 reenviados a Familia 🏡")
+                    && ((Label) bar.lookup(".upload-percent")).getText().equals("3 de 3");
+        });
         assertEquals(List.of(first.body(), third.body(), last.body()),
                 w.svc.messages(TO).subList(before, before + 3).stream().map(Message::body).toList(), "in the chat's order, nothing added");
         FxWait.until("picking ended, the header's buttons are back", () -> w.scene.getRoot().lookup(".selection-bar") == null);
@@ -141,6 +146,48 @@ class ForwardUiTest {
         });
         FxWait.until("picking ended", () -> w.scene.getRoot().lookup(".selection-bar") == null);
         assertFalse(FxWait.fx(() -> w.scene.getRoot().lookup(".composer-banner").isVisible()), "R or E while picking started no answer or edit");
+    }
+
+    /** After forwarding, nothing looks picked: rows scrolled away while picking kept the look when they came back. */
+    @Test
+    void afterForwardingNoRowLooksPickedWhereverItIs() throws Exception {
+        w = TimelineWindow.open(30);
+        List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("Mensaje")).toList());
+        Message newest = mine.getLast();
+        FxWait.until("listed", () -> cellOf(newest) != null);
+        fire(menuItem(newest, "Reenviar…"));
+        // Up through the chat, picking what shows on the way.
+        for (int i = 0; i < 6; i++) {
+            w.wheel(400);
+            FxWait.settled();
+            FxWait.fx(() -> {
+                for (Node n : w.list().lookupAll(".row-cell")) {
+                    if (n instanceof ListCell<?> c && c.isVisible() && c.getItem() instanceof ThreadRows.MessageRow mr
+                            && mr.message().body().startsWith("Mensaje") && c.getIndex() % 3 == 0) {
+                        press(c, false);
+                        break;
+                    }
+                }
+                return null;
+            });
+        }
+        forwardPicked();
+        Node sheet = FxWait.fx(() -> w.scene.getRoot().lookup(".forward-sheet"));
+        choose(sheet, "Familia");
+        FxWait.fx(() -> {
+            ((Button) sheet.lookup(".primary-button")).fire();
+            return null;
+        });
+        FxWait.until("picking ended", () -> w.scene.getRoot().lookup(".selection-bar") == null);
+        // Every row, drawn again wherever it is.
+        for (double at : new double[] {0, 0.25, 0.5, 0.75, 1}) {
+            w.dragScrollbar(at);
+            FxWait.settled();
+            List<String> stillPicked = FxWait.fx(() -> w.list().lookupAll(".row-cell").stream()
+                    .filter(n -> n.getPseudoClassStates().stream().anyMatch(p -> p.getPseudoClassName().equals("picked")))
+                    .map(n -> String.valueOf(((ListCell<?>) n).getIndex())).toList());
+            assertTrue(stillPicked.isEmpty(), "at " + at + " rows still look picked: " + stillPicked);
+        }
     }
 
     /** {@code m}'s row on screen, or null. */

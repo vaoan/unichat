@@ -96,6 +96,17 @@ final class ConverterSettings {
                             refresh.run();
                         })),
                 row(I18n.t("settings.converter.gifs"), I18n.t("settings.converter.gifsHelp"),
-                        toggle(app.unichat.video.GifVideos.on(), app.unichat.video.GifVideos::setOn)));
+                        toggle(app.unichat.video.GifVideos.on(), app.unichat.video.GifVideos::setOn)),
+                row(I18n.t("settings.converter.gifLongest"), I18n.t("settings.converter.gifLongestHelp"),
+                        SettingsForm.chips(I18n.t("settings.converter.gifLongest"), app.unichat.video.GifVideos.LONGEST_CHOICES,
+                                s -> s == app.unichat.video.GifVideos.NO_LIMIT ? I18n.t("settings.converter.noLimit") : I18n.t("settings.converter.seconds", s),
+                                app.unichat.video.GifVideos.longestSeconds(),
+                                app.unichat.video.GifVideos::setLongestSeconds)),
+                row(I18n.t("settings.converter.gifMb"), I18n.t("settings.converter.gifMbHelp"),
+                        SettingsForm.chips(I18n.t("settings.converter.gifMb"), app.unichat.video.GifVideos.MB_CHOICES,
+                                mb -> mb + " MB", app.unichat.video.GifVideos.maxMb(), app.unichat.video.GifVideos::setMaxMb)),
+                row(I18n.t("settings.converter.gifSide"), I18n.t("settings.converter.gifSideHelp"),
+                        SettingsForm.chips(I18n.t("settings.converter.gifSide"), app.unichat.video.GifVideos.SIDE_CHOICES,
+                                px -> px + " px", app.unichat.video.GifVideos.maxSide(), app.unichat.video.GifVideos::setMaxSide)));
     }
 }

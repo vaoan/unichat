@@ -27,27 +27,87 @@ public final class Forwarding {
         into.setMediaInfo(from.mediaInfo());
     }
 
+    /** What a forward going on has done: how many went and failed of how many, which chat and message now. Read on any thread. */
+    public static final class Job {
+        private final int total;
+        private final List<String> chatIds;
+        private final java.util.concurrent.atomic.AtomicInteger sent = new java.util.concurrent.atomic.AtomicInteger();
+        private final java.util.concurrent.atomic.AtomicInteger failed = new java.util.concurrent.atomic.AtomicInteger();
+        private final CompletableFuture<Void> done = new CompletableFuture<>();
+        private final List<Runnable> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+        private volatile Message current;
+        private volatile String currentChat;
+        private volatile boolean cancelled;
+
+        Job(int total, List<String> chatIds) {
+            this.total = total;
+            this.chatIds = List.copyOf(chatIds);
+        }
+
+        public int total() { return total; }
+        public int sent() { return sent.get(); }
+        public int failed() { return failed.get(); }
+        public List<String> chatIds() { return chatIds; }
+        /** The message going now (null when none). */
+        public Message current() { return current; }
+        public String currentChat() { return currentChat; }
+        public boolean cancelled() { return cancelled; }
+        public boolean finished() { return done.isDone(); }
+        /** Completes when the last one went (or failed), or after a cancel when the one going ends. */
+        public CompletableFuture<Void> done() { return done; }
+
+        /** What's left doesn't go; the one going ends as it does. */
+        public void cancel() {
+            cancelled = true;
+            changed();
+        }
+
+        /** Runs on any thread after each change. */
+        public void addListener(Runnable r) { listeners.add(r); }
+
+        private void changed() {
+            for (Runnable r : listeners) r.run();
+        }
+    }
+
     /**
      * Sends {@code messages}, in their order, to each of {@code chatIds}, one at a time. {@code note} gives the line that
      * says where a message came from (null: none); it goes before a message only when it differs from the one before,
-     * so a run from the same person carries one. Gives how many messages couldn't go; the rest still go.
+     * so a run from the same person carries one. One that fails is counted and the rest still go. {@code gifs}: as
+     * {@link ChatMessaging#forward}.
      */
-    public static CompletableFuture<Integer> send(ChatMessaging svc, List<Message> messages, List<String> chatIds,
-                                                  Function<Message, String> note) {
-        CompletableFuture<Integer> chain = CompletableFuture.completedFuture(0);
+    public static Job send(ChatMessaging svc, List<Message> messages, List<String> chatIds, Function<Message, String> note, boolean gifs) {
+        Job job = new Job(messages.size() * chatIds.size(), chatIds);
+        CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (String chatId : chatIds) {
             String[] last = {null};
             for (Message m : messages) {
                 String line = note.apply(m);
                 boolean noted = line != null && !line.equals(last[0]);
                 last[0] = line;
-                // The line as plain text, like a forward: it holds names strangers chose ("*Ana*" isn't bold), and pings no one.
-                chain = chain.thenCompose(failed -> (noted ? svc.forward(chatId, plain(chatId, line)) : CompletableFuture.<Void>completedFuture(null))
-                        .handle((v, err) -> logged(err))
-                        .thenCompose(v -> counted(svc.forward(chatId, m))).thenApply(b -> failed + b));
+                chain = chain.thenCompose(v -> {
+                    if (job.cancelled) return CompletableFuture.completedFuture(null);
+                    job.current = m;
+                    job.currentChat = chatId;
+                    job.changed();
+                    // The line as plain text, like a forward: it holds names strangers chose ("*Ana*" isn't bold), and pings no one.
+                    return (noted ? svc.forward(chatId, plain(chatId, line), false) : CompletableFuture.<Void>completedFuture(null))
+                            .handle((x, err) -> logged(err))
+                            .thenCompose(x -> svc.forward(chatId, m, gifs))
+                            .handle((x, err) -> {
+                                if (err != null) System.err.println("Forward failed: " + err);
+                                (err == null ? job.sent : job.failed).incrementAndGet();
+                                return null;
+                            });
+                });
             }
         }
-        return chain;
+        chain.whenComplete((v, err) -> {
+            job.current = null;
+            job.done.complete(null);
+            job.changed();
+        });
+        return job;
     }
 
     private static Message plain(String chatId, String text) {
@@ -62,11 +122,4 @@ public final class Forwarding {
         return null;
     }
 
-    /** 1 when {@code sent} failed, 0 when it went. */
-    private static CompletableFuture<Integer> counted(CompletableFuture<Void> sent) {
-        return sent.handle((v, err) -> {
-            if (err != null) System.err.println("Forward failed: " + err);
-            return err == null ? 0 : 1;
-        });
-    }
 }

@@ -86,6 +86,7 @@ public final class MainView extends StackPane {
     private final AudioPlayback audio;
     /** The batch going up, whichever chat is open. */
     private final UploadBar uploads;
+    private final app.unichat.ui.timeline.ForwardBar forwards;
     private final ExploreBar exploring;
     private final Consumer<String> openLink;
     private String pendingOpenId;
@@ -169,7 +170,8 @@ public final class MainView extends StackPane {
         panel.setContent(SidePanel.Tab.FAVORITES, favorites, favorites::refresh);
         thread.composer().setOnPanel(this::togglePanel);
         offerProtectedPhotos(svc);
-        thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(svc, this::showOverlay, this::hideOverlay, this::toast));
+        forwards = new app.unichat.ui.timeline.ForwardBar(svc);
+        thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(svc, this::showOverlay, this::hideOverlay, forwards::show));
         offerChatOptions(svc);
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::gearClicked);
 
@@ -192,7 +194,7 @@ public final class MainView extends StackPane {
         java.nio.file.Path pendingUploads = Settings.dataDir().resolve(svc instanceof app.unichat.service.MockChatService ? "uploads-demo.json" : "uploads.json");
         uploads = new UploadBar(app.unichat.service.UploadQueue.of(svc, pendingUploads), svc, this::openChatId);
         exploring = new ExploreBar(app.unichat.autosave.AutoSave.of(svc), svc, this::openChatId);
-        main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true)), uploads, exploring,
+        main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true)), uploads, forwards, exploring,
                 new CloakBar(app.unichat.cloak.CloakJob.get())));
 
         overlay.getStyleClass().add("overlay");

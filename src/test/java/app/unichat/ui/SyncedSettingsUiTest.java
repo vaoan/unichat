@@ -94,6 +94,9 @@ class SyncedSettingsUiTest {
         p.put("voice.enhance", new Proof("false", app.unichat.voice.VoiceEnhancer::enabled, false));
         p.put("video.ffmpegAuto", new Proof("false", app.unichat.video.Ffmpeg::autoInstall, false));
         p.put("video.gifVideosAsGif", new Proof("false", app.unichat.video.GifVideos::on, false));
+        p.put("video.gifLongestSeconds", new Proof("30", app.unichat.video.GifVideos::longestSeconds, 30));
+        p.put("video.gifMaxMb", new Proof("50", app.unichat.video.GifVideos::maxMb, 50));
+        p.put("video.gifMaxSide", new Proof("320", app.unichat.video.GifVideos::maxSide, 320));
         p.put("cloak.level", new Proof("HIGH", () -> Settings.get().getString("cloak.level", null), "HIGH"));
         p.put("whatsapp.animatedStickers", new Proof("GIF",
                 () -> app.unichat.service.StickerMode.of(app.unichat.model.Network.WHATSAPP).name(), "GIF"));

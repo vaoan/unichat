@@ -346,7 +346,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     @Override
-    public CompletableFuture<Void> forward(String chatId, Message message) {
+    public CompletableFuture<Void> forward(String chatId, Message message, boolean gifs) {
         return sendLocal(chatId, null, m -> Forwarding.copy(message, m));
     }
 

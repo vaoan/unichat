@@ -39,17 +39,36 @@ class GifVideosTest {
         assertFalse(GifVideos.is(message(MessageType.STICKER, "video/webm", true)), "stickers go their own way");
     }
 
-    /** The GIF made is cut at 30 s and loses colours: a long "GIF" (a silent video Telegram marked) stays its video. */
+    /** As Telegram, any length by default; with a limit chosen, a longer one stays its video. */
     @Test
-    void onlyAShortOneBecomesAGif() throws Exception {
-        Message shortOne = message(MessageType.VIDEO, "video/mp4", true);
-        assertTrue(GifVideos.becomesGif(shortOne), "no length known: a GIF is short");
-        shortOne.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true,\"duration\":5000}"));
-        assertTrue(GifVideos.becomesGif(shortOne));
+    void anyLengthByDefaultAsTelegramOrUpToTheLimitChosen() throws Exception {
         Message longOne = message(MessageType.VIDEO, "video/mp4", true);
-        longOne.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true,\"duration\":20000}"));
-        assertFalse(GifVideos.becomesGif(longOne), "past 15 s it would lose its end, or weigh too much");
+        longOne.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true,\"duration\":26000}"));
+        assertTrue(GifVideos.becomesGif(longOne), "Telegram made a GIF of it: so does Unichat");
+        GifVideos.setLongestSeconds(15);
+        try {
+            assertFalse(GifVideos.becomesGif(longOne), "past the limit chosen");
+            assertTrue(GifVideos.becomesGif(message(MessageType.VIDEO, "video/mp4", true)), "no length known: a GIF is short");
+        } finally {
+            GifVideos.setLongestSeconds(GifVideos.NO_LIMIT);
+        }
         assertFalse(GifVideos.becomesGif(message(MessageType.VIDEO, "video/mp4", false)));
+    }
+
+    @Test
+    void theLimitsAreAjustesChoicesAndOnlyThose() throws Exception {
+        Message twenty = message(MessageType.VIDEO, "video/mp4", true);
+        twenty.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true,\"duration\":20000}"));
+        GifVideos.setLongestSeconds(10);
+        try {
+            assertFalse(GifVideos.fits(twenty));
+            GifVideos.setLongestSeconds(30);
+            assertTrue(GifVideos.fits(twenty), "up to 30 s chosen");
+            app.unichat.settings.Settings.get().set("video.gifLongestSeconds", "99999");
+            assertEquals(GifVideos.NO_LIMIT, GifVideos.longestSeconds(), "a value that isn't a choice (it travels: anyone's) is the default");
+        } finally {
+            GifVideos.setLongestSeconds(GifVideos.NO_LIMIT);
+        }
     }
 
     @Test
@@ -84,5 +103,21 @@ class GifVideosTest {
         byte[] head = Files.readAllBytes(gif);
         assertEquals("GIF89a", new String(head, 0, 6, java.nio.charset.StandardCharsets.US_ASCII));
         assertEquals(gif, GifVideos.toGif(mp4, x -> { }), "converted once, beside the video");
+    }
+
+    /** A video with sound would lose it as a GIF: marked so by the bridge or found in the file, it stays a video. */
+    @Test
+    void oneWithSoundStaysAVideo() throws Exception {
+        Message marked = message(MessageType.VIDEO, "video/mp4", true);
+        marked.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true,\"fi.mau.no_audio\":false}"));
+        assertFalse(GifVideos.fits(marked), "the bridge says it has sound");
+        Path ffmpeg = Ffmpeg.find();
+        Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path withSound = dir.resolve("sound.mp4");
+        Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
+                "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-pix_fmt", "yuv420p", "-shortest", withSound.toString())
+                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        Assumptions.assumeTrue(p.waitFor() == 0, "this ffmpeg can't make an MP4 with sound");
+        assertEquals(withSound, GifVideos.gifOr(withSound), "the file has sound: it stays the video");
     }
 }

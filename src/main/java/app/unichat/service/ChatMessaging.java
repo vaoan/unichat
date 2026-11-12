@@ -24,8 +24,11 @@ public interface ChatMessaging {
     void sendTyping(String chatId, boolean typing);
     /** Sends a favourite/recent sticker; {@code item.info()} lets the bridge resend the native sticker. */
     CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId);
-    /** A copy of {@code message} sent as one's own to {@code chatId}, of any network ({@link Forwarding}). */
-    CompletableFuture<Void> forward(String chatId, app.unichat.model.Message message);
+    /**
+     * A copy of {@code message} sent as one's own to {@code chatId}, of any network ({@link Forwarding}); {@code gifs}: a
+     * GIF that came as a video goes as a real GIF where a video wouldn't play by itself.
+     */
+    CompletableFuture<Void> forward(String chatId, app.unichat.model.Message message, boolean gifs);
     /** A recorded voice note; a network without them gets it as an audio file. */
     CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId);
 

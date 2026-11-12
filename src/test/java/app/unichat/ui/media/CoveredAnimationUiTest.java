@@ -15,6 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -64,6 +65,36 @@ class CoveredAnimationUiTest {
             assertFalse(FxWait.fx(() -> behind.getImage() == null));
         } finally {
             FxWait.fx(() -> { stage.close(); return null; });
+        }
+    }
+
+    /** The inline videos (Telegram's GIFs are MP4s that play by themselves) follow the same rule, at once. */
+    @Test
+    void whatPlaysBehindASheetIsNotSeenAndIsToldAtOnce() throws Exception {
+        javafx.scene.layout.Region behind = new javafx.scene.layout.Region(), inSheet = new javafx.scene.layout.Region();
+        behind.setPrefSize(20, 20);
+        inSheet.setPrefSize(20, 20);
+        StackPane overlay = new StackPane(inSheet);
+        int[] told = {0};
+        Runnable watcher = () -> told[0]++;
+        Stage stage = FxWait.fx(() -> {
+            Stage s = new Stage();
+            s.setOpacity(0);
+            s.setScene(new Scene(new StackPane(behind, overlay), 200, 200));
+            s.show();
+            AnimatedImage.watchCover(watcher);
+            return s;
+        });
+        try {
+            assertTrue(FxWait.fx(() -> AnimatedImage.seen(behind)));
+            FxWait.fx(() -> { AnimatedImage.cover(stage.getScene(), overlay); return null; });
+            assertFalse(FxWait.fx(() -> AnimatedImage.seen(behind)), "behind the sheet");
+            assertTrue(FxWait.fx(() -> AnimatedImage.seen(inSheet)), "in it");
+            assertEquals(1, told[0], "the players hear it as it happens, not at their next second's look");
+            FxWait.fx(() -> { AnimatedImage.cover(stage.getScene(), null); return null; });
+            assertTrue(FxWait.fx(() -> AnimatedImage.seen(behind)));
+        } finally {
+            FxWait.fx(() -> { AnimatedImage.unwatchCover(watcher); stage.close(); return null; });
         }
     }
 }

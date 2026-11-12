@@ -112,12 +112,9 @@ public final class StickerConverter {
         return network != Network.TELEGRAM && network != Network.WHATSAPP;
     }
 
-    /** The most a GIF made from a video may weigh: Discord refuses files over 10 MB without Nitro. */
-    private static final long GIF_MAX_BYTES = 10L << 20;
-
-    /** Whether a GIF of {@code bytes} can go; a heavier one goes as the video it was made from. */
+    /** Whether a GIF of {@code bytes} can go ({@code GifVideos.maxMb}: Discord refuses over 10 MB without Nitro); a heavier one goes as its video. */
     static boolean fitsAsGif(long bytes) {
-        return bytes <= GIF_MAX_BYTES;
+        return bytes <= ((long) app.unichat.video.GifVideos.maxMb() << 20);
     }
 
 /**

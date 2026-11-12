@@ -32,6 +32,8 @@ final class InlineVideo extends StackPane {
     private final MediaView view = new MediaView();
     private final PauseTransition start = new PauseTransition(START_DELAY);
     private final Timeline visibility = new Timeline(new KeyFrame(Duration.seconds(1), e -> followVisibility()));
+    /** Behind a sheet it pauses at once: its frames under the card's shadow made the Mac flash black. */
+    private final Runnable coverChanged = this::followVisibility;
     private MediaPlayer player;
     private long generation;
 
@@ -76,11 +78,13 @@ final class InlineVideo extends StackPane {
         view.setMediaPlayer(player);
         player.play();
         visibility.playFromStart();
+        AnimatedImage.watchCover(coverChanged);
+        followVisibility();
     }
 
     private void followVisibility() {
         if (player == null) return;
-        boolean shown = AnimatedImage.onScreen(this);
+        boolean shown = AnimatedImage.seen(this);
         boolean playing = player.getStatus() == MediaPlayer.Status.PLAYING;
         if (shown && !playing) player.play();
         else if (!shown && playing) player.pause();
@@ -95,6 +99,7 @@ final class InlineVideo extends StackPane {
         generation++;
         start.stop();
         visibility.stop();
+        AnimatedImage.unwatchCover(coverChanged);
         view.setMediaPlayer(null);
         if (player != null) player.dispose();
         player = null;

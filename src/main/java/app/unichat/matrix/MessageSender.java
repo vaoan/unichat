@@ -202,7 +202,7 @@ final class MessageSender {
      * A copy of {@code m} as one's own ({@link ForwardedContent}). A sticker goes as stickers do, converted for the chat;
      * a file on another bridge's direct media goes as a copy on our server ({@link #needsCopy}).
      */
-    CompletableFuture<Void> forward(String chatId, Message m) {
+    CompletableFuture<Void> forward(String chatId, Message m, boolean gifs) {
         // Only a media address goes on: a stranger's message may name any other (a file: one, a web page).
         if (m.isMedia() && Mxc.parse(m.mediaUrl()) == null) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
         if (m.type() == MessageType.STICKER) {
@@ -214,7 +214,7 @@ final class MessageSender {
             return sendSticker(chatId, m.outgoing() ? MediaLibrary.original(item) : item, null);
         }
         Chat chat = core.chat(chatId);
-        boolean gif = chat != null && StickerConverter.gifAsGif(chat.network()) && app.unichat.video.GifVideos.becomesGif(m);
+        boolean gif = gifs && chat != null && StickerConverter.gifAsGif(chat.network()) && app.unichat.video.GifVideos.fits(m);
         boolean copy = m.isMedia() && (gif || needsCopy(m.mediaUrl()));
         ObjectNode content = ForwardedContent.of(m, copy);
         String txn = core.newTxnId();

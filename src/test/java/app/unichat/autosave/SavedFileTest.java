@@ -65,10 +65,15 @@ class SavedFileTest {
             @Override public Failure link(String url, Path into, String tag, java.util.function.DoubleConsumer progress) { return null; }
         };
         Path into = dir.resolve("Buga");
-        assertTrue(SavedFile.copyInto(saver, m, into, new Path[1], x -> { }));
+        app.unichat.video.GifVideos.setLongestSeconds(15); // a limit chosen in Ajustes (none by default, as Telegram)
+        try {
+            assertTrue(SavedFile.copyInto(saver, m, into, new Path[1], x -> { }));
+        } finally {
+            app.unichat.video.GifVideos.setLongestSeconds(app.unichat.video.GifVideos.NO_LIMIT);
+        }
         try (var in = Files.list(into)) {
             String name = in.map(f -> f.getFileName().toString()).findFirst().orElseThrow();
-            assertTrue(name.endsWith("].MP4"), "40 s as a GIF would be cut at 30: " + name);
+            assertTrue(name.endsWith("].MP4"), "past the limit it's saved as its video, whole: " + name);
         }
     }
 }

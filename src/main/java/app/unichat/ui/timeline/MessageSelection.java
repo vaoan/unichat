@@ -104,6 +104,7 @@ final class MessageSelection {
         on = false;
         picked.clear();
         last = null;
+        list.getSelectionModel().clearSelection(); // the row picking moved through kept its ring, and looked still picked
         app.unichat.ui.Nodes.style(list, "picking", false);
         showBar.accept(false);
         sync();

@@ -276,7 +276,7 @@ class SendStickerTest {
         java.nio.file.Files.createDirectories(media);
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(8, 8, java.awt.image.BufferedImage.TYPE_INT_RGB), "gif",
                 media.resolve(app.unichat.support.Hashes.sha256(MediaDownloader.cacheKey(m.mediaUrl(), 0, 0)) + ".gif").toFile());
-        svc.forward("!c:example.org", m).get();
+        svc.forward("!c:example.org", m, true).get();
         assertTrue(path.contains("/send/m.room.message/"), path);
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("mxc://s/converted", sent.path("url").asText(), "Discord's bridge can't read Telegram's direct media");
@@ -301,7 +301,7 @@ class SendStickerTest {
         m.setSize(64, 64);
         m.setMediaInfo(MatrixClient.JSON.readTree("{\"mimetype\":\"video/mp4\",\"duration\":1000,\"fi.mau.gif\":true,\"fi.mau.loop\":true}"));
 
-        chatOn("discord").forward("!c:example.org", m).get();
+        chatOn("discord").forward("!c:example.org", m, true).get();
         assertEquals("image/gif", uploadedType, "a GIF Discord plays by itself");
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("m.image", sent.path("msgtype").asText());
@@ -309,7 +309,7 @@ class SendStickerTest {
         assertEquals("gif.gif", sent.path("filename").asText());
 
         uploadedType = null;
-        chatOn("telegram").forward("!c:example.org", m).get();
+        chatOn("telegram").forward("!c:example.org", m, true).get();
         assertNull(uploadedType, "Telegram shows its own as a GIF: it goes as it is");
         assertEquals("m.video", MatrixClient.JSON.readTree(body).path("msgtype").asText());
     }
@@ -320,7 +320,7 @@ class SendStickerTest {
         app.unichat.model.Message m = new app.unichat.model.Message("$f", "!x:example.org", "@whatsapp_1:example.org", "Ana", false, java.time.Instant.EPOCH);
         m.setType(app.unichat.model.MessageType.FILE);
         m.setMediaUrl("file:///etc/passwd");
-        assertTrue(svc.forward("!c:example.org", m).isCompletedExceptionally());
+        assertTrue(svc.forward("!c:example.org", m, true).isCompletedExceptionally());
         assertNull(path, "nothing went");
     }
 
@@ -329,7 +329,7 @@ class SendStickerTest {
         MatrixChatService svc = chatOn("telegram");
         app.unichat.model.Message m = new app.unichat.model.Message("$t", "!x:example.org", "@whatsapp_1:example.org", "Ana", false, java.time.Instant.EPOCH);
         m.setBody("nos vemos");
-        svc.forward("!c:example.org", m).get();
+        svc.forward("!c:example.org", m, true).get();
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("nos vemos", sent.path("body").asText());
         assertNull(uploadedType, "nothing to upload");

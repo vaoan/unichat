@@ -44,13 +44,14 @@ public final class ForwardSheet {
     private final ChatService svc;
     private final Consumer<Node> show;
     private final Runnable hide;
-    private final Consumer<String> toast;
+    private final Consumer<Forwarding.Job> progress;
 
-    public ForwardSheet(ChatService svc, Consumer<Node> show, Runnable hide, Consumer<String> toast) {
+    /** {@code progress}: shows a forward going on ({@link ForwardBar}). */
+    public ForwardSheet(ChatService svc, Consumer<Node> show, Runnable hide, Consumer<Forwarding.Job> progress) {
         this.svc = svc;
         this.show = show;
         this.hide = hide;
-        this.toast = toast;
+        this.progress = progress;
     }
 
     /**
@@ -105,7 +106,7 @@ public final class ForwardSheet {
             }
         });
 
-        Saying saying = new Saying(messages.getFirst(), from);
+        Saying saying = new Saying(messages, from);
 
         Button cancel = new Button(I18n.t("folders.dialog.cancel"));
         cancel.getStyleClass().add("secondary-button");
@@ -115,9 +116,10 @@ public final class ForwardSheet {
         go.setDefaultButton(true);
         go.setOnAction(e -> {
             ForwardNote note = saying.note();
+            boolean gifs = saying.gifs.isSelected();
             List<String> to = List.copyOf(chosen);
             hide.run();
-            send(messages, from, to, note);
+            send(messages, from, to, note, gifs);
             sent.run();
         });
         changed.run();
@@ -126,7 +128,7 @@ public final class ForwardSheet {
         HBox buttons = new HBox(10, count, grow, cancel, go);
         buttons.setAlignment(Pos.CENTER_LEFT);
 
-        VBox card = new VBox(12, title, SearchFields.clearable(search), list, saying.label, saying.boxes, saying.preview, buttons);
+        VBox card = new VBox(12, title, SearchFields.clearable(search), list, saying.label, saying.boxes, saying.preview, saying.gifs, buttons);
         card.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
             if (e.getCode() == KeyCode.ENTER && e.isShortcutDown() && !go.isDisabled()) {
                 go.fire(); // ⌘Enter sends from anywhere in the sheet; Enter alone chooses a chat
@@ -151,9 +153,15 @@ public final class ForwardSheet {
         /** On as many lines as they need: at 160 % text they were cut to "Quién lo escr…". */
         final javafx.scene.layout.FlowPane boxes = new javafx.scene.layout.FlowPane(14, 8, who, where, when);
         final Label preview = new Label();
+        /** Only when a GIF that came as a video goes: as a real GIF where a video wouldn't play by itself (Ajustes' choice to start). */
+        final CheckBox gifs = new CheckBox(I18n.t("forward.gifs"));
 
-        /** {@code first}: the message whose line is shown, of {@code from}. */
-        Saying(Message first, Chat from) {
+        /** The first of {@code messages} (of {@code from}) is the one whose line is shown. */
+        Saying(List<Message> messages, Chat from) {
+            Message first = messages.getFirst();
+            gifs.setSelected(app.unichat.video.GifVideos.on());
+            gifs.setWrapText(true);
+            app.unichat.ui.Nodes.show(gifs, messages.stream().anyMatch(app.unichat.video.GifVideos::is));
             ForwardNote saved = ForwardNote.saved();
             who.setSelected(saved.who());
             where.setSelected(saved.where());
@@ -176,10 +184,9 @@ public final class ForwardSheet {
         }
     }
 
-    private void send(List<Message> messages, Chat from, List<String> to, ForwardNote note) {
+    private void send(List<Message> messages, Chat from, List<String> to, ForwardNote note, boolean gifs) {
         ZoneId zone = ZoneId.systemDefault();
-        Forwarding.send(svc, messages, to, m -> note.of(m, from, zone)).thenAccept(failed -> Platform.runLater(() ->
-                toast.accept(failed == 0 ? I18n.n("forward.done", to.size()) : I18n.n("forward.failed", failed))));
+        progress.accept(Forwarding.send(svc, messages, to, m -> note.of(m, from, zone), gifs));
     }
 
     /** A chat to choose: its check, picture, name and network. */
