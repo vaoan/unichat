@@ -61,12 +61,19 @@ final class Recovery {
     static void install(Start start) {
         restartsSoFar = start.restarts();
         installed = true;
-        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> uncaught(t, e, Recovery::restart));
+        watchMemory();
+    }
+
+    /** What a thread's error does: said, and a start again when it's fatal. */
+    static void uncaught(Thread t, Throwable e, java.util.function.Consumer<String> restart) {
+        try {
             System.err.println("Uncaught in " + t.getName() + ": " + e);
             e.printStackTrace();
-            if (fatal(e)) restart("a thread ran out of memory (" + t.getName() + ")");
-        });
-        watchMemory();
+        } catch (Throwable unsaid) {
+            // Out of memory, saying it can run out too: the restart mustn't depend on it.
+        }
+        if (fatal(e)) restart.accept("a thread ran out of memory (" + t.getName() + ")");
     }
 
     /** Watches the UI thread too, once it exists; nothing when recovery isn't on (tests, snapshot runs). */
@@ -100,8 +107,12 @@ final class Recovery {
     /** Logs why with every thread's stack, starts the next run when allowed, and ends this one. Once. */
     static void restart(String why) {
         if (!RESTARTING.compareAndSet(false, true)) return;
-        System.err.println("Recovery: " + why + "; starting again.");
-        System.err.println(threads());
+        try {
+            System.err.println("Recovery: " + why + "; starting again.");
+            System.err.println(threads());
+        } catch (Throwable unsaid) {
+            // out of memory to say it: starting again matters more
+        }
         Duration uptime = Duration.ofMillis(ManagementFactory.getRuntimeMXBean().getUptime());
         ProcessHandle.Info info = ProcessHandle.current().info();
         if (mayRestart(restartsSoFar, uptime) && info.command().isPresent()) {

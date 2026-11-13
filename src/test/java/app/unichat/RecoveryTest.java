@@ -74,4 +74,23 @@ class RecoveryTest {
         org.junit.jupiter.api.Assertions.assertTrue(h.contains("#instances") && h.contains("java."), h);
         org.junit.jupiter.api.Assertions.assertTrue(h.lines().count() <= 5 + 4, "only the heaviest: " + h.lines().count());
     }
+
+    @Test
+    void itStartsAgainEvenWhenThereIsNoMemoryToSayWhy() {
+        // 2026-11-13: the heap ran out in the sync thread, and the handler's own println ran out too, before it could
+        // start Unichat again; the thread was gone, nothing was said and the top bar kept "Conectando…".
+        java.io.PrintStream err = System.err;
+        List<String> restarts = new java.util.ArrayList<>();
+        System.setErr(new java.io.PrintStream(new java.io.OutputStream() {
+            @Override public void write(int b) {
+                throw new OutOfMemoryError("Java heap space");
+            }
+        }));
+        try {
+            Recovery.uncaught(new Thread("matrix-sync"), new OutOfMemoryError("Java heap space"), restarts::add);
+        } finally {
+            System.setErr(err);
+        }
+        assertEquals(List.of("a thread ran out of memory (matrix-sync)"), restarts);
+    }
 }
