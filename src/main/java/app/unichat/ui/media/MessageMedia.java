@@ -276,7 +276,8 @@ public final class MessageMedia {
     /** Stickers, GIFs and WebP may be animated: those load the original file, never a (static) thumbnail. */
     static boolean mayBeAnimated(Message m) {
         String mime = m.mimeType() == null ? "" : m.mimeType();
-        return m.type() == MessageType.STICKER || mime.equals("image/gif") || mime.equals("image/webp");
+        // video/mp4: a saved GIF that came as one (only the sticker and GIF panels ask for a video here).
+        return m.type() == MessageType.STICKER || mime.equals("image/gif") || mime.equals("image/webp") || mime.equals("video/mp4");
     }
 
     /** Thumbnail first, then the (possibly animated) original; shared with the sticker and GIF grids. */

@@ -22,7 +22,12 @@ public final class VideoFrames {
      * {@link WebmStickers.NoConverter} without ffmpeg.
      */
     public static AnimatedWebp.Probe probe(Path video) throws IOException, InterruptedException {
-        return AnimatedWebp.probe(ffmpeg(), video, AnimatedWebp.Source.WEBM);
+        return AnimatedWebp.probe(ffmpeg(), video, sourceOf(video));
+    }
+
+    /** What {@code video} is read as, from its own bytes: a WebM (video stickers) or else an MP4 (GIFs sent as video). */
+    static AnimatedWebp.Source sourceOf(Path video) throws IOException {
+        return app.unichat.support.ImageHeaders.isWebm(video) ? AnimatedWebp.Source.WEBM : AnimatedWebp.Source.MP4;
     }
 
     /** Takes each frame as it's decoded: RGBA, {@code width}x{@code height}; the array is reused for the next one. */
@@ -42,7 +47,7 @@ public final class VideoFrames {
         double fps = probe.seconds() > 0 && probe.seconds() * natural > maxFrames ? Math.max(1, maxFrames / probe.seconds()) : natural;
         byte[] frame = new byte[width * height * 4];
         int[] count = {0};
-        Processes.read(new ProcessBuilder(command(ffmpeg(), video, width, height, fps, maxFrames))
+        Processes.read(new ProcessBuilder(command(ffmpeg(), video, sourceOf(video), width, height, fps, maxFrames))
                 .redirectError(ProcessBuilder.Redirect.DISCARD), TIMEOUT_SECONDS, out -> {
             while (count[0] < maxFrames && out.readNBytes(frame, 0, frame.length) == frame.length) {
                 each.take(frame);
@@ -53,12 +58,18 @@ public final class VideoFrames {
         return (int) Math.round(1000 / fps);
     }
 
-    /** ffmpeg decoding {@code in} (read as a WebM only, by libvpx, which keeps the transparency) to raw RGBA on its output. */
-    static List<String> command(Path ffmpeg, Path in, int width, int height, double fps, int maxFrames) {
-        return List.of(ffmpeg.toString(), "-nostdin", "-loglevel", "error", "-protocol_whitelist", "file", "-f", "matroska",
-                "-c:v", "libvpx-vp9", "-i", in.toString(), "-an",
+    /**
+     * ffmpeg decoding {@code in} to raw RGBA on its output, read only as {@code src} says (a WebM by libvpx, which keeps
+     * the transparency; an MP4 by ffmpeg's own decoders).
+     */
+    static List<String> command(Path ffmpeg, Path in, AnimatedWebp.Source src, int width, int height, double fps, int maxFrames) {
+        List<String> c = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-loglevel", "error",
+                "-protocol_whitelist", "file", "-f", src.format()));
+        if (src.libvpx()) c.addAll(List.of("-c:v", "libvpx-vp9"));
+        c.addAll(List.of("-i", in.toString(), "-an",
                 "-vf", String.format(java.util.Locale.ROOT, "fps=%.3f,scale=%d:%d:flags=lanczos", fps, width, height),
-                "-frames:v", Integer.toString(maxFrames), "-f", "rawvideo", "-pix_fmt", "rgba", "pipe:1");
+                "-frames:v", Integer.toString(maxFrames), "-f", "rawvideo", "-pix_fmt", "rgba", "pipe:1"));
+        return c;
     }
 
     private static Path ffmpeg() throws IOException, InterruptedException {

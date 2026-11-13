@@ -333,6 +333,29 @@ class SendStickerTest {
     }
 
     @Test
+    void aSavedGifThatIsAnMp4GoesToDiscordAsAnAnimatedWebpAndToTelegramAsItIs(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        // From the GIF panel (a favourite from Telegram, a provider's MP4): Discord showed it as a video with a play button.
+        java.nio.file.Path ffmpeg = app.unichat.video.Ffmpeg.find();
+        org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.support.BundledTools.find("unichat.img2webp", null, "img2webp") != null, "no img2webp");
+        java.nio.file.Path mp4 = dir.resolve("gif.mp4");
+        Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
+                "-pix_fmt", "yuv420p", "-an", mp4.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        org.junit.jupiter.api.Assumptions.assumeTrue(p.waitFor() == 0, "this ffmpeg can't make an MP4");
+
+        chatOn("discord").sendGif("!c:example.org", mp4, "video/mp4", 64, 64, null).get();
+        assertEquals("image/webp", uploadedType, "an animated WebP, which Discord plays by itself");
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("m.image", sent.path("msgtype").asText());
+        assertTrue(sent.path("info").path("fi.mau.gif").asBoolean(), "still a GIF");
+
+        uploadedType = null;
+        chatOn("telegram").sendGif("!c:example.org", mp4, "video/mp4", 64, 64, null).get();
+        assertEquals("video/mp4", uploadedType, "Telegram shows its own as a GIF: it goes as it is");
+        assertEquals("m.video", MatrixClient.JSON.readTree(body).path("msgtype").asText());
+    }
+
+    @Test
     void aForwardedFileMustBeAtAMediaAddress() throws Exception {
         MatrixChatService svc = chatOn("telegram");
         app.unichat.model.Message m = new app.unichat.model.Message("$f", "!x:example.org", "@whatsapp_1:example.org", "Ana", false, java.time.Instant.EPOCH);

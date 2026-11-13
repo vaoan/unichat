@@ -166,7 +166,9 @@ public final class AnimatedImage {
             double s = fit * shrinkToKeep(count, (int) Math.round(probe.width() * fit), (int) Math.round(probe.height() * fit));
             int w = Math.max(1, (int) Math.round(probe.width() * s)), h = Math.max(1, (int) Math.round(probe.height() * s));
             List<Image> images = new ArrayList<>();
-            int ms = app.unichat.video.VideoFrames.read(file, probe, w, h, maxFrames, rgba -> images.add(fromRgba(rgba, w, h)));
+            // Capped by bytes too: the probe is what ffmpeg read of the file, and a file can say less than it holds.
+            int frames = (int) Math.max(1, Math.min(maxFrames, MAX_ANIMATION_BYTES / ((long) w * h * 4)));
+            int ms = app.unichat.video.VideoFrames.read(file, probe, w, h, frames, rgba -> images.add(fromRgba(rgba, w, h)));
             return new Frames(List.copyOf(images), java.util.Collections.nCopies(images.size(), ms), new Source(file, maxW, maxH));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -276,9 +278,9 @@ public final class AnimatedImage {
         return remember(key, new Frames(List.copyOf(images), sample(delays, step[0]), new Source(file, maxW, maxH)));
     }
 
-    /** All the frames of an animated WebP, GIF or video sticker (WebM), or the one of a plain picture, whatever the file claims to be. Blocking. */
+    /** All the frames of an animated WebP, GIF, video sticker (WebM) or GIF sent as an MP4, or the one of a plain picture, whatever the file claims to be. Blocking. */
     public static Frames decode(Path file, int maxW, int maxH) throws IOException {
-        boolean webm = app.unichat.support.ImageHeaders.isWebm(file), webp = !webm && isWebp(file), gif = !webm && !webp && isGif(file);
+        boolean webm = app.unichat.support.ImageHeaders.isVideo(file), webp = !webm && isWebp(file), gif = !webm && !webp && isGif(file);
         if (!webm && !webp && !gif) return decodePlain(file, maxW, maxH);
         Frames hit = decoded(file, maxW, maxH);
         if (hit != null) return hit;
@@ -298,7 +300,7 @@ public final class AnimatedImage {
      * own animation, which leaks). For thumbnails and avatars; blocking, call off the FX thread.
      */
     public static Image still(Path file, int maxW, int maxH) throws IOException {
-        if (app.unichat.support.ImageHeaders.isWebm(file)) return video(file, maxW, maxH, 1).images().getFirst();
+        if (app.unichat.support.ImageHeaders.isVideo(file)) return video(file, maxW, maxH, 1).images().getFirst();
         if (isBigWebp(file)) return new Image(shrunk(file).toUri().toString(), maxW, maxH, true, true, false);
         if (isGif(file) || isWebp(file)) { // JavaFX can't read WebP; ImageIO can (TwelveMonkeys), its first frame if animated
             BufferedImage first;

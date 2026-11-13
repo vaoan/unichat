@@ -65,6 +65,15 @@ class MessageActionsTest {
         assertTrue(MessageActions.of(msg(false, MessageType.STICKER, "image/webp"), f(WHATSAPP), SENT).contains(FAVORITE));
         assertTrue(MessageActions.of(msg(false, MessageType.IMAGE, "image/gif"), f(WHATSAPP), SENT).contains(FAVORITE));
         assertFalse(MessageActions.of(msg(false, MessageType.IMAGE, "image/jpeg"), f(WHATSAPP), SENT).contains(FAVORITE));
+        // Telegram's and WhatsApp's GIFs come as an MP4 the bridge marks as one, Discord's gifv as a WebP so marked.
+        Message gifVideo = msg(false, MessageType.VIDEO, "video/mp4");
+        gifVideo.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true}"));
+        assertTrue(MessageActions.of(gifVideo, f(WHATSAPP), SENT).contains(FAVORITE), "a GIF that came as a video");
+        Message gifv = msg(false, MessageType.IMAGE, "image/webp");
+        gifv.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true,\"fi.mau.discord.gifv\":true}"));
+        assertTrue(MessageActions.of(gifv, f(WHATSAPP), SENT).contains(FAVORITE), "Discord's gifv");
+        Message video = msg(false, MessageType.VIDEO, "video/mp4");
+        assertFalse(MessageActions.of(video, f(WHATSAPP), SENT).contains(FAVORITE), "a plain video isn't a GIF");
     }
 
     @Test

@@ -369,9 +369,20 @@ final class MessageSender {
     /** How long a file may take to reach the network before it's taken as sent anyway (a bridge that doesn't report). */
     private static final java.time.Duration NETWORK_PATIENCE = java.time.Duration.ofMinutes(5);
 
-    /** A GIF from the GIF tab: m.video (mp4) or m.image (gif) flagged {@code fi.mau.gif}, so bridges send a GIF. */
+    /**
+     * A GIF from the GIF tab: m.video (mp4) or m.image (gif) flagged {@code fi.mau.gif}, so bridges send a GIF. One that's
+     * an MP4 (a provider's, a favourite from Telegram or WhatsApp) goes where the bridge would show a video (Discord) as
+     * the animated WebP a forward makes ({@code video/GifVideos}), else as it is.
+     */
     CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, String replyToId) {
-        return sendMedia(chatId, file, replyToId, mime, width, height, true);
+        Chat chat = core.chat(chatId);
+        boolean video = mime != null && mime.startsWith("video/");
+        if (!video || chat == null || NetworkFormats.of(chat.network()).gifVideosAsIs()) {
+            return sendMedia(chatId, file, replyToId, mime, width, height, true);
+        }
+        return CompletableFuture.supplyAsync(() -> app.unichat.video.GifVideos.webpUnder(file, app.unichat.video.GifVideos.maxBytes()), core.io)
+                .thenCompose(p -> p == file ? sendMedia(chatId, file, replyToId, mime, width, height, true)
+                        : sendMedia(chatId, p, replyToId, StickerConverter.WEBP, width, height, true));
     }
 
     /**

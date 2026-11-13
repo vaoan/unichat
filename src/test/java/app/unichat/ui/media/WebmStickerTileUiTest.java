@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
@@ -53,5 +54,25 @@ class WebmStickerTileUiTest {
         ImageView view = FxWait.fx(ImageView::new);
         MessageMedia.loadMedia((url, w, h) -> CompletableFuture.completedFuture(webm), view, m, 128, 128).get();
         assertNotNull(FxWait.fx(view::getImage), "the sticker shows");
+    }
+
+    @Test
+    void aFavouriteGifThatIsAnMp4LoadsAsAMovingPicture() throws Exception {
+        // Telegram's and WhatsApp's GIFs are MP4s: saved as favourites, their tile is one too.
+        Path ffmpeg = Ffmpeg.find();
+        assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path mp4 = dir.resolve("g.mp4");
+        Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
+                "-pix_fmt", "yuv420p", "-an", mp4.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        assumeTrue(p.waitFor() == 0, "this ffmpeg can't make an MP4");
+        assertTrue(AnimatedImage.decode(mp4, 64, 64).animated(), "its frames, as a GIF's");
+        Message m = new Message("$g", "!c:demo", "@a:demo", "A", false, java.time.Instant.now());
+        m.setType(MessageType.IMAGE); // as a saved GIF's tile asks for it (MediaItems.message)
+        m.setMediaUrl("mxc://demo/mp4-" + System.nanoTime());
+        m.setMimeType("video/mp4");
+        m.setSize(64, 64);
+        ImageView view = FxWait.fx(ImageView::new);
+        MessageMedia.loadMedia((url, w, h) -> CompletableFuture.completedFuture(mp4), view, m, 128, 128).get();
+        assertNotNull(FxWait.fx(view::getImage), "the GIF shows");
     }
 }

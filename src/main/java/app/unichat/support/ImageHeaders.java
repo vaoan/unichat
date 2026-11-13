@@ -21,6 +21,23 @@ public final class ImageHeaders {
         }
     }
 
+    /** An MP4's brands; an iPhone's HEIC or an AVIF photo has the same {@code ftyp} box with another (heic, mif1, avif). */
+    private static final java.util.Set<String> MP4_BRANDS = java.util.Set.of("isom", "iso2", "iso4", "iso5", "iso6", "mp41", "mp42",
+            "avc1", "M4V ", "dash");
+
+    /**
+     * Whether {@code file} is a video ffmpeg turns into frames: a WebM (video stickers) or an MP4 (the ISO box {@code ftyp}
+     * at byte 4 with a video's brand: the GIFs Telegram and WhatsApp send as video).
+     */
+    public static boolean isVideo(Path file) throws java.io.IOException {
+        if (isWebm(file)) return true;
+        try (java.io.InputStream in = java.nio.file.Files.newInputStream(file)) {
+            byte[] head = in.readNBytes(12);
+            return head.length == 12 && head[4] == 'f' && head[5] == 't' && head[6] == 'y' && head[7] == 'p'
+                    && MP4_BRANDS.contains(new String(head, 8, 4, java.nio.charset.StandardCharsets.US_ASCII));
+        }
+    }
+
     /**
      * The picture's type told by its first bytes (GIF, WebP, PNG, JPEG), or null for anything else. Labels lie: a
      * bridge that converts a WebM sticker to a GIF can still call it video/webm.

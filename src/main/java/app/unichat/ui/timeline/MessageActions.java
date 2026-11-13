@@ -45,6 +45,7 @@ public final class MessageActions {
     }
 
     public static boolean isStickerOrGif(Message m) {
-        return m.type() == MessageType.STICKER || "image/gif".equals(m.mimeType());
+        // A GIF however its bridge sent it: a picture, or an MP4 or WebP marked as one (Telegram, WhatsApp, Discord's gifv).
+        return m.type() == MessageType.STICKER || m.isGif();
     }
 }
