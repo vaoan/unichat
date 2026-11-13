@@ -68,6 +68,9 @@ public final class AnimatedImage {
         }
     }
 
+    /** How many times an animation's frames were read again from its file (tests). */
+    static final java.util.concurrent.atomic.AtomicInteger RELOADS = new java.util.concurrent.atomic.AtomicInteger();
+
     private static final String TIMELINE = "unichat.animation";
     private static final String COVER = "unichat.cover";
     /** Animations that can be seen now, to look again when a sheet covers their window or leaves. */
@@ -588,6 +591,8 @@ public final class AnimatedImage {
         private Frames frames;
         private Timeline timeline;
         private boolean showing, loading, ended;
+        /** Budget taken for frames being read again, not yet moving. */
+        private boolean reserved;
         /** Whether it can be seen; cancelled when the view is handed another animation. */
         private Showing.Watch watch;
 
@@ -619,11 +624,22 @@ public final class AnimatedImage {
             if (ended) return;
             boolean wanted = showing && seen(view);
             if (wanted && !running()) {
-                if (frames == null) reload();
-                else if (AnimationBudget.SHARED.take(bytes)) timeline().play();
-                else letGo();
+                // Its room is taken before its frames are read again: past the budget, every look (a scroll step, a
+                // sheet closing, the window back) read them and threw them away.
+                if (frames == null) {
+                    if (!reserved && AnimationBudget.SHARED.take(bytes)) {
+                        reserved = true;
+                        reload();
+                    }
+                } else if (reserved || AnimationBudget.SHARED.take(bytes)) {
+                    reserved = false;
+                    timeline().play();
+                } else {
+                    letGo();
+                }
             } else if (!wanted) {
-                if (running()) AnimationBudget.SHARED.release(bytes);
+                if (running() || reserved) AnimationBudget.SHARED.release(bytes);
+                reserved = false;
                 if (timeline != null) timeline.stop();
                 letGo();
             }
@@ -661,6 +677,7 @@ public final class AnimatedImage {
         private void reload() {
             if (loading) return;
             loading = true;
+            RELOADS.incrementAndGet();
             DECODER.execute(() -> {
                 Frames again;
                 try {
@@ -671,7 +688,11 @@ public final class AnimatedImage {
                 Frames read = again;
                 javafx.application.Platform.runLater(() -> {
                     loading = false;
-                    if (read == null || !read.animated() || ended) return;
+                    if (read == null || !read.animated() || ended) {
+                        if (reserved) AnimationBudget.SHARED.release(bytes);
+                        reserved = false;
+                        return;
+                    }
                     frames = read;
                     follow();
                 });
