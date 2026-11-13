@@ -48,6 +48,9 @@ public final class StickerGrid extends ScrollPane {
     private final TileCache tiles = new TileCache();
     private final StickerSetSection sets;
     private boolean rebuilding;
+    /** By itself, a rebuild some set failed in tries again only after this (each set is asked of Telegram sticker by sticker). */
+    private static final long RETRY_MS = 10 * 60_000;
+    private long notBefore;
 
     public StickerGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Supplier<String> takeReply, Consumer<String> toast) {
         this.takeReply = takeReply;
@@ -124,7 +127,7 @@ public final class StickerGrid extends ScrollPane {
      * set could be brought.
      */
     public void rebuildOnce(List<Account> accounts) {
-        if (Settings.get().favoritesRebuilt()) return;
+        if (Settings.get().favoritesRebuilt() || System.currentTimeMillis() < notBefore) return;
         if (accounts.stream().noneMatch(a -> a.network() == Network.TELEGRAM && a.status() == AccountStatus.CONNECTED)) return;
         rebuild(true);
     }
@@ -137,10 +140,12 @@ public final class StickerGrid extends ScrollPane {
         FavoriteRefresh.run(svc, library).whenComplete((r, err) -> Platform.runLater(() -> {
             rebuilding = false;
             if (r == null) {
+                notBefore = System.currentTimeMillis() + RETRY_MS;
                 if (!once) toast.accept(I18n.t("library.rebuildFailed"));
                 return;
             }
             if (r.failedSets() == 0) Settings.get().setFavoritesRebuilt(true);
+            else notBefore = System.currentTimeMillis() + RETRY_MS;
             if (!once || r.rebuilt() > 0) toast.accept(I18n.n("library.rebuilt", r.rebuilt()));
         }));
     }

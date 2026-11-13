@@ -58,6 +58,40 @@ class FavoritesRebuildUiTest {
         if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
     }
 
+    /**
+     * At start the bridge isn't ready and every set fails; each change of an account tried them all again at once (11
+     * failures in a minute, each set asked of Telegram sticker by sticker). By itself it tries again only 10 minutes on.
+     */
+    @Test
+    void byItselfAFailedRebuildWaitsBeforeTryingAgain() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger asked = new java.util.concurrent.atomic.AtomicInteger();
+        MockChatService mock = new MockChatService();
+        ChatService svc = (ChatService) java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) {
+                    case "freshStickerPack" -> {
+                        asked.incrementAndGet();
+                        yield CompletableFuture.failedFuture(new IllegalStateException("the bridge isn't ready"));
+                    }
+                    case "stickerPacks" -> CompletableFuture.completedFuture(List.of());
+                    default -> m.invoke(mock, args);
+                });
+        MediaLibrary library = new MediaLibrary(dir.resolve("lib.json"));
+        library.toggleFavorite(sticker("mxc://media-telegram.localhost/old", "image/gif"));
+        app.unichat.settings.Settings.get().setFavoritesRebuilt(false);
+        List<app.unichat.model.Account> telegram = List.of(new app.unichat.model.Account("telegram:1", app.unichat.model.Network.TELEGRAM,
+                "yo", app.unichat.model.AccountStatus.CONNECTED, null));
+        StickerGrid grid = FxWait.fx(() -> new StickerGrid(svc, library, () -> null, () -> null, toasts::add));
+
+        FxWait.fx(() -> { grid.rebuildOnce(telegram); return null; });
+        FxWait.until("tried", () -> asked.get() == 1);
+        FxWait.settled();
+        FxWait.fx(() -> { grid.rebuildOnce(telegram); return null; });
+        FxWait.settled();
+
+        assertEquals(1, asked.get(), "not again at once");
+        assertEquals(false, app.unichat.settings.Settings.get().favoritesRebuilt());
+    }
+
     @Test
     void theButtonBesideFavouritesRebuildsThemFromTheirSets() throws Exception {
         MediaLibrary.Item now = sticker("mxc://media-telegram.localhost/new", "video/webm");

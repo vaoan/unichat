@@ -34,7 +34,9 @@ public final class FavoriteRefresh {
             chain = chain.thenCompose(v -> sets.freshStickerPack(e.getKey()).handle((pack, err) -> {
                 if (pack == null) {
                     failed[0]++;
-                    System.err.println("Favourites: a sticker set couldn't be brought (" + (err == null ? "none" : err.getClass().getSimpleName()) + ")");
+                    Throwable why = err instanceof java.util.concurrent.CompletionException && err.getCause() != null ? err.getCause() : err;
+                    System.err.println("Favourites: a sticker set couldn't be brought (" + (why == null ? "none" : why.getClass().getSimpleName()
+                            + ": " + why.getMessage()) + ")");
                     return null;
                 }
                 for (MediaLibrary.Item old : e.getValue()) {
