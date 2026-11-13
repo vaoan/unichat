@@ -132,12 +132,26 @@ public final class AnimatedWebp {
     public static Probe probe(Path ffmpeg, Path in, Source src) throws IOException, InterruptedException {
         Processes.Result r = Processes.capture(new ProcessBuilder(ffmpeg.toString(), "-nostdin", "-hide_banner",
                 "-protocol_whitelist", "file", "-f", src.format(), "-i", in.toString()).redirectErrorStream(true), 60);
-        Matcher d = Pattern.compile("Duration: (\\d+):(\\d+):(\\d+(?:\\.\\d+)?)").matcher(r.out());
+        return parse(r.out());
+    }
+
+    private static final Pattern DURATION = Pattern.compile("(?m)^  Duration: (\\d+):(\\d+):(\\d+(?:\\.\\d+)?)");
+    private static final Pattern VIDEO = Pattern.compile("(?m)^\\s*Stream #\\d+:\\d+\\S*: Video: (.*)$");
+    private static final Pattern AUDIO = Pattern.compile("(?m)^\\s*Stream #\\d+:\\d+\\S*: Audio: ");
+
+    /**
+     * {@link Probe} from ffmpeg's own lines ("  Duration:", "Stream #…: Video:"), never the file's tags, which it prints
+     * first: a sender's title saying "Video: h264, 100x100, 1 fps" made a big, long video pass the caps.
+     */
+    static Probe parse(String out) {
+        Matcher d = DURATION.matcher(out);
         double seconds = d.find() ? Integer.parseInt(d.group(1)) * 3600 + Integer.parseInt(d.group(2)) * 60 + Double.parseDouble(d.group(3)) : 0;
-        Matcher f = Pattern.compile("([0-9]+(?:\\.[0-9]+)?) fps").matcher(r.out());
-        Matcher wh = Pattern.compile("Video: .*?, ([0-9]{2,5})x([0-9]{2,5})").matcher(r.out());
+        Matcher v = VIDEO.matcher(out);
+        String video = v.find() ? v.group(1) : "";
+        Matcher f = Pattern.compile("([0-9]+(?:\\.[0-9]+)?) fps").matcher(video);
+        Matcher wh = Pattern.compile(", ([0-9]{2,5})x([0-9]{2,5})").matcher(video);
         boolean sized = wh.find();
-        return new Probe(r.out().contains(" Audio: "), seconds, f.find() ? Double.parseDouble(f.group(1)) : 0,
+        return new Probe(AUDIO.matcher(out).find(), seconds, f.find() ? Double.parseDouble(f.group(1)) : 0,
                 sized ? Integer.parseInt(wh.group(1)) : 0, sized ? Integer.parseInt(wh.group(2)) : 0);
     }
 }
