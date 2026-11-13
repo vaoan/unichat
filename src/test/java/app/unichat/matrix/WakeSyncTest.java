@@ -77,6 +77,35 @@ class WakeSyncTest {
     }
 
     @Test
+    void anErrorInsideTheSyncDoesNotEndIt() throws Exception {
+        // After waking (2026-11-13) the heap ran out in the sync thread: it ended, and "Conectando…" stayed for good.
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.setExecutor(Executors.newCachedThreadPool());
+        server.createContext("/", ex -> {
+            boolean sync = ex.getRequestURI().getPath().endsWith("/sync");
+            if (sync) syncs.add(ex.getRequestURI().getRawQuery());
+            boolean first = sync && syncs.size() == 1;
+            byte[] b = (first ? "{\"errcode\":\"M_UNKNOWN\"}" : sync ? "{\"next_batch\":\"b\"}" : "{}").getBytes(StandardCharsets.UTF_8);
+            ex.getResponseHeaders().add("Content-Type", "application/json");
+            ex.sendResponseHeaders(first ? 503 : 200, b.length);
+            try (OutputStream o = ex.getResponseBody()) {
+                o.write(b);
+            }
+            changes.changed();
+        });
+        server.start();
+        svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@oom:example.org", "t");
+        svc.addListener(changes.listener());
+        java.util.concurrent.atomic.AtomicBoolean thrown = new java.util.concurrent.atomic.AtomicBoolean();
+        svc.pauseRetriesWith(millis -> {
+            if (thrown.compareAndSet(false, true)) throw new OutOfMemoryError("Java heap space");
+        });
+        svc.start();
+        changes.until(() -> svc.connectionState() == ConnectionState.ONLINE);
+        assertTrue(thrown.get(), "the error was thrown inside the sync");
+    }
+
+    @Test
     void aServerStillStartingIsConnectingNotOffline() throws Exception {
         java.net.ServerSocket closed = new java.net.ServerSocket(0);
         int port = closed.getLocalPort();

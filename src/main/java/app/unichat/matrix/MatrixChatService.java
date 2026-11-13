@@ -225,9 +225,35 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     }
 
     private void syncLoop() {
-        int failures = 0;
         setState(ConnectionState.CONNECTING);
         boolean catchUp = loadSyncCache();
+        // Nothing ends the sync but stopping: after waking (2026-11-13) the heap ran out in this thread, it ended, and
+        // "Conectando…" stayed for good with nothing arriving. It goes on from where it was (nextBatch).
+        while (core.running) {
+            try {
+                syncRounds(catchUp);
+            } catch (Throwable t) {
+                survived(t);
+            }
+            catchUp = false;
+        }
+    }
+
+    /** After an error the loop didn't expect: said if there's memory to say it, then a pause before going on. */
+    private void survived(Throwable t) {
+        try {
+            System.err.println("Matrix sync survived " + t);
+            setState(ConnectionState.CONNECTING);
+            pause.pause(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Throwable again) {
+            // out of memory still: the next round tries
+        }
+    }
+
+    private void syncRounds(boolean catchUp) {
+        int failures = 0;
         boolean quick = false;
         while (core.running) {
             try {
