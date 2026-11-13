@@ -76,61 +76,80 @@ public final class LoginCopy {
     /** Translated title and steps for a step we know; otherwise the bridge's instructions. */
     public static StepText step(Network n, BridgeLogin.Step s) {
         String net = n.displayName();
+        StepText shown = s.display() == null ? null : shown(n, s.display().type());
+        if (shown != null) return shown;
         String id = s.stepId() == null ? "" : s.stepId();
-        if (s.display() != null && "qr".equals(s.display().type())) {
-            String where = switch (n) {
-                case WHATSAPP -> I18n.t("login.step.qr.whatsapp");
-                case TELEGRAM -> I18n.t("login.step.qr.telegram");
-                case SIGNAL -> I18n.t("login.step.qr.signal");
-                case GOOGLE_MESSAGES -> I18n.t("login.step.qr.googleMessages");
-                default -> I18n.t("login.step.qr.other");
-            };
-            return new StepText(I18n.t("login.step.qr.title"),
-                    List.of(I18n.t("login.step.openOnPhone", net), where, I18n.t("login.step.qr.aim")));
+        for (Asked a : ASKED) {
+            for (String end : a.ends()) if (id.endsWith(end)) return a.text().apply(n, s);
         }
-        if (s.display() != null && "code".equals(s.display().type())) {
-            return new StepText(I18n.t("login.step.code.title"), n == Network.WHATSAPP
+        if ("cookies".equals(s.type())) return new StepText(I18n.t("login.step.cookies.title", net), List.of());
+        if (s.isComplete()) return new StepText(I18n.t("login.step.connected", net), List.of());
+        return new StepText(net, s.instructions().isBlank() ? List.of() : List.of(s.instructions()));
+    }
+
+    /** What to do with what the bridge shows: a QR code to scan, a code or emoji to match on the phone. */
+    private static StepText shown(Network n, String type) {
+        String net = n.displayName();
+        return switch (type == null ? "" : type) {
+            case "qr" -> new StepText(I18n.t("login.step.qr.title"),
+                    List.of(I18n.t("login.step.openOnPhone", net), qrWhere(n), I18n.t("login.step.qr.aim")));
+            case "code" -> new StepText(I18n.t("login.step.code.title"), n == Network.WHATSAPP
                     ? List.of(I18n.t("login.step.code.whatsapp.open"), I18n.t("login.step.code.whatsapp.tap"),
                     I18n.t("login.step.code.type"))
                     : List.of(I18n.t("login.step.openOnPhone", net), I18n.t("login.step.code.type")));
+            case "emoji" -> new StepText(I18n.t("login.step.emoji.title"),
+                    List.of(I18n.t("login.step.openOnPhone", net), I18n.t("login.step.emoji.tap")));
+            default -> null;
+        };
+    }
+
+    /** Where {@code n}'s app scans a QR code. */
+    private static String qrWhere(Network n) {
+        return switch (n) {
+            case WHATSAPP -> I18n.t("login.step.qr.whatsapp");
+            case TELEGRAM -> I18n.t("login.step.qr.telegram");
+            case SIGNAL -> I18n.t("login.step.qr.signal");
+            case GOOGLE_MESSAGES -> I18n.t("login.step.qr.googleMessages");
+            default -> I18n.t("login.step.qr.other");
+        };
+    }
+
+    /** What the bridge asks for, by how its step's id ends: a new step a bridge asks is one more line. */
+    private record Asked(List<String> ends, java.util.function.BiFunction<Network, BridgeLogin.Step, StepText> text) {}
+
+    private static final List<Asked> ASKED = List.of(
+            new Asked(List.of(".history_pin"), (n, s) -> historyPin(s)),
+            new Asked(List.of(".juicebox_pin"), (n, s) -> juiceboxPin(s)),
+            new Asked(List.of(".phone", ".phone_number"),
+                    (n, s) -> new StepText(I18n.t("login.step.phone.title", n.displayName()), List.of(I18n.t("login.step.phone.help")))),
+            new Asked(List.of(".code", ".code.incorrect"), (n, s) -> new StepText(
+                    I18n.t(incorrect(s) ? "login.step.code.incorrect" : "login.step.code.enter"),
+                    List.of(I18n.t(n == Network.TELEGRAM ? "login.step.code.telegramHelp" : "login.step.code.checkPhone")))),
+            new Asked(List.of(".password", ".password.incorrect"), (n, s) -> new StepText(
+                    I18n.t(incorrect(s) ? "login.step.password.incorrect" : "login.step.password.title"),
+                    List.of(I18n.t("login.step.password.help", n.displayName())))));
+
+    private static boolean incorrect(BridgeLogin.Step s) {
+        return s.stepId().endsWith(".incorrect");
+    }
+
+    /** It comes back with the bridge's reason first when the last attempt failed. */
+    private static StepText historyPin(BridgeLogin.Step s) {
+        String[] parts = s.instructions().split("\n\n", 2);
+        List<String> lines = new ArrayList<>();
+        if (parts.length == 2) lines.add(parts[0]);
+        lines.add(I18n.t("login.step.historyPin.use"));
+        lines.add(I18n.t("login.step.historyPin.skip"));
+        return new StepText(I18n.t("login.step.historyPin.title"), lines);
+    }
+
+    /** X's encrypted chats ("X Chat") are protected with a 4-digit PIN the user chooses. */
+    private static StepText juiceboxPin(BridgeLogin.Step s) {
+        if (!s.instructions().contains("No PIN code is registered")) {
+            return new StepText(I18n.t("login.step.juicebox.enter.title"), List.of(I18n.t("login.step.juicebox.enter.help")));
         }
-        if (s.display() != null && "emoji".equals(s.display().type())) {
-            return new StepText(I18n.t("login.step.emoji.title"), List.of(I18n.t("login.step.openOnPhone", net), I18n.t("login.step.emoji.tap")));
-        }
-        if (id.endsWith(".history_pin")) {
-            // It comes back with the bridge's reason first when the last attempt failed.
-            String[] parts = s.instructions().split("\n\n", 2);
-            List<String> lines = new java.util.ArrayList<>();
-            if (parts.length == 2) lines.add(parts[0]);
-            lines.add(I18n.t("login.step.historyPin.use"));
-            lines.add(I18n.t("login.step.historyPin.skip"));
-            return new StepText(I18n.t("login.step.historyPin.title"), lines);
-        }
-        if (id.endsWith(".juicebox_pin")) {
-            // X's encrypted chats ("X Chat") are protected with a 4-digit PIN the user chooses.
-            boolean create = s.instructions().contains("No PIN code is registered");
-            return create
-                    ? new StepText(I18n.t("login.step.juicebox.create.title"), List.of(
-                    I18n.t("login.step.juicebox.create.protect"),
-                    I18n.t("login.step.juicebox.create.choose")))
-                    : new StepText(I18n.t("login.step.juicebox.enter.title"), List.of(I18n.t("login.step.juicebox.enter.help")));
-        }
-        if (id.endsWith(".phone") || id.endsWith(".phone_number")) {
-            return new StepText(I18n.t("login.step.phone.title", net), List.of(I18n.t("login.step.phone.help")));
-        }
-        if (id.endsWith(".code") || id.endsWith(".code.incorrect")) {
-            return new StepText(id.endsWith(".incorrect") ? I18n.t("login.step.code.incorrect") : I18n.t("login.step.code.enter"),
-                    List.of(n == Network.TELEGRAM ? I18n.t("login.step.code.telegramHelp") : I18n.t("login.step.code.checkPhone")));
-        }
-        if (id.endsWith(".password") || id.endsWith(".password.incorrect")) {
-            return new StepText(id.endsWith(".incorrect") ? I18n.t("login.step.password.incorrect") : I18n.t("login.step.password.title"),
-                    List.of(I18n.t("login.step.password.help", net)));
-        }
-        if ("cookies".equals(s.type())) {
-            return new StepText(I18n.t("login.step.cookies.title", net), List.of());
-        }
-        if (s.isComplete()) return new StepText(I18n.t("login.step.connected", net), List.of());
-        return new StepText(net, s.instructions().isBlank() ? List.of() : List.of(s.instructions()));
+        return new StepText(I18n.t("login.step.juicebox.create.title"),
+                List.of(I18n.t("login.step.juicebox.create.protect"), I18n.t("login.step.juicebox.create.choose")));
     }
 
     /** The digits a pattern like {@code ^[0-9]{6}$} asks for; 0 when it doesn't say. */

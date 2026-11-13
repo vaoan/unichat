@@ -15,6 +15,7 @@ import app.unichat.model.Chat;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
+import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
 import app.unichat.stt.Transcripts;
 import app.unichat.support.I18n;
@@ -24,10 +25,12 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.layout.HBox;
 import javafx.stage.Popup;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -193,64 +196,101 @@ final class MessageActionsUi {
         save.saveLink(m, url);
     }
 
+    /** The menu's order for what a message allows; the quick reactions and "delete for everyone" come after, set apart. */
+    private static final List<MessageActions.Action> MENU_ORDER = List.of(MessageActions.Action.SAVE_LINK,
+            MessageActions.Action.REPLY, MessageActions.Action.COPY, MessageActions.Action.FORWARD, MessageActions.Action.OPEN_FILE,
+            MessageActions.Action.SAVE_AS, MessageActions.Action.TRANSCRIBE, MessageActions.Action.FAVORITE, MessageActions.Action.EDIT);
+
     ContextMenu messageMenu(Message m) {
         ContextMenu menu = new ContextMenu();
-        java.util.Set<MessageActions.Action> a = MessageActions.of(m, chat.get().features(), Instant.now());
+        Set<MessageActions.Action> a = MessageActions.of(m, chat.get().features(), Instant.now());
         if (a.isEmpty()) return menu;
-        if (media.canView(m)) menu.getItems().add(ChatMenus.item(I18n.t("message.view"), () -> media.view(m)));
-        if (m.type() == app.unichat.model.MessageType.STICKER && m.mediaUrl() != null && !m.deleted()) {
-            menu.getItems().add(ChatMenus.item(I18n.t("library.enlarge"), () -> {
+        List<MenuItem> items = menu.getItems();
+        items.addAll(ways(m));
+        for (MessageActions.Action act : MENU_ORDER) if (a.contains(act)) items.addAll(itemsFor(act, m));
+        List<String> reactions = quick();
+        if (!reactions.isEmpty()) {
+            items.add(new SeparatorMenuItem());
+            for (String e : reactions) items.add(ChatMenus.item(I18n.t("message.reactWith", e), () -> react(m, e)));
+        }
+        if (a.contains(MessageActions.Action.DELETE_FOR_EVERYONE)) {
+            items.add(new SeparatorMenuItem());
+            items.add(ChatMenus.danger(ChatMenus.item(I18n.t("message.deleteForAll"), () -> svc.deleteMessage(chat.get().id(), m.id()))));
+        }
+        return menu;
+    }
+
+    /** What only the mouse could do otherwise: view it, enlarge a sticker, go to what it answers, open its links. */
+    private List<MenuItem> ways(Message m) {
+        List<MenuItem> out = new ArrayList<>();
+        if (media.canView(m)) out.add(ChatMenus.item(I18n.t("message.view"), () -> media.view(m)));
+        if (m.type() == MessageType.STICKER && m.mediaUrl() != null) {
+            out.add(ChatMenus.item(I18n.t("library.enlarge"), () -> {
                 if (scene.get() != null) LibraryMenu.enlarge(scene.get().getWindow(), svc, MediaItems.of(m), toast);
             }));
         }
         Message replied = replied(m);
-        if (replied != null) menu.getItems().add(ChatMenus.item(I18n.t("message.goToReplied"), () -> jumpTo.accept(replied)));
+        if (replied != null) out.add(ChatMenus.item(I18n.t("message.goToReplied"), () -> jumpTo.accept(replied)));
         for (String url : RichText.addresses(m.body()).stream().distinct().limit(MENU_LINKS).toList()) {
-            menu.getItems().add(ChatMenus.item(I18n.t("message.openLink", RichText.shown(url, 40)), () -> media.openLink(url)));
+            out.add(ChatMenus.item(I18n.t("message.openLink", RichText.shown(url, 40)), () -> media.openLink(url)));
         }
-        if (a.contains(MessageActions.Action.SAVE_LINK)) {
-            for (String url : AutoSave.links(m).stream().limit(MENU_LINKS).toList()) {
-                menu.getItems().add(ChatMenus.item(I18n.t("message.saveLink", RichText.shown(url, 40)), () -> saveLink(m, url)));
-            }
-        }
-        if (a.contains(MessageActions.Action.REPLY)) menu.getItems().add(ChatMenus.item(I18n.t("message.reply"), () -> composer.reply(m)));
-        if (a.contains(MessageActions.Action.REPLY) && AiReplyButton.SHOWN.get()) {
-            menu.getItems().add(ChatMenus.item(I18n.t("message.replyWithAi"), () -> composer.replyWithAi(m)));
-        }
-        if (a.contains(MessageActions.Action.COPY)) menu.getItems().add(ChatMenus.item(I18n.t("message.copyText"), () -> Clipboards.copy(m.body())));
-        if (a.contains(MessageActions.Action.FORWARD)) {
-            menu.getItems().add(ChatMenus.item(I18n.t("message.forward"), () -> onForward.accept(m)));
-        }
-        if (a.contains(MessageActions.Action.OPEN_FILE)) menu.getItems().add(ChatMenus.item(I18n.t("message.openFile"), () -> media.openFile(m)));
-        if (a.contains(MessageActions.Action.SAVE_AS)) menu.getItems().add(ChatMenus.item(I18n.t("message.saveAs"), () -> {
-            if (scene.get() != null) MediaSaver.save(scene.get().getWindow(), svc, m, toast);
-        }));
-        if (a.contains(MessageActions.Action.TRANSCRIBE)) {
-            if (Transcripts.get().state(m.mediaUrl()) instanceof Transcripts.Done d) {
-                if (!d.text().isEmpty()) menu.getItems().add(ChatMenus.item(I18n.t("message.copyTranscript"), () -> Clipboards.copy(d.text())));
-            } else {
-                menu.getItems().add(ChatMenus.item(I18n.t("message.transcribe"), () -> media.transcribe(m)));
-            }
-        }
-        if (a.contains(MessageActions.Action.FAVORITE)) {
-            boolean fav = library.isFavorite(MediaItems.of(m));
-            menu.getItems().add(ChatMenus.item(I18n.t(fav ? "message.removeFavorite" : "message.addFavorite"), () -> {
-                boolean now = library.toggleFavorite(MediaItems.of(m));
-                toast.accept(I18n.t(now ? "message.favoriteAdded" : "message.favoriteRemoved"));
+        return out;
+    }
+
+    /** The menu's items for {@code act}, which {@code m} allows. */
+    private List<MenuItem> itemsFor(MessageActions.Action act, Message m) {
+        return switch (act) {
+            case SAVE_LINK -> AutoSave.links(m).stream().limit(MENU_LINKS)
+                    .map(url -> ChatMenus.item(I18n.t("message.saveLink", RichText.shown(url, 40)), () -> saveLink(m, url))).toList();
+            case REPLY -> AiReplyButton.SHOWN.get()
+                    ? List.of(item("message.reply", act, m), ChatMenus.item(I18n.t("message.replyWithAi"), () -> composer.replyWithAi(m)))
+                    : List.of(item("message.reply", act, m));
+            case COPY -> List.of(ChatMenus.item(I18n.t("message.copyText"), () -> Clipboards.copy(m.body())));
+            case FORWARD -> List.of(ChatMenus.item(I18n.t("message.forward"), () -> onForward.accept(m)));
+            case OPEN_FILE -> List.of(ChatMenus.item(I18n.t("message.openFile"), () -> media.openFile(m)));
+            case SAVE_AS -> List.of(ChatMenus.item(I18n.t("message.saveAs"), () -> {
+                if (scene.get() != null) MediaSaver.save(scene.get().getWindow(), svc, m, toast);
             }));
-            String set = m.type() == app.unichat.model.MessageType.STICKER ? app.unichat.model.StickerPack.urlOf(m.mediaInfo()) : null;
-            if (set != null) menu.getItems().add(ChatMenus.item(I18n.t("sticker.showSet"), () -> onShowStickerSet.accept(set)));
+            case TRANSCRIBE -> transcript(m);
+            case FAVORITE -> favorite(m);
+            case EDIT -> List.of(item("message.edit", act, m));
+            case DELETE_FOR_EVERYONE, DELETE_FOR_ME -> List.of();
+        };
+    }
+
+    private MenuItem item(String key, MessageActions.Action act, Message m) {
+        return ChatMenus.item(I18n.t(key), () -> run(act, m));
+    }
+
+    /**
+     * Does {@code act} on {@code m}, for the actions a key does too (R, T, E on the timeline): the menu and the keys
+     * do the same thing.
+     */
+    void run(MessageActions.Action act, Message m) {
+        switch (act) {
+            case REPLY -> composer.reply(m);
+            case TRANSCRIBE -> media.transcribe(m);
+            case EDIT -> composer.edit(m);
+            default -> throw new IllegalArgumentException("no key does " + act);
         }
-        if (a.contains(MessageActions.Action.EDIT)) menu.getItems().add(ChatMenus.item(I18n.t("message.edit"), () -> composer.edit(m)));
-        java.util.List<String> reactions = quick();
-        if (!reactions.isEmpty()) {
-            menu.getItems().add(new SeparatorMenuItem());
-            for (String e : reactions) menu.getItems().add(ChatMenus.item(I18n.t("message.reactWith", e), () -> react(m, e)));
-        }
-        if (a.contains(MessageActions.Action.DELETE_FOR_EVERYONE)) {
-            menu.getItems().add(new SeparatorMenuItem());
-            menu.getItems().add(ChatMenus.danger(ChatMenus.item(I18n.t("message.deleteForAll"), () -> svc.deleteMessage(chat.get().id(), m.id()))));
-        }
-        return menu;
+    }
+
+    /** A voice note's transcript to copy once it's done (none when it's empty), else the way to make one. */
+    private List<MenuItem> transcript(Message m) {
+        if (!(Transcripts.get().state(m.mediaUrl()) instanceof Transcripts.Done d)) return List.of(item("message.transcribe", MessageActions.Action.TRANSCRIBE, m));
+        return d.text().isEmpty() ? List.of() : List.of(ChatMenus.item(I18n.t("message.copyTranscript"), () -> Clipboards.copy(d.text())));
+    }
+
+    /** Adding to or taking from the favourites, and a sticker's set. */
+    private List<MenuItem> favorite(Message m) {
+        List<MenuItem> out = new ArrayList<>();
+        boolean fav = library.isFavorite(MediaItems.of(m));
+        out.add(ChatMenus.item(I18n.t(fav ? "message.removeFavorite" : "message.addFavorite"), () -> {
+            boolean now = library.toggleFavorite(MediaItems.of(m));
+            toast.accept(I18n.t(now ? "message.favoriteAdded" : "message.favoriteRemoved"));
+        }));
+        String set = m.type() == MessageType.STICKER ? app.unichat.model.StickerPack.urlOf(m.mediaInfo()) : null;
+        if (set != null) out.add(ChatMenus.item(I18n.t("sticker.showSet"), () -> onShowStickerSet.accept(set)));
+        return out;
     }
 }

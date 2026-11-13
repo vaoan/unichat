@@ -201,74 +201,91 @@ final class MessageRowView {
 
         if (m.replyToId() != null) bubble.getChildren().add(replyQuote(m, maxWidth));
 
-        if (m.deleted()) {
-            Label l = new Label(I18n.t("message.deleted"));
-            l.getStyleClass().add("deleted-text");
-            bubble.getChildren().add(l);
-        } else if (m.playsInline()) {
-            bubble.getStyleClass().add(m.type() == MessageType.STICKER ? "sticker" : "media");
-            bubble.getChildren().add(media.inlineVideoNode(m));
-        } else if (m.type() == MessageType.IMAGE || m.type() == MessageType.STICKER) {
-            bubble.getStyleClass().add(m.type() == MessageType.STICKER ? "sticker" : "media");
-            bubble.getChildren().add(media.imageNode(m));
-        } else if (m.type() == MessageType.AUDIO && m.mediaUrl() != null) {
-            bubble.getChildren().add(media.audioNode(m, chat.get()));
-            bubble.getChildren().add(media.transcriptNode(m, maxWidth));
-        } else if (m.isMedia()) {
-            bubble.getChildren().add(media.fileNode(m));
-        } else if ((m.type() == MessageType.TEXT) && RichText.isJumboEmoji(m.body()) && m.replyToId() == null) {
-            bubble.getStyleClass().add("jumbo");
-            // Big, and whole: a flag or joined emoji as its picture (EmojiInline), the rest as text.
-            javafx.scene.layout.HBox big = new javafx.scene.layout.HBox();
-            big.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-            for (javafx.scene.Node n : EmojiInline.nodes(m.body().strip(), Label::new)) {
-                n.getStyleClass().add("jumbo-emoji");
-                big.getChildren().add(n);
-            }
-            bubble.getChildren().add(big);
-        } else {
-            String body = m.type() == MessageType.EMOTE ? "* " + m.senderName() + " " + m.body() : m.body();
-            double textWidth = maxWidth - 24;
-            if (m.html() != null && m.type() != MessageType.EMOTE) {
-                bubble.getChildren().add(HtmlView.of(m.html(), textWidth, media, openLink));
-            } else {
-                TextFlow flow = new TextFlow();
-                flow.getChildren().addAll(RichText.nodes(body, openLink, textWidth));
-                flow.getStyleClass().add("message-text");
-                flow.setLineSpacing(Theme.lineSpacing());
-                if (m.type() == MessageType.NOTICE) flow.getStyleClass().add("notice");
-                flow.setMaxWidth(textWidth);
-                bubble.getChildren().add(flow);
-            }
-            if (m.previewHtml() != null) bubble.getChildren().add(HtmlView.of(m.previewHtml(), textWidth, media, openLink));
-            if (!followedByItsOwnMedia(m)) bubble.getChildren().add(media.linkPlayers(links(m), chat.get(), textWidth));
-        }
+        content(m, bubble, maxWidth);
 
         if (!m.deleted() && !m.buttons().isEmpty()) bubble.getChildren().add(BusinessButtons.of(m.buttons(), maxWidth - 24));
 
-        HBox meta = new HBox(4);
-        meta.getStyleClass().add("bubble-meta");
-        meta.setAlignment(Pos.CENTER_RIGHT);
-        if (m.edited() && !m.deleted()) {
-            Label ed = new Label(I18n.t("message.edited"));
-            meta.getChildren().add(ed);
-        }
-        meta.getChildren().add(new Label(Formats.time(m.timestamp(), ZoneId.systemDefault())));
-        if (out) meta.getChildren().add(statusIcon(m.status()));
-        HBox metaRow = new HBox(meta);
-        metaRow.setAlignment(Pos.CENTER_RIGHT);
-        metaRow.setMaxWidth(Double.MAX_VALUE);
-        bubble.getChildren().add(metaRow);
+        bubble.getChildren().add(metaRow(m));
         bubble.setFillWidth(true);
 
         bubble.setOnContextMenuRequested(e -> actions.messageMenu(m).show(bubble, e.getScreenX(), e.getScreenY()));
         bubble.setOnMouseClicked(e -> {
-            if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2 && !m.deleted()
-                    && !chat.get().features().reactionsOffered(java.util.List.of("❤️")).isEmpty()) {
-                svc.toggleReaction(chat.get().id(), m.id(), "❤️");
-            }
+            if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2) heart(m);
         });
         return bubble;
+    }
+
+    /** What the message is, drawn by its kind: deleted, a video or picture, a voice note, a file, big emoji or text. */
+    private void content(Message m, VBox bubble, double maxWidth) {
+        List<Node> into = bubble.getChildren();
+        boolean picture = m.type() == MessageType.IMAGE || m.type() == MessageType.STICKER;
+        if (m.deleted()) {
+            Label l = new Label(I18n.t("message.deleted"));
+            l.getStyleClass().add("deleted-text");
+            into.add(l);
+        } else if (m.playsInline() || picture) {
+            bubble.getStyleClass().add(m.type() == MessageType.STICKER ? "sticker" : "media");
+            into.add(m.playsInline() ? media.inlineVideoNode(m) : media.imageNode(m));
+        } else if (m.type() == MessageType.AUDIO && m.mediaUrl() != null) {
+            into.add(media.audioNode(m, chat.get()));
+            into.add(media.transcriptNode(m, maxWidth));
+        } else if (m.isMedia()) {
+            into.add(media.fileNode(m));
+        } else if (m.type() == MessageType.TEXT && RichText.isJumboEmoji(m.body()) && m.replyToId() == null) {
+            bubble.getStyleClass().add("jumbo");
+            into.add(jumbo(m));
+        } else {
+            text(m, into, maxWidth - 24);
+        }
+    }
+
+    /** Big, and whole: a flag or joined emoji as its picture (EmojiInline), the rest as text. */
+    private static Node jumbo(Message m) {
+        HBox big = new HBox();
+        big.setAlignment(Pos.CENTER_LEFT);
+        for (Node n : EmojiInline.nodes(m.body().strip(), Label::new)) {
+            n.getStyleClass().add("jumbo-emoji");
+            big.getChildren().add(n);
+        }
+        return big;
+    }
+
+    /** A text message: its HTML or text, its link preview, and players for the videos its links lead to. */
+    private void text(Message m, List<Node> into, double textWidth) {
+        if (m.html() != null && m.type() != MessageType.EMOTE) {
+            into.add(HtmlView.of(m.html(), textWidth, media, openLink));
+        } else {
+            String body = m.type() == MessageType.EMOTE ? "* " + m.senderName() + " " + m.body() : m.body();
+            TextFlow flow = new TextFlow();
+            flow.getChildren().addAll(RichText.nodes(body, openLink, textWidth));
+            flow.getStyleClass().add("message-text");
+            flow.setLineSpacing(Theme.lineSpacing());
+            if (m.type() == MessageType.NOTICE) flow.getStyleClass().add("notice");
+            flow.setMaxWidth(textWidth);
+            into.add(flow);
+        }
+        if (m.previewHtml() != null) into.add(HtmlView.of(m.previewHtml(), textWidth, media, openLink));
+        if (!followedByItsOwnMedia(m)) into.add(media.linkPlayers(links(m), chat.get(), textWidth));
+    }
+
+    /** "Edited", the time and, on one's own, whether it went; on the bubble's right. */
+    private Node metaRow(Message m) {
+        HBox meta = new HBox(4);
+        meta.getStyleClass().add("bubble-meta");
+        meta.setAlignment(Pos.CENTER_RIGHT);
+        if (m.edited() && !m.deleted()) meta.getChildren().add(new Label(I18n.t("message.edited")));
+        meta.getChildren().add(new Label(Formats.time(m.timestamp(), ZoneId.systemDefault())));
+        if (m.outgoing()) meta.getChildren().add(statusIcon(m.status()));
+        HBox metaRow = new HBox(meta);
+        metaRow.setAlignment(Pos.CENTER_RIGHT);
+        metaRow.setMaxWidth(Double.MAX_VALUE);
+        return metaRow;
+    }
+
+    /** A double click hearts the message, where the chat takes that reaction. */
+    private void heart(Message m) {
+        if (m.deleted() || chat.get().features().reactionsOffered(List.of("❤️")).isEmpty()) return;
+        svc.toggleReaction(chat.get().id(), m.id(), "❤️");
     }
 
     private static java.util.List<String> links(Message m) {

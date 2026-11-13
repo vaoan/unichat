@@ -141,40 +141,42 @@ final class BridgeAccounts {
             long now = BridgeStates.now();
             for (Network n : Network.values()) {
                 if (!n.isBridged()) continue;
-                int portals = portalCount.getOrDefault(n, 0);
-                MatrixRoom botRoom = botRooms.get(n);
-                List<Login> cachedLogins = logins.get(n);
                 List<BridgeStates.State> reported = live == null ? List.of() : live.accounts(n.protocolId());
-                if (!reported.isEmpty()) {
-                    // The bridge's own live report beats anything inferred from its bot chat.
-                    for (BridgeStates.State st : reported) {
-                        String name = st.remoteName();
-                        if (name.isBlank() && cachedLogins != null) {
-                            for (Login l : cachedLogins) if (l.id().equals(st.remoteId()) && l.name() != null) name = l.name();
-                        }
-                        AccountStatus status = liveStatus(st.event(), st.since(), now);
-                        out.add(new Account(accountId(n, st.remoteId()), n, name.isBlank() ? st.remoteId() : name,
-                                status, liveDetail(status)));
-                    }
-                    continue;
-                }
-                if (cachedLogins != null && !cachedLogins.isEmpty()) {
-                    // Known logins don't depend on rooms: show them even before the first sync arrives.
-                    for (Login l : cachedLogins) {
-                        out.add(accountOf(n, l));
-                    }
-                    continue;
-                }
-                if (portals == 0 && botRoom == null) continue;
-                BotChatLogin login = inferFromBotChat(botRoom == null ? List.of() : botRoom.timeline, portals, n.displayName());
-                String detail = login.status() == AccountStatus.CONNECTED
-                        ? I18n.n("account.chats", portals)
-                        : I18n.t("account.loginFromBot");
-                AccountStatus status = cachedLogins != null && portals == 0 ? AccountStatus.NEEDS_LOGIN : login.status();
-                out.add(new Account(n, login.label(), status, detail));
+                List<Login> kept = logins.getOrDefault(n, List.of());
+                // The bridge's own live report beats the logins kept, which beat what its bot chat says.
+                if (!reported.isEmpty()) out.addAll(fromReport(n, reported, now));
+                else if (!kept.isEmpty()) out.addAll(kept.stream().map(l -> accountOf(n, l)).toList());
+                else fromBotChat(n, portalCount.getOrDefault(n, 0), botRooms.get(n)).ifPresent(out::add);
             }
         }
         return out;
+    }
+
+    /** {@code n}'s accounts as its bridge reports them live, named as the logins kept call them when it gives no name. */
+    private List<Account> fromReport(Network n, List<BridgeStates.State> reported, long now) {
+        List<Account> out = new ArrayList<>();
+        for (BridgeStates.State st : reported) {
+            String name = st.remoteName().isBlank() ? keptName(n, st.remoteId()) : st.remoteName();
+            AccountStatus status = liveStatus(st.event(), st.since(), now);
+            out.add(new Account(accountId(n, st.remoteId()), n, name.isBlank() ? st.remoteId() : name, status, liveDetail(status)));
+        }
+        return out;
+    }
+
+    /** The name the logins kept give {@code n}'s account {@code remoteId}, blank when none does. */
+    private String keptName(Network n, String remoteId) {
+        List<Login> kept = logins.get(n);
+        if (kept == null) return "";
+        return kept.stream().filter(l -> l.id().equals(remoteId) && l.name() != null).map(Login::name).reduce((a, b) -> b).orElse("");
+    }
+
+    /** What {@code n}'s bot chat and portals tell of its account, when it has either (known logins don't depend on rooms). */
+    private java.util.Optional<Account> fromBotChat(Network n, int portals, MatrixRoom botRoom) {
+        if (portals == 0 && botRoom == null) return java.util.Optional.empty();
+        BotChatLogin login = inferFromBotChat(botRoom == null ? List.of() : botRoom.timeline, portals, n.displayName());
+        String detail = login.status() == AccountStatus.CONNECTED ? I18n.n("account.chats", portals) : I18n.t("account.loginFromBot");
+        AccountStatus status = logins.get(n) != null && portals == 0 ? AccountStatus.NEEDS_LOGIN : login.status();
+        return java.util.Optional.of(new Account(n, login.label(), status, detail));
     }
 
     BridgeLogin bridgeLogin(Network n) {

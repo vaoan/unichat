@@ -49,37 +49,52 @@ final class RoomFields {
         c.setTopic(room.topic);
 
         String counterpart = group ? null : counterpart(room);
+        c.setTitle(title(room, counterpart));
+        c.setAvatarUrl(avatar(room, counterpart));
+        List<Member> members = members(room);
+        if (!members.equals(c.members())) c.setMembers(members);
+        showLast(room, c);
+    }
+
+    /** The room's name, else the person's on the other side, its members', its address, or what it is. */
+    private String title(MatrixRoom room, String counterpart) {
         String title = cleanName(blankToNull(room.name));
         if (title == null && counterpart != null) title = nameOf(room, counterpart);
         if (title == null) title = heroesTitle(room);
         if (title == null) title = blankToNull(room.canonicalAlias);
         if (title == null) title = room.invite ? I18n.t("room.invitation") : I18n.t("room.empty");
-        c.setTitle(title);
+        return title;
+    }
 
-        String avatar = room.avatar;
-        if (avatar == null && counterpart != null) {
-            Member m = room.members.get(counterpart);
-            if (m != null) avatar = m.avatarUrl();
-        }
-        c.setAvatarUrl(avatar);
+    /** The room's picture, else the other person's. */
+    private static String avatar(MatrixRoom room, String counterpart) {
+        if (room.avatar != null || counterpart == null) return room.avatar;
+        Member m = room.members.get(counterpart);
+        return m == null ? null : m.avatarUrl();
+    }
 
+    /** Who is in it or invited, as the room knows them. */
+    private static List<Member> members(MatrixRoom room) {
         List<Member> members = new ArrayList<>();
         for (Map.Entry<String, String> e : room.membership.entrySet()) {
             if (!"join".equals(e.getValue()) && !"invite".equals(e.getValue())) continue;
             Member m = room.members.get(e.getKey());
             members.add(m != null ? m : new Member(e.getKey(), null, null));
         }
-        if (!members.equals(c.members())) c.setMembers(members);
+        return members;
+    }
 
-        Message last = null;
+    /** The newest message that isn't a room change, else the newest change. */
+    private static Message last(MatrixRoom room) {
         for (int i = room.timeline.size() - 1; i >= 0; i--) {
-            Message m = room.timeline.get(i);
-            if (last == null) last = m;
-            if (m.type() != MessageType.SYSTEM) {
-                last = m;
-                break;
-            }
+            if (room.timeline.get(i).type() != MessageType.SYSTEM) return room.timeline.get(i);
         }
+        return room.timeline.isEmpty() ? null : room.timeline.get(room.timeline.size() - 1);
+    }
+
+    /** The list's preview and when the chat last moved: its last message, the invitation, or nothing yet. */
+    private void showLast(MatrixRoom room, Chat c) {
+        Message last = last(room);
         if (last != null) {
             Instant kept = c.lastActivity();
             c.applyLastMessage(last);

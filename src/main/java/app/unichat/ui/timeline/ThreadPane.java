@@ -415,6 +415,12 @@ public final class ThreadPane extends BorderPane {
     }
 
     /** Keyboard control of the focused timeline. Arrow keys move the selection (ListView default). */
+    /** A message's actions a plain key does, under the same rules as its menu ({@link MessageActionsUi#run}). */
+    private static final java.util.Map<javafx.scene.input.KeyCode, MessageActions.Action> KEY_ACTIONS = java.util.Map.of(
+            javafx.scene.input.KeyCode.R, MessageActions.Action.REPLY,
+            javafx.scene.input.KeyCode.T, MessageActions.Action.TRANSCRIBE,
+            javafx.scene.input.KeyCode.E, MessageActions.Action.EDIT);
+
     private void onTimelineKey(javafx.scene.input.KeyEvent e) {
         Message m = selectedMessage();
         if (selection.key(e, m)) return;
@@ -423,14 +429,12 @@ public final class ThreadPane extends BorderPane {
             composer.focus();
         } else if (m == null || m.type() == MessageType.SYSTEM) {
             return;
-        } else if (code == javafx.scene.input.KeyCode.R && !e.isShortcutDown() && messageActions.allows(m, MessageActions.Action.REPLY)) {
-            composer.reply(m);
-        } else if (code == javafx.scene.input.KeyCode.T && !e.isShortcutDown() && messageActions.allows(m, MessageActions.Action.TRANSCRIBE)) {
-            media.transcribe(m);
+        } else if (KEY_ACTIONS.containsKey(code) && !e.isShortcutDown()) {
+            MessageActions.Action act = KEY_ACTIONS.get(code);
+            if (!messageActions.allows(m, act)) return;
+            messageActions.run(act, m);
         } else if (code == javafx.scene.input.KeyCode.P && !e.isShortcutDown() && m.type() == MessageType.AUDIO && m.mediaUrl() != null) {
             audio.toggle(m, chat);
-        } else if (code == javafx.scene.input.KeyCode.E && !e.isShortcutDown() && messageActions.allows(m, MessageActions.Action.EDIT)) {
-            composer.edit(m);
         } else if (code == javafx.scene.input.KeyCode.C && e.isShortcutDown() && !m.isMedia()) {
             Clipboards.copy(m.body());
         } else if ((code == javafx.scene.input.KeyCode.ENTER || code == javafx.scene.input.KeyCode.SPACE
