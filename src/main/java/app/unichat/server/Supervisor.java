@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.support.Redactor;
+import app.unichat.support.Storage;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -31,19 +32,22 @@ public final class Supervisor {
 
     /** Where each running process is noted as {@code <name>.pid} ("pid startMillis"), or null. */
     private final Path runDir;
+    /** Told of a process whose output says a write didn't fit ({@link Storage#writeFailed}). */
+    private final Storage storage;
 
     public Supervisor(Path runDir) {
-        this(Duration.ofSeconds(1), Duration.ofSeconds(30), runDir);
+        this(Duration.ofSeconds(1), Duration.ofSeconds(30), runDir, Storage.SHARED);
     }
 
     Supervisor(Duration firstBackoff, Duration maxBackoff) {
-        this(firstBackoff, maxBackoff, null);
+        this(firstBackoff, maxBackoff, null, Storage.SHARED);
     }
 
-    Supervisor(Duration firstBackoff, Duration maxBackoff, Path runDir) {
+    Supervisor(Duration firstBackoff, Duration maxBackoff, Path runDir, Storage storage) {
         this.firstBackoff = firstBackoff;
         this.maxBackoff = maxBackoff;
         this.runDir = runDir;
+        this.storage = storage;
     }
 
     /**
@@ -133,7 +137,10 @@ public final class Supervisor {
             launchedAt = System.currentTimeMillis();
             Process p = process;
             notePid(name, p);
-            Thread pump = new Thread(() -> pump(p, log, () -> listener.logged(name)), "log-" + name);
+            // Seen before it's written: with the disk full, writing it fails too.
+            Thread pump = new Thread(() -> pump(p, log, line -> {
+                if (Storage.writeFailed(line)) storage.failed(name);
+            }, () -> listener.logged(name)), "log-" + name);
             pump.setDaemon(true);
             pump.start();
             p.onExit().thenRun(() -> onExit(this, p));
@@ -150,11 +157,14 @@ public final class Supervisor {
      * next one tries again.
      */
     static void pump(Process p, Path log) {
-        pump(p, log, () -> { });
+        pump(p, log, line -> { }, () -> { });
     }
 
-    /** {@link #pump(Process, Path)}, running {@code afterLine} after each line written. */
-    static void pump(Process p, Path log, Runnable afterLine) {
+    /**
+     * {@link #pump(Process, Path)}, handing {@code read} each line as it came (not redacted) before it's written, and
+     * running {@code afterLine} once it is.
+     */
+    static void pump(Process p, Path log, java.util.function.Consumer<String> read, Runnable afterLine) {
         InputStream raw = p.getInputStream();
         BufferedReader in = new BufferedReader(new InputStreamReader(raw, StandardCharsets.UTF_8));
         OutputStream out = null;
@@ -163,6 +173,7 @@ public final class Supervisor {
             String line;
             while ((line = in.readLine()) != null) {
                 try {
+                    read.accept(line);
                     if (out == null) out = Files.newOutputStream(log, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                     out.write((Redactor.redact(line) + "\n").getBytes(StandardCharsets.UTF_8));
                     out.flush();

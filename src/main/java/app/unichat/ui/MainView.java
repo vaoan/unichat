@@ -220,6 +220,7 @@ public final class MainView extends StackPane {
         stage.focusedProperty().addListener(onFocused);
 
         svc.addListener(listener);
+        app.unichat.support.Storage.SHARED.addListener(onStorage);
         showConnection(svc.connectionState());
         showAccountAlerts();
         refreshAll();
@@ -254,8 +255,12 @@ public final class MainView extends StackPane {
         exploring.dispose();
         updateBar.dispose();
         svc.removeListener(listener);
+        app.unichat.support.Storage.SHARED.removeListener(onStorage);
         svc.onSaveFailure(null);
     }
+
+    /** The disk ran low or had room again, or a process of the server couldn't write: told on another thread. */
+    private final Runnable onStorage = () -> Platform.runLater(() -> showConnection(state));
 
     // ------------------------------------------------------------------ updates (coalesced)
 
@@ -377,7 +382,10 @@ public final class MainView extends StackPane {
     /** Chats are up to date only when both the server and every network are: until then the top bar says what's behind. */
     private void showConnection(ConnectionState s) {
         state = s;
-        String text = s == ConnectionState.ONLINE ? syncingNetworks : switch (s) {
+        app.unichat.support.Storage disk = app.unichat.support.Storage.SHARED;
+        // A full disk first: with it nothing new arrives while the server and bridges still answer, so nothing else says so.
+        String storage = s == ConnectionState.LOGGED_OUT ? null : AccountAlerts.storageLine(disk.low(), disk.free(), !disk.failing().isEmpty());
+        String text = storage != null ? storage : s == ConnectionState.ONLINE ? syncingNetworks : switch (s) {
             case CONNECTING -> I18n.t("main.connecting");
             case SYNCING -> I18n.t("main.syncing");
             case OFFLINE -> I18n.t("main.offline");
@@ -386,7 +394,7 @@ public final class MainView extends StackPane {
         };
         connection.setText(text);
         connection.getStyleClass().removeAll("error");
-        if (s == ConnectionState.OFFLINE || s == ConnectionState.LOGGED_OUT) connection.getStyleClass().add("error");
+        if (storage != null || s == ConnectionState.OFFLINE || s == ConnectionState.LOGGED_OUT) connection.getStyleClass().add("error");
         Nodes.show(connection, text != null);
         if (s == ConnectionState.LOGGED_OUT) onLogout.run();
     }

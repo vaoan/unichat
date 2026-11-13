@@ -21,6 +21,9 @@ import java.util.stream.Stream;
  */
 public final class AnimDump {
     private static final long TIMEOUT_SECONDS = 30;
+    private static final String PREFIX = "unichat-anim";
+    /** Older than this, a frames folder is no decode's any more: the longest takes {@link #TIMEOUT_SECONDS}. */
+    static final long LEFT_MS = 3_600_000;
 
     private AnimDump() {}
 
@@ -43,7 +46,7 @@ public final class AnimDump {
         if (tool == null) return null;
         Path dir = null;
         try {
-            dir = Files.createTempDirectory("unichat-anim");
+            dir = Files.createTempDirectory(PREFIX);
             Processes.Result r = Processes.capture(List.of(tool.toString(), "-folder", dir.toString(), "-prefix", "f", "-pam",
                     webp.toAbsolutePath().toString()), TIMEOUT_SECONDS);
             if (!r.finished() || r.exit() != 0) return null;
@@ -62,6 +65,24 @@ public final class AnimDump {
             return null;
         } finally {
             if (dir != null) Folders.deleteQuietly(dir);
+        }
+    }
+
+    /**
+     * Removes the frames folders a run that ended mid-decode left in the temp folder (a restart for memory halts the
+     * JVM, so no {@code finally} runs): anim_dump writes every frame whole, hundreds of MB for a long sticker.
+     */
+    public static void sweep() {
+        sweep(Path.of(System.getProperty("java.io.tmpdir")), System.currentTimeMillis());
+    }
+
+    static void sweep(Path tmp, long now) {
+        try (Stream<Path> s = Files.list(tmp)) {
+            for (Path d : s.filter(p -> p.getFileName().toString().startsWith(PREFIX) && Files.isDirectory(p)).toList()) {
+                if (now - Files.getLastModifiedTime(d).toMillis() > LEFT_MS) Folders.deleteQuietly(d);
+            }
+        } catch (IOException e) {
+            // nothing to sweep
         }
     }
 

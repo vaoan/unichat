@@ -19,6 +19,27 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * wrong: a black blotch). moving.webp: a red square moving right over a transparent background and a blue band.
  */
 class AnimDumpTest {
+    /**
+     * A Unichat that restarted (memory) while a sticker was being decoded left its frames: 19 folders, 2.5 GB in the temp
+     * folder, and the disk filled. What an earlier run left is removed; a folder still being written (another run's,
+     * a test's) is younger than an hour and stays.
+     */
+    @Test
+    void framesAnEarlierRunLeftAreRemoved(@TempDir Path tmp) throws Exception {
+        Path old = Files.createDirectory(tmp.resolve("unichat-anim123"));
+        Files.write(old.resolve("f0000.pam"), new byte[1024]);
+        Files.setLastModifiedTime(old, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() - 2 * 3_600_000));
+        Path fresh = Files.createDirectory(tmp.resolve("unichat-anim456"));
+        Path someoneElses = Files.createDirectory(tmp.resolve("other"));
+        Files.setLastModifiedTime(someoneElses, java.nio.file.attribute.FileTime.fromMillis(0));
+
+        AnimDump.sweep(tmp, System.currentTimeMillis());
+
+        assertTrue(Files.notExists(old));
+        assertTrue(Files.exists(fresh));
+        assertTrue(Files.exists(someoneElses));
+    }
+
     @TempDir Path dir;
 
     /** The one built for development (run-dev.sh), when this machine has it: CI has no anim_dump and skips. */

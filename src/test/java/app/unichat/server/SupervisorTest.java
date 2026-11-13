@@ -48,6 +48,24 @@ class SupervisorTest {
         return List.of(java, "-cp", System.getProperty("java.class.path"), FakeService.class.getName(), mode);
     }
 
+    /** Its database refused a write (the disk was full): the watchdog hears of it, to start it over once there's room. */
+    @Test
+    void aProcessSayingItCouldntWriteIsNoted() throws Exception {
+        app.unichat.support.Storage storage = new app.unichat.support.Storage(() -> Long.MAX_VALUE, System::currentTimeMillis);
+        Supervisor watched = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, null, storage);
+        watched.listen(new Supervisor.Listener() {
+            @Override public void logged(String name) { changes.changed(); }
+        });
+        String java = ProcessHandle.current().info().command().orElse("java");
+        try {
+            watched.start("telegram", dir, List.of(java, "-cp", System.getProperty("java.class.path"), FakeService.class.getName(), "run",
+                    "{\"level\":\"error\",\"error\":\"database or disk is full\"}"), dir.resolve("t.log"));
+            await(() -> storage.failing().contains("telegram"));
+        } finally {
+            watched.stopAll();
+        }
+    }
+
     @Test
     void runsAndLogsAndStops() throws Exception {
         Path log = dir.resolve("svc.log");
@@ -90,12 +108,12 @@ class SupervisorTest {
     @Test
     void orphansFromAPreviousRunAreStopped() throws Exception {
         Path run = dir.resolve("run");
-        Supervisor first = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run);
+        Supervisor first = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run, app.unichat.support.Storage.SHARED);
         first.start("svc", dir, fake("run"), dir.resolve("svc.log"));
         assertTrue(first.isRunning("svc"));
         long orphan = Long.parseLong(Files.readString(run.resolve("svc.pid")).strip().split(" ")[0]);
         // Unichat dies without stopping its children (forced quit, crash): the next run cleans up.
-        Supervisor next = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run);
+        Supervisor next = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run, app.unichat.support.Storage.SHARED);
         next.reapOrphans();
         var left = ProcessHandle.of(orphan);
         if (left.isPresent()) left.get().onExit().get();
@@ -108,7 +126,7 @@ class SupervisorTest {
         Files.createDirectories(run);
         // A pid file pointing at this test's own JVM (not started by the supervisor): must survive.
         Files.writeString(run.resolve("svc.pid"), Long.toString(ProcessHandle.current().pid()));
-        new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run).reapOrphans();
+        new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run, app.unichat.support.Storage.SHARED).reapOrphans();
         assertTrue(ProcessHandle.current().isAlive());
         assertFalse(Files.exists(run.resolve("svc.pid")));
     }

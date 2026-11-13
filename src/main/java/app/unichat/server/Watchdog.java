@@ -1,10 +1,12 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgeStates;
+import app.unichat.support.Storage;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -22,6 +24,11 @@ import java.util.function.Supplier;
  * <p>Without internet a disconnected bridge is doing nothing wrong: restarting it only made things worse (mautrix-discord
  * started offline fails once and never tries again, and every restart lengthened the wait for the next one). So those
  * restarts wait, and when the internet returns every bridge starts again at once, with a fresh connection and its catch-up.
+ *
+ * <p>A full disk is nobody's fault either, but it doesn't heal by itself: tuwunel and the bridges couldn't write and stayed
+ * so after there was room again (2026-11-12: hours with nothing new, every process answering). While the disk is low only
+ * a hung process is restarted; once there's room every process starts over, the server too, and one whose output said
+ * a write failed ({@link Storage#failing}) starts over as soon as there's room, even if the 30 s rounds never saw the disk low.
  */
 final class Watchdog {
     static final long PROBE_EVERY_MS = 30_000;
@@ -79,7 +86,9 @@ final class Watchdog {
     private final BiConsumer<String, String> restart;
     private final BooleanSupplier internet;
     private final SessionKeeper keeper;
+    private final Storage storage;
     private boolean wasOnline = true;
+    private boolean wasLow;
     private final Map<String, Integer> failures = new HashMap<>();
     private final Map<String, Long> lastRestart = new HashMap<>();
     private final Map<String, Integer> inARow = new HashMap<>();
@@ -94,11 +103,22 @@ final class Watchdog {
      */
     Watchdog(Map<String, Integer> ports, Supplier<Iterable<String>> running, BridgeStates states,
              BiConsumer<String, String> restart, BooleanSupplier internet) {
-        this(ports, running, states, restart, internet, NO_KEEPER);
+        this(ports, running, states, restart, internet, NO_KEEPER, Storage.SHARED);
+    }
+
+    Watchdog(Map<String, Integer> ports, Supplier<Iterable<String>> running, BridgeStates states,
+             BiConsumer<String, String> restart, BooleanSupplier internet, Storage storage) {
+        this(ports, running, states, restart, internet, NO_KEEPER, storage);
     }
 
     Watchdog(Map<String, Integer> ports, Supplier<Iterable<String>> running, BridgeStates states,
              BiConsumer<String, String> restart, BooleanSupplier internet, SessionKeeper keeper) {
+        this(ports, running, states, restart, internet, keeper, Storage.SHARED);
+    }
+
+    Watchdog(Map<String, Integer> ports, Supplier<Iterable<String>> running, BridgeStates states,
+             BiConsumer<String, String> restart, BooleanSupplier internet, SessionKeeper keeper, Storage storage) {
+        this.storage = storage;
         this.ports = ports;
         this.running = running;
         this.states = states;
@@ -122,12 +142,24 @@ final class Watchdog {
         timer = null;
     }
 
+    /** What one round of checks knows of the computer. */
+    private record Round(long now, boolean online, boolean internetBack, boolean low, boolean roomBack, Set<String> failing) {}
+
+    /** Why to restart {@code name} this round: with the disk low only a hung one, as a restart can't help the rest. */
+    private static String why(String name, Health h, Round r) {
+        if (r.low()) return h.probeFailures() >= PROBE_FAILURES ? reason(h, r.now(), r.online()) : null;
+        if (r.failing().contains(name)) return "it couldn't write to the disk";
+        return reason(h, r.now(), r.online());
+    }
+
     void check() {
         try {
             long now = BridgeStates.now();
             boolean online = internet.getAsBoolean();
-            boolean internetBack = online && !wasOnline;
+            storage.check();
+            Round round = new Round(now, online, online && !wasOnline, storage.low(), !storage.low() && wasLow, storage.failing());
             wasOnline = online;
+            wasLow = round.low();
             for (String name : running.get()) {
                 Integer port = ports.get(name);
                 if (port == null) continue;
@@ -136,13 +168,15 @@ final class Watchdog {
                 Health h = name.equals("tuwunel") ? new Health(f, -1, 0)
                         : new Health(f, states.troubledSince(name), states.dropsWithin(name, FLAP_WINDOW_MS, now));
                 boolean bridge = !name.equals("tuwunel");
-                boolean fresh = internetBack && bridge && !keeper.fragile(name);
-                String why = fresh ? "internet is back" : reason(h, now, online);
+                // Things that happen once (the internet or room on the disk back): no waiting after the last restart.
+                String once = round.roomBack() ? "the disk has room again"
+                        : round.internetBack() && bridge && !keeper.fragile(name) ? "internet is back" : null;
+                String why = once != null ? once : why(name, h, round);
                 Long last = lastRestart.get(name);
                 int row = inARow.getOrDefault(name, 0);
                 // A long quiet run since the last restart: the next one starts with a short wait again.
                 if (last != null && why == null && now - last > MAX_COOLDOWN_MS) inARow.put(name, row = 0);
-                if (fresh) inARow.put(name, row = 0);
+                if (once != null) inARow.put(name, row = 0);
                 else if (why == null || (last != null && now - last < cooldown(row))) continue;
                 // A hung process can't lose more than it has; anything else waits until a restart can't cost its session.
                 if (h.probeFailures() < PROBE_FAILURES && !keeper.safeToRestart(name)) continue;
@@ -151,6 +185,7 @@ final class Watchdog {
                 inARow.put(name, row + 1);
                 failures.put(name, 0);
                 if (bridge) states.restarting(name, now);
+                storage.startedOver(name);
                 restart.accept(name, why);
             }
             keeper.tick(online, now);

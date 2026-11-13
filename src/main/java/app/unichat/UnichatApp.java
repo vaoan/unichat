@@ -58,6 +58,9 @@ public final class UnichatApp extends Application {
     public void start(Stage primary) {
         stage = primary;
         Recovery.watchUi(); // a window that stops answering starts Unichat again
+        // A full disk stops messages with no other sign. Not for a snapshot: the screen it shows mustn't hang on this disk.
+        if (System.getProperty("unichat.snapshot") == null) app.unichat.support.Storage.SHARED.watch(Settings.dataDir());
+        Thread.ofVirtual().name("anim-sweep").start(app.unichat.video.AnimDump::sweep); // what a restart mid-decode left
         // -Dunichat.language (tests, snapshots) wins over what was chosen in Ajustes.
         I18n.use(System.getProperty("unichat.language", Settings.get().language()));
         stage.setTitle("Unichat");

@@ -59,6 +59,15 @@ public final class AccountAlerts {
         return syncing.isEmpty() ? null : line(syncing, "main.syncingNetworks");
     }
 
+    /**
+     * The top bar's line about the disk, null when it's fine: low on room (what to fix, whatever failed) or a process of
+     * the server that couldn't write (being started over).
+     */
+    public static String storageLine(boolean low, long free, boolean failing) {
+        if (low) return I18n.t("main.diskLow", free <= 0 ? "0 B" : app.unichat.ui.Formats.fileSize(free));
+        return failing ? I18n.t("main.diskFailing") : null;
+    }
+
     private static String line(List<Alert> alerts, String key) {
         List<String> names = alerts.stream().map(Alert::who).toList();
         return switch (names.size()) {
