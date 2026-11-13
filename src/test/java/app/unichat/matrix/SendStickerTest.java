@@ -194,6 +194,19 @@ class SendStickerTest {
         assertEquals("image/webp", sent.path("info").path("mimetype").asText());
     }
 
+    /** A GIF sticker (Telegram's Lottie ones come so) went to Discord as the GIF: as an animated WebP it weighs less. */
+    @Test
+    void anAnimatedGifStickerGoesToDiscordAsAnAnimatedWebp(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(StickerConverter.gif2webp() != null, "no gif2webp");
+        served = app.unichat.TestPictures.gif(dir.resolve("s.gif"), 32, 32, 3);
+        JsonNode info = MatrixClient.JSON.readTree("""
+                {"mimetype":"image/gif","w":32,"h":32,"fi.mau.bridged_sticker":{"network":"telegram","id":"5","pack_url":"https://t.me/addstickers/X"}}""");
+        chatOn("discord").sender().sendStickerFor("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/gifsticker", "image/gif", 32, 32, info),
+                app.unichat.model.RoomFeatures.UNKNOWN, null).get();
+        assertEquals("image/webp", uploadedType);
+        assertEquals("image/webp", MatrixClient.JSON.readTree(body).path("info").path("mimetype").asText());
+    }
+
     @Test
     void aStickerLabelledWebmThatIsReallyAGifGoesAsTheGifItIs() throws Exception {
         // Telegram's bridge converts its WebM stickers (convert_from_webm) and still calls them video/webm: ffmpeg,
@@ -203,8 +216,9 @@ class SendStickerTest {
                 {"mimetype":"video/webm","w":16,"h":16,"fi.mau.bridged_sticker":{"network":"telegram","id":"8","pack_url":"https://t.me/addstickers/X"}}""");
         svc.sender().sendStickerFor("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/labelled", "video/webm", 16, 16, info),
                 app.unichat.model.RoomFeatures.UNKNOWN, null).get();
-        assertEquals("image/gif", uploadedType, "what the file is, not its label");
-        assertEquals("image/gif", MatrixClient.JSON.readTree(body).path("info").path("mimetype").asText());
+        // The fake server's file is a still GIF: it goes as the picture it is (a still one as a PNG), never as its WebM label.
+        assertEquals("image/png", uploadedType, "what the file is, not its label");
+        assertEquals("image/png", MatrixClient.JSON.readTree(body).path("info").path("mimetype").asText());
     }
 
     private MatrixChatService telegramChat() throws Exception {

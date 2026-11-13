@@ -73,8 +73,16 @@ public final class StickerConverter {
             Result as = forChat(src, real, network, own, f, dir);
             return as != null ? as : copy(src, real, dir);
         }
-        String want = network == null ? NetworkFormats.byFeatures(mime, f) : NetworkFormats.sticker(network, mime, animated(src, mime), own, f);
-        return want == null ? null : to(src, mime, want, dir);
+        boolean moves = animated(src, mime);
+        String want = network == null ? NetworkFormats.byFeatures(mime, f) : NetworkFormats.sticker(network, mime, moves, own, f);
+        if (want == null) return null;
+        Result r = to(src, mime, want, dir);
+        boolean unmade = r != null && !want.equals(r.mime());
+        if (unmade && NetworkFormats.asIsIfUnmade(network, mime, moves)) {
+            Files.deleteIfExists(r.file());
+            return null;
+        }
+        return r;
     }
 
     /** Whether the {@code mime} sticker {@code src} moves: a video sticker always, a GIF with more than one frame. */

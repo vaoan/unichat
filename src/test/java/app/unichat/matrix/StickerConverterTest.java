@@ -49,7 +49,11 @@ class StickerConverterTest {
         }
         assertNull(NetworkFormats.sticker(Network.TELEGRAM, "video/webm", true, false, RoomFeatures.UNKNOWN), "Telegram's own video stickers");
         assertNull(NetworkFormats.sticker(Network.DISCORD, "image/webp", true, false, RoomFeatures.UNKNOWN), "Discord plays an animated WebP by itself");
-        assertNull(NetworkFormats.sticker(Network.DISCORD, "image/gif", true, false, RoomFeatures.UNKNOWN));
+        assertEquals("image/webp", NetworkFormats.sticker(Network.DISCORD, "image/gif", true, false, RoomFeatures.UNKNOWN),
+                "a GIF (Telegram's Lottie stickers come so) as the lighter animated WebP");
+        assertEquals("image/png", NetworkFormats.sticker(Network.DISCORD, "image/gif", false, false, RoomFeatures.UNKNOWN), "a still one as a PNG");
+        assertTrue(NetworkFormats.of(Network.DISCORD).takesIfUnmade("image/gif"), "no gif2webp: the GIF still plays there");
+        assertFalse(NetworkFormats.of(Network.WHATSAPP).takesIfUnmade("image/gif"), "WhatsApp's stickers can't be GIFs");
         assertEquals("image/webp", NetworkFormats.sticker(Network.DISCORD, "video/webm", null, false, RoomFeatures.UNKNOWN),
                 "not read yet: it will change");
     }

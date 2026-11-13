@@ -19,9 +19,23 @@ final class NetworkFormats {
     /**
      * {@code asIs}: the sticker formats its bridge sends on (the chat's room_features may still refuse one); {@code animated}
      * and {@code still}: what one in another format becomes; {@code gifVideosAsIs}: its bridge sends a GIF that came as an
-     * MP4 (marked {@code fi.mau.gif}) on as a GIF.
+     * MP4 (marked {@code fi.mau.gif}) on as a GIF; {@code ifUnmade}: what it still shows as it is when the conversion
+     * can't be made.
      */
-    record Rule(Set<String> asIs, String animated, String still, boolean gifVideosAsIs) {}
+    /**
+     * Whether a sticker that couldn't be made what {@code n} should get (no tool) goes as it is rather than as a still
+     * picture: an animated one where that format still plays; never by room_features alone (null network).
+     */
+    static boolean asIsIfUnmade(Network n, String mime, boolean animated) {
+        return n != null && animated && of(n).takesIfUnmade(mime);
+    }
+
+    record Rule(Set<String> asIs, String animated, String still, boolean gifVideosAsIs, Set<String> ifUnmade) {
+        /** Whether a {@code mime} sticker still goes as it is when it can't be made what it should be (no tool). */
+        boolean takesIfUnmade(String mime) {
+            return ifUnmade.contains(mime);
+        }
+    }
 
     /**
      * Telegram's bridge sends PNG and JPEG (it encodes them itself), WebM and Lottie on, and everything else, WebP
@@ -31,9 +45,11 @@ final class NetworkFormats {
      */
     static Rule of(Network n) {
         return switch (n) {
-            case TELEGRAM -> new Rule(Set.of(PNG, JPEG, WEBM, LOTTIE), WEBM, PNG, true);
-            case WHATSAPP -> new Rule(Set.of(WEBP, PNG), WEBP, PNG, true);
-            default -> new Rule(Set.of(GIF, WEBP, PNG, JPEG), WEBP, PNG, false);
+            case TELEGRAM -> new Rule(Set.of(PNG, JPEG, WEBM, LOTTIE), WEBM, PNG, true, Set.of());
+            case WHATSAPP -> new Rule(Set.of(WEBP, PNG), WEBP, PNG, true, Set.of());
+            // A GIF (Telegram's Lottie stickers come so: nobody else reads Lottie) goes as the lighter animated WebP,
+            // as it is when gif2webp can't make one: it plays there either way.
+            default -> new Rule(Set.of(WEBP, PNG, JPEG), WEBP, PNG, false, Set.of(GIF));
         };
     }
 
