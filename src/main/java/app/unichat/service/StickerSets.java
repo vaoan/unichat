@@ -12,4 +12,9 @@ public interface StickerSets {
 
     /** A whole set by its link; fails when no connected account can bring it. */
     CompletableFuture<StickerPack> stickerPack(String url);
+
+    /** {@link #stickerPack}, asked of the network again rather than the copy kept. */
+    default CompletableFuture<StickerPack> freshStickerPack(String url) {
+        return stickerPack(url);
+    }
 }

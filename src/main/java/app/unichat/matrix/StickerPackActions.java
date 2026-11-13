@@ -40,11 +40,16 @@ final class StickerPackActions {
     }
 
     CompletableFuture<StickerPack> pack(String url) {
+        return pack(url, false);
+    }
+
+    /** {@code url}'s set; {@code again}: from the bridge even when a copy is kept (it changes what the stickers are). */
+    CompletableFuture<StickerPack> pack(String url, boolean again) {
         if (!StickerPack.isLink(url)) return CompletableFuture.failedFuture(new IllegalArgumentException("not a sticker set"));
-        StickerPack known = loaded.get(url);
+        StickerPack known = again ? null : loaded.get(url);
         if (known != null) return CompletableFuture.completedFuture(known);
         return core.call(() -> {
-            JsonNode content = cache.fresh(url);
+            JsonNode content = again ? null : cache.fresh(url);
             Exception failed = null;
             for (BridgeStickerPacks b : content == null ? bridges() : List.<BridgeStickerPacks>of()) {
                 try {

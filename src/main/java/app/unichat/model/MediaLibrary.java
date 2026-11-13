@@ -118,6 +118,30 @@ public final class MediaLibrary {
         return out;
     }
 
+    /** {@code was} becomes {@code now} wherever it is ({@link #replace}). */
+    public record Replacement(Item was, Item now) {}
+
+    /** Each one's {@code was} becomes its {@code now} where it stands, in favourites and recents; one change for all. */
+    public synchronized void replace(List<Replacement> replacements) {
+        boolean any = false;
+        for (Replacement r : replacements) any |= replaceIn(favorites, r) | replaceIn(recents, r);
+        if (!any) return;
+        dropCopies(favorites);
+        dropCopies(recents);
+        changed();
+    }
+
+    private static boolean replaceIn(List<Item> items, Replacement r) {
+        boolean any = false;
+        for (int i = 0; i < items.size(); i++) {
+            if (same(items.get(i), r.was())) {
+                items.set(i, r.now());
+                any = true;
+            }
+        }
+        return any;
+    }
+
     /** Adds or removes a favourite; true when it's now a favourite. */
     public synchronized boolean toggleFavorite(Item item) {
         boolean removed = favorites.removeIf(i -> same(i, item));
@@ -165,7 +189,8 @@ public final class MediaLibrary {
                 && java.util.Objects.equals(a.mime(), b.mime());
     }
 
-    private static String bridgeId(Item i) {
+    /** The bridge's own id of the sticker ({@code fi.mau.bridged_sticker}), null when it has none. */
+    public static String bridgeId(Item i) {
         JsonNode sticker = i.info() == null ? null : i.info().get("fi.mau.bridged_sticker");
         return sticker == null ? null : sticker.path("id").asText(null);
     }

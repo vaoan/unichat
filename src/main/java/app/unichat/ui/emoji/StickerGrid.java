@@ -7,14 +7,24 @@ import app.unichat.ui.media.MessageMedia;
 import app.unichat.model.Chat;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.RoomFeatures;
+import app.unichat.model.Account;
+import app.unichat.model.AccountStatus;
+import app.unichat.model.Network;
 import app.unichat.service.ChatService;
+import app.unichat.service.FavoriteRefresh;
+import app.unichat.settings.Settings;
+import app.unichat.ui.Icons;
 import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.ImageView;
+import javafx.geometry.Pos;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
@@ -37,6 +47,7 @@ public final class StickerGrid extends ScrollPane {
     private final VBox content = new VBox(10);
     private final TileCache tiles = new TileCache();
     private final StickerSetSection sets;
+    private boolean rebuilding;
 
     public StickerGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Supplier<String> takeReply, Consumer<String> toast) {
         this.takeReply = takeReply;
@@ -66,8 +77,9 @@ public final class StickerGrid extends ScrollPane {
         Chat c = chat.get();
         boolean accepted = c == null || c.features().accepts(RoomFeatures.STICKER);
         if (!accepted) content.getChildren().add(Labels.help(I18n.t("sticker.networkRefuses")));
-        section(I18n.t("library.favorites"), library.favorites(MediaLibrary.Kind.STICKER), I18n.t("library.stickerFavorite"), accepted);
-        section(I18n.t("library.recents"), library.recents(MediaLibrary.Kind.STICKER), I18n.t("library.stickerRecent"), accepted);
+        section(I18n.t("library.favorites"), library.favorites(MediaLibrary.Kind.STICKER), I18n.t("library.stickerFavorite"), accepted,
+                Icons.iconButton(Icons.REPLAY, I18n.t("library.rebuildFavorites"), () -> rebuild(false)));
+        section(I18n.t("library.recents"), library.recents(MediaLibrary.Kind.STICKER), I18n.t("library.stickerRecent"), accepted, null);
         List<Node> setNodes = sets.nodes((item, what) -> tiles.get(what + accepted + item.url(), () -> tile(item, what, accepted)),
                 this::bringIntoView);
         if (library.favorites(MediaLibrary.Kind.STICKER).isEmpty() && library.recents(MediaLibrary.Kind.STICKER).isEmpty()
@@ -89,13 +101,48 @@ public final class StickerGrid extends ScrollPane {
         if (max > 0) setVvalue(Math.min(1, n.getBoundsInParent().getMinY() / max));
     }
 
-    private void section(String title, List<MediaLibrary.Item> items, String what, boolean accepted) {
+    private void section(String title, List<MediaLibrary.Item> items, String what, boolean accepted, Node action) {
         if (items.isEmpty()) return;
         Label t = new Label(title);
         t.getStyleClass().add("emoji-category");
+        Node header = t;
+        if (action != null) {
+            Region gap = new Region();
+            HBox.setHgrow(gap, Priority.ALWAYS);
+            HBox row = new HBox(4, t, gap, action);
+            row.setAlignment(Pos.CENTER_LEFT);
+            header = row;
+        }
         FlowPane grid = new FlowPane(6, 6);
         for (MediaLibrary.Item i : items) grid.getChildren().add(tiles.get(what + accepted + i.url(), () -> tile(i, what, accepted)));
-        content.getChildren().addAll(t, grid);
+        content.getChildren().addAll(header, grid);
+    }
+
+    /**
+     * Once on this computer, when a Telegram account is connected: the favourites saved before Unichat got Telegram's
+     * stickers as they are (video stickers as GIFs, no size) are rebuilt from their sets. Done for good only when every
+     * set could be brought.
+     */
+    public void rebuildOnce(List<Account> accounts) {
+        if (Settings.get().favoritesRebuilt()) return;
+        if (accounts.stream().noneMatch(a -> a.network() == Network.TELEGRAM && a.status() == AccountStatus.CONNECTED)) return;
+        rebuild(true);
+    }
+
+    /** Rebuilds the favourite stickers from their sets ({@link FavoriteRefresh}); by itself ({@code once}) says only what changed. */
+    private void rebuild(boolean once) {
+        if (rebuilding) return;
+        rebuilding = true;
+        if (!once) toast.accept(I18n.t("library.rebuilding"));
+        FavoriteRefresh.run(svc, library).whenComplete((r, err) -> Platform.runLater(() -> {
+            rebuilding = false;
+            if (r == null) {
+                if (!once) toast.accept(I18n.t("library.rebuildFailed"));
+                return;
+            }
+            if (r.failedSets() == 0) Settings.get().setFavoritesRebuilt(true);
+            if (!once || r.rebuilt() > 0) toast.accept(I18n.n("library.rebuilt", r.rebuilt()));
+        }));
     }
 
     boolean accepts() {

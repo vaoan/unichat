@@ -118,6 +118,7 @@ public final class MainView extends StackPane {
             Platform.runLater(() -> {
                 if (SettingsWindow.accountsPage() != null) SettingsWindow.accountsPage().refresh();
                 if (stage.isShowing()) showAccountAlerts();
+                stickers.rebuildOnce(svc.accounts());
             });
         }
         @Override public void connectionChanged(ConnectionState s) { Platform.runLater(() -> showConnection(s)); }

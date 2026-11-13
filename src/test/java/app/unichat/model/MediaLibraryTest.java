@@ -19,6 +19,26 @@ class MediaLibraryTest {
     }
 
     @Test
+    void anItemReplacedKeepsItsPlaceInFavouritesAndRecents() {
+        Path f = dir.resolve("lib.json");
+        MediaLibrary lib = new MediaLibrary(f);
+        lib.toggleFavorite(sticker("mxc://s/c"));
+        lib.toggleFavorite(sticker("mxc://s/b"));
+        lib.toggleFavorite(sticker("mxc://s/a"));
+        lib.addRecent(sticker("mxc://s/b"));
+        int[] told = {0};
+        lib.addListener(() -> told[0]++);
+        MediaLibrary.Item now = new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/b2", "video/webm", 512, 512, null);
+
+        lib.replace(List.of(new MediaLibrary.Replacement(sticker("mxc://s/b"), now)));
+
+        assertEquals(List.of("mxc://s/a", "mxc://s/b2", "mxc://s/c"),
+                new MediaLibrary(f).favorites(MediaLibrary.Kind.STICKER).stream().map(MediaLibrary.Item::url).toList());
+        assertEquals("mxc://s/b2", lib.recents(MediaLibrary.Kind.STICKER).get(0).url());
+        assertEquals(1, told[0], "one change for all of them");
+    }
+
+    @Test
     void recentsAreNewestFirstUniqueAndCapped() {
         MediaLibrary lib = new MediaLibrary(dir.resolve("lib.json"));
         for (int i = 0; i < 70; i++) lib.addRecent(sticker("mxc://s/" + i));

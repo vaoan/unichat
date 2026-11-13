@@ -538,6 +538,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public CompletableFuture<String> openDm(Account a, Contact contact) { return contacts.openDm(a, contact); }
     @Override public CompletableFuture<List<app.unichat.model.StickerPack.Ref>> stickerPacks() { return stickerPacks.packs(); }
     @Override public CompletableFuture<app.unichat.model.StickerPack> stickerPack(String url) { return stickerPacks.pack(url); }
+    @Override public CompletableFuture<app.unichat.model.StickerPack> freshStickerPack(String url) { return stickerPacks.pack(url, true); }
     @Override public CompletableFuture<Void> loadAllChannels(String spaceId) { return discord.loadAllChannels(spaceId); }
     @Override public CompletableFuture<List<DiscordGuild>> discordGuilds() { return discord.discordGuilds(); }
     @Override public CompletableFuture<Void> setDiscordGuildBridged(String guildId, boolean bridged) { return discord.setDiscordGuildBridged(guildId, bridged); }

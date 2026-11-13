@@ -69,6 +69,8 @@ public final class Settings {
                 || key.startsWith("cloud.")
                 // Whether this computer's Telegram bridge already re-synced its chats: a marker, not a choice.
                 || key.equals("telegram.chatSyncLimit")
+                // Whether the favourites were rebuilt from their sets once: a marker, not a choice.
+                || key.equals("library.favoritesRebuilt")
                 || (key.startsWith("gif.") && key.endsWith(".key"));
     }
 
@@ -310,6 +312,9 @@ public final class Settings {
     static double clampScale(double s) {
         return Math.max(MIN_FONT_SCALE, Math.min(MAX_FONT_SCALE, Math.round(s * 100) / 100.0));
     }
+    /** The favourite stickers were rebuilt from their sets once by themselves ({@code service/FavoriteRefresh}). */
+    public boolean favoritesRebuilt() { return getBool("library.favoritesRebuilt", false); }
+    public void setFavoritesRebuilt(boolean v) { setBool("library.favoritesRebuilt", v); }
     public boolean compactList() { return getBool("ui.compact", false); }
     public void setCompactList(boolean v) { setBool("ui.compact", v); }
     public boolean showNetworkBadges() { return getBool("ui.networkBadges", true); }
