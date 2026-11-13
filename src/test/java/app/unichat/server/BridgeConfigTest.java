@@ -191,6 +191,18 @@ class BridgeConfigTest {
     }
 
     @Test
+    void googleMessagesKeepsItsMediaOnTheServer() throws Exception {
+        // Its connector has no direct media: with it on, the bridge stopped at every start ("does not support it").
+        ObjectNode c = BridgeConfig.read(V2 + """
+                direct_media:
+                    enabled: true
+                    server_name: media-gmessages.localhost
+                """);
+        BridgeConfig.apply(c, settings("gmessages"));
+        assertFalse(c.at("/direct_media/enabled").asBoolean());
+    }
+
+    @Test
     void bridgesReportTheirStateToUnichat() throws Exception {
         BridgeConfig.Settings with = new BridgeConfig.Settings("whatsapp", 29318, "localhost", "@yo:localhost",
                 "http://127.0.0.1:8008", Path.of("/data/whatsapp"), "dp", null, null, "http://127.0.0.1:5000/status/whatsapp");

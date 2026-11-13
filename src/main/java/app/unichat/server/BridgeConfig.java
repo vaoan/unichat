@@ -90,8 +90,9 @@ public final class BridgeConfig {
             // History from the first room creation on: a room created without it is never filled later.
             obj(c, "/backfill").put("enabled", true).put("max_initial_messages", 50).put("max_catchup_messages", 500);
             obj(c, "/logging").put("min_level", "info").set("writers", writers);
-            // Media stays on the network until opened (the server_key the bridge generated is kept).
-            obj(c, "/direct_media").put("enabled", true).put("server_name", BridgePorts.mediaServerName(b));
+            // Media stays on the network until opened (the server_key the bridge generated is kept). Google Messages'
+            // connector has none: with it on, that bridge stopped at every start.
+            obj(c, "/direct_media").put("enabled", !b.equals("gmessages")).put("server_name", BridgePorts.mediaServerName(b));
             // Whether each message reached the network: one that didn't shows as failed in Unichat, and the notice says why.
             obj(c, "/matrix").put("message_status_events", true).put("message_error_notices", true);
             switch (b) {
