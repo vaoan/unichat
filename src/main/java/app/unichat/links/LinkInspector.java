@@ -4,6 +4,7 @@ import app.unichat.support.BoundedBody;
 import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 import app.unichat.model.LinkMedia;
+import app.unichat.model.LinkPreview;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -48,6 +49,7 @@ public final class LinkInspector {
     /** A whole video may take long on a slow line; this only keeps a trickle from holding the download forever. */
     private static final Duration DOWNLOAD_DEADLINE = Duration.ofHours(1);
     private static final int REMEMBERED = 1000;
+    static final int MAX_PAGE_MEDIA = 5;
     private static final int AT_ONCE = 4;
     private static final List<String> PAGE_MEDIA = List.of("og:video:secure_url", "og:video:url", "og:video",
             "twitter:player:stream", "og:audio:secure_url", "og:audio:url", "og:audio");
@@ -56,8 +58,8 @@ public final class LinkInspector {
     private final ExecutorService workers = Executors.newFixedThreadPool(AT_ONCE, Threads.daemon("link-inspector"));
     private final Predicate<InetAddress> allowed;
     private final Duration bodyDeadline;
-    private final Map<String, CompletableFuture<Optional<LinkMedia>>> seen = new LinkedHashMap<>(64, 0.75f, true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String, CompletableFuture<Optional<LinkMedia>>> eldest) {
+    private final Map<String, CompletableFuture<Optional<LinkPreview>>> seen = new LinkedHashMap<>(64, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<String, CompletableFuture<Optional<LinkPreview>>> eldest) {
             return size() > REMEMBERED;
         }
     };
@@ -77,15 +79,23 @@ public final class LinkInspector {
 
     /** What the link holds; each link is opened once however many messages or redraws ask. Empty on any failure. */
     public CompletableFuture<Optional<LinkMedia>> inspect(String url) {
+        return preview(url).thenApply(p -> p.map(LinkPreview::video));
+    }
+
+    /**
+     * What the link is, for its card: the page's title, text and picture, and the video or audio it leads to, checked
+     * by what its server answers. Each link is opened once however many messages or redraws ask; empty on any failure.
+     */
+    public CompletableFuture<Optional<LinkPreview>> preview(String url) {
         synchronized (seen) {
             return seen.computeIfAbsent(url, u -> CompletableFuture.supplyAsync(() -> {
                 try {
-                    return look(u, true);
+                    return Optional.ofNullable(read(u)).filter(p -> !p.isEmpty());
                 } catch (IOException | IllegalArgumentException e) {
-                    return Optional.<LinkMedia>empty();
+                    return Optional.<LinkPreview>empty();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    return Optional.<LinkMedia>empty();
+                    return Optional.<LinkPreview>empty();
                 }
             }, workers));
         }
@@ -107,22 +117,52 @@ public final class LinkInspector {
         }
     }
 
-    private Optional<LinkMedia> look(String url, boolean mayBePage) throws IOException, InterruptedException {
+    private LinkPreview read(String url) throws IOException, InterruptedException {
+        String api = TweetPreview.api(url);
+        if (api != null) {
+            Answer a = open(api);
+            try (InputStream in = new BoundedBody(a.response().body(), MAX_PAGE_BYTES, bodyDeadline)) {
+                if (a.response().statusCode() != 200) return null;
+                return TweetPreview.parse(new String(in.readNBytes(MAX_PAGE_BYTES), StandardCharsets.UTF_8), url);
+            }
+        }
         Answer a = open(url);
         try (InputStream in = new BoundedBody(a.response().body(), MAX_PAGE_BYTES, bodyDeadline)) {
-            if (a.response().statusCode() != 200) return Optional.empty();
-            String mime = a.response().headers().firstValue("Content-Type").orElse("").split(";")[0].trim().toLowerCase(Locale.ROOT);
-            LinkMedia.Kind kind = kindOf(mime, a.uri().getPath());
-            long size = a.response().headers().firstValueAsLong("Content-Length").orElse(0);
-            if (kind != null) return Optional.of(new LinkMedia(kind, a.uri().toString(), mime.isEmpty() ? null : mime, size));
-            if (!mayBePage || !(mime.equals("text/html") || mime.equals("application/xhtml+xml"))) return Optional.empty();
+            if (a.response().statusCode() != 200) return null;
+            String mime = mimeOf(a);
+            Optional<LinkMedia> media = mediaOf(a, mime);
+            if (media.isPresent()) return LinkPreview.of(url, media.get(), null);
+            if (mime.startsWith("image/")) return LinkPreview.of(url, null, a.uri().toString());
+            if (!(mime.equals("text/html") || mime.equals("application/xhtml+xml"))) return null;
             String page = new String(in.readNBytes(MAX_PAGE_BYTES), StandardCharsets.UTF_8);
-            for (String candidate : pageMedia(page, a.uri().toString())) {
-                Optional<LinkMedia> found = look(candidate, false);
-                if (found.isPresent()) return found;
+            LinkPreview found = PagePreview.parse(page, a.uri().toString());
+            LinkPreview preview = new LinkPreview(url, found.site(), found.title(), found.description(), found.image(),
+                    found.width(), found.height(), null, false);
+            // A page can name thousands, each a request from this computer: the first few are the page's own.
+            for (String candidate : pageMedia(page, a.uri().toString()).stream().limit(MAX_PAGE_MEDIA).toList()) {
+                Optional<LinkMedia> video = media(candidate);
+                if (video.isPresent()) return preview.withVideo(video.get(), false);
             }
-            return Optional.empty();
+            return preview;
         }
+    }
+
+    /** A page's video or audio, if its address really is one. */
+    private Optional<LinkMedia> media(String url) throws IOException, InterruptedException {
+        Answer a = open(url);
+        try (InputStream ignored = a.response().body()) {
+            return a.response().statusCode() == 200 ? mediaOf(a, mimeOf(a)) : Optional.empty();
+        }
+    }
+
+    private static String mimeOf(Answer a) {
+        return a.response().headers().firstValue("Content-Type").orElse("").split(";")[0].trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static Optional<LinkMedia> mediaOf(Answer a, String mime) {
+        LinkMedia.Kind kind = kindOf(mime, a.uri().getPath());
+        long size = a.response().headers().firstValueAsLong("Content-Length").orElse(0);
+        return kind == null ? Optional.empty() : Optional.of(new LinkMedia(kind, a.uri().toString(), mime.isEmpty() ? null : mime, size));
     }
 
     /** The media a page declares, the most specific first. A player page (YouTube's) isn't media and is skipped later. */

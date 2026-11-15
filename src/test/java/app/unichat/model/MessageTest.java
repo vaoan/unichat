@@ -41,7 +41,7 @@ class MessageTest {
         m.addReaction("mxc://s/e", "@b");
         m.setReactionName("mxc://s/e", ":e:");
         m.setHtml("<b>h</b>");
-        m.setPreviewHtml("<p>p</p>");
+        m.setLinkPreviews(List.of(LinkPreview.of("https://a.example/", null, null)));
         m.setHtmlText("h");
 
         Message copy = m.withId("$2");

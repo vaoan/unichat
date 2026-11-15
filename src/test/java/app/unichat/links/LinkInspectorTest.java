@@ -159,4 +159,31 @@ class LinkInspectorTest {
         assertThrows(java.io.IOException.class, () -> open.download(base + "/no", dir.resolve("n")));
         assertThrows(java.io.IOException.class, () -> new LinkInspector().download(base + "/f", dir.resolve("m")));
     }
+
+    @Test
+    void aPageBecomesACardWithTheVideoItLeadsTo() throws Exception {
+        answer("/pagina", 200, "text/html", "<meta property=\"og:title\" content=\"Un GIF\">"
+                + "<meta property=\"og:site_name\" content=\"Sitio\"><meta property=\"og:video\" content=\"" + base + "/gif.mp4\">"
+                + "<meta property=\"og:image\" content=\"" + base + "/quieto.jpg\">", null);
+        answer("/gif.mp4", 200, "video/mp4", "12345", null);
+        answer("/foto", 200, "image/jpeg", "1", null);
+        app.unichat.model.LinkPreview p = open.preview(base + "/pagina").get().orElseThrow();
+        assertEquals("Un GIF", p.title());
+        assertEquals("Sitio", p.site());
+        assertEquals(base + "/quieto.jpg", p.image());
+        assertEquals(base + "/gif.mp4", p.video().url(), "checked by what its server answers");
+        assertEquals(base + "/gif.mp4", inspect(open, "/pagina").orElseThrow().url(), "the same answer for its video");
+        assertEquals(base + "/foto", open.preview(base + "/foto").get().orElseThrow().image(), "a link to a picture is its picture");
+    }
+
+    /** Each address a page names is a request from this computer: a page of thousands held a worker for hours. */
+    @Test
+    void aPageThatNamesManyVideosHasOnlyItsFirstFewAsked() throws Exception {
+        StringBuilder page = new StringBuilder();
+        for (int i = 0; i < 50; i++) page.append("<video src=\"").append(base).append("/v").append(i).append("\"></video>");
+        answer("/muchos", 200, "text/html", page.toString(), null);
+        answer("/v", 404, null, "", null);
+        assertTrue(open.preview(base + "/muchos").get().isEmpty(), "no title, text, picture nor video: nothing to show");
+        assertEquals(1 + LinkInspector.MAX_PAGE_MEDIA, hits.get(), "the page and its first few");
+    }
 }

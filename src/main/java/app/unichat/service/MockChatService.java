@@ -40,7 +40,7 @@ import java.util.function.Consumer;
  * typing and read receipts are simulated so every UI state can be exercised without a server.
  */
 public class MockChatService implements ChatService, FolderForwarding {
-    private final Map<String, app.unichat.model.LinkMedia> demoLinks = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, app.unichat.model.LinkPreview> demoLinks = new java.util.concurrent.ConcurrentHashMap<>();
     static final String ME = "@yo:demo.unichat";
     static final String WA_PERSONAL = "whatsapp:personal";
     static final String WA_WORK = "whatsapp:trabajo";
@@ -508,13 +508,21 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     @Override
     public CompletableFuture<java.util.Optional<app.unichat.model.LinkMedia>> linkMedia(String url) {
+        return linkPreview(url).thenApply(p -> p.map(app.unichat.model.LinkPreview::video));
+    }
+
+    @Override
+    public CompletableFuture<java.util.Optional<app.unichat.model.LinkPreview>> linkPreview(String url) {
         return CompletableFuture.completedFuture(java.util.Optional.ofNullable(demoLinks.get(url)));
     }
 
-    /** The demo opens nothing on the web: these are the links it pretends hold media. */
-    public void addLinkMedia(String url, app.unichat.model.LinkMedia media) {
-        demoLinks.put(url, media);
+    /** The demo opens nothing on the web: these are the links it pretends to have read. */
+    public void addLinkPreview(String url, app.unichat.model.LinkPreview preview) {
+        demoLinks.put(url, preview);
     }
+
+    /** A link that is only its media. */
+    public void addLinkMedia(String url, app.unichat.model.LinkMedia media) { addLinkPreview(url, app.unichat.model.LinkPreview.of(url, media, null)); }
 
     @Override
     public CompletableFuture<Path> media(String url, int width, int height) {

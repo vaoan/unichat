@@ -301,7 +301,7 @@ public final class AnimatedImage {
      */
     public static Image still(Path file, int maxW, int maxH) throws IOException {
         if (app.unichat.support.ImageHeaders.isVideo(file)) return video(file, maxW, maxH, 1).images().getFirst();
-        if (isBigWebp(file)) return new Image(shrunk(file).toUri().toString(), maxW, maxH, true, true, false);
+        if (isBigWebp(file) || tooBigToDecode(file)) return new Image(shrunk(file).toUri().toString(), maxW, maxH, true, true, false);
         if (isGif(file) || isWebp(file)) { // JavaFX can't read WebP; ImageIO can (TwelveMonkeys), its first frame if animated
             BufferedImage first;
             try {
@@ -321,6 +321,19 @@ public final class AnimatedImage {
      * 24-megapixel photo), against Unichat's 1 GB. Stickers and ordinary pictures are far below.
      */
     static final long MAX_WEBP_PIXELS = 3_000_000;
+
+    /**
+     * Above this a still picture is made smaller in another process before it's read here: a GIF of 800 bytes from any
+     * web page can declare 30000x30000, and ImageIO holds the whole of it (900 MB, against Unichat's 1 GB) before
+     * scaling. A phone's photo (12 to 48 megapixels) is the most that's ever real.
+     */
+    static final long MAX_STILL_PIXELS = 50_000_000;
+
+    /** What a picture's header says it is, past {@link #MAX_STILL_PIXELS}; nothing is decoded. */
+    static boolean tooBigToDecode(Path file) {
+        int[] wh = app.unichat.support.ImageHeaders.size(file);
+        return (long) wh[0] * wh[1] > MAX_STILL_PIXELS;
+    }
 
     /**
      * Canvas pixels times frames an animation may have to be decoded here: every frame is held whole (anim_dump writes

@@ -11,6 +11,7 @@ import app.unichat.service.MediaSource;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.LinkMedia;
 import app.unichat.model.Message;
+import app.unichat.model.Mxc;
 import app.unichat.model.MessageType;
 import app.unichat.stt.Transcripts;
 import javafx.application.Platform;
@@ -71,7 +72,8 @@ public final class MessageMedia {
         box.getChildren().add(view);
         if (m.mediaUrl() != null) {
             MediaLoading.track(box, progress -> loadMedia(svc, view, m, (int) (dw * 2), (int) (dh * 2), progress));
-            if (MessageActions.isStickerOrGif(m)) library.rememberSeen(MediaItems.of(m));
+            // A link's GIF is on the web, not on the server: nothing the library could send again.
+        if (MessageActions.isStickerOrGif(m) && m.mediaUrl().startsWith(Mxc.SCHEME)) library.rememberSeen(MediaItems.of(m));
             if (m.isReelLink()) {
                 box.getChildren().add(playBadge());
                 clickable(box, I18n.t("media.reelOpen"), () -> openReel(m));
@@ -159,7 +161,13 @@ public final class MessageMedia {
     }
 
     private Node player(LinkMedia lm, Chat chat) {
+        return linkPlayer(lm, 0, 0, false, chat);
+    }
+
+    /** What a link's video or sound is, as a message's own would show: a GIF plays by itself, muted and looping. */
+    public Node linkPlayer(LinkMedia lm, int width, int height, boolean gif, Chat chat) {
         Message m = new Message(lm.url(), chat.id(), "", null, false, java.time.Instant.now());
+        m.setSize(width, height);
         m.setMediaUrl(lm.url());
         m.setMimeType(lm.mimeType());
         m.setFileSize(lm.size());
@@ -170,7 +178,7 @@ public final class MessageMedia {
             return audioNode(m, chat);
         }
         m.setType(MessageType.VIDEO);
-        m.setMediaInfo(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode());
+        m.setMediaInfo(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("fi.mau.gif", gif));
         return m.playsInline() ? inlineVideoNode(m) : fileNode(m);
     }
 
@@ -182,7 +190,8 @@ public final class MessageMedia {
         StackPane box = mediaBox(dw, dh, sticker);
         if (isWebm(m)) showAnimated(box, m, dw, dh);
         else box.getChildren().add(new InlineVideo(svc, m.mediaUrl(), dw, dh, () -> fileNode(m)));
-        if (MessageActions.isStickerOrGif(m)) library.rememberSeen(MediaItems.of(m));
+        // A link's GIF is on the web, not on the server: nothing the library could send again.
+        if (MessageActions.isStickerOrGif(m) && m.mediaUrl().startsWith(Mxc.SCHEME)) library.rememberSeen(MediaItems.of(m));
         clickable(box, I18n.t(sticker ? "media.stickerOpen" : "media.videoOpen"), () -> openVideo(m));
         return box;
     }

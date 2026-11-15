@@ -39,6 +39,11 @@ public interface MediaSource {
         return CompletableFuture.completedFuture(java.util.Optional.empty());
     }
 
+    /** What a web link is, for its card under the message (title, text, picture, video); empty if it can't be told. */
+    default CompletableFuture<java.util.Optional<app.unichat.model.LinkPreview>> linkPreview(String url) {
+        return CompletableFuture.completedFuture(java.util.Optional.empty());
+    }
+
     /** Media that must stay on disk whatever the cache's limit: the person's saved stickers and GIFs. Replaces the last list. */
     default void keepCached(java.util.Collection<String> urls) { }
 

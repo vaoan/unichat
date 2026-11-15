@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.model.LinkPreview;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -33,27 +34,21 @@ class MessageHtmlTest {
     }
 
     @Test
-    void aPreviewBecomesHtmlAndItsTextCantBecomeTags() {
-        String html = MessageHtml.previews(json(Map.of("com.beeper.linkpreviews", List.of(
-                Map.of("matched_url", "https://a.example/?a=1&b=2", "og:title", "<script>x</script>", "og:description", "Texto", "og:image", "mxc://s/p"),
-                Map.of("matched_url", "https://vacio.example/")))));
-        assertFalse(html.contains("<script>"));
-        assertTrue(html.contains("https://a.example/?a=1&amp;b=2"));
-        assertTrue(html.contains("<img src=\"mxc://s/p\">"));
-        assertFalse(html.contains("vacio"), "nothing to show for the second");
-        assertNull(MessageHtml.previews(json(Map.of("com.beeper.linkpreviews", List.of()))));
-    }
-
-    /**
-     * A preview's picture is sized before it loads when the bridge says how big it is: without it the box started as
-     * 16:9 and grew when the picture came, moving the chat (the chat apps' "reserve the space" rule).
-     */
-    @Test
-    void aPreviewsPictureCarriesItsSize() {
-        String html = MessageHtml.previews(json(Map.of("com.beeper.linkpreviews", List.of(Map.of("og:title", "Reel",
-                "og:image", "mxc://s/p", "og:image:width", 1080, "og:image:height", 1920)))));
-        assertTrue(html.contains("<img src=\"mxc://s/p\" width=\"1080\" height=\"1920\">"), html);
-        String unsized = MessageHtml.previews(json(Map.of("com.beeper.linkpreviews", List.of(Map.of("og:image", "mxc://s/q")))));
-        assertTrue(unsized.contains("<img src=\"mxc://s/q\">"), "no size given: none written");
+    void aBridgesPreviewBecomesACardWithAPictureOnlyFromOurServer() {
+        List<LinkPreview> cards = MessageHtml.previews(json(Map.of("com.beeper.linkpreviews", List.of(
+                Map.of("matched_url", "https://a.example/?a=1&b=2", "og:title", "<script>x</script>", "og:description", "Texto",
+                        "og:site_name", "Ejemplo", "og:image", "mxc://s/p", "og:image:width", 1080, "og:image:height", 1920),
+                Map.of("matched_url", "https://vacio.example/"),
+                Map.of("matched_url", "https://b.example/", "og:title", "B", "og:image", "file:///etc/passwd")))));
+        assertEquals(2, cards.size(), "nothing to show for the second");
+        LinkPreview a = cards.get(0);
+        assertEquals("https://a.example/?a=1&b=2", a.url());
+        assertEquals("<script>x</script>", a.title(), "kept as text: a card draws labels, never markup");
+        assertEquals("Ejemplo", a.site());
+        assertEquals("mxc://s/p", a.image());
+        assertEquals(1080, a.width(), "its size, so the box is the picture's shape before it loads");
+        assertEquals(1920, a.height());
+        assertNull(cards.get(1).image(), "a stranger's event chooses the address: only our server's");
+        assertTrue(MessageHtml.previews(json(Map.of("com.beeper.linkpreviews", List.of()))).isEmpty());
     }
 }

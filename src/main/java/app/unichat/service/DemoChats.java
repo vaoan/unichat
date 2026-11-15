@@ -104,11 +104,17 @@ final class DemoChats {
                 .unread(1).done();
     }
 
+    /** A link the demo pretends to have read, so its card shows as Telegram draws one. */
+    private static final String DEMO_LINK = "https://unichat.example/torneo";
+
     private static void otherChats(MockChatService svc) {
+        svc.addLinkPreview(DEMO_LINK, new app.unichat.model.LinkPreview(DEMO_LINK, "Unichat", I18n.t("demo.link.title"),
+                I18n.t("demo.link.text"), "demo://torneo", 1200, 800, null, false));
         ChatBuilder.dm(svc, "andres", Network.TELEGRAM, "Andrés Mejía")
                 .out(-90000, I18n.t("demo.andres.1"))
                 .in(-89000, I18n.t("demo.andres.2"))
                 .in(-88900, I18n.t("demo.andres.3"))
+                .in(-88800, DEMO_LINK)
                 .out(-3600, I18n.t("demo.andres.4"))
                 .reply(-3500, I18n.t("demo.andres.5"), -3600)
                 .favorite().done();

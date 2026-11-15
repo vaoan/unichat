@@ -166,6 +166,11 @@ final class MediaDownloader {
         return links.inspect(url);
     }
 
+    CompletableFuture<java.util.Optional<app.unichat.model.LinkPreview>> linkPreview(String url) {
+        if (!Settings.get().linkPreviews()) return CompletableFuture.completedFuture(java.util.Optional.empty());
+        return links.preview(url);
+    }
+
     /** Pinned in the cache from now on: {@link MediaCache}. */
     void keep(java.util.Collection<String> urls) {
         pinned = urls.stream().map(u -> Hashes.sha256(cacheKey(u, 0, 0))).collect(java.util.stream.Collectors.toUnmodifiableSet());

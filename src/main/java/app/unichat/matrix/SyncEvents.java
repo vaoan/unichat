@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.model.LinkPreview;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.Network;
@@ -49,12 +50,13 @@ final class SyncEvents {
         m.setButtons(buttons);
         m.setType(t);
         if (!m.isMedia()) {
-            String previews = MessageHtml.previews(content);
+            List<LinkPreview> previews = MessageHtml.previews(content);
             String own = MessageHtml.withoutEmbedText(b, html);
             m.setBody(own);
             m.setHtml(html);
-            m.setPreviewHtml(previews);
-            String extra = (own.equals(b) ? "" : MessageHtml.text(html)) + (previews == null ? "" : " " + MessageHtml.text(previews));
+            m.setLinkPreviews(previews);
+            String extra = (own.equals(b) ? "" : MessageHtml.text(html))
+                    + previews.stream().map(p -> " " + p.title() + " " + p.description()).collect(java.util.stream.Collectors.joining());
             m.setHtmlText(extra.isBlank() ? null : extra.strip());
             return;
         }

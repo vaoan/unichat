@@ -506,6 +506,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     }
     @Override public boolean gone(Throwable error) { return MediaDownloader.gone(error); }
     @Override public CompletableFuture<java.util.Optional<app.unichat.model.LinkMedia>> linkMedia(String url) { return media.linkMedia(url); }
+    @Override public CompletableFuture<java.util.Optional<app.unichat.model.LinkPreview>> linkPreview(String url) { return media.linkPreview(url); }
 
     @Override public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) { return sender.sendText(chatId, text, replyToId); }
     @Override public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) { return sender.sendSticker(chatId, item, replyToId); }

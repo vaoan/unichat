@@ -145,7 +145,7 @@ public final class Message {
     /** Changes when anything drawn from this message does. Rows ask it for every message each time one arrives, so it stays cheap. */
     public int revision() {
         return java.util.Objects.hash(type, body, senderName, mediaUrl, fileName, mimeType, fileSize, width, height, replyToId, edited,
-                deleted, status, reactions, reactionNames, html, previewHtml, htmlText, externalUrl, mediaInfo, buttons);
+                deleted, status, reactions, reactionNames, html, linkPreviews, htmlText, externalUrl, mediaInfo, buttons);
     }
 
     /** The same message under another id, the way a local echo becomes the event the server gave it. */
@@ -177,7 +177,7 @@ public final class Message {
         m.reactions = reactions;
         m.reactionNames = reactionNames;
         m.html = html;
-        m.previewHtml = previewHtml;
+        m.linkPreviews = linkPreviews;
         m.htmlText = htmlText;
         m.buttons = buttons;
         return m;
@@ -210,14 +210,14 @@ public final class Message {
     public static boolean isCustomReaction(String key) { return key != null && key.startsWith("mxc://"); }
 
     private String html;
-    private String previewHtml;
+    private List<LinkPreview> linkPreviews = List.of();
     private String htmlText;
     /** The message as HTML, when it came so ({@code ui.HtmlView} draws it); {@link #body()} remains its plain text. */
     public String html() { return html; }
     public void setHtml(String html) { this.html = html; }
-    /** Link previews, as HTML, shown under the message. */
-    public String previewHtml() { return previewHtml; }
-    public void setPreviewHtml(String previewHtml) { this.previewHtml = previewHtml; }
+    /** The link previews its bridge sent, each a card under the message. */
+    public List<LinkPreview> linkPreviews() { return linkPreviews; }
+    public void setLinkPreviews(List<LinkPreview> linkPreviews) { this.linkPreviews = List.copyOf(linkPreviews); }
     /** In words, what the HTML shows that the body doesn't say (an embed); null if nothing. */
     public String htmlText() { return htmlText; }
     public void setHtmlText(String htmlText) { this.htmlText = htmlText; }

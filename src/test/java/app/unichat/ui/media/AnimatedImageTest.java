@@ -91,6 +91,21 @@ class AnimatedImageTest {
         assertFalse(AnimatedImage.isGif(fixture()));
     }
 
+    /**
+     * A web page's picture (a link's card) is anyone's: 50 bytes of GIF saying 30000x30000 made ImageIO take 900 MB of a
+     * 1 GB heap before scaling (found by the security reviewer). Its header is read first and it's made smaller elsewhere.
+     */
+    @Test
+    void aPictureWhoseHeaderClaimsAHugeSizeIsNeverDecodedHere(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
+        byte[] bomb = {'G', 'I', 'F', '8', '9', 'a', 0x30, 0x75, 0x30, 0x75, (byte) 0x80, 0, 0, 0, 0, 0, -1, -1, -1,
+                0x2C, 0, 0, 0, 0, 0x30, 0x75, 0x30, 0x75, 0, 2, 2, 0x4C, 1, 0, 0x3B};
+        Path big = Files.write(dir.resolve("bomba.gif"), bomb);
+        assertTrue(AnimatedImage.tooBigToDecode(big), "30000x30000 by its header");
+        Path small = dir.resolve("chico.gif");
+        writeGif(small, 1);
+        assertFalse(AnimatedImage.tooBigToDecode(small));
+    }
+
     /** A {@code frames}-frame 20x20 GIF. */
     private static void writeGif(Path out, int frames) throws Exception {
         app.unichat.TestPictures.gif(out, 20, 20, frames);

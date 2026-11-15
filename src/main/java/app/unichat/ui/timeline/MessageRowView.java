@@ -8,6 +8,7 @@ import app.unichat.ui.chats.Avatar;
 import app.unichat.ui.emoji.EmojiInline;
 import app.unichat.ui.media.MessageMedia;
 import app.unichat.model.Chat;
+import app.unichat.model.LinkPreview;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
@@ -15,6 +16,7 @@ import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
 import app.unichat.stt.Transcripts;
 import app.unichat.support.I18n;
+import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -264,8 +266,31 @@ final class MessageRowView {
             flow.setMaxWidth(textWidth);
             into.add(flow);
         }
-        if (m.previewHtml() != null) into.add(HtmlView.of(m.previewHtml(), textWidth, media, openLink));
-        if (!followedByItsOwnMedia(m)) into.add(media.linkPlayers(links(m), chat.get(), textWidth));
+        boolean ownMedia = followedByItsOwnMedia(m);
+        for (LinkPreview p : m.linkPreviews()) into.add(cardWithItsVideo(p, ownMedia, textWidth));
+        if (!m.linkPreviews().isEmpty() || ownMedia) return;
+        List<String> links = links(m);
+        // An embed (Discord's) already shows the page: only its video is missing. Otherwise the first link gets its card,
+        // as Telegram gives one per message.
+        if (m.htmlText() != null) into.add(media.linkPlayers(links, chat.get(), textWidth));
+        else if (!links.isEmpty()) into.add(fetchedCard(links.get(0), textWidth));
+    }
+
+    /** A bridge's card has the page's picture only: the video it leads to takes its place once found. */
+    private Node cardWithItsVideo(LinkPreview p, boolean ownMedia, double width) {
+        VBox box = new VBox(LinkPreviewCard.of(p, width, media, openLink, chat.get()));
+        if (ownMedia || p.url().isEmpty()) return box;
+        svc.linkMedia(p.url()).thenAcceptAsync(found -> found.ifPresent(v ->
+                box.getChildren().setAll(LinkPreviewCard.of(p.withVideo(v, false), width, media, openLink, chat.get()))), Platform::runLater);
+        return box;
+    }
+
+    /** A link no bridge described: Unichat reads the page, as Telegram's server does for its apps. */
+    private Node fetchedCard(String link, double width) {
+        VBox box = new VBox();
+        svc.linkPreview(link).thenAcceptAsync(found -> found.ifPresent(p ->
+                box.getChildren().setAll(LinkPreviewCard.of(p, width, media, openLink, chat.get()))), Platform::runLater);
+        return box;
     }
 
     /** "Edited", the time and, on one's own, whether it went; on the bubble's right. */
@@ -290,7 +315,7 @@ final class MessageRowView {
 
     private static java.util.List<String> links(Message m) {
         java.util.Set<String> out = new java.util.LinkedHashSet<>(m.html() != null ? HtmlView.links(m.html()) : RichText.addresses(m.body()));
-        if (m.previewHtml() != null) out.addAll(HtmlView.links(m.previewHtml()));
+        m.linkPreviews().stream().map(LinkPreview::url).filter(u -> !u.isEmpty()).forEach(out::add);
         return java.util.List.copyOf(out);
     }
 

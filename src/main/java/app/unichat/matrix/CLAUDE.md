@@ -1,6 +1,6 @@
 # matrix — notes for Claude
 
-`ChatService` over Matrix: sync, sending, bridges seen from the client. `MessageHtml` writes link previews as HTML that `ui/timeline/HtmlView` draws: `ui/timeline/CLAUDE.md`.
+`ChatService` over Matrix: sync, sending, bridges seen from the client. `MessageHtml` gives the message's HTML to `ui/timeline/HtmlView` and its bridge's link previews to `ui/timeline/LinkPreviewCard`: `ui/timeline/CLAUDE.md`.
 
 - `matrix/` — `MatrixChatService` (facade: lifecycle, sync loop) over `MatrixCore` (shared), `MessageSender`, `ChatActions`,
   `BridgeAccounts`, `DiscordServers`, `ContactActions`, `MediaDownloader`, `SyncCache`, `MatrixLogin`, `Profiles`, `Invites`, `FetchedMessages`; `SyncProcessor`
