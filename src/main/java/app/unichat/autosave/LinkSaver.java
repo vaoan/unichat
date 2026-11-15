@@ -81,9 +81,11 @@ final class LinkSaver {
     /**
      * A page no site knows (yt-dlp's {@code [generic]}) that refuses or isn't there (4xx): nothing to save there, ever (a
      * Linktree profile answered 403 each time and, tried again, held its chat's later files). A known site refusing may
-     * be rate limiting, and a 5xx is a server busy for now: those are tried again.
+     * be rate limiting, and a 5xx is a server busy for now: those are tried again. yt-dlp's "Unsupported URL" comes after
+     * its last resort read the page and found nothing in it (a share.google link was tried 53 times).
      */
-    private static final java.util.regex.Pattern NOTHING_THERE = java.util.regex.Pattern.compile("^\\[generic\\].*HTTP Error 4\\d\\d");
+    private static final java.util.regex.Pattern NOTHING_THERE =
+            java.util.regex.Pattern.compile("^\\[generic\\].*HTTP Error 4\\d\\d|^(ERROR: )?Unsupported URL: ");
 
     static Failure failure(Fetch.Result r) {
         // Tried again at each change of the chat, a run that took the whole LIMIT would hold all saving that long each

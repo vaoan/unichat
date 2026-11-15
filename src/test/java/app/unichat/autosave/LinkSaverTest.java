@@ -119,4 +119,16 @@ class LinkSaverTest {
                 "[Instagram] abc: Unable to download webpage: HTTP Error 403: Forbidden", List.of(), null)).permanent(),
                 "a known site refusing may be rate limiting");
     }
+
+    /**
+     * yt-dlp's "Unsupported URL" is said after its last resort, reading the page whatever it is, found nothing: a
+     * share.google link (a page asking for JavaScript) was tried 53 times, and each time its words differed (a new
+     * "sei=" in the address), so each try was told again.
+     */
+    @Test
+    void aLinkYtDlpFindsNothingInIsntTriedAgain() {
+        assertTrue(LinkSaver.failure(new Fetch.Result(Fetch.Outcome.FAILED,
+                "Unsupported URL: https://www.google.com/httpservice/retry/enablejs?sei=6_j4aryZMpL5wbkPw4mRwAI", List.of(), null))
+                .permanent());
+    }
 }
