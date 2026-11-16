@@ -29,9 +29,7 @@ class LinkSaverTest {
 
     /** A yt-dlp that prints what the real one does with the engine's options, and saves a file; it says it ran. */
     private Tools fakeYtDlp() throws Exception {
-        Path tool = dir.resolve("yt-dlp");
-        Files.writeString(tool, """
-                #!/bin/sh
+        return fakeYtDlp("""
                 touch "$FAKE_OUT/.ran"
                 f="$FAKE_OUT/clip [abc].mp4"
                 echo "TITLE Un video"
@@ -40,6 +38,12 @@ class LinkSaverTest {
                 printf video > "$f"
                 echo "$f"
                 """);
+    }
+
+    /** A yt-dlp that runs {@code body}, with {@code $FAKE_OUT} the chat's folder. */
+    private Tools fakeYtDlp(String body) throws Exception {
+        Path tool = dir.resolve("yt-dlp");
+        Files.writeString(tool, "#!/bin/sh\n" + body);
         Files.setPosixFilePermissions(tool, PosixFilePermissions.fromString("rwx------"));
         Path out = Files.createDirectories(dir.resolve("Ana"));
         return new Tools() {
@@ -130,5 +134,25 @@ class LinkSaverTest {
         assertTrue(LinkSaver.failure(new Fetch.Result(Fetch.Outcome.FAILED,
                 "Unsupported URL: https://www.google.com/httpservice/retry/enablejs?sei=6_j4aryZMpL5wbkPw4mRwAI", List.of(), null))
                 .permanent());
+    }
+
+    /**
+     * An Instagram carousel of photos: yt-dlp fails on each item and its last line is the playlist's end, which the
+     * engine (before core-1.0.2) took for a failure worth retrying; Unichat tried one for days.
+     */
+    @Test
+    @DisabledOnOs(OS.WINDOWS) // the fake tool is a shell script
+    void aPostOfPhotosOnlyIsntTriedAgain() throws Exception {
+        Tools tools = fakeYtDlp("""
+                echo "[download] Downloading item 1 of 2"
+                echo "ERROR: [Instagram] DWE5R9ljl9R: No video formats found!"
+                echo "[download] Downloading item 2 of 2"
+                echo "ERROR: [Instagram] DWE5R9lDrj5: No video formats found!"
+                echo "[download] Finished downloading playlist: Post by superherodex"
+                exit 1
+                """);
+        Failure why = LinkSaver.save("https://www.instagram.com/p/DWFGzEJjko4/", dir.resolve("Ana"), "abc", p -> { }, tools,
+                Files.createDirectories(dir.resolve("Downloads")));
+        assertEquals(Failure.forGood(I18n.t("autosave.link.noVideo")), why);
     }
 }

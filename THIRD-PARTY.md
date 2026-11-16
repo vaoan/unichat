@@ -21,7 +21,7 @@ Unichat's own code is [0BSD](LICENSE). Unichat's packages also carry the compone
 | JCodec (includes a decoder derived from JAAD) | 0.2.5 | BSD-2-Clause | videos from GIFs |
 | jsoup | 1.18.3 | MIT | reading messages' HTML |
 | Concentus | 1.0.2 | BSD-3-Clause | decoding Opus voice notes |
-| InstaTray core (instatray.core) | core-1.0.1 | 0BSD | saving what links in chats lead to (sites, cookies, yt-dlp/gallery-dl) |
+| InstaTray core (instatray.core) | core-1.0.2 | 0BSD | saving what links in chats lead to (sites, cookies, yt-dlp/gallery-dl) |
 | Rust crates inside tuwunel | see list | several, see below | local Matrix server |
 | OpenJDK (Java runtime) | that of the packaging JDK | GPL-2.0 with classpath exception | running the app |
 

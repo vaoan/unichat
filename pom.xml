@@ -34,7 +34,7 @@
     <dependency>
       <groupId>com.github.vaoan</groupId>
       <artifactId>InstaTray</artifactId>
-      <version>core-1.0.1</version>
+      <version>core-1.0.2</version>
     </dependency>
     <dependency>
       <groupId>net.java.dev.jna</groupId>
