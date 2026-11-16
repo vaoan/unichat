@@ -47,8 +47,8 @@ final class NetworkFormats {
         return switch (n) {
             case TELEGRAM -> new Rule(Set.of(PNG, JPEG, WEBM, LOTTIE), WEBM, PNG, true, Set.of());
             case WHATSAPP -> new Rule(Set.of(WEBP, PNG), WEBP, PNG, true, Set.of());
-            // A GIF (Telegram's Lottie stickers come so: nobody else reads Lottie) goes as the lighter animated WebP,
-            // as it is when gif2webp can't make one: it plays there either way.
+            // A GIF goes as the lighter animated WebP, as it is when gif2webp can't make one: it plays there either way.
+            // Lottie (nobody else reads it) becomes the animated WebP too (StickerConverter, video/LottieStickers).
             default -> new Rule(Set.of(WEBP, PNG, JPEG), WEBP, PNG, false, Set.of(GIF));
         };
     }

@@ -19,6 +19,10 @@ if [ "$(uname -s)" = Darwin ]; then
   [ -x "$GIF2WEBP" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.gif2webp=$GIF2WEBP"
   [ -x "$ANIM_DUMP" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.animDump=$ANIM_DUMP"
   [ -x "$IMG2WEBP" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.img2webp=$IMG2WEBP"
+  # Telegram's animated stickers (Lottie): LottieConverter (native/build-lottie.sh), built once.
+  LOTTIE="$HOME/Library/Caches/unichat-build/lottieconverter"
+  [ -x "$LOTTIE" ] || native/build-lottie.sh "$LOTTIE" || true
+  [ -x "$LOTTIE" ] && JAVA_OPTS="$JAVA_OPTS -Dunichat.lottieconverter=$LOTTIE"
   # Voice notes to text: whisper.cpp built once (native/build-whisper.sh, a few minutes).
   WHISPER="$HOME/Library/Caches/unichat-build/whisper-cli"
   [ -x "$WHISPER" ] || native/build-whisper.sh "$WHISPER" || true

@@ -75,7 +75,8 @@ public final class Message {
      */
     public boolean playsInline() {
         if (mediaUrl == null) return false;
-        if (type == MessageType.STICKER) return mimeType != null && mimeType.startsWith("video/");
+        // Lottie (video/lottie+json, Telegram's animated stickers) is drawn as an animation, not played.
+        if (type == MessageType.STICKER) return mimeType != null && mimeType.startsWith("video/") && !mimeType.contains("lottie");
         if (type != MessageType.VIDEO || mediaInfo == null) return false;
         if (mediaInfo.path("fi.mau.gif").asBoolean(false)) return true;
         long ms = mediaInfo.path("duration").asLong(0);

@@ -41,6 +41,9 @@ fi
 if [ "$(uname -s)" = Darwin ]; then
   mkdir -p target/pkg/server
   native/build-gif2webp.sh "$PWD/target/pkg/server/gif2webp" "$PWD/target/pkg/server/anim_dump" "$PWD/target/pkg/server/img2webp" || echo "Warning: without gif2webp, animated stickers go to WhatsApp as still images." >&2
+  # Telegram's animated stickers (Lottie): drawn and made WebP with LottieConverter (video/LottieStickers).
+  native/build-lottie.sh "$PWD/target/pkg/server/lottieconverter" \
+    || echo "Warning: without lottieconverter, Telegram's animated stickers can't be shown nor sent to other networks." >&2
   # Voice notes to text (stt/Transcriber); the model is downloaded by the app on first use.
   mkdir -p target/pkg/server/whisper
   native/build-whisper.sh "$PWD/target/pkg/server/whisper/whisper-cli" \

@@ -43,6 +43,9 @@ WHISPER = pinned(r"^VERSION=(\S+)", "native/build-whisper.sh")
 WEBP = pinned(r"^VERSION=(\S+)", "native/build-gif2webp.sh")
 GIFLIB = pinned(r"^GIFLIB_VERSION=(\S+)", "native/build-gif2webp.sh")
 OLM = pinned(r"^VERSION=(\S+)", "native/build-libolm.sh")
+LC = pinned(r"^LC_COMMIT=(\S+)", "native/build-lottie.sh")
+RLOTTIE = pinned(r"^RLOTTIE_COMMIT=(\S+)", "native/build-lottie.sh")
+LIBPNG = pinned(r"^LIBPNG_VERSION=(\S+)", "native/build-lottie.sh")
 TUWUNEL_V = pinned(r"^TUWUNEL_VERSION=(\S+)", "src/main/resources/app/unichat/server/versions.env")
 
 # name, version, license, what it's for, [(heading, text)]
@@ -53,8 +56,17 @@ COMPONENTS = [
      [("LICENSE", fetch(f"{GH}ggml-org/whisper.cpp/v{WHISPER}/LICENSE"))]),
     ("libwebp (gif2webp, img2webp, anim_dump)", WEBP, "BSD-3-Clause + patent grant", "animated stickers",
      [("COPYING", fetch(f"{GH}webmproject/libwebp/v{WEBP}/COPYING")), ("PATENTS", fetch(f"{GH}webmproject/libwebp/v{WEBP}/PATENTS"))]),
-    ("GIFLib (inside gif2webp)", GIFLIB, "MIT", "reading GIFs",
+    ("GIFLib (inside gif2webp and lottieconverter)", GIFLIB, "MIT", "reading and writing GIFs",
      [("COPYING", fetch("https://sourceforge.net/p/giflib/code/ci/master/tree/COPYING?format=raw"))]),
+    ("LottieConverter (lottieconverter)", LC[:12], "BSD-3-Clause", "drawing Telegram's animated stickers (Lottie)",
+     [("LICENSE.txt", fetch(f"{GH}sot-tech/LottieConverter/{LC}/LICENSE.txt"))]),
+    ("rlottie (inside lottieconverter)", RLOTTIE[:12], "MIT; parts FTL, MIT (pixman, Skia, RapidJSON), public domain (stb)",
+     "drawing Lottie animations",
+     [("COPYING", fetch(f"{GH}Samsung/rlottie/{RLOTTIE}/COPYING"))]
+     + [(f"licenses/{n}", fetch(f"{GH}Samsung/rlottie/{RLOTTIE}/licenses/{n}"))
+        for n in ("COPYING.MIT", "COPYING.FTL", "COPYING.PIX", "COPYING.SKIA", "COPYING.STB", "COPYING.RPD", "COPYING.MPL")]),
+    ("libpng (inside lottieconverter)", LIBPNG, "libpng-2.0", "the frames of Lottie animations",
+     [("LICENSE", fetch(f"{GH}pnggroup/libpng/v{LIBPNG}/LICENSE"))]),
     ("libolm", OLM, "Apache-2.0", "needed by the bridges on macOS",
      [("LICENSE", fetch(f"https://gitlab.matrix.org/matrix-org/olm/-/raw/{OLM}/LICENSE"))]),
     ("tuwunel", TUWUNEL_V, "Apache-2.0", "local Matrix server",
@@ -159,6 +171,8 @@ o.append("## Notes\n\n"
          "is at <https://github.com/openjdk/jfx>.\n"
          "- **MPL-2.0**: tuwunel's `as_variant` crate. Its source is at <https://github.com/matrix-construct/tuwunel> "
          "and its dependencies.\n"
+         "- **MPL-2.0 in rlottie**: `src/vector/vinterpolator.cpp`, inside lottieconverter. Its source is at "
+         "<https://github.com/Samsung/rlottie>.\n"
          "- **JAAD**: JCodec carries an AAC decoder in package `net.sourceforge.jaad`, with no notice of its own in JCodec's "
          "source; it's listed under JCodec's license.\n")
 o.append("## Rust crates built into tuwunel\n\n| Crate | Version | License |\n|---|---|---|")

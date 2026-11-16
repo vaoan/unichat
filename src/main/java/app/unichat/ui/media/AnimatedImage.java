@@ -278,8 +278,12 @@ public final class AnimatedImage {
         return remember(key, new Frames(List.copyOf(images), sample(delays, step[0]), new Source(file, maxW, maxH)));
     }
 
-    /** All the frames of an animated WebP, GIF, video sticker (WebM) or GIF sent as an MP4, or the one of a plain picture, whatever the file claims to be. Blocking. */
+    /**
+     * All the frames of an animated WebP, GIF, video sticker (WebM), GIF sent as an MP4 or Lottie sticker (as the
+     * animated WebP made of it once), or the one of a plain picture, whatever the file claims to be. Blocking.
+     */
     public static Frames decode(Path file, int maxW, int maxH) throws IOException {
+        file = drawable(file);
         boolean webm = app.unichat.support.ImageHeaders.isVideo(file), webp = !webm && isWebp(file), gif = !webm && !webp && isGif(file);
         if (!webm && !webp && !gif) return decodePlain(file, maxW, maxH);
         Frames hit = decoded(file, maxW, maxH);
@@ -300,6 +304,7 @@ public final class AnimatedImage {
      * own animation, which leaks). For thumbnails and avatars; blocking, call off the FX thread.
      */
     public static Image still(Path file, int maxW, int maxH) throws IOException {
+        file = drawable(file);
         if (app.unichat.support.ImageHeaders.isVideo(file)) return video(file, maxW, maxH, 1).images().getFirst();
         if (isBigWebp(file) || tooBigToDecode(file)) return new Image(shrunk(file).toUri().toString(), maxW, maxH, true, true, false);
         if (isGif(file) || isWebp(file)) { // JavaFX can't read WebP; ImageIO can (TwelveMonkeys), its first frame if animated
@@ -314,6 +319,17 @@ public final class AnimatedImage {
             return toFx(scale(first, maxW, maxH));
         }
         return new Image(file.toUri().toString(), maxW, maxH, true, true, false);
+    }
+
+    /** A Lottie sticker (Telegram's .tgs), which nothing here reads, as the animated WebP made of it; anything else as it is. */
+    private static Path drawable(Path file) throws IOException {
+        if (!app.unichat.video.LottieStickers.isLottie(file)) return file;
+        try {
+            return app.unichat.video.LottieStickers.asWebp(file);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(I18n.t("image.invalid"), e);
+        }
     }
 
     /**

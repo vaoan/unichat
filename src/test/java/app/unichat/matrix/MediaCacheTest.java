@@ -66,6 +66,22 @@ class MediaCacheTest {
         assertTrue(Files.exists(kept), "under the limit, real files stay");
     }
 
+    /**
+     * Found by the security reviewer: a sticker's frames folder ("….frames.part", one whole picture a frame) left by a
+     * run that ended mid-way stayed for good: the leftover was deleted as a file, which a full folder refuses.
+     */
+    @Test
+    void aFramesFolderLeftByARunCutShortGoesWithWhatsInIt(@TempDir Path dir) throws Exception {
+        long twoHoursAgo = System.currentTimeMillis() - 2 * 3_600_000L;
+        Path frames = Files.createDirectories(dir.resolve(".abc.webp.frames.part"));
+        file(frames, "f00.pam", 1_000, twoHoursAgo);
+        Files.setLastModifiedTime(frames, java.nio.file.attribute.FileTime.fromMillis(twoHoursAgo));
+
+        MediaCache.trim(dir, 1_000_000);
+
+        assertFalse(Files.exists(frames));
+    }
+
     @Test
     void bigFilesGoBeforeSmallOnesHoweverRecentlySeen(@TempDir Path dir) throws Exception {
         Path sticker = file(dir, "sticker.webp", 50_000, 1_000);

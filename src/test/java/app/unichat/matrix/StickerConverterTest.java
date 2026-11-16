@@ -81,6 +81,33 @@ class StickerConverterTest {
         assertTrue(b.contains("ANIM") && b.contains("ALPH"), "it still moves, and keeps its transparency");
     }
 
+    /**
+     * A Telegram animated sticker (Lottie, a .tgs labelled application/x-tgsticker) went everywhere as the file it was,
+     * which nothing but Telegram reads. Told by its bytes, it goes to Discord and WhatsApp as an animated WebP, and to
+     * Telegram as Lottie, its JSON, which the bridge gzips itself.
+     */
+    @Test
+    void aLottieStickerGoesAsAnAnimatedWebpWhereLottieIsntReadAndAsLottieToTelegram() throws Exception {
+        Assumptions.assumeTrue(app.unichat.video.LottieStickersTest.tool() != null, "no lottieconverter");
+        Assumptions.assumeTrue(app.unichat.video.AnimatedWebp.img2webp() != null, "no img2webp");
+        byte[] json = app.unichat.video.LottieStickersTest.json();
+        Path tgs = app.unichat.video.LottieStickersTest.tgs(dir, json);
+        for (Network n : new Network[]{Network.DISCORD, Network.WHATSAPP}) {
+            StickerConverter.Result r = StickerConverter.forChat(tgs, "application/x-tgsticker", n, false, RoomFeatures.UNKNOWN, dir);
+            assertNotNull(r, n.name());
+            assertEquals("image/webp", r.mime(), n.name());
+            assertTrue(new String(Files.readAllBytes(r.file()), java.nio.charset.StandardCharsets.ISO_8859_1).contains("ANIM"),
+                    "it still moves on " + n);
+        }
+        StickerConverter.Result telegram = StickerConverter.forChat(tgs, "application/x-tgsticker", Network.TELEGRAM, false,
+                RoomFeatures.UNKNOWN, dir);
+        assertNotNull(telegram);
+        assertEquals(NetworkFormats.LOTTIE, telegram.mime());
+        org.junit.jupiter.api.Assertions.assertArrayEquals(json, Files.readAllBytes(telegram.file()), "its JSON, not gzipped twice");
+        assertEquals("image/png", StickerConverter.forChat(tgs, "application/x-tgsticker", Network.DISCORD, false,
+                features("{\"image/png\":2}"), dir).mime(), "a chat that takes only PNG gets its first frame");
+    }
+
     @Test
     void picksWebpThenPngAndLeavesAcceptedStickersAlone() throws Exception {
         RoomFeatures wa = features("{\"image/webp\":2,\"image/png\":1}");

@@ -117,4 +117,19 @@ class MessageTest {
         m.addReaction("👍", "@a");
         assertFalse(before == m.revision());
     }
+
+    /**
+     * Telegram's bridge sends Lottie stickers as their JSON labelled video/lottie+json: not a video for the player (which
+     * can't read it) but an animation drawn as the other stickers are. A WebM sticker still plays as one.
+     */
+    @Test
+    void aLottieStickerIsntAVideoToPlay() {
+        Message m = message();
+        m.setType(MessageType.STICKER);
+        m.setMediaUrl("mxc://s/l");
+        m.setMimeType("video/lottie+json");
+        assertFalse(m.playsInline());
+        m.setMimeType("video/webm");
+        assertTrue(m.playsInline());
+    }
 }

@@ -1,6 +1,7 @@
 package app.unichat.video;
 
 import app.unichat.support.BundledTools;
+import app.unichat.support.Folders;
 import app.unichat.support.I18n;
 import app.unichat.support.Processes;
 import app.unichat.support.SafeFile;
@@ -54,25 +55,38 @@ public final class AnimatedWebp {
             throws IOException, InterruptedException {
         int rate = rate(fps, probe);
         double seconds = probe.seconds();
+        fromFrames(img2webp, out, quality, frames -> {
+            run(new ProcessBuilder(frames(ffmpeg, in, src, frames, rate, side)), "ffmpeg");
+            return count -> rate != AS_IT_COMES ? 1000 / rate : seconds > 0 ? (int) Math.round(seconds * 1000 / count) : 40;
+        });
+    }
+
+    /** Writes the PAM frames into a folder; gives how long each of {@code count} frames lasts, in ms. */
+    @FunctionalInterface
+    interface FrameWriter {
+        java.util.function.IntUnaryOperator write(Path frames) throws IOException, InterruptedException;
+    }
+
+    /**
+     * An animated WebP at {@code out} from the PAM frames {@code writer} puts in a folder of their own, lossy at
+     * {@code quality}. Blocking; an IOException with what went wrong.
+     */
+    static void fromFrames(Path img2webp, Path out, int quality, FrameWriter writer) throws IOException, InterruptedException {
         // A hidden ".part" folder beside it: the cache trims one left by a crash.
         Path frames = Files.createDirectories(out.resolveSibling("." + out.getFileName() + ".frames.part"));
         try {
-            run(new ProcessBuilder(frames(ffmpeg, in, src, frames, rate, side)), "ffmpeg");
+            java.util.function.IntUnaryOperator ms = writer.write(frames);
             List<String> names;
             try (var list = Files.list(frames)) {
                 names = list.map(f -> f.getFileName().toString()).filter(n -> n.endsWith(".pam")).sorted().toList();
             }
             if (names.isEmpty()) throw new IOException(I18n.t("video.webpFailed"));
             // Short names, run where they are: hundreds of frames as whole paths would pass Windows' command-line limit.
-            int ms = rate != AS_IT_COMES ? 1000 / rate : seconds > 0 ? (int) Math.round(seconds * 1000 / names.size()) : 40;
-            run(new ProcessBuilder(webp(img2webp, names, ms, quality)).directory(frames.toFile()), "img2webp");
+            run(new ProcessBuilder(webp(img2webp, names, ms.applyAsInt(names.size()), quality)).directory(frames.toFile()), "img2webp");
             Path made = frames.resolve(OUT);
             SafeFile.at(out).write(o -> Files.copy(made, o));
         } finally {
-            try (var list = Files.list(frames)) {
-                for (Path f : list.toList()) Files.deleteIfExists(f);
-            }
-            Files.deleteIfExists(frames);
+            Folders.deleteQuietly(frames);
         }
     }
 
@@ -88,7 +102,12 @@ public final class AnimatedWebp {
     }
 
     private static void run(ProcessBuilder pb, String what) throws IOException, InterruptedException {
-        Processes.Result r = Processes.capture(pb.redirectErrorStream(true), TIMEOUT_SECONDS);
+        run(pb, what, TIMEOUT_SECONDS);
+    }
+
+    /** Runs a step of making the WebP, ended after {@code seconds}; an IOException with the tool's last line when it fails. */
+    static void run(ProcessBuilder pb, String what, long seconds) throws IOException, InterruptedException {
+        Processes.Result r = Processes.capture(pb.redirectErrorStream(true), seconds);
         if (!r.ok()) {
             throw new IOException(I18n.t("video.webpFailed") + " (" + what + (r.finished() ? " exit " + r.exit() : " timed out") + ": "
                     + Processes.lastLines(r.out(), 1).strip() + ")");

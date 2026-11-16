@@ -7,6 +7,7 @@ import app.unichat.support.BundledTools;
 import app.unichat.support.ImageHeaders;
 import app.unichat.support.I18n;
 import app.unichat.support.Processes;
+import app.unichat.video.LottieStickers;
 import app.unichat.video.WebmStickers;
 
 import javax.imageio.ImageIO;
@@ -17,12 +18,13 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * A sticker made the format a chat gets it as ({@link NetworkFormats} decides which): WebM → animated WebP (img2webp,
- * transparency kept), animated GIF → WebM video sticker, GIF → animated WebP (gif2webp), anything → a still PNG. A way
+ * A sticker made the format a chat gets it as ({@link NetworkFormats} decides which): WebM or Lottie → animated WebP
+ * (img2webp, transparency kept), animated GIF → WebM video sticker, GIF → animated WebP (gif2webp), anything → a still PNG. A way
  * whose tool isn't there or fails gives the sticker as it is, or a still PNG. It knows formats, not networks.
  */
 public final class StickerConverter {
-    static final String WEBP = NetworkFormats.WEBP, PNG = NetworkFormats.PNG, WEBM = NetworkFormats.WEBM, GIF = NetworkFormats.GIF;
+    static final String WEBP = NetworkFormats.WEBP, PNG = NetworkFormats.PNG, WEBM = NetworkFormats.WEBM, GIF = NetworkFormats.GIF,
+            LOTTIE = NetworkFormats.LOTTIE;
 
     record Result(Path file, String mime) {}
 
@@ -68,6 +70,10 @@ public final class StickerConverter {
      * {@code own} when it's that network's own sticker.
      */
     static Result forChat(Path src, String mime, Network network, boolean own, RoomFeatures f, Path dir) throws IOException {
+        if (!LOTTIE.equals(mime) && LottieStickers.isLottie(src)) { // a .tgs comes labelled application/x-tgsticker
+            Result as = forChat(src, LOTTIE, network, own, f, dir);
+            return as != null || own ? as : lottieJson(src, dir);
+        }
         String real = ImageHeaders.pictureMime(src);
         if (real != null && !real.equals(mime)) { // labelled one thing, really a picture: it goes as what it is
             Result as = forChat(src, real, network, own, f, dir);
@@ -92,6 +98,14 @@ public final class StickerConverter {
 
     /** {@code src} ({@code from}) made {@code want}, each way falling back to the next best; null: it goes as it is. */
     static Result to(Path src, String from, String want, Path dir) throws IOException {
+        // Lottie only becomes an animated WebP, and from it a still PNG; without LottieConverter it goes as it is.
+        if (LOTTIE.equals(from)) {
+            Result webp = fromVideo(src, dir, ".webp", WEBP, LottieStickers::toWebp, "WebP");
+            if (webp == null || WEBP.equals(want)) return webp;
+            Result still = convert(webp.file(), PNG, dir, null);
+            Files.deleteIfExists(webp.file());
+            return still;
+        }
         // A video sticker only becomes an animated WebP; without img2webp it goes as the WebM it is.
         if (WEBM.equals(from)) return WEBP.equals(want) ? fromVideo(src, dir, ".webp", WEBP, WebmStickers::toWebp, "WebP") : null;
         if (WEBM.equals(want)) {
@@ -123,6 +137,12 @@ public final class StickerConverter {
             System.err.println("Sticker to " + what + " failed (" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")");
             return null;
         }
+    }
+
+    /** A Lottie sticker as its JSON, what Telegram's bridge takes (it gzips it itself: a .tgs would be gzipped twice). */
+    private static Result lottieJson(Path src, Path dir) throws IOException {
+        Files.createDirectories(dir);
+        return new Result(LottieStickers.plainJson(src, Files.createTempFile(dir, "sticker", ".json")), LOTTIE);
     }
 
     /** A copy of {@code src} to upload as {@code mime} (the caller deletes what it uploads; {@code src} is the cache's). */

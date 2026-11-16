@@ -117,7 +117,12 @@ final class MediaCache {
     private static long deleteIfLeftover(Path p, long staleBefore) {
         try {
             BasicFileAttributes a = Files.readAttributes(p, BasicFileAttributes.class);
-            return a.lastModifiedTime().toMillis() < staleBefore && Files.deleteIfExists(p) ? a.size() : 0;
+            if (a.lastModifiedTime().toMillis() >= staleBefore) return 0;
+            if (a.isDirectory()) { // a sticker's frames folder (video/AnimatedWebp), one whole picture a frame
+                app.unichat.support.Folders.deleteQuietly(p);
+                return 0;
+            }
+            return Files.deleteIfExists(p) ? a.size() : 0;
         } catch (IOException finishedOrOpen) {
             // Moved into place meanwhile, or open elsewhere (Windows): next time.
             return 0;

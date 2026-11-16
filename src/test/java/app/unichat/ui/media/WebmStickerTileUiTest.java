@@ -75,4 +75,25 @@ class WebmStickerTileUiTest {
         MessageMedia.loadMedia((url, w, h) -> CompletableFuture.completedFuture(mp4), view, m, 128, 128).get();
         assertNotNull(FxWait.fx(view::getImage), "the GIF shows");
     }
+
+    /**
+     * A Telegram animated sticker (Lottie, .tgs) in the recents showed only the button to try again: nothing in Unichat
+     * read Lottie ("Invalid image"), and the bridge sends it as it is without LottieConverter. It's drawn as an animated
+     * WebP now.
+     */
+    @Test
+    void aLottieStickerLoadsAsAMovingPicture() throws Exception {
+        assumeTrue(app.unichat.video.LottieStickersTest.tool() != null, "no lottieconverter");
+        assumeTrue(app.unichat.video.AnimatedWebp.img2webp() != null, "no img2webp");
+        Path tgs = app.unichat.video.LottieStickersTest.tgs(dir, app.unichat.video.LottieStickersTest.json());
+        assertTrue(AnimatedImage.decode(tgs, 64, 64).animated(), "all its frames");
+        Message m = new Message("$l", "!c:demo", "@a:demo", "A", false, java.time.Instant.now());
+        m.setType(MessageType.STICKER);
+        m.setMediaUrl("mxc://demo/tgs-" + System.nanoTime());
+        m.setMimeType("application/x-tgsticker");
+        m.setSize(64, 64);
+        ImageView view = FxWait.fx(ImageView::new);
+        MessageMedia.loadMedia((url, w, h) -> CompletableFuture.completedFuture(tgs), view, m, 128, 128).get();
+        assertNotNull(FxWait.fx(view::getImage), "the sticker shows");
+    }
 }
