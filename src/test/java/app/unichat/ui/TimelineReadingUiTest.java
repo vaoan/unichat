@@ -352,7 +352,8 @@ class TimelineReadingUiTest {
         FxWait.until("it's listed", w::showsNewest);
         frames.stop("a message arriving after dragging up");
         w.dragScrollbar(1);
-        assertFalse(FxWait.fx(w::jumpDownShown), "dragged to the end: following the newest");
+        assertFalse(FxWait.fx(w::jumpDownShown), "dragged to the end: following the newest (the newest's bottom "
+                + FxWait.fx(w::newestGap) + " px below the list's, position " + FxWait.fx(() -> w.flowPosition()) + ")");
         followsFromHere(w.untilAtBottom());
     }
 

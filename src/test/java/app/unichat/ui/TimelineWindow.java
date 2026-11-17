@@ -397,12 +397,20 @@ final class TimelineWindow {
         return watch(stays(read, FxWait.fx(() -> yOf(read))));
     }
 
+    /** Where the list is scrolled to, 0 (its start) to 1 (its end). */
+    double flowPosition() { return flow().getPosition(); }
+
     /** A frame is right when message {@code id} is drawn at {@code y} (±1 px). */
     Frames.Probe stays(String id, double y) {
+        double listY = flow().localToScene(0, 0).getY();
         return () -> {
             Double now = yOf(id);
             if (now == null) return "the message read is gone from view";
-            return Math.abs(now - y) <= 1 ? null : "the message read moved " + Math.round(now - y) + " px";
+            if (Math.abs(now - y) <= 1) return null;
+            // Which moved: the list in the window (a header growing), or the rows in the list (the flow's own layout).
+            double listMoved = flow().localToScene(0, 0).getY() - listY;
+            return "the message read moved " + Math.round(now - y) + " px (the list " + Math.round(listMoved) + " px, position "
+                    + String.format(java.util.Locale.ROOT, "%.4f", flow().getPosition()) + ")";
         };
     }
 
