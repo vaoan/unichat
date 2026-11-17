@@ -99,7 +99,10 @@ public final class Composer extends VBox {
         banner.setAlignment(Pos.CENTER_LEFT);
         Nodes.show(banner, false);
 
-        input.setPromptText(I18n.t("composer.placeholder"));
+        // With the AI on, the empty box says what the marks do ([+], [-], [a fact]). A binding: it holds SHOWN, which lives
+        // as long as the app, only weakly, so a closed window's box isn't kept.
+        input.promptTextProperty().bind(javafx.beans.binding.Bindings.when(AiReplyButton.SHOWN)
+                .then(I18n.t("composer.placeholderAi")).otherwise(I18n.t("composer.placeholder")));
         input.setAccessibleText(I18n.t("composer.placeholder"));
         input.setAccessibleHelp(I18n.t("composer.help"));
         input.setWrapText(true);

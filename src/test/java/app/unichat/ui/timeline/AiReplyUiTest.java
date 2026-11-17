@@ -142,6 +142,51 @@ class AiReplyUiTest {
         assertTrue(draft.contains("dile que sí"), "what was written, as the idea");
     }
 
+    /**
+     * [+] or [-] written with the text, as [gaps] are, and the draft button: what's written comes back longer, or shorter
+     * and more focused, as an edit (⌘Z brings it back), never sent, and without searching the web.
+     */
+    @Test
+    void aPlusOrMinusWrittenWithTheTextMakesItLongerOrShorter() throws Exception {
+        int before = svc.messages(CHAT).size();
+        List<Boolean> searched = new ArrayList<>();
+        writer(new AiReplyButton.Writer() {
+            @Override public String write(String p) {
+                if (!p.startsWith("Redacta")) return "listo"; // learning how the person writes calls it too
+                prompts.add(p);
+                searched.add(false);
+                return p.contains("Amplíalo") ? "Sí, nos vemos el sábado. Llevo algo de comer, ¿te parece?" : "Sí, el sábado";
+            }
+
+            @Override public AiReplyButton.Writer searching() {
+                return p -> { searched.add(true); return "buscado"; };
+            }
+        });
+        write("Sí, nos vemos el sábado [+]");
+        press();
+        FxWait.until("longer, in the box", () -> text().startsWith("Sí, nos vemos el sábado. Llevo"));
+        String longer = prompts.getLast();
+        assertTrue(longer.contains("Amplíalo") && !longer.contains("[+]") && longer.contains(svc.messages(CHAT).get(before - 1).preview()),
+                "what was written, without the mark, with the chat");
+        write(text() + " [-]");
+        press();
+        FxWait.until("shorter, in the box", () -> text().equals("Sí, el sábado"));
+        assertTrue(prompts.getLast().contains("Resúmelo"));
+        assertEquals(List.of(false, false), searched, "a mark isn't a gap: no web");
+        assertEquals(before, svc.messages(CHAT).size(), "never sent");
+        fx(() -> { ((TextArea) composer.lookup(".text-area")).undo(); return null; });
+        assertEquals("Sí, nos vemos el sábado. Llevo algo de comer, ¿te parece? [-]", text(), "⌘Z brings back what was there");
+    }
+
+    /** With the AI on, the empty box says how to ask it for more, less or a fact; without it, only "Escribe un mensaje". */
+    @Test
+    void theEmptyBoxSaysWhatTheMarksDoWhileTheAiIsOn() throws Exception {
+        String on = fx(() -> ((TextArea) composer.lookup(".text-area")).getPromptText());
+        assertTrue(on.contains("[+]") && on.contains("[-]"), on);
+        fx(() -> { AiReplyButton.SHOWN.set(false); return null; });
+        assertEquals("Escribe un mensaje", fx(() -> ((TextArea) composer.lookup(".text-area")).getPromptText()));
+    }
+
     private Button fixButton() { return (Button) composer.lookup(".ai-fix-button"); }
 
     private void pressFix(AiReplyButton.Writer w) throws Exception {

@@ -221,4 +221,64 @@ class ReplyPromptTest {
         assertFalse(ReplyPrompt.build("", false, List.of(msg("Ana", false, "hola")), null, "", java.util.Map.of(), "", List.of())
                 .contains("correcciones-"), "none: no section");
     }
+
+    /**
+     * [+] or [-] written in the box, as [gaps] are: the draft makes what's written longer or shorter and more focused,
+     * with the same bases as any draft (the instructions, the chat, how the person writes, earlier corrections). The mark
+     * itself never reaches the draft, and it isn't a gap to search the web for.
+     */
+    @Test
+    void aPlusOrMinusInWhatsWrittenMakesItLongerOrShorterOnTheSameBases() {
+        List<Message> chat = List.of(msg("Ana", false, "¿Vienes el sábado?"));
+        java.time.ZonedDateTime now = java.time.ZonedDateTime.parse("2026-01-02T10:00:00Z");
+        List<StylePrompt.Correction> examples = List.of(new StylePrompt.Correction("Claro que sí", "sip", "", "!c"));
+        for (String mark : List.of("[+]", "[-]", "[−]")) {
+            String p = ReplyPrompt.build("Sé amable", false, chat, null, "Sí, nos vemos el sábado " + mark, java.util.Map.of(),
+                    "- escribe en minúsculas", examples, now);
+            assertTrue(p.contains("Sé amable") && p.contains("¿Vienes el sábado?") && p.contains("escribe en minúsculas")
+                    && p.contains("sip"), mark + ": a draft's bases go along");
+            assertTrue(p.contains("Sí, nos vemos el sábado\n"), mark + ": what's written, without the mark");
+            assertFalse(p.contains(mark), mark + ": the mark never reaches it");
+            assertFalse(p.contains("Úsalo como base"), mark + ": not an idea to write from");
+            assertTrue(p.contains(mark.equals("[+]") ? "Amplíalo" : "Resúmelo"), mark);
+            assertFalse(ReplyPrompt.hasGaps("Sí, nos vemos el sábado " + mark), mark + " isn't a gap: no web search");
+        }
+        assertTrue(ReplyPrompt.hasGaps("a las [hora del partido] [-]"), "a real gap still is one");
+        assertTrue(ReplyPrompt.build("", false, chat, null, "[+]", java.util.Map.of(), "", List.of(), now).contains("detallada"),
+                "only the mark: a fuller reply");
+        assertTrue(ReplyPrompt.build("", false, chat, null, "[-]", java.util.Map.of(), "", List.of(), now).contains("breve"),
+                "only the mark: a brief reply");
+    }
+
+    private static String with(String written) {
+        return ReplyPrompt.build("", false, List.of(msg("Ana", false, "¿Vienes el sábado?")), null, written, java.util.Map.of(), "",
+                List.of(), java.time.ZonedDateTime.parse("2026-01-02T10:00:00Z"));
+    }
+
+    /**
+     * The other marks: [=] says it another way, [!] warmer, [.] more formal, [?] as a question or proposal, [++] and [--]
+     * further than [+] and [-]. One of each kind goes together ([-] [!]: shorter and warmer); within a kind the last
+     * wins. None reaches the prompt nor is a gap.
+     */
+    @Test
+    void theOtherMarksAndHowTheyGoTogether() {
+        String text = "Sí, nos vemos el sábado";
+        assertTrue(with(text + " [=]").contains("Dilo de otra manera"));
+        assertTrue(with(text + " [!]").contains("más cálido"));
+        assertTrue(with(text + " [.]").contains("más serio"));
+        assertTrue(with(text + " [?]").contains("pregunta"));
+        assertTrue(with(text + " [++]").contains("mucho más largo"));
+        assertTrue(with(text + " [--]").contains("lo esencial"));
+        String both = with(text + " [-] [!]");
+        assertTrue(both.contains("Resúmelo") && both.contains("más cálido"), "one of each kind, together");
+        String last = with(text + " [!] [.]");
+        assertTrue(last.contains("más serio") && !last.contains("más cálido"), "within a kind, the last");
+        assertFalse(with(text + " [=]").contains("sus palabras"), "another way: not keeping its words");
+        for (String mark : List.of("[=]", "[!]", "[.]", "[?]", "[++]", "[--]")) {
+            assertFalse(with(text + " " + mark).contains(mark), mark + " never reaches it");
+            assertFalse(ReplyPrompt.hasGaps(text + " " + mark), mark + " isn't a gap");
+        }
+        assertTrue(with("[!]").contains("cálida"), "alone, how the reply sounds");
+        assertTrue(with("[?]").contains("pregunta"));
+    }
 }
