@@ -29,11 +29,14 @@ if [ -n "$WINDOWS" ]; then
   BIN="$CACHE/$NAME-windows-x64.exe"
   CMAKE_TARGET="-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX"
   TARGET_FLAGS=""
+  # rlottie adds MSVC's /MT to a static Windows Release build, whatever the compiler: MinSizeRel has none of it.
+  RLOTTIE_BUILD_TYPE=MinSizeRel
 else
   CC=cc CXX=c++ AR=ar
   BIN="$CACHE/$NAME-macos$MACOS_MIN"
   CMAKE_TARGET="-DCMAKE_OSX_DEPLOYMENT_TARGET=$MACOS_MIN"
   TARGET_FLAGS="-mmacosx-version-min=$MACOS_MIN"
+  RLOTTIE_BUILD_TYPE=Release
 fi
 mkdir -p "$CACHE"
 sha256() { if command -v sha256sum >/dev/null; then sha256sum -c - >/dev/null 2>&1; else shasum -a 256 -c - >/dev/null 2>&1; fi; }
@@ -74,7 +77,7 @@ if [ ! -f "$BIN" ]; then
   # Its NEON drawing is 32-bit ARM assembly: on an arm64 Mac the plain C path (the arm64 compiler still defines
   # __ARM_NEON__). No threads: frames are drawn one at a time anyway. Only the library: its examples need what this
   # build leaves out.
-  cmake -S "$WORK/rlottie-$RLOTTIE_COMMIT" -B "$WORK/rlottie" -DCMAKE_BUILD_TYPE=Release $CMAKE_TARGET \
+  cmake -S "$WORK/rlottie-$RLOTTIE_COMMIT" -B "$WORK/rlottie" -DCMAKE_BUILD_TYPE=$RLOTTIE_BUILD_TYPE $CMAKE_TARGET \
     -DBUILD_SHARED_LIBS=OFF -DLOTTIE_MODULE=OFF -DLOTTIE_TEST=OFF -DLOTTIE_EXAMPLE=OFF -DLOTTIE_THREAD=OFF \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_CXX_FLAGS="-U__ARM_NEON__" >/dev/null
   cmake --build "$WORK/rlottie" -j8 --target rlottie >/dev/null
@@ -84,7 +87,7 @@ if [ ! -f "$BIN" ]; then
     # Its headers import rlottie from a DLL on Windows unless RLOTTIE_BUILD is defined; here it's static.
     $CXX -O2 -std=c++11 -DRLOTTIE_BUILD=0 "$LC/lottie_export.cpp" -o "$OUT.exe" \
       -I"$WORK/rlottie-$RLOTTIE_COMMIT/inc" -I"$WORK/libpng-$LIBPNG_VERSION" -I"$WORK/png" -I"$GIF" $ZINC \
-      "$WORK/rlottie/librlottie.a" "$(ls "$WORK/png"/libpng*.a | head -1)" "$GIF/libgif.a" $ZLIB -static
+      "$WORK/rlottie/librlottie.a" "$(ls "$WORK/png"/libpng*.a | head -1)" "$GIF/libgif.a" $ZLIB -lshlwapi -static
     OUT="$OUT.exe"
   else
     $CXX -O2 -std=c++11 $TARGET_FLAGS "$LC/lottie_export.cpp" -o "$OUT" \
