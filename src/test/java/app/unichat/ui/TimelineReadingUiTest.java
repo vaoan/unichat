@@ -233,7 +233,11 @@ class TimelineReadingUiTest {
 
     /** What the Mac needs to show what Linux's fonts did on CI: rows whose heights the list's estimate gets wrong. */
     private static void atAFractionalTextSize(org.junit.jupiter.api.function.Executable body) throws Throwable {
-        app.unichat.settings.Settings.get().setFontScale(1.08);
+        atTextSize(1.08, body);
+    }
+
+    private static void atTextSize(double scale, org.junit.jupiter.api.function.Executable body) throws Throwable {
+        app.unichat.settings.Settings.get().setFontScale(scale);
         try {
             body.execute();
         } finally {
@@ -335,10 +339,13 @@ class TimelineReadingUiTest {
         followsFromHere(w.untilAtBottom());
     }
 
-    /** Dragged to the end where the list's estimate is wrong, it ended with the newest a few pixels cut and never followed. */
+    /**
+     * Dragged to the end where the list's estimate is wrong, it ended with the newest a few pixels cut (position 0.9958
+     * on CI's Linux at 108 %, here at 115 %) and never followed: let go at the very end is the newest, followed.
+     */
     @Test
     void draggingTheScrollbarUpAndBackDownWhereTheListGuessesItsLengthWrong() throws Throwable {
-        atAFractionalTextSize(this::draggingTheScrollbarUpAndBackDown);
+        atTextSize(1.15, this::draggingTheScrollbarUpAndBackDown);
     }
 
     @Test

@@ -169,7 +169,15 @@ final class TimelineWindow {
         VirtualFlow<?> flow = flow();
         IndexedCell<?> last = flow.getLastVisibleCell();
         if (last == null || last.getIndex() != list().getItems().size() - 1) return null;
-        return last.localToScene(last.getBoundsInLocal()).getMaxY() - flow.localToScene(flow.getBoundsInLocal()).getMaxY();
+        return belowViewport(last, flow);
+    }
+
+    /**
+     * How far {@code row}'s bottom is below the viewport's, measured as TimelineScroll does: from the viewport's own top and
+     * height, not the flow's bounds, which reach down to a row cut below it.
+     */
+    private static double belowViewport(IndexedCell<?> row, VirtualFlow<?> flow) {
+        return row.localToScene(0, 0).getY() + row.getHeight() - (flow.localToScene(0, 0).getY() + flow.getHeight());
     }
 
     /** What the list draws last, for a failure to say why the newest message isn't there. */
@@ -178,7 +186,7 @@ final class TimelineWindow {
         IndexedCell<?> last = flow.getLastVisibleCell();
         int n = list().getItems().size();
         if (last == null) return "no cells, " + n + " rows";
-        double bottom = last.localToScene(last.getBoundsInLocal()).getMaxY() - flow.localToScene(flow.getBoundsInLocal()).getMaxY();
+        double bottom = belowViewport(last, flow);
         Object item = n == 0 ? null : list().getItems().get(n - 1);
         String newest = item instanceof ThreadRows.MessageRow mr ? mr.message().type() + " '" + mr.message().body() + "'"
                 : String.valueOf(item);
@@ -204,7 +212,9 @@ final class TimelineWindow {
      */
     String readMessage() {
         VirtualFlow<?> flow = flow();
-        double top = flow.localToScene(flow.getBoundsInLocal()).getMinY(), middle = top + flow.getHeight() / 2;
+        // The viewport's top, as TimelineScroll measures it: the flow's bounds reach up to a row cut above it (-9 px), and
+        // a message read from there wasn't the one the list holds (CI's Linux, now and then, when the text grew).
+        double top = flow.localToScene(0, 0).getY(), middle = top + flow.getHeight() / 2;
         String read = null;
         for (int i = flow.getFirstVisibleCell().getIndex(); i <= flow.getLastVisibleCell().getIndex(); i++) {
             IndexedCell<?> c = flow.getVisibleCell(i);

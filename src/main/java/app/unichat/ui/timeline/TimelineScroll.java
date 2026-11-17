@@ -259,7 +259,12 @@ final class TimelineScroll {
         for (Node n : list.lookupAll(".scroll-bar")) {
             if (n instanceof ScrollBar sb && sb.getOrientation() == javafx.geometry.Orientation.VERTICAL) {
                 sb.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> dragging = true);
-                sb.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> dragging = false);
+                sb.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> {
+                    dragging = false;
+                    // Let go at the very end: the newest, followed. Where the flow lands there depends on its estimate of
+                    // the rows (Linux's fonts: the newest 3 px cut, position 0.9958), not on what the person did.
+                    if (sb.getValue() >= sb.getMax() - 1e-4 && !pinnedBottom) scrollToBottom();
+                });
                 sb.valueProperty().addListener((o, a, v) -> {
                     if (dragging) {
                         moved = true;
