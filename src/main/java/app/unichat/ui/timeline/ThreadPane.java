@@ -76,6 +76,9 @@ public final class ThreadPane extends BorderPane {
     private Chat chat;
     private boolean loadingOlder;
     private boolean reachedStart;
+    /** What waits for the older messages being loaded (going to a pinned message). */
+    private final List<Runnable> afterOlder = new java.util.ArrayList<>();
+    private final PinnedBar pinnedBar = new PinnedBar(this::reveal);
     private int drawnWith;
     /** Newest message shown, to notice your own new message (always jumps to it). */
 
@@ -123,7 +126,7 @@ public final class ThreadPane extends BorderPane {
         typing.getStyleClass().add("typing-line");
         VBox bottom = new VBox(typing, composer);
 
-        content.setTop(header);
+        content.setTop(new VBox(header, pinnedBar.node()));
         content.setCenter(timeline);
         content.setBottom(bottom);
 
@@ -210,6 +213,30 @@ public final class ThreadPane extends BorderPane {
     /** Stops listening to what outlives this pane (the transcripts are the app's): the window is being rebuilt. */
     public void dispose() {
         Transcripts.get().removeListener(onTranscript);
+        pinnedBar.dispose();
+    }
+
+    /**
+     * Goes to a pinned message: selected and in view, the chat's history loaded page by page until it's there however
+     * far back it is; told when the chat's start comes first (it was deleted).
+     */
+    private void reveal(app.unichat.model.PinnedMessage pin) {
+        if (chat == null) return;
+        String id = chat.id();
+        for (Message m : svc.messages(id)) {
+            if (m.id().equals(pin.messageId())) {
+                scroll.jumpTo(m);
+                list.requestFocus();
+                return;
+            }
+        }
+        if (reachedStart) {
+            toast.accept(I18n.t("pinned.gone"));
+            return;
+        }
+        loadOlder(() -> {
+            if (chat != null && chat.id().equals(id)) reveal(pin);
+        });
     }
 
     /** Selects and shows {@code target} (the message a reply quotes). */
@@ -289,6 +316,8 @@ public final class ThreadPane extends BorderPane {
         chat = c;
         reachedStart = false;
         loadingOlder = false;
+        afterOlder.clear(); // a pinned message another chat was looking for
+        pinnedBar.show(c == null ? null : c.id());
         scroll.pin();
         setCenter(c == null ? emptyState : content);
         composer.setChat(c == null ? null : c.id());
@@ -358,7 +387,14 @@ public final class ThreadPane extends BorderPane {
     }
 
     private void loadOlder() {
-        if (loadingOlder || reachedStart || chat == null) return;
+        loadOlder(() -> { });
+    }
+
+    /** Older messages, then {@code then} (also when a load already going ends); nothing past the chat's start. */
+    private void loadOlder(Runnable then) {
+        if (reachedStart || chat == null) return;
+        afterOlder.add(then);
+        if (loadingOlder) return;
         loadingOlder = true;
         String id = chat.id();
         // Loaded because the chat is short (not because you scrolled to the top): keep showing the newest.
@@ -371,6 +407,9 @@ public final class ThreadPane extends BorderPane {
             messageRows.index(all);
             rows.setAll(ThreadRows.build(all, ZoneId.systemDefault()));
             scroll.afterOlder(followBottom);
+            List<Runnable> waiting = List.copyOf(afterOlder);
+            afterOlder.clear();
+            waiting.forEach(Runnable::run);
         }));
     }
 

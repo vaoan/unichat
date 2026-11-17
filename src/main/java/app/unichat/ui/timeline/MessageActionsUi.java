@@ -205,7 +205,8 @@ final class MessageActionsUi {
     /** The menu's order for what a message allows; the quick reactions and "delete for everyone" come after, set apart. */
     private static final List<MessageActions.Action> MENU_ORDER = List.of(MessageActions.Action.SAVE_LINK,
             MessageActions.Action.REPLY, MessageActions.Action.COPY, MessageActions.Action.FORWARD, MessageActions.Action.OPEN_FILE,
-            MessageActions.Action.SAVE_AS, MessageActions.Action.TRANSCRIBE, MessageActions.Action.FAVORITE, MessageActions.Action.EDIT);
+            MessageActions.Action.SAVE_AS, MessageActions.Action.TRANSCRIBE, MessageActions.Action.FAVORITE, MessageActions.Action.PIN,
+            MessageActions.Action.EDIT);
 
     ContextMenu messageMenu(Message m) {
         ContextMenu menu = new ContextMenu();
@@ -261,6 +262,13 @@ final class MessageActionsUi {
             }));
             case TRANSCRIBE -> transcript(m);
             case FAVORITE -> favorite(m);
+            case PIN -> {
+                app.unichat.service.PinnedMessages pins = app.unichat.service.PinnedMessages.get();
+                String chatId = chat.get().id();
+                yield pins.isPinned(chatId, m.id())
+                        ? List.of(ChatMenus.item(I18n.t("message.unpin"), () -> pins.unpin(chatId, m.id())))
+                        : List.of(ChatMenus.item(I18n.t("message.pin"), () -> pins.pin(chatId, m)));
+            }
             case EDIT -> List.of(item("message.edit", act, m));
             case DELETE_FOR_EVERYONE, DELETE_FOR_ME -> List.of();
         };

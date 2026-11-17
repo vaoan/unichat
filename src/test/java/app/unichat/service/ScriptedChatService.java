@@ -123,8 +123,37 @@ public final class ScriptedChatService extends MockChatService {
     private volatile CompletableFuture<Void> history = CompletableFuture.completedFuture(null);
     private final java.util.Set<String> asked = ConcurrentHashMap.newKeySet();
 
+    /** Messages taken out of a chat, oldest first, that come back {@link #PAGE} at a time as its history loads. */
+    private final Map<String, List<Message>> heldBack = new ConcurrentHashMap<>();
+    static final int PAGE = 10;
+
+    /**
+     * The {@code count} oldest messages of {@code chatId} aren't loaded yet: each history load brings back the newest
+     * {@link #PAGE} of them, as a server's history would. Their ids stay as they were.
+     */
+    public void holdBack(String chatId, int count) {
+        List<Message> list = messages.get(chatId);
+        synchronized (list) {
+            List<Message> oldest = new ArrayList<>(list.subList(0, count));
+            list.subList(0, count).clear();
+            heldBack.put(chatId, oldest);
+        }
+        fireMessages(chatId);
+    }
+
     @Override
     public CompletableFuture<Boolean> loadOlder(String chatId) {
+        List<Message> held = heldBack.get(chatId);
+        if (held != null && !held.isEmpty()) {
+            List<Message> list = messages.get(chatId);
+            synchronized (list) {
+                List<Message> page = new ArrayList<>(held.subList(Math.max(0, held.size() - PAGE), held.size()));
+                held.subList(Math.max(0, held.size() - PAGE), held.size()).clear();
+                list.addAll(0, page);
+            }
+            fireMessages(chatId);
+            return CompletableFuture.completedFuture(!held.isEmpty());
+        }
         Integer count = olderToLoad.remove(chatId);
         if (count == null) return CompletableFuture.completedFuture(false);
         asked.add(chatId);

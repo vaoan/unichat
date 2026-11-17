@@ -977,3 +977,12 @@
 .profile-audio:hover { -fx-background-color: -surface-2; }
 /* The settings gear while files go up to the cloud: a ring filling around it, over it (the rail never moves). */
 .rail-cloud-ring { -fx-stroke: -accent; -fx-stroke-width: 2.5; -fx-stroke-line-cap: round; }
+
+/* Pinned messages: a bar under the chat's header (ui/timeline/PinnedBar). */
+.pinned-bar { -fx-padding: 4 12 4 12; -fx-border-color: transparent transparent -border transparent; -fx-border-width: 0 0 1 0; }
+.pinned-go { -fx-background-color: transparent; -fx-padding: 4 6; -fx-background-radius: 8; -fx-text-fill: -text; }
+.pinned-go:hover, .pinned-go:focused { -fx-background-color: -hover; }
+.pinned-go .icon { -fx-background-color: -accent; }
+.pinned-title { -fx-text-fill: -accent; -fx-font-weight: bold; -fx-font-size: 0.85em; }
+.pinned-count { -fx-text-fill: -text-2; -fx-font-size: 0.85em; }
+.pinned-preview { -fx-text-fill: -text; -fx-font-size: 0.95em; }

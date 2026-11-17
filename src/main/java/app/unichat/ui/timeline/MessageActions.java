@@ -14,7 +14,7 @@ import java.util.Set;
 public final class MessageActions {
     private MessageActions() {}
 
-    enum Action { REPLY, COPY, OPEN_FILE, SAVE_AS, SAVE_LINK, TRANSCRIBE, EDIT, DELETE_FOR_EVERYONE, DELETE_FOR_ME, FAVORITE, FORWARD }
+    enum Action { REPLY, COPY, OPEN_FILE, SAVE_AS, SAVE_LINK, TRANSCRIBE, EDIT, DELETE_FOR_EVERYONE, DELETE_FOR_ME, FAVORITE, FORWARD, PIN }
 
     static Set<Action> of(Message m, RoomFeatures f, Instant now) {
         Set<Action> out = EnumSet.noneOf(Action.class);
@@ -35,6 +35,8 @@ public final class MessageActions {
         if (onServer && m.type() != MessageType.SYSTEM && (!m.isMedia() || app.unichat.model.Mxc.parse(m.mediaUrl()) != null)) {
             out.add(Action.FORWARD);
         }
+        // Pinned in Unichat (no bridge carries pins): what the server has, so the id stays; never a join or a new name.
+        if (onServer && m.type() != MessageType.SYSTEM) out.add(Action.PIN);
         if (isStickerOrGif(m)) out.add(Action.FAVORITE);
         if (m.outgoing()) {
             if (!m.isMedia() && f.canEdit(m.timestamp(), now)) out.add(Action.EDIT);
