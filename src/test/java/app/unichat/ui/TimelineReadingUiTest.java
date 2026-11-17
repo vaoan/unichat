@@ -206,6 +206,26 @@ class TimelineReadingUiTest {
     @Test
     void tinyTrackpadMovesUpThenBackDown() throws Exception {
         w = TimelineWindow.open(30);
+        tinyTrackpadUpAndDown();
+    }
+
+    /**
+     * Rows whose heights the list's estimate gets wrong (text at 110 %; on CI it was Linux's fonts, and this failed every
+     * run for days): the first turn up from the bottom moved 12 px instead of 3, so coming back the same way left the
+     * newest 7 px cut and never followed it again.
+     */
+    @Test
+    void tinyTrackpadMovesUpThenBackDownWhereTheListGuessesItsLengthWrong() throws Exception {
+        app.unichat.settings.Settings.get().setFontScale(1.1);
+        try {
+            w = TimelineWindow.open(30);
+            tinyTrackpadUpAndDown();
+        } finally {
+            app.unichat.settings.Settings.get().setFontScale(1.0);
+        }
+    }
+
+    private void tinyTrackpadUpAndDown() throws Exception {
         for (int i = 0; i < 6; i++) w.wheel(3);
         assertTrue(FxWait.fx(() -> w.newestGap() == null || w.newestGap() > 1), "precondition: moved up a little");
         for (int i = 0; i < 6; i++) w.wheel(-3);

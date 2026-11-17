@@ -46,6 +46,11 @@ final class TimelineScroll {
     /** Reading older messages: the message held in place and where its top was, in the list's own coordinates. */
     private String anchorId;
     private double anchorY;
+    /**
+     * Leaving the bottom with the wheel: where the newest message's top should land (its top then plus the turn). The
+     * flow, past its end with rows its estimate got wrong (110 %, Linux's fonts), laid them out again 9 px further.
+     */
+    private double leavingTo = Double.NaN;
 
     /** {@code atTop} runs each time the list reaches its first row. {@code owner}'s scene is watched for layouts. */
     TimelineScroll(ListView<ThreadRows.Row> list, ObservableList<ThreadRows.Row> rows, Node owner, BooleanSupplier chatOpen, Runnable atTop) {
@@ -59,6 +64,7 @@ final class TimelineScroll {
         });
         list.addEventFilter(ScrollEvent.SCROLL, e -> {
             moved = true;
+            if (e.getDeltaY() > 0 && pinnedBottom) leavingTo = newestTop() + e.getDeltaY();
             if (e.getDeltaY() > 0) unpin(); // towards older messages
         });
         list.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
@@ -124,10 +130,28 @@ final class TimelineScroll {
             // Down to the newest message by any means (the wheel, the keys, the thumb): following it again.
             pin();
         } else {
+            if (!Double.isNaN(leavingTo)) landLeaving(flow);
             if (moved || anchorId == null) holdWhatsInView(flow);
             else keepAnchor(flow);
         }
         moved = false;
+    }
+
+    /** The newest message's top, from the top of the list's viewport; NaN when it isn't drawn. */
+    private double newestTop() {
+        if (!(list.lookup(".virtual-flow") instanceof VirtualFlow<?> flow)) return Double.NaN;
+        IndexedCell<?> last = flow.getLastVisibleCell();
+        return last == null || last.getIndex() != rows.size() - 1 ? Double.NaN : top(last, flow);
+    }
+
+    /** The first turn up from the bottom moves the list by the turn, not by what the flow's estimate added to it. */
+    private void landLeaving(VirtualFlow<?> flow) {
+        double off = newestTop() - leavingTo;
+        leavingTo = Double.NaN;
+        if (!Double.isNaN(off) && Math.abs(off) >= 0.5) {
+            flow.scrollPixels(off);
+            list.layout();
+        }
     }
 
     /**

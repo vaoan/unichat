@@ -66,6 +66,10 @@ public abstract class TaskBar extends HBox {
 
         big.getStyleClass().add("upload-percent");
         small.getStyleClass().add("audio-time");
+        // The column is fixed, and "falta menos de un minuto" didn't fit it with Linux's wider fonts: it goes on two
+        // lines there rather than end in "…".
+        small.setWrapText(true);
+        small.setMinHeight(Region.USE_PREF_SIZE);
         numbers.setAlignment(Pos.CENTER_LEFT);
         fixedEm(numbers, 10);
         actions.setAlignment(Pos.CENTER_LEFT);

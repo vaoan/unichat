@@ -41,13 +41,15 @@ class CloakBarUiTest {
         CloakJob job = runningJob();
         assertTrue(job.start(Path.of("una foto de vacaciones.jpg"), Path.of("out.png"), CloakLevel.MEDIUM, p -> { }));
         FxWait.until("protecting", () -> job.status().phase() == CloakJob.Phase.PROTECTING && job.status().fraction() > 0);
-        for (double px : List.of(13.0, 21.0)) {
+        // Linux's fonts are wider than the Mac's: "falta menos de un minuto" lost its end there, in CI only. A wide font
+        // here shows it on any system.
+        for (String font : List.of("System", "Monospaced")) for (double px : List.of(13.0, 21.0)) {
             CloakBar bar = FxWait.fx(() -> {
                 CloakBar b = new CloakBar(job);
                 Stage stage = new Stage();
                 VBox root = new VBox(b);
                 root.getStyleClass().add("root");
-                root.setStyle("-fx-font-size: " + px + "px;");
+                root.setStyle("-fx-font-size: " + px + "px; -fx-font-family: '" + font + "';");
                 Scene scene = new Scene(root, Double.parseDouble(System.getProperty("unichat.barWidth", "900")), 200);
                 scene.getStylesheets().add(CloakBarUiTest.class.getResource("/app/unichat/css/app.css").toExternalForm());
                 stage.setScene(scene);
@@ -65,7 +67,7 @@ class CloakBarUiTest {
                 if (!FxWait.fx(l::isVisible) || FxWait.fx(l::getText) == null || FxWait.fx(l::getText).isEmpty()) continue;
                 Text drawn = (Text) FxWait.fx(() -> l.lookup(".text"));
                 String full = FxWait.fx(l::getText);
-                assertEquals(full.replace("\n", ""), FxWait.fx(drawn::getText).replace("\n", ""), "cut at " + px + "px");
+                assertEquals(full.replace("\n", ""), FxWait.fx(drawn::getText).replace("\n", ""), "cut at " + px + "px in " + font);
             }
             // "55 %" lost the end of its "%" on a Mac at 160 %: it draws bold glyphs a little wider than JavaFX measures
             // them (headless measures and draws alike, so the cut doesn't show here). The number keeps room after it.
