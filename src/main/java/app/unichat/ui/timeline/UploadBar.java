@@ -97,8 +97,10 @@ public final class UploadBar extends TaskBar {
             String text = I18n.t("uploadBar.done", s.sent(), s.total());
             if (s.failed() > 0) text += " · " + I18n.n("uploadBar.failed", s.failed());
             what.setText(text);
-            bar.setAccessibleText(text);
-            detail.setText("");
+            // Why a file couldn't go as asked (a video too long to be a moving picture): it wasn't tried again.
+            String why = s.refused() == null ? "" : s.refused();
+            bar.setAccessibleText(why.isEmpty() ? text : text + ". " + why);
+            detail.setText(why);
             where.setText("");
             small.setText("");
             stage.setText("");

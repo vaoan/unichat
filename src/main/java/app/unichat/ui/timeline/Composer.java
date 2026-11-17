@@ -363,13 +363,15 @@ public final class Composer extends VBox {
 
     /**
      * As in WhatsApp and Telegram: a file as it is, photos and videos (pictures made into photos the network shows as
-     * such, several at once), a document (the original, never a photo), or many files or many photos one by one.
+     * such, several at once), a document (the original, never a photo), a moving picture (a video or GIF as an animated
+     * WebP that plays by itself), or many files or many photos one by one.
      */
     private javafx.scene.control.ContextMenu attachMenu() {
         javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu(
                 attachItem("composer.attach.file", Icons.ATTACH, () -> choose(false, SendAs.AS_IS, false)),
                 attachItem("composer.attach.photo", Icons.IMAGE, () -> choose(true, SendAs.PHOTO, false)),
                 attachItem("composer.attach.document", Icons.FILE, () -> choose(false, SendAs.DOCUMENT, false)),
+                attachItem("composer.attach.moving", Icons.REPLAY, () -> choose(false, SendAs.MOVING, false)),
                 attachItem("composer.attach.batch", Icons.UPLOAD, () -> choose(false, SendAs.AS_IS, true)),
                 attachItem("composer.attach.photoBatch", Icons.CAMERA, () -> choose(true, SendAs.PHOTO, true)),
                 attachItem("composer.attach.protected", Icons.SHIELD, () -> { if (onProtect != null) onProtect.run(); }));
@@ -387,9 +389,11 @@ public final class Composer extends VBox {
     private void choose(boolean photos, SendAs as, boolean batch) {
         FileChooser fc = new FileChooser();
         fc.setTitle(I18n.t(batch && photos ? "composer.attach.photoBatch" : batch ? "composer.attach.batch"
-                : photos ? "composer.attach.photo" : "composer.attach"));
+                : photos ? "composer.attach.photo" : as == SendAs.MOVING ? "composer.attach.moving" : "composer.attach"));
         if (photos) fc.getExtensionFilters().add(new FileChooser.ExtensionFilter(I18n.t("composer.attach.photos"),
                 "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp", "*.heic", "*.bmp", "*.mp4", "*.mov", "*.m4v", "*.webm", "*.mkv"));
+        if (as == SendAs.MOVING) fc.getExtensionFilters().add(new FileChooser.ExtensionFilter(I18n.t("composer.attach.movingFiles"),
+                "*.mp4", "*.mov", "*.m4v", "*.webm", "*.mkv", "*.gif", "*.webp", "*.tgs", "*.json"));
         javafx.stage.Window w = getScene().getWindow();
         if (batch || photos) {
             send(fc.showOpenMultipleDialog(w), as, batch);

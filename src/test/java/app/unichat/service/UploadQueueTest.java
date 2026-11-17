@@ -116,6 +116,24 @@ class UploadQueueTest {
         assertEquals(1, fake.calls.size());
     }
 
+    /**
+     * A file that can't go as asked (a video too long to be a moving picture, a text file) was tried again every five
+     * minutes for good: trying again never changes it. It's given up at once, the rest go on, and the bar says why.
+     */
+    @Test
+    void aFileThatCantGoAsAskedIsGivenUpAtOnceSayingWhy() throws Exception {
+        FakeSender fake = new FakeSender();
+        List<Wait> waits = new ArrayList<>();
+        UploadQueue q = new UploadQueue(fake.messaging(), (ms, r) -> waits.add(new Wait(ms, r)), null);
+        q.addAll(List.of(up("long.mp4"), up("b.jpg")));
+        fake.futures.get(0).completeExceptionally(new java.util.concurrent.CompletionException(new CantSend("dura demasiado")));
+        assertEquals(List.of(UploadQueue.PAUSE_MS), waits.stream().map(Wait::ms).toList(), "only the pause before the next, no retry");
+        assertEquals(1, q.status().failed());
+        assertEquals("dura demasiado", q.status().refused(), "the bar says why");
+        waits.get(0).r().run();
+        assertEquals("b.jpg", fake.calls.get(1).file().getFileName().toString(), "the rest go on");
+    }
+
     @Test
     void aFileNoLongerOnDiskIsGivenUpAndTheRestGoOn() throws Exception {
         FakeSender fake = new FakeSender();

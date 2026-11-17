@@ -51,10 +51,11 @@ public final class UploadQueue {
      * much of it went up (0 to 1). {@code total} counts every file of the batch, sent, failed or still waiting.
      * {@code retries}: how many times the current file has failed so far; {@code retryAt}: when it's tried again
      * (epoch ms, while {@link Phase#RETRYING}). {@code etaMs}: the time left, from how long the last files took; -1 unknown.
+     * {@code refused}: why the last file given up couldn't go as asked ({@link CantSend}), null when none.
      */
     public record Status(Upload current, int sent, int failed, int total, double progress, int retries, Phase phase,
-                         long retryAt, long etaMs) {
-        public static final Status IDLE = new Status(null, 0, 0, 0, 0, 0, Phase.UPLOADING, 0, -1);
+                         long retryAt, long etaMs, String refused) {
+        public static final Status IDLE = new Status(null, 0, 0, 0, 0, 0, Phase.UPLOADING, 0, -1, null);
 
         public boolean idle() {
             return total == 0;
@@ -96,6 +97,8 @@ public final class UploadQueue {
     private Upload current;
     /** The current file stops being tried (the batch was cancelled). */
     private boolean abandoned;
+    /** Why the last file given up couldn't go as asked; null when none. */
+    private String refused;
     /** The current file failed and waits to be tried again. */
     private boolean waiting;
     private int retries;
@@ -139,7 +142,7 @@ public final class UploadQueue {
     public synchronized Status status() {
         Phase phase = waiting ? Phase.RETRYING : progress >= 1 ? Phase.DELIVERING : Phase.UPLOADING;
         int left = total - sent - failed;
-        return new Status(current, sent, failed, total, progress, retries, phase, retryAt, eta(durations, left));
+        return new Status(current, sent, failed, total, progress, retries, phase, retryAt, eta(durations, left), refused);
     }
 
     /** Adds files to the batch; the first starts at once if nothing is going up. */
@@ -150,6 +153,7 @@ public final class UploadQueue {
             if (current == null && pending.isEmpty()) { // a finished batch was still on show: the new one counts from zero
                 sent = 0;
                 failed = 0;
+                refused = null;
                 total = 0;
                 durations.clear();
                 fileStarted = 0;
@@ -184,6 +188,7 @@ public final class UploadQueue {
             if (current != null || !pending.isEmpty()) return;
             sent = 0;
             failed = 0;
+            refused = null;
             total = 0;
         }
         fire();
@@ -213,9 +218,11 @@ public final class UploadQueue {
         }
         sending.whenComplete((v, err) -> {
             long wait;
+            CantSend cant = cantSend(err);
             synchronized (this) {
-                wait = err == null || abandoned || !Files.isReadable(u.file()) ? -1 : retryDelay(++retries);
+                wait = err == null || cant != null || abandoned || !Files.isReadable(u.file()) ? -1 : retryDelay(++retries);
                 if (wait >= 0) progress = 0;
+                if (cant != null) refused = cant.getMessage();
             }
             if (wait >= 0) {
                 synchronized (this) {
@@ -237,6 +244,14 @@ public final class UploadQueue {
             waiting = false;
         }
         attempt(u);
+    }
+
+    /** The {@link CantSend} behind a failure (it comes wrapped by the futures it went through), or null. */
+    private static CantSend cantSend(Throwable err) {
+        for (Throwable t = err; t != null; t = t.getCause()) {
+            if (t instanceof CantSend c) return c;
+        }
+        return null;
     }
 
     /** 30 s, 1 min, 2 min, 4 min, then every 5 min. */

@@ -400,4 +400,23 @@ class SendStickerTest {
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("$original", sent.path("m.relates_to").path("m.in_reply_to").path("event_id").asText());
     }
+
+    /**
+     * "Imagen en movimiento" in the attach menu: the chosen file (a video, a GIF, a Lottie sticker) goes as an animated
+     * WebP picture (m.image), which Discord and WhatsApp play by themselves, named as the file was.
+     */
+    @Test
+    void aFileSentAsAMovingPictureGoesAsAnAnimatedWebpPicture(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.video.LottieStickersTest.tool() != null, "no lottieconverter");
+        org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.video.AnimatedWebp.img2webp() != null, "no img2webp");
+        java.nio.file.Path tgs = app.unichat.video.LottieStickersTest.tgs(dir, app.unichat.video.LottieStickersTest.json());
+        MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
+        svc.sendFile("!c:example.org", tgs, null, app.unichat.service.SendAs.MOVING, p -> { }).get();
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("m.image", sent.path("msgtype").asText());
+        assertEquals("image/webp", sent.path("info").path("mimetype").asText());
+        assertEquals("image/webp", uploadedType);
+        assertEquals("sticker.webp", sent.path("body").asText(), "named as the file was");
+        assertTrue(sent.path("info").path("w").asInt() > 0, "its size, for the chat to make room");
+    }
 }

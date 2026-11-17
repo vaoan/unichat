@@ -10,5 +10,10 @@ public enum SendAs {
      */
     PHOTO,
     /** The original, never shown as a photo or video (WhatsApp's and Telegram's "document"). */
-    DOCUMENT
+    DOCUMENT,
+    /**
+     * A video, GIF or animated sticker as a moving picture: an animated WebP sent as a picture, which plays by itself and
+     * silently where a video would wait to be pressed (Discord, WhatsApp).
+     */
+    MOVING
 }

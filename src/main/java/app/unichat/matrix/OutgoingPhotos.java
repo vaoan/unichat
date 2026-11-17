@@ -1,9 +1,11 @@
 package app.unichat.matrix;
 
+import app.unichat.service.CantSend;
 import app.unichat.settings.Settings;
 import app.unichat.support.Folders;
 import app.unichat.support.Hashes;
 import app.unichat.support.ImageHeaders;
+import app.unichat.video.MovingPictures;
 import app.unichat.video.SendablePhotos;
 
 import java.io.IOException;
@@ -43,6 +45,25 @@ final class OutgoingPhotos {
             Thread.currentThread().interrupt();
             return original;
         }
+    }
+
+    /**
+     * {@code file} made a moving picture (an animated WebP, {@code SendAs.MOVING}), named as the file was. Blocking; an
+     * IOException saying why when it can't be one: the person asked for it, so the original never goes instead.
+     */
+    static Photo moving(Path file) throws IOException, InterruptedException {
+        Path root = Settings.dataDir().resolve("cache").resolve("sending");
+        prune(root);
+        Path dir = Files.createDirectories(root.resolve(Hashes.sha256(file.toAbsolutePath() + "|moving").substring(0, 16)));
+        String name = file.getFileName().toString().replaceFirst("\\.[^.]*$", "") + ".webp";
+        Path webp;
+        try {
+            webp = MovingPictures.toWebp(file, dir.resolve(name), p -> { });
+        } catch (IOException e) { // too long, not a video, no ffmpeg: trying again won't change it
+            throw new CantSend(e.getMessage());
+        }
+        int[] size = ImageHeaders.size(webp);
+        return new Photo(webp, "image/webp", size[0], size[1]);
     }
 
     private static void prune(Path root) {

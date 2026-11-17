@@ -352,11 +352,15 @@ final class MessageSender {
 
     /**
      * {@code as}: DOCUMENT sends m.file whatever it is, so the network sends the original instead of a photo; PHOTO
-     * makes a picture one the network shows as a photo first ({@link OutgoingPhotos}).
+     * makes a picture one the network shows as a photo first, MOVING a video or GIF an animated WebP picture
+     * ({@link OutgoingPhotos}).
      */
     CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, SendAs as, DoubleConsumer progress) {
         String mime = MimeTypes.of(file);
-        CompletableFuture<String> sent = as == SendAs.PHOTO && SendablePhotos.convertible(mime)
+        CompletableFuture<String> sent = as == SendAs.MOVING
+                ? CompletableFuture.supplyAsync(() -> moving(file), core.io).thenCompose(p ->
+                        sendMedia(chatId, p.file(), replyToId, new Kind(p.mime(), p.width(), p.height(), 0, false, progress), content -> { }))
+                : as == SendAs.PHOTO && SendablePhotos.convertible(mime)
                 ? CompletableFuture.supplyAsync(() -> OutgoingPhotos.prepare(file, mime), core.io).thenCompose(p ->
                         sendMedia(chatId, p.file(), replyToId, new Kind(p.mime(), p.width(), p.height(), 0, false, progress), content -> { }))
                 : sendMedia(chatId, file, replyToId, new Kind(mime, 0, 0, 0, as == SendAs.DOCUMENT, progress), content -> { });
@@ -364,6 +368,17 @@ final class MessageSender {
         if (c == null || c.network() == app.unichat.model.Network.MATRIX) return sent.thenApply(id -> null);
         // Bridged: done when the network has it (a batch sends the next file only then), or failed if it refused it.
         return sent.thenCompose(id -> id == null ? CompletableFuture.completedFuture(null) : core.statuses.await(id, NETWORK_PATIENCE));
+    }
+
+    private static OutgoingPhotos.Photo moving(Path file) {
+        try {
+            return OutgoingPhotos.moving(file);
+        } catch (IOException e) {
+            throw new java.util.concurrent.CompletionException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new java.util.concurrent.CompletionException(e);
+        }
     }
 
     /** How long a file may take to reach the network before it's taken as sent anyway (a bridge that doesn't report). */

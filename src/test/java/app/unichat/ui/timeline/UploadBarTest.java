@@ -12,7 +12,7 @@ class UploadBarTest {
     private static final UploadQueue.Upload FILE = new UploadQueue.Upload("!c", Path.of("IMG_0019.webp"), null, app.unichat.service.SendAs.DOCUMENT);
 
     private static UploadQueue.Status status(double progress, int retries, UploadQueue.Phase phase, long retryAt) {
-        return new UploadQueue.Status(FILE, 32, 0, 1288, progress, retries, phase, retryAt, -1);
+        return new UploadQueue.Status(FILE, 32, 0, 1288, progress, retries, phase, retryAt, -1, null);
     }
 
     @Test
