@@ -83,6 +83,9 @@ public final class ThreadPane extends BorderPane {
     /** Picking messages to forward several at once. */
     private final MessageSelection selection;
     private ForwardSheet forwardSheet;
+    private DeleteSheet deleteSheet;
+    private final MessageSelection.Purpose forwarding, deleting;
+    private final Consumer<String> toast;
 
     public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast, AudioPlayback audio,
                       FolderDialogs folderDialogs, MediaLibrary library) {
@@ -90,6 +93,7 @@ public final class ThreadPane extends BorderPane {
         this.folderDialogs = folderDialogs;
         this.svc = svc;
         this.toggleInfo = toggleInfo;
+        this.toast = toast;
         getStyleClass().add("thread-pane");
         composer = new Composer(svc, toast);
         composer.setBeforeRecording(audio::pause);
@@ -101,8 +105,13 @@ public final class ThreadPane extends BorderPane {
         archiveButton = Icons.iconButton(Icons.ARCHIVE, I18n.t("thread.archive", Shortcuts.key("E")),
                 () -> svc.setArchived(chat.id(), !chat.archived()));
         configureTimeline();
-        selection = new MessageSelection(list, m -> messageActions.allows(m, MessageActions.Action.FORWARD), this::forward, this::showSelectionBar);
-        messageActions.setOnForward(selection::start);
+        selection = new MessageSelection(list, this::showSelectionBar);
+        forwarding = new MessageSelection.Purpose("select.forward", "primary-button",
+                m -> messageActions.allows(m, MessageActions.Action.FORWARD), this::forward);
+        deleting = new MessageSelection.Purpose("select.delete", "danger-button",
+                m -> messageActions.allows(m, MessageActions.Action.DELETE_FOR_EVERYONE), this::delete);
+        messageActions.setOnForward(m -> selection.start(m, forwarding));
+        messageActions.setOnDelete(m -> delete(List.of(m)), m -> selection.start(m, deleting));
         scroll = new TimelineScroll(list, rows, this, () -> chat != null, this::loadOlder);
         Node header = buildHeader();
         messageRows = new MessageRowView(svc, media, messageActions, openLink, () -> chat, this::member, scroll::jumpTo);
@@ -226,6 +235,33 @@ public final class ThreadPane extends BorderPane {
         });
     }
 
+    /** Where deleting for everyone asks twice (the window's overlay). */
+    public void setDeleteSheet(DeleteSheet sheet) { this.deleteSheet = sheet; }
+
+    /**
+     * Asks twice about deleting {@code messages} for everyone; after the second yes they go, one at a time in the chat's
+     * order, picking ends, and a notice says how it went.
+     */
+    private void delete(List<Message> messages) {
+        if (deleteSheet == null || chat == null || messages.isEmpty()) return;
+        String chatId = chat.id();
+        deleteSheet.ask(messages, chat, () -> {
+            selection.end();
+            java.util.concurrent.CompletableFuture<Integer> failed = java.util.concurrent.CompletableFuture.completedFuture(0);
+            for (Message m : messages) {
+                failed = failed.thenCompose(n -> svc.deleteMessage(chatId, m.id()).handle((v, e) -> e == null ? n : n + 1));
+            }
+            failed.thenAccept(n -> Platform.runLater(() -> toast.accept(n == 0 ? I18n.n("delete.done", messages.size())
+                    : I18n.n("delete.failed", n))));
+        });
+    }
+
+    /** Snapshot diagnostics: the question before deleting the newest three of mine that can be deleted for everyone. */
+    public void showDeleting() {
+        List<Message> mine = svc.messages(chat.id()).stream().filter(deleting.pickable()).toList();
+        delete(mine.subList(Math.max(0, mine.size() - 3), mine.size()));
+    }
+
     /** Snapshot diagnostics: the sheet for the newest message, or ({@code several}) the newest three picked. */
     public void showForwarding(boolean several) {
         List<Message> last = svc.messages(chat.id()).stream().filter(m -> messageActions.allows(m, MessageActions.Action.FORWARD)).toList();
@@ -235,7 +271,7 @@ public final class ThreadPane extends BorderPane {
             return;
         }
         List<Message> three = last.subList(Math.max(0, last.size() - 3), last.size());
-        selection.start(three.getFirst());
+        selection.start(three.getFirst(), forwarding);
         three.subList(1, three.size()).forEach(selection::toggle);
     }
 

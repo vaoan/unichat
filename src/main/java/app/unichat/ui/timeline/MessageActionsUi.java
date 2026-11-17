@@ -54,11 +54,17 @@ final class MessageActionsUi {
     /** Links offered in a message's menu: the keyboard has no other way to them. */
     private static final int MENU_LINKS = 5;
 
-    private Consumer<Message> onForward = m -> { };
+    private Consumer<Message> onForward = m -> { }, onDelete = m -> { }, onDeleteSeveral = m -> { };
 
     /** "Reenviar…": picking messages to forward starts with {@code m}. */
     void setOnForward(Consumer<Message> forward) {
         this.onForward = forward;
+    }
+
+    /** "Eliminar para todos…" asks about {@code m} ({@code one}); "Eliminar varios…" starts picking with it ({@code several}). */
+    void setOnDelete(Consumer<Message> one, Consumer<Message> several) {
+        this.onDelete = one;
+        this.onDeleteSeveral = several;
     }
 
     /** Where "see this sticker's set" opens it (the side panel's Stickers tab). */
@@ -215,7 +221,9 @@ final class MessageActionsUi {
         }
         if (a.contains(MessageActions.Action.DELETE_FOR_EVERYONE)) {
             items.add(new SeparatorMenuItem());
-            items.add(ChatMenus.danger(ChatMenus.item(I18n.t("message.deleteForAll"), () -> svc.deleteMessage(chat.get().id(), m.id()))));
+            // Never at once: the sheet asks twice (DeleteSheet).
+            items.add(ChatMenus.danger(ChatMenus.item(I18n.t("message.deleteForAll"), () -> onDelete.accept(m))));
+            items.add(ChatMenus.danger(ChatMenus.item(I18n.t("message.deleteSeveral"), () -> onDeleteSeveral.accept(m))));
         }
         return menu;
     }

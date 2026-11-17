@@ -107,6 +107,42 @@ final class TimelineWindow {
     }
 
     @SuppressWarnings("unchecked")
+    /** The row drawing {@code m}, or null when it isn't drawn. */
+    javafx.scene.control.ListCell<?> cellOf(Message m) {
+        for (Node n : list().lookupAll(".row-cell")) {
+            if (n instanceof javafx.scene.control.ListCell<?> c && c.getItem() instanceof ThreadRows.MessageRow mr && mr.message().id().equals(m.id())) return c;
+        }
+        return null;
+    }
+
+    /** The item {@code text} of {@code m}'s menu, opened from the keys as a person would (Enter on it). */
+    javafx.scene.control.MenuItem menuItem(Message m, String text) throws Exception {
+        return FxWait.fx(() -> {
+            javafx.scene.control.ListCell<?> cell = cellOf(m);
+            list().getSelectionModel().select(cell.getIndex());
+            list().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
+            javafx.scene.control.ContextMenu menu = javafx.stage.Window.getWindows().stream().filter(x -> x instanceof javafx.scene.control.ContextMenu cm && cm.isShowing()
+                    && cm.getOwnerNode() != null && cm.getOwnerNode().getScene() == scene).map(x -> (javafx.scene.control.ContextMenu) x).findFirst().orElseThrow();
+            javafx.scene.control.MenuItem item = menu.getItems().stream().filter(i -> text.equals(i.getText())).findFirst().orElseThrow();
+            menu.hide();
+            return item;
+        });
+    }
+
+    /** Runs a menu item as a click on it would. */
+    static void fire(javafx.scene.control.MenuItem item) throws Exception {
+        FxWait.fx(() -> {
+            item.fire();
+            return null;
+        });
+    }
+
+    /** A click on {@code cell}, with Shift when {@code shift}. */
+    static void press(Node cell, boolean shift) {
+        cell.fireEvent(new javafx.scene.input.MouseEvent(javafx.scene.input.MouseEvent.MOUSE_CLICKED, 0, 0, 0, 0, javafx.scene.input.MouseButton.PRIMARY, 1, shift, false, false, false,
+                true, false, false, true, false, true, null));
+    }
+
     ListView<Object> list() { return (ListView<Object>) scene.getRoot().lookup(".timeline"); }
 
     VirtualFlow<?> flow() { return (VirtualFlow<?>) list().lookup(".virtual-flow"); }

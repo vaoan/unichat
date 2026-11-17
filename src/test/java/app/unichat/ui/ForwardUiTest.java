@@ -48,8 +48,8 @@ class ForwardUiTest {
         w = TimelineWindow.open(3, "mensaje %d");
         w.svc.receive(CHAT, "nos vemos a las 8");
         Message theirs = w.newest();
-        FxWait.until("it's listed", () -> cellOf(theirs) != null);
-        fire(menuItem(theirs, "Reenviar…"));
+        FxWait.until("it's listed", () -> w.cellOf(theirs) != null);
+        TimelineWindow.fire(w.menuItem(theirs, "Reenviar…"));
         assertEquals("1 seleccionado", FxWait.fx(() -> ((Label) w.scene.getRoot().lookup(".selection-count")).getText()),
                 "Reenviar starts picking with it");
         forwardPicked();
@@ -83,19 +83,19 @@ class ForwardUiTest {
         w = TimelineWindow.open(5, "mensaje %d");
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("mensaje")).toList());
         Message first = mine.get(1), third = mine.get(3), last = mine.get(4);
-        FxWait.until("they're listed", () -> cellOf(first) != null && cellOf(last) != null);
-        fire(menuItem(first, "Reenviar…"));
+        FxWait.until("they're listed", () -> w.cellOf(first) != null && w.cellOf(last) != null);
+        TimelineWindow.fire(w.menuItem(first, "Reenviar…"));
         assertTrue(FxWait.fx(() -> w.scene.getRoot().lookup(".thread-header .selection-bar") != null), "the bar is in the header");
         assertTrue(FxWait.fx(() -> w.scene.getRoot().lookup(".thread-header").lookupAll(".icon-button").isEmpty()),
                 "in the place of the star and the other buttons");
         assertNotNull(FxWait.fx(() -> w.scene.getRoot().lookup(".composer")), "the message box stays");
         FxWait.fx(() -> {
-            press(cellOf(last), false);  // picks the newest
-            press(cellOf(third), true);  // and with Shift, what's between them
+            TimelineWindow.press(w.cellOf(last), false);  // picks the newest
+            TimelineWindow.press(w.cellOf(third), true);  // and with Shift, what's between them
             return null;
         });
         assertEquals("3 seleccionados", FxWait.fx(() -> ((Label) w.scene.getRoot().lookup(".selection-count")).getText()));
-        assertTrue(FxWait.fx(() -> cellOf(third).getPseudoClassStates().stream().anyMatch(p -> p.getPseudoClassName().equals("picked"))),
+        assertTrue(FxWait.fx(() -> w.cellOf(third).getPseudoClassStates().stream().anyMatch(p -> p.getPseudoClassName().equals("picked"))),
                 "a picked message looks picked");
         forwardPicked();
         Node sheet = FxWait.fx(() -> w.scene.getRoot().lookup(".forward-sheet"));
@@ -115,7 +115,7 @@ class ForwardUiTest {
         assertEquals(List.of(first.body(), third.body(), last.body()),
                 w.svc.messages(TO).subList(before, before + 3).stream().map(Message::body).toList(), "in the chat's order, nothing added");
         FxWait.until("picking ended, the header's buttons are back", () -> w.scene.getRoot().lookup(".selection-bar") == null);
-        assertFalse(FxWait.fx(() -> cellOf(third).getPseudoClassStates().stream().anyMatch(p -> p.getPseudoClassName().equals("picked"))));
+        assertFalse(FxWait.fx(() -> w.cellOf(third).getPseudoClassStates().stream().anyMatch(p -> p.getPseudoClassName().equals("picked"))));
     }
 
     /**
@@ -127,10 +127,10 @@ class ForwardUiTest {
         w = TimelineWindow.open(4, "mensaje %d");
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("mensaje")).toList());
         Message a = mine.get(2), b = mine.get(3);
-        FxWait.until("they're listed", () -> cellOf(a) != null && cellOf(b) != null);
-        fire(menuItem(a, "Reenviar…"));
+        FxWait.until("they're listed", () -> w.cellOf(a) != null && w.cellOf(b) != null);
+        TimelineWindow.fire(w.menuItem(a, "Reenviar…"));
         FxWait.fx(() -> {
-            press(cellOf(b), false);
+            TimelineWindow.press(w.cellOf(b), false);
             for (KeyCode k : List.of(KeyCode.R, KeyCode.E, KeyCode.DIGIT1)) {
                 w.list().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", k, false, false, false, false));
             }
@@ -154,8 +154,8 @@ class ForwardUiTest {
         w = TimelineWindow.open(30);
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("Mensaje")).toList());
         Message newest = mine.getLast();
-        FxWait.until("listed", () -> cellOf(newest) != null);
-        fire(menuItem(newest, "Reenviar…"));
+        FxWait.until("listed", () -> w.cellOf(newest) != null);
+        TimelineWindow.fire(w.menuItem(newest, "Reenviar…"));
         // Up through the chat, picking what shows on the way.
         for (int i = 0; i < 6; i++) {
             w.wheel(400);
@@ -164,7 +164,7 @@ class ForwardUiTest {
                 for (Node n : w.list().lookupAll(".row-cell")) {
                     if (n instanceof ListCell<?> c && c.isVisible() && c.getItem() instanceof ThreadRows.MessageRow mr
                             && mr.message().body().startsWith("Mensaje") && c.getIndex() % 3 == 0) {
-                        press(c, false);
+                        TimelineWindow.press(c, false);
                         break;
                     }
                 }
@@ -191,45 +191,12 @@ class ForwardUiTest {
     }
 
     /** {@code m}'s row on screen, or null. */
-    private ListCell<?> cellOf(Message m) {
-        for (Node n : w.list().lookupAll(".row-cell")) {
-            if (n instanceof ListCell<?> c && c.getItem() instanceof ThreadRows.MessageRow mr && mr.message().id().equals(m.id())) return c;
-        }
-        return null;
-    }
-
-    /** The item {@code text} of {@code m}'s menu, opened from the keys as a person would (Enter on it). */
-    private MenuItem menuItem(Message m, String text) throws Exception {
-        return FxWait.fx(() -> {
-            ListCell<?> cell = cellOf(m);
-            w.list().getSelectionModel().select(cell.getIndex());
-            w.list().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            ContextMenu menu = Window.getWindows().stream().filter(x -> x instanceof ContextMenu cm && cm.isShowing()
-                    && cm.getOwnerNode() != null && cm.getOwnerNode().getScene() == w.scene).map(x -> (ContextMenu) x).findFirst().orElseThrow();
-            MenuItem item = menu.getItems().stream().filter(i -> text.equals(i.getText())).findFirst().orElseThrow();
-            menu.hide();
-            return item;
-        });
-    }
-
     /** The header's "Reenviar", which asks where the picked ones go. */
     private void forwardPicked() throws Exception {
         FxWait.fx(() -> {
             ((Button) w.scene.getRoot().lookup(".thread-header .selection-bar .primary-button")).fire();
             return null;
         });
-    }
-
-    private static void fire(MenuItem item) throws Exception {
-        FxWait.fx(() -> {
-            item.fire();
-            return null;
-        });
-    }
-
-    private static void press(Node cell, boolean shift) {
-        cell.fireEvent(new MouseEvent(MouseEvent.MOUSE_CLICKED, 0, 0, 0, 0, MouseButton.PRIMARY, 1, shift, false, false, false,
-                true, false, false, true, false, true, null));
     }
 
     /** Searches {@code name} in the sheet and picks the first chat found, with the keys. */

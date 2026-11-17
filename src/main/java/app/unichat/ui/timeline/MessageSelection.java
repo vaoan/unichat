@@ -24,20 +24,26 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
- * Picking several messages to forward at once: a click (or Space, Enter) picks or unpicks one, Shift+click the ones in
- * between, Esc ends. "Reenviar…" in a message's menu starts it with that one. While it lasts, a click on a message only
- * picks it (no photo opens, no link), and a bar in the header's buttons' place says how many and forwards them, in
- * the chat's order, or cancels.
+ * Picking several messages to forward or delete at once: a click (or Space, Enter) picks or unpicks one, Shift+click the
+ * ones in between, Esc ends. "Reenviar…" or "Eliminar varios…" in a message's menu starts it with that one, for that
+ * ({@link Purpose}). While it lasts, a click on a message only picks it (no photo opens, no link), and a bar in the
+ * header's buttons' place says how many and forwards or deletes them, in the chat's order, or cancels.
  */
 final class MessageSelection {
     static final PseudoClass PICKED = PseudoClass.getPseudoClass("picked");
 
+    /**
+     * What picking is for: the bar's button ({@code buttonKey}, its look {@code buttonStyle}), which messages can be
+     * picked, and what's done with them.
+     */
+    record Purpose(String buttonKey, String buttonStyle, Predicate<Message> pickable, Consumer<List<Message>> act) {}
+
     private final ListView<ThreadRows.Row> list;
-    private final Predicate<Message> pickable;
     private final Consumer<Boolean> showBar;
+    private Purpose purpose;
     private final Set<String> picked = new LinkedHashSet<>();
     private final Label count = new Label();
-    private final Button send = new Button(I18n.t("select.forward"));
+    private final Button send = new Button();
     private final HBox bar;
     private String last;
     private boolean on;
@@ -52,13 +58,11 @@ final class MessageSelection {
             KeyCode.END, KeyCode.TAB, KeyCode.F6);
 
     /** {@code showBar}: the bar in the header's buttons' place (true) or the buttons back (false). */
-    MessageSelection(ListView<ThreadRows.Row> list, Predicate<Message> pickable, Consumer<List<Message>> forward, Consumer<Boolean> showBar) {
+    MessageSelection(ListView<ThreadRows.Row> list, Consumer<Boolean> showBar) {
         this.list = list;
-        this.pickable = pickable;
         this.showBar = showBar;
         count.getStyleClass().add("selection-count");
-        send.getStyleClass().add("primary-button");
-        send.setOnAction(e -> forward.accept(messages()));
+        send.setOnAction(e -> purpose.act().accept(messages()));
         Button cancel = new Button(I18n.t("select.cancel"));
         cancel.getStyleClass().add("secondary-button");
         cancel.setOnAction(e -> end());
@@ -86,9 +90,13 @@ final class MessageSelection {
 
     boolean picked(Message m) { return on && picked.contains(m.id()); }
 
-    /** Starts with {@code first} picked. */
-    void start(Message first) {
+    /** Starts picking for {@code why}, with {@code first} picked. */
+    void start(Message first, Purpose why) {
         picked.clear();
+        purpose = why;
+        send.setText(I18n.t(why.buttonKey()));
+        send.getStyleClass().removeAll("primary-button", "danger-button");
+        send.getStyleClass().add(why.buttonStyle());
         on = true;
         app.unichat.ui.Nodes.style(list, "picking", true);
         showBar.accept(true);
@@ -110,10 +118,11 @@ final class MessageSelection {
         sync();
     }
 
-    /** The picked messages still in the chat and still forwardable (not deleted meanwhile), in the chat's order. */
+    /** The picked messages still in the chat and still fit for it (not deleted meanwhile), in the chat's order. */
     List<Message> messages() {
+        if (purpose == null) return List.of();
         return list.getItems().stream().filter(r -> r instanceof ThreadRows.MessageRow mr && picked.contains(mr.message().id()))
-                .map(r -> ((ThreadRows.MessageRow) r).message()).filter(pickable).toList();
+                .map(r -> ((ThreadRows.MessageRow) r).message()).filter(purpose.pickable()).toList();
     }
 
     /** The timeline's keys while picking: true when it took {@code e} (all but the ones that move). */
@@ -144,12 +153,12 @@ final class MessageSelection {
 
     /** Picks or unpicks {@code m}; {@code range}: picks every message from the last one picked to it. */
     private void toggle(Message m, boolean range) {
-        if (!pickable.test(m)) return;
+        if (!purpose.pickable().test(m)) return;
         List<Message> all = list.getItems().stream().filter(r -> r instanceof ThreadRows.MessageRow)
                 .map(r -> ((ThreadRows.MessageRow) r).message()).toList();
         int from = last == null ? -1 : indexOf(all, last), to = indexOf(all, m.id());
         if (range && from >= 0 && to >= 0) {
-            for (int i = Math.min(from, to); i <= Math.max(from, to); i++) if (pickable.test(all.get(i))) picked.add(all.get(i).id());
+            for (int i = Math.min(from, to); i <= Math.max(from, to); i++) if (purpose.pickable().test(all.get(i))) picked.add(all.get(i).id());
         } else if (!picked.remove(m.id())) {
             picked.add(m.id());
         }

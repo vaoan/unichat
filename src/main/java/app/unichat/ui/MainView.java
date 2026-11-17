@@ -173,6 +173,7 @@ public final class MainView extends StackPane {
         offerProtectedPhotos(svc);
         forwards = new app.unichat.ui.timeline.ForwardBar(svc, this::openChatId);
         thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(svc, this::showOverlay, this::hideOverlay, forwards::show));
+        thread.setDeleteSheet(new app.unichat.ui.timeline.DeleteSheet(this::showOverlay, this::hideOverlay));
         offerChatOptions(svc);
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::gearClicked);
 
@@ -569,6 +570,11 @@ public final class MainView extends StackPane {
     /** Forwarding for the open chat: the sheet, or several messages picked (snapshot diagnostics). */
     public void showForwarding(boolean several) {
         if (thread.chat() != null) thread.showForwarding(several);
+    }
+
+    /** The question before deleting the newest messages of mine for everyone (snapshot diagnostics). */
+    public void showDeleting() {
+        if (thread.chat() != null) thread.showDeleting();
     }
 
     /** The sheet that asks how hard to protect a photo, for the open chat (snapshot diagnostics). */
