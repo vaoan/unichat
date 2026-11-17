@@ -43,7 +43,10 @@ final class TimelineScroll {
     private boolean dragging;
     /** The person moved the list since the last layout: what's in view now is the new place to hold. */
     private boolean moved;
-    /** Reading older messages: the message held in place and where its top was, in the list's own coordinates. */
+    /**
+     * Reading older messages: the message held in place and where its top was in the window, not in the list: the
+     * header growing with the text (9 px with Linux's fonts) moved the list, and the message with it.
+     */
     private String anchorId;
     private double anchorY;
     /**
@@ -126,7 +129,9 @@ final class TimelineScroll {
         if (!chatOpen.getAsBoolean() || rows.isEmpty() || !(list.lookup(".virtual-flow") instanceof VirtualFlow<?> flow)) return;
         if (pinnedBottom) {
             keepBottom(flow);
-        } else if (!dragging && newestGap(flow) != null && newestGap(flow) <= 1) {
+        } else if (!dragging && newestGap(flow) != null && (newestGap(flow) <= 1 || flow.getPosition() >= 1 - 1e-9)) {
+            // Its end is the newest reached too: dragged to the bottom with rows the flow's estimate got wrong (110 %,
+            // Linux's fonts), the list ended with the newest a few pixels cut, and never followed again.
             // Down to the newest message by any means (the wheel, the keys, the thumb): following it again.
             pin();
         } else {
@@ -189,7 +194,7 @@ final class TimelineScroll {
             if (y > flow.getHeight() / 2 && anchorId != null) return;
             if (y >= 0 || i == last.getIndex()) {
                 anchorId = mr.message().id();
-                anchorY = y;
+                anchorY = sceneY(c);
             }
         }
     }
@@ -208,7 +213,7 @@ final class TimelineScroll {
                 // moves it down to its place. Moving by pixels before that layout undid the jump (it stayed out of view).
                 flow.scrollToTop(i);
             } else {
-                double off = top(cell, flow) - anchorY;
+                double off = sceneY(cell) - anchorY;
                 if (Math.abs(off) < 0.5) return;
                 flow.scrollPixels(off);
             }
@@ -238,6 +243,11 @@ final class TimelineScroll {
         IndexedCell<?> last = flow.getLastVisibleCell();
         if (last == null || last.getIndex() != rows.size() - 1) return null;
         return top(last, flow) + last.getHeight() - flow.getHeight();
+    }
+
+    /** Where {@code cell}'s top is drawn in the window. */
+    private static double sceneY(IndexedCell<?> cell) {
+        return cell.localToScene(0, 0).getY();
     }
 
     /** Where {@code cell}'s top is drawn, from the top of the list's viewport. */

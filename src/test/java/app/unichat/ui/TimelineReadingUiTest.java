@@ -180,6 +180,15 @@ class TimelineReadingUiTest {
         frames.stop("the side panel opening and closing while reading older ones");
     }
 
+    /**
+     * The message read is held on its pixel in the window, not only in the list: the header grows with the text and
+     * moved the list (9 px with Linux's fonts, failing on CI now and then; 3 px here at 108 %).
+     */
+    @Test
+    void theTextGetsBiggerWhereTheListGuessesItsLengthWrong() throws Throwable {
+        atAFractionalTextSize(this::theTextGetsBigger);
+    }
+
     @Test
     void theTextGetsBigger() throws Exception {
         TimelineWindow.Frames frames = readingOlder();
@@ -215,11 +224,18 @@ class TimelineReadingUiTest {
      * newest 7 px cut and never followed it again.
      */
     @Test
-    void tinyTrackpadMovesUpThenBackDownWhereTheListGuessesItsLengthWrong() throws Exception {
-        app.unichat.settings.Settings.get().setFontScale(1.1);
-        try {
+    void tinyTrackpadMovesUpThenBackDownWhereTheListGuessesItsLengthWrong() throws Throwable {
+        atAFractionalTextSize(() -> {
             w = TimelineWindow.open(30);
             tinyTrackpadUpAndDown();
+        });
+    }
+
+    /** What the Mac needs to show what Linux's fonts did on CI: rows whose heights the list's estimate gets wrong. */
+    private static void atAFractionalTextSize(org.junit.jupiter.api.function.Executable body) throws Throwable {
+        app.unichat.settings.Settings.get().setFontScale(1.08);
+        try {
+            body.execute();
         } finally {
             app.unichat.settings.Settings.get().setFontScale(1.0);
         }
@@ -317,6 +333,12 @@ class TimelineReadingUiTest {
         w.listKey(KeyCode.END);
         assertFalse(FxWait.fx(w::jumpDownShown), "the End key goes back to it");
         followsFromHere(w.untilAtBottom());
+    }
+
+    /** Dragged to the end where the list's estimate is wrong, it ended with the newest a few pixels cut and never followed. */
+    @Test
+    void draggingTheScrollbarUpAndBackDownWhereTheListGuessesItsLengthWrong() throws Throwable {
+        atAFractionalTextSize(this::draggingTheScrollbarUpAndBackDown);
     }
 
     @Test
