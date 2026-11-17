@@ -45,11 +45,37 @@ jobs:
           printf 'pcm.!default { type pulse }\nctl.!default { type pulse }\n' | sudo tee /etc/asound.conf
       - run: ./mvnw -B verify -Pheadless-ui
 
+  lottie-windows:
+    # LottieConverter for Windows (Telegram's animated stickers), cross-built here with MinGW-w64 from the sources
+    # native/build-lottie.sh pins: no official build, and Linux minutes cost half of Windows'.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends mingw-w64 cmake make
+      - run: mkdir -p out && native/build-lottie.sh --windows out/lottieconverter.exe
+      - uses: actions/upload-artifact@v5
+        with:
+          name: lottie-windows
+          path: out/lottieconverter.exe
+          if-no-files-found: error
+          retention-days: 1
+
   windows:
-    needs: test
+    needs: [test, lottie-windows]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: lottie-windows
+          path: target/lottie
+      - name: lottieconverter draws a sticker on Windows
+        shell: bash
+        run: |
+          target/lottie/lottieconverter.exe src/test/resources/app/unichat/video/moving.json "$RUNNER_TEMP/moving.gif" gif 64x64 30
+          test -s "$RUNNER_TEMP/moving.gif"
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

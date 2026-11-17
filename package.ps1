@@ -69,6 +69,15 @@ try {
     Write-Warning "Without gif2webp, animated stickers go to WhatsApp as still images: $_"
 }
 
+# Telegram's animated stickers (Lottie): LottieConverter, cross-built for Windows from pinned sources by build.yml's
+# lottie-windows job (native/build-lottie.sh --windows), which leaves it in target\lottie.
+if (Test-Path target\lottie\lottieconverter.exe) {
+    New-Item -ItemType Directory -Force target\pkg\server | Out-Null
+    Copy-Item target\lottie\lottieconverter.exe target\pkg\server\
+} else {
+    Write-Warning "Without lottieconverter, Telegram's animated stickers can't be shown nor sent to other networks (native/build-lottie.sh --windows)."
+}
+
 # Voice notes to text (stt/Transcriber): whisper.cpp's official Windows build of the release that
 # native/build-whisper.sh compiles for macOS (v1.9.5 = build b5454). Only whisper-cli and the DLLs it loads; ggml
 # picks the ggml-cpu-*.dll matching the processor.
