@@ -58,7 +58,9 @@ final class AiReplyPage {
                         SettingsForm.row(I18n.t("settings.ai.voiceNotes"), I18n.t("settings.ai.voiceNotesHelp"),
                                 SettingsForm.toggle(AiSettings.hearVoiceNotes(), AiSettings::setHearVoiceNotes)),
                         SettingsForm.row(I18n.t("settings.ai.learnStyle"), I18n.t("settings.ai.learnStyleHelp"),
-                                SettingsForm.toggle(AiSettings.learnStyle(), AiSettings::setLearnStyle))),
+                                SettingsForm.toggle(AiSettings.learnStyle(), AiSettings::setLearnStyle)),
+                        SettingsForm.row(I18n.t("settings.ai.autoFix"), I18n.t("settings.ai.autoFixHelp"),
+                                SettingsForm.toggle(AiSettings.autoFix(), AiSettings::setAutoFix))),
                 readySound(),
                 new VBox(6, new Label(I18n.t("settings.ai.instructions")), instructions, instructionsHelp),
                 learnedBox());

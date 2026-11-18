@@ -84,6 +84,19 @@ public final class PCloudApi implements Storage {
     }
 
     @Override
+    public java.util.List<String> list(String dir) throws IOException {
+        JsonNode contents;
+        try {
+            contents = call("listfolder", "path=" + Urls.enc(abs(dir))).path("metadata").path("contents");
+        } catch (Missing gone) {
+            return java.util.List.of();
+        }
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (JsonNode n : contents) out.add(n.path("name").asText());
+        return out;
+    }
+
+    @Override
     public void mkdirs(String dir) throws IOException {
         StringBuilder at = new StringBuilder();
         for (String part : dir.split("/")) {

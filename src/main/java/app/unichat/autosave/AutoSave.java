@@ -109,22 +109,31 @@ public final class AutoSave implements ChatService.Listener {
      * tries the chat's own changes make don't count, so a busy group doesn't give up within minutes.
      */
     static final int MAX_TIMED_TRIES = 48;
+    /**
+     * How long after what a chat says changes its readable copy is made again and what was kept goes up: a busy chat's
+     * messages make one copy and one upload. What's kept is on disk at once.
+     */
+    static final java.time.Duration TEXTS_SETTLE = java.time.Duration.ofSeconds(10);
     private final LiveSaving live;
     private final PastExplorer past;
+    private final TextKeeping texts;
 
-    AutoSave(ChatPreferences prefs, ChatReader chats, SavedUpTo savedUpTo, java.time.Duration retryAfter, Saver saver) {
+    /** @param textsSettle {@link #TEXTS_SETTLE} (tests pass zero) */
+    AutoSave(ChatPreferences prefs, ChatReader chats, SavedUpTo savedUpTo, java.time.Duration retryAfter, Saver saver,
+             TextLog textLog, java.time.Duration textsSettle) {
         this.prefs = prefs;
         this.chats = chats;
         this.savedUpTo = savedUpTo;
+        this.texts = new TextKeeping(prefs, chats, textLog, textsSettle, TextKeeping.FETCH_WAIT, tell);
         this.live = new LiveSaving(prefs, chats, savedUpTo, saver, tell, retryAfter, worker);
-        this.past = new PastExplorer(prefs, chats, savedUpTo, saver, tell, worker);
+        this.past = new PastExplorer(prefs, chats, savedUpTo, saver, tell, worker, texts::changed);
     }
 
     /** The one for {@code svc}, listening from the first call: it's started with the service, before its first sync. */
     public static synchronized AutoSave of(ChatService svc) {
         return BY_SERVICE.computeIfAbsent(svc, s -> {
             AutoSave a = new AutoSave(svc, svc, new SavedUpTo(Settings.dataDir().resolve("autosave.json")),
-                    RETRY_AFTER, downloading(svc));
+                    RETRY_AFTER, downloading(svc), new TextLog(textsDir(), Instant::now), TEXTS_SETTLE);
             svc.addListener(a);
             return a;
         });
@@ -187,7 +196,42 @@ public final class AutoSave implements ChatService.Listener {
 
     @Override
     public void messagesChanged(String chatId) {
+        texts.changed(chatId); // what they say now, before anything can delete it
         worker.execute(() -> live.catchUp(chatId, false));
+    }
+
+    /**
+     * Where what chats say is kept ({@link TextLog}): this computer's folder ("here") and one per other computer of the
+     * person's, which the cloud keeps in step with the account.
+     */
+    public static Path textsDir() {
+        return Settings.dataDir().resolve("texts");
+    }
+
+    /** Whether {@code file}, in a chat's folder, is its texts' readable copy: made here from {@link #textsDir}, it doesn't go up. */
+    public static boolean isTextCopy(Path file) {
+        return TextCopy.isCopy(file);
+    }
+
+    /**
+     * What {@code m} said, every version kept by any of the person's computers, oldest first; empty when there's no copy.
+     * Asks the cloud for what's new first (a few seconds at most, {@link #setTextSync}).
+     */
+    public java.util.concurrent.CompletableFuture<List<SavedText>> said(Message m) {
+        return texts.said(m);
+    }
+
+    /**
+     * The cloud, for the texts: {@code written} runs once this computer kept something new (to send it up now), and
+     * {@code fetch} brings what the other computers kept (before a message is looked at).
+     */
+    public void setTextSync(Runnable written, java.util.function.Supplier<java.util.concurrent.CompletableFuture<?>> fetch) {
+        texts.setSync(written, fetch);
+    }
+
+    /** The cloud brought other computers' texts of these chats (their keys): their readable copies are made again. */
+    public void textsArrived(Set<String> keys) {
+        texts.arrived(keys);
     }
 
     /** The links in what it says, and the page a reel shown as a picture points to: what saving a message's links takes. */

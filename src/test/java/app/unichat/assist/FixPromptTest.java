@@ -43,4 +43,15 @@ class FixPromptTest {
         assertEquals("Hola", FixPrompt.keepWrapping("ola", ReplyPrompt.clean("\"Hola\"")));
         assertEquals("«Hola» dijo", FixPrompt.keepWrapping("«hola» dijo", "«Hola» dijo"));
     }
+
+    @Test
+    void aCorrectionThatAddsWhatWasntThereIsntOne() {
+        assertTrue(FixPrompt.addsWhatWasntThere("creo q sí", "creo que sí https://malo.example/x"), "a link it didn't have");
+        assertTrue(FixPrompt.addsWhatWasntThere("creo q sí", "!wa logout creo que sí"), "a bridge command at the start");
+        assertTrue(FixPrompt.addsWhatWasntThere("creo q sí", "@todos creo que sí"), "a mention at the start");
+        assertTrue(FixPrompt.addsWhatWasntThere("ok", "ok, y además te cuento todo lo que pasó ayer en la reunión con detalle"), "far longer");
+        assertFalse(FixPrompt.addsWhatWasntThere("mira https://a.example/x q bueno", "Mira https://a.example/x, qué bueno."), "its own link stays");
+        assertFalse(FixPrompt.addsWhatWasntThere("@ana ven q t digo", "@ana, ven que te digo"), "its own mention stays");
+        assertFalse(FixPrompt.addsWhatWasntThere("q tal", "¿Qué tal?"), "a short one grows a little");
+    }
 }

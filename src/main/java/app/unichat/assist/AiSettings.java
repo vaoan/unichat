@@ -43,6 +43,11 @@ public final class AiSettings {
 
     public static void setLearnStyle(boolean on) { Settings.get().setBool("ai.learnStyle", on); }
 
+    /** Every message sent from the message box is corrected by itself once it's gone (off unless chosen). */
+    public static boolean autoFix() { return Settings.get().getBool("ai.autoFix", false); }
+
+    public static void setAutoFix(boolean on) { Settings.get().setBool("ai.autoFix", on); }
+
     /** The sound when a draft or a fix is ready. */
     public static ReadySound.Tone readyTone() { return Settings.get().getEnum("ai.readySound", ReadySound.Tone.CHIME); }
 

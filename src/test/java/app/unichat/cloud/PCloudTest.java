@@ -28,6 +28,13 @@ class PCloudTest {
     static final java.time.Duration NO_LIMIT = java.time.Duration.ofNanos(Long.MAX_VALUE);
 
     @Test
+    void aFolderIsListed() throws Exception {
+        try (FakePCloud cloud = new FakePCloud("tok")) {
+            StorageListing.check(new PCloudApi(cloud.host(), "tok"));
+        }
+    }
+
+    @Test
     void foldersFilesAndWhetherTheyChanged() throws Exception {
         try (FakePCloud cloud = new FakePCloud("tok")) {
             PCloudApi api = new PCloudApi(cloud.host(), "tok");

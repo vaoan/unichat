@@ -61,6 +61,16 @@ public final class Cloud {
     private final List<SyncedPart> parts;
     private final SyncedPart settingsPart;
     private final MediaUpload media;
+    private final TextSync texts;
+    private final java.util.function.Consumer<java.util.Set<String>> textsArrived;
+    /** Asking for the texts alone, apart from the round: a round may be busy sending a video for minutes. */
+    private final ExecutorService textsWorker = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "cloud-texts");
+        t.setDaemon(true);
+        return t;
+    });
+    /** The texts' turn asked and not started yet: more asks meanwhile join it. */
+    private CompletableFuture<Void> textsPending;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "cloud");
         t.setDaemon(true);
@@ -71,7 +81,19 @@ public final class Cloud {
     private volatile Status status = Status.OFF;
     private int uploaded;
 
-    Cloud(Supplier<CloudAccount> account, SyncedPart settingsPart, SyncedPart stylePart, MediaUpload media) {
+    /**
+     * What chats say, kept on every computer ({@link TextSync}).
+     *
+     * @param dir where they're kept here
+     * @param made a file in a chat's folder made from them (their readable copy): it doesn't go up as media
+     * @param arrived told the chats (their keys) that something came for from another computer
+     */
+    public record Texts(Path dir, Predicate<Path> made, java.util.function.Consumer<java.util.Set<String>> arrived) {}
+
+    Cloud(Supplier<CloudAccount> account, SyncedPart settingsPart, SyncedPart stylePart, MediaUpload media, TextSync texts,
+          java.util.function.Consumer<java.util.Set<String>> textsArrived) {
+        this.texts = texts;
+        this.textsArrived = textsArrived;
         this.account = account;
         this.settingsPart = settingsPart;
         this.parts = List.of(settingsPart, stylePart);
@@ -83,9 +105,10 @@ public final class Cloud {
      * @param adoptPreferences takes the account's in their place, at once
      * @param settingsAdopted after the account's settings were taken: whatever shows them applies them
      * @param mediaFolders where chats save
+     * @param texts what chats say
      */
     public static Cloud create(Path dataDir, Supplier<byte[]> preferences, Predicate<byte[]> adoptPreferences,
-                               Runnable settingsAdopted, Supplier<List<Path>> mediaFolders) {
+                               Runnable settingsAdopted, Supplier<List<Path>> mediaFolders, Texts texts) {
         SyncedPart settings = new SyncedPart(CloudAccount.SETTINGS_FILE, "settings",
                 now -> Bundle.of(machine(), now, Settings.get().portable(), Bundle.readPreferences(preferences.get())),
                 theirs -> {
@@ -103,7 +126,9 @@ public final class Cloud {
         SyncedPart learned = new SyncedPart(CloudAccount.ROOT + "/Ajustes/unichat-ai.json", "ai",
                 now -> Bundle.of(machine(), now, Map.of(STYLE_FILE, read(style)), null),
                 theirs -> write(style, theirs.settings().getOrDefault(STYLE_FILE, "")));
-        return new Cloud(CloudAccount::saved, settings, learned, new MediaUpload(dataDir.resolve("cloud-uploaded.txt"), mediaFolders));
+        return new Cloud(CloudAccount::saved, settings, learned,
+                new MediaUpload(dataDir.resolve("cloud-uploaded.txt"), mediaFolders, texts.made()),
+                new TextSync(texts.dir(), dataDir.resolve("cloud-texts.json"), machine()), texts.arrived());
     }
 
     /** This computer, as the account's files say who wrote them. */
@@ -156,7 +181,13 @@ public final class Cloud {
                 doing(new Activity(Step.LEARNED, 0, 0, null));
                 parts.get(1).sync(dav, now);
             }
+            String textsFailed = null;
             if (CloudAccount.media()) {
+                try {
+                    syncTexts(dav); // small and what a deleted message is read from: before a long video
+                } catch (IOException e) {
+                    textsFailed = Errors.message(e); // told, but the media still go up
+                }
                 uploaded += media.run(dav, progressOf(Step.UPLOADING));
                 if (verifyNext || verifyDue(now)) {
                     verifyNext = false;
@@ -164,10 +195,38 @@ public final class Cloud {
                     Settings.get().set("cloud.lastVerify", now.toString());
                 }
             }
-            return publish(finished(now, null));
+            return publish(finished(now, textsFailed));
         } catch (IOException | RuntimeException e) {
             return publish(finished(status.lastSync(), Errors.message(e)));
         }
+    }
+
+    private void syncTexts(Storage dav) throws IOException {
+        java.util.Set<String> came = texts.run(dav);
+        if (!came.isEmpty()) textsArrived.accept(came);
+    }
+
+    /**
+     * The texts alone, now, on a thread of their own (a round may be sending a video): what this computer kept goes up,
+     * what the others kept comes. Done at once without an account; a failure is the next round's to tell.
+     */
+    public synchronized CompletableFuture<Void> textsNow() {
+        if (textsPending != null) return textsPending;
+        CompletableFuture<Void> f = new CompletableFuture<>();
+        textsPending = f;
+        textsWorker.execute(() -> {
+            synchronized (this) {
+                textsPending = null;
+            }
+            try {
+                CloudAccount a = account.get();
+                if (a != null && CloudAccount.media()) syncTexts(a.storage());
+            } catch (IOException | RuntimeException e) {
+                System.err.println("Cloud: texts: " + Errors.message(e));
+            }
+            f.complete(null);
+        });
+        return f;
     }
 
     private static boolean verifyDue(Instant now) {

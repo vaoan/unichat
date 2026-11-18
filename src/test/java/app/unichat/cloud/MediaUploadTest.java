@@ -35,6 +35,11 @@ class MediaUploadTest {
         @Override public String stamp(String path) { return null; }
         @Override public void mkdirs(String d) { }
 
+        @Override public List<String> list(String d) {
+            return files.keySet().stream().filter(p -> p.startsWith(d + "/")).map(p -> p.substring(d.length() + 1).split("/")[0])
+                    .distinct().toList();
+        }
+
         @Override public void put(String path, Path file) throws IOException {
             put(path, Files.readAllBytes(file));
         }
@@ -73,7 +78,8 @@ class MediaUploadTest {
     private Instant now = Instant.parse("2026-11-10T12:00:00Z");
 
     private MediaUpload uploader(Path chat) {
-        return new MediaUpload(dir.resolve("cloud-uploaded.txt"), () -> List.of(chat), () -> now);
+        return new MediaUpload(dir.resolve("cloud-uploaded.txt"), () -> List.of(chat), p -> p.getFileName().toString().startsWith("Chat ("),
+                () -> now);
     }
 
     private Path chat(String... files) throws IOException {
@@ -84,6 +90,14 @@ class MediaUploadTest {
 
     private static String remote(String name) {
         return CloudAccount.MEDIA + "/Ana/" + name;
+    }
+
+    @Test
+    void aFileMadeFromWhatTheCloudHasAlreadyDoesntGoUp() throws Exception {
+        Account acc = new Account();
+        Path c = chat("a.jpg", "Chat (WhatsApp) 3f2a9c1b2d4e.txt");
+        assertEquals(1, uploader(c).run(acc, (d, t, n) -> { }));
+        assertEquals(java.util.Set.of(remote("a.jpg")), acc.files.keySet(), "the texts' copy stays here: it grows, and its source goes up");
     }
 
     @Test

@@ -14,11 +14,13 @@ import java.util.Set;
 public final class MessageActions {
     private MessageActions() {}
 
-    enum Action { REPLY, COPY, OPEN_FILE, SAVE_AS, SAVE_LINK, TRANSCRIBE, EDIT, DELETE_FOR_EVERYONE, DELETE_FOR_ME, FAVORITE, FORWARD, PIN }
+    enum Action { REPLY, COPY, OPEN_FILE, SAVE_AS, SAVE_LINK, SAVED_TEXT, TRANSCRIBE, EDIT, FIX, DELETE_FOR_EVERYONE, DELETE_FOR_ME, FAVORITE, FORWARD, PIN }
 
     static Set<Action> of(Message m, RoomFeatures f, Instant now) {
         Set<Action> out = EnumSet.noneOf(Action.class);
-        if (m.deleted()) return out;
+        // What it said, from the texts' copy (or that there's none): all a deleted message has left, and an edited one's past.
+        if (m.deleted()) return EnumSet.of(Action.SAVED_TEXT);
+        if (m.edited()) out.add(Action.SAVED_TEXT);
         if (f.replies() || f.isUnknown()) out.add(Action.REPLY);
         if (!m.isMedia()) out.add(Action.COPY);
         if (m.mediaUrl() != null) {
@@ -39,7 +41,11 @@ public final class MessageActions {
         if (onServer && m.type() != MessageType.SYSTEM) out.add(Action.PIN);
         if (isStickerOrGif(m)) out.add(Action.FAVORITE);
         if (m.outgoing()) {
-            if (!m.isMedia() && f.canEdit(m.timestamp(), now)) out.add(Action.EDIT);
+            if (!m.isMedia() && f.canEdit(m.timestamp(), now)) {
+                out.add(Action.EDIT);
+                // Corrected and edited by itself, the message box left alone; once the server has it (its id is final).
+                if (onServer) out.add(Action.FIX);
+            }
             if (f.canDeleteForEveryone(m.timestamp(), now)) out.add(Action.DELETE_FOR_EVERYONE);
             else if (f.deleteForMe()) out.add(Action.DELETE_FOR_ME);
         }

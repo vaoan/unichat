@@ -35,6 +35,6 @@ record ForwardNote(boolean who, boolean where, boolean when) {
 
     /** A name strangers chose, on one line and without marks that turn text around: it goes as one's own words. */
     static String shown(String name) {
-        return name.replaceAll("[\\p{Cc}\\u202A-\\u202E\\u2066-\\u2069]+", " ").strip();
+        return app.unichat.support.Lines.one(name);
     }
 }

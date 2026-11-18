@@ -36,6 +36,18 @@ public final class FixPrompt {
                 + "Escribe únicamente el texto corregido: sin comillas añadidas, sin marcas y sin explicaciones.";
     }
 
+    /**
+     * Whether {@code fixed} brings what {@code original} didn't have: a link, a mention or a bridge command at its start,
+     * or far more text. A correction changes little; one sent without review (a message already sent, edited by
+     * itself) mustn't carry what a stranger's words, learned into how the person writes, steered the AI to add.
+     */
+    public static boolean addsWhatWasntThere(String original, String fixed) {
+        String o = original.strip(), f = fixed.strip();
+        if (!new java.util.HashSet<>(app.unichat.support.Urls.in(o)).containsAll(app.unichat.support.Urls.in(f))) return true;
+        for (char lead : new char[] {'@', '!', '/'}) if (f.indexOf(lead) == 0 && o.indexOf(lead) != 0) return true;
+        return f.length() > o.length() * 3 / 2 + 20;
+    }
+
     /** {@link ReplyPrompt#clean} takes off quotes or a code fence around the answer: those were the person's own. */
     public static String keepWrapping(String original, String fixed) {
         String o = original.strip();

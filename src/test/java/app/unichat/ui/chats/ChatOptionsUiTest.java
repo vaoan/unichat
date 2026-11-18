@@ -79,6 +79,24 @@ class ChatOptionsUiTest {
         FxWait.fx(() -> { overlay.getScene().getWindow().hide(); return null; });
     }
 
+    /** "Textos" is a kind like the others, for what others send and for what I send, each apart. */
+    @Test
+    void theTextsAreAKindOfTheirOwnOnEachSide() throws Exception {
+        MockChatService svc = new MockChatService();
+        String id = "!familia:demo";
+        StackPane overlay = open(svc, id);
+        CheckBox theirs = box(overlay, "Guardar lo que envíen en este chat");
+        CheckBox texts = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
+                .filter(b -> "Guardar lo que envíen en este chat: Textos (para poder ver lo que se borre)".equals(b.getAccessibleText()))
+                .findFirst().orElseThrow());
+        FxWait.fx(() -> { theirs.fire(); return null; });
+        assertTrue(svc.autoSaves(id).contains(SaveKind.TEXTS), "turned on: the texts too");
+        FxWait.fx(() -> { texts.fire(); return null; });
+        assertEquals(EnumSet.complementOf(EnumSet.of(SaveKind.TEXTS)), svc.autoSaves(id), "the texts left out alone");
+        assertTrue(svc.autoSaves(id, true).isEmpty(), "what I send untouched");
+        FxWait.fx(() -> { overlay.getScene().getWindow().hide(); return null; });
+    }
+
     @Test
     void savingTurnsOnWithEveryKindAndEachTurnsOffApart() throws Exception {
         MockChatService svc = new MockChatService();

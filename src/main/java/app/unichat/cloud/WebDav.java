@@ -89,6 +89,34 @@ public final class WebDav implements Storage {
         return m.find() ? m.group(1).strip() : null;
     }
 
+    /** What's in {@code dir}: its PROPFIND one level deep, each answer's last part but the folder's own. */
+    @Override
+    public java.util.List<String> list(String dir) throws IOException {
+        URI self = uri(dir);
+        HttpResponse<String> r = Http.send(http, HttpRequest.newBuilder(URI.create(self + "/")).timeout(answer).header("Authorization", auth)
+                .header("Depth", "1").method("PROPFIND", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+        if (r.statusCode() == 404) return java.util.List.of();
+        if (r.statusCode() != 207 && r.statusCode() != 200) throw failure(r.statusCode());
+        String own = trimmed(decoded(self.getRawPath()));
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("<(?:[A-Za-z0-9]+:)?href[^>]*>([^<]*)<").matcher(r.body());
+        while (m.find()) {
+            String href = m.group(1).strip().replace("&amp;", "&");
+            String path = trimmed(decoded(href.contains("://") ? URI.create(href).getRawPath() : href));
+            if (path.equals(own) || path.isEmpty()) continue; // the folder itself
+            out.add(path.substring(path.lastIndexOf('/') + 1));
+        }
+        return java.util.List.copyOf(out);
+    }
+
+    private static String decoded(String rawPath) {
+        return java.net.URLDecoder.decode(rawPath.replace("+", "%2B"), StandardCharsets.UTF_8);
+    }
+
+    private static String trimmed(String path) {
+        return path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+    }
+
     /** Makes {@code dir} and the folders above it that are missing. */
     @Override
     public void mkdirs(String dir) throws IOException {

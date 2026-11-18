@@ -107,7 +107,7 @@ class AutoSaveTest {
                 linkedInto.add(folder + " " + tag);
                 return null;
             }
-        });
+        }, new TextLog(dir.resolve("texts"), Instant::now), java.time.Duration.ZERO);
         a.setProgress(new AutoSave.Progress() {
             @Override public void changed(int done, int total) { told.add("progress " + done + "/" + total); }
             @Override public void finished(int saved, Chat c) {
@@ -181,7 +181,8 @@ class AutoSaveTest {
         if (!Files.isDirectory(folder)) return List.of();
         try (Stream<Path> s = Files.list(folder)) {
             // The names carry the message's id ("hoy [id].jpg"): what's compared here is the name it had.
-            return s.map(p -> p.getFileName().toString()).filter(n -> !n.startsWith("."))
+            // The texts' readable copy (every kind includes the texts) is made on a thread of its own: not a file saved.
+            return s.filter(p -> !AutoSave.isTextCopy(p)).map(p -> p.getFileName().toString()).filter(n -> !n.startsWith("."))
                     .map(n -> n.replaceFirst(" \\[[^\\]]+\\](\\.[^.]+)?$", "$1")).sorted().toList();
         }
     }
@@ -353,6 +354,27 @@ class AutoSaveTest {
         assertEquals(List.of("ayer.jpg", "contrato.pdf", "hoy.jpg", "primera.jpg"), saved(), "nothing twice");
         assertEquals(4, save.exploring(chat.id()).looked(), "it did look again (pressing it used to do nothing)");
         assertEquals(0, save.exploring(chat.id()).saved(), "and found it all saved already");
+    }
+
+    private static Message text(String body, Instant at) {
+        Message m = new Message("$" + body.hashCode() + at, "!familia:demo", "@ana", "Ana", false, at);
+        m.setType(MessageType.TEXT);
+        m.setBody(body);
+        return m;
+    }
+
+    @Test
+    void theTextsAreKeptAsTheyArriveAndBackThroughThePast() throws Exception {
+        svc.setAutoSave(chat.id(), EnumSet.of(SaveKind.TEXTS)).get();
+        Instant t = Instant.now();
+        Message old = text("lo de hace un mes", t.minusSeconds(30 * 86_400));
+        older.add(List.of(old));
+        Message now = text("lo de hoy", later(1));
+        arrive(now);
+        exploreAndWait();
+        assertEquals(List.of("lo de hoy"), save.said(now).get().stream().map(SavedText::text).toList(), "as it arrived");
+        assertEquals(List.of("lo de hace un mes"), save.said(old).get().stream().map(SavedText::text).toList(), "from the past");
+        assertEquals(List.of(), saved(), "texts aren't files to save");
     }
 
     @Test

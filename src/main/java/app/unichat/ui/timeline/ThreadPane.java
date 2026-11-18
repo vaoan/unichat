@@ -58,6 +58,8 @@ public final class ThreadPane extends BorderPane {
 
     /** The message actions (reacting), for tests. */
     MessageActionsUi actions() { return messageActions; }
+
+    MessageFixer fixer() { return messageFixer; }
     private final Label typing = new Label();
     private final TimelineScroll scroll;
     private final MessageRowView messageRows;
@@ -87,6 +89,8 @@ public final class ThreadPane extends BorderPane {
     private final MessageSelection selection;
     private ForwardSheet forwardSheet;
     private DeleteSheet deleteSheet;
+    private SavedTextSheet savedTextSheet;
+    private MessageFixer messageFixer;
     private final MessageSelection.Purpose forwarding, deleting;
     private final Consumer<String> toast;
 
@@ -115,6 +119,17 @@ public final class ThreadPane extends BorderPane {
                 m -> messageActions.allows(m, MessageActions.Action.DELETE_FOR_EVERYONE), this::delete);
         messageActions.setOnForward(m -> selection.start(m, forwarding));
         messageActions.setOnDelete(m -> delete(List.of(m)), m -> selection.start(m, deleting));
+        messageFixer = new MessageFixer(svc, text -> Platform.runLater(() -> toast.accept(text)));
+        messageFixer.addListener(onTranscript); // each message being corrected says so in its row
+        messageActions.setFixer(messageFixer);
+        // Ajustes → Escribir con IA → "Corregir cada mensaje que envío": what's sent goes at once, corrected after.
+        svc.addListener(messageFixer);
+        composer.setOnSent((chatId, text) -> {
+            if (AiReplyButton.SHOWN.get() && app.unichat.assist.AiSettings.autoFix()) messageFixer.expect(chatId, text);
+        });
+        messageActions.setOnSavedText(m -> {
+            if (savedTextSheet != null) savedTextSheet.show(app.unichat.autosave.AutoSave.of(svc).said(m));
+        });
         scroll = new TimelineScroll(list, rows, this, () -> chat != null, this::loadOlder);
         Node header = buildHeader();
         messageRows = new MessageRowView(svc, media, messageActions, openLink, () -> chat, this::member, scroll::jumpTo);
@@ -202,7 +217,10 @@ public final class ThreadPane extends BorderPane {
         });
     }
 
-    /** Transcript progress redraws the visible rows; coalesced so a model download doesn't flood the FX thread. */
+    /**
+     * Transcript progress and a message being corrected redraw the visible rows; coalesced so a model download doesn't
+     * flood the FX thread.
+     */
     private final FxCoalescer transcriptRedraw = new FxCoalescer(list::refresh);
     private final Runnable onTranscript = transcriptRedraw::request;
 
@@ -213,6 +231,8 @@ public final class ThreadPane extends BorderPane {
     /** Stops listening to what outlives this pane (the transcripts are the app's): the window is being rebuilt. */
     public void dispose() {
         Transcripts.get().removeListener(onTranscript);
+        messageFixer.removeListener(onTranscript);
+        svc.removeListener(messageFixer);
         pinnedBar.dispose();
     }
 
@@ -265,6 +285,9 @@ public final class ThreadPane extends BorderPane {
     /** Where deleting for everyone asks twice (the window's overlay). */
     public void setDeleteSheet(DeleteSheet sheet) { this.deleteSheet = sheet; }
 
+    /** Where what a deleted or edited message said shows (the window's overlay). */
+    public void setSavedTextSheet(SavedTextSheet sheet) { this.savedTextSheet = sheet; }
+
     /**
      * Asks twice about deleting {@code messages} for everyone; after the second yes they go, one at a time in the chat's
      * order, picking ends, and a notice says how it went.
@@ -287,6 +310,35 @@ public final class ThreadPane extends BorderPane {
     public void showDeleting() {
         List<Message> mine = svc.messages(chat.id()).stream().filter(deleting.pickable()).toList();
         delete(mine.subList(Math.max(0, mine.size() - 3), mine.size()));
+    }
+
+    /** Snapshot diagnostics: my newest message being corrected with AI (an answer that never comes). */
+    public void showFixing() {
+        List<Message> mine = svc.messages(chat.id()).stream().filter(Message::outgoing).toList();
+        if (mine.isEmpty()) return;
+        messageFixer.useWriter(() -> prompt -> {
+            try {
+                new java.util.concurrent.CountDownLatch(1).await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return prompt;
+        });
+        messageFixer.fix(mine.getLast());
+    }
+
+    /**
+     * Snapshot diagnostics: what the newest message said, as if deleted after an edit (two versions); {@code none}: the
+     * sheet for a message there's no copy of.
+     */
+    public void showSavedText(boolean none) {
+        if (savedTextSheet == null || svc.messages(chat.id()).isEmpty()) return;
+        Message m = svc.messages(chat.id()).getLast();
+        java.time.Instant at = m.timestamp() == null ? java.time.Instant.now() : m.timestamp();
+        List<app.unichat.autosave.SavedText> versions = none ? List.of() : List.of(
+                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at, m.senderName(), m.senderId(), m.outgoing(), m.body() + "…"),
+                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at.plusSeconds(90), m.senderName(), m.senderId(), m.outgoing(), m.body()));
+        savedTextSheet.show(java.util.concurrent.CompletableFuture.completedFuture(versions));
     }
 
     /** Snapshot diagnostics: the sheet for the newest message, or ({@code several}) the newest three picked. */
@@ -513,7 +565,7 @@ public final class ThreadPane extends BorderPane {
         } else if (code == javafx.scene.input.KeyCode.C && e.isShortcutDown() && !m.isMedia()) {
             Clipboards.copy(m.body());
         } else if ((code == javafx.scene.input.KeyCode.ENTER || code == javafx.scene.input.KeyCode.SPACE
-                || code == javafx.scene.input.KeyCode.CONTEXT_MENU) && !m.deleted()) {
+                || code == javafx.scene.input.KeyCode.CONTEXT_MENU)) { // a deleted one's too: what it said
             var cell = list.lookupAll(".row-cell").stream()
                     .filter(n -> n instanceof RowCell rc && rc.isSelected()).findFirst().orElse(list);
             messageActions.messageMenu(m).show(cell, Side.BOTTOM, 40, -10);

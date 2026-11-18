@@ -1,0 +1,52 @@
+package app.unichat.autosave;
+
+import app.unichat.model.Message;
+import app.unichat.model.MessageStatus;
+import app.unichat.model.MessageType;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import java.io.IOException;
+import java.time.Instant;
+
+/**
+ * One version of what a message said, as a computer kept it ({@link TextLog}): which message, of which chat, sent when
+ * ({@code at}) and by whom, and when this text was first seen ({@code seen}: an edit is seen after the message was
+ * sent). A line of JSON on disk, so whatever a stranger wrote is kept as it is and can't pass for another entry.
+ */
+public record SavedText(String id, String chatId, Instant at, Instant seen, String from, String fromId, boolean mine, String text) {
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    /**
+     * What {@code m} says now, seen {@code seen}; null when there's nothing to keep: deleted, media (auto-save's other
+     * kinds), nothing said, or mine still going out (its id is a temporary one).
+     */
+    static SavedText of(Message m, Instant seen) {
+        boolean said = m.type() == MessageType.TEXT || m.type() == MessageType.NOTICE || m.type() == MessageType.EMOTE;
+        if (!said || m.deleted() || m.timestamp() == null || m.body().isBlank()) return null;
+        if (m.status() == MessageStatus.SENDING || m.status() == MessageStatus.FAILED) return null;
+        return new SavedText(m.id(), m.chatId(), m.timestamp(), seen, m.senderName(), m.senderId(), m.outgoing(), m.body());
+    }
+
+    String json() {
+        ObjectNode n = JSON.createObjectNode().put("id", id).put("chat", chatId).put("at", at.toString()).put("seen", seen.toString())
+                .put("from", from).put("fromId", fromId).put("mine", mine).put("text", text);
+        return n.toString();
+    }
+
+    /** The entry a line holds; null for one that isn't whole (cut short, written by hand, from a later version). */
+    static SavedText parse(String line) {
+        try {
+            JsonNode n = JSON.readTree(line);
+            if (n == null || !n.isObject()) return null;
+            String id = n.path("id").asText(null), chat = n.path("chat").asText(null), text = n.path("text").asText(null);
+            String at = n.path("at").asText(null), seen = n.path("seen").asText(null);
+            if (id == null || chat == null || text == null || at == null || seen == null) return null;
+            return new SavedText(id, chat, Instant.parse(at), Instant.parse(seen), n.path("from").asText(""),
+                    n.path("fromId").asText(""), n.path("mine").asBoolean(false), text);
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
+    }
+}

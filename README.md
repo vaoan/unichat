@@ -81,7 +81,10 @@ memory, with simulated incoming messages, "typing…" and read receipts.
   goes to that program's service. The other corrects the spelling, accents and wording of what you wrote, changing
   as little as possible; it only sends that text. The result stays in the text box for you to review: it's never sent by itself.
   With "Learn how I write", drafts follow your style and learn from what you change in them; Settings shows what was
-  learned and lets you undo it.
+  learned and lets you undo it. A message of yours already sent can be corrected too ("Correct with AI" in its menu):
+  it's corrected in the background and edited by itself, the text box left free, the message showing it meanwhile.
+  "Correct every message I send" does that with each one you send from Unichat on this computer (it goes at once, as
+  written; many networks then mark it as edited).
 - **Voice notes to text**: "Transcribe" under each audio (or the T key). It uses Whisper, which comes with Unichat and
   runs on your computer, free and without sending the audio to any service; the model (60 or 190 MB) is downloaded
   the first time. In Settings → Voice to text you can choose the model and language, or set your own command
@@ -108,6 +111,8 @@ memory, with simulated incoming messages, "typing…" and read receipts.
 - **Save what they send**: in a chat's options (the gear in its profile), photos, videos, audio, documents, GIFs and the
   videos behind links are saved as they arrive, even with the chat closed, in a folder per chat; its past can be saved
   too. "Save link" in a message's menu saves one on demand. Links go through yt-dlp (and gallery-dl if you have it).
+  With "Texts" chosen too, a copy of what's said is kept, so a message deleted later can still be read ("See what it
+  said…" in its menu, or the chat's readable `.txt` in its folder); every computer of yours adds what it saw.
 - **Your own cloud**: Settings → Cloud keeps your settings, chat options, what the AI learned and the saved files in
   your pCloud, Dropbox or WebDAV storage (Icedrive, Nextcloud…), the same on every computer.
 - Chat actions: mark read/unread, favorite, pin, mute, low priority, archive,

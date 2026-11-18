@@ -86,17 +86,10 @@ public final class ChatOptions {
         VBox danger = new VBox(12, warning, sectionTitle(I18n.t(chat.group() ? "info.leaveGroup" : "info.deleteChat")), leave(chat));
         VBox card = new VBox(12, title, tabs(general, danger), general, danger, new HBox(10, grow, done));
         card.getStyleClass().addAll("card", "folder-dialog", "chat-options");
-        card.setPrefWidth(WIDTH);
         card.sceneProperty().addListener((o, a, scene) -> {
             if (scene == null) Platform.runLater(after);
         });
-        // Scrolls when taller than the window (big text): the overlay keeps a Region within its height, never a Group.
-        javafx.scene.control.ScrollPane scroll = new javafx.scene.control.ScrollPane(card);
-        scroll.setFitToWidth(true);
-        scroll.setMaxWidth(WIDTH + 24);
-        scroll.setMaxHeight(Region.USE_PREF_SIZE);
-        scroll.getStyleClass().addAll("side-panel-scroll", "chat-options-scroll");
-        show.accept(scroll);
+        show.accept(app.unichat.ui.Sheets.scrolling(card, WIDTH));
         Platform.runLater(theirs.on::requestFocus);
     }
 

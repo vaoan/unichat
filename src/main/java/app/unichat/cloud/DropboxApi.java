@@ -90,6 +90,23 @@ public final class DropboxApi implements Storage {
         }
     }
 
+    /** Page after page: Dropbox gives a folder's names in pieces, {@code has_more} until the last. */
+    @Override
+    public java.util.List<String> list(String dir) throws IOException {
+        JsonNode page;
+        try {
+            page = rpc("/2/files/list_folder", JSON.createObjectNode().put("path", abs(dir)));
+        } catch (Missing gone) {
+            return java.util.List.of();
+        }
+        java.util.List<String> out = new java.util.ArrayList<>();
+        while (true) {
+            for (JsonNode n : page.path("entries")) out.add(n.path("name").asText());
+            if (!page.path("has_more").asBoolean(false)) return out;
+            page = rpc("/2/files/list_folder/continue", JSON.createObjectNode().put("cursor", page.path("cursor").asText()));
+        }
+    }
+
     @Override
     public void mkdirs(String dir) throws IOException {
         // Uploading makes the folders it needs; this one only makes sure an empty one exists.

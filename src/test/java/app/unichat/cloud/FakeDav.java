@@ -19,6 +19,10 @@ final class FakeDav implements AutoCloseable {
     final Set<String> dirs = ConcurrentHashMap.newKeySet();
     final Map<String, Integer> versions = new ConcurrentHashMap<>();
     final AtomicInteger gets = new AtomicInteger(), puts = new AtomicInteger();
+    /** Whether a listing gives whole addresses ("https://host/dav/…", as some servers do) rather than paths. */
+    volatile boolean wholeHrefs;
+    /** Paths whose next PUT fails (the network dropped), once each. */
+    final Set<String> failOnce = ConcurrentHashMap.newKeySet();
     private final HttpServer server;
     private final String auth;
 
@@ -45,7 +49,7 @@ final class FakeDav implements AutoCloseable {
                 x.sendResponseHeaders(401, -1);
                 return;
             }
-            String path = URLDecoder.decode(x.getRequestURI().getRawPath(), StandardCharsets.UTF_8).replaceFirst("^/dav/?", "");
+            String path = URLDecoder.decode(x.getRequestURI().getRawPath(), StandardCharsets.UTF_8).replaceFirst("^/dav/?", "").replaceFirst("/$", "");
             byte[] body = x.getRequestBody().readAllBytes();
             switch (x.getRequestMethod()) {
                 case "PROPFIND" -> {
@@ -53,15 +57,28 @@ final class FakeDav implements AutoCloseable {
                         x.sendResponseHeaders(404, -1);
                         return;
                     }
-                    byte[] xml = ("<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\"><d:response><d:propstat><d:prop>"
+                    StringBuilder listed = new StringBuilder();
+                    if ("1".equals(x.getRequestHeaders().getFirst("Depth"))) {
+                        for (String child : children(path)) {
+                            listed.append("<d:response><d:href>").append(wholeHrefs ? url() + "/" : "/dav/").append(href(path.isEmpty() ? child : path + "/" + child))
+                                    .append("</d:href></d:response>");
+                        }
+                    }
+                    byte[] xml = ("<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\"><d:response><d:href>"
+                            + (wholeHrefs ? url() + "/" : "/dav/") + href(path)
+                            + "/</d:href><d:propstat><d:prop>"
                             + (files.containsKey(path) ? "<d:getetag>\"" + versions.get(path) + "\"</d:getetag><d:getcontentlength>"
                                     + files.get(path).length + "</d:getcontentlength>" : "")
-                            + "</d:prop></d:propstat></d:response></d:multistatus>").getBytes(StandardCharsets.UTF_8);
+                            + "</d:prop></d:propstat></d:response>" + listed + "</d:multistatus>").getBytes(StandardCharsets.UTF_8);
                     x.sendResponseHeaders(207, xml.length);
                     x.getResponseBody().write(xml);
                 }
                 case "MKCOL" -> x.sendResponseHeaders(dirs.add(path) ? 201 : 405, -1);
                 case "PUT" -> {
+                    if (failOnce.remove(path)) {
+                        x.sendResponseHeaders(503, -1);
+                        return;
+                    }
                     puts.incrementAndGet();
                     put(path, body);
                     x.sendResponseHeaders(201, -1);
@@ -79,6 +96,25 @@ final class FakeDav implements AutoCloseable {
                 default -> x.sendResponseHeaders(405, -1);
             }
         }
+    }
+
+    /** The names right in {@code dir}, as a server says them: each once. */
+    private java.util.Set<String> children(String dir) {
+        java.util.Set<String> out = new java.util.TreeSet<>();
+        for (String p : files.keySet()) if (p.startsWith(dir + "/")) out.add(p.substring(dir.length() + 1).split("/")[0]);
+        for (String p : dirs) if (p.startsWith(dir + "/")) out.add(p.substring(dir.length() + 1).split("/")[0]);
+        return out;
+    }
+
+    /** {@code path} as an href: each part encoded, as servers write them. */
+    private static String href(String path) {
+        StringBuilder b = new StringBuilder();
+        for (String part : path.split("/")) {
+            if (part.isEmpty()) continue;
+            if (!b.isEmpty()) b.append('/');
+            b.append(java.net.URLEncoder.encode(part, StandardCharsets.UTF_8).replace("+", "%20"));
+        }
+        return b.toString();
     }
 
     @Override public void close() {

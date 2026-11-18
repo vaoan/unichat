@@ -9,12 +9,23 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 class FoldersTest {
+    @Test
+    void aPrivateFolderIsTheOwnersAlone(@org.junit.jupiter.api.io.TempDir Path tmp) throws Exception {
+        Path dir = Folders.ownerOnly(tmp.resolve("texts/here"));
+        assertTrue(java.nio.file.Files.isDirectory(dir));
+        if (dir.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            assertEquals("rwx------", java.nio.file.attribute.PosixFilePermissions.toString(java.nio.file.Files.getPosixFilePermissions(dir)));
+        }
+        assertEquals(dir, Folders.ownerOnly(dir), "there already: fine");
+    }
+
     @TempDir Path dir;
 
     private Path tree() throws IOException {

@@ -174,6 +174,7 @@ public final class MainView extends StackPane {
         forwards = new app.unichat.ui.timeline.ForwardBar(svc, this::openChatId);
         thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(svc, this::showOverlay, this::hideOverlay, forwards::show));
         thread.setDeleteSheet(new app.unichat.ui.timeline.DeleteSheet(this::showOverlay, this::hideOverlay));
+        thread.setSavedTextSheet(new app.unichat.ui.timeline.SavedTextSheet(this::showOverlay, this::hideOverlay, this::toast));
         offerChatOptions(svc);
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::gearClicked);
 
@@ -575,6 +576,16 @@ public final class MainView extends StackPane {
     /** The question before deleting the newest messages of mine for everyone (snapshot diagnostics). */
     public void showDeleting() {
         if (thread.chat() != null) thread.showDeleting();
+    }
+
+    /** My newest message in the open chat being corrected with AI (snapshot diagnostics). */
+    public void showFixing() {
+        if (thread.chat() != null) thread.showFixing();
+    }
+
+    /** What a deleted message said, or ({@code none}) that there's no copy, for the open chat (snapshot diagnostics). */
+    public void showSavedText(boolean none) {
+        if (thread.chat() != null) thread.showSavedText(none);
     }
 
     /** The sheet that asks how hard to protect a photo, for the open chat (snapshot diagnostics). */

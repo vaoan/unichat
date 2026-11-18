@@ -56,6 +56,19 @@ final class FakePCloud implements AutoCloseable {
                     else if (dirs.contains(p)) json(x, "{\"result\": 0, \"metadata\": {\"isfolder\": true}}");
                     else json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
                 }
+                case "listfolder" -> {
+                    String p = q.get("path");
+                    if (!dirs.contains(p)) {
+                        json(x, "{\"result\": 2005, \"error\": \"Directory does not exist.\"}");
+                        return;
+                    }
+                    java.util.Set<String> names = new java.util.TreeSet<>();
+                    for (String f : files.keySet()) if (f.startsWith(p + "/")) names.add(f.substring(p.length() + 1).split("/")[0]);
+                    for (String d : dirs) if (d.startsWith(p + "/")) names.add(d.substring(p.length() + 1).split("/")[0]);
+                    StringBuilder contents = new StringBuilder();
+                    for (String n : names) contents.append(contents.isEmpty() ? "" : ",").append("{\"name\": \"").append(n).append("\"}");
+                    json(x, "{\"result\": 0, \"metadata\": {\"contents\": [" + contents + "]}}");
+                }
                 case "checksumfile" -> {
                     byte[] f = files.get(q.get("path"));
                     if (f == null) json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");

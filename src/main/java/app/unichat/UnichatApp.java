@@ -229,8 +229,12 @@ public final class UnichatApp extends Application {
         if (!(svc instanceof app.unichat.service.MockChatService) || System.getProperty("unichat.snapshot") != null) {
             cloud = app.unichat.cloud.Cloud.create(Settings.dataDir(), svc::preferencesJson, svc::adoptPreferences,
                     () -> Platform.runLater(() -> { if (mainView != null) mainView.settingsSynced(); }),
-                    () -> app.unichat.autosave.AutoSave.of(svc).folders());
+                    () -> app.unichat.autosave.AutoSave.of(svc).folders(),
+                    new app.unichat.cloud.Cloud.Texts(app.unichat.autosave.AutoSave.textsDir(), app.unichat.autosave.AutoSave::isTextCopy,
+                            app.unichat.autosave.AutoSave.of(svc)::textsArrived));
             app.unichat.cloud.Cloud c = cloud;
+            // What a chat says goes up as soon as it's kept, and looking at a deleted message asks the other computers first.
+            app.unichat.autosave.AutoSave.of(svc).setTextSync(c::textsNow, c::textsNow);
             // What it's doing: on the tray (its menu's lines and ring) and on the settings gear.
             c.addListener(() -> {
                 app.unichat.cloud.Cloud.Status st = c.status();

@@ -14,6 +14,18 @@ import java.util.List;
 public final class Folders {
     private Folders() {}
 
+    /**
+     * {@code dir}, made if missing, readable by its owner alone where the system has owners and modes (another account on
+     * the computer can't list or read it): for what's private, as a copy of what chats said.
+     */
+    public static Path ownerOnly(Path dir) throws IOException {
+        Files.createDirectories(dir);
+        if (dir.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            Files.setPosixFilePermissions(dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+        }
+        return dir;
+    }
+
     /** Removes {@code dir} and all it holds; nothing there is fine. Whatever can go goes, then the first failure is thrown. */
     public static void delete(Path dir) throws IOException {
         List<IOException> failures = sweep(dir);

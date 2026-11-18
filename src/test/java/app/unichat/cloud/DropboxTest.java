@@ -37,6 +37,13 @@ class DropboxTest {
     }
 
     @Test
+    void aFolderIsListed() throws Exception {
+        try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
+            StorageListing.check(api(fake, DropboxApi.SINGLE, 1024));
+        }
+    }
+
+    @Test
     void filesWhetherTheyChangedAndNamesWithAccents() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
             DropboxApi api = api(fake, DropboxApi.SINGLE, 1024);

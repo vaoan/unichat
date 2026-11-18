@@ -40,6 +40,8 @@ final class PastExplorer {
     private final AutoSave.Saver saver;
     private final AutoSave.Progress progress;
     private final Executor worker;
+    /** A page of the past was loaded: what it says is kept too ({@link TextKeeping#changed}). */
+    private final java.util.function.Consumer<String> pageLoaded;
     private final Map<String, Exploring> exploring = new ConcurrentHashMap<>();
     private final Set<String> stopping = ConcurrentHashMap.newKeySet();
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
@@ -49,7 +51,8 @@ final class PastExplorer {
     private String exploringChat;
 
     PastExplorer(ChatPreferences prefs, ChatReader chats, SavedUpTo savedUpTo, AutoSave.Saver saver,
-            AutoSave.Progress progress, Executor worker) {
+            AutoSave.Progress progress, Executor worker, java.util.function.Consumer<String> pageLoaded) {
+        this.pageLoaded = pageLoaded;
         this.prefs = prefs;
         this.chats = chats;
         this.savedUpTo = savedUpTo;
@@ -121,6 +124,7 @@ final class PastExplorer {
             end(chatId, chat, false);
             return;
         }
+        pageLoaded.accept(chatId);
         List<Message> old = chats.messages(chatId).stream()
                 .filter(m -> !m.deleted() && m.timestamp() != null && !wanted.of(m).isEmpty() && savedUpTo.isOld(chatId, m))
                 .sorted(Comparator.comparing(Message::timestamp).reversed()).toList();

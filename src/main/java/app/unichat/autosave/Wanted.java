@@ -25,6 +25,11 @@ record Wanted(Set<SaveKind> theirs, Set<SaveKind> mine) {
         return m.status() == MessageStatus.SENDING || m.status() == MessageStatus.FAILED ? Set.of() : mine;
     }
 
+    /** Whether what's said is kept, of others or mine. */
+    boolean texts() {
+        return theirs.contains(SaveKind.TEXTS) || mine.contains(SaveKind.TEXTS);
+    }
+
     boolean none() {
         return theirs.isEmpty() && mine.isEmpty();
     }

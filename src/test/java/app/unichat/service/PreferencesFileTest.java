@@ -501,11 +501,14 @@ class PreferencesFileTest {
         PreferencesFile p = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
         assertTrue(p.saveKinds("k", false).isEmpty(), "nothing saved at first");
         p.choose("k", PreferencesFile.Flag.AUTO_SAVE, true); // turned on before there were kinds
-        assertEquals(java.util.EnumSet.allOf(app.unichat.model.SaveKind.class), p.saveKinds("k", false));
+        assertEquals(java.util.EnumSet.complementOf(java.util.EnumSet.of(app.unichat.model.SaveKind.TEXTS)), p.saveKinds("k", false),
+                "every kind but the texts, which a chat that saved already keeps only once asked");
         p.chooseSaveKinds("k", false, java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS, app.unichat.model.SaveKind.LINKS));
         p.flush();
         PreferencesFile again = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
         assertEquals(java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS, app.unichat.model.SaveKind.LINKS), again.saveKinds("k", false), "kept");
+        again.chooseSaveKinds("k", false, java.util.EnumSet.of(app.unichat.model.SaveKind.TEXTS));
+        assertEquals(java.util.EnumSet.of(app.unichat.model.SaveKind.TEXTS), again.saveKinds("k", false), "the texts alone");
         again.chooseSaveKinds("k", false, java.util.Set.of());
         assertTrue(again.saveKinds("k", false).isEmpty(), "none chosen: off");
         again.flush(); // its save runs on a thread of its own: done before the folder goes, or it races the deletion

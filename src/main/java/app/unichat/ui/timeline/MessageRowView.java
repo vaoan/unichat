@@ -298,6 +298,7 @@ final class MessageRowView {
         HBox meta = new HBox(4);
         meta.getStyleClass().add("bubble-meta");
         meta.setAlignment(Pos.CENTER_RIGHT);
+        if (actions.fixing(m)) meta.getChildren().add(fixingNote());
         if (m.edited() && !m.deleted()) meta.getChildren().add(new Label(I18n.t("message.edited")));
         meta.getChildren().add(new Label(Formats.time(m.timestamp(), ZoneId.systemDefault())));
         if (m.outgoing()) meta.getChildren().add(statusIcon(m.status()));
@@ -305,6 +306,15 @@ final class MessageRowView {
         metaRow.setAlignment(Pos.CENTER_RIGHT);
         metaRow.setMaxWidth(Double.MAX_VALUE);
         return metaRow;
+    }
+
+    /** "Corrigiendo con IA…" with a turning wheel, on the message being corrected (and only on it). */
+    private static Node fixingNote() {
+        javafx.scene.control.ProgressIndicator wheel = new javafx.scene.control.ProgressIndicator();
+        wheel.getStyleClass().add("message-fixing-wheel"); // as big as the text (app.css)
+        Label l = new Label(I18n.t("messageFix.working"), wheel);
+        l.getStyleClass().addAll("transcript-status", "message-fixing");
+        return l;
     }
 
     /** A double click hearts the message, where the chat takes that reaction. */

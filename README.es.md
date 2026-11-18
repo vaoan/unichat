@@ -81,7 +81,10 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   va al servicio de ese programa. El otro corrige la ortografía, las tildes y la redacción de lo que escribiste, cambiando
   lo mínimo; solo envía ese texto. El resultado queda en el cuadro de texto para que lo revises: nunca se envía solo.
   Con «Aprender cómo escribo», los borradores siguen tu estilo y aprenden de lo que les cambias; Ajustes muestra lo
-  aprendido y te deja deshacerlo.
+  aprendido y te deja deshacerlo. También se puede corregir un mensaje tuyo ya enviado («Corregir con IA» en su menú):
+  se corrige en segundo plano y se edita solo, con el cuadro de texto libre y el mensaje mostrándolo mientras tanto.
+  «Corregir cada mensaje que envío» lo hace con cada uno que envías desde Unichat en este computador (sale al
+  instante, como lo escribiste; muchas redes lo marcan después como editado).
 - **Notas de voz a texto**: "Transcribir" bajo cada audio (o la tecla T). Usa Whisper, que viene con Unichat y
   corre en tu computador, gratis y sin enviar el audio a ningún servicio; el modelo (60 o 190 MB) se descarga
   la primera vez. En Ajustes → Voz a texto puedes elegir modelo e idioma, o poner tu propio comando
@@ -108,7 +111,9 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
 - **Guardar lo que envíen**: en las opciones de un chat (el engranaje de su perfil), fotos, videos, audios, documentos,
   GIFs y los videos de los enlaces se guardan en cuanto llegan, aunque el chat esté cerrado, en una carpeta por chat;
   también se puede guardar su pasado. «Guardar enlace» en el menú de un mensaje guarda uno cuando quieras. Los enlaces
-  pasan por yt-dlp (y gallery-dl si lo tienes).
+  pasan por yt-dlp (y gallery-dl si lo tienes). Con «Textos» elegido, también se guarda una copia de lo que se dice,
+  para leer después un mensaje que se borró («Ver lo que decía…» en su menú, o el `.txt` del chat en su carpeta); cada
+  computador tuyo suma lo que vio.
 - **Tu propia nube**: Ajustes → Nube guarda tus ajustes, las opciones de los chats, lo que aprendió la IA y los archivos
   guardados en tu pCloud, Dropbox o WebDAV (Icedrive, Nextcloud…), iguales en cada computador.
 - Acciones por chat: marcar leído/no leído, favorito, fijar, silenciar, prioridad baja, archivar,

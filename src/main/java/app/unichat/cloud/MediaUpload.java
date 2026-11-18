@@ -45,16 +45,21 @@ final class MediaUpload {
     private final Set<String> done = new LinkedHashSet<>();
     private final Map<String, Retry> retries = new ConcurrentHashMap<>();
     private final Set<String> conflicts = ConcurrentHashMap.newKeySet();
+    private final java.util.function.Predicate<Path> made;
     private boolean loaded;
 
-    /** @param folders where chats save, each one's name its folder in the account */
-    MediaUpload(Path record, Supplier<List<Path>> folders) {
-        this(record, folders, Instant::now);
+    /**
+     * @param folders where chats save, each one's name its folder in the account
+     * @param made files there made again here from what goes up otherwise (a chat's texts' copy): they stay here
+     */
+    MediaUpload(Path record, Supplier<List<Path>> folders, java.util.function.Predicate<Path> made) {
+        this(record, folders, made, Instant::now);
     }
 
-    MediaUpload(Path record, Supplier<List<Path>> folders, Supplier<Instant> clock) {
+    MediaUpload(Path record, Supplier<List<Path>> folders, java.util.function.Predicate<Path> made, Supplier<Instant> clock) {
         this.record = record;
         this.folders = folders;
+        this.made = made;
         this.clock = clock;
     }
 
@@ -188,7 +193,7 @@ final class MediaUpload {
         try (DirectoryStream<Path> in = Files.newDirectoryStream(folder)) {
             for (Path p : in) {
                 String name = p.getFileName().toString();
-                if (!Files.isRegularFile(p) || name.startsWith(".") || name.endsWith(".part") || name.endsWith(".ytdl")) continue;
+                if (!Files.isRegularFile(p) || name.startsWith(".") || name.endsWith(".part") || name.endsWith(".ytdl") || made.test(p)) continue;
                 if (!done.contains(key(folder, p))) out.add(p);
             }
         }

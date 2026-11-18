@@ -9,6 +9,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,6 +46,27 @@ final class FakeDropbox implements AutoCloseable {
         access = "expired-" + access;
     }
 
+    /**
+     * The names right in {@code dir}, as Dropbox gives them: the first one, then the rest after its cursor (the cursor is
+     * the folder here), so taking only the first page loses names.
+     */
+    private void list(HttpExchange x, String dir, boolean rest) throws IOException {
+        java.util.Set<String> names = new java.util.TreeSet<>();
+        boolean there = folders.contains(dir);
+        for (String f : files.keySet()) if (f.startsWith(dir + "/")) { names.add(f.substring(dir.length() + 1).split("/")[0]); there = true; }
+        for (String d : folders) if (d.startsWith(dir + "/")) names.add(d.substring(dir.length() + 1).split("/")[0]);
+        if (!there) {
+            reply(x, 409, "{\"error_summary\": \"path/not_found/..\"}");
+            return;
+        }
+        List<String> all = List.copyOf(names), page = rest ? all.subList(Math.min(1, all.size()), all.size()) : all.subList(0, Math.min(1, all.size()));
+        com.fasterxml.jackson.databind.node.ObjectNode out = JSON.createObjectNode();
+        com.fasterxml.jackson.databind.node.ArrayNode entries = out.putArray("entries");
+        for (String n : page) entries.addObject().put("name", n);
+        out.put("cursor", dir).put("has_more", !rest && all.size() > 1);
+        reply(x, 200, JSON.writeValueAsString(out));
+    }
+
     /** Someone else (another computer) puts a file there. */
     void put(String path, byte[] data) {
         files.put(path, data);
@@ -79,6 +101,8 @@ final class FakeDropbox implements AutoCloseable {
                     else if (folders.contains(p)) reply(x, 200, "{\".tag\": \"folder\", \"id\": \"id:f\"}");
                     else reply(x, 409, "{\"error_summary\": \"path/not_found/..\"}");
                 }
+                case "/2/files/list_folder" -> list(x, arg.path("path").asText(), false);
+                case "/2/files/list_folder/continue" -> list(x, arg.path("cursor").asText(), true);
                 case "/2/files/create_folder_v2" -> {
                     if (!folders.add(arg.path("path").asText())) reply(x, 409, "{\"error_summary\": \"path/conflict/folder/..\"}");
                     else reply(x, 200, "{}");

@@ -45,6 +45,11 @@ public final class PreferencesFile {
         AUTO_SAVE_MINE_NO_PHOTOS("autoSaveMineNoPhotos"), AUTO_SAVE_MINE_NO_VIDEOS("autoSaveMineNoVideos"),
         AUTO_SAVE_MINE_NO_AUDIO("autoSaveMineNoAudio"), AUTO_SAVE_MINE_NO_DOCUMENTS("autoSaveMineNoDocuments"),
         AUTO_SAVE_MINE_NO_GIFS("autoSaveMineNoGifs"), AUTO_SAVE_MINE_NO_LINKS("autoSaveMineNoLinks"),
+        /**
+         * The texts are kept: chosen, unlike the kinds above (left out), so a chat that saved before texts existed
+         * doesn't start keeping what's said without being asked.
+         */
+        AUTO_SAVE_TEXTS("autoSaveTexts"), AUTO_SAVE_MINE_TEXTS("autoSaveMineTexts"),
         /** The profile doesn't show what was shared in this chat (its options). */
         MEDIA_HIDDEN("mediaHidden");
 
@@ -389,7 +394,7 @@ public final class PreferencesFile {
         Entry e = chats.get(key);
         java.util.Set<app.unichat.model.SaveKind> out = EnumSet.noneOf(app.unichat.model.SaveKind.class);
         if (e == null || !is(e, mine ? Flag.AUTO_SAVE_MINE : Flag.AUTO_SAVE)) return out;
-        for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) if (!is(e, leftOut(k, mine))) out.add(k);
+        for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) if (is(e, flag(k, mine)) == chosen(k)) out.add(k);
         return out;
     }
 
@@ -397,11 +402,16 @@ public final class PreferencesFile {
     public synchronized void chooseSaveKinds(String key, boolean mine, java.util.Set<app.unichat.model.SaveKind> kinds) {
         Entry e = entry(key);
         e.values.put(mine ? Flag.AUTO_SAVE_MINE : Flag.AUTO_SAVE, !kinds.isEmpty());
-        for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) e.values.put(leftOut(k, mine), !kinds.contains(k));
+        for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) e.values.put(flag(k, mine), kinds.contains(k) == chosen(k));
         changed();
     }
 
-    private static Flag leftOut(app.unichat.model.SaveKind k, boolean mine) {
+    /** Whether {@code k}'s flag says it's chosen ({@link Flag#AUTO_SAVE_TEXTS}) rather than left out. */
+    private static boolean chosen(app.unichat.model.SaveKind k) {
+        return k == app.unichat.model.SaveKind.TEXTS;
+    }
+
+    private static Flag flag(app.unichat.model.SaveKind k, boolean mine) {
         return switch (k) {
             case PHOTOS -> mine ? Flag.AUTO_SAVE_MINE_NO_PHOTOS : Flag.AUTO_SAVE_NO_PHOTOS;
             case VIDEOS -> mine ? Flag.AUTO_SAVE_MINE_NO_VIDEOS : Flag.AUTO_SAVE_NO_VIDEOS;
@@ -409,6 +419,7 @@ public final class PreferencesFile {
             case DOCUMENTS -> mine ? Flag.AUTO_SAVE_MINE_NO_DOCUMENTS : Flag.AUTO_SAVE_NO_DOCUMENTS;
             case GIFS -> mine ? Flag.AUTO_SAVE_MINE_NO_GIFS : Flag.AUTO_SAVE_NO_GIFS;
             case LINKS -> mine ? Flag.AUTO_SAVE_MINE_NO_LINKS : Flag.AUTO_SAVE_NO_LINKS;
+            case TEXTS -> mine ? Flag.AUTO_SAVE_MINE_TEXTS : Flag.AUTO_SAVE_TEXTS;
         };
     }
 

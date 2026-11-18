@@ -54,7 +54,24 @@ final class MessageActionsUi {
     /** Links offered in a message's menu: the keyboard has no other way to them. */
     private static final int MENU_LINKS = 5;
 
-    private Consumer<Message> onForward = m -> { }, onDelete = m -> { }, onDeleteSeveral = m -> { };
+    private Consumer<Message> onForward = m -> { }, onDelete = m -> { }, onDeleteSeveral = m -> { }, onSavedText = m -> { };
+
+    private MessageFixer fixer;
+
+    /** "Corregir con IA": corrects a message already sent, apart from the message box. */
+    void setFixer(MessageFixer fixer) {
+        this.fixer = fixer;
+    }
+
+    /** Whether {@code m} is being corrected now: its row says so. */
+    boolean fixing(Message m) {
+        return fixer != null && fixer.fixing(m.id());
+    }
+
+    /** "Ver lo que decía…": what {@code m} said, from the copy of the chat's texts. */
+    void setOnSavedText(Consumer<Message> show) {
+        this.onSavedText = show;
+    }
 
     /** "Reenviar…": picking messages to forward starts with {@code m}. */
     void setOnForward(Consumer<Message> forward) {
@@ -122,19 +139,24 @@ final class MessageActionsUi {
         HBox box = new HBox(2);
         box.getStyleClass().add("hover-actions");
         box.setAlignment(Pos.CENTER);
-        if (m.deleted()) return box;
-        if (!quick().isEmpty() || chat.get().features().anyReaction()) {
+        // A deleted message has only its menu left, with what it said.
+        if (!m.deleted() && (!quick().isEmpty() || chat.get().features().anyReaction())) {
             Button react = Icons.iconButton(Icons.EMOJI, I18n.t("message.react"), null);
             react.setOnAction(e -> reactionPopup(m, react));
             box.getChildren().add(react);
         }
         if (allows(m, MessageActions.Action.REPLY)) box.getChildren().add(Icons.iconButton(Icons.REPLY, I18n.t("message.reply"), () -> composer.reply(m)));
-        Button more = Icons.iconButton(Icons.MORE, I18n.t("message.more"), null);
-        more.setOnAction(e -> messageMenu(m).show(more, Side.BOTTOM, 0, 0));
-        box.getChildren().add(more);
+        box.getChildren().add(more(m));
         // Reachable with the timeline keys instead; tabbing through every message would be unusable.
         box.getChildren().forEach(n -> n.setFocusTraversable(false));
         return box;
+    }
+
+    /** The "⋯" that opens the message's menu. */
+    private Button more(Message m) {
+        Button more = Icons.iconButton(Icons.MORE, I18n.t("message.more"), null);
+        more.setOnAction(e -> messageMenu(m).show(more, Side.BOTTOM, 0, 0));
+        return more;
     }
 
     private void reactionPopup(Message m, Node anchor) {
@@ -206,7 +228,7 @@ final class MessageActionsUi {
     private static final List<MessageActions.Action> MENU_ORDER = List.of(MessageActions.Action.SAVE_LINK,
             MessageActions.Action.REPLY, MessageActions.Action.COPY, MessageActions.Action.FORWARD, MessageActions.Action.OPEN_FILE,
             MessageActions.Action.SAVE_AS, MessageActions.Action.TRANSCRIBE, MessageActions.Action.FAVORITE, MessageActions.Action.PIN,
-            MessageActions.Action.EDIT);
+            MessageActions.Action.EDIT, MessageActions.Action.FIX, MessageActions.Action.SAVED_TEXT);
 
     ContextMenu messageMenu(Message m) {
         ContextMenu menu = new ContextMenu();
@@ -270,6 +292,10 @@ final class MessageActionsUi {
                         : List.of(ChatMenus.item(I18n.t("message.pin"), () -> pins.pin(chatId, m)));
             }
             case EDIT -> List.of(item("message.edit", act, m));
+            // With the AI turned on, and not twice: its row already says it's being corrected.
+            case FIX -> fixer == null || !AiReplyButton.SHOWN.get() || fixer.fixing(m.id()) ? List.of()
+                    : List.of(ChatMenus.item(I18n.t("message.fix"), () -> fixer.fix(m)));
+            case SAVED_TEXT -> List.of(ChatMenus.item(I18n.t("message.savedText"), () -> onSavedText.accept(m)));
             case DELETE_FOR_EVERYONE, DELETE_FOR_ME -> List.of();
         };
     }

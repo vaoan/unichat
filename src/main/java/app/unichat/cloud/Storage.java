@@ -23,6 +23,9 @@ public interface Storage {
     /** Makes {@code dir} and the folders above it that are missing. */
     void mkdirs(String dir) throws IOException;
 
+    /** The names of what's right in {@code dir}, files and folders; empty when there's no such folder. */
+    java.util.List<String> list(String dir) throws IOException;
+
     void put(String path, Path file) throws IOException;
 
     /** The same, telling {@code sent} the running total of bytes gone out (null: nobody listens). */

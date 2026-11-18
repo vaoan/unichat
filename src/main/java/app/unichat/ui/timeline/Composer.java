@@ -65,6 +65,8 @@ public final class Composer extends VBox {
     private final Map<String, String> drafts = new HashMap<>();
     private final PauseTransition typingStop = new PauseTransition(Duration.seconds(4));
     private final Consumer<String> onError;
+    /** A text just sent (not an edit): the chat and what it said. */
+    private java.util.function.BiConsumer<String, String> onSent = (chat, text) -> { };
     private String chatId;
     private Message replyTo;
     private Message editing;
@@ -455,6 +457,8 @@ public final class Composer extends VBox {
         if (editing != null) {
             if (!text.equals(editing.body())) svc.editMessage(chatId, editing.id(), text).exceptionally(this::fail);
         } else {
+            // Told before it goes: the server may confirm it before the next line runs. What it'll say: no "/me".
+            onSent.accept(chatId, Message.withoutEmoteCommand(text));
             svc.sendText(chatId, text, replyTo == null ? null : replyTo.id()).exceptionally(this::fail);
             ai.sent(chatId, text);
         }
@@ -462,6 +466,11 @@ public final class Composer extends VBox {
         drafts.remove(chatId);
         cancelMode();
         stopTyping();
+    }
+
+    /** Runs as each text is sent from the box (not an edit), just before it goes: correcting it by itself, when that's on. */
+    void setOnSent(java.util.function.BiConsumer<String, String> onSent) {
+        this.onSent = onSent;
     }
 
     private Void fail(Throwable t) {

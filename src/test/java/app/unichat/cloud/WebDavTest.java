@@ -28,6 +28,21 @@ class WebDavTest {
         }
     }
     @Test
+    void aFolderIsListed() throws Exception {
+        try (FakeDav cloud = new FakeDav("u", "p")) {
+            StorageListing.check(new WebDav(cloud.url(), "u", "p"));
+        }
+    }
+
+    @Test
+    void aFolderIsListedFromWholeAddressesToo() throws Exception {
+        try (FakeDav cloud = new FakeDav("u", "p")) {
+            cloud.wholeHrefs = true;
+            StorageListing.check(new WebDav(cloud.url(), "u", "p"));
+        }
+    }
+
+    @Test
     void foldersFilesAndWhetherTheyChanged() throws Exception {
         try (FakeDav cloud = new FakeDav("yo@correo.com", "clave")) {
             WebDav dav = new WebDav(cloud.url(), "yo@correo.com", "clave");

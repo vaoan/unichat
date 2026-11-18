@@ -85,10 +85,31 @@ class MessageActionsTest {
     }
 
     @Test
-    void deletedMessagesHaveNoActions() throws Exception {
+    void aDeletedMessageOnlyOffersWhatItSaid() throws Exception {
         Message m = msg(true, MessageType.TEXT, null);
         m.setDeleted(true);
-        assertEquals(Set.of(), MessageActions.of(m, f(WHATSAPP), SENT));
+        assertEquals(Set.of(SAVED_TEXT), MessageActions.of(m, f(WHATSAPP), SENT), "the copy, or that there's none");
+    }
+
+    @Test
+    void whatCanStillBeEditedCanBeCorrected() throws Exception {
+        assertTrue(MessageActions.of(msg(true, MessageType.TEXT, null), f(WHATSAPP), SENT.plusSeconds(600)).contains(FIX));
+        assertFalse(MessageActions.of(msg(true, MessageType.TEXT, null), f(WHATSAPP), SENT.plusSeconds(901)).contains(FIX), "too late to edit");
+        assertFalse(MessageActions.of(msg(false, MessageType.TEXT, null), f(WHATSAPP), SENT).contains(FIX), "only one's own");
+        assertFalse(MessageActions.of(msg(true, MessageType.IMAGE, "image/jpeg"), f(WHATSAPP), SENT).contains(FIX), "only text");
+        Message going = msg(true, MessageType.TEXT, null);
+        going.setStatus(app.unichat.model.MessageStatus.SENDING);
+        assertFalse(MessageActions.of(going, f(WHATSAPP), SENT).contains(FIX), "not while its id is a temporary one");
+        going.setStatus(app.unichat.model.MessageStatus.FAILED);
+        assertFalse(MessageActions.of(going, f(WHATSAPP), SENT).contains(FIX), "nor when it didn't go");
+    }
+
+    @Test
+    void anEditedMessageOffersWhatItSaidBefore() throws Exception {
+        Message m = msg(false, MessageType.TEXT, null);
+        assertFalse(MessageActions.of(m, f(WHATSAPP), SENT).contains(SAVED_TEXT), "never changed: it says it all");
+        m.setEdited(true);
+        assertTrue(MessageActions.of(m, f(WHATSAPP), SENT).contains(SAVED_TEXT));
     }
 
     @Test
