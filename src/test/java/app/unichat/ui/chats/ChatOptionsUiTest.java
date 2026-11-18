@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** A chat's options: saving what arrives turns on with every kind, each kind turns off apart, and it says where. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ChatOptionsUiTest {
-    @Test
-    void savingTurnsOnWithEveryKindAndEachTurnsOffApart() throws Exception {
+    /** The chat's options, opened in a window of their own; saving starts off, what's sent and what I send. */
+    private static StackPane open(MockChatService svc, String id) throws Exception {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
@@ -35,11 +35,10 @@ class ChatOptionsUiTest {
             // another UI test started the toolkit
         }
         Platform.setImplicitExit(false);
-        MockChatService svc = new MockChatService();
-        String id = "!familia:demo";
         // The test data folder is the whole run's: start from a known state, and leave it so.
         svc.setMediaHidden(id, false).get();
-        svc.setAutoSave(id, java.util.Set.of()).get();
+        svc.setAutoSave(id, false, java.util.Set.of()).get();
+        svc.setAutoSave(id, true, java.util.Set.of()).get();
         StackPane overlay = FxWait.fx(() -> {
             StackPane o = new StackPane();
             Stage stage = new Stage();
@@ -50,6 +49,41 @@ class ChatOptionsUiTest {
             return o;
         });
         FxWait.until("the sheet shows", () -> overlay.lookup(".chat-options") != null);
+        return overlay;
+    }
+
+    private static CheckBox box(StackPane overlay, String text) throws Exception {
+        return FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
+                .filter(b -> b.getText().equals(text)).findFirst().orElseThrow());
+    }
+
+    /**
+     * Saving what's sent on and what I send off left the person's own photos out without a word: they thought saving
+     * was broken. A note says so, only then, and goes with what I send turned on.
+     */
+    @Test
+    void whileOnlyWhatOthersSendIsSavedANoteSaysMineIsnt() throws Exception {
+        MockChatService svc = new MockChatService();
+        String id = "!familia:demo";
+        StackPane overlay = open(svc, id);
+        Node note = FxWait.fx(() -> overlay.lookup(".chat-options-mine-note"));
+        assertFalse(FxWait.fx(note::isVisible), "nothing saved: nothing to say");
+        CheckBox theirs = box(overlay, "Guardar lo que envíen en este chat"), mine = box(overlay, "Guardar lo que yo envíe en este chat");
+        FxWait.fx(() -> { theirs.fire(); return null; });
+        assertTrue(FxWait.fx(note::isVisible), "theirs saved, mine not: said");
+        assertTrue(FxWait.fx(() -> ((javafx.scene.control.Label) note).getText()).contains("tú"));
+        FxWait.fx(() -> { mine.fire(); return null; });
+        assertFalse(FxWait.fx(note::isVisible), "mine saved too");
+        FxWait.fx(() -> { mine.fire(); theirs.fire(); return null; });
+        assertFalse(FxWait.fx(note::isVisible), "nothing saved again");
+        FxWait.fx(() -> { overlay.getScene().getWindow().hide(); return null; });
+    }
+
+    @Test
+    void savingTurnsOnWithEveryKindAndEachTurnsOffApart() throws Exception {
+        MockChatService svc = new MockChatService();
+        String id = "!familia:demo";
+        StackPane overlay = open(svc, id);
         List<CheckBox> boxes = FxWait.fx(() -> overlay.lookupAll(".chat-options-kinds .check-box").stream().map(n -> (CheckBox) n).toList());
         CheckBox on = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
                 .filter(b -> b.getText().equals("Guardar lo que envíen en este chat")).findFirst().orElseThrow());

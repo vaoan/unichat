@@ -58,6 +58,11 @@ public final class ChatOptions {
         SaveChoice mine = new SaveChoice(I18n.t("chatOptions.autoSaveMine"), svc.autoSaves(chat.id(), true),
                 k -> svc.setAutoSave(chat.id(), true, k), () -> AutoSave.of(svc).startNow(chat.id()));
         Label help = Labels.help(I18n.t("chatOptions.autoSaveHelp"));
+        // What's sent saved and what I send not: one's own photos were left out without a word, and it looked broken.
+        Label mineNote = Labels.help(I18n.t("chatOptions.autoSaveMineOff"));
+        mineNote.getStyleClass().addAll("chat-options-mine-note", "risk-notice");
+        mineNote.visibleProperty().bind(theirs.on.selectedProperty().and(mine.on.selectedProperty().not()));
+        mineNote.managedProperty().bind(mineNote.visibleProperty());
         theirs.on.setAccessibleHelp(help.getText());
         Button openFolder = new Button(I18n.t("chatOptions.openFolder"));
         openFolder.getStyleClass().add("secondary-button");
@@ -74,7 +79,7 @@ public final class ChatOptions {
         showMedia.setWrapText(true);
         showMedia.setOnAction(e -> svc.setMediaHidden(chat.id(), !showMedia.isSelected()));
         VBox general = new VBox(12, sectionTitle(I18n.t("chatOptions.profileTitle")), showMedia,
-                sectionTitle(I18n.t("chatOptions.autoSaveTitle")), theirs.node, mine.node, help,
+                sectionTitle(I18n.t("chatOptions.autoSaveTitle")), theirs.node, mine.node, mineNote, help,
                 folderRow(chat), openFolder, sectionTitle(I18n.t("chatOptions.pastTitle")),
                 past(chat, theirs.on.selectedProperty().or(mine.on.selectedProperty())));
         Label warning = Labels.help(I18n.t("chatOptions.dangerHelp"));
