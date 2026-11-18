@@ -104,6 +104,11 @@ public final class Message {
     public com.fasterxml.jackson.databind.JsonNode mediaInfo() { return mediaInfo; }
     public void setMediaInfo(com.fasterxml.jackson.databind.JsonNode info) { this.mediaInfo = info; }
 
+    private List<Integer> voiceWaveform;
+    /** A voice note's waveform (empty when it came without one), or null when the audio isn't a voice note. */
+    public List<Integer> voiceWaveform() { return voiceWaveform; }
+    public void setVoiceWaveform(List<Integer> waveform) { this.voiceWaveform = waveform == null ? null : List.copyOf(waveform); }
+
     public String fileName() { return fileName; }
     public void setFileName(String fileName) { this.fileName = fileName; }
     /** MIME type of the media (e.g. {@code image/webp}), or null when unknown. */
@@ -166,6 +171,7 @@ public final class Message {
         m.mediaUrl = mediaUrl;
         m.externalUrl = externalUrl;
         m.mediaInfo = mediaInfo;
+        m.voiceWaveform = voiceWaveform;
         m.fileName = fileName;
         m.mimeType = mimeType;
         m.fileSize = fileSize;

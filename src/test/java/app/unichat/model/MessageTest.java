@@ -30,6 +30,7 @@ class MessageTest {
         m.setMediaUrl("mxc://s/v");
         m.setExternalUrl("https://example.org/reel");
         m.setMediaInfo(new ObjectMapper().readTree("{\"duration\":3}"));
+        m.setVoiceWaveform(List.of(0, 512));
         m.setFileName("v.mp4");
         m.setMimeType("video/mp4");
         m.setFileSize(5);

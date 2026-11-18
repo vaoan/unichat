@@ -81,6 +81,21 @@ final class SyncEvents {
         m.setMimeType(text(info, "mimetype"));
         m.setSize(info.path("w").asInt(0), info.path("h").asInt(0));
         m.setFileSize(info.path("size").asLong(0));
+        m.setVoiceWaveform(t == MessageType.AUDIO && content.has(VOICE) ? waveform(content.path(AUDIO).path("waveform")) : null);
+    }
+
+    static final String VOICE = "org.matrix.msc3245.voice", AUDIO = "org.matrix.msc1767.audio";
+    /** As many bars as any network draws: a stranger's longer list goes no further. */
+    private static final int MAX_BARS = 1000;
+
+    /** A voice note's waveform as the MSC writes it, each value 0 to 1024; anything else in it left out. */
+    private static List<Integer> waveform(JsonNode wave) {
+        List<Integer> bars = new java.util.ArrayList<>();
+        for (JsonNode v : wave) {
+            if (bars.size() == MAX_BARS) break;
+            if (v.isInt()) bars.add(Math.clamp(v.asInt(), 0, 1024));
+        }
+        return bars;
     }
 
     /** Removes the "> quoted" reply fallback that precedes the real body. */

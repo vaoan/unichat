@@ -25,6 +25,7 @@ public final class Forwarding {
         into.setFileSize(from.fileSize());
         into.setSize(from.width(), from.height());
         into.setMediaInfo(from.mediaInfo());
+        into.setVoiceWaveform(from.voiceWaveform());
     }
 
     /** What a forward going on has done: how many went and failed of how many, which chat and message now. Read on any thread. */

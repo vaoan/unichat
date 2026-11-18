@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.DoubleConsumer;
@@ -217,6 +218,7 @@ final class MessageSender {
         boolean gif = gifs && chat != null && !NetworkFormats.of(chat.network()).gifVideosAsIs() && app.unichat.video.GifVideos.fits(m);
         boolean copy = m.isMedia() && (gif || needsCopy(m.mediaUrl()));
         ObjectNode content = ForwardedContent.of(m, copy);
+        keepVoice(content, m, chat);
         String txn = core.newTxnId();
         synchronized (proc) {
             proc.addLocalEcho(chatId, txn, echo -> app.unichat.service.Forwarding.copy(m, echo));
@@ -410,13 +412,29 @@ final class MessageSender {
         if (how == null) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("send.noVoice")));
         return sendMedia(chatId, note.file(), replyToId, new Kind(how.mime(), 0, 0, note.durationMs(), false, p -> { }), content -> {
             content.with("info").put("duration", note.durationMs());
-            if (!how.voice()) return;
-            content.putObject("org.matrix.msc3245.voice");
-            ObjectNode audio = content.putObject("org.matrix.msc1767.audio");
-            audio.put("duration", note.durationMs());
-            ArrayNode wave = audio.putArray("waveform");
-            note.waveform().forEach(wave::add);
+            if (how.voice()) markVoice(content, note.durationMs(), note.waveform());
         }).thenApply(id -> null);
+    }
+
+    /** The flag and the waveform that make a network show a voice note's player instead of a file. */
+    private static void markVoice(ObjectNode content, long durationMs, List<Integer> waveform) {
+        content.putObject(SyncEvents.VOICE);
+        ObjectNode audio = content.putObject(SyncEvents.AUDIO);
+        audio.put("duration", durationMs);
+        ArrayNode wave = audio.putArray("waveform");
+        waveform.forEach(wave::add);
+    }
+
+    /**
+     * A forwarded voice note goes as one where the chat has them: Telegram's bridge takes Ogg only as a voice note, and
+     * refused it as a plain audio file.
+     */
+    private static void keepVoice(ObjectNode content, Message m, Chat chat) {
+        if (m.voiceWaveform() == null) return;
+        RoomFeatures.VoiceSend how = (chat == null ? RoomFeatures.UNKNOWN : chat.features()).voiceSend();
+        if (how == null || !how.voice()) return;
+        if (m.mimeType() != null && m.mimeType().startsWith("audio/ogg")) content.with("info").put("mimetype", how.mime());
+        markVoice(content, m.durationMs(), m.voiceWaveform());
     }
 
     private CompletableFuture<Void> sendMedia(String chatId, Path file, String replyToId, String mime, int width, int height,

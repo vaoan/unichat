@@ -365,6 +365,36 @@ class SendStickerTest {
         assertNull(path, "nothing went");
     }
 
+    /**
+     * A Telegram voice note forwarded to Telegram: its bridge takes Ogg only as a voice note (room_features as it
+     * publishes them), so without the mark it refused it ("unsupported media type (audio/ogg in m.audio)").
+     */
+    @Test
+    void aForwardedVoiceNoteGoesAsAVoiceNoteWithItsWaveform() throws Exception {
+        MatrixChatService svc = chatOn("telegram");
+        svc.processor().process(MatrixClient.JSON.readTree("""
+                {"rooms":{"join":{"!c:example.org":{"state":{"events":[
+                  {"type":"com.beeper.room_features","state_key":"","sender":"@telegrambot:example.org","event_id":"$f","origin_server_ts":1,
+                   "content":{"id":"tg","file":{
+                     "m.audio":{"mime_types":{"audio/mp4":2,"audio/mpeg":2}},
+                     "org.matrix.msc3245.voice":{"mime_types":{"audio/mp4":2,"audio/mpeg":2,"audio/ogg":2}}}}}]}}}}}"""), false);
+        JsonNode event = MatrixClient.JSON.readTree("""
+                {"type":"m.room.message","sender":"@telegram_1:example.org","event_id":"$v","origin_server_ts":1,
+                 "content":{"msgtype":"m.audio","body":"audio.ogg","url":"mxc://s/voz",
+                  "info":{"mimetype":"audio/ogg","size":3,"duration":33000},
+                  "org.matrix.msc1767.audio":{"duration":33000,"waveform":[0,512,1024]},
+                  "org.matrix.msc3245.voice":{}}}""");
+        app.unichat.model.Message m = new app.unichat.model.Message("$v", "!x:example.org", "@telegram_1:example.org", "Ana", false, java.time.Instant.EPOCH);
+        JsonNode content = event.path("content");
+        SyncEvents.applyContent(m, "m.audio", content.path("body").asText(), content);
+        svc.forward("!c:example.org", m, true).get();
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("m.audio", sent.path("msgtype").asText());
+        assertTrue(sent.has("org.matrix.msc3245.voice"), body);
+        assertEquals(1024, sent.path("org.matrix.msc1767.audio").path("waveform").get(2).asInt());
+        assertEquals(33000, sent.path("org.matrix.msc1767.audio").path("duration").asLong());
+    }
+
     @Test
     void aForwardedTextGoesAsItIs() throws Exception {
         MatrixChatService svc = chatOn("telegram");
