@@ -36,7 +36,13 @@ final class StickerSetSection {
     /** Sets opened from a sticker that aren't among yours, newest first. */
     private final List<StickerPack.Ref> others = new ArrayList<>();
     private final Map<String, StickerPack> packs = new HashMap<>();
-    private final Set<String> open = new HashSet<>(), loading = new HashSet<>(), failed = new HashSet<>();
+    private final Set<String> open = new HashSet<>(), loading = new HashSet<>();
+    /** Sets that couldn't be brought, and when: searching tries one again after {@link #ASK_AGAIN_MS} (the bridge wasn't ready). */
+    private final Map<String, Long> failed = new HashMap<>();
+    /** The clock failures are timed by (a test moves it). */
+    java.util.function.LongSupplier clock = System::currentTimeMillis;
+    /** Sets are brought for searching one after another: each is asked of Telegram sticker by sticker. */
+    private boolean bringingAll;
     private String scrollTo;
 
     StickerSetSection(StickerSets svc, Runnable refresh) {
@@ -73,9 +79,45 @@ final class StickerSetSection {
             if (isOpen) out.add(body(r.url(), name, tile));
             if (r.url().equals(scrollTo)) {
                 show.accept(head);
-                if (packs.containsKey(r.url()) || failed.contains(r.url())) scrollTo = null;
+                if (packs.containsKey(r.url()) || failed.containsKey(r.url())) scrollTo = null;
             }
         }
+        return out;
+    }
+
+    /**
+     * Brings every set of yours (and any opened) not here yet, for searching them, one after another; each refreshes as
+     * it comes. One that failed is tried again once a while has passed.
+     */
+    void loadAll() {
+        askForYours();
+        if (bringingAll) return;
+        String next = missing();
+        if (next == null) return;
+        bringingAll = true;
+        load(next, () -> {
+            bringingAll = false;
+            loadAll();
+        });
+    }
+
+    /** The first set listed that isn't here, being brought, or failed a moment ago; null when none. */
+    private String missing() {
+        List<StickerPack.Ref> all = new ArrayList<>(others);
+        if (yours != null) all.addAll(yours);
+        long now = clock.getAsLong();
+        for (StickerPack.Ref r : all) {
+            Long at = failed.get(r.url());
+            if (!packs.containsKey(r.url()) && !loading.contains(r.url()) && (at == null || now - at >= ASK_AGAIN_MS)) return r.url();
+        }
+        return null;
+    }
+
+    /** The sets brought so far: yours first, then others opened. */
+    List<StickerPack> loaded() {
+        List<StickerPack> out = new ArrayList<>();
+        if (yours != null) for (StickerPack.Ref r : yours) if (packs.containsKey(r.url())) out.add(packs.get(r.url()));
+        for (StickerPack.Ref r : others) if (packs.containsKey(r.url()) && !out.contains(packs.get(r.url()))) out.add(packs.get(r.url()));
         return out;
     }
 
@@ -95,29 +137,43 @@ final class StickerSetSection {
     private Node body(String url, String name, BiFunction<MediaLibrary.Item, String, Node> tile) {
         StickerPack p = packs.get(url);
         if (p == null) {
-            if (failed.contains(url)) return Labels.help(I18n.t("sticker.setFailed"));
+            if (failed.containsKey(url)) return Labels.help(I18n.t("sticker.setFailed"));
             load(url);
             return Labels.help(I18n.t("sticker.setLoading"));
         }
         FlowPane grid = new FlowPane(6, 6);
         for (MediaLibrary.Item i : p.stickers()) {
-            String emoji = i.info() == null ? "" : i.info().path("fi.mau.bridged_sticker").path("emoji").asText("");
-            grid.getChildren().add(tile.apply(i, I18n.t("library.stickerInSet", emoji, name).strip()));
+            grid.getChildren().add(tile.apply(i, inSet(i, name)));
         }
         return grid;
     }
 
+    /** What a sticker of the set {@code name} is, for a screen reader: its emoji and its set. */
+    static String inSet(MediaLibrary.Item i, String name) {
+        return StickerFinder.says("library.stickerInSet", i, name);
+    }
+
     private void load(String url) {
-        if (!loading.add(url)) return;
+        load(url, () -> { });
+    }
+
+    /** Brings {@code url}'s set, then runs {@code then}, whether it came or not. */
+    private void load(String url, Runnable then) {
+        if (!loading.add(url)) {
+            then.run();
+            return;
+        }
         svc.stickerPack(url).whenComplete((p, err) -> Platform.runLater(() -> {
             loading.remove(url);
             if (err != null) {
                 System.err.println("Sticker set not fetched: " + err);
-                failed.add(url);
+                failed.put(url, clock.getAsLong());
             } else {
+                failed.remove(url);
                 packs.put(url, p);
             }
             refresh.run();
+            then.run();
         }));
     }
 

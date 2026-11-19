@@ -76,6 +76,10 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
 - **Stickers entre redes**: los sets de stickers de Telegram en el panel lateral (los tuyos y cualquiera que abras desde
   el menú de un sticker). Un sticker llega a cualquier red en un formato que acepte: un GIF animado llega a Telegram como
   sticker animado (un WebP animado, como los de WhatsApp, llega quieto).
+- **Buscar stickers**, como en Telegram: una palabra («gato», «risa») encuentra los stickers del emoji que nombra, un
+  emoji los suyos y el nombre de un set ese set, entre tus favoritos, recientes y todos tus sets. Si lo que escribes en
+  el mensaje es un solo emoji, arriba del cuadro aparecen tus stickers de ese emoji y uno se envía en su lugar
+  (Ajustes → Apariencia → Escritura lo apaga).
 - **Escribir con IA**: en Ajustes → Escribir con IA puedes activar dos botones que usan Claude Code o Codex, si tienes
   alguno instalado. Uno escribe un borrador siguiendo tus instrucciones y con el chat como contexto; al pulsarlo, ese chat
   va al servicio de ese programa. El otro corrige la ortografía, las tildes y la redacción de lo que escribiste, cambiando

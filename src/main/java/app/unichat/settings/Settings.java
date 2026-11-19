@@ -326,6 +326,9 @@ public final class Settings {
     public void setForwardSaysWhere(boolean v) { setBool("forward.where", v); }
     public boolean forwardSaysWhen() { return getBool("forward.when", false); }
     public void setForwardSaysWhen(boolean v) { setBool("forward.when", v); }
+    /** A message box holding one emoji alone shows the stickers of that emoji above it (on unless turned off). */
+    public boolean suggestStickers() { return getBool("compose.suggestStickers", true); }
+    public void setSuggestStickers(boolean v) { setBool("compose.suggestStickers", v); }
     public boolean sendOnEnter() { return getBool("compose.sendOnEnter", true); }
     public void setSendOnEnter(boolean v) { setBool("compose.sendOnEnter", v); }
     public boolean notificationsEnabled() { return getBool("notify.enabled", true); }

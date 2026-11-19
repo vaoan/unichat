@@ -501,6 +501,40 @@ public final class Composer extends VBox {
         this.sending = sending;
     }
 
+    /** What the box holds, as it's typed: stickers are suggested from it. */
+    public javafx.beans.value.ObservableValue<String> typed() {
+        return input.textProperty();
+    }
+
+    /** Whether a sent message is being edited: no sticker can take its place. */
+    public boolean isEditing() {
+        return editing != null;
+    }
+
+    /**
+     * What empties the box later (a suggested sticker went instead of what was typed): only if it's still this chat's,
+     * holding the same text, and not an edit; anything else typed or another chat open meanwhile stays.
+     */
+    public Runnable clearLater() {
+        String chat = chatId, text = input.getText();
+        return () -> {
+            if (editing == null && java.util.Objects.equals(chat, chatId) && text.equals(input.getText())) {
+                input.clear();
+                drafts.remove(chatId);
+            }
+        };
+    }
+
+    /** {@code r} runs when the chat or the box's mode (replying, editing) changes. */
+    public void setOnModeChange(Runnable r) {
+        onModeChange = r;
+    }
+
+    /** Puts {@code n} just above the box (under what's already there), for another package's line. */
+    public void showJustAbove(Node n) {
+        statuses.getChildren().add(n);
+    }
+
     /** Files and voice notes go in their chat's turn through {@code inTurn}. */
     void setInTurn(InTurn inTurn) {
         this.inTurn = inTurn;
@@ -523,7 +557,10 @@ public final class Composer extends VBox {
         updateBanner();
     }
 
+    private Runnable onModeChange = () -> { };
+
     private void updateBanner() {
+        onModeChange.run();
         boolean show = replyTo != null || editing != null;
         Nodes.show(banner, show);
         if (replyTo != null) {

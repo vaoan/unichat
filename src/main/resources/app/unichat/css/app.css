@@ -1006,3 +1006,6 @@
 .pinned-title { -fx-text-fill: -accent; -fx-font-weight: bold; -fx-font-size: 0.85em; }
 .pinned-count { -fx-text-fill: -text-2; -fx-font-size: 0.85em; }
 .pinned-preview { -fx-text-fill: -text; -fx-font-size: 0.95em; }
+
+/* Stickers of the one emoji typed, above the message box: one row that scrolls sideways. */
+.sticker-suggestions { -fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0.25em 0.5em; }

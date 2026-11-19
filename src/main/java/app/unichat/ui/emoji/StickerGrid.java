@@ -10,15 +10,18 @@ import app.unichat.model.RoomFeatures;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Network;
+import app.unichat.model.StickerPack;
 import app.unichat.service.ChatService;
 import app.unichat.service.FavoriteRefresh;
 import app.unichat.settings.Settings;
 import app.unichat.ui.Icons;
+import app.unichat.ui.SearchFields;
 import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
 import javafx.geometry.Pos;
 import javafx.scene.layout.FlowPane;
@@ -28,8 +31,11 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -38,6 +44,8 @@ import java.util.function.Supplier;
  */
 public final class StickerGrid extends ScrollPane {
     private static final int TILE = 76;
+    /** The most a search shows (each tile loads its picture): a few screens; more words narrow it. */
+    static final int MOST_FOUND = 60;
 
     private final Supplier<String> takeReply;
     private final ChatService svc;
@@ -46,11 +54,21 @@ public final class StickerGrid extends ScrollPane {
     private final Consumer<String> toast;
     private final VBox content = new VBox(10);
     private final TileCache tiles = new TileCache();
-    private final StickerSetSection sets;
+    final StickerSetSection sets;
     private boolean rebuilding;
     /** By itself, a rebuild some set failed in tries again only after this (each set is asked of Telegram sticker by sticker). */
     private static final long RETRY_MS = 10 * 60_000;
     private long notBefore;
+    /** On top, kept across redraws (the focus stays in it while typing): a word or an emoji finds stickers. */
+    private final TextField search = new TextField();
+    private final Node searchBox;
+    private EmojiSearch names;
+    /** Runs at each redraw (a set arrived, a favourite changed): the suggestions follow. */
+    private Runnable refreshed = () -> { };
+
+    void onRefresh(Runnable r) {
+        refreshed = r;
+    }
 
     public StickerGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Supplier<String> takeReply, Consumer<String> toast) {
         this.takeReply = takeReply;
@@ -59,6 +77,12 @@ public final class StickerGrid extends ScrollPane {
         this.chat = chat;
         this.toast = toast;
         this.sets = new StickerSetSection(svc, this::refresh);
+        search.setPromptText(I18n.t("sticker.search"));
+        search.setAccessibleText(I18n.t("sticker.search"));
+        search.getStyleClass().add("emoji-search");
+        search.textProperty().addListener(o -> refresh());
+        searchBox = SearchFields.clearable(search);
+        content.getChildren().add(searchBox);
         setUp(this, content, library, this::refresh);
     }
 
@@ -75,14 +99,20 @@ public final class StickerGrid extends ScrollPane {
 
     /** Rebuilds the grid (opening the tab, after sending, after a favourite changes). */
     public void refresh() {
+        refreshed.run();
         tiles.next();
-        content.getChildren().clear();
+        content.getChildren().remove(1, content.getChildren().size()); // all but the search, which keeps the focus
         Chat c = chat.get();
         boolean accepted = c == null || c.features().accepts(RoomFeatures.STICKER);
         if (!accepted) content.getChildren().add(Labels.help(I18n.t("sticker.networkRefuses")));
-        section(I18n.t("library.favorites"), library.favorites(MediaLibrary.Kind.STICKER), I18n.t("library.stickerFavorite"), accepted,
+        if (!search.getText().isBlank()) {
+            found(search.getText(), accepted);
+            return;
+        }
+        String favorite = I18n.t("library.stickerFavorite"), recent = I18n.t("library.stickerRecent");
+        section(I18n.t("library.favorites"), library.favorites(MediaLibrary.Kind.STICKER), i -> favorite, accepted,
                 Icons.iconButton(Icons.REPLAY, I18n.t("library.rebuildFavorites"), () -> rebuild(false)));
-        section(I18n.t("library.recents"), library.recents(MediaLibrary.Kind.STICKER), I18n.t("library.stickerRecent"), accepted, null);
+        section(I18n.t("library.recents"), library.recents(MediaLibrary.Kind.STICKER), i -> recent, accepted, null);
         List<Node> setNodes = sets.nodes((item, what) -> tiles.get(what + accepted + item.url(), () -> tile(item, what, accepted)),
                 this::bringIntoView);
         if (library.favorites(MediaLibrary.Kind.STICKER).isEmpty() && library.recents(MediaLibrary.Kind.STICKER).isEmpty()
@@ -90,6 +120,49 @@ public final class StickerGrid extends ScrollPane {
             content.getChildren().add(Labels.help(I18n.t("sticker.none")));
         }
         content.getChildren().addAll(setNodes);
+    }
+
+    /**
+     * What {@code query} finds: the stickers of the emoji it names or has (favourites, recents, then the sets, each
+     * once), and the sets whose name it has. Every set of yours is brought for it, each showing as it comes.
+     */
+    private void found(String query, boolean accepted) {
+        List<MediaLibrary.Item> hits = StickerFinder.find(StickerFinder.wanted(query, names(), allEmoji()), sources());
+        List<StickerPack> named = StickerFinder.setsNamed(query, sets.loaded());
+        if (hits.isEmpty() && named.isEmpty()) {
+            content.getChildren().add(Labels.help(I18n.t("sticker.searchNone", query.strip())));
+            return;
+        }
+        if (hits.size() > MOST_FOUND) content.getChildren().add(Labels.help(I18n.t("sticker.searchMore", MOST_FOUND, hits.size())));
+        section(I18n.t("sticker.searchFound"), hits.subList(0, Math.min(MOST_FOUND, hits.size())),
+                i -> StickerFinder.says("library.stickerFound", i), accepted, null);
+        for (StickerPack p : named) {
+            section(p.title(), p.stickers().subList(0, Math.min(MOST_FOUND, p.stickers().size())),
+                    i -> StickerSetSection.inSet(i, p.title()), accepted, null);
+        }
+    }
+
+    /** The stickers whose emoji is {@code emoji}, from favourites, recents and the sets brought: suggestions for it. */
+    List<MediaLibrary.Item> withEmoji(String emoji) {
+        return StickerFinder.find(Set.of(StickerFinder.plain(emoji)), sources());
+    }
+
+    /** Where stickers are looked for, in order: favourites, recents, then every set (those not here yet are brought). */
+    private List<List<MediaLibrary.Item>> sources() {
+        sets.loadAll();
+        List<MediaLibrary.Item> fromSets = new ArrayList<>();
+        for (StickerPack p : sets.loaded()) fromSets.addAll(p.stickers());
+        return List.of(library.favorites(MediaLibrary.Kind.STICKER), library.recents(MediaLibrary.Kind.STICKER), fromSets);
+    }
+
+    private EmojiSearch names() {
+        if (names == null) names = EmojiSearch.forLanguage(I18n.locale().getLanguage());
+        return names;
+    }
+
+    /** Every emoji, in the picker's order. */
+    static List<String> allEmoji() {
+        return EmojiPicker.CATEGORIES.values().stream().flatMap(List::stream).toList();
     }
 
     /** Opens {@code url}'s sticker set in this tab (from one of its stickers' menu). */
@@ -104,7 +177,7 @@ public final class StickerGrid extends ScrollPane {
         if (max > 0) setVvalue(Math.min(1, n.getBoundsInParent().getMinY() / max));
     }
 
-    private void section(String title, List<MediaLibrary.Item> items, String what, boolean accepted, Node action) {
+    private void section(String title, List<MediaLibrary.Item> items, Function<MediaLibrary.Item, String> what, boolean accepted, Node action) {
         if (items.isEmpty()) return;
         Label t = new Label(title);
         t.getStyleClass().add("emoji-category");
@@ -117,7 +190,10 @@ public final class StickerGrid extends ScrollPane {
             header = row;
         }
         FlowPane grid = new FlowPane(6, 6);
-        for (MediaLibrary.Item i : items) grid.getChildren().add(tiles.get(what + accepted + i.url(), () -> tile(i, what, accepted)));
+        for (MediaLibrary.Item i : items) {
+            String w = what.apply(i);
+            grid.getChildren().add(tiles.get(w + accepted + i.url(), () -> tile(i, w, accepted)));
+        }
         content.getChildren().addAll(header, grid);
     }
 
@@ -161,9 +237,13 @@ public final class StickerGrid extends ScrollPane {
         return tile(item, what, c == null || c.features().accepts(RoomFeatures.STICKER));
     }
 
-    private Node tile(MediaLibrary.Item item, String what, boolean accepted) {
+    /**
+     * A tile for {@code accepted} (whether the open chat takes stickers), that asks {@code after} when clicked what to
+     * run once its sticker went (a suggestion empties the message box, if it still holds what the sticker replaced).
+     */
+    Node tile(MediaLibrary.Item item, String what, boolean accepted, Supplier<Runnable> after) {
         ImageView view = new ImageView();
-        Runnable send = () -> send(item, accepted);
+        Runnable send = () -> send(item, accepted, after);
         StackPane tile = MediaTile.of(view, TILE, TILE, "sticker-tile",
                 I18n.t(accepted ? "library.tileSend" : "library.stickerTileRefused", what), accepted, send);
         MediaLoading.track(tile, progress -> MessageMedia.loadMedia(svc, view, MediaItems.message(item), TILE * 2, TILE * 2, progress));
@@ -171,19 +251,25 @@ public final class StickerGrid extends ScrollPane {
         return tile;
     }
 
-    private void send(MediaLibrary.Item item, boolean accepted) {
+    private Node tile(MediaLibrary.Item item, String what, boolean accepted) {
+        return tile(item, what, accepted, () -> () -> { });
+    }
+
+    private void send(MediaLibrary.Item item, boolean accepted, Supplier<Runnable> afterSent) {
         Chat c = chat.get();
         if (c == null) return;
         if (!accepted) {
             toast.accept(I18n.t("library.stickerNotAccepted"));
             return;
         }
+        Runnable after = afterSent.get(); // asked now: what the box holds at the click
         svc.sendSticker(c.id(), item, takeReply.get()).whenComplete((v, err) -> Platform.runLater(() -> {
             if (err != null) {
                 toast.accept(I18n.t("sticker.sendFailed"));
                 return;
             }
             library.addRecent(item);
+            after.run();
         }));
     }
 }

@@ -87,6 +87,7 @@ class SyncedSettingsUiTest {
         p.put("ai.instructions", new Proof("Breve.", AiSettings::instructions, "Breve."));
         p.put("ai.voiceNotes", new Proof("false", AiSettings::hearVoiceNotes, false));
         p.put("ai.learnStyle", new Proof("false", AiSettings::learnStyle, false));
+        p.put("compose.suggestStickers", new Proof("false", () -> Settings.get().suggestStickers(), false));
         p.put("ai.fixMode", new Proof("BEFORE", () -> AiSettings.fixMode().name(), "BEFORE"));
         p.put("ai.keepThread", new Proof("false", AiSettings::keepThread, false));
         p.put("ai.readySound", new Proof("BELL", () -> AiSettings.readyTone().name(), "BELL"));

@@ -76,6 +76,10 @@ memory, with simulated incoming messages, "typing…" and read receipts.
 - **Stickers between networks**: Telegram's sticker sets in the side panel (yours, and any opened from a sticker's
   menu). A sticker goes to any network in a format it takes: an animated GIF reaches Telegram as an animated sticker (an
   animated WebP, WhatsApp's, arrives still).
+- **Search stickers**, as in Telegram: a word ("cat", "laugh") finds the stickers of the emoji it names, an emoji its
+  own and a set's name that set, among your favourites, recents and all your sets. If what you type in the message is
+  one emoji alone, your stickers of that emoji show above the box and one goes in its place (Settings → Appearance →
+  Writing turns it off).
 - **Write with AI**: in Settings → Write with AI you can turn on two buttons that use Claude Code or Codex, if you have
   either installed. One writes a draft following your instructions, with the chat as context; when you click it, that chat
   goes to that program's service. The other corrects the spelling, accents and wording of what you wrote, changing

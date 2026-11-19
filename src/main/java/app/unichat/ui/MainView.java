@@ -20,6 +20,7 @@ import app.unichat.ui.emoji.FavoritesPane;
 import app.unichat.ui.emoji.GifGrid;
 import app.unichat.ui.emoji.MediaItems;
 import app.unichat.ui.emoji.StickerGrid;
+import app.unichat.ui.emoji.StickerSuggestions;
 import app.unichat.ui.login.AccountsPane;
 import app.unichat.ui.media.AudioBar;
 import app.unichat.ui.media.AudioPlayback;
@@ -29,6 +30,7 @@ import app.unichat.ui.settings.SettingsWindow;
 import app.unichat.ui.settings.SyncedSettings;
 import app.unichat.ui.timeline.CloakBar;
 import app.unichat.ui.timeline.CloakSend;
+import app.unichat.ui.timeline.Composer;
 import app.unichat.ui.timeline.ThreadPane;
 import app.unichat.ui.timeline.UploadBar;
 import app.unichat.model.Chat;
@@ -94,6 +96,7 @@ public final class MainView extends StackPane {
     private boolean infoVisible;
     private SidePanel panel;
     private StickerGrid stickers;
+    private StickerSuggestions suggestions;
     /** Favourite and recent stickers/GIFs, shared by every chat. */
     private final MediaLibrary library =
             new MediaLibrary(Settings.dataDir().resolve("media-library.json"));
@@ -162,6 +165,7 @@ public final class MainView extends StackPane {
         MediaItems.keepCached(svc, library);
         library.addListener(() -> MediaItems.keepCached(svc, library));
         panel.setContent(SidePanel.Tab.STICKERS, stickers, stickers::refresh);
+        suggestStickers();
         thread.setOnShowStickerSet(this::showStickerSet);
         GifGrid gifs = new GifGrid(svc, library, thread::chat, thread::takeReply, this::toast);
         panel.setContent(SidePanel.Tab.GIFS, gifs, gifs::refresh);
@@ -691,8 +695,17 @@ public final class MainView extends StackPane {
     }
 
     /** What Ajustes does after a change: the theme, the lists and the open chat drawn again. */
+    /** The stickers of the one emoji typed, above the message box. */
+    private void suggestStickers() {
+        Composer box = thread.composer();
+        suggestions = new StickerSuggestions(stickers, box.typed(), box::isEditing, box::clearLater);
+        box.setOnModeChange(suggestions::refresh);
+        box.showJustAbove(suggestions.node());
+    }
+
     private void appearanceChanged() {
         Theme.applyAll();
+        suggestions.refresh();
         refreshAll();
         thread.redraw();
     }
