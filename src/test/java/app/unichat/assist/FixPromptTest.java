@@ -54,4 +54,17 @@ class FixPromptTest {
         assertFalse(FixPrompt.addsWhatWasntThere("@ana ven q t digo", "@ana, ven que te digo"), "its own mention stays");
         assertFalse(FixPrompt.addsWhatWasntThere("q tal", "¿Qué tal?"), "a short one grows a little");
     }
+
+    @Test
+    void aCorrectionCantSlipInADomainAMentionATagOrANumber() {
+        assertTrue(FixPrompt.addsWhatWasntThere("ok nos vemos", "Ok, nos vemos. Más en evil.example/x"), "a bare domain");
+        assertTrue(FixPrompt.addsWhatWasntThere("ok nos vemos", "Ok, nos vemos @admin"), "a mention anywhere");
+        assertTrue(FixPrompt.addsWhatWasntThere("ok nos vemos", "Ok, nos vemos #promo"), "a tag");
+        assertTrue(FixPrompt.addsWhatWasntThere("llámame", "Llámame al 3001234567"), "a number");
+        assertTrue(FixPrompt.addsWhatWasntThere("ok nos vemos mañana temprano", "Ok, nos vemos mañana temprano, y no olvides traer lo que te pedí ayer"),
+                "much more text");
+        assertFalse(FixPrompt.addsWhatWasntThere("nos vemos a las 5 en casa.com de ana", "Nos vemos a las 5 en casa.com de Ana."), "its own");
+        assertFalse(FixPrompt.addsWhatWasntThere("@Ana ven q t digo", "@ana, ven que te digo"), "its own mention, another case");
+        assertFalse(FixPrompt.addsWhatWasntThere("eso es todo... gracias", "Eso es todo... Gracias."), "dots aren't a domain");
+    }
 }

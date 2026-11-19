@@ -43,10 +43,24 @@ public final class FixPrompt {
      */
     public static boolean addsWhatWasntThere(String original, String fixed) {
         String o = original.strip(), f = fixed.strip();
-        if (!new java.util.HashSet<>(app.unichat.support.Urls.in(o)).containsAll(app.unichat.support.Urls.in(f))) return true;
+        if (!marks(o).containsAll(marks(f))) return true;
         for (char lead : new char[] {'@', '!', '/'}) if (f.indexOf(lead) == 0 && o.indexOf(lead) != 0) return true;
-        return f.length() > o.length() * 3 / 2 + 20;
+        return f.length() > o.length() * 13 / 10 + 15;
     }
+
+    /**
+     * What a text points somewhere with, lower-cased: links, bare domains ("evil.example/x", which networks make links
+     * of), mentions, tags and numbers of three digits or more (a phone).
+     */
+    private static java.util.Set<String> marks(String text) {
+        java.util.Set<String> out = new java.util.HashSet<>(app.unichat.support.Urls.in(text));
+        java.util.regex.Matcher m = MARK.matcher(text);
+        while (m.find()) out.add(m.group().toLowerCase(java.util.Locale.ROOT).replaceAll("[.,;:!?)]+$", ""));
+        return out;
+    }
+
+    private static final java.util.regex.Pattern MARK = java.util.regex.Pattern.compile(
+            "[\\p{L}\\p{N}-]+(?:\\.[\\p{L}\\p{N}-]+)+(?:/\\S*)?|[@#][\\p{L}\\p{N}_.]+|\\+?\\d[\\d ]{2,}\\d");
 
     /** {@link ReplyPrompt#clean} takes off quotes or a code fence around the answer: those were the person's own. */
     public static String keepWrapping(String original, String fixed) {

@@ -14,7 +14,7 @@ class TextCopyTest {
     private static final Instant SENT = Instant.parse("2026-11-18T14:03:00Z");
 
     private static SavedText said(String id, Instant seen, String from, String text) {
-        return new SavedText(id, "!familia:demo", SENT, seen, from, "@a:demo", false, text);
+        return new SavedText(id, "!familia:demo", SENT, seen, from, "@a:demo", false, text, false);
     }
 
     @Test
@@ -49,5 +49,24 @@ class TextCopyTest {
                 "ok\u001b[2K\u001b[1G2026-11-18 09:12 · Mamá · {$abc}\b\b\u202Eal\tfin")), ZoneOffset.UTC);
         assertEquals("2026-11-18 14:03 · Ana - editado · {$1}\n  ok\uFFFD[2K\uFFFD[1G2026-11-18 09:12 · Mamá · {$abc}\uFFFD\uFFFD\uFFFDal\tfin\n",
                 copy.substring(copy.indexOf("\n\n") + 2), "a terminal's escapes, backspaces and a reversal are shown, not obeyed; a tab stays");
+    }
+
+    @Test
+    void whatWasWrittenBeforeTheAiCorrectedItAndTheCorrectionAreSaidSo() {
+        Chat chat = new Chat("!familia:demo");
+        chat.setTitle("Familia");
+        SavedText written = new SavedText("$1", "!familia:demo", SENT, SENT, "Yo", "@me:demo", true, "creo q sí", true);
+        String copy = TextCopy.render(chat, List.of(written, said("$1", SENT.plusSeconds(5), "Yo", "creo que sí"),
+                said("$1", SENT.plusSeconds(60), "Yo", "creo que sí, a las 5")), ZoneOffset.UTC);
+        assertEquals("""
+                2026-11-18 14:03 · Yo · escrito, antes de corregir · {$1}
+                  creo q sí
+
+                2026-11-18 14:03 · Yo · corregido con IA · {$1}
+                  creo que sí
+
+                2026-11-18 14:04 · Yo · editado · {$1}
+                  creo que sí, a las 5
+                """, copy.substring(copy.indexOf("\n\n") + 2));
     }
 }

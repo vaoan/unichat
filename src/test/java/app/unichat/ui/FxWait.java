@@ -16,6 +16,13 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class FxWait {
     private FxWait() {}
 
+    /** Waiting on the FX thread, which would wait for itself: a condition of {@link #until} may only look. */
+    public static final class OnFxThread extends IllegalStateException {
+        OnFxThread(String what) {
+            super("waiting for \"" + what + "\" on the FX thread (inside an until's condition?) would never end: look, don't wait");
+        }
+    }
+
     /** Runs {@code c} on the FX thread and returns its result (or rethrows what it threw). */
     public static <T> T fx(Callable<T> c) throws Exception {
         if (Platform.isFxApplicationThread()) return c.call();
@@ -40,6 +47,9 @@ public final class FxWait {
      * (a node not there yet) counts as not yet.
      */
     public static void until(String what, Callable<Boolean> condition) throws Exception {
+        // A condition runs on the FX thread: waiting there (settled() or until() inside it) waits for itself, for good;
+        // a whole test class hung to JUnit's limit, three minutes a test, saying nothing. It fails at once instead.
+        if (Platform.isFxApplicationThread()) throw new OnFxThread(what);
         CompletableFuture<Void> met = new CompletableFuture<>();
         AtomicReference<Throwable> last = new AtomicReference<>();
         AnimationTimer[] timer = new AnimationTimer[1];
@@ -50,6 +60,9 @@ public final class FxWait {
                     if (timer[0] != null) timer[0].stop();
                     met.complete(null);
                 }
+            } catch (OnFxThread wrong) {
+                if (timer[0] != null) timer[0].stop();
+                met.completeExceptionally(wrong); // never "not yet": it would never be
             } catch (Throwable t) {
                 last.set(t);
             }
@@ -64,6 +77,9 @@ public final class FxWait {
         });
         try {
             met.get();
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof OnFxThread wrong) throw wrong;
+            throw e;
         } catch (InterruptedException timedOut) {
             Platform.runLater(() -> { if (timer[0] != null) timer[0].stop(); });
             Thread.currentThread().interrupt();

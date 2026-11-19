@@ -1,7 +1,5 @@
 package app.unichat.ui.timeline;
 
-import app.unichat.assist.FixPrompt;
-import app.unichat.assist.ReplyWriter;
 import app.unichat.assist.WritingStyle;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
@@ -20,7 +18,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * "Corregir con IA" on a message of mine already sent: the same correction as ⌘O ({@link FixPrompt}), done apart from
+ * "Corregir con IA" on a message of mine already sent: the same correction as ⌘O ({@link Correction}), done apart from
  * the message box on a thread of its own, then the message edited by itself. Nothing waits for it: the box, sending and
  * ⌘O go on; each message being corrected shows it ({@link #fixing}, told to {@link #addListener}). Several at once,
  * each its own; the same one asked again while going on starts nothing.
@@ -136,11 +134,10 @@ final class MessageFixer implements ChatService.Listener {
         CompletableFuture<Void> done = new CompletableFuture<>();
         runner.execute(() -> {
             CompletableFuture<Void> edited;
-            try {
-                String result = writers.get().write(FixPrompt.build(original, WritingStyle.get().text()));
-                edited = apply(m, original, FixPrompt.keepWrapping(original, result), quiet);
-            } catch (ReplyWriter.Failure | RuntimeException e) {
-                tell.accept(I18n.t("messageFix.failed", Errors.message(e)));
+            Correction.Result r = Correction.of(writers.get(), original);
+            if (r.failure() == null) edited = apply(m, original, r.text(), quiet);
+            else {
+                tell.accept(I18n.t("messageFix.failed", r.failure()));
                 edited = CompletableFuture.completedFuture(null);
             }
             edited.whenComplete((v, e) -> {
@@ -157,10 +154,6 @@ final class MessageFixer implements ChatService.Listener {
         Message now = svc.messages(m.chatId()).stream().filter(x -> x.id().equals(m.id())).findFirst().orElse(null);
         if (now == null || now.deleted() || !now.body().equals(original)) {
             tell.accept(I18n.t("messageFix.changed")); // edited meanwhile, or deleted: what the person did stays
-            return CompletableFuture.completedFuture(null);
-        }
-        if (FixPrompt.addsWhatWasntThere(original, corrected)) {
-            tell.accept(I18n.t("messageFix.failed", I18n.t("messageFix.addsThings")));
             return CompletableFuture.completedFuture(null);
         }
         if (corrected.equals(original.strip())) {

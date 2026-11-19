@@ -143,7 +143,7 @@ class MessageFixUiTest {
     @Test
     void withCorrectingEverythingOnWhatsSentGoesAtOnceAndIsCorrectedAfter() throws Exception {
         thread.fixer().useWriter(() -> prompt -> prompt.substring(prompt.indexOf(">\n") + 2, prompt.indexOf("\n</")).replace(" q ", " que "));
-        app.unichat.assist.AiSettings.setAutoFix(true);
+        app.unichat.assist.AiSettings.setFixMode(app.unichat.assist.AiSettings.FixMode.AFTER);
         try {
             TextArea box = FxWait.fx(() -> (TextArea) thread.lookup(".composer .text-area"));
             FxWait.fx(() -> {
@@ -156,14 +156,14 @@ class MessageFixUiTest {
             assertEquals(List.of(true), expectedWhenSent, "told before it went, not after");
             FxWait.until("corrected once the server had it", () -> m.body().equals("creo que sí") && m.edited());
         } finally {
-            app.unichat.assist.AiSettings.setAutoFix(false);
+            app.unichat.assist.AiSettings.setFixMode(app.unichat.assist.AiSettings.FixMode.OFF);
         }
     }
 
     @Test
     void withCorrectingEverythingOnAnEmoteIsCorrectedToo() throws Exception {
         thread.fixer().useWriter(() -> prompt -> prompt.substring(prompt.indexOf(">\n") + 2, prompt.indexOf("\n</")).replace(" q ", " que "));
-        app.unichat.assist.AiSettings.setAutoFix(true);
+        app.unichat.assist.AiSettings.setFixMode(app.unichat.assist.AiSettings.FixMode.AFTER);
         try {
             TextArea box = FxWait.fx(() -> (TextArea) thread.lookup(".composer .text-area"));
             FxWait.fx(() -> {
@@ -175,7 +175,7 @@ class MessageFixUiTest {
             assertEquals("dice q sí", m.body(), "sent without the command");
             FxWait.until("corrected", () -> m.body().equals("dice que sí"));
         } finally {
-            app.unichat.assist.AiSettings.setAutoFix(false);
+            app.unichat.assist.AiSettings.setFixMode(app.unichat.assist.AiSettings.FixMode.OFF);
         }
     }
 

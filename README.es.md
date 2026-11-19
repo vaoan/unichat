@@ -83,8 +83,11 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   Con «Aprender cómo escribo», los borradores siguen tu estilo y aprenden de lo que les cambias; Ajustes muestra lo
   aprendido y te deja deshacerlo. También se puede corregir un mensaje tuyo ya enviado («Corregir con IA» en su menú):
   se corrige en segundo plano y se edita solo, con el cuadro de texto libre y el mensaje mostrándolo mientras tanto.
-  «Corregir cada mensaje que envío» lo hace con cada uno que envías desde Unichat en este computador (sale al
-  instante, como lo escribiste; muchas redes lo marcan después como editado).
+  «Corregir lo que envío» lo hace con cada uno que envías desde Unichat en este computador: después de enviar (sale
+  al instante, como lo escribiste; muchas redes lo marcan después como editado) o antes de enviar (espera en una cola
+  sobre el cuadro de texto mientras se corrige, que puedes cancelar o saltar, y sigues escribiendo; si otros
+  escribieron mientras esperaba, sale como respuesta a lo último que se dijo). Con «Textos» guardados, se ven todas
+  las versiones: lo que escribiste y su corrección.
 - **Notas de voz a texto**: "Transcribir" bajo cada audio (o la tecla T). Usa Whisper, que viene con Unichat y
   corre en tu computador, gratis y sin enviar el audio a ningún servicio; el modelo (60 o 190 MB) se descarga
   la primera vez. En Ajustes → Voz a texto puedes elegir modelo e idioma, o poner tu propio comando

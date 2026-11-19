@@ -18,9 +18,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -66,13 +64,20 @@ public final class SavedTextSheet {
         }));
     }
 
-    /** Each version: when (the first, when sent; a later one, when it was seen edited) and who, its text, and a way to copy it. */
+    /**
+     * Each version: when (as sent or written, when sent; a correction or an edit, when it was seen) and who, what it is
+     * (written before the AI corrected it, corrected with AI, edited), its text, and a way to copy it.
+     */
     private List<Node> versions(List<SavedText> versions) {
         List<Node> out = new ArrayList<>();
-        Set<String> before = new HashSet<>();
-        for (SavedText t : versions) {
-            boolean edited = !before.add(t.id());
-            Label meta = text(I18n.t(edited ? "savedText.edited" : "savedText.version", when(edited ? t.seen() : t.at()), t.from()));
+        List<SavedText.Mark> marks = SavedText.marks(versions);
+        for (int i = 0; i < versions.size(); i++) {
+            SavedText t = versions.get(i);
+            SavedText.Mark mark = marks.get(i);
+            boolean asSent = mark == SavedText.Mark.SENT || mark == SavedText.Mark.WRITTEN;
+            String when = when(asSent ? t.at() : t.seen());
+            Label meta = text(mark == SavedText.Mark.SENT ? I18n.t("savedText.version", when, t.from())
+                    : I18n.t("savedText.marked", when, t.from(), I18n.t("autosave.texts." + mark.name())));
             meta.getStyleClass().add("help-text");
             Label said = text(t.text());
             Button copy = new Button(I18n.t("common.copy"));

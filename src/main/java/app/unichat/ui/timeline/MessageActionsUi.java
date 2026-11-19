@@ -204,7 +204,14 @@ final class MessageActionsUi {
 
     /** Same rules as the message menu, for the shortcuts and hover buttons. */
     boolean allows(Message m, MessageActions.Action a) {
-        return MessageActions.of(m, chat.get().features(), java.time.Instant.now()).contains(a);
+        return actionsOf(m).contains(a);
+    }
+
+    /** What {@code m} allows in the open chat, which may keep what I send (its versions to see). */
+    private Set<MessageActions.Action> actionsOf(Message m) {
+        Chat c = chat.get();
+        boolean mineKept = svc.autoSaves(c.id(), true).contains(app.unichat.model.SaveKind.TEXTS);
+        return MessageActions.of(m, c.features(), Instant.now(), mineKept);
     }
 
     /** The message {@code m} answers, if it's in the timeline to go to. */
@@ -232,7 +239,7 @@ final class MessageActionsUi {
 
     ContextMenu messageMenu(Message m) {
         ContextMenu menu = new ContextMenu();
-        Set<MessageActions.Action> a = MessageActions.of(m, chat.get().features(), Instant.now());
+        Set<MessageActions.Action> a = actionsOf(m);
         if (a.isEmpty()) return menu;
         List<MenuItem> items = menu.getItems();
         items.addAll(ways(m));
@@ -295,7 +302,7 @@ final class MessageActionsUi {
             // With the AI turned on, and not twice: its row already says it's being corrected.
             case FIX -> fixer == null || !AiReplyButton.SHOWN.get() || fixer.fixing(m.id()) ? List.of()
                     : List.of(ChatMenus.item(I18n.t("message.fix"), () -> fixer.fix(m)));
-            case SAVED_TEXT -> List.of(ChatMenus.item(I18n.t("message.savedText"), () -> onSavedText.accept(m)));
+            case SAVED_TEXT -> List.of(ChatMenus.item(I18n.t(m.deleted() ? "message.savedText" : "message.versions"), () -> onSavedText.accept(m)));
             case DELETE_FOR_EVERYONE, DELETE_FOR_ME -> List.of();
         };
     }

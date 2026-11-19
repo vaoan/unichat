@@ -12,7 +12,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,6 +51,18 @@ final class TextKeeping {
     /** Chats whose copy failed and was told: told again only after it worked. Worker only. */
     private final Set<String> failing = new HashSet<>();
     private volatile Runnable written = () -> { };
+    /**
+     * What the person wrote before the AI corrected it (it never went out), oldest first: the first version of the
+     * message that went instead, once it's here. The newest few: one that never comes is let go.
+     */
+    private final java.util.Deque<Written> wrote = new java.util.ArrayDeque<>();
+    private static final int WROTE = 50;
+
+    /**
+     * What went ({@code sent}), what had been written, when, and my messages the chat had before it went: one of those
+     * saying the same (yesterday's "Vale." from the phone) is never it.
+     */
+    private record Written(String chatId, String sent, String text, Instant at, Set<String> before) {}
     private volatile Supplier<CompletableFuture<?>> fetch = () -> CompletableFuture.completedFuture(null);
 
     /**
@@ -77,13 +88,47 @@ final class TextKeeping {
         this.fetch = fetch;
     }
 
+    /**
+     * {@code sent} went in {@code chatId} in place of {@code written}, which the AI corrected before it went: kept as
+     * that message's first version once it's here, so every version of what was said can be seen.
+     */
+    void wroteBefore(String chatId, String sent, String written) {
+        if (!prefs.autoSaves(chatId, true).contains(SaveKind.TEXTS)) return; // not kept: nothing to hold for later
+        Set<String> before = new HashSet<>();
+        for (Message m : chats.messages(chatId)) if (m.outgoing()) before.add(m.id());
+        synchronized (wrote) {
+            wrote.addLast(new Written(chatId, sent.strip(), written, Instant.now(), before));
+            if (wrote.size() > WROTE) wrote.removeFirst();
+        }
+    }
+
+    /** The first written text waiting for {@code m} (mine, new since it was written, saying what went); taken. */
+    private Written takeWritten(Message m) {
+        synchronized (wrote) {
+            for (java.util.Iterator<Written> it = wrote.iterator(); it.hasNext(); ) {
+                Written w = it.next();
+                if (w.chatId().equals(m.chatId()) && w.sent().equals(m.body().strip()) && !w.before().contains(m.id())) {
+                    it.remove();
+                    return w;
+                }
+            }
+            return null;
+        }
+    }
+
     /** {@code chatId}'s messages changed: what they say now is taken here and now, and written on the texts thread. */
     void changed(String chatId) {
         Wanted wanted = Wanted.of(prefs, chatId);
         if (!wanted.texts()) return;
         Instant now = Instant.now();
-        List<SavedText> said = chats.messages(chatId).stream().filter(m -> wanted.of(m).contains(SaveKind.TEXTS))
-                .map(m -> SavedText.of(m, now)).filter(Objects::nonNull).toList();
+        List<SavedText> said = new java.util.ArrayList<>();
+        for (Message m : chats.messages(chatId)) {
+            SavedText t = wanted.of(m).contains(SaveKind.TEXTS) ? SavedText.of(m, now) : null;
+            if (t == null) continue;
+            Written w = m.outgoing() ? takeWritten(m) : null;
+            if (w != null) said.add(new SavedText(t.id(), t.chatId(), t.at(), w.at(), t.from(), t.fromId(), true, w.text(), true));
+            said.add(t);
+        }
         if (said.isEmpty()) return;
         worker.execute(() -> keep(chatId, said));
     }

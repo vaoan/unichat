@@ -42,6 +42,9 @@ final class VoiceRecording {
 
         /** Shows {@code bar} where the text box is; null puts the text box back. */
         void showInstead(Node bar);
+
+        /** Sends with {@code send} in {@code chatId}'s turn, behind texts being corrected before they go. */
+        void inTurn(String chatId, Runnable send);
     }
 
     private final ChatService svc;
@@ -156,10 +159,10 @@ final class VoiceRecording {
                     Platform.runLater(() -> onError.accept(I18n.t("composer.installingEnhancer")));
                 }, () -> Platform.runLater(() -> onError.accept(I18n.t("composer.voiceNotCleaned"))));
                 r.deleteRaw();
-                svc.sendVoice(toChat, improved, reply).exceptionally(err -> {
+                box.inTurn(toChat, () -> svc.sendVoice(toChat, improved, reply).exceptionally(err -> {
                     Platform.runLater(() -> onError.accept(I18n.t("composer.voiceSendFailed")));
                     return null;
-                });
+                }));
             } catch (Exception e) {
                 Platform.runLater(() -> onError.accept(I18n.t("composer.voiceSaveFailed")));
             } finally {

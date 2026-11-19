@@ -43,10 +43,27 @@ public final class AiSettings {
 
     public static void setLearnStyle(boolean on) { Settings.get().setBool("ai.learnStyle", on); }
 
-    /** Every message sent from the message box is corrected by itself once it's gone (off unless chosen). */
-    public static boolean autoFix() { return Settings.get().getBool("ai.autoFix", false); }
+    /** Whether, and when, what's sent from the message box is corrected by itself. */
+    public enum FixMode {
+        /** As written. */
+        OFF,
+        /** It goes at once and is edited once corrected (many networks mark it as edited). */
+        AFTER,
+        /** It waits in its chat's queue while corrected, then goes corrected (the person can cancel or send it as is). */
+        BEFORE
+    }
 
-    public static void setAutoFix(boolean on) { Settings.get().setBool("ai.autoFix", on); }
+    public static FixMode fixMode() { return Settings.get().getEnum("ai.fixMode", FixMode.OFF); }
+
+    public static void setFixMode(FixMode mode) { Settings.get().set("ai.fixMode", mode.name()); }
+
+    /**
+     * A message that waited to be corrected while others wrote goes as an answer to what was last said when it was
+     * written, so the thread reads right (on unless turned off).
+     */
+    public static boolean keepThread() { return Settings.get().getBool("ai.keepThread", true); }
+
+    public static void setKeepThread(boolean on) { Settings.get().setBool("ai.keepThread", on); }
 
     /** The sound when a draft or a fix is ready. */
     public static ReadySound.Tone readyTone() { return Settings.get().getEnum("ai.readySound", ReadySound.Tone.CHIME); }

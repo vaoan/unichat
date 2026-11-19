@@ -74,7 +74,7 @@ class SavedTextUiTest {
             m.setEdited(true);
         });
         FxWait.until("edited", said::edited);
-        TimelineWindow.fire(w.menuItem(said, "Ver lo que decía…"));
+        TimelineWindow.fire(w.menuItem(said, "Ver versiones…"));
         FxWait.until("both versions", () -> sheetTexts().containsAll(List.of("mañana no puedo", "mañana sí puedo")));
         List<String> texts = sheetTexts();
         assertTrue(texts.indexOf("mañana no puedo") < texts.indexOf("mañana sí puedo"), "oldest first: " + texts);

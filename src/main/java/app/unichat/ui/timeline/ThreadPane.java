@@ -60,6 +60,8 @@ public final class ThreadPane extends BorderPane {
     MessageActionsUi actions() { return messageActions; }
 
     MessageFixer fixer() { return messageFixer; }
+
+    SendQueue sendQueue() { return sendQueue; }
     private final Label typing = new Label();
     private final TimelineScroll scroll;
     private final MessageRowView messageRows;
@@ -91,6 +93,8 @@ public final class ThreadPane extends BorderPane {
     private DeleteSheet deleteSheet;
     private SavedTextSheet savedTextSheet;
     private MessageFixer messageFixer;
+    private SendQueue sendQueue;
+    private SendQueueView sendQueueView;
     private final MessageSelection.Purpose forwarding, deleting;
     private final Consumer<String> toast;
 
@@ -122,10 +126,26 @@ public final class ThreadPane extends BorderPane {
         messageFixer = new MessageFixer(svc, text -> Platform.runLater(() -> toast.accept(text)));
         messageFixer.addListener(onTranscript); // each message being corrected says so in its row
         messageActions.setFixer(messageFixer);
-        // Ajustes → Escribir con IA → "Corregir cada mensaje que envío": what's sent goes at once, corrected after.
+        // Ajustes → Escribir con IA → "Corregir lo que envío": after (it goes at once and is edited once corrected) or
+        // before (it waits in its chat's queue, corrected, and can be cancelled or sent as written meanwhile).
         svc.addListener(messageFixer);
-        composer.setOnSent((chatId, text) -> {
-            if (AiReplyButton.SHOWN.get() && app.unichat.assist.AiSettings.autoFix()) messageFixer.expect(chatId, text);
+        sendQueue = SendQueue.of(svc); // the service's: a window rebuilt shows and controls the same queue
+        sendQueue.tellTo(text -> Platform.runLater(() -> toast.accept(text)));
+        // What was written stays as a version. Asked for when it's used: AutoSave runs threads of its own, and made with
+        // every window it kept every test's service (and window) alive until the run ran out of memory.
+        sendQueue.onCorrected((chatId, sent, written) -> app.unichat.autosave.AutoSave.of(svc).wroteBefore(chatId, sent, written));
+        composer.setInTurn(sendQueue::inOrder);
+        sendQueueView = new SendQueueView(sendQueue, () -> chat == null ? null : chat.id());
+        composer.showAbove(sendQueueView);
+        composer.setSending((chatId, text, replyId) -> {
+            // A command ("!wa sync" to a bridge, "/…") goes as typed: an AI's version of it would run unseen.
+            String said = Message.withoutEmoteCommand(text);
+            boolean command = said.startsWith("!") || said.startsWith("/");
+            app.unichat.assist.AiSettings.FixMode mode = AiReplyButton.SHOWN.get() && !command ? app.unichat.assist.AiSettings.fixMode()
+                    : app.unichat.assist.AiSettings.FixMode.OFF;
+            if (mode == app.unichat.assist.AiSettings.FixMode.BEFORE) sendQueue.submit(chatId, text, replyId);
+            else if (mode == app.unichat.assist.AiSettings.FixMode.AFTER) messageFixer.expect(chatId, Message.withoutEmoteCommand(text));
+            return mode == app.unichat.assist.AiSettings.FixMode.BEFORE;
         });
         messageActions.setOnSavedText(m -> {
             if (savedTextSheet != null) savedTextSheet.show(app.unichat.autosave.AutoSave.of(svc).said(m));
@@ -233,6 +253,8 @@ public final class ThreadPane extends BorderPane {
         Transcripts.get().removeListener(onTranscript);
         messageFixer.removeListener(onTranscript);
         svc.removeListener(messageFixer);
+        sendQueueView.dispose();
+        sendQueue.tellTo(System.err::println); // the queue outlives this window: it mustn't hold it
         pinnedBar.dispose();
     }
 
@@ -312,6 +334,22 @@ public final class ThreadPane extends BorderPane {
         delete(mine.subList(Math.max(0, mine.size() - 3), mine.size()));
     }
 
+    /** Snapshot diagnostics: four texts waiting to be corrected before they go (answers that never come). */
+    public void showQueue() {
+        sendQueue.useWriter(() -> prompt -> {
+            try {
+                new java.util.concurrent.CountDownLatch(1).await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return prompt;
+        });
+        for (String t : List.of("creo q mañana no puedo", "pero el jueves si", "avisame q te parece",
+                "y tambien le dije a juan q viniera temprano para ayudar con todo lo de la cocina")) {
+            sendQueue.submit(chat.id(), t, null);
+        }
+    }
+
     /** Snapshot diagnostics: my newest message being corrected with AI (an answer that never comes). */
     public void showFixing() {
         List<Message> mine = svc.messages(chat.id()).stream().filter(Message::outgoing).toList();
@@ -328,7 +366,7 @@ public final class ThreadPane extends BorderPane {
     }
 
     /**
-     * Snapshot diagnostics: what the newest message said, as if deleted after an edit (two versions); {@code none}: the
+     * Snapshot diagnostics: what the newest message said, as if written, corrected with AI, then edited; {@code none}: the
      * sheet for a message there's no copy of.
      */
     public void showSavedText(boolean none) {
@@ -336,8 +374,9 @@ public final class ThreadPane extends BorderPane {
         Message m = svc.messages(chat.id()).getLast();
         java.time.Instant at = m.timestamp() == null ? java.time.Instant.now() : m.timestamp();
         List<app.unichat.autosave.SavedText> versions = none ? List.of() : List.of(
-                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at, m.senderName(), m.senderId(), m.outgoing(), m.body() + "…"),
-                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at.plusSeconds(90), m.senderName(), m.senderId(), m.outgoing(), m.body()));
+                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at, m.senderName(), m.senderId(), m.outgoing(), m.body().toLowerCase(), true),
+                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at.plusSeconds(5), m.senderName(), m.senderId(), m.outgoing(), m.body() + "…", false),
+                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at.plusSeconds(90), m.senderName(), m.senderId(), m.outgoing(), m.body(), false));
         savedTextSheet.show(java.util.concurrent.CompletableFuture.completedFuture(versions));
     }
 
@@ -373,6 +412,7 @@ public final class ThreadPane extends BorderPane {
         scroll.pin();
         setCenter(c == null ? emptyState : content);
         composer.setChat(c == null ? null : c.id());
+        sendQueueView.refresh(); // the new chat's own queue
         if (c == null) return;
         refreshHeader();
         rebuild(true);

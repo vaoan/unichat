@@ -105,6 +105,15 @@ class MessageActionsTest {
     }
 
     @Test
+    void whereMyTextsAreKeptMineOfferTheirVersions() throws Exception {
+        Message mine = msg(true, MessageType.TEXT, null);
+        assertFalse(MessageActions.of(mine, f(WHATSAPP), SENT, false).contains(SAVED_TEXT));
+        assertTrue(MessageActions.of(mine, f(WHATSAPP), SENT, true).contains(SAVED_TEXT), "what I wrote before it was corrected");
+        assertFalse(MessageActions.of(msg(false, MessageType.TEXT, null), f(WHATSAPP), SENT, true).contains(SAVED_TEXT),
+                "theirs only when edited or deleted");
+    }
+
+    @Test
     void anEditedMessageOffersWhatItSaidBefore() throws Exception {
         Message m = msg(false, MessageType.TEXT, null);
         assertFalse(MessageActions.of(m, f(WHATSAPP), SENT).contains(SAVED_TEXT), "never changed: it says it all");

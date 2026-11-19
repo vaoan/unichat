@@ -60,13 +60,31 @@ public final class Composer extends VBox {
         }
     };
     private final HBox banner = new HBox(8);
+    /** Above the box: what the AI, the voice and the queue of texts being corrected are doing. */
+    private final VBox statuses = new VBox();
     private final Label bannerTitle = new Label();
     private final Label bannerText = new Label();
     private final Map<String, String> drafts = new HashMap<>();
     private final PauseTransition typingStop = new PauseTransition(Duration.seconds(4));
     private final Consumer<String> onError;
-    /** A text just sent (not an edit): the chat and what it said. */
-    private java.util.function.BiConsumer<String, String> onSent = (chat, text) -> { };
+    /** Where a file or a voice note goes in its chat's turn; by default at once. */
+    private InTurn inTurn = (chat, send) -> send.run();
+
+    /** Sending something in its chat's turn, behind what's waiting there (texts being corrected before they go). */
+    @FunctionalInterface
+    interface InTurn {
+        void send(String chatId, Runnable send);
+    }
+
+    /** What happens to a text before it goes; by default nothing, and it goes. */
+    private Sending sending = (chat, text, replyId) -> false;
+
+    /** A text about to be sent from the box (not an edit): what happens to it first. */
+    @FunctionalInterface
+    interface Sending {
+        /** True when it took {@code text} (to send it later, corrected); false: it goes now. */
+        boolean before(String chatId, String text, String replyToId);
+    }
     private String chatId;
     private Message replyTo;
     private Message editing;
@@ -140,6 +158,8 @@ public final class Composer extends VBox {
             @Override public void focus() { Composer.this.focus(); }
 
             @Override public void showInstead(Node bar) { Composer.this.showInstead(bar); }
+
+            @Override public void inTurn(String chat, Runnable send) { inTurn.send(chat, send); }
         });
         ai = new ComposerAi(svc, input, drafts, onError, new ComposerAi.Box() {
             @Override public String chatId() { return chatId; }
@@ -163,7 +183,6 @@ public final class Composer extends VBox {
         Icons.SCALE.addListener(new javafx.beans.WeakInvalidationListener(fit));
         AiReplyButton.SHOWN.addListener(new javafx.beans.WeakInvalidationListener(fit));
         frameFit = fit;
-        VBox statuses = new VBox();
         statuses.getChildren().addAll(ai.statuses());
         statuses.getChildren().add(voice.status());
         boxShown = frame;
@@ -355,14 +374,17 @@ public final class Composer extends VBox {
     /** {@code batch}: through the upload queue even if it's a single file. Only the first file answers the reply. */
     private void send(List<File> files, SendAs as, boolean batch) {
         if (chatId == null || files == null || files.isEmpty()) return;
-        String reply = replyTo == null ? null : replyTo.id();
-        if (files.size() == 1 && !batch) {
-            svc.sendFile(chatId, files.get(0).toPath(), reply, as, p -> { }).exceptionally(this::fail);
-        } else {
-            List<UploadQueue.Upload> uploads = new java.util.ArrayList<>();
-            for (File f : files) uploads.add(new UploadQueue.Upload(chatId, f.toPath(), uploads.isEmpty() ? reply : null, as));
-            UploadQueue.of(svc).addAll(uploads);
-        }
+        String reply = replyTo == null ? null : replyTo.id(), chat = chatId;
+        // In its turn: behind texts still being corrected before they go, so a caption sent first arrives first.
+        inTurn.send(chat, () -> {
+            if (files.size() == 1 && !batch) {
+                svc.sendFile(chat, files.get(0).toPath(), reply, as, p -> { }).exceptionally(this::fail);
+            } else {
+                List<UploadQueue.Upload> uploads = new java.util.ArrayList<>();
+                for (File f : files) uploads.add(new UploadQueue.Upload(chat, f.toPath(), uploads.isEmpty() ? reply : null, as));
+                UploadQueue.of(svc).addAll(uploads);
+            }
+        });
         cancelMode();
     }
 
@@ -457,9 +479,9 @@ public final class Composer extends VBox {
         if (editing != null) {
             if (!text.equals(editing.body())) svc.editMessage(chatId, editing.id(), text).exceptionally(this::fail);
         } else {
-            // Told before it goes: the server may confirm it before the next line runs. What it'll say: no "/me".
-            onSent.accept(chatId, Message.withoutEmoteCommand(text));
-            svc.sendText(chatId, text, replyTo == null ? null : replyTo.id()).exceptionally(this::fail);
+            // Told before it goes: the server may confirm it before the next line runs.
+            String replyId = replyTo == null ? null : replyTo.id();
+            if (!sending.before(chatId, text, replyId)) svc.sendText(chatId, text, replyId).exceptionally(this::fail);
             ai.sent(chatId, text);
         }
         input.clear();
@@ -468,9 +490,19 @@ public final class Composer extends VBox {
         stopTyping();
     }
 
-    /** Runs as each text is sent from the box (not an edit), just before it goes: correcting it by itself, when that's on. */
-    void setOnSent(java.util.function.BiConsumer<String, String> onSent) {
-        this.onSent = onSent;
+    /** What happens to each text sent from the box (not an edit) just before it goes: correcting it, when that's on. */
+    void setSending(Sending sending) {
+        this.sending = sending;
+    }
+
+    /** Files and voice notes go in their chat's turn through {@code inTurn}. */
+    void setInTurn(InTurn inTurn) {
+        this.inTurn = inTurn;
+    }
+
+    /** Shows {@code n} above the box, with what the AI and the voice are doing. */
+    void showAbove(Node n) {
+        statuses.getChildren().add(0, n);
     }
 
     private Void fail(Throwable t) {

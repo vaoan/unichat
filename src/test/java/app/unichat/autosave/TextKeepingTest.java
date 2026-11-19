@@ -170,6 +170,73 @@ class TextKeepingTest {
     }
 
     @Test
+    void whatIWroteBeforeTheAiCorrectedItIsItsFirstVersion() throws Exception {
+        svc.setAutoSave(chat.id(), true, EnumSet.of(SaveKind.TEXTS)).get();
+        keeping.wroteBefore(chat.id(), "creo que sí", "creo q sí"); // corrected before it went
+        Message m = new Message("$9", chat.id(), "@me:demo", "Yo", true, Instant.now());
+        m.setType(MessageType.TEXT);
+        m.setBody("creo que sí");
+        timeline.add(m);
+        keeping.changed(chat.id());
+        List<SavedText> versions = keeping.said(m).get();
+        assertEquals(List.of("creo q sí", "creo que sí"), versions.stream().map(SavedText::text).toList());
+        assertTrue(versions.getFirst().written(), "said to be what was written");
+        assertFalse(versions.get(1).written());
+        keeping.changed(chat.id());
+        assertEquals(2, keeping.said(m).get().size(), "once");
+    }
+
+    private Message mine(String id, String body) {
+        Message m = new Message(id, chat.id(), "@me:demo", "Yo", true, Instant.now());
+        m.setType(MessageType.TEXT);
+        m.setBody(body);
+        return m;
+    }
+
+    @Test
+    void anOlderMessageOfMineSayingTheSameNeverGetsWhatWasWritten() throws Exception {
+        svc.setAutoSave(chat.id(), true, EnumSet.of(SaveKind.TEXTS)).get();
+        Message yesterday = mine("$old", "Vale."); // from the phone
+        timeline.add(yesterday);
+        keeping.wroteBefore(chat.id(), "Vale.", "vale");
+        keeping.changed(chat.id());
+        Message now = mine("$new", "Vale.");
+        timeline.add(now);
+        keeping.changed(chat.id());
+        assertEquals(List.of("Vale."), keeping.said(yesterday).get().stream().map(SavedText::text).toList(), "untouched");
+        assertEquals(List.of("vale", "Vale."), keeping.said(now).get().stream().map(SavedText::text).toList());
+    }
+
+    @Test
+    void twoSentAlikeEachGetTheirOwn() throws Exception {
+        svc.setAutoSave(chat.id(), true, EnumSet.of(SaveKind.TEXTS)).get();
+        keeping.wroteBefore(chat.id(), "Ok.", "ok");
+        keeping.wroteBefore(chat.id(), "Ok.", "okk");
+        Message a = mine("$a", "Ok."), b = mine("$b", "Ok.");
+        timeline.add(a);
+        timeline.add(b);
+        keeping.changed(chat.id());
+        assertEquals(List.of("ok", "Ok."), keeping.said(a).get().stream().map(SavedText::text).toList());
+        assertEquals(List.of("okk", "Ok."), keeping.said(b).get().stream().map(SavedText::text).toList());
+    }
+
+    @Test
+    void whatWasWrittenIsKeptOnlyWhereMyTextsAre() throws Exception {
+        svc.setAutoSave(chat.id(), EnumSet.of(SaveKind.TEXTS)).get(); // theirs only
+        keeping.wroteBefore(chat.id(), "creo que sí", "creo q sí");
+        Message m = new Message("$9", chat.id(), "@me:demo", "Yo", true, Instant.now());
+        m.setType(MessageType.TEXT);
+        m.setBody("creo que sí");
+        timeline.add(m);
+        keeping.changed(chat.id());
+        assertEquals(List.of(), keeping.said(m).get());
+        svc.setAutoSave(chat.id(), true, EnumSet.of(SaveKind.TEXTS)).get(); // turned on later
+        keeping.changed(chat.id());
+        assertEquals(List.of("creo que sí"), keeping.said(m).get().stream().map(SavedText::text).toList(),
+                "nothing written then is attached later");
+    }
+
+    @Test
     void whatAnotherComputerKeptReachesTheCopyWhenItArrives() throws Exception {
         svc.setAutoSave(chat.id(), EnumSet.of(SaveKind.TEXTS)).get();
         Path other = Files.createDirectories(dir.resolve("texts/0b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44"));

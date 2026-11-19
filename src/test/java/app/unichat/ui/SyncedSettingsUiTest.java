@@ -87,7 +87,8 @@ class SyncedSettingsUiTest {
         p.put("ai.instructions", new Proof("Breve.", AiSettings::instructions, "Breve."));
         p.put("ai.voiceNotes", new Proof("false", AiSettings::hearVoiceNotes, false));
         p.put("ai.learnStyle", new Proof("false", AiSettings::learnStyle, false));
-        p.put("ai.autoFix", new Proof("true", AiSettings::autoFix, true));
+        p.put("ai.fixMode", new Proof("BEFORE", () -> AiSettings.fixMode().name(), "BEFORE"));
+        p.put("ai.keepThread", new Proof("false", AiSettings::keepThread, false));
         p.put("ai.readySound", new Proof("BELL", () -> AiSettings.readyTone().name(), "BELL"));
         p.put("ai.readyVolume", new Proof("30", AiSettings::readyVolume, 30));
         p.put("stt.model", new Proof("BASE", () -> app.unichat.stt.SttSettings.model().name(), "BASE"));

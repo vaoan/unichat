@@ -17,10 +17,16 @@ public final class MessageActions {
     enum Action { REPLY, COPY, OPEN_FILE, SAVE_AS, SAVE_LINK, SAVED_TEXT, TRANSCRIBE, EDIT, FIX, DELETE_FOR_EVERYONE, DELETE_FOR_ME, FAVORITE, FORWARD, PIN }
 
     static Set<Action> of(Message m, RoomFeatures f, Instant now) {
+        return of(m, f, now, false);
+    }
+
+    /** {@code myTextsKept}: the chat keeps what I send (auto-save's "Textos"), so mine have versions to see. */
+    static Set<Action> of(Message m, RoomFeatures f, Instant now, boolean myTextsKept) {
         Set<Action> out = EnumSet.noneOf(Action.class);
         // What it said, from the texts' copy (or that there's none): all a deleted message has left, and an edited one's past.
         if (m.deleted()) return EnumSet.of(Action.SAVED_TEXT);
-        if (m.edited()) out.add(Action.SAVED_TEXT);
+        // An edited one's past; mine where kept: what I wrote before the AI corrected it.
+        if (m.edited() || myTextsKept && m.outgoing() && !m.isMedia()) out.add(Action.SAVED_TEXT);
         if (f.replies() || f.isUnknown()) out.add(Action.REPLY);
         if (!m.isMedia()) out.add(Action.COPY);
         if (m.mediaUrl() != null) {

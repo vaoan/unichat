@@ -578,6 +578,11 @@ public final class MainView extends StackPane {
         if (thread.chat() != null) thread.showDeleting();
     }
 
+    /** Texts waiting in the open chat to be corrected before they go (snapshot diagnostics). */
+    public void showQueue() {
+        if (thread.chat() != null) thread.showQueue();
+    }
+
     /** My newest message in the open chat being corrected with AI (snapshot diagnostics). */
     public void showFixing() {
         if (thread.chat() != null) thread.showFixing();

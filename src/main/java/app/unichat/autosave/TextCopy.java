@@ -11,9 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * A chat's texts as a person reads them, in its folder beside what auto-save keeps: made again from every computer's
@@ -46,11 +44,14 @@ final class TextCopy {
         StringBuilder out = new StringBuilder();
         out.append("# Unichat · ").append(oneLine(chat.title())).append(" · ").append(chat.network().displayName()).append(" · ")
                 .append(chat.id()).append('\n').append("# ").append(I18n.t("autosave.texts.copyHeader")).append('\n');
-        Set<String> before = new HashSet<>();
-        for (SavedText t : said) {
-            boolean edited = !before.add(t.id());
-            out.append('\n').append(WHEN.format((edited ? t.seen() : t.at()).atZone(zone))).append(" · ").append(oneLine(t.from()))
-                    .append(edited ? " · " + I18n.t("autosave.texts.edited") : "").append(" · {").append(t.id()).append("}\n");
+        List<SavedText.Mark> marks = SavedText.marks(said);
+        for (int i = 0; i < said.size(); i++) {
+            SavedText t = said.get(i);
+            SavedText.Mark mark = marks.get(i);
+            boolean asSent = mark == SavedText.Mark.SENT || mark == SavedText.Mark.WRITTEN;
+            out.append('\n').append(WHEN.format((asSent ? t.at() : t.seen()).atZone(zone))).append(" · ").append(oneLine(t.from()))
+                    .append(mark == SavedText.Mark.SENT ? "" : " · " + I18n.t("autosave.texts." + mark.name()))
+                    .append(" · {").append(t.id()).append("}\n");
             for (String line : t.text().split("\\R", -1)) out.append("  ").append(shown(line)).append('\n');
         }
         return out.toString();

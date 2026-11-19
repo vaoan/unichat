@@ -18,7 +18,7 @@ import java.util.function.Consumer;
  * The demo with nobody acting on their own and no pauses: the test plays the others in the chat (writing, typing, the
  * history the server still has) and decides when pictures and files finish downloading.
  */
-public final class ScriptedChatService extends MockChatService {
+public class ScriptedChatService extends MockChatService {
     private final Map<String, Integer> olderToLoad = new ConcurrentHashMap<>();
     private volatile CompletableFuture<Void> downloads = CompletableFuture.completedFuture(null);
 

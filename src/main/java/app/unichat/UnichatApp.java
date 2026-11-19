@@ -276,7 +276,8 @@ public final class UnichatApp extends Application {
         if (svc == null) return;
         if (cloud != null) cloud.stop();
         cloud = null;
-        svc.logout().whenComplete((v, err) -> Platform.runLater(() -> {
+        // Off the UI thread: what's waiting goes first (seconds at most), then the session ends.
+        java.util.concurrent.CompletableFuture.runAsync(() -> sendWhatsWaiting(svc)).thenCompose(v -> svc.logout()).whenComplete((v, err) -> Platform.runLater(() -> {
             svc.stop();
             Settings.get().clearSession();
             if (Settings.get().localServer()) {
@@ -346,6 +347,18 @@ public final class UnichatApp extends Application {
         s.setWindowGeometry(stage.getWidth(), stage.getHeight(), stage.getX(), stage.getY());
     }
 
+    /**
+     * What's waiting to be corrected before it goes is sent now, as written, before the service stops: quitting or
+     * logging out never loses a message. At most a few seconds (a network that never answers mustn't hold quitting).
+     */
+    static void sendWhatsWaiting(ChatService svc) {
+        try {
+            app.unichat.ui.timeline.SendQueue.of(svc).drain().get(10, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception e) {
+            System.err.println("Sending what was waiting: " + e);
+        }
+    }
+
     /** The window goes at once; what has to stop stops off the UI thread (it can take seconds per bridge), then the app ends. */
     private void quit() {
         Platform.runLater(() -> {
@@ -357,6 +370,7 @@ public final class UnichatApp extends Application {
             LocalServer local = Settings.get().localServer() ? LocalServer.get() : null;
             java.util.List<Runnable> stops = new java.util.ArrayList<>();
             if (c != null) stops.add(c::stop);
+            if (s != null) stops.add(() -> sendWhatsWaiting(s)); // before the service stops: it sends them
             if (s != null) stops.add(s::stop);
             if (local != null) stops.add(local::stop);
             // Exit off the FX thread: System.exit on it can deadlock with AWT's shutdown on macOS.

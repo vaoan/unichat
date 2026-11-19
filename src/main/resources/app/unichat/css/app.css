@@ -396,6 +396,12 @@
 /* A message being corrected with AI ("Corrigiendo con IA…"): a wheel as big as the text, beside the time. */
 .message-fixing-wheel { -fx-pref-width: 1em; -fx-pref-height: 1em; -fx-max-width: 1em; -fx-max-height: 1em; -fx-progress-color: -text-2; }
 .bubble.out .message-fixing-wheel { -fx-progress-color: white; }
+/* Texts waiting to be corrected before they go, above the message box: past three rows it scrolls, never pushing the chat up. */
+.send-queue { -fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0 4 4 4; }
+.send-queue > .viewport { -fx-background-color: transparent; }
+.send-queue-row { -fx-padding: 2 4; }
+.send-queue-text { -fx-text-fill: -text-2; -fx-font-style: italic; }
+.send-queue-answers { -fx-text-fill: -text-2; -fx-font-size: 0.85em; -fx-padding: 0 0 0 1.4em; }
 .transcript-action:hover { -fx-underline: true; }
 
 .reactions { -fx-padding: 2 4 0 4; }

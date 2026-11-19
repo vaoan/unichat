@@ -83,8 +83,11 @@ memory, with simulated incoming messages, "typing…" and read receipts.
   With "Learn how I write", drafts follow your style and learn from what you change in them; Settings shows what was
   learned and lets you undo it. A message of yours already sent can be corrected too ("Correct with AI" in its menu):
   it's corrected in the background and edited by itself, the text box left free, the message showing it meanwhile.
-  "Correct every message I send" does that with each one you send from Unichat on this computer (it goes at once, as
-  written; many networks then mark it as edited).
+  "Correct what I send" does it with each one you send from Unichat on this computer: after sending (it goes at once,
+  as written; many networks then mark it as edited) or before sending (it waits in a queue above the text box while
+  it's corrected, which you can cancel or skip, and you keep writing meanwhile; if others wrote while it waited, it
+  goes as an answer to what was last said). With "Texts" kept, every version stays visible: what you wrote and its
+  correction.
 - **Voice notes to text**: "Transcribe" under each audio (or the T key). It uses Whisper, which comes with Unichat and
   runs on your computer, free and without sending the audio to any service; the model (60 or 190 MB) is downloaded
   the first time. In Settings → Voice to text you can choose the model and language, or set your own command

@@ -16,7 +16,7 @@ import java.io.File;
  * and exits; {@code -Dunichat.openChat=<id>} opens a chat first, {@code -Dunichat.info=true} the info panel,
  * {@code -Dunichat.openSpace=<id>} a server's channels,
  * {@code -Dunichat.openFolders=true} the list of folders, {@code -Dunichat.openFolder=<name>} inside one,
- * {@code -Dunichat.overlay=command|newchat|add|picker|folder|folderDelete|cloak|chatOptions|forward|select|delete|savedText[:none]|fixing|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
+ * {@code -Dunichat.overlay=command|newchat|add|picker|folder|folderDelete|cloak|chatOptions|forward|select|delete|savedText[:none]|fixing|queue|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
  * {@code -Dunichat.network=<protocol id>} filters the inbox to one network, {@code -Dunichat.search=<text>} searches it.
  */
 final class SnapshotRun {
@@ -77,6 +77,7 @@ final class SnapshotRun {
         if (overlay.equals("delete")) mainView.showDeleting();
         if (overlay.startsWith("savedText")) mainView.showSavedText(overlay.equals("savedText:none"));
         if (overlay.equals("fixing")) mainView.showFixing();
+        if (overlay.equals("queue")) mainView.showQueue();
         if (overlay.startsWith("login:")) mainView.addAccount(Network.fromProtocolId(overlay.substring(6)));
         if (overlay.startsWith("settings")) {
             mainView.showSettings();

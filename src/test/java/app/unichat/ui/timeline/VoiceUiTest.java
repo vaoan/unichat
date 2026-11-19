@@ -165,6 +165,19 @@ class VoiceUiTest {
     }
 
     @Test
+    void aVoiceNoteGoesInItsChatsTurn() throws Exception {
+        List<Runnable> held = new java.util.concurrent.CopyOnWriteArrayList<>();
+        fx(() -> { composer.setInTurn((chat, send) -> held.add(send)); return null; }); // texts still being corrected
+        startRecording();
+        speak(1200);
+        fx(() -> { ((Button) composer.lookup(".voice-bar .send-button")).fire(); return null; });
+        await(() -> held.size() == 1, "it waits its turn");
+        assertEquals(0, voiceNotes().size());
+        held.getFirst().run();
+        await(() -> voiceNotes().size() == 1, "sent in its turn");
+    }
+
+    @Test
     void aReplyStaysAReply() throws Exception {
         Message first = svc.messages(CHAT).get(0);
         fx(() -> { composer.reply(first); return null; });

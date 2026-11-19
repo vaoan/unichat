@@ -229,6 +229,14 @@ public final class AutoSave implements ChatService.Listener {
         texts.setSync(written, fetch);
     }
 
+    /**
+     * {@code sent} went in {@code chatId} in place of {@code written}, corrected by the AI before it went: what was
+     * written is kept as that message's first version ({@link TextKeeping#wroteBefore}).
+     */
+    public void wroteBefore(String chatId, String sent, String written) {
+        texts.wroteBefore(chatId, sent, written);
+    }
+
     /** The cloud brought other computers' texts of these chats (their keys): their readable copies are made again. */
     public void textsArrived(Set<String> keys) {
         texts.arrived(keys);
