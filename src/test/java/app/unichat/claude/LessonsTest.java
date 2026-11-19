@@ -31,6 +31,7 @@ class LessonsTest {
             Map.entry("oauth-state-equals", new String[] {"src/main/java/app/unichat/cloud/X.java", "        if (!state.equals(q.get(\"state\"))) {"}),
             Map.entry("http-client-per-call", new String[] {"src/main/java/X.java", "        HttpClient http = HttpClient.newBuilder().build();"}),
             Map.entry("test-future-join", new String[] {"src/test/java/X.java", "        svc.send(m).join();"}), // lesson-ok: test-future-join
+            Map.entry("extend-selection", new String[] {"src/main/java/X.java", "        input.extendSelection(0);"}), // lesson-ok: extend-selection
             Map.entry("own-process", new String[] {"src/main/java/app/unichat/stt/X.java", "        Process p = new ProcessBuilder(cmd).start();"}),
             Map.entry("fx-coalesce-by-hand", new String[] {"src/main/java/app/unichat/ui/X.java",
                     "        if (scheduled.compareAndSet(false, true)) Platform.runLater(() -> {"}),

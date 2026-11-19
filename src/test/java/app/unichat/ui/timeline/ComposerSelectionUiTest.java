@@ -67,6 +67,32 @@ class ComposerSelectionUiTest {
         });
     }
 
+    /** ⇧⌘ and an arrow (⌘: the shortcut key, as the Mac sends it); where the selection is after it: "anchor-caret". */
+    private String shiftShortcut(KeyCode arrow) throws Exception {
+        return FxWait.fx(() -> {
+            Event.fireEvent(box, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", arrow, true, false, false, true));
+            return box.getAnchor() + "-" + box.getCaretPosition();
+        });
+    }
+
+    /**
+     * ⇧⌘↑ / ⇧⌘↓ select from where the selection started to the text's start / end, however many times and in any order,
+     * as macOS does: JavaFX extended from the selection's nearer end, so a second ⇧⌘↑ lost it all and ⇧⌘↓ after ⇧⌘↑
+     * moved where it started, and from then on it grew the wrong way.
+     */
+    @Test
+    void shiftCommandUpAndDownSelectFromWhereItStartedAndStayThere() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.support.Os.mac(), "the Mac's keys");
+        open(TEXT, 400);
+        int from = LINE_2 + 3, end = TEXT.length();
+        caretAt(from);
+        assertEquals(from + "-0", shiftShortcut(KeyCode.UP));
+        assertEquals(from + "-0", shiftShortcut(KeyCode.UP), "again: still from where it started");
+        assertEquals(from + "-" + end, shiftShortcut(KeyCode.DOWN), "the other way, from the same place");
+        assertEquals(from + "-" + end, shiftShortcut(KeyCode.DOWN), "again: still");
+        assertEquals(from + "-0", shiftShortcut(KeyCode.UP));
+    }
+
     private void caretAt(int at) throws Exception {
         FxWait.fx(() -> { box.positionCaret(at); return null; });
     }

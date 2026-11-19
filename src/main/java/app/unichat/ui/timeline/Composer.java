@@ -457,6 +457,12 @@ public final class Composer extends VBox {
                 && !e.isShortcutDown() && !e.isAltDown()) {
             e.consume();
             lineSelection.step(e.getCode() == KeyCode.UP);
+        } else if ((e.getCode() == KeyCode.UP || e.getCode() == KeyCode.DOWN) && e.isShiftDown() && e.isShortcutDown()
+                && !e.isAltDown() && app.unichat.support.Os.mac()) {
+            // ⇧⌘↑ / ⇧⌘↓: from where the selection started to the text's start / end, as macOS does. JavaFX's own
+            // extended from the selection's nearer end: a second ⇧⌘↑ lost it, and after ⇧⌘↑ a ⇧⌘↓ grew it the wrong way.
+            e.consume();
+            input.selectRange(input.getAnchor(), e.getCode() == KeyCode.UP ? 0 : input.getLength());
         } else if (e.getCode() == KeyCode.ESCAPE && (replyTo != null || editing != null)) {
             e.consume();
             cancelMode();
