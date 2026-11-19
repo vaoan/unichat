@@ -233,6 +233,7 @@ public final class LocalServer {
 
     private void startBridge(String b) throws IOException {
         Path bd = dir.resolve(b);
+        BridgeCapabilities.beforeStart(b, bd); // not running yet: its database is ours for a moment
         supervisor.start(b, bd, List.of(store.path(b).toString(), "-c", "config.yaml"), bd.resolve("bridge.log"));
     }
 

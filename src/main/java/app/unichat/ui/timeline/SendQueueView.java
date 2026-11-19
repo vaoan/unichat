@@ -41,11 +41,7 @@ final class SendQueueView extends ScrollPane {
         setContent(rows);
         setFitToWidth(true);
         getStyleClass().add("send-queue");
-        // As tall as its rows up to about three, then it scrolls: measured on a row itself (it grows with the text), not
-        // on a font, whose size read at the wrong moment let it grow past them.
         setMaxHeight(USE_PREF_SIZE); // never stretched past it by what holds it (it was, in a full run)
-        prefViewportHeightProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
-                () -> Math.min(rows.getHeight(), MAX_ROWS * rowHeight()), rows.heightProperty()));
         queue.addListener(onChange);
         redraw();
     }
@@ -60,9 +56,17 @@ final class SendQueueView extends ScrollPane {
         queue.removeListener(onChange);
     }
 
-    /** A row's height with the space under it; none before there's one. */
-    private double rowHeight() {
-        return rows.getChildren().isEmpty() ? 0 : ((javafx.scene.layout.Region) rows.getChildren().getFirst()).getHeight() + rows.getSpacing();
+    /**
+     * As tall as its rows up to about three, then it scrolls: measured at each layout on a row itself (it grows with the
+     * text), never kept from an earlier one (a height bound to the list's kept a row's while it was still being laid
+     * out, and the list showed all eight).
+     */
+    @Override
+    protected double computePrefHeight(double width) {
+        if (rows.getChildren().isEmpty()) return super.computePrefHeight(width);
+        double inner = (width < 0 ? getWidth() : width) - snappedLeftInset() - snappedRightInset();
+        double row = rows.getChildren().getFirst().prefHeight(inner) + rows.getSpacing();
+        return Math.min(rows.prefHeight(inner), MAX_ROWS * row) + snappedTopInset() + snappedBottomInset();
     }
 
     private void redraw() {
