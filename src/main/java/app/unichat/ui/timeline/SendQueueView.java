@@ -24,8 +24,8 @@ import java.util.function.Supplier;
 final class SendQueueView extends ScrollPane {
     /** How much of a text a row shows. */
     private static final int PREVIEW = 60;
-    /** How tall it gets before it scrolls, in lines of its text: about three rows. */
-    private static final double MAX_EM = 8.5;
+    /** How many rows it shows before it scrolls. */
+    private static final double MAX_ROWS = 3.5;
 
     private final SendQueue queue;
     private final Supplier<String> chatId;
@@ -41,9 +41,11 @@ final class SendQueueView extends ScrollPane {
         setContent(rows);
         setFitToWidth(true);
         getStyleClass().add("send-queue");
-        // As tall as its rows up to about three, then it scrolls: measured in the text's size, which grows to 160 %.
+        // As tall as its rows up to about three, then it scrolls: measured on a row itself (it grows with the text), not
+        // on a font, whose size read at the wrong moment let it grow past them.
+        setMaxHeight(USE_PREF_SIZE); // never stretched past it by what holds it (it was, in a full run)
         prefViewportHeightProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
-                () -> Math.min(rows.getHeight(), MAX_EM * textSize()), rows.heightProperty()));
+                () -> Math.min(rows.getHeight(), MAX_ROWS * rowHeight()), rows.heightProperty()));
         queue.addListener(onChange);
         redraw();
     }
@@ -58,9 +60,9 @@ final class SendQueueView extends ScrollPane {
         queue.removeListener(onChange);
     }
 
-    /** The size of the rows' text (a row's label), or the system's before there's one. */
-    private double textSize() {
-        return rows.lookup(".send-queue-text") instanceof Label l ? l.getFont().getSize() : javafx.scene.text.Font.getDefault().getSize();
+    /** A row's height with the space under it; none before there's one. */
+    private double rowHeight() {
+        return rows.getChildren().isEmpty() ? 0 : ((javafx.scene.layout.Region) rows.getChildren().getFirst()).getHeight() + rows.getSpacing();
     }
 
     private void redraw() {

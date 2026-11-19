@@ -31,10 +31,16 @@ final class MessageLine extends HBox {
     }
 
     private boolean picking() {
-        return getParent() instanceof ListCell<?> cell && cell.getListView() != null && cell.getListView().getStyleClass().contains("picking");
+        return cell() instanceof ListCell<?> cell && cell.getListView() != null && cell.getListView().getStyleClass().contains("picking");
     }
 
     private boolean inSelectedCell() {
-        return getParent() instanceof ListCell<?> cell && cell.isSelected();
+        return cell() instanceof ListCell<?> cell && cell.isSelected();
+    }
+
+    /** The list cell it's in: its parent, or further up when a range's markers wrap it. */
+    private ListCell<?> cell() {
+        for (javafx.scene.Parent p = getParent(); p != null; p = p.getParent()) if (p instanceof ListCell<?> c) return c;
+        return null;
     }
 }

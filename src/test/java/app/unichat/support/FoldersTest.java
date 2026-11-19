@@ -17,6 +17,18 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 class FoldersTest {
     @Test
+    void whatsInAFolderLongerThanItsTimeGoesTheRestStays(@org.junit.jupiter.api.io.TempDir Path tmp) throws Exception {
+        Path old = java.nio.file.Files.createDirectories(tmp.resolve("capture-1"));
+        java.nio.file.Files.writeString(old.resolve("a.png"), "x");
+        java.nio.file.Files.setLastModifiedTime(old, java.nio.file.attribute.FileTime.from(java.time.Instant.now().minus(java.time.Duration.ofDays(2))));
+        Path recent = java.nio.file.Files.createDirectories(tmp.resolve("capture-2"));
+        Folders.deleteOlderThan(tmp, java.time.Duration.ofDays(1));
+        assertFalse(java.nio.file.Files.exists(old), "a day old: gone, with what was in it");
+        assertTrue(java.nio.file.Files.exists(recent));
+        Folders.deleteOlderThan(tmp.resolve("nada"), java.time.Duration.ofDays(1)); // no folder: nothing to do
+    }
+
+    @Test
     void aPrivateFolderIsTheOwnersAlone(@org.junit.jupiter.api.io.TempDir Path tmp) throws Exception {
         Path dir = Folders.ownerOnly(tmp.resolve("texts/here"));
         assertTrue(java.nio.file.Files.isDirectory(dir));

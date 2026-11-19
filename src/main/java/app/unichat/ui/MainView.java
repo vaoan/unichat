@@ -172,9 +172,7 @@ public final class MainView extends StackPane {
         thread.composer().setOnPanel(this::togglePanel);
         offerProtectedPhotos(svc);
         forwards = new app.unichat.ui.timeline.ForwardBar(svc, this::openChatId);
-        thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(svc, this::showOverlay, this::hideOverlay, forwards::show));
-        thread.setDeleteSheet(new app.unichat.ui.timeline.DeleteSheet(this::showOverlay, this::hideOverlay));
-        thread.setSavedTextSheet(new app.unichat.ui.timeline.SavedTextSheet(this::showOverlay, this::hideOverlay, this::toast));
+        sheets(svc);
         offerChatOptions(svc);
         rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::gearClicked);
 
@@ -578,6 +576,11 @@ public final class MainView extends StackPane {
         if (thread.chat() != null) thread.showDeleting();
     }
 
+    /** A stretch of the open chat picked to capture, or ({@code sheet}) its capture (snapshot diagnostics). */
+    public void showCapture(boolean sheet) {
+        if (thread.chat() != null) thread.showCapture(sheet);
+    }
+
     /** Texts waiting in the open chat to be corrected before they go (snapshot diagnostics). */
     public void showQueue() {
         if (thread.chat() != null) thread.showQueue();
@@ -586,6 +589,14 @@ public final class MainView extends StackPane {
     /** My newest message in the open chat being corrected with AI (snapshot diagnostics). */
     public void showFixing() {
         if (thread.chat() != null) thread.showFixing();
+    }
+
+    /** The chat's questions and sheets, in the window's overlay: forwarding, deleting, capturing, what a message said. */
+    private void sheets(ChatService svc) {
+        thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(svc, this::showOverlay, this::hideOverlay, forwards::show));
+        thread.setDeleteSheet(new app.unichat.ui.timeline.DeleteSheet(this::showOverlay, this::hideOverlay));
+        thread.setCaptureSheet(new app.unichat.ui.timeline.CaptureSheet(svc, this::showOverlay, this::hideOverlay, this::toast));
+        thread.setSavedTextSheet(new app.unichat.ui.timeline.SavedTextSheet(this::showOverlay, this::hideOverlay, this::toast));
     }
 
     /** What a deleted message said, or ({@code none}) that there's no copy, for the open chat (snapshot diagnostics). */

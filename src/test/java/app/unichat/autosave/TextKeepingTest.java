@@ -62,7 +62,8 @@ class TextKeepingTest {
     }
 
     @AfterEach
-    void stop() {
+    void stop() throws Exception {
+        settled(); // a copy made after the test, into a folder being deleted, failed the cleanup
         SaveFolders.setOwn(chat.id(), null);
         svc.stop();
     }

@@ -20,7 +20,6 @@ import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -131,6 +130,16 @@ final class MessageRowView {
         return Math.max(200, Math.min(560, listWidth * 0.68));
     }
 
+    /** A day's line between messages ("Hoy", "Ayer", a date), as the chat and a capture of it draw it. */
+    static Node dayRow(ThreadRows.DayRow d) {
+        Label l = new Label(app.unichat.ui.Formats.daySeparator(d.day(), java.time.Instant.now(), java.time.ZoneId.systemDefault()));
+        l.getStyleClass().add("day-separator");
+        HBox box = new HBox(l);
+        box.setAlignment(Pos.CENTER);
+        box.getStyleClass().add("day-row");
+        return box;
+    }
+
     Node node(ThreadRows.MessageRow row, double width) {
         Message m = row.message();
         if (m.type() == MessageType.SYSTEM) {
@@ -211,9 +220,6 @@ final class MessageRowView {
         bubble.setFillWidth(true);
 
         bubble.setOnContextMenuRequested(e -> actions.messageMenu(m).show(bubble, e.getScreenX(), e.getScreenY()));
-        bubble.setOnMouseClicked(e -> {
-            if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2) heart(m);
-        });
         return bubble;
     }
 
@@ -315,12 +321,6 @@ final class MessageRowView {
         Label l = new Label(I18n.t("messageFix.working"), wheel);
         l.getStyleClass().addAll("transcript-status", "message-fixing");
         return l;
-    }
-
-    /** A double click hearts the message, where the chat takes that reaction. */
-    private void heart(Message m) {
-        if (m.deleted() || chat.get().features().reactionsOffered(List.of("❤️")).isEmpty()) return;
-        svc.toggleReaction(chat.get().id(), m.id(), "❤️");
     }
 
     private static java.util.List<String> links(Message m) {

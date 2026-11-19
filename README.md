@@ -88,6 +88,7 @@ memory, with simulated incoming messages, "typing…" and read receipts.
   it's corrected, which you can cancel or skip, and you keep writing meanwhile; if others wrote while it waited, it
   goes as an answer to what was last said). With "Texts" kept, every version stays visible: what you wrote and its
   correction.
+- **Capture a conversation**: "Capture conversation…" in a message's menu picks a stretch between two markers (all of it, nothing left out) and makes a picture of it as Unichat draws it (header, names, photos, reactions), as one long picture or several a phone's screen tall, to send to a chat, copy or save.
 - **Voice notes to text**: "Transcribe" under each audio (or the T key). It uses Whisper, which comes with Unichat and
   runs on your computer, free and without sending the audio to any service; the model (60 or 190 MB) is downloaded
   the first time. In Settings → Voice to text you can choose the model and language, or set your own command
@@ -146,7 +147,7 @@ Screen readers (Narrator, VoiceOver, Orca): chats, messages, icon-only buttons, 
 reactions and switches have a spoken description.
 
 Everything can be used **with the keyboard alone**: F6 / Shift+F6 jumps between sidebar, list, messages and text
-box; in the messages, ↑/↓ moves through them, **R** replies, **E** edits, **Enter** opens the actions, **1–6** reacts,
+box; in the messages, ↑/↓ moves through them, **R** replies, **E** edits, **Enter** opens the actions (reacting is there),
 **Esc** goes back to the text box. The focus is visible when navigating with Tab.
 
 ## Build

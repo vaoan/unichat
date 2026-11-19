@@ -88,6 +88,7 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   sobre el cuadro de texto mientras se corrige, que puedes cancelar o saltar, y sigues escribiendo; si otros
   escribieron mientras esperaba, sale como respuesta a lo último que se dijo). Con «Textos» guardados, se ven todas
   las versiones: lo que escribiste y su corrección.
+- **Capturar una conversación**: «Capturar conversación…» en el menú de un mensaje elige un tramo entre dos marcadores (todo, sin dejar nada fuera) y hace una imagen de él tal como lo dibuja Unichat (encabezado, nombres, fotos, reacciones), en una imagen larga o varias del alto de la pantalla de un teléfono, para enviar a un chat, copiar o guardar.
 - **Notas de voz a texto**: "Transcribir" bajo cada audio (o la tecla T). Usa Whisper, que viene con Unichat y
   corre en tu computador, gratis y sin enviar el audio a ningún servicio; el modelo (60 o 190 MB) se descarga
   la primera vez. En Ajustes → Voz a texto puedes elegir modelo e idioma, o poner tu propio comando
@@ -147,7 +148,7 @@ Lectores de pantalla (Narrador, VoiceOver, Orca): chats, mensajes, botones de so
 reacciones e interruptores tienen descripción hablada.
 
 Todo se puede usar **solo con teclado**: F6 / Shift+F6 salta entre barra lateral, lista, mensajes y campo de
-texto; en los mensajes, ↑/↓ recorre, **R** responde, **E** edita, **Enter** abre las acciones, **1–6** reacciona,
+texto; en los mensajes, ↑/↓ recorre, **R** responde, **E** edita, **Enter** abre las acciones (reaccionar está ahí),
 **Esc** vuelve al campo de texto. El foco se ve al navegar con Tab.
 
 ## Compilar

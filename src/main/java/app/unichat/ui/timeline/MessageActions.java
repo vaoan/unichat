@@ -14,7 +14,7 @@ import java.util.Set;
 public final class MessageActions {
     private MessageActions() {}
 
-    enum Action { REPLY, COPY, OPEN_FILE, SAVE_AS, SAVE_LINK, SAVED_TEXT, TRANSCRIBE, EDIT, FIX, DELETE_FOR_EVERYONE, DELETE_FOR_ME, FAVORITE, FORWARD, PIN }
+    enum Action { REPLY, COPY, OPEN_FILE, SAVE_AS, SAVE_LINK, SAVED_TEXT, CAPTURE, TRANSCRIBE, EDIT, FIX, DELETE_FOR_EVERYONE, DELETE_FOR_ME, FAVORITE, FORWARD, PIN }
 
     static Set<Action> of(Message m, RoomFeatures f, Instant now) {
         return of(m, f, now, false);
@@ -27,6 +27,7 @@ public final class MessageActions {
         if (m.deleted()) return EnumSet.of(Action.SAVED_TEXT);
         // An edited one's past; mine where kept: what I wrote before the AI corrected it.
         if (m.edited() || myTextsKept && m.outgoing() && !m.isMedia()) out.add(Action.SAVED_TEXT);
+        out.add(Action.CAPTURE); // a picture of the chat from here to there: any message can be an end
         if (f.replies() || f.isUnknown()) out.add(Action.REPLY);
         if (!m.isMedia()) out.add(Action.COPY);
         if (m.mediaUrl() != null) {

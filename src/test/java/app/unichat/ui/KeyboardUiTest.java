@@ -24,6 +24,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -80,11 +81,11 @@ class KeyboardUiTest {
                 .findFirst().orElse(""));
         assertTrue(msgText.startsWith("Laura, ") && msgText.contains("¿Quién trae qué el domingo?"), msgText);
 
-        // The last message is selected when the timeline gets focus; "1" reacts with the first quick emoji.
+        // The last message is selected when the timeline gets focus; a digit never reacts (only the menu does).
         List<Message> msgs = svc.messages("!familia:demo");
         Message last = msgs.get(msgs.size() - 1);
         press(scene, KeyCode.DIGIT1, false, false);
-        assertTrue(last.reactions().containsKey(EmojiPicker.QUICK[0]), "1 reacts to the selected message");
+        assertFalse(last.reactions().containsKey(EmojiPicker.QUICK[0]), "1 doesn't react to the selected message");
 
         press(scene, KeyCode.R, false, false);
         assertEquals("composer", fx(() -> zone(scene)), "R moves to the composer");

@@ -15,6 +15,20 @@ public final class Folders {
     private Folders() {}
 
     /**
+     * Removes what's in {@code root} (files and folders) last changed longer than {@code keep} ago: a folder of things
+     * made for a while (to send, to copy) that mustn't stay for good. No folder is fine.
+     */
+    public static void deleteOlderThan(Path root, java.time.Duration keep) {
+        if (!Files.isDirectory(root)) return;
+        long before = System.currentTimeMillis() - keep.toMillis();
+        try (java.nio.file.DirectoryStream<Path> items = Files.newDirectoryStream(root)) {
+            for (Path d : items) if (Files.getLastModifiedTime(d).toMillis() < before) deleteQuietly(d);
+        } catch (IOException e) {
+            // next time
+        }
+    }
+
+    /**
      * {@code dir}, made if missing, readable by its owner alone where the system has owners and modes (another account on
      * the computer can't list or read it): for what's private, as a copy of what chats said.
      */

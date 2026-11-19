@@ -329,7 +329,7 @@ final class MessageSender {
     private final Map<String, String> readOnReply = new ConcurrentHashMap<>();
 
     /**
-     * With {@link Settings.ReadReceipts#ON_REPLY}, others see you read their messages once you write: a public m.read
+     * With {@link Settings.ReadReceipts#ON_REPLY}, others see you read their messages once you write or react: a public m.read
      * for the newest one of theirs, before the message goes. A failure only costs the receipt.
      */
     private void readOnReply(String chatId) {
@@ -583,6 +583,7 @@ final class MessageSender {
             } else {
                 ObjectNode content = MatrixClient.JSON.createObjectNode();
                 content.putObject("m.relates_to").put("rel_type", "m.annotation").put("event_id", messageId).put("key", emoji);
+                readOnReply(chatId); // reacting is answering: with "Al responder", they see it was read
                 JsonNode resp = client.sendEvent(chatId, "m.reaction", core.newTxnId(), content);
                 synchronized (proc) {
                     proc.registerOwnReaction(chatId, resp.path("event_id").asText(null), messageId, emoji);

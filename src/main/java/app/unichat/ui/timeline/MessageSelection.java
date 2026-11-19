@@ -34,9 +34,24 @@ final class MessageSelection {
 
     /**
      * What picking is for: the bar's button ({@code buttonKey}, its look {@code buttonStyle}), which messages can be
-     * picked, and what's done with them.
+     * picked, and what's done with them. {@code range}: a stretch between two markers ({@link MessageRange}) rather than
+     * messages picked one by one: nothing between its ends can be left out.
      */
-    record Purpose(String buttonKey, String buttonStyle, Predicate<Message> pickable, Consumer<List<Message>> act) {}
+    record Purpose(String buttonKey, String buttonStyle, Predicate<Message> pickable, Consumer<List<Message>> act, boolean range) {
+        Purpose(String buttonKey, String buttonStyle, Predicate<Message> pickable, Consumer<List<Message>> act) {
+            this(buttonKey, buttonStyle, pickable, act, false);
+        }
+    }
+
+    /** The two ends of a range, on its first and last rows: their ✕ takes one away. */
+    static final PseudoClass RANGE_START = PseudoClass.getPseudoClass("range-start");
+    static final PseudoClass RANGE_END = PseudoClass.getPseudoClass("range-end");
+    private final MessageRange range = new MessageRange();
+    /**
+     * Under the header while picking a range: each end, said, with its ✕ (the keyboard's way to take one away). Its own
+     * strip: in the bar beside the buttons it cut them all to "Ca…".
+     */
+    private final HBox ends = new HBox(16);
 
     private final ListView<ThreadRows.Row> list;
     private final Consumer<Boolean> showBar;
@@ -68,6 +83,11 @@ final class MessageSelection {
         cancel.setOnAction(e -> end());
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.ALWAYS);
+        ends.setAlignment(Pos.CENTER_LEFT);
+        ends.getStyleClass().add("range-ends");
+        app.unichat.ui.Nodes.show(ends, false);
+        for (Button b : List.of(cancel, send)) b.setMinWidth(Region.USE_PREF_SIZE);
+        count.setMinWidth(0);
         bar = new HBox(10, count, grow, cancel, send);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.getStyleClass().add("selection-bar");
@@ -86,13 +106,32 @@ final class MessageSelection {
 
     Node bar() { return bar; }
 
+    /** The strip under the header that says a range's ends (shown only while picking one). */
+    Node ends() { return ends; }
+
     boolean active() { return on; }
 
-    boolean picked(Message m) { return on && picked.contains(m.id()); }
+    boolean picked(Message m) {
+        if (!on) return false;
+        return purpose.range() ? inRange().contains(m.id()) : picked.contains(m.id());
+    }
+
+    /** Whether {@code m} is the range's start (true) or end, as its row shows a marker. */
+    boolean rangeStart(Message m) { return on && purpose.range() && m.id().equals(range.start()); }
+
+    boolean rangeEnd(Message m) { return on && purpose.range() && m.id().equals(range.end()); }
+
+    /** Takes the range's start (or end) away: the range is the other alone, and the next click puts it back. */
+    void removeRangeEnd(boolean start) {
+        if (start) range.removeStart();
+        else range.removeEnd();
+        sync();
+    }
 
     /** Starts picking for {@code why}, with {@code first} picked. */
     void start(Message first, Purpose why) {
         picked.clear();
+        range.clear();
         purpose = why;
         send.setText(I18n.t(why.buttonKey()));
         send.getStyleClass().removeAll("primary-button", "danger-button");
@@ -111,6 +150,7 @@ final class MessageSelection {
         if (!on) return;
         on = false;
         picked.clear();
+        range.clear();
         last = null;
         list.getSelectionModel().clearSelection(); // the row picking moved through kept its ring, and looked still picked
         app.unichat.ui.Nodes.style(list, "picking", false);
@@ -121,8 +161,19 @@ final class MessageSelection {
     /** The picked messages still in the chat and still fit for it (not deleted meanwhile), in the chat's order. */
     List<Message> messages() {
         if (purpose == null) return List.of();
-        return list.getItems().stream().filter(r -> r instanceof ThreadRows.MessageRow mr && picked.contains(mr.message().id()))
+        java.util.Collection<String> in = purpose.range() ? inRange() : picked;
+        return list.getItems().stream().filter(r -> r instanceof ThreadRows.MessageRow mr && in.contains(mr.message().id()))
                 .map(r -> ((ThreadRows.MessageRow) r).message()).filter(purpose.pickable()).toList();
+    }
+
+    /** The ids of the chat's messages, in its order, as the list has them. */
+    private List<String> ids() {
+        return list.getItems().stream().filter(r -> r instanceof ThreadRows.MessageRow)
+                .map(r -> ((ThreadRows.MessageRow) r).message().id()).toList();
+    }
+
+    private java.util.Set<String> inRange() {
+        return new java.util.HashSet<>(range.of(ids()));
     }
 
     /** The timeline's keys while picking: true when it took {@code e} (all but the ones that move). */
@@ -136,6 +187,7 @@ final class MessageSelection {
 
     private void mouse(MouseEvent e) {
         if (!on || e.getButton() != MouseButton.PRIMARY) return;
+        if (e.getTarget() instanceof Node n && inMarker(n)) return; // its ✕ takes that end away
         ListCell<?> cell = e.getTarget() instanceof Node n ? cellOf(n) : null;
         if (cell == null || !(cell.getItem() instanceof ThreadRows.MessageRow mr)) return;
         if (e.getEventType() == MouseEvent.MOUSE_CLICKED) {
@@ -146,6 +198,11 @@ final class MessageSelection {
         e.consume(); // the message's own buttons, pictures and links wait until picking ends
     }
 
+    private static boolean inMarker(Node n) {
+        for (Node at = n; at != null; at = at.getParent()) if (at.getStyleClass().contains("range-marker")) return true;
+        return false;
+    }
+
     private static ListCell<?> cellOf(Node n) {
         for (Node at = n; at != null; at = at.getParent()) if (at instanceof ListCell<?> c) return c;
         return null;
@@ -154,6 +211,12 @@ final class MessageSelection {
     /** Picks or unpicks {@code m}; {@code range}: picks every message from the last one picked to it. */
     private void toggle(Message m, boolean range) {
         if (!purpose.pickable().test(m)) return;
+        if (purpose.range()) { // a stretch: the click moves an end (or puts one back), never leaves one out
+            this.range.click(m.id(), ids());
+            last = m.id();
+            sync();
+            return;
+        }
         List<Message> all = list.getItems().stream().filter(r -> r instanceof ThreadRows.MessageRow)
                 .map(r -> ((ThreadRows.MessageRow) r).message()).toList();
         int from = last == null ? -1 : indexOf(all, last), to = indexOf(all, m.id());
@@ -171,10 +234,38 @@ final class MessageSelection {
         return -1;
     }
 
+    /** In the bar, while picking a range: "Desde: …" and "Hasta: …", each with its ✕. */
+    private void showEnds() {
+        ends.getChildren().clear();
+        boolean shown = on && purpose != null && purpose.range();
+        app.unichat.ui.Nodes.show(ends, shown);
+        if (!shown) return;
+        for (boolean start : new boolean[] {true, false}) {
+            Message m = message(start ? range.start() : range.end());
+            if (m == null) continue;
+            String said = I18n.t(start ? "select.rangeFrom" : "select.rangeTo", m.senderName(),
+                    app.unichat.ui.Formats.time(m.timestamp(), java.time.ZoneId.systemDefault()));
+            Label l = new Label(said);
+            l.getStyleClass().add("range-end-label");
+            Button x = app.unichat.ui.Icons.iconButton(app.unichat.ui.Icons.CLOSE, I18n.t("select.rangeRemove", said), () -> {
+                removeRangeEnd(start);
+                list.requestFocus(); // its button is rebuilt: the keyboard goes on from the list, not from nowhere
+            });
+            ends.getChildren().add(new HBox(2, l, x));
+        }
+    }
+
+    private Message message(String id) {
+        if (id == null) return null;
+        for (ThreadRows.Row r : list.getItems()) if (r instanceof ThreadRows.MessageRow mr && mr.message().id().equals(id)) return mr.message();
+        return null;
+    }
+
     /** The bar's count and the rows on screen as picked now; the rest show it when drawn. */
     private void sync() {
         int n = messages().size();
-        count.setText(I18n.n("select.count", n));
+        count.setText(I18n.n(purpose != null && purpose.range() ? "select.rangeCount" : "select.count", n));
+        showEnds();
         send.setDisable(n == 0);
         for (Node row : list.lookupAll(".row-cell")) if (row instanceof Shows s) s.showPicked();
     }

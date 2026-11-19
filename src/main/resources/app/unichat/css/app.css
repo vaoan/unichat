@@ -459,6 +459,17 @@
     -fx-border-width: 0 0 0 3;
 }
 .selection-bar { -fx-spacing: 10; }
+/* Capturing a stretch of the chat: its two ends, "Desde aquí" above the first and "Hasta aquí" under the last. */
+.range-marker { -fx-padding: 0.15em 0.6em; }
+.range-marker-label { -fx-text-fill: -accent; -fx-font-weight: bold; -fx-font-size: 0.86em; }
+.range-marker-line { -fx-background-color: -accent; -fx-max-height: 2; -fx-pref-height: 2; }
+.range-end-label { -fx-text-fill: -text-2; -fx-font-size: 0.86em; }
+.range-ends { -fx-padding: 0.2em 1em; -fx-background-color: -surface-2; }
+/* A capture of the chat (ConversationShot), drawn off screen with the chat's look, and its preview. */
+.shot { -fx-background-color: -bg; }
+.shot-rows { -fx-padding: 0.4em 0 0.4em 0; }
+.shot-footer { -fx-text-fill: -text-3; -fx-font-size: 0.8em; -fx-padding: 0.6em 0 0.8em 0; }
+.capture-preview { -fx-background-color: -surface-2; -fx-background: -surface-2; }
 .selection-count { -fx-font-weight: bold; }
 .forward-preview { -fx-text-fill: -text-2; -fx-font-style: italic; }
 .typing-dot { -fx-background-color: -text-3; -fx-background-radius: 3; }

@@ -62,6 +62,8 @@ public final class ThreadPane extends BorderPane {
     MessageFixer fixer() { return messageFixer; }
 
     SendQueue sendQueue() { return sendQueue; }
+
+    CaptureSheet captureSheet() { return captureSheet; }
     private final Label typing = new Label();
     private final TimelineScroll scroll;
     private final MessageRowView messageRows;
@@ -95,7 +97,8 @@ public final class ThreadPane extends BorderPane {
     private MessageFixer messageFixer;
     private SendQueue sendQueue;
     private SendQueueView sendQueueView;
-    private final MessageSelection.Purpose forwarding, deleting;
+    private final MessageSelection.Purpose forwarding, deleting, capturing;
+    private CaptureSheet captureSheet;
     private final Consumer<String> toast;
 
     public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast, AudioPlayback audio,
@@ -121,6 +124,12 @@ public final class ThreadPane extends BorderPane {
                 m -> messageActions.allows(m, MessageActions.Action.FORWARD), this::forward);
         deleting = new MessageSelection.Purpose("select.delete", "danger-button",
                 m -> messageActions.allows(m, MessageActions.Action.DELETE_FOR_EVERYONE), this::delete);
+        // "Capturar conversación…": a stretch between two markers, then a picture of it as the chat draws it.
+        // Only what the server has can be an end: one still going out changes its id when it arrives, and the range emptied.
+        capturing = new MessageSelection.Purpose("select.capture", "primary-button",
+                m -> m.status() != app.unichat.model.MessageStatus.SENDING && m.status() != app.unichat.model.MessageStatus.FAILED,
+                this::capture, true);
+        messageActions.setOnCapture(m -> selection.start(m, capturing));
         messageActions.setOnForward(m -> selection.start(m, forwarding));
         messageActions.setOnDelete(m -> delete(List.of(m)), m -> selection.start(m, deleting));
         messageFixer = new MessageFixer(svc, text -> Platform.runLater(() -> toast.accept(text)));
@@ -161,7 +170,7 @@ public final class ThreadPane extends BorderPane {
         typing.getStyleClass().add("typing-line");
         VBox bottom = new VBox(typing, composer);
 
-        content.setTop(new VBox(header, pinnedBar.node()));
+        content.setTop(new VBox(header, selection.ends(), pinnedBar.node()));
         content.setCenter(timeline);
         content.setBottom(bottom);
 
@@ -307,6 +316,49 @@ public final class ThreadPane extends BorderPane {
     /** Where deleting for everyone asks twice (the window's overlay). */
     public void setDeleteSheet(DeleteSheet sheet) { this.deleteSheet = sheet; }
 
+    /** Where a capture of a stretch of the chat is looked at and sent (the window's overlay). */
+    public void setCaptureSheet(CaptureSheet sheet) { this.captureSheet = sheet; }
+
+    /**
+     * A picture of {@code messages} (the stretch picked) as the chat draws them, under the chat's header: the sheet
+     * shows it and sends, copies or saves it. Picking ends.
+     */
+    private void capture(List<Message> messages) {
+        selection.end();
+        if (captureSheet == null || chat == null || messages.isEmpty()) return;
+        double width = ConversationShot.WIDTH;
+        Chat of = chat; // taken now: the open chat may change while the sheet is up (a notice's click)
+        javafx.scene.Scene look = getScene();
+        captureSheet.open(messages.size(), of, footer -> ConversationShot.take(captureHeader(of), messages,
+                mr -> messageRows.node(mr, width), look, width, footer, java.time.Duration.ofSeconds(15)));
+    }
+
+    /**
+     * What a capture's header says under the chat's name: its network and, in a group, how many are in it. Never the
+     * account it's on (a phone number) nor one's own settings (muted): the picture goes to others.
+     */
+    static String captureSubtitle(Chat c) {
+        String sub = c.network().displayName();
+        return c.group() ? sub + " · " + I18n.t("thread.participants", c.members().size()) : sub;
+    }
+
+    /** {@code c}'s header as a capture shows it: its picture, name and what's under it, without the buttons. */
+    Node captureHeader(Chat c) {
+        Avatar avatar = new Avatar(34);
+        avatar.set(c.title(), c.id(), c.avatarUrl(), svc);
+        avatar.setNetwork(c.network(), Settings.get().showNetworkBadges());
+        Label title = new Label(c.title());
+        title.getStyleClass().add("thread-title");
+        Label sub = new Label(captureSubtitle(c));
+        sub.getStyleClass().add("thread-subtitle");
+        VBox titles = new VBox(1, title, sub);
+        titles.setAlignment(Pos.CENTER_LEFT);
+        HBox h = new HBox(10, avatar, titles);
+        h.getStyleClass().add("thread-header");
+        h.setAlignment(Pos.CENTER_LEFT);
+        return h;
+    }
+
     /** Where what a deleted or edited message said shows (the window's overlay). */
     public void setSavedTextSheet(SavedTextSheet sheet) { this.savedTextSheet = sheet; }
 
@@ -332,6 +384,19 @@ public final class ThreadPane extends BorderPane {
     public void showDeleting() {
         List<Message> mine = svc.messages(chat.id()).stream().filter(deleting.pickable()).toList();
         delete(mine.subList(Math.max(0, mine.size() - 3), mine.size()));
+    }
+
+    /**
+     * Snapshot diagnostics: the newest six messages picked as a stretch to capture, or ({@code sheet}) their capture's
+     * sheet, as phone pieces.
+     */
+    public void showCapture(boolean sheet) {
+        List<Message> all = svc.messages(chat.id());
+        if (all.size() < 2) return;
+        List<Message> six = all.subList(Math.max(0, all.size() - 6), all.size());
+        selection.start(six.getFirst(), capturing);
+        selection.toggle(six.getLast());
+        if (sheet) capture(selection.messages());
     }
 
     /** Snapshot diagnostics: four texts waiting to be corrected before they go (answers that never come). */
@@ -514,6 +579,9 @@ public final class ThreadPane extends BorderPane {
     // ------------------------------------------------------------------ rendering
 
     private final class RowCell extends ListCell<ThreadRows.Row> implements MessageSelection.Shows {
+        /** The message's own row, before the range's markers (if any) go around it. */
+        private Node drawn;
+
         RowCell() {
             getStyleClass().add("row-cell");
             // Sized to the viewport, not to the widest row (mistakes.md): otherwise one wide row stretched every cell
@@ -532,15 +600,13 @@ public final class ThreadPane extends BorderPane {
                 return;
             }
             if (row instanceof ThreadRows.DayRow d) {
-                Label l = new Label(Formats.daySeparator(d.day(), Instant.now(), ZoneId.systemDefault()));
-                l.getStyleClass().add("day-separator");
-                HBox box = new HBox(l);
-                box.setAlignment(Pos.CENTER);
-                box.getStyleClass().add("day-row");
-                setGraphic(box);
-                setAccessibleText(l.getText());
+                drawn = null;
+                Node day = MessageRowView.dayRow(d);
+                setGraphic(day);
+                setAccessibleText(((Label) ((HBox) day).getChildren().getFirst()).getText());
             } else if (row instanceof ThreadRows.MessageRow mr) {
-                setGraphic(messageRows.node(mr, getListView().getWidth()));
+                drawn = messageRows.node(mr, getListView().getWidth());
+                setGraphic(drawn);
                 showActions(isSelected());
             }
             showPicked();
@@ -551,6 +617,11 @@ public final class ThreadPane extends BorderPane {
             boolean picked = getItem() instanceof ThreadRows.MessageRow mr && selection.picked(mr.message());
             pseudoClassStateChanged(MessageSelection.PICKED, picked);
             showActions(isSelected());
+            if (getItem() instanceof ThreadRows.MessageRow mr && drawn != null) {
+                boolean start = selection.rangeStart(mr.message()), end = selection.rangeEnd(mr.message());
+                Node shown = RangeMarkers.around(drawn, start, end, () -> selection.removeRangeEnd(true), () -> selection.removeRangeEnd(false));
+                if (getGraphic() != shown) setGraphic(shown);
+            }
             if (getItem() instanceof ThreadRows.MessageRow mr) {
                 setAccessibleText(messageRows.describe(mr.message()) + (picked ? ". " + I18n.t("select.picked") : ""));
             }
@@ -563,7 +634,7 @@ public final class ThreadPane extends BorderPane {
         }
 
         private void showActions(boolean selected) {
-            if (getGraphic() instanceof MessageLine line) line.showActions(selected);
+            if (drawn instanceof MessageLine line) line.showActions(selected); // inside the range's markers too
         }
     }
 
@@ -609,12 +680,7 @@ public final class ThreadPane extends BorderPane {
             var cell = list.lookupAll(".row-cell").stream()
                     .filter(n -> n instanceof RowCell rc && rc.isSelected()).findFirst().orElse(list);
             messageActions.messageMenu(m).show(cell, Side.BOTTOM, 40, -10);
-        } else if (code.isDigitKey() && !e.isShortcutDown() && !m.deleted()) {
-            int n = code.getCode() - javafx.scene.input.KeyCode.DIGIT1.getCode();
-            java.util.List<String> quick = messageActions.quick(); // 1 to 6: the quick reactions, as the popup shows them
-            if (n < 0 || n >= quick.size()) return;
-            messageActions.react(m, quick.get(n));
-        } else {
+        } else { // no key reacts: a digit typed here is a digit for the message box (reacting is the menu's, meant)
             return;
         }
         e.consume();

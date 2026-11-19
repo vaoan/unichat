@@ -85,9 +85,9 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
         thread.composer().takeTyping();
     }
 
-    /** The message keys (ThreadPane.onTimelineKey): reply, transcribe, play, edit, and the digits that react. */
+    /** The message keys (ThreadPane.onTimelineKey): reply, transcribe, play, edit. No key reacts. */
     static boolean isTimelineKey(KeyCode code) {
-        return code == KeyCode.R || code == KeyCode.T || code == KeyCode.P || code == KeyCode.E || code.isDigitKey();
+        return code == KeyCode.R || code == KeyCode.T || code == KeyCode.P || code == KeyCode.E;
     }
 
     private static boolean inTimeline(Node n) {

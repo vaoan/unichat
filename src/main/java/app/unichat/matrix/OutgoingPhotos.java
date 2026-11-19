@@ -9,7 +9,6 @@ import app.unichat.video.MovingPictures;
 import app.unichat.video.SendablePhotos;
 
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -67,14 +66,6 @@ final class OutgoingPhotos {
     }
 
     private static void prune(Path root) {
-        if (!Files.isDirectory(root)) return;
-        long before = System.currentTimeMillis() - KEEP.toMillis();
-        try (DirectoryStream<Path> dirs = Files.newDirectoryStream(root)) {
-            for (Path d : dirs) {
-                if (Files.getLastModifiedTime(d).toMillis() < before) Folders.deleteQuietly(d);
-            }
-        } catch (IOException e) {
-            // Next time.
-        }
+        Folders.deleteOlderThan(root, KEEP);
     }
 }

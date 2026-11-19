@@ -54,7 +54,13 @@ final class MessageActionsUi {
     /** Links offered in a message's menu: the keyboard has no other way to them. */
     private static final int MENU_LINKS = 5;
 
-    private Consumer<Message> onForward = m -> { }, onDelete = m -> { }, onDeleteSeveral = m -> { }, onSavedText = m -> { };
+    private Consumer<Message> onForward = m -> { }, onDelete = m -> { }, onDeleteSeveral = m -> { }, onSavedText = m -> { },
+            onCapture = m -> { };
+
+    /** "Capturar conversación…": picking the stretch to capture starts with {@code m}. */
+    void setOnCapture(Consumer<Message> capture) {
+        this.onCapture = capture;
+    }
 
     private MessageFixer fixer;
 
@@ -235,7 +241,7 @@ final class MessageActionsUi {
     private static final List<MessageActions.Action> MENU_ORDER = List.of(MessageActions.Action.SAVE_LINK,
             MessageActions.Action.REPLY, MessageActions.Action.COPY, MessageActions.Action.FORWARD, MessageActions.Action.OPEN_FILE,
             MessageActions.Action.SAVE_AS, MessageActions.Action.TRANSCRIBE, MessageActions.Action.FAVORITE, MessageActions.Action.PIN,
-            MessageActions.Action.EDIT, MessageActions.Action.FIX, MessageActions.Action.SAVED_TEXT);
+            MessageActions.Action.EDIT, MessageActions.Action.FIX, MessageActions.Action.SAVED_TEXT, MessageActions.Action.CAPTURE);
 
     ContextMenu messageMenu(Message m) {
         ContextMenu menu = new ContextMenu();
@@ -299,6 +305,7 @@ final class MessageActionsUi {
                         : List.of(ChatMenus.item(I18n.t("message.pin"), () -> pins.pin(chatId, m)));
             }
             case EDIT -> List.of(item("message.edit", act, m));
+            case CAPTURE -> List.of(ChatMenus.item(I18n.t("message.capture"), () -> onCapture.accept(m)));
             // With the AI turned on, and not twice: its row already says it's being corrected.
             case FIX -> fixer == null || !AiReplyButton.SHOWN.get() || fixer.fixing(m.id()) ? List.of()
                     : List.of(ChatMenus.item(I18n.t("message.fix"), () -> fixer.fix(m)));

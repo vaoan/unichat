@@ -5,21 +5,13 @@ import app.unichat.model.Message;
 import app.unichat.service.ChatService;
 import app.unichat.service.Forwarding;
 import app.unichat.support.I18n;
-import app.unichat.ui.SearchFields;
-import app.unichat.ui.chats.ChatLine;
-import app.unichat.ui.chats.ChatFilter;
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.geometry.Pos;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
-import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
@@ -28,9 +20,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.time.ZoneId;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -39,7 +29,7 @@ import java.util.function.Consumer;
  * A sheet in the window's overlay, like the rest of the app's questions.
  */
 public final class ForwardSheet {
-    private static final double WIDTH = 460, LIST_HEIGHT = 260;
+    private static final double WIDTH = 460;
 
     private final ChatService svc;
     private final Consumer<Node> show;
@@ -60,51 +50,10 @@ public final class ForwardSheet {
      */
     public void open(List<Message> messages, Chat from, Runnable sent, Runnable after) {
         if (messages.isEmpty()) return;
-        Set<String> chosen = new LinkedHashSet<>();
         Label title = new Label(I18n.n("forward.title", messages.size()));
         title.getStyleClass().add("sheet-title");
-
-        TextField search = new TextField();
-        search.setPromptText(I18n.t("forward.search"));
-        search.setAccessibleText(I18n.t("forward.search"));
-        ObservableList<Chat> shown = FXCollections.observableArrayList(ChatFilter.writable(svc.chats(), "", false));
-        ListView<Chat> list = new ListView<>(shown);
-        list.getStyleClass().add("forward-chats");
-        list.setPrefHeight(LIST_HEIGHT);
-        Label count = new Label();
-        count.getStyleClass().add("settings-help");
         Button go = new Button(I18n.t("forward.send"));
-        Runnable changed = () -> {
-            count.setText(chosen.isEmpty() ? I18n.t("forward.noneChosen") : I18n.n("forward.chosen", chosen.size()));
-            go.setDisable(chosen.isEmpty());
-            for (Node n : list.lookupAll(".list-cell")) if (n instanceof ChatCell cell) cell.sync();
-        };
-        Consumer<Chat> toggle = c -> {
-            if (c == null) return;
-            if (!chosen.remove(c.id())) chosen.add(c.id());
-            changed.run();
-        };
-        list.setCellFactory(v -> new ChatCell(chosen, toggle));
-        list.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
-            if (e.getCode() == KeyCode.SPACE || e.getCode() == KeyCode.ENTER) {
-                toggle.accept(list.getSelectionModel().getSelectedItem());
-                e.consume();
-            }
-        });
-        search.textProperty().addListener((o, a, q) -> {
-            shown.setAll(ChatFilter.writable(svc.chats(), q, false));
-            if (!shown.isEmpty()) list.getSelectionModel().select(0);
-        });
-        search.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
-            if (e.getCode() == KeyCode.DOWN) {
-                list.requestFocus();
-                if (list.getSelectionModel().isEmpty()) list.getSelectionModel().select(0);
-                e.consume();
-            } else if (e.getCode() == KeyCode.ENTER && !search.getText().isBlank()) {
-                toggle.accept(list.getSelectionModel().getSelectedItem());
-                e.consume();
-            }
-        });
+        ChatChooser chats = new ChatChooser(svc, to -> go.setDisable(to.isEmpty()));
 
         Saying saying = new Saying(messages, from);
 
@@ -117,18 +66,17 @@ public final class ForwardSheet {
         go.setOnAction(e -> {
             ForwardNote note = saying.note();
             boolean gifs = saying.gifs.isSelected();
-            List<String> to = List.copyOf(chosen);
+            List<String> to = chats.chosen();
             hide.run();
             send(messages, from, to, note, gifs);
             sent.run();
         });
-        changed.run();
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.ALWAYS);
-        HBox buttons = new HBox(10, count, grow, cancel, go);
+        HBox buttons = new HBox(10, chats.count(), grow, cancel, go);
         buttons.setAlignment(Pos.CENTER_LEFT);
 
-        VBox card = new VBox(12, title, SearchFields.clearable(search), list, saying.label, saying.boxes, saying.preview, saying.gifs, buttons);
+        VBox card = new VBox(12, title, chats.search(), chats.list(), saying.label, saying.boxes, saying.preview, saying.gifs, buttons);
         card.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
             if (e.getCode() == KeyCode.ENTER && e.isShortcutDown() && !go.isDisabled()) {
                 go.fire(); // ⌘Enter sends from anywhere in the sheet; Enter alone chooses a chat
@@ -141,7 +89,7 @@ public final class ForwardSheet {
             if (scene == null) Platform.runLater(after);
         });
         show.accept(new Group(card));
-        Platform.runLater(search::requestFocus);
+        Platform.runLater(chats::focus);
     }
 
     /** What the copies say about where they came from: three choices, starting from Ajustes', and the line as it will go. */
@@ -187,47 +135,5 @@ public final class ForwardSheet {
     private void send(List<Message> messages, Chat from, List<String> to, ForwardNote note, boolean gifs) {
         ZoneId zone = ZoneId.systemDefault();
         progress.accept(Forwarding.send(svc, messages, to, m -> note.of(m, from, zone), gifs));
-    }
-
-    /** A chat to choose: its check, picture, name and network. */
-    private final class ChatCell extends ListCell<Chat> {
-        private final Set<String> chosen;
-        private final CheckBox check = new CheckBox();
-        private final ChatLine line = new ChatLine(svc);
-        private final HBox row;
-
-        ChatCell(Set<String> chosen, Consumer<Chat> toggle) {
-            this.chosen = chosen;
-            check.setFocusTraversable(false);
-            check.setOnAction(e -> toggle.accept(getItem()));
-            HBox.setHgrow(line, Priority.ALWAYS);
-            row = new HBox(10, check, line);
-            row.setAlignment(Pos.CENTER_LEFT);
-            setOnMouseClicked(e -> {
-                if (getItem() != null && e.getClickCount() == 1 && e.getTarget() != check && !check.isHover()) toggle.accept(getItem());
-            });
-        }
-
-        @Override
-        protected void updateItem(Chat c, boolean empty) {
-            super.updateItem(c, empty);
-            if (empty || c == null) {
-                setGraphic(null);
-                setAccessibleText(null);
-                return;
-            }
-            line.show(c, c.network().displayName());
-            sync();
-            setGraphic(row);
-        }
-
-        /** Its check, and what a screen reader says, as chosen now. */
-        void sync() {
-            Chat c = getItem();
-            if (c == null) return;
-            boolean on = chosen.contains(c.id());
-            check.setSelected(on);
-            setAccessibleText(I18n.t(on ? "forward.chatChosen" : "forward.chatNotChosen", c.title(), c.network().displayName()));
-        }
     }
 }

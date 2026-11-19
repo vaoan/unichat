@@ -21,6 +21,7 @@ Off by default, only the person runs them: `-Dunichat.networkTests=true` (real d
 - `KeyboardUiTest` checks F6 zones, timeline keys, zoom and screen-reader texts; `FilterUiTest` that the rail keeps the chosen chip when switching network.
 
 ## Lessons
+- A line taken out because its test still passed without it (run alone) was needed: `SendQueueView`'s `setMaxHeight(USE_PREF_SIZE)` kept the queue's list from being stretched, which only happened with other windows in the run, and the full run failed. Breaking a line to see its test fail proves the test; a test that passes without the line proves nothing about the line until the full run says so.
 - `FxWait.until`'s condition runs on the FX thread: `settled()` (or another `until`) inside it waited for itself, and a whole UI test class hung to JUnit's limit, three minutes a test, without a word. A condition only looks (`SendQueueUiTest.rowsNow`); `FxWait` now throws `OnFxThread` at once (`FxWaitUiTest`).
 - `Node.isFocused()` needs the window to have OS focus: F6 into the timeline only selected a message via the focused listener, so it silently failed when the window wasn't frontmost. Select explicitly (`focusTimeline()`), and never test through focus listeners.
 - A fixed "now" next to code that reads the real clock (`FirefoxCookiesTest`: cookies valid one day after 2026-10-26) starts failing days later. Give fixtures a margin of years.
