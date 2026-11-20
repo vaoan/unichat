@@ -155,18 +155,11 @@ class VaultSlotTest {
     }
 
     @Test
-    void aSlotWrittenBeforeTheGenerationWasSealedStillOpensAndSaysItsToBeWrittenAgain() throws Exception {
+    void aSlotSealedWithoutItsGenerationOpensNothing() {
         byte[] key = VaultCrypto.randomKey();
         String id = "9b2f3c1e-0000-4000-8000-0000000000aa";
         VaultSlot old = new VaultSlot(id, VAULT, VaultSlot.Method.RECOVERY, "recovery", Instant.now(), 2, JsonNodes.empty(),
             VaultCrypto.seal(key, "slot:" + VAULT + ":RECOVERY:" + id, vk));
-        VaultSlot.Opened opened = old.open(key);
-        assertArrayEquals(vk, opened.vk());
-        assertEquals(true, opened.old(), "to be written again");
-        VaultSlot again = old.sealedAgain(key, vk);
-        assertEquals(old.generation(), again.generation());
-        assertEquals(old.created(), again.created());
-        assertEquals(false, again.open(key).old());
-        assertEquals(false, VaultSlot.wrap(VAULT, VaultSlot.Method.RECOVERY, "r", 0, key, JsonNodes.empty(), vk).open(key).old(), "a new one never is");
+        assertThrows(VaultCrypto.Broken.class, () -> old.unwrap(key), "a slot says its generation only by what sealed it");
     }
 }

@@ -206,46 +206,6 @@ class VaultActionsTest {
         assertNull(laptop.get(VaultParts.ID));
     }
 
-    /** {@code slot} as it was written before its generation was sealed with it, opening with {@code key}. */
-    private void writtenTheOldWay(VaultSlot slot, byte[] key, byte[] vk) {
-        cloud.put(Vault.SLOTS + "/" + slot.id() + ".json", new VaultSlot(slot.id(), slot.vault(), slot.method(), slot.label(), slot.created(),
-            slot.generation(), slot.params(), VaultCrypto.seal(key, "slot:" + slot.vault() + ":" + slot.method() + ":" + slot.id(), vk)).toJson());
-    }
-
-    private VaultSlot ownSlot(VaultComputer c) throws Exception {
-        return Vault.slot(dav(), Vault.info(dav()), c.get("cloud.machine"));
-    }
-
-    private byte[] ownKey(VaultComputer c) {
-        return java.util.Base64.getDecoder().decode(c.get(VaultParts.KEY));
-    }
-
-    @Test
-    void aWayInWrittenTheOldWayStillOpensAndIsWrittenAgain() throws Exception {
-        String code = create(desk);
-        byte[] vk = ownSlot(desk).unwrap(ownKey(desk));
-        VaultSlot recovery = Vault.slots(dav()).stream().filter(x -> x.method() == VaultSlot.Method.RECOVERY).findFirst().orElseThrow();
-        byte[] key = VaultSlot.recoveryKey(RecoveryCode.parse(code));
-        writtenTheOldWay(recovery, key, vk);
-        assertTrue(Vault.slot(dav(), Vault.info(dav()), recovery.id()).open(key).old());
-        as(laptop, () -> laptop.cloud.vault().openVault(VaultView.Way.RECOVERY, code.toCharArray()));
-        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault(), "it still opens");
-        VaultSlot.Opened now = Vault.slot(dav(), Vault.info(dav()), recovery.id()).open(key);
-        assertFalse(now.old(), "written again, its generation sealed with it");
-        assertArrayEquals(vk, now.vk());
-    }
-
-    @Test
-    void aComputersOwnSlotWrittenTheOldWayIsWrittenAgainByItsRound() throws Exception {
-        create(desk);
-        byte[] vk = ownSlot(desk).unwrap(ownKey(desk));
-        writtenTheOldWay(ownSlot(desk), ownKey(desk), vk);
-        assertTrue(ownSlot(desk).open(ownKey(desk)).old());
-        assertEquals(Cloud.VaultState.OPEN, desk.round().vault(), "it still opens");
-        assertFalse(ownSlot(desk).open(ownKey(desk)).old(), "written again");
-        assertArrayEquals(vk, ownSlot(desk).unwrap(ownKey(desk)));
-    }
-
     @Test
     void goingOnWithoutItIsRememberedAndOpeningLaterEndsIt() throws Exception {
         String code = create(desk);

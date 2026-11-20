@@ -96,7 +96,7 @@ final class VaultActions {
         for (VaultSlot slot : Vault.slots(dav)) {
             if (!slot.method().name().equals(way.name())) continue;
             if (slot.generation() < info.generation()) older.add(slot);
-            else if (slot.generation() == info.generation() && vk == null) vk = unwrap(dav, slot, way, secret);
+            else if (slot.generation() == info.generation() && vk == null) vk = unwrap(slot, way, secret);
         }
         if (vk == null && here == Cloud.VaultState.UNRECOGNIZED) vk = heldBefore(dav, info, older, way, secret);
         if (vk == null) throw new WrongSecret();
@@ -123,7 +123,7 @@ final class VaultActions {
             slotKey = Base64.getDecoder().decode(key);
             held = own.unwrap(slotKey);
             for (VaultSlot slot : older) {
-                byte[] old = unwrap(dav, slot, way, secret);
+                byte[] old = unwrap(slot, way, secret);
                 if (old != null && java.security.MessageDigest.isEqual(old, held)) return old;
                 if (old != null) Arrays.fill(old, (byte) 0);
             }
@@ -136,11 +136,8 @@ final class VaultActions {
         }
     }
 
-    /**
-     * The vault key from {@code slot} with this secret; null when it doesn't open it. A slot written before its
-     * generation was sealed is written again so (best effort: the next opening tries again).
-     */
-    private static byte[] unwrap(Storage dav, VaultSlot slot, VaultView.Way way, char[] secret) {
+    /** The vault key from {@code slot} with this secret; null when it doesn't open it. */
+    private static byte[] unwrap(VaultSlot slot, VaultView.Way way, char[] secret) {
         byte[] key = null;
         try {
             if (way == VaultView.Way.RECOVERY) {
@@ -153,9 +150,7 @@ final class VaultActions {
             } else {
                 return null; // Google and the passkey open in the browser
             }
-            VaultSlot.Opened opened = slot.open(key);
-            if (opened.old()) Vault.writeAgain(dav, slot.sealedAgain(key, opened.vk()));
-            return opened.vk();
+            return slot.unwrap(key);
         } catch (VaultCrypto.Broken e) {
             return null;
         } finally {

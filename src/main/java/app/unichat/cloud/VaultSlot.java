@@ -36,33 +36,8 @@ record VaultSlot(String id, String vault, Method method, String label, Instant c
         return new VaultSlot(id, vault, m, label, Instant.now(), generation, params, VaultCrypto.seal(slotKey, path(vault, m, id, generation), vk));
     }
 
-    /** The vault key a slot holds, and whether it was sealed before its generation was ({@code old}: to be written again). */
-    record Opened(byte[] vk, boolean old) {
-        @Override
-        public String toString() {
-            return "VaultSlot.Opened[" + old + "]";
-        }
-    }
-
-    /**
-     * The vault key, from a slot sealed with its generation or, once, one written before the generation was sealed (it
-     * opens under the old path alone); whoever opens such a slot writes it again ({@link #sealedAgain}).
-     */
-    Opened open(byte[] slotKey) throws VaultCrypto.Broken {
-        try {
-            return new Opened(VaultCrypto.open(slotKey, path(vault, method, id, generation), wrapped), false);
-        } catch (VaultCrypto.Broken e) {
-            return new Opened(VaultCrypto.open(slotKey, "slot:" + vault + ":" + method + ":" + id, wrapped), true);
-        }
-    }
-
     byte[] unwrap(byte[] slotKey) throws VaultCrypto.Broken {
-        return open(slotKey).vk();
-    }
-
-    /** This slot as it is, sealed again with its generation: an {@link Opened#old} one written anew. */
-    VaultSlot sealedAgain(byte[] slotKey, byte[] vk) {
-        return new VaultSlot(id, vault, method, label, created, generation, params, VaultCrypto.seal(slotKey, path(vault, method, id, generation), vk));
+        return VaultCrypto.open(slotKey, path(vault, method, id, generation), wrapped);
     }
 
     static byte[] recoveryKey(RecoveryCode code) {
