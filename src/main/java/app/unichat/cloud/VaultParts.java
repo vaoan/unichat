@@ -102,6 +102,12 @@ final class VaultParts {
 
         boolean open() { return state == Cloud.VaultState.OPEN; }
 
+        /** A copy of the vault's key while open, for its holder to clear. */
+        byte[] key() {
+            if (vk == null) throw new IllegalStateException("The vault isn't open");
+            return vk.clone();
+        }
+
         /** Where the texts go this round, for {@link TextSync#run(Storage, String)}: this vault, or the plain account. */
         String textsTo() { return open() ? "vault:" + vault : TextSync.PLAIN; }
 
@@ -144,10 +150,7 @@ final class VaultParts {
         // and a key held here isn't forgotten over it.
         if (info == null && file != null) return closed(s);
         if (info == null) {
-            if (held != null) {
-                for (String k : new String[] {ID, KEY, PRIVATE}) s.set(k, null);
-                VaultMove.forget();
-            }
+            if (held != null) forget();
             return new Round(Cloud.VaultState.NONE, null);
         }
         if (!info.id().equals(held)) VaultMove.forget(); // another vault than the one moved into: it's moved into afresh
@@ -162,11 +165,57 @@ final class VaultParts {
             return new Round(Cloud.VaultState.REMOVED, null);
         }
         try {
+            if (info.generation() > slot.generation()) return taken(plain, info, slot, slotKey, s);
             return new Round(Cloud.VaultState.OPEN, slot.unwrap(slotKey), info.id());
         } catch (VaultCrypto.Broken e) {
             return new Round(Cloud.VaultState.REMOVED, null);
         } finally {
             Arrays.fill(slotKey, (byte) 0);
+        }
+    }
+
+    /** This computer's hold on the vault forgotten here: the vault itself and the other computers left as they are. */
+    static void forget() {
+        Settings s = Settings.get();
+        for (String k : new String[] {ID, KEY, PRIVATE}) s.set(k, null);
+        VaultMove.forget();
+    }
+
+    /**
+     * The vault's key changed since this computer's slot was written: the new one offered to it, opened with its private
+     * key; what it sent with the old one meanwhile sealed again (its slot still opens the old key); its slot then taken to
+     * the new key. Until that last write, the next round does it all again. No offer for it: it was removed first.
+     */
+    private static Round taken(Storage plain, Vault.Info info, VaultSlot slot, byte[] slotKey, Settings s) throws IOException {
+        byte[] privateKey;
+        try {
+            privateKey = Base64.getDecoder().decode(s.getString(PRIVATE, ""));
+        } catch (IllegalArgumentException e) {
+            return new Round(Cloud.VaultState.REMOVED, null);
+        }
+        byte[] vk;
+        try {
+            vk = VaultNext.take(slot, privateKey, info.generation());
+        } catch (VaultCrypto.Broken e) {
+            return new Round(Cloud.VaultState.REMOVED, null);
+        } finally {
+            Arrays.fill(privateKey, (byte) 0);
+        }
+        byte[] old = null;
+        try {
+            try {
+                old = slot.unwrap(slotKey);
+            } catch (VaultCrypto.Broken e) {
+                // Nothing of the old key to seal again.
+            }
+            if (old != null) VaultReseal.run(plain, old, vk);
+            Vault.rewrap(plain, info, slot, slotKey, vk);
+            return new Round(Cloud.VaultState.OPEN, vk, info.id());
+        } catch (IOException | RuntimeException e) {
+            Arrays.fill(vk, (byte) 0);
+            throw e;
+        } finally {
+            if (old != null) Arrays.fill(old, (byte) 0);
         }
     }
 }

@@ -74,18 +74,18 @@ class VaultTest {
         VaultSlot password = Vault.addPassword(storage, made.vk(), pw);
         Map<VaultSlot.Method, VaultSlot> slots = byMethod(Vault.slots(storage));
 
-        assertArrayEquals(made.vk(), Vault.open(storage, slots.get(VaultSlot.Method.RECOVERY), VaultSlot.recoveryKey(made.code())));
-        assertArrayEquals(made.vk(), Vault.open(storage, slots.get(VaultSlot.Method.COMPUTER), made.computer().key()));
+        assertArrayEquals(made.vk(), Vault.open(slots.get(VaultSlot.Method.RECOVERY), VaultSlot.recoveryKey(made.code())));
+        assertArrayEquals(made.vk(), Vault.open(slots.get(VaultSlot.Method.COMPUTER), made.computer().key()));
         VaultSlot stored = slots.get(VaultSlot.Method.PASSWORD);
         assertEquals(password, stored);
-        assertArrayEquals(made.vk(), Vault.open(storage, stored, VaultSlot.passwordKey(pw, stored.params())));
+        assertArrayEquals(made.vk(), Vault.open(stored, VaultSlot.passwordKey(pw, stored.params())));
         RecoveryCode typed = RecoveryCode.parse(made.code().shown().toLowerCase(java.util.Locale.ROOT));
-        assertArrayEquals(made.vk(), Vault.open(storage, slots.get(VaultSlot.Method.RECOVERY), VaultSlot.recoveryKey(typed)));
+        assertArrayEquals(made.vk(), Vault.open(slots.get(VaultSlot.Method.RECOVERY), VaultSlot.recoveryKey(typed)));
 
         assertThrows(VaultCrypto.Broken.class,
-            () -> Vault.open(storage, slots.get(VaultSlot.Method.COMPUTER), VaultCrypto.randomKey()));
+            () -> Vault.open(slots.get(VaultSlot.Method.COMPUTER), VaultCrypto.randomKey()));
         assertThrows(VaultCrypto.Broken.class,
-            () -> Vault.open(storage, stored, VaultSlot.passwordKey("otra clave muy larga".toCharArray(), stored.params())));
+            () -> Vault.open(stored, VaultSlot.passwordKey("otra clave muy larga".toCharArray(), stored.params())));
     }
 
     @Test
@@ -147,7 +147,7 @@ class VaultTest {
         assertEquals(Set.of(), slotFiles());
         Vault.Created made = Vault.create(storage, MAC, "Mac");
         assertEquals(2, Vault.slots(storage).size());
-        assertArrayEquals(made.vk(), Vault.open(storage, byMethod(Vault.slots(storage)).get(VaultSlot.Method.RECOVERY),
+        assertArrayEquals(made.vk(), Vault.open(byMethod(Vault.slots(storage)).get(VaultSlot.Method.RECOVERY),
             VaultSlot.recoveryKey(made.code())));
     }
 
@@ -214,7 +214,7 @@ class VaultTest {
         cloud.put(path, new String(cloud.files.get(path), StandardCharsets.UTF_8).replace("\"COMPUTER\"", "\"PASSKEY\"")
             .getBytes(StandardCharsets.UTF_8));
         VaultSlot changed = byMethod(Vault.slots(storage)).get(VaultSlot.Method.PASSKEY);
-        assertThrows(VaultCrypto.Broken.class, () -> Vault.open(storage, changed, made.computer().key()));
+        assertThrows(VaultCrypto.Broken.class, () -> Vault.open(changed, made.computer().key()));
     }
 
     @Test
@@ -240,7 +240,7 @@ class VaultTest {
         assertThrows(IllegalArgumentException.class, () -> Vault.addPassword(storage, made.vk(), six.toCharArray()));
         char[] twelve = "\uD83D\uDE00".repeat(12).toCharArray();
         VaultSlot slot = Vault.addPassword(storage, made.vk(), twelve);
-        assertArrayEquals(made.vk(), Vault.open(storage, slot, VaultSlot.passwordKey(twelve, slot.params())));
+        assertArrayEquals(made.vk(), Vault.open(slot, VaultSlot.passwordKey(twelve, slot.params())));
     }
 
     @Test
@@ -256,8 +256,8 @@ class VaultTest {
         assertEquals(4, slots.size());
         VaultSlot pcSlot = slots.stream().filter(s -> s.id().equals(PC)).findFirst().orElseThrow();
         assertEquals("PC de la oficina", pcSlot.label());
-        assertArrayEquals(made.vk(), Vault.open(storage, pcSlot, pc.key()));
-        assertArrayEquals(made.vk(), Vault.open(storage, Vault.slots(storage).stream().filter(s -> s.id().equals(MAC))
+        assertArrayEquals(made.vk(), Vault.open(pcSlot, pc.key()));
+        assertArrayEquals(made.vk(), Vault.open(Vault.slots(storage).stream().filter(s -> s.id().equals(MAC))
             .findFirst().orElseThrow(), made.computer().key()), "the first computer still opens it");
     }
 
@@ -268,8 +268,8 @@ class VaultTest {
 
         List<VaultSlot> recovery = Vault.slots(storage).stream().filter(s -> s.method() == VaultSlot.Method.RECOVERY).toList();
         assertEquals(1, recovery.size(), "at most one recovery slot");
-        assertThrows(VaultCrypto.Broken.class, () -> Vault.open(storage, recovery.getFirst(), VaultSlot.recoveryKey(made.code())));
-        assertArrayEquals(made.vk(), Vault.open(storage, recovery.getFirst(), VaultSlot.recoveryKey(fresh)));
+        assertThrows(VaultCrypto.Broken.class, () -> Vault.open(recovery.getFirst(), VaultSlot.recoveryKey(made.code())));
+        assertArrayEquals(made.vk(), Vault.open(recovery.getFirst(), VaultSlot.recoveryKey(fresh)));
         assertEquals(2, Vault.slots(storage).size(), "the computer's slot stays");
     }
 
@@ -327,7 +327,7 @@ class VaultTest {
         Vault.Created made = Vault.create(storage, MAC, "Mac");
         byte[] key = VaultCrypto.randomKey();
         VaultSlot old = VaultSlot.wrap(made.info().id(), VaultSlot.Method.COMPUTER, "old", 7, key, VaultSlot.newPasswordParams(), made.vk());
-        assertArrayEquals(made.vk(), Vault.open(storage, old, key));
+        assertArrayEquals(made.vk(), Vault.open(old, key));
     }
 
     private Set<String> slotFiles() {

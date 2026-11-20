@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
+import app.unichat.support.I18n;
 import app.unichat.support.SafeFile;
 
 import java.io.IOException;
@@ -10,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -67,6 +69,17 @@ public final class Cloud {
         }
     }
 
+    /**
+     * The vault's key changed: the new recovery code (shown once; its text form never says it), the ways in that went (each
+     * method's name: added again by the person) and the files that opened with neither key, left as they were.
+     */
+    public record KeyChanged(String code, java.util.Set<String> dropped, List<String> left) {
+        @Override
+        public String toString() {
+            return "Cloud.KeyChanged[" + dropped + ", " + left.size() + " left]";
+        }
+    }
+
     /** How often everything uploaded is checked against the account (also on "Verificar ahora"). */
     static final java.time.Duration VERIFY_EVERY = java.time.Duration.ofDays(1);
     private volatile boolean verifyNext;
@@ -91,6 +104,8 @@ public final class Cloud {
     /** The vault's state last read: when it changes, what was seen of the account is another storage's. */
     private VaultState lastVault;
     private final Object vaultLock = new Object();
+    /** The texts alone never run while the vault's key changes or is forgotten here: they'd go with a key just replaced. */
+    private final Object keyLock = new Object();
     private final java.util.function.Consumer<java.util.Set<String>> textsArrived;
     /** Asking for the texts alone, apart from the round: a round may be busy sending a video for minutes. */
     private final ExecutorService textsWorker = Executors.newSingleThreadExecutor(r -> {
@@ -332,9 +347,11 @@ public final class Cloud {
                 CloudAccount a = account.get();
                 if (a != null) {
                     Storage dav = a.storage();
-                    try (VaultParts.Round vault = vault(dav)) {
-                        Storage to = textsTo(vault, vault.personal(dav));
-                        if (to != null) syncTexts(to, vault.textsTo());
+                    synchronized (keyLock) {
+                        try (VaultParts.Round vault = vault(dav)) {
+                            Storage to = textsTo(vault, vault.personal(dav));
+                            if (to != null) syncTexts(to, vault.textsTo());
+                        }
                     }
                 }
             } catch (IOException | RuntimeException e) {
@@ -343,6 +360,72 @@ public final class Cloud {
             f.complete(null);
         });
         return f;
+    }
+
+    /**
+     * A new key for the vault ({@link Vault#rotate}), on the cloud's thread: only with the vault open here. This computer
+     * then takes it at once, as the others do on their next round; if that fails, its next round does it.
+     */
+    public CompletableFuture<KeyChanged> rotateKey() {
+        return onWorker(dav -> {
+            Vault.Rotated r;
+            try (VaultParts.Round vault = VaultParts.open(dav)) {
+                if (!vault.open()) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
+                byte[] old = vault.key();
+                try {
+                    r = Vault.rotate(dav, old, machine());
+                } finally {
+                    Arrays.fill(old, (byte) 0);
+                }
+            }
+            Arrays.fill(r.vk(), (byte) 0);
+            try {
+                VaultParts.open(dav).close();
+            } catch (IOException | RuntimeException e) {
+                System.err.println("Cloud: the vault's new key: " + Errors.message(e)); // the next round takes it
+            }
+            return new KeyChanged(r.code().shown(), r.dropped().stream().map(Enum::name).collect(java.util.stream.Collectors.toSet()), r.left());
+        });
+    }
+
+    /** Another computer's way into the vault taken away, on the cloud's thread; this one's own goes by {@link #forgetHere}. */
+    public CompletableFuture<Void> removeComputer(String machine) {
+        return onWorker(dav -> {
+            if (machine().equals(machine)) throw new IllegalArgumentException("This computer is forgotten with forgetHere");
+            Vault.removeComputer(dav, machine);
+            return null;
+        });
+    }
+
+    /**
+     * The vault forgotten on this computer, on the cloud's thread: its slot deleted, then its hold on the vault here (whether
+     * it declined is left as it is). The next round finds it locked; it can be opened again later.
+     */
+    public CompletableFuture<Void> forgetHere() {
+        return onWorker(dav -> {
+            Vault.removeSlot(dav, machine());
+            VaultParts.forget();
+            return null;
+        });
+    }
+
+    private interface Job<T> {
+        T run(Storage dav) throws IOException;
+    }
+
+    /** {@code job} on the cloud's thread, never alongside a round or the texts alone; a failure completes the future with it. */
+    private <T> CompletableFuture<T> onWorker(Job<T> job) {
+        return CompletableFuture.supplyAsync(() -> {
+            CloudAccount a = account.get();
+            try {
+                if (a == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
+                synchronized (keyLock) {
+                    return job.run(a.storage());
+                }
+            } catch (IOException e) {
+                throw new java.util.concurrent.CompletionException(e);
+            }
+        }, worker);
     }
 
     private static boolean verifyDue(Instant now) {

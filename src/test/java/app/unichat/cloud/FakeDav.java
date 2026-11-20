@@ -23,6 +23,8 @@ final class FakeDav implements AutoCloseable {
     volatile boolean wholeHrefs;
     /** Paths whose next PUT fails (the network dropped), once each. */
     final Set<String> failOnce = ConcurrentHashMap.newKeySet();
+    /** Paths whose next PUT lands but answers a failure (the answer lost), once each. */
+    final Set<String> failAfterOnce = ConcurrentHashMap.newKeySet();
     private final HttpServer server;
     private final String auth;
 
@@ -81,7 +83,7 @@ final class FakeDav implements AutoCloseable {
                     }
                     puts.incrementAndGet();
                     put(path, body);
-                    x.sendResponseHeaders(201, -1);
+                    x.sendResponseHeaders(failAfterOnce.remove(path) ? 503 : 201, -1);
                 }
                 case "GET" -> {
                     byte[] f = files.get(path);

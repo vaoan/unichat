@@ -5,15 +5,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -44,6 +43,17 @@ final class Vault {
         @Override
         public String toString() {
             return "Vault.Computer[…]";
+        }
+    }
+
+    /**
+     * The vault's new key, the new recovery code (shown once), the ways in that were dropped (they can't be wrapped again
+     * without their secret: added again by the person), and the files that opened with neither key, left as they were.
+     */
+    record Rotated(byte[] vk, RecoveryCode code, Set<VaultSlot.Method> dropped, List<String> left) {
+        @Override
+        public String toString() {
+            return "Vault.Rotated[" + dropped + ", " + left.size() + " left]";
         }
     }
 
@@ -134,7 +144,7 @@ final class Vault {
     }
 
     /** The vault key from one slot and its way in's key. */
-    static byte[] open(Storage s, VaultSlot slot, byte[] slotKey) throws VaultCrypto.Broken {
+    static byte[] open(VaultSlot slot, byte[] slotKey) throws VaultCrypto.Broken {
         return slot.unwrap(slotKey);
     }
 
@@ -178,6 +188,123 @@ final class Vault {
             // Left for the next call; the person must see the new code now, or it is lost.
         }
         return code;
+    }
+
+    /**
+     * A new vault key, so that whoever copied a slot and its secret before (a computer removed, a way in taken away) reads
+     * nothing new. Every computer still listed whose public key {@code oldVk} sealed is offered it, sealed for its X25519
+     * key ({@link VaultNext}), and takes it on its next round (this one too, right after); a new recovery code; the
+     * generation rises; then the old recovery, the password, Google and passkey slots go, and every file is sealed again.
+     * Until the generation rises the old key and every old way in stay as they were, and a change cut short takes back what
+     * it wrote ({@link #withdrawn}). After it,
+     * nothing fails the change: the person must see the new code, and what's left is done again as each computer takes the
+     * new key.
+     */
+    static Rotated rotate(Storage s, byte[] oldVk, String machine) throws IOException {
+        if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
+        Info was = current(s);
+        List<VaultSlot> slots = slots(s);
+        VaultSlot own = slots.stream().filter(slot -> slot.id().equals(machine) && slot.method() == VaultSlot.Method.COMPUTER)
+            .findFirst().orElse(null);
+        if (own == null || VaultNext.publicKey(own, oldVk) == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
+        Info now = new Info(was.id(), was.created(), was.generation() + 1);
+        byte[] vk = VaultCrypto.randomKey();
+        List<String> written = new ArrayList<>();
+        List<VaultSlot> offered = new ArrayList<>();
+        RecoveryCode code = null;
+        try {
+            for (VaultSlot slot : slots) {
+                if (slot.method() == VaultSlot.Method.COMPUTER && offer(s, slot, oldVk, vk, now.generation())) offered.add(slot);
+            }
+            code = writeRecovery(s, vk, now, written);
+            s.put(INFO, json(now));
+        } catch (IOException e) {
+            if (code == null || !at(s, now)) throw withdrawn(s, was, offered, written, vk, e); // risen with its answer lost: done
+        } catch (RuntimeException e) {
+            throw withdrawn(s, was, offered, written, vk, e);
+        }
+        try {
+            Set<VaultSlot.Method> dropped = EnumSet.noneOf(VaultSlot.Method.class);
+            for (VaultSlot slot : slots) {
+                if (slot.method() == VaultSlot.Method.COMPUTER || written.contains(path(slot.id()))) continue;
+                if (slot.method() != VaultSlot.Method.RECOVERY) dropped.add(slot.method());
+                try {
+                    removeSlot(s, slot.id());
+                } catch (IOException e) {
+                    // It opens only the old key now; the next change or new code takes it.
+                }
+            }
+            List<String> left;
+            try {
+                left = VaultReseal.run(s, oldVk, vk);
+            } catch (IOException e) {
+                left = List.of(); // done again as this computer takes the new key
+            }
+            return new Rotated(vk, code, dropped, left);
+        } catch (RuntimeException e) {
+            Arrays.fill(vk, (byte) 0);
+            throw e;
+        }
+    }
+
+    /**
+     * A change cut short before the generation rose: its offers and new recovery slot taken back, so an offer left there
+     * never becomes the vault's key if someone raises the generation by hand (the person's recovery code would open only
+     * the old one). When the account can't say the generation is still the old one, they stay: it may have risen.
+     */
+    private static <E extends Exception> E withdrawn(Storage s, Info was, List<VaultSlot> offered, List<String> written, byte[] vk, E cause) {
+        Arrays.fill(vk, (byte) 0);
+        if (!at(s, was)) return cause;
+        for (VaultSlot slot : offered) {
+            try {
+                s.put(path(slot.id()), slot.toJson());
+            } catch (IOException e) {
+                cause.addSuppressed(e);
+            }
+        }
+        return undo(s, written, null, cause);
+    }
+
+    /** Whether the account's vault is {@code info}'s, at its generation; false when it can't be read. */
+    private static boolean at(Storage s, Info info) {
+        try {
+            Info read = info(s);
+            return read != null && read.id().equals(info.id()) && read.generation() == info.generation();
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
+     * {@code slot}'s computer offered {@code vk}; its own key and wrapping stay until it takes it. A slot whose public key
+     * the vault key didn't seal (put in through the account, or a slot from before) is offered nothing (false).
+     */
+    private static boolean offer(Storage s, VaultSlot slot, byte[] oldVk, byte[] vk, long generation) throws IOException {
+        byte[] publicKey = VaultNext.publicKey(slot, oldVk);
+        if (publicKey == null) return false;
+        ObjectNode params = slot.params().deepCopy();
+        VaultNext.offer(params, publicKey, slot.vault(), slot.id(), generation, vk);
+        s.put(path(slot.id()), new VaultSlot(slot.id(), slot.vault(), slot.method(), slot.label(), slot.created(), slot.generation(),
+            params, slot.wrapped()).toJson());
+        return true;
+    }
+
+    /** This computer's slot taking the vault's new key: wrapped again with its own key, at the vault's generation, no offer left. */
+    static void rewrap(Storage s, Info vault, VaultSlot own, byte[] slotKey, byte[] vk) throws IOException {
+        byte[] publicKey = VaultNext.publicKey(own, vk);
+        if (publicKey == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
+        ObjectNode params = own.params().deepCopy();
+        params.remove(VaultNext.NEXT);
+        VaultNext.bind(params, vk, vault.id(), own.id(), publicKey);
+        write(s, VaultSlot.wrap(vault.id(), own.id(), VaultSlot.Method.COMPUTER, own.label(), vault.generation(), slotKey, params, vk),
+            new ArrayList<>());
+    }
+
+    /** Another computer's way in taken away: only a computer's slot, by its machine id; none there is fine. */
+    static void removeComputer(Storage s, String machine) throws IOException {
+        if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
+        VaultSlot slot = slot(s, current(s), machine);
+        if (slot != null && slot.method() == VaultSlot.Method.COMPUTER) removeSlot(s, machine);
     }
 
     /** Ids are ours (UUIDs): one from the account that isn't never becomes a path to delete. */
@@ -231,9 +358,9 @@ final class Vault {
     private static Computer writeComputer(Storage s, byte[] vk, Info vault, String machine, String name, List<String> written)
         throws IOException {
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
-        KeyPair pair = x25519();
+        KeyPair pair = VaultNext.generate();
         ObjectNode params = JSON.createObjectNode();
-        params.put("x25519", Base64.getEncoder().encodeToString(pair.getPublic().getEncoded()));
+        VaultNext.bind(params, vk, vault.id(), machine, pair.getPublic().getEncoded());
         byte[] key = VaultCrypto.randomKey();
         write(s, VaultSlot.wrap(vault.id(), machine, VaultSlot.Method.COMPUTER, name, vault.generation(), key, params, vk), written);
         return new Computer(key, pair);
@@ -244,14 +371,6 @@ final class Vault {
         written.add(path(slot.id()));
         s.put(path(slot.id()), slot.toJson());
         return slot;
-    }
-
-    private static KeyPair x25519() {
-        try {
-            return KeyPairGenerator.getInstance("X25519").generateKeyPair();
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException(e);
-        }
     }
 
     private static String path(String id) {

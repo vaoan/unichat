@@ -10,13 +10,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,11 +32,6 @@ class CloudVaultTest {
     private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl", TRANSCRIPT = "a".repeat(64) + ".txt";
     private static final String SETTINGS = CloudAccount.SETTINGS_FILE, AI = "Unichat/Ajustes/unichat-ai.json",
         PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg";
-    /** What each computer holds of the settings: swapped in and out of the one {@link Settings} around its rounds. */
-    private static final List<String> KEYS = List.of("cloud.machine", VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultParts.DECLINED,
-        "cloud.base.settings", "cloud.base.ai", "cloud.base.secrets", "cloud.base.pinned", "cloud.media", "cloud.settings", "cloud.lastVerify",
-        "server.telegram.apiId", "server.telegram.apiHash", "gif.giphy.key", "cloud.dropboxAppKey", "cloud.pcloudClientId", "stt.command",
-        "ui.theme", VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN);
 
     @TempDir
     Path dir;
@@ -49,8 +42,7 @@ class CloudVaultTest {
     void start() throws Exception {
         cloud = new FakeDav("u", "p");
         portableWere = Settings.get().portable();
-        keysWere = new HashMap<>();
-        for (String k : KEYS) keysWere.put(k, Settings.get().getString(k, null));
+        keysWere = VaultComputer.kept();
     }
 
     @AfterEach
@@ -64,96 +56,8 @@ class CloudVaultTest {
         return new WebDav(cloud.url(), "u", "p");
     }
 
-    /** One computer of the person's: its own folder, its own settings, its own {@link Cloud}. */
-    private final class Computer {
-        final Map<String, String> values = new HashMap<>();
-        final Path data;
-        final Cloud cloud;
-        final AtomicInteger pinnedAdopted = new AtomicInteger();
-
-        Computer(String machine) throws Exception {
-            values.put("cloud.machine", machine);
-            data = Files.createDirectories(dir.resolve(machine));
-            Path photos = Files.createDirectories(data.resolve("Ana"));
-            Files.writeString(photos.resolve("a.jpg"), "foto");
-            CloudAccount account = new CloudAccount(CloudAccount.Service.OTHER, CloudVaultTest.this.cloud.url(), "u", "p");
-            in(); // its machine id, which the texts are made with
-            cloud = Cloud.create(() -> account, data, () -> null, b -> true, () -> { }, () -> List.of(photos),
-                new Cloud.Texts(data.resolve("texts"), p -> false, s -> { }),
-                new Cloud.Personal(this::pins, theirs -> {
-                    pinnedAdopted.incrementAndGet();
-                    try {
-                        Files.write(data.resolve("pinned-messages.json"), theirs);
-                    } catch (java.io.IOException e) {
-                        throw new java.io.UncheckedIOException(e);
-                    }
-                }, data.resolve("transcripts")));
-            out();
-        }
-
-        /** As {@code PinnedMessages.json} gives them: what the file holds, here. */
-        private byte[] pins() {
-            try {
-                Path p = data.resolve("pinned-messages.json");
-                return Files.exists(p) ? Files.readAllBytes(p) : "{}".getBytes(StandardCharsets.UTF_8);
-            } catch (java.io.IOException e) {
-                throw new java.io.UncheckedIOException(e);
-            }
-        }
-
-        private void in() {
-            for (String k : KEYS) Settings.get().set(k, values.get(k));
-        }
-
-        private void out() {
-            for (String k : KEYS) values.put(k, Settings.get().getString(k, null));
-        }
-
-        Computer set(String key, String value) {
-            values.put(key, value);
-            return this;
-        }
-
-        String get(String key) {
-            return values.get(key);
-        }
-
-        Computer write(String file, String text) throws Exception {
-            Path p = data.resolve(file);
-            Files.createDirectories(p.getParent());
-            Files.writeString(p, text);
-            return this;
-        }
-
-        String read(String file) throws Exception {
-            Path p = data.resolve(file);
-            return Files.exists(p) ? Files.readString(p) : null;
-        }
-
-        Cloud.Status round() throws Exception {
-            in();
-            try {
-                return cloud.syncNow().get();
-            } finally {
-                out();
-            }
-        }
-
-        void textsNow() throws Exception {
-            in();
-            try {
-                cloud.textsNow().get();
-            } finally {
-                out();
-            }
-        }
-
-        /** Opened here: this computer's key and the vault's id kept, as opening it with a way in leaves them. */
-        Computer opened(Vault.Info vault, Vault.Computer computer) {
-            set(VaultParts.ID, vault.id());
-            set(VaultParts.KEY, Base64.getEncoder().encodeToString(computer.key()));
-            return set(VaultParts.PRIVATE, Base64.getEncoder().encodeToString(computer.pair().getPrivate().getEncoded()));
-        }
+    private VaultComputer computer(String machine) throws Exception {
+        return new VaultComputer(cloud, dir, machine);
     }
 
     private Map<String, byte[]> files() {
@@ -171,14 +75,14 @@ class CloudVaultTest {
         return !path.startsWith(Vault.ROOT + "/") && !path.startsWith(CloudAccount.MEDIA + "/");
     }
 
-    private Computer withEverything(Computer c) throws Exception {
+    private VaultComputer withEverything(VaultComputer c) throws Exception {
         return c.set("ui.theme", "DARK").write("writing-style.md", "escribo corto").write("texts/here/" + TEXT, "{}\n")
             .write("pinned-messages.json", "{\"!c\":[]}").write("transcripts/" + TRANSCRIPT, "hola");
     }
 
     @Test
     void noVaultIsTodaysRound() throws Exception {
-        Computer desk = withEverything(new Computer(DESK)).set("server.telegram.apiId", "12345");
+        VaultComputer desk = withEverything(computer(DESK)).set("server.telegram.apiId", "12345");
         Cloud.Status s = desk.round();
         assertNull(s.error());
         assertEquals(Cloud.VaultState.NONE, s.vault());
@@ -191,7 +95,7 @@ class CloudVaultTest {
     @Test
     void aLockedVaultSendsNothingPlain() throws Exception {
         Vault.create(dav(), OTHER, "Otro");
-        Computer desk = withEverything(new Computer(DESK)).set("server.telegram.apiId", "12345");
+        VaultComputer desk = withEverything(computer(DESK)).set("server.telegram.apiId", "12345");
         Map<String, byte[]> before = files();
         Cloud.Status s = desk.round();
         assertNull(s.error());
@@ -206,7 +110,7 @@ class CloudVaultTest {
     void aComputerGoingOnWithoutTheVaultIsAsBeforeAndSendsNothingPlain() throws Exception {
         Vault.create(dav(), OTHER, "Otro");
         cloud.put(SETTINGS, Bundle.of(OTHER, java.time.Instant.now(), Map.of("ui.theme", "LIGHT"), null).toBytes()); // an older computer's
-        Computer desk = withEverything(new Computer(DESK)).set(VaultParts.DECLINED, "true");
+        VaultComputer desk = withEverything(computer(DESK)).set(VaultParts.DECLINED, "true");
         Map<String, byte[]> before = files();
         Cloud.Status s = desk.round();
         assertNull(s.error());
@@ -222,7 +126,7 @@ class CloudVaultTest {
     @Test
     void aComputerWhoseSlotWentIsRemovedAndSendsNothing() throws Exception {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
-        Computer desk = withEverything(new Computer(DESK)).opened(made.info(), made.computer());
+        VaultComputer desk = withEverything(computer(DESK)).opened(made.info(), made.computer());
         Vault.removeSlot(dav(), DESK);
         Map<String, byte[]> before = files();
         Cloud.Status s = desk.round();
@@ -238,7 +142,7 @@ class CloudVaultTest {
     @Test
     void aVaultGoneFromTheAccountIsTodaysRoundAgainAndItsKeyForgotten() throws Exception {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
-        Computer desk = new Computer(DESK).opened(made.info(), made.computer()).set(VaultParts.DECLINED, "true");
+        VaultComputer desk = computer(DESK).opened(made.info(), made.computer()).set(VaultParts.DECLINED, "true");
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
         dav().delete(Vault.ROOT);
         Cloud.Status s = desk.round();
@@ -262,10 +166,10 @@ class CloudVaultTest {
     void anOpenVaultCarriesSecretsSettingsAiTextsPinnedAndTranscripts() throws Exception {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
         Vault.Computer laptopWay = Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil");
-        Computer desk = withEverything(new Computer(DESK)).opened(made.info(), made.computer())
+        VaultComputer desk = withEverything(computer(DESK)).opened(made.info(), made.computer())
             .set("server.telegram.apiId", "12345").set("server.telegram.apiHash", "0123456789abcdef0123456789abcdef")
             .set("gif.giphy.key", "giphy").set("cloud.dropboxAppKey", "dbx").set("stt.command", "say hola");
-        Computer laptop = new Computer(LAPTOP).opened(made.info(), laptopWay).set("ui.theme", "LIGHT")
+        VaultComputer laptop = computer(LAPTOP).opened(made.info(), laptopWay).set("ui.theme", "LIGHT")
             .write("transcripts/" + "b".repeat(64) + ".txt", "adiós");
 
         Map<String, byte[]> before = files();
@@ -302,7 +206,7 @@ class CloudVaultTest {
         sealed.mkdirs("Unichat/Ajustes");
         sealed.put(VaultParts.TRANSCRIPTS_FILE, ("{\"entries\":{\"../../fuera.txt\":\"x\",\"" + "c".repeat(64) + ".txt\":\"bien\","
             + "\"" + "C".repeat(64) + ".txt\":\"x\",\"..\":\"x\"}}").getBytes(StandardCharsets.UTF_8));
-        Computer desk = new Computer(DESK).opened(made.info(), made.computer());
+        VaultComputer desk = computer(DESK).opened(made.info(), made.computer());
         assertNull(desk.round().error());
         assertEquals("bien", desk.read("transcripts/" + "c".repeat(64) + ".txt"));
         try (var all = Files.walk(dir)) {
@@ -315,10 +219,10 @@ class CloudVaultTest {
 
     @Test
     void theVaultOpeningHereReadsItsFilesAfreshThoughTheirStampsAreThePlainOnes() throws Exception {
-        Computer desk = new Computer(DESK).set("ui.theme", "DARK");
+        VaultComputer desk = computer(DESK).set("ui.theme", "DARK");
         desk.round(); // plain: the account's settings file at its first version
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
-        Computer laptop = new Computer(LAPTOP).opened(made.info(), Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil")).set("ui.theme", "LIGHT");
+        VaultComputer laptop = computer(LAPTOP).opened(made.info(), Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil")).set("ui.theme", "LIGHT");
         laptop.round(); // the vault's settings file at its first version too: the same stamp, another file
         assertEquals(cloud.versions.get(SETTINGS), cloud.versions.get(Vault.ROOT + "/Ajustes/unichat-settings.json"));
         desk.opened(made.info(), made.computer());
@@ -329,7 +233,7 @@ class CloudVaultTest {
     @Test
     void textsAskedAloneGoSealedWithTheVaultOpenAndNowhereWhileLocked() throws Exception {
         Vault.Created made = Vault.create(dav(), OTHER, "Otro");
-        Computer desk = withEverything(new Computer(DESK)).set("cloud.media", "false");
+        VaultComputer desk = withEverything(computer(DESK)).set("cloud.media", "false");
         Map<String, byte[]> before = files();
         desk.textsNow();
         assertEquals(Set.of(), written(before), "locked here: nowhere");
@@ -344,9 +248,9 @@ class CloudVaultTest {
     void aKeyOnlyThisComputerHadStaysAndReachesTheOthers() throws Exception {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
         Vault.Computer laptopWay = Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil");
-        Computer desk = new Computer(DESK).opened(made.info(), made.computer()).set("server.telegram.apiId", "12345");
+        VaultComputer desk = computer(DESK).opened(made.info(), made.computer()).set("server.telegram.apiId", "12345");
         desk.round(); // the vault's secrets: the Telegram id only
-        Computer laptop = new Computer(LAPTOP).opened(made.info(), laptopWay).set("gif.giphy.key", "de-la-portátil");
+        VaultComputer laptop = computer(LAPTOP).opened(made.info(), laptopWay).set("gif.giphy.key", "de-la-portátil");
         laptop.round();
         assertEquals("de-la-portátil", laptop.get("gif.giphy.key"), "opening the vault never loses a key typed here");
         assertEquals("12345", laptop.get("server.telegram.apiId"), "and takes the vault's");
@@ -365,7 +269,7 @@ class CloudVaultTest {
         cloud.dirs.add("Unichat");
         cloud.dirs.add(Vault.ROOT);
         cloud.put(Vault.INFO, "{no es una bóveda".getBytes(StandardCharsets.UTF_8));
-        Computer desk = withEverything(new Computer(DESK));
+        VaultComputer desk = withEverything(computer(DESK));
         Map<String, byte[]> before = files();
         assertEquals(Cloud.VaultState.LOCKED, desk.round().vault());
         assertEquals(Set.of(PHOTO), written(before), "nothing plain, though no vault was ever opened here");
@@ -375,9 +279,9 @@ class CloudVaultTest {
     @Test
     void textsAskedAloneAfterTheVaultOpenedReadItsIndexesAfresh() throws Exception {
         String later = "3f2a9c1b2d4e 2026-12.jsonl";
-        Computer laptop = new Computer(LAPTOP).write("texts/here/" + TEXT, "{}\n");
+        VaultComputer laptop = computer(LAPTOP).write("texts/here/" + TEXT, "{}\n");
         laptop.round(); // plain: its index at its first version
-        Computer desk = new Computer(DESK);
+        VaultComputer desk = computer(DESK);
         desk.round();
         assertEquals("{}\n", desk.read("texts/" + LAPTOP + "/" + TEXT));
         Vault.Created made = Vault.create(dav(), LAPTOP, "Portátil");
@@ -396,7 +300,7 @@ class CloudVaultTest {
                 String what = "media " + media + ", vault " + vault;
                 cloud.files.clear();
                 cloud.dirs.clear();
-                Computer c = withEverything(new Computer(java.util.UUID.randomUUID().toString())).set("cloud.media", Boolean.toString(media));
+                VaultComputer c = withEverything(computer(java.util.UUID.randomUUID().toString())).set("cloud.media", Boolean.toString(media));
                 if (vault) {
                     Vault.Created made = Vault.create(dav(), c.get("cloud.machine"), "Este");
                     c.opened(made.info(), made.computer());
@@ -416,7 +320,7 @@ class CloudVaultTest {
 
     @Test
     void aVaultMadeHereMovesWhatWasPlainIn() throws Exception {
-        Computer desk = withEverything(new Computer(DESK));
+        VaultComputer desk = withEverything(computer(DESK));
         desk.round(); // today's: plain
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
         desk.opened(made.info(), made.computer());
@@ -428,7 +332,7 @@ class CloudVaultTest {
         assertNotNull(s.moving().at());
         assertEquals(Map.of(), s.moving().strays());
 
-        Computer laptop = new Computer(LAPTOP).opened(made.info(), Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil"));
+        VaultComputer laptop = computer(LAPTOP).opened(made.info(), Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil"));
         laptop.round();
         assertEquals("{}\n", laptop.read("texts/" + DESK + "/" + TEXT), "the texts sent plain before reach the others, sealed: sent again by the one that wrote them");
         assertEquals(4, desk.round().moving().files(), "and the count stays");
@@ -437,7 +341,7 @@ class CloudVaultTest {
     @Test
     void anOlderComputerStillSendingPlainIsNamedAndNeverTaken() throws Exception {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
-        Computer desk = new Computer(DESK).opened(made.info(), made.computer()).set("ui.theme", "DARK");
+        VaultComputer desk = computer(DESK).opened(made.info(), made.computer()).set("ui.theme", "DARK");
         desk.round();
         Vault.addComputer(dav(), made.vk(), OTHER, "Viejo");
         cloud.dirs.add("Unichat/Ajustes"); // the older computer's folder, as it makes it
@@ -454,7 +358,7 @@ class CloudVaultTest {
     @Test
     void aFileThatFailsToMoveInIsTheRoundsErrorAndMediaStillGoes() throws Exception {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
-        Computer desk = new Computer(DESK).opened(made.info(), made.computer());
+        VaultComputer desk = computer(DESK).opened(made.info(), made.computer());
         for (String d : new String[] {"Unichat/Textos", "Unichat/Textos/" + OTHER}) cloud.dirs.add(d);
         cloud.put("Unichat/Textos/" + OTHER + "/" + TEXT, "{}\n".getBytes(StandardCharsets.UTF_8)); // a computer without the vault's
         cloud.put(Vault.ROOT + "/Textos/" + OTHER + "/" + TEXT, "dañado".getBytes(StandardCharsets.UTF_8));
@@ -467,7 +371,7 @@ class CloudVaultTest {
     @Test
     void anotherVaultInTheAccountForgetsTheMoveIntoTheOldOne() throws Exception {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
-        Computer desk = new Computer(DESK).opened(made.info(), made.computer());
+        VaultComputer desk = computer(DESK).opened(made.info(), made.computer());
         desk.round();
         assertNotNull(desk.get(VaultMove.MOVED_AT));
         dav().delete(Vault.ROOT);
@@ -478,9 +382,9 @@ class CloudVaultTest {
 
     @Test
     void aLaunchSendsNoTextAgainAndTheVaultOpeningHereSendsThemOnce() throws Exception {
-        Computer desk = withEverything(new Computer(DESK));
+        VaultComputer desk = withEverything(computer(DESK));
         desk.round(); // plain
-        Computer launched = new Computer(DESK);
+        VaultComputer launched = computer(DESK);
         launched.values.putAll(desk.values);
         int puts = cloud.puts.get();
         assertNull(launched.round().error());
@@ -496,7 +400,7 @@ class CloudVaultTest {
         assertTrue(cloud.files.containsKey(sealedText), "opened here: its texts go again, sealed");
         int sent = cloud.versions.get(sealedText);
 
-        Computer again = new Computer(DESK);
+        VaultComputer again = computer(DESK);
         again.values.putAll(launched.values);
         assertNull(again.round().error());
         assertEquals(sent, cloud.versions.get(sealedText), "a launch with the vault open: not again");
