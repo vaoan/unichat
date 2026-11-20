@@ -119,23 +119,29 @@ final class TextSync {
 
     /**
      * Whether {@code plain} at {@code path} is a text this computer sent: one of its own, whose content is the start of
-     * the file here (texts only grow). Its index never is: it's sent anew, so it says what this computer has.
+     * the file here (texts only grow). Its index never is ({@link #indexAgain}). One of its own names that isn't what it
+     * has here (someone else's in its folder) is sent again from here, so it doesn't stay in the way.
      */
     synchronized boolean sentHere(String path, byte[] plain) throws IOException {
         String folder = ROOT + "/" + machine + "/";
         if (!path.startsWith(folder)) return false;
         String name = path.substring(folder.length());
-        if (name.equals(INDEX)) {
-            load();
-            indexDue = true;
-            save();
-            return false;
-        }
         if (!FILE.matcher(name).matches()) return false;
         Path here = local.resolve(HERE).resolve(name);
-        if (!Files.exists(here) || Files.size(here) < plain.length) return false;
+        if (!Files.exists(here)) return false;
         byte[] mine = Files.readAllBytes(here);
-        return java.util.Arrays.equals(mine, 0, plain.length, plain, 0, plain.length);
+        if (mine.length >= plain.length && java.util.Arrays.equals(mine, 0, plain.length, plain, 0, plain.length)) return true;
+        load();
+        sent.remove(name);
+        save();
+        return false;
+    }
+
+    /** The index goes up again at the next run, so it says what this computer has (after the vault's key changed). */
+    synchronized void indexAgain() throws IOException {
+        load();
+        indexDue = true;
+        save();
     }
 
     /** The other machines whose texts in the vault didn't open at the last run. */
@@ -172,9 +178,13 @@ final class TextSync {
             if (Files.exists(here) && Files.size(here) >= f.getValue()) continue;
             app.unichat.support.Folders.ownerOnly(local); // what chats said: no other account of the computer reads it
             Files.createDirectories(into);
-            if (storage.get(folder + "/" + f.getKey(), here)) came.add(name.group(1));
+            try {
+                if (storage.get(folder + "/" + f.getKey(), here)) came.add(name.group(1));
+            } catch (SealedStorage.Damaged e) {
+                damaged.add(other); // its later files still come; this one is looked for again next round
+            }
         }
-        stamps.put(other, stamp); // only once all of it came: a failure above reads the index again next time
+        if (!damaged.contains(other)) stamps.put(other, stamp); // only once all of it came: what failed is read again next time
     }
 
     private void load() throws IOException {

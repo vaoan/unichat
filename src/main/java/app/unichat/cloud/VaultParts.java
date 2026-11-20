@@ -94,8 +94,9 @@ final class VaultParts {
         private final Cloud.VaultState state;
         private final byte[] vk;
         private final Vault.Info vault;
-        /** The vault's parts that didn't open this round and went up anew from here (their file names). */
-        private final List<String> replaced = new java.util.concurrent.CopyOnWriteArrayList<>();
+        /** The vault's parts that didn't open this round (their logical paths), and those of them that went up anew from here. */
+        private final Set<String> damaged = new java.util.concurrent.CopyOnWriteArraySet<>(),
+            replaced = new java.util.concurrent.CopyOnWriteArraySet<>();
 
         private Round(Cloud.VaultState state, byte[] vk) {
             this(state, vk, null);
@@ -127,7 +128,8 @@ final class VaultParts {
         Storage personal(Storage plain) {
             return switch (state) {
                 case NONE -> plain;
-                case OPEN -> new SealedStorage(plain, () -> vk.clone(), path -> replaceable(plain, path));
+                case OPEN -> new SealedStorage(plain, () -> vk.clone(), path -> replaceable(plain, path),
+                    path -> { if (damaged.contains(path)) replaced.add(path); });
                 case LOCKED, DECLINED, REMOVED -> null;
             };
         }
@@ -140,12 +142,23 @@ final class VaultParts {
          */
         private boolean replaceable(Storage plain, String path) {
             if (!path.startsWith(SETTINGS_DIR + "/") || !Vault.at(plain, vault)) return false;
-            replaced.add(path.substring(path.lastIndexOf('/') + 1));
+            damaged.add(path);
             return true;
         }
 
-        /** The parts that went up anew this round in place of one that didn't open. */
-        List<String> replaced() { return List.copyOf(replaced); }
+        /** The parts that went up anew this round in place of one that didn't open (their file names). */
+        List<String> replaced() { return names(replaced); }
+
+        /** The parts that didn't open this round and still don't: nothing of this computer's went up in their place. */
+        List<String> damaged() {
+            Set<String> left = new java.util.TreeSet<>(damaged);
+            left.removeAll(replaced);
+            return names(left);
+        }
+
+        private static List<String> names(Set<String> paths) {
+            return paths.stream().map(p -> p.substring(p.lastIndexOf('/') + 1)).sorted().toList();
+        }
 
         @Override
         public void close() {
@@ -168,9 +181,9 @@ final class VaultParts {
      * forgotten); there but not this computer's to open (a vault file that doesn't read, another vault, no key here, or
      * declined); this computer's slot gone or not opening with its key (removed: nothing is sent, nothing deleted); or open.
      * {@code sentHere} says which files this computer sent itself, by logical path and content: after the key changed, only
-     * those are sealed again with the new key.
+     * those are sealed again with the new key, and then {@code keyTaken} runs (what this computer always sends anew).
      */
-    static Round open(Storage plain, BiPredicate<String, byte[]> sentHere) throws IOException {
+    static Round open(Storage plain, BiPredicate<String, byte[]> sentHere, Runnable keyTaken) throws IOException {
         Settings s = Settings.get();
         byte[] file = plain.get(Vault.INFO);
         Vault.Info info = Vault.parse(file);
@@ -194,7 +207,7 @@ final class VaultParts {
             return new Round(Cloud.VaultState.REMOVED, null);
         }
         try {
-            if (info.generation() > slot.generation()) return taken(plain, info, slot, slotKey, s, sentHere);
+            if (info.generation() > slot.generation()) return taken(plain, info, slot, slotKey, s, sentHere, keyTaken);
             byte[] vk = slot.unwrap(slotKey);
             ownKeyBack(plain, info, slot, slotKey, vk, s);
             return new Round(Cloud.VaultState.OPEN, vk, info);
@@ -243,7 +256,7 @@ final class VaultParts {
      * the new key. Until that last write, the next round does it all again. No offer for it: it was removed first.
      */
     private static Round taken(Storage plain, Vault.Info info, VaultSlot slot, byte[] slotKey, Settings s,
-                               BiPredicate<String, byte[]> sentHere) throws IOException {
+                               BiPredicate<String, byte[]> sentHere, Runnable keyTaken) throws IOException {
         byte[] privateKey;
         try {
             privateKey = Base64.getDecoder().decode(s.getString(PRIVATE, ""));
@@ -267,6 +280,7 @@ final class VaultParts {
             }
             // What can't be read is left: a stray entry never holds this computer on the old key.
             if (old != null) VaultReseal.run(plain, old, vk, sentHere);
+            keyTaken.run();
             Vault.rewrap(plain, info, slot, slotKey, vk, ownPublicKey(s));
             return new Round(Cloud.VaultState.OPEN, vk, info);
         } catch (IOException | RuntimeException e) {

@@ -291,7 +291,7 @@ public final class Cloud {
      * stamps it saw, since a plain file and its sealed copy may carry the same.
      */
     private VaultParts.Round vault(Storage dav) throws IOException {
-        VaultParts.Round vault = VaultParts.open(dav, this::sentHere); // asked outside the lock: the other thread never waits on the network for it
+        VaultParts.Round vault = openVault(dav); // asked outside the lock: the other thread never waits on the network for it
         try {
             synchronized (vaultLock) {
                 if (vault.state() != lastVault) {
@@ -324,9 +324,21 @@ public final class Cloud {
     private String notice(VaultParts.Round vault) {
         List<String> lines = new java.util.ArrayList<>();
         if (!vault.replaced().isEmpty()) lines.add(I18n.t("cloud.vault.partReplaced", String.join(", ", vault.replaced())));
+        if (!vault.damaged().isEmpty()) lines.add(I18n.t("cloud.vault.partDamaged", String.join(", ", vault.damaged())));
         java.util.Set<String> damaged = vault.open() ? texts.damaged() : java.util.Set.of();
         if (!damaged.isEmpty()) lines.add(I18n.t("cloud.vault.textsDamaged", String.join(", ", damaged)));
         return lines.isEmpty() ? null : String.join("\n", lines);
+    }
+
+    /** The vault's state here ({@link VaultParts#open}), knowing what this computer sent and that its texts' index goes anew. */
+    private VaultParts.Round openVault(Storage dav) throws IOException {
+        return VaultParts.open(dav, this::sentHere, () -> {
+            try {
+                texts.indexAgain();
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        });
     }
 
     /** Whether a file of the vault is one this computer sent itself: its own texts as it has them, or a part as it agreed on it. */
@@ -404,7 +416,7 @@ public final class Cloud {
     public CompletableFuture<KeyChanged> rotateKey() {
         return onWorker(dav -> {
             Vault.Rotated r;
-            try (VaultParts.Round vault = VaultParts.open(dav, this::sentHere)) {
+            try (VaultParts.Round vault = openVault(dav)) {
                 if (!vault.open()) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
                 byte[] old = vault.key();
                 VaultPeers peers = VaultPeers.load(vault.info().id());
@@ -417,7 +429,7 @@ public final class Cloud {
             }
             Arrays.fill(r.vk(), (byte) 0);
             try {
-                VaultParts.open(dav, this::sentHere).close();
+                openVault(dav).close();
             } catch (IOException | RuntimeException e) {
                 System.err.println("Cloud: the vault's new key: " + Errors.message(e)); // the next round takes it
             }
@@ -433,13 +445,13 @@ public final class Cloud {
     public CompletableFuture<Void> acceptKey(String machine) {
         return onWorker(dav -> {
             if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
-            try (VaultParts.Round vault = VaultParts.open(dav, this::sentHere)) {
+            try (VaultParts.Round vault = openVault(dav)) {
                 if (!vault.open()) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
                 VaultSlot slot = Vault.slot(dav, vault.info(), machine);
                 byte[] vk = vault.key();
                 try {
                     byte[] key = slot == null || slot.method() != VaultSlot.Method.COMPUTER ? null : VaultNext.publicKey(slot, vk);
-                    if (key == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
+                    if (key == null) throw new IOException(I18n.t("cloud.error.vaultNoSuchKey"));
                     VaultPeers peers = VaultPeers.load(vault.info().id());
                     peers.accept(machine, key);
                     peers.save();
@@ -455,13 +467,14 @@ public final class Cloud {
     public CompletableFuture<Void> removeComputer(String machine) {
         return onWorker(dav -> {
             if (machine().equals(machine)) throw new IllegalArgumentException("This computer is forgotten with forgetHere");
-            Vault.removeComputer(dav, machine);
+            if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
             Vault.Info info = Vault.info(dav);
-            if (info != null) {
-                VaultPeers peers = VaultPeers.load(info.id());
-                peers.removed(machine);
-                peers.save();
-            }
+            if (info == null) throw new IOException(I18n.t("cloud.error.noVault"));
+            // Kept out here first: a slot that can't be deleted now is never offered the next key either.
+            VaultPeers peers = VaultPeers.load(info.id());
+            peers.removed(machine);
+            peers.save();
+            Vault.removeComputer(dav, info, machine);
             return null;
         });
     }

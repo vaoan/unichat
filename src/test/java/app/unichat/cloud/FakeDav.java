@@ -25,6 +25,8 @@ final class FakeDav implements AutoCloseable {
     final Set<String> failOnce = ConcurrentHashMap.newKeySet();
     /** A listing of a file fails, as Dropbox's does (path/not_folder), rather than listing nothing. */
     volatile boolean filesAreNoFolders;
+    /** Paths whose next DELETE fails, once each. */
+    final Set<String> failDeleteOnce = ConcurrentHashMap.newKeySet();
     /** Paths whose next PUT lands but answers a failure (the answer lost), once each. */
     final Set<String> failAfterOnce = ConcurrentHashMap.newKeySet();
     private final HttpServer server;
@@ -102,6 +104,10 @@ final class FakeDav implements AutoCloseable {
                     x.getResponseBody().write(f);
                 }
                 case "DELETE" -> {
+                    if (failDeleteOnce.remove(path)) {
+                        x.sendResponseHeaders(503, -1);
+                        return;
+                    }
                     if (!files.containsKey(path) && !dirs.contains(path)) {
                         x.sendResponseHeaders(404, -1);
                         return;

@@ -313,10 +313,10 @@ final class Vault {
             new ArrayList<>());
     }
 
-    /** Another computer's way in taken away: only a computer's slot, by its machine id; none there is fine. */
-    static void removeComputer(Storage s, String machine) throws IOException {
+    /** Another computer's way into {@code vault} taken away: only a computer's slot, by its machine id; none there is fine. */
+    static void removeComputer(Storage s, Info vault, String machine) throws IOException {
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
-        VaultSlot slot = slot(s, current(s), machine);
+        VaultSlot slot = slot(s, vault, machine);
         if (slot != null && slot.method() == VaultSlot.Method.COMPUTER) removeSlot(s, machine);
     }
 

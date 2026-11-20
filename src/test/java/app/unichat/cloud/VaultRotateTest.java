@@ -242,7 +242,7 @@ class VaultRotateTest {
             Bundle.of(OTHER, java.time.Instant.now().plusSeconds(60), Map.of("gif.giphy.key", "falsa"), null).toBytes());
         Cloud.Status s = laptop.round();
         assertNull(s.error(), "a part that doesn't open never stops the round");
-        assertTrue(s.vaultNotice() != null && s.vaultNotice().contains("unichat-secrets.json"), "said: " + s.vaultNotice());
+        assertEquals(app.unichat.support.I18n.t("cloud.vault.partReplaced", "unichat-secrets.json"), s.vaultNotice(), "said");
         assertNull(desk.round().error());
         assertFalse("falsa".equals(laptop.get("gif.giphy.key")), "no computer of the vault takes it in");
         assertFalse("falsa".equals(desk.get("gif.giphy.key")));
@@ -255,7 +255,7 @@ class VaultRotateTest {
     void aPartSealedAtANewerGenerationIsNeverOverwrittenWithAnOlderKey() throws Exception {
         String stored = Vault.ROOT + "/Ajustes/unichat-secrets.json";
         try (VaultParts.Round old = laptop.as(() -> java.util.concurrent.CompletableFuture.completedFuture(
-            VaultParts.open(dav(), (p, b) -> false)))) {
+            VaultParts.open(dav(), (p, b) -> false, () -> { })))) {
             rotate(desk); // meanwhile: every part sealed again at the next generation
             byte[] sealedNow = cloud.files.get(stored);
             Storage personal = old.personal(dav());
@@ -288,8 +288,9 @@ class VaultRotateTest {
         old.put(folder + "/" + TEXT, forged.getBytes(StandardCharsets.UTF_8));
         old.put(folder + "/index.json", TextIndex.write(Map.of(TEXT, (long) forged.length())));
         assertNull(laptop.round().error());
-        assertFalse(opens(keyOf(laptop), folder + "/" + TEXT, cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/" + TEXT)),
-            "not what this computer has: left");
+        assertEquals(mine, new String(VaultCrypto.open(keyOf(laptop), folder + "/" + TEXT,
+            cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/" + TEXT)), StandardCharsets.UTF_8),
+            "not what this computer has: never sealed again, its own sent in its place");
         assertTrue(opens(keyOf(laptop), folder + "/index.json", cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/index.json")),
             "its index sent anew");
         desk.round();
@@ -508,5 +509,74 @@ class VaultRotateTest {
             });
         VaultReseal.run(racing, made.vk(), newVk);
         assertArrayEquals(sentMeanwhile, cloud.files.get(stored), "the newer copy is never written over");
+    }
+
+    @Test
+    void aForgedTextNeverHoldsBackTheNextOnesAndItsWriterSendsItsOwnAgain() throws Exception {
+        String first = "3f2a9c1b2d4e 2026-10.jsonl", second = TEXT; // October sorts first
+        String real = "{\"mio\":12345}\n", forged = "{\"forjado\":1}\n"; // the same size
+        assertNull(laptop.write("texts/here/" + first, "{}\n").write("texts/here/" + second, "{}\n").round().error());
+        assertNull(desk.round().error());
+        assertNull(laptop.write("texts/here/" + first, "{}\n" + real).write("texts/here/" + second, "{}\n{\"b\":1}\n").round().error());
+        rotate(desk);
+        new SealedStorage(dav(), () -> made.vk().clone()).put("Unichat/Textos/" + LAPTOP + "/" + first,
+            ("{}\n" + forged).getBytes(StandardCharsets.UTF_8));
+
+        Cloud.Status s = desk.round();
+        assertNull(s.error());
+        assertEquals("{}\n{\"b\":1}\n", desk.read("texts/" + LAPTOP + "/" + second), "the one after it still comes");
+        assertEquals("{}\n", desk.read("texts/" + LAPTOP + "/" + first), "the forged one never");
+        assertTrue(s.vaultNotice() != null && s.vaultNotice().contains(LAPTOP), "named: " + s.vaultNotice());
+
+        assertNull(laptop.round().error());
+        assertNull(desk.round().error());
+        assertEquals("{}\n" + real, desk.read("texts/" + LAPTOP + "/" + first), "its writer sent its own again in its place");
+    }
+
+    @Test
+    void aKeyThatIsntAComputersOrTheVaultsIsNeverAccepted() throws Exception {
+        String recovery = Vault.slots(dav()).stream().filter(v -> v.method() == VaultSlot.Method.RECOVERY).findFirst().orElseThrow().id();
+        tamperWithoutTheVaultKey(LAPTOP);
+        for (String id : new String[] {OTHER, recovery, LAPTOP}) {
+            ExecutionException e = assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.acceptKey(id)), id);
+            assertEquals(app.unichat.support.I18n.t("cloud.error.vaultNoSuchKey"), e.getCause().getMessage(), id);
+        }
+    }
+
+    /** {@code id}'s slot given another public key without the vault key's seal: what someone with only the account can do. */
+    private void tamperWithoutTheVaultKey(String id) throws Exception {
+        VaultSlot was = slot(id);
+        ObjectNode params = was.params().deepCopy();
+        params.put("x25519", Base64.getEncoder().encodeToString(KeyPairGenerator.getInstance("X25519").generateKeyPair().getPublic().getEncoded()));
+        cloud.put(Vault.SLOTS + "/" + id + ".json", new VaultSlot(was.id(), was.vault(), was.method(), was.label(), was.created(),
+            was.generation(), params, was.wrapped()).toJson());
+    }
+
+    @Test
+    void aComputerIsKeptOutThoughItsSlotCouldntBeDeleted() throws Exception {
+        cloud.failDeleteOnce.add(Vault.SLOTS + "/" + LAPTOP + ".json");
+        assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.removeComputer(LAPTOP)));
+        assertNotNull(slot(LAPTOP), "still there");
+        assertEquals(Map.of(LAPTOP, "Portátil"), rotate(desk).refused(), "but never offered the next key");
+    }
+
+    @Test
+    void aPartThatDoesntOpenAndHasNothingOfOursToReplaceItIsSaidDamaged() throws Exception {
+        String stored = Vault.ROOT + "/Ajustes/unichat-transcripts.json";
+        cloud.put(stored, "dañado".getBytes(StandardCharsets.UTF_8));
+        Cloud.Status s = desk.round(); // no transcripts here: nothing goes up in its place
+        assertArrayEquals("dañado".getBytes(StandardCharsets.UTF_8), cloud.files.get(stored));
+        assertEquals(app.unichat.support.I18n.t("cloud.vault.partDamaged", "unichat-transcripts.json"), s.vaultNotice());
+    }
+
+    @Test
+    void anIndexForgedInAComputersFolderWithTheOldKeyIsSentAnewByIt() throws Exception {
+        assertNull(laptop.write("texts/here/" + TEXT, "{}\n").round().error());
+        rotate(desk);
+        String index = "Unichat/Textos/" + LAPTOP + "/index.json";
+        new SealedStorage(dav(), () -> made.vk().clone()).put(index, TextIndex.write(Map.of(TEXT, 99L)));
+        assertNull(laptop.round().error());
+        assertEquals(Map.of(TEXT, 3L), TextIndex.read(VaultCrypto.open(keyOf(laptop), index, cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/index.json"))),
+            "never sealed again: what it has, sent anew");
     }
 }

@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -30,16 +31,21 @@ final class SealedStorage implements Storage {
     private final Storage plain;
     private final Supplier<byte[]> vk;
     private final Predicate<String> absentIfDamaged;
+    private final Consumer<String> written;
 
     SealedStorage(Storage plain, Supplier<byte[]> vk) {
-        this(plain, vk, path -> false);
+        this(plain, vk, path -> false, path -> { });
     }
 
-    /** @param absentIfDamaged whether a file at this logical path that doesn't open reads as none (asked only then) */
-    SealedStorage(Storage plain, Supplier<byte[]> vk, Predicate<String> absentIfDamaged) {
+    /**
+     * @param absentIfDamaged whether a file at this logical path that doesn't open reads as none (asked only then)
+     * @param written told each logical path once its file went up
+     */
+    SealedStorage(Storage plain, Supplier<byte[]> vk, Predicate<String> absentIfDamaged, Consumer<String> written) {
         this.plain = plain;
         this.vk = vk;
         this.absentIfDamaged = absentIfDamaged;
+        this.written = written;
     }
 
     @Override
@@ -82,12 +88,14 @@ final class SealedStorage implements Storage {
     public void put(String path, Path file, LongConsumer sent) throws IOException {
         byte[] sealed = seal(path, Files.readAllBytes(file));
         plain.put(stored(path), sealed);
+        written.accept(path);
         if (sent != null) sent.accept(sealed.length);
     }
 
     @Override
     public void put(String path, byte[] data) throws IOException {
         plain.put(stored(path), seal(path, data));
+        written.accept(path);
     }
 
     @Override
