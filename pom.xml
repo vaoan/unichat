@@ -37,6 +37,12 @@
       <version>core-1.0.2</version>
     </dependency>
     <dependency>
+      <!-- Argon2id for the vault's password key (the JDK has none). -->
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <version>1.80</version>
+    </dependency>
+    <dependency>
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>
       <version>5.14.0</version>

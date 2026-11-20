@@ -48,6 +48,14 @@ RLOTTIE = pinned(r"^RLOTTIE_COMMIT=(\S+)", "native/build-lottie.sh")
 LIBPNG = pinned(r"^LIBPNG_VERSION=(\S+)", "native/build-lottie.sh")
 TUWUNEL_V = pinned(r"^TUWUNEL_VERSION=(\S+)", "src/main/resources/app/unichat/server/versions.env")
 
+# bouncycastle.org's licence page is HTML, so the MIT text is kept here.
+BC_LICENSE = '''Copyright (c) 2000 - 2026 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sub license, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.'''
 # name, version, license, what it's for, [(heading, text)]
 JFX_LEGAL = [p["path"] for p in json.loads(fetch("https://api.github.com/repos/openjdk/jfx/git/trees/master?recursive=1"))["tree"]
              if re.match(r"modules/javafx\.(base|graphics|controls|media|web|swing)/src/main/legal/.+\.md$", p["path"])]
@@ -89,6 +97,7 @@ COMPONENTS = [
      [("LICENSE", fetch(GH + "jcodec/jcodec/master/LICENSE"))]),
     ("jsoup", "1.18.3", "MIT", "reading messages' HTML", [("LICENSE", fetch(GH + "jhy/jsoup/master/LICENSE"))]),
     ("Concentus", "1.0.2", "BSD-3-Clause", "decoding Opus voice notes", [("LICENSE", fetch(GH + "lostromb/concentus/master/LICENSE"))]),
+    ("Bouncy Castle (bcprov)", "1.80", "MIT", "the vault's password key (Argon2id)", [("LICENSE", BC_LICENSE)]),
     ("InstaTray core (instatray.core)", "core-1.0.2", "0BSD", "saving what links in chats lead to (sites, cookies, yt-dlp/gallery-dl)",
      [("LICENSE", fetch(GH + "vaoan/InstaTray/core-1.0.2/LICENSE"))]),
 ]
