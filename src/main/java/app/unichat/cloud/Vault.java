@@ -140,11 +140,11 @@ final class Vault {
         return out;
     }
 
-    /** The vault's computers: each machine with a computer slot, and its label (from the account: plain text only). */
+    /** The vault's computers: each machine with a computer slot, and its label (from the account: one plain line, {@link VaultView#label}). */
     static Map<String, String> computers(Storage s) throws IOException {
         Map<String, String> out = new TreeMap<>();
         for (VaultSlot slot : slots(s)) {
-            if (slot.method() == VaultSlot.Method.COMPUTER) out.put(slot.id(), slot.label());
+            if (slot.method() == VaultSlot.Method.COMPUTER) out.put(slot.id(), VaultView.label(slot.label()));
         }
         return out;
     }
@@ -216,6 +216,15 @@ final class Vault {
      * new key.
      */
     static Rotated rotate(Storage s, byte[] oldVk, String machine, VaultPeers peers) throws IOException {
+        return rotate(s, oldVk, machine, peers, id -> true);
+    }
+
+    /**
+     * The same, offering the new key only to the computers {@code confirmed} (the person saw them listed and said yes) and
+     * this one: any other, one that came after the list was shown included, is offered nothing and named.
+     */
+    static Rotated rotate(Storage s, byte[] oldVk, String machine, VaultPeers peers, java.util.function.Predicate<String> confirmed)
+        throws IOException {
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
         Info was = current(s);
         List<VaultSlot> slots = slots(s);
@@ -232,8 +241,9 @@ final class Vault {
         try {
             for (VaultSlot slot : slots) {
                 if (slot.method() != VaultSlot.Method.COMPUTER) continue;
-                if (offer(s, slot, oldVk, vk, now.generation(), peers)) offered.add(slot);
-                else refused.put(slot.id(), slot.label());
+                boolean asked = slot.id().equals(machine) || confirmed.test(slot.id());
+                if (asked && offer(s, slot, oldVk, vk, now.generation(), peers)) offered.add(slot);
+                else refused.put(slot.id(), VaultView.label(slot.label()));
             }
             code = writeRecovery(s, vk, now, written);
             s.put(INFO, json(now));

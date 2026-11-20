@@ -83,4 +83,17 @@ class CloudTextsTest {
         assertTrue(lines.get(1).contains("las transcripciones de las notas de voz, los mensajes fijados"), lines.get(1));
         assertTrue(lines.get(2).contains("(Portátil)"), lines.get(2));
     }
+
+    @Test
+    void aComputersNameFromTheAccountIsShownAsOnePlainLine() {
+        String nasty = "Viejo\nfalso\u202Etxt.exe" + "z".repeat(200);
+        Cloud.Moving moving = new Cloud.Moving(0, null, java.util.Map.of("m1", nasty));
+        List<String> lines = CloudTexts.vaultLines(vault(Cloud.VaultState.OPEN, moving, null), NOW);
+        assertEquals(1, lines.size());
+        String line = lines.get(0);
+        assertTrue(line.startsWith("Viejo falso txt.exe"), line);
+        assertTrue(!line.contains("\n") && !line.contains("\u202E"), "no line break nor text turned around");
+        assertTrue(line.length() < 120, "not 200 characters of it: " + line.length());
+        assertTrue(CloudTexts.menuLines(vault(Cloud.VaultState.OPEN, moving, null), NOW).stream().noneMatch(l -> l.contains("\n")), "the tray too");
+    }
 }

@@ -64,9 +64,13 @@ public final class CloudTexts {
         return out;
     }
 
-    /** A computer's name in the vault (from the account: shown as text), or words for one that has none. */
+    /**
+     * A computer's name in the vault as shown anywhere: from the account, so one plain line of at most 64 characters
+     * ({@link app.unichat.cloud.VaultView#label}); words for one that has none.
+     */
     static String computer(String label) {
-        return label == null || label.isBlank() ? I18n.t("settings.vault.unnamed") : label;
+        String clean = app.unichat.cloud.VaultView.label(label);
+        return clean.isBlank() ? I18n.t("settings.vault.unnamed") : clean;
     }
 
     private static String parts(List<Cloud.Part> parts) {

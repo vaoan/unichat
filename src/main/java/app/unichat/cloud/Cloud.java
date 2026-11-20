@@ -359,7 +359,7 @@ public final class Cloud {
             } catch (IOException e) {
                 labels = Map.of(); // named by machine alone this round
             }
-            for (String machine : texts) named.put(machine, VaultActions.label(labels.getOrDefault(machine, "")));
+            for (String machine : texts) named.put(machine, labels.getOrDefault(machine, ""));
         }
         Notice n = new Notice(parts(vault.replaced()), parts(vault.damaged()), named);
         return n.none() ? null : n;
@@ -452,26 +452,41 @@ public final class Cloud {
      * A new key for the vault ({@link Vault#rotate}), on the cloud's thread: only with the vault open here. This computer
      * then takes it at once, as the others do on their next round; if that fails, its next round does it.
      */
-    public CompletableFuture<KeyChanged> rotateKey() {
-        return onWorker(this::rotate);
+    CompletableFuture<KeyChanged> rotateKey() {
+        return onWorker(dav -> rotate(dav, id -> true));
+    }
+
+    /**
+     * The same, the new key offered only to the computers in {@code confirmed} (those the person saw listed and said yes
+     * to) and this one; any other, one that came after the list included, gets nothing and is named in {@link KeyChanged#refused}.
+     */
+    public CompletableFuture<KeyChanged> rotateKey(java.util.Set<String> confirmed) {
+        java.util.Set<String> asked = java.util.Set.copyOf(confirmed);
+        return onWorker(dav -> rotate(dav, asked::contains));
     }
 
     /**
      * Another computer taken out of the vault and the key changed, in one: a removed computer still holds the key, so
      * only a new one shuts it out of anything new. Kept out first, so it's never offered the new key.
      */
-    public CompletableFuture<KeyChanged> removeAndChangeKey(String machine) {
+    public CompletableFuture<KeyChanged> removeAndChangeKey(String machine, java.util.Set<String> confirmed) {
+        java.util.Set<String> asked = java.util.Set.copyOf(confirmed);
         return onWorker(dav -> {
             remove(dav, machine);
-            return rotate(dav);
+            try {
+                return rotate(dav, id -> !id.equals(machine) && asked.contains(id));
+            } catch (IOException | RuntimeException e) {
+                // Removed all the same: the person must know the key it holds still opens the vault.
+                throw new IOException(I18n.t("cloud.error.vaultRemovedKeyKept", Errors.message(e)), e);
+            }
         });
     }
 
-    private KeyChanged rotate(Storage dav) throws IOException {
+    private KeyChanged rotate(Storage dav, java.util.function.Predicate<String> confirmed) throws IOException {
         Vault.Rotated r = withKey(dav, (vault, old) -> {
             VaultPeers peers = VaultPeers.load(vault.info().id());
             try {
-                return Vault.rotate(dav, old, machine(), peers);
+                return Vault.rotate(dav, old, machine(), peers, confirmed);
             } finally {
                 peers.save(); // a computer seen for the first time is pinned, the change done or not
             }

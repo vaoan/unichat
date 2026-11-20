@@ -204,7 +204,7 @@ class VaultActionsTest {
         as(laptop, () -> laptop.cloud.openVault(VaultView.Way.RECOVERY, code.toCharArray()));
         assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
-        Cloud.KeyChanged changed = as(desk, () -> desk.cloud.removeAndChangeKey(LAPTOP));
+        Cloud.KeyChanged changed = as(desk, () -> desk.cloud.removeAndChangeKey(LAPTOP, Set.of(DESK, LAPTOP)));
         assertNotNull(RecoveryCode.parse(changed.code()));
         assertEquals(Set.of("PASSWORD"), changed.dropped(), "said, to add again");
         assertEquals(1, Vault.info(dav()).generation(), "the key changed");
@@ -254,6 +254,52 @@ class VaultActionsTest {
         String label = view(desk).computers().stream().filter(c -> c.machine().equals(OTHER)).findFirst().orElseThrow().label();
         assertTrue(label.startsWith("Mal vado txt.exe"), label);
         assertTrue(label.length() <= 65, "not too long to show: " + label.length());
+        assertNotNull(code);
+    }
+
+    @Test
+    void aChangeOffersTheNewKeyOnlyToTheComputersThePersonConfirmed() throws Exception {
+        String code = create(desk);
+        as(laptop, () -> laptop.cloud.openVault(VaultView.Way.RECOVERY, code.toCharArray()));
+        VaultComputer other = new VaultComputer(cloud, dir, OTHER);
+        as(other, () -> other.cloud.openVault(VaultView.Way.RECOVERY, code.toCharArray()));
+        assertNull(desk.round().error());
+        // The list showed the laptop; OTHER came after it was shown (or wasn't confirmed).
+        Cloud.KeyChanged changed = as(desk, () -> desk.cloud.rotateKey(Set.of(LAPTOP)));
+        assertEquals(Set.of(OTHER), changed.refused().keySet(), "named");
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
+        assertEquals(Cloud.VaultState.REMOVED, other.round().vault(), "it got nothing");
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault(), "this computer always goes on");
+    }
+
+    @Test
+    void aRemovalWhoseChangeOfKeyFailsSaysTheKeyWasntChanged() throws Exception {
+        String code = create(desk);
+        as(laptop, () -> laptop.cloud.openVault(VaultView.Way.RECOVERY, code.toCharArray()));
+        assertNull(desk.round().error());
+        cloud.failOnce.add(Vault.INFO);
+        ExecutionException e = assertThrows(ExecutionException.class,
+            () -> as(desk, () -> desk.cloud.removeAndChangeKey(LAPTOP, Set.of(DESK))));
+        String said = I18n.t("cloud.error.vaultRemovedKeyKept", "");
+        assertTrue(message(e).startsWith(said.substring(0, said.indexOf('('))), message(e));
+        assertFalse(Vault.computers(dav()).containsKey(LAPTOP), "removed all the same");
+        assertEquals(0, Vault.info(dav()).generation(), "the key didn't change");
+    }
+
+    @Test
+    void everyNameFromTheAccountIsOnePlainLineWhereverItIsShown() throws Exception {
+        String code = create(desk);
+        String nasty = "Mal\nvado\u202Eexe.txt" + "y".repeat(200);
+        byte[] vk;
+        try (var r = desk.as(() -> CompletableFuture.completedFuture(VaultParts.open(dav(), (p, b) -> false, () -> { })))) {
+            vk = r.key();
+        }
+        Vault.addComputer(dav(), vk, OTHER, nasty);
+        Arrays.fill(vk, (byte) 0);
+        String clean = VaultView.label(nasty);
+        assertTrue(clean.startsWith("Mal vado exe.txt") && clean.length() <= 65, clean);
+        assertEquals(clean, Vault.computers(dav()).get(OTHER), "what strays and damaged texts are named by");
+        assertEquals(clean, as(desk, () -> desk.cloud.rotateKey(Set.of())).refused().get(OTHER), "and refused computers");
         assertNotNull(code);
     }
 }

@@ -170,10 +170,10 @@ final class RecoveryCodeSheet extends VBox {
             job.cancelJob();
             return false;
         }
-        Label page = new Label(text);
-        page.setWrapText(true);
-        page.setStyle("-fx-font-family: monospace; -fx-font-size: 14px;");
-        page.setMaxWidth(job.getJobSettings().getPageLayout().getPrintableWidth());
+        // A Text lays itself out: a Label outside a scene has no skin, and printed nothing.
+        javafx.scene.text.Text page = new javafx.scene.text.Text(text);
+        page.setFont(javafx.scene.text.Font.font("monospace", 14));
+        page.setWrappingWidth(job.getJobSettings().getPageLayout().getPrintableWidth());
         boolean printed = job.printPage(page);
         return printed && job.endJob();
     }

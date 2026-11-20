@@ -52,7 +52,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class VaultPageUiTest {
-    private static final String PASSWORD = "una contraseña larga", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String PASSWORD = "una contraseña larga", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
+        LATE = "5f0e7d7c-4b5a-4a4c-9e95-0d6b1a5c6f88";
 
     @TempDir
     Path dir;
@@ -208,40 +209,48 @@ class VaultPageUiTest {
     @Test
     void withoutAVaultTheKeysAreEnteredByHandAsToday() throws Exception {
         CloudPage.use(account.cloud());
-        GifProviders.Known gif = GifProviders.known().get(0);
         String local = Settings.get().getString("server.local", null);
-        Settings.get().setLocalServer(true); // where Telegram's keys are typed
-        account.otherComputerMadeIt(null);
-        account.cloud().declineVault(true).get();
-        for (boolean vault : new boolean[] {false, true}) {
-            if (!vault) Settings.get().set("cloud.vault.declined", null);
-            MockChatService svc = new MockChatService();
-            try {
-                Stage owner = FxWait.fx(() -> {
-                    Stage o = new Stage();
-                    o.setOpacity(0);
-                    o.show();
-                    SettingsWindow.show(o, svc, () -> { }, () -> { }, id -> { }, t -> { });
-                    return o;
-                });
-                FxWait.fx(() -> { SettingsWindow.select("networks"); return null; });
-                FxWait.until("Telegram's keys", () -> SettingsWindow.current().getScene().getRoot().lookup(".telegram-api-id") != null);
-                TextField id = FxWait.fx(() -> (TextField) SettingsWindow.current().getScene().getRoot().lookup(".telegram-api-id"));
-                assertTrue(FxWait.fx(() -> id.isEditable() && !id.isDisabled()), "Telegram's keys typed here");
-                FxWait.fx(() -> { SettingsWindow.select("gifs"); return null; });
-                String keyOf = I18n.t("settings.gifs.keyOf", gif.name());
-                FxWait.until("the GIF key's field", () -> SettingsWindow.current().getScene().getRoot().lookupAll(".password-field").stream()
-                    .anyMatch(p -> keyOf.equals(p.getAccessibleText())));
-                PasswordField key = FxWait.fx(() -> SettingsWindow.current().getScene().getRoot().lookupAll(".password-field").stream()
-                    .map(n -> (PasswordField) n).filter(p -> keyOf.equals(p.getAccessibleText())).findFirst().orElseThrow());
-                FxWait.fx(() -> { key.setText("clave-a-mano"); return null; });
-                assertEquals("clave-a-mano", Settings.get().getString("gif." + gif.id() + ".key", null), "and kept here as before");
-                FxWait.fx(() -> { SettingsWindow.current().close(); owner.close(); return null; });
-            } finally {
-                svc.stop();
-            }
+        try {
+            Settings.get().setLocalServer(true); // where Telegram's keys are typed
+            assertEquals(Cloud.VaultState.NONE, round());
+            keysByHand("none");
+            account.otherComputerMadeIt(null);
+            account.cloud().declineVault(true).get();
+            assertEquals(Cloud.VaultState.DECLINED, round());
+            keysByHand("declined");
+        } finally {
+            Settings.get().set("server.local", local);
         }
-        Settings.get().set("server.local", local);
+    }
+
+    /** Telegram's keys and a GIF service's key typed in Ajustes and kept here, as before the vault. */
+    private void keysByHand(String where) throws Exception {
+        GifProviders.Known gif = GifProviders.known().get(0);
+        MockChatService svc = new MockChatService();
+        try {
+            Stage owner = FxWait.fx(() -> {
+                Stage o = new Stage();
+                o.setOpacity(0);
+                o.show();
+                SettingsWindow.show(o, svc, () -> { }, () -> { }, id -> { }, t -> { });
+                return o;
+            });
+            FxWait.fx(() -> { SettingsWindow.select("networks"); return null; });
+            FxWait.until("Telegram's keys", () -> SettingsWindow.current().getScene().getRoot().lookup(".telegram-api-id") != null);
+            TextField id = FxWait.fx(() -> (TextField) SettingsWindow.current().getScene().getRoot().lookup(".telegram-api-id"));
+            assertTrue(FxWait.fx(() -> id.isEditable() && !id.isDisabled()), where + ": Telegram's keys typed here");
+            FxWait.fx(() -> { SettingsWindow.select("gifs"); return null; });
+            String keyOf = I18n.t("settings.gifs.keyOf", gif.name());
+            FxWait.until("the GIF key's field", () -> SettingsWindow.current().getScene().getRoot().lookupAll(".password-field").stream()
+                .anyMatch(p -> keyOf.equals(p.getAccessibleText())));
+            PasswordField key = FxWait.fx(() -> SettingsWindow.current().getScene().getRoot().lookupAll(".password-field").stream()
+                .map(n -> (PasswordField) n).filter(p -> keyOf.equals(p.getAccessibleText())).findFirst().orElseThrow());
+            FxWait.fx(() -> { key.setText("clave-" + where); return null; });
+            assertEquals("clave-" + where, Settings.get().getString("gif." + gif.id() + ".key", null), where + ": kept here as before");
+            FxWait.fx(() -> { SettingsWindow.current().close(); owner.close(); return null; });
+        } finally {
+            svc.stop();
+        }
     }
 
     @Test
@@ -447,6 +456,47 @@ class VaultPageUiTest {
     }
 
     @Test
+    void aComputerAddedAfterThePageWasDrawnShowsUpFlaggedInTheConfirmation() throws Exception {
+        openedWithOthers();
+        page();
+        waitOpen();
+        account.anotherComputer(LATE, "Tardío"); // while the page shows: no round has seen it
+        assertFalse(FxWait.fx(() -> says("Tardío")), "not drawn yet");
+        click(I18n.t("settings.vault.changeKey"));
+        waitFor(I18n.t("settings.vault.change.unseen", "Tardío"));
+        click(I18n.t("settings.vault.change.confirm"));
+        codeShown();
+        FxWait.settled();
+        assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.change.refusedAfter", "Tardío"))), "listed and confirmed: it gets the key");
+    }
+
+    @Test
+    void aComputerAppearingBetweenConfirmingAndChangingGetsNothingAndIsNamed() throws Exception {
+        openedWithOthers();
+        page();
+        waitOpen();
+        click(I18n.t("settings.vault.changeKey"));
+        waitFor(I18n.t("settings.vault.change.receive"));
+        account.anotherComputer(LATE, "Tardío"); // after the list was shown
+        click(I18n.t("settings.vault.change.confirm"));
+        codeShown();
+        waitFor(I18n.t("settings.vault.change.refusedAfter", "Tardío"));
+        assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.change.refusedAfter", "Portátil"))), "the ones listed got it");
+    }
+
+    @Test
+    void aCodeThatCouldntBeNotedAsKeptSaysSo() throws Exception {
+        page();
+        FxWait.until("no vault yet", () -> hasButton(I18n.t("settings.vault.create")));
+        click(I18n.t("settings.vault.create"));
+        String code = codeShown();
+        app.unichat.cloud.CloudAccount.forget(); // the account gone meanwhile: nothing can be noted
+        typeGroups(code, true);
+        waitFor(I18n.t("settings.vault.code.keptFailed", "").substring(0, 20));
+        assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.code.keptLine"))));
+    }
+
+    @Test
     void forgettingItHereAsksOnce() throws Exception {
         openedWithOthers();
         page();
@@ -507,15 +557,22 @@ class VaultPageUiTest {
         try {
             for (double fontScale : new double[] {1.0, 1.6}) {
                 Settings.get().setFontScale(fontScale);
-                bad.addAll(squeezedOnCloudPage(svc, "none @" + fontScale));
+                bad.addAll(squeezedOnCloudPage(svc, "none @" + fontScale, null));
             }
+            Settings.get().setFontScale(1.6);
+            bad.addAll(squeezedOnCloudPage(svc, "code", I18n.t("settings.vault.create")));
+            account.cloud().forgetHere().get();
+            account.close();
+            account = new VaultFixture(dir.resolve("fits"));
+            CloudPage.use(account.cloud());
             String code = account.otherComputerMadeIt(PASSWORD);
             Settings.get().setFontScale(1.6);
-            bad.addAll(squeezedOnCloudPage(svc, "locked"));
+            bad.addAll(squeezedOnCloudPage(svc, "locked", null));
             account.anotherComputer(LAPTOP, "Un portátil con un nombre bastante largo");
             account.cloud().openVault(app.unichat.cloud.VaultView.Way.RECOVERY, code.toCharArray()).get();
             account.cloud().syncNow().get();
-            bad.addAll(squeezedOnCloudPage(svc, "open"));
+            bad.addAll(squeezedOnCloudPage(svc, "open", null));
+            bad.addAll(squeezedOnCloudPage(svc, "confirmation", I18n.t("settings.vault.changeKey")));
         } finally {
             Settings.get().set("ui.fontScale", scale);
             svc.stop();
@@ -523,7 +580,8 @@ class VaultPageUiTest {
         assertTrue(bad.isEmpty(), "cut or squeezed:\n" + String.join("\n", bad));
     }
 
-    private List<String> squeezedOnCloudPage(MockChatService svc, String where) throws Exception {
+    /** The squeezed texts on Nube with the vault drawn, after pressing {@code press} if given (a step: the code, a confirmation). */
+    private List<String> squeezedOnCloudPage(MockChatService svc, String where, String press) throws Exception {
         Stage owner = FxWait.fx(() -> {
             Stage o = new Stage();
             o.setOpacity(0);
@@ -535,6 +593,16 @@ class VaultPageUiTest {
         });
         FxWait.until("the vault drawn", () -> SettingsWindow.current().getScene().getRoot().lookup(".vault-page") instanceof VBox v
             && !v.getChildren().isEmpty() && v.lookupAll(".button").size() > 0);
+        if (press != null) {
+            FxWait.fx(() -> {
+                ((ButtonBase) SettingsWindow.current().getScene().getRoot().lookupAll(".button").stream()
+                    .filter(n -> press.equals(((ButtonBase) n).getText())).findFirst().orElseThrow()).fire();
+                return null;
+            });
+            String receive = I18n.t("settings.vault.change.receive");
+            FxWait.until("the step shown", () -> SettingsWindow.current().getScene().getRoot().lookup(".recovery-code-sheet") != null
+                || SettingsWindow.current().getScene().getRoot().lookupAll(".label").stream().anyMatch(n -> receive.equals(((Labeled) n).getText())));
+        }
         FxWait.settled();
         List<String> bad = FxWait.fx(() -> SettingsLayoutUiTest.squeezed(SettingsWindow.current().getScene().getRoot(), where));
         FxWait.fx(() -> { SettingsWindow.current().close(); owner.close(); return null; });

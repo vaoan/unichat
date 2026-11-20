@@ -142,6 +142,12 @@ final class VaultPeers {
         return pinned != null && !pinned.equals(NOT_A_COMPUTER) && !Arrays.equals(Base64.getDecoder().decode(pinned), publicKey);
     }
 
+    /** Whether this computer has pinned {@code machine}'s key (seen it in a round, or at a change of key). */
+    boolean seen(String machine) {
+        String pinned = pins.get(machine);
+        return pinned != null && !pinned.equals(NOT_A_COMPUTER);
+    }
+
     /** Whether {@code machine} came after the last computer removed here (never seen yet, or pinned after it). */
     boolean newSinceRemoval(String machine) {
         if (removals == 0) return false;

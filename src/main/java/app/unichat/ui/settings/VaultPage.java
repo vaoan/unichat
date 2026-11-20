@@ -98,8 +98,10 @@ final class VaultPage {
     /** A code to keep, shown once and asked back; then the vault as it is now. */
     private void showCode(String code, String before) {
         inStep = true;
-        show(line(before), new RecoveryCodeSheet(code, () -> cloud.codeKept().whenComplete((ok, err) -> Platform.runLater(this::reload)),
-            this::reload));
+        show(line(before), new RecoveryCodeSheet(code, () -> cloud.codeKept().whenComplete((ok, err) -> Platform.runLater(() -> {
+            if (err == null) reload();
+            else show(actions(KeyChangeFlow.warning(I18n.t("settings.vault.code.keptFailed", Errors.message(Errors.unwrap(err))))), retry());
+        })), this::reload));
     }
 
     /** Not open here: how to open it, and (locked, not removed) going on without it. */
@@ -144,7 +146,7 @@ final class VaultPage {
         rows.add(ways(v));
         rows.add(computers(v));
         Button change = secondary(I18n.t("settings.vault.changeKey"));
-        change.setOnAction(e -> changeKey(v, null));
+        change.setOnAction(e -> changeKey(null));
         Button forget = new Button(I18n.t("settings.vault.forget"));
         forget.getStyleClass().add("danger-button");
         forget.setOnAction(e -> forget());
@@ -196,12 +198,12 @@ final class VaultPage {
             who.getStyleClass().add("vault-computer");
             VBox entry = new VBox(4, who);
             if (c.keyChanged()) entry.getChildren().add(KeyChangeFlow.accept(cloud, c, I18n.t("settings.vault.change.keyChanged", name), this::reload));
-            if (c.newSinceRemoval()) entry.getChildren().add(KeyChangeFlow.warning(I18n.t("settings.vault.change.newSince", name)));
+            KeyChangeFlow.flags(entry, c);
             if (!c.here()) {
                 Button remove = new Button(I18n.t("settings.vault.computer.remove"));
                 remove.getStyleClass().add("danger-button");
                 remove.setAccessibleText(I18n.t("settings.vault.computer.removeOf", name));
-                remove.setOnAction(e -> changeKey(v, c));
+                remove.setOnAction(e -> changeKey(c));
                 entry.getChildren().add(remove);
             }
             list.getChildren().add(entry);
@@ -209,13 +211,23 @@ final class VaultPage {
         return stacked(I18n.t("settings.vault.computers"), I18n.t("settings.vault.computersHelp"), list);
     }
 
-    /** "Cambiar la llave", or taking {@code removing} out with it: confirmed first, then what came of it. */
-    private void changeKey(VaultView v, VaultView.Computer removing) {
+    /**
+     * "Cambiar la llave", or taking {@code removing} out with it: the computers read again (the page may have been drawn
+     * long ago, and only those listed now get the key), confirmed, then what came of it.
+     */
+    private void changeKey(VaultView.Computer removing) {
         inStep = true;
-        show(KeyChangeFlow.confirm(cloud, v, removing, r -> {
-            cloud.syncNow();
-            show(KeyChangeFlow.result(cloud, r, cloud::codeKept, this::addPassword, this::reload));
-        }, this::reload));
+        show(line(I18n.t("settings.vault.reading")));
+        cloud.vaultView().whenComplete((now, err) -> Platform.runLater(() -> {
+            if (err != null || now.state() != Cloud.VaultState.OPEN) {
+                show(line(err != null ? I18n.t("settings.vault.unreadable", Errors.message(Errors.unwrap(err))) : I18n.t("cloud.error.vaultNotOpen")), retry());
+                return;
+            }
+            show(KeyChangeFlow.confirm(cloud, now, removing, r -> {
+                cloud.syncNow();
+                show(KeyChangeFlow.result(cloud, r, this::addPassword, this::reload));
+            }, this::reload));
+        }));
     }
 
     /** "Olvidar la bóveda en este equipo", asked once. */

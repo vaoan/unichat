@@ -2,7 +2,6 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
-import app.unichat.support.Lines;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -22,7 +21,6 @@ import java.util.Set;
 final class VaultActions {
     /** The vault id whose latest recovery code the person hasn't yet confirmed they kept (machine-only). */
     static final String UNCONFIRMED = "cloud.vault.codeUnconfirmed";
-    private static final int LABEL = 64;
 
     private VaultActions() {}
 
@@ -50,8 +48,8 @@ final class VaultActions {
                 } else if (vk != null) {
                     boolean mine = slot.id().equals(here);
                     byte[] key = VaultNext.publicKey(slot, vk);
-                    computers.add(new VaultView.Computer(slot.id(), label(slot.label()), peers.firstSeen(slot.id()), mine,
-                        !mine && peers.keyChanged(slot.id(), key), !mine && peers.newSinceRemoval(slot.id())));
+                    computers.add(new VaultView.Computer(slot.id(), VaultView.label(slot.label()), peers.firstSeen(slot.id()), mine,
+                        !mine && peers.keyChanged(slot.id(), key), !mine && peers.newSinceRemoval(slot.id()), !mine && !peers.seen(slot.id())));
                 }
             }
         } finally {
@@ -59,12 +57,6 @@ final class VaultActions {
         }
         computers.sort(Comparator.comparing((VaultView.Computer c) -> !c.here()).thenComparing(VaultView.Computer::label));
         return new VaultView(round.state(), ways, computers, info.id().equals(Settings.get().getString(UNCONFIRMED, null)));
-    }
-
-    /** A label from the account as one plain line, not too long to show. */
-    static String label(String s) {
-        String one = Lines.one(s);
-        return one.codePointCount(0, one.length()) <= LABEL ? one : one.substring(0, one.offsetByCodePoints(0, LABEL)) + "…";
     }
 
     /** A new vault, open here; its recovery code as printed (shown once: never kept). */
@@ -181,6 +173,6 @@ final class VaultActions {
             }
         }
         if (name == null || name.isBlank()) return "Unichat";
-        return label(name.replaceFirst("(?i)\\.local$", ""));
+        return VaultView.label(name.replaceFirst("(?i)\\.local$", ""));
     }
 }

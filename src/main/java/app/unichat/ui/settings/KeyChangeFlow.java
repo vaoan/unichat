@@ -34,6 +34,7 @@ final class KeyChangeFlow {
 
     /** Asks before changing the key; {@code removing} is the computer taken out with it, or null. */
     static Node confirm(Cloud cloud, VaultView view, VaultView.Computer removing, Consumer<Cloud.KeyChanged> done, Runnable cancel) {
+        java.util.Set<String> confirmed = new java.util.HashSet<>(); // those listed here as getting it: no other is offered it
         VBox who = new VBox(6);
         who.getChildren().add(Labels.help(I18n.t("settings.vault.change.receive")));
         for (VaultView.Computer c : view.computers()) {
@@ -42,11 +43,12 @@ final class KeyChangeFlow {
                 who.getChildren().add(accept(cloud, c, I18n.t("settings.vault.change.refused", CloudTexts.computer(c.label())), () -> { }));
                 continue;
             }
+            confirmed.add(c.machine());
             Label line = new Label(c.here() ? I18n.t("settings.vault.computer.here", CloudTexts.computer(c.label())) : name(c));
             line.setWrapText(true);
             line.getStyleClass().add("vault-receiver");
             who.getChildren().add(line);
-            if (c.newSinceRemoval()) who.getChildren().add(warning(I18n.t("settings.vault.change.newSince", CloudTexts.computer(c.label()))));
+            flags(who, c);
         }
         if (removing != null) who.getChildren().add(Labels.help(I18n.t("settings.vault.change.removing", CloudTexts.computer(removing.label()))));
         Label error = Labels.help("");
@@ -61,7 +63,7 @@ final class KeyChangeFlow {
             go.setDisable(true);
             no.setDisable(true);
             Nodes.show(error, false);
-            (removing == null ? cloud.rotateKey() : cloud.removeAndChangeKey(removing.machine())).whenComplete((r, err) -> Platform.runLater(() -> {
+            (removing == null ? cloud.rotateKey(confirmed) : cloud.removeAndChangeKey(removing.machine(), confirmed)).whenComplete((r, err) -> Platform.runLater(() -> {
                 go.setDisable(false);
                 no.setDisable(false);
                 if (err == null) {
@@ -80,16 +82,18 @@ final class KeyChangeFlow {
     /**
      * After the change: the new code to keep, what went and who was refused, and "Listo".
      *
-     * @param codeKept the person typed back the new code's groups
      * @param addPassword "Agregar de nuevo" for a password that went
      */
-    static Node result(Cloud cloud, Cloud.KeyChanged r, Runnable codeKept, Runnable addPassword, Runnable finished) {
+    static Node result(Cloud cloud, Cloud.KeyChanged r, Runnable addPassword, Runnable finished) {
         VBox box = new VBox();
         VBox code = new VBox();
-        code.getChildren().add(new RecoveryCodeSheet(r.code(), () -> {
-            code.getChildren().setAll(actions(Labels.help(I18n.t("settings.vault.code.keptLine"))));
-            codeKept.run();
-        }, () -> code.getChildren().setAll(actions(warning(I18n.t("settings.vault.code.notKept"))))));
+        Runnable kept = () -> cloud.codeKept().whenComplete((ok, err) -> Platform.runLater(() -> {
+            Label said = err == null ? Labels.help(I18n.t("settings.vault.code.keptLine"))
+                : warning(I18n.t("settings.vault.code.keptFailed", Errors.message(Errors.unwrap(err))));
+            code.getChildren().setAll(actions(said));
+        }));
+        code.getChildren().add(new RecoveryCodeSheet(r.code(), kept,
+            () -> code.getChildren().setAll(actions(warning(I18n.t("settings.vault.code.notKept"))))));
         box.getChildren().add(code);
         for (String way : r.dropped()) {
             Label line = Labels.help(I18n.t("settings.vault.change.dropped", I18n.t("settings.vault.way." + way)));
@@ -104,7 +108,7 @@ final class KeyChangeFlow {
             }
         }
         for (String refused : r.refused().values()) {
-            box.getChildren().add(actions(warning(I18n.t("settings.vault.change.refusedAfter", CloudTexts.computer(app.unichat.support.Lines.one(refused))))));
+            box.getChildren().add(actions(warning(I18n.t("settings.vault.change.refusedAfter", CloudTexts.computer(refused)))));
         }
         if (!r.left().isEmpty()) box.getChildren().add(actions(Labels.help(I18n.n("settings.vault.change.left", r.left().size()))));
         if (r.resealFailed()) box.getChildren().add(actions(Labels.help(I18n.t("settings.vault.change.resealFailed"))));
@@ -142,6 +146,13 @@ final class KeyChangeFlow {
         });
         row.getChildren().add(accept);
         return row;
+    }
+
+    /** What to look at in a computer before it gets the key: new since the last removal, or never seen here. */
+    static void flags(VBox into, VaultView.Computer c) {
+        String name = CloudTexts.computer(c.label());
+        if (c.newSinceRemoval()) into.getChildren().add(warning(I18n.t("settings.vault.change.newSince", name)));
+        else if (c.unseen()) into.getChildren().add(warning(I18n.t("settings.vault.change.unseen", name)));
     }
 
     /** A computer's name and when this computer first saw it. */
