@@ -24,8 +24,12 @@ record VaultSlot(String id, Method method, String label, Instant created, long g
     private static final int SALT = 16;
 
     static VaultSlot wrap(Method m, String label, long generation, byte[] slotKey, ObjectNode params, byte[] vk) {
-        if (label == null || params == null || generation < 0) throw new IllegalArgumentException("A slot needs a label, params and a generation");
-        String id = UUID.randomUUID().toString();
+        return wrap(UUID.randomUUID().toString(), m, label, generation, slotKey, params, vk);
+    }
+
+    /** The same under a given id: a computer's slot is its machine's id, so it has one and only one. */
+    static VaultSlot wrap(String id, Method m, String label, long generation, byte[] slotKey, ObjectNode params, byte[] vk) {
+        if (id == null || label == null || params == null || generation < 0) throw new IllegalArgumentException("A slot needs an id, a label, params and a generation");
         return new VaultSlot(id, m, label, Instant.now(), generation, params, VaultCrypto.seal(slotKey, path(id), vk));
     }
 

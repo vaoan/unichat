@@ -27,7 +27,7 @@ final class TextSync {
     static final String ROOT = CloudAccount.ROOT + "/Textos";
     private static final String HERE = "here", INDEX = "index.json";
     /** A machine's name ({@link Cloud#machine}) and a file of ours: anything else in the account never becomes a path here. */
-    private static final Pattern MACHINE = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+    static final Pattern MACHINE = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     private static final Pattern FILE = Pattern.compile("([0-9a-f]{12}) \\d{4}-\\d{2}\\.jsonl");
     private static final ObjectMapper JSON = new ObjectMapper();
 
