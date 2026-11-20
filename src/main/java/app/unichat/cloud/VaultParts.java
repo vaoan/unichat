@@ -248,7 +248,7 @@ final class VaultParts {
      */
     static void forget() {
         Settings s = Settings.get();
-        for (String k : new String[] {ID, KEY, PRIVATE, VaultActions.UNCONFIRMED, VaultOff.KEY}) s.set(k, null);
+        for (String k : new String[] {ID, KEY, PRIVATE, VaultActions.UNCONFIRMED, VaultOff.KEY, VaultMove.RECORD}) s.set(k, null);
         VaultMove.forget();
         VaultPeers.forget();
     }

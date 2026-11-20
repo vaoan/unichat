@@ -181,7 +181,9 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
   during the removal (and missed the change that shut it out) and keep reading what that computer then seals. The
   limit holds until that computer is opened with a way in (recovery code, password), which writes it a slot of its own.
 - Texts come into the vault from plain folders only for the machines sending plain when the move started, and only as
-  new files: a folder or a longer copy put in through the account is named, never sealed in.
+  new files: a folder or a longer copy put in through the account is named, never sealed in. That list is the vault's
+  own, sealed (`Ajustes/unichat-senders.json`), written once by the computer that made the vault; the others adopt it,
+  and one finding none (deleted through the account) takes nothing in.
 - A stranger in a chat: nothing new (names never become vault paths; nothing from the vault runs).
 
 ### Phases

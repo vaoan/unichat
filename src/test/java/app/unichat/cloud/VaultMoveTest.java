@@ -30,7 +30,7 @@ class VaultMoveTest {
         PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg", NOTES = "Unichat/Ajustes/notas.txt";
     private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl", NEXT = "3f2a9c1b2d4e 2026-12.jsonl", LATER = "3f2a9c1b2d4e 2027-01.jsonl";
     private static final Instant T = Instant.parse("2026-11-19T08:00:00Z");
-    private static final List<String> KEYS = List.of(VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultMove.SENDERS, VaultActions.UNCONFIRMED);
+    private static final List<String> KEYS = List.of(VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultMove.RECORD, VaultActions.UNCONFIRMED);
 
     private FakeDav cloud;
     private Map<String, String> were;
@@ -51,6 +51,7 @@ class VaultMoveTest {
             Settings.get().set(k, null);
         }
         vault = Vault.create(dav(), DESK, "Escritorio");
+        Settings.get().set(VaultMove.RECORD, vault.info().id()); // made here: this computer says who sent plain
     }
 
     @AfterEach

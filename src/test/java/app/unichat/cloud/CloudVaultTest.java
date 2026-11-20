@@ -360,7 +360,7 @@ class CloudVaultTest {
     @Test
     void aFileThatFailsToMoveInIsTheRoundsErrorAndMediaStillGoes() throws Exception {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
-        VaultComputer desk = computer(DESK).opened(made.info(), made.computer());
+        VaultComputer desk = computer(DESK).madeHere(made);
         for (String d : new String[] {"Unichat/Textos", "Unichat/Textos/" + OTHER}) cloud.dirs.add(d);
         cloud.put("Unichat/Textos/" + OTHER + "/" + TEXT, "{}\n".getBytes(StandardCharsets.UTF_8)); // a computer without the vault's
         cloud.put(Vault.ROOT + "/Textos/" + OTHER + "/" + TEXT, "dañado".getBytes(StandardCharsets.UTF_8));
@@ -406,5 +406,46 @@ class CloudVaultTest {
         again.values.putAll(launched.values);
         assertNull(again.round().error());
         assertEquals(sent, cloud.versions.get(sealedText), "a launch with the vault open: not again");
+    }
+
+    private static final String PUT_IN = "5f0e7d7c-4b5a-4a4c-9e95-0d6b1a5c6f88";
+
+    /** {@code machine}'s plain texts in the account, as a computer without the vault sends them (or as someone puts them in). */
+    private void plainTexts(String machine, String text) throws java.io.IOException {
+        String folder = TextSync.ROOT + "/" + machine;
+        for (String d : new String[] {TextSync.ROOT, folder}) cloud.dirs.add(d);
+        cloud.put(folder + "/" + TEXT, text.getBytes(StandardCharsets.UTF_8));
+        cloud.put(folder + "/index.json", TextIndex.write(Map.of(TEXT, (long) text.getBytes(StandardCharsets.UTF_8).length)));
+    }
+
+    /** The vault made on the desk, which moved in what was plain; then a folder put in through the account. */
+    private Vault.Created movedThenAFolderPutIn() throws Exception {
+        plainTexts(OTHER, "{\"viejo\":1}\n"); // a computer of the person's, without the vault
+        Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
+        VaultComputer desk = computer(DESK).madeHere(made);
+        assertNull(desk.round().error());
+        assertTrue(cloud.files.containsKey(Vault.ROOT + "/Textos/" + OTHER + "/" + TEXT), "its texts taken in");
+        plainTexts(PUT_IN, "{\"puesto\":1}\n");
+        return made;
+    }
+
+    private void aLaterComputerNeverTakesItIn(Vault.Created made) throws Exception {
+        VaultComputer laptop = computer(LAPTOP).opened(made.info(), Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil"));
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
+        laptop.round();
+        assertFalse(cloud.files.containsKey(Vault.ROOT + "/Textos/" + PUT_IN + "/" + TEXT), "never sealed in");
+        assertTrue(cloud.files.containsKey(TextSync.ROOT + "/" + PUT_IN + "/" + TEXT), "nor deleted");
+    }
+
+    @Test
+    void aFolderPutInAfterTheFirstMoveIsNeverTakenInByALaterComputer() throws Exception {
+        aLaterComputerNeverTakesItIn(movedThenAFolderPutIn());
+    }
+
+    @Test
+    void theListOfWhoSentPlainDeletedFromTheVaultTakesNothingIn() throws Exception {
+        Vault.Created made = movedThenAFolderPutIn();
+        assertNotNull(cloud.files.remove(Vault.ROOT + "/Ajustes/unichat-senders.json"), "kept in the vault, sealed");
+        aLaterComputerNeverTakesItIn(made);
     }
 }

@@ -22,7 +22,7 @@ final class VaultComputer {
     static final List<String> KEYS = List.of("cloud.machine", VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultParts.DECLINED,
         "cloud.base.settings", "cloud.base.ai", "cloud.base.secrets", "cloud.base.pinned", "cloud.media", "cloud.settings", "cloud.lastVerify",
         "server.telegram.apiId", "server.telegram.apiHash", "gif.giphy.key", "cloud.dropboxAppKey", "cloud.pcloudClientId", "stt.command",
-        "ui.theme", VaultPeers.KEY, VaultActions.UNCONFIRMED, VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultOff.KEY, VaultMove.SENDERS, VaultParts.SEEN);
+        "ui.theme", VaultPeers.KEY, VaultActions.UNCONFIRMED, VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultOff.KEY, VaultMove.RECORD, VaultParts.SEEN);
 
     final Map<String, String> values = new HashMap<>();
     final Path data;
@@ -111,6 +111,11 @@ final class VaultComputer {
 
     void textsNow() throws Exception {
         as(cloud::textsNow);
+    }
+
+    /** The vault {@code made} here, as {@code VaultActions.create} leaves this computer: opened, and the one to record who sent plain. */
+    VaultComputer madeHere(Vault.Created made) {
+        return opened(made.info(), made.computer()).set(VaultMove.RECORD, made.info().id());
     }
 
     /** Opened here: this computer's key and the vault's id kept, as opening it with a way in leaves them. */

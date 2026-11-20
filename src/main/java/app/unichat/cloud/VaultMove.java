@@ -39,8 +39,17 @@ final class VaultMove {
      */
     static final String MOVED_AT = "cloud.vault.movedAt", QUIET_SINCE = "cloud.vault.strayQuietSince", STRAYS_SEEN = "cloud.vault.straySeen";
     static final Duration QUIET = Duration.ofDays(1);
-    /** The machines sending plain texts when the move started (machine-only): only their folders are ever taken in. */
-    static final String SENDERS = "cloud.vault.plainSenders";
+    /**
+     * The machines sending plain texts when the move started, one list inside the vault (sealed: only a key holder writes
+     * it): only their folders are ever taken in, by any computer of the vault.
+     */
+    static final String SENDERS = CloudAccount.SETTINGS_DIR + "/unichat-senders.json";
+    /**
+     * The vault made here, whose list of {@link #SENDERS} this computer is to write (machine-only, until it's written):
+     * the one that made it moves first; a later one finding no list was handed a vault without it, and takes nothing in.
+     */
+    static final String RECORD = "cloud.vault.recordSenders";
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
     static final String SETTINGS_DIR = CloudAccount.SETTINGS_DIR;
     /** The files Unichat writes in {@link #SETTINGS_DIR}: no other name there is moved or deleted. */
     private static final Pattern OURS = Pattern.compile("unichat-[a-z]+\\.json");
@@ -96,7 +105,7 @@ final class VaultMove {
     /** A vault other than the one moved into: everything about the move starts again. */
     static void forget() {
         Settings s = Settings.get();
-        for (String k : new String[] {MOVED_AT, QUIET_SINCE, STRAYS_SEEN, SENDERS}) {
+        for (String k : new String[] {MOVED_AT, QUIET_SINCE, STRAYS_SEEN}) {
             if (s.getString(k, null) != null) s.set(k, null);
         }
     }
@@ -107,8 +116,8 @@ final class VaultMove {
      */
     static Result run(Storage plain, Storage sealed, String vaultId, Instant now) throws IOException {
         Settings s = Settings.get();
-        Found found = find(plain);
         Tally t = new Tally(vaultId);
+        Found found = find(plain, sealed, t);
         boolean let = true;
         for (Map.Entry<String, List<String>> m : found.ofTheVault().entrySet()) {
             try {
@@ -136,7 +145,7 @@ final class VaultMove {
         }
         if (now.isBefore(quiet.plus(QUIET))) return t.result(strays(plain, found, quiet));
         carry(plain, sealed, found, Pass.DROP, t);
-        Found left = find(plain);
+        Found left = find(plain, sealed, t);
         if (left.none()) {
             s.set(QUIET_SINCE, null);
             s.set(STRAYS_SEEN, null);
@@ -155,7 +164,7 @@ final class VaultMove {
     }
 
     /** The vault's computers are read only when some texts are plain: nothing plain costs no more than the listings. */
-    private static Found find(Storage plain) throws IOException {
+    private static Found find(Storage plain, Storage sealed, Tally t) throws IOException {
         List<String> settings = new ArrayList<>();
         for (String name : plain.list(SETTINGS_DIR)) {
             if (OURS.matcher(name).matches()) settings.add(SETTINGS_DIR + "/" + name);
@@ -176,7 +185,9 @@ final class VaultMove {
                 if (names != null) ofTheVault.put(machine, names);
             }
         }
-        Set<String> senders = senders(texts.keySet()); // recorded on the first pass, nothing plain or not
+        // Recorded on the first pass, nothing plain or not; read only when some texts are plain.
+        boolean recording = t.vault.equals(Settings.get().getString(RECORD, null));
+        Set<String> senders = texts.isEmpty() && !recording ? Set.of() : senders(sealed, recording, texts.keySet());
         for (String machine : List.copyOf(texts.keySet())) {
             if (!senders.contains(machine)) unknown.put(machine, texts.remove(machine));
         }
@@ -184,17 +195,36 @@ final class VaultMove {
     }
 
     /**
-     * The machines sending plain texts when the move started, recorded the first time it runs (from {@code now}, those
-     * without a slot found then): only those were ever the person's, so only theirs come in.
+     * The machines sending plain texts when the move started: the vault's list, written once by the computer that made
+     * the vault, the first time its move runs (from {@code now}, those without a slot found then). Only those were ever
+     * the person's, so only theirs come in. No list and not this computer's to write: none (the account can delete it,
+     * never write one).
      */
-    private static Set<String> senders(Set<String> now) {
+    private static Set<String> senders(Storage sealed, boolean mine, Set<String> now) throws IOException {
         Settings s = Settings.get();
-        String kept = s.getString(SENDERS, null);
-        if (kept == null) {
-            kept = String.join(",", now);
-            s.set(SENDERS, kept);
+        Set<String> kept = machines(sealed.get(SENDERS));
+        if (kept == null && mine) {
+            sealed.mkdirs(SETTINGS_DIR);
+            sealed.put(SENDERS, JSON.writeValueAsBytes(new TreeSet<>(now)));
+            kept = machines(sealed.get(SENDERS));
+            if (kept == null) throw new IOException(app.unichat.support.I18n.t("cloud.error.vaultDamaged"));
         }
-        return kept.isEmpty() ? Set.of() : Set.of(kept.split(","));
+        if (mine) s.set(RECORD, null); // written, or another computer of the vault's was first: adopted
+        return kept == null ? Set.of() : kept;
+    }
+
+    /** The machine ids in a list of {@link #SENDERS}; null for none, or what isn't one (only ids of ours are kept). */
+    private static Set<String> machines(byte[] json) {
+        if (json == null) return null;
+        try {
+            com.fasterxml.jackson.databind.JsonNode n = JSON.readTree(json);
+            if (n == null || !n.isArray()) return null;
+            Set<String> out = new TreeSet<>();
+            for (com.fasterxml.jackson.databind.JsonNode m : n) if (m.isTextual() && Ids.ours(m.asText())) out.add(m.asText());
+            return out;
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /** One pass over what's plain; whether all of it was done. */

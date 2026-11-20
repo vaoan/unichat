@@ -73,6 +73,7 @@ final class VaultActions {
         try {
             hold(made.info(), made.computer());
             Settings.get().set(UNCONFIRMED, made.info().id());
+            Settings.get().set(VaultMove.RECORD, made.info().id()); // made here: the first to move, it says who sent plain
             return made.code().shown();
         } finally {
             Arrays.fill(made.vk(), (byte) 0);
