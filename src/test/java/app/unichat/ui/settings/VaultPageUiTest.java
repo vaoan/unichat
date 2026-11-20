@@ -161,6 +161,35 @@ class VaultPageUiTest extends VaultPageTestBase {
         assertEquals(Set.of("PASSWORD", "RECOVERY"), account.ways());
     }
 
+    /**
+     * A vault made while media went up: the round's progress kept telling the state from before it, and the page read
+     * the vault again at each tick (hours of a day's check: a request a tick, and the page drawn again under the person).
+     */
+    @Test
+    void aVaultMadeWhileMediaGoesUpIsntReadAgainAtEachProgressTick() throws Exception {
+        account.cloud().syncNow().get(); // connected: the page follows the rounds
+        account.photos(6);
+        VaultFixture.Held first = account.holdPhoto(0), last = account.holdPhoto(5);
+        var media = account.cloud().syncNow();
+        first.arrived();
+        page();
+        FxWait.until("no vault yet", () -> hasButton(I18n.t("settings.vault.create")));
+        click(I18n.t("settings.vault.create"));
+        typeGroups(codeShown(), true);
+        waitOpen();
+        FxWait.settled();
+        account.vaultJobsDone();
+        long before = account.vaultReads();
+        first.release();
+        last.arrived(); // photos 1 to 4 went, each told as it went
+        FxWait.settled();
+        account.vaultJobsDone();
+        assertEquals(0, account.vaultReads() - before, "no reload for a state the page already shows");
+        assertTrue(FxWait.fx(() -> says(I18n.t("settings.vault.open"))), "still the open vault");
+        last.release();
+        assertEquals(Cloud.VaultState.OPEN, media.get().vault());
+    }
+
     @Test
     void stoppingBeforeTheGroupsSaysTheCodeMustBeKeptAndOffersANewOne() throws Exception {
         page();

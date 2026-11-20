@@ -25,11 +25,16 @@ final class FakeDav implements AutoCloseable {
     final Set<String> failOnce = ConcurrentHashMap.newKeySet();
     /** A listing of a file fails, as Dropbox's does (path/not_folder), rather than listing nothing. */
     volatile boolean filesAreNoFolders;
+    /** Paths whose next GET fails (the network dropped), once each. */
+    final Set<String> failReadOnce = ConcurrentHashMap.newKeySet();
     /** Paths whose next DELETE fails, once each. */
     final Set<String> failDeleteOnce = ConcurrentHashMap.newKeySet();
     /** Paths whose next PUT waits until its latch is let go (a slow network), once each. */
     final Map<String, java.util.concurrent.CountDownLatch> holdOnce = new ConcurrentHashMap<>();
-    /** The next GET of a path waits for its latch: a read on the cloud's worker held, so what's queued after it waits too. */
+    /**
+     * The next GET of a path waits for its latch: that request alone held (the server answers the others meanwhile), and
+     * whatever thread asked it with it, holding what it holds (a round's vault part or a vault job holds the vault's lock).
+     */
     final Map<String, java.util.concurrent.CountDownLatch> holdReadOnce = new ConcurrentHashMap<>();
     /** Paths whose held PUT or GET (above) let this latch go once it arrived and waits: the test knows the request is there. */
     final Map<String, java.util.concurrent.CountDownLatch> arrived = new ConcurrentHashMap<>();
@@ -101,51 +106,8 @@ final class FakeDav implements AutoCloseable {
                     x.getResponseBody().write(xml);
                 }
                 case "MKCOL" -> x.sendResponseHeaders(dirs.add(path) ? 201 : 405, -1);
-                case "PUT" -> {
-                    java.util.concurrent.CountDownLatch held = holdOnce.remove(path);
-                    if (held != null) {
-                        arrivedAt(path);
-                        try {
-                            held.await();
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }
-                    if (failOnce.remove(path)) {
-                        x.sendResponseHeaders(503, -1);
-                        return;
-                    }
-                    puts.incrementAndGet();
-                    put(path, body);
-                    log.add("PUT " + path);
-                    if (unreadableAfterPut.contains(path)) unreadable.add(path);
-                    x.sendResponseHeaders(failAfterOnce.remove(path) ? 503 : 201, -1);
-                }
-                case "GET" -> {
-                    java.util.concurrent.CountDownLatch heldRead = holdReadOnce.remove(path);
-                    if (heldRead != null) {
-                        arrivedAt(path);
-                        try {
-                            heldRead.await();
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }
-                    log.add("GET " + path);
-                    if (unreadable.contains(path) && unreadableAfterPut.contains(path)) {
-                        x.sendResponseHeaders(503, -1);
-                        return;
-                    }
-                    unreadable.remove(path);
-                    byte[] f = files.get(path);
-                    if (f == null) {
-                        x.sendResponseHeaders(404, -1);
-                        return;
-                    }
-                    gets.incrementAndGet();
-                    x.sendResponseHeaders(200, f.length);
-                    x.getResponseBody().write(f);
-                }
+                case "PUT" -> put(x, path, body);
+                case "GET" -> get(x, path);
                 case "DELETE" -> {
                     if (failDeleteOnce.remove(path)) {
                         x.sendResponseHeaders(503, -1);
@@ -162,6 +124,55 @@ final class FakeDav implements AutoCloseable {
                 }
                 default -> x.sendResponseHeaders(405, -1);
             }
+        }
+    }
+
+    /** A file written, unless held, failed or answered as lost (each once, as the test set it). */
+    private void put(HttpExchange x, String path, byte[] body) throws IOException {
+        waitIfHeld(holdOnce, path);
+        if (failOnce.remove(path)) {
+            x.sendResponseHeaders(503, -1);
+            return;
+        }
+        puts.incrementAndGet();
+        put(path, body);
+        log.add("PUT " + path);
+        if (unreadableAfterPut.contains(path)) unreadable.add(path);
+        x.sendResponseHeaders(failAfterOnce.remove(path) ? 503 : 201, -1);
+    }
+
+    /** A file read, unless held or failed (each once), or unreadable since its last write. */
+    private void get(HttpExchange x, String path) throws IOException {
+        waitIfHeld(holdReadOnce, path);
+        log.add("GET " + path);
+        if (failReadOnce.remove(path)) {
+            x.sendResponseHeaders(503, -1);
+            return;
+        }
+        if (unreadable.contains(path) && unreadableAfterPut.contains(path)) {
+            x.sendResponseHeaders(503, -1);
+            return;
+        }
+        unreadable.remove(path);
+        byte[] f = files.get(path);
+        if (f == null) {
+            x.sendResponseHeaders(404, -1);
+            return;
+        }
+        gets.incrementAndGet();
+        x.sendResponseHeaders(200, f.length);
+        x.getResponseBody().write(f);
+    }
+
+    /** The request waits while {@code path} is held in {@code holds} (once), having said it arrived. */
+    private void waitIfHeld(Map<String, java.util.concurrent.CountDownLatch> holds, String path) {
+        java.util.concurrent.CountDownLatch held = holds.remove(path);
+        if (held == null) return;
+        arrivedAt(path);
+        try {
+            held.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

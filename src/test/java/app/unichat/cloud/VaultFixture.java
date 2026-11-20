@@ -23,6 +23,8 @@ public final class VaultFixture implements AutoCloseable {
     private final Map<String, String> were = new HashMap<>();
     private final Map<String, String> portableWere;
     private final Cloud cloud;
+    private final Path photos;
+    private final List<java.util.concurrent.CountDownLatch> held = new java.util.concurrent.CopyOnWriteArrayList<>();
     private byte[] vk;
 
     public VaultFixture(Path dir) throws Exception {
@@ -35,7 +37,8 @@ public final class VaultFixture implements AutoCloseable {
         Settings.get().set("cloud.media", "false");
         new CloudAccount(CloudAccount.Service.OTHER, dav.url(), "u", "p").save();
         Path data = Files.createDirectories(dir.resolve("here"));
-        cloud = Cloud.create(data, () -> null, b -> true, () -> { }, List::of,
+        photos = data.resolve("Fotos");
+        cloud = Cloud.create(data, () -> null, b -> true, () -> { }, () -> Files.isDirectory(photos) ? List.of(photos) : List.of(),
             new Cloud.Texts(data.resolve("texts"), p -> false, s -> { }),
             new Cloud.Personal(() -> "{}".getBytes(), b -> { }, data.resolve("transcripts")));
     }
@@ -121,6 +124,44 @@ public final class VaultFixture implements AutoCloseable {
         return latch::countDown;
     }
 
+    /** Media turned on here, with {@code n} photos to go up, in order ({@code p0.jpg}, {@code p1.jpg}…). */
+    public void photos(int n) throws java.io.IOException {
+        Files.createDirectories(photos);
+        for (int i = 0; i < n; i++) Files.writeString(photos.resolve("p" + i + ".jpg"), "foto " + i);
+        Settings.get().set("cloud.media", "true");
+    }
+
+    /** A request held: {@link #arrived} waits until it's there, {@link #release} lets it go (also on {@link #close}). */
+    public record Held(java.util.concurrent.CountDownLatch at, java.util.concurrent.CountDownLatch go) {
+        public void arrived() throws InterruptedException {
+            at.await();
+        }
+
+        public void release() {
+            go.countDown();
+        }
+    }
+
+    /** The account's next upload of photo {@code i} (of {@link #photos}) held. */
+    public Held holdPhoto(int i) {
+        Held h = new Held(new java.util.concurrent.CountDownLatch(1), new java.util.concurrent.CountDownLatch(1));
+        held.add(h.go());
+        String path = CloudAccount.MEDIA + "/Fotos/p" + i + ".jpg";
+        dav.arrived.put(path, h.at());
+        dav.holdOnce.put(path, h.go());
+        return h;
+    }
+
+    /** How many times the account was asked for the vault's {@code boveda.json} (each look at the vault's state). */
+    public long vaultReads() {
+        return dav.log.stream().filter(("GET " + Vault.INFO)::equals).count();
+    }
+
+    /** Once every vault job asked so far is done (the page's reloads included). */
+    public void vaultJobsDone() throws Exception {
+        cloud.vaultJobsOver().get();
+    }
+
     /** Whether the account still holds a vault (anything under its folder). */
     public boolean vaultThere() {
         return dav.files.keySet().stream().anyMatch(p -> p.startsWith(Vault.ROOT + "/"));
@@ -142,6 +183,7 @@ public final class VaultFixture implements AutoCloseable {
     public void close() throws Exception {
         dav.holdOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown); // nothing waits past the test
         dav.holdReadOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown);
+        held.forEach(java.util.concurrent.CountDownLatch::countDown); // a held upload let go, also once it's under way
         try {
             cloud.stop();
             cloud.vaultJobsOver().get(); // what a step asked for runs before the account goes

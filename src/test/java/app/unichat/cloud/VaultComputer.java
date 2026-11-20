@@ -28,6 +28,8 @@ final class VaultComputer {
     final Path data;
     final Cloud cloud;
     final AtomicInteger pinnedAdopted = new AtomicInteger();
+    /** Whether the account is still connected here: false, as disconnecting in Ajustes leaves it (no account). */
+    volatile boolean connected = true;
 
     VaultComputer(FakeDav account, Path dir, String machine) throws Exception {
         values.put("cloud.machine", machine);
@@ -36,7 +38,7 @@ final class VaultComputer {
         Files.writeString(photos.resolve("a.jpg"), "foto");
         CloudAccount a = new CloudAccount(CloudAccount.Service.OTHER, account.url(), "u", "p");
         in(); // its machine id, which the texts are made with
-        cloud = Cloud.create(() -> a, data, () -> null, b -> true, () -> { }, () -> List.of(photos),
+        cloud = Cloud.create(() -> connected ? a : null, data, () -> null, b -> true, () -> { }, () -> List.of(photos),
             new Cloud.Texts(data.resolve("texts"), p -> false, s -> { }),
             new Cloud.Personal(this::pins, theirs -> {
                 pinnedAdopted.incrementAndGet();

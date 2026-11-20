@@ -131,4 +131,74 @@ class CloudVaultJobsTest {
         letMediaGo.countDown();
         assertNull(round.get().error());
     }
+
+    /** A round held on its first photo; once let go, it holds on the second, its progress told for it in between. */
+    private CompletableFuture<Cloud.Status> roundHeldOnTwoPhotos(VaultComputer desk, CountDownLatch[] second) throws Exception {
+        desk.write("Ana/b.jpg", "otra foto");
+        CountDownLatch atFirst = new CountDownLatch(1), atSecond = new CountDownLatch(1);
+        CountDownLatch first = holdPut(PHOTO, atFirst);
+        second[0] = holdPut(CloudAccount.MEDIA + "/Ana/b.jpg", atSecond);
+        CompletableFuture<Cloud.Status> round = desk.cloud.syncNow();
+        atFirst.await();
+        second[1] = atSecond;
+        second[2] = first;
+        return round;
+    }
+
+    @Test
+    void theStateAJobReadDuringMediaIsToldAtOnce() throws Exception {
+        VaultComputer desk = desk();
+        CompletableFuture<?>[] round = {null};
+        CountDownLatch release = roundInMedia(desk, round);
+        desk.cloud.vault().createVault().get();
+        desk.cloud.vault().vaultView().get();
+        assertEquals(Cloud.VaultState.OPEN, desk.cloud.status().vault(), "the page reads the status: never the state from before the job");
+        release.countDown();
+        round[0].get();
+    }
+
+    @Test
+    void theRoundsProgressNeverTellsTheStateFromBeforeAJob() throws Exception {
+        VaultComputer desk = desk();
+        CountDownLatch[] holds = new CountDownLatch[3];
+        CompletableFuture<Cloud.Status> round = roundHeldOnTwoPhotos(desk, holds);
+        desk.cloud.vault().createVault().get();
+        desk.cloud.textsNow().get(); // reads the vault's state (open now) and tells no status of its own
+        holds[2].countDown();
+        holds[1].await(); // the second photo's upload told before it went
+        assertEquals(Cloud.Step.UPLOADING, desk.cloud.status().now().step(), "mid-round");
+        assertEquals(Cloud.VaultState.OPEN, desk.cloud.status().vault(), "each progress tick says the state last read, never the round's first");
+        holds[0].countDown();
+        assertEquals(Cloud.VaultState.OPEN, round.get().vault());
+    }
+
+    @Test
+    void aStateThatCantBeReadAgainAfterMediaIsTheLastOneRead() throws Exception {
+        VaultComputer desk = desk();
+        CompletableFuture<?>[] round = {null};
+        CountDownLatch release = roundInMedia(desk, round);
+        desk.cloud.vault().createVault().get();
+        desk.cloud.vault().vaultView().get(); // as the page does after making it
+        account.failReadOnce.add(Vault.INFO); // the round's look again after media fails
+        release.countDown();
+        assertEquals(Cloud.VaultState.OPEN, ((Cloud.Status) round[0].get()).vault(), "the state last read, not the one from before the vault");
+        assertFalse(account.failReadOnce.contains(Vault.INFO), "the look again was asked, and failed");
+    }
+
+    @Test
+    void aJobWaitingWhileTheAccountIsDisconnectedRunsAgainstNone() throws Exception {
+        VaultComputer desk = desk();
+        CountDownLatch inVaultPart = new CountDownLatch(1);
+        CountDownLatch letGo = holdPut(CloudAccount.SETTINGS_FILE, inVaultPart);
+        CompletableFuture<Cloud.Status> round = desk.cloud.syncNow();
+        inVaultPart.await();
+        CompletableFuture<String> made = desk.cloud.vault().createVault();
+        while (!desk.cloud.vaultJobWaiting() && !made.isDone()) Thread.onSpinWait();
+        desk.connected = false; // Ajustes → Nube → Desconectar meanwhile
+        letGo.countDown();
+        java.util.concurrent.ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class, made::get);
+        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultNotOpen"), e.getCause().getMessage());
+        assertFalse(account.files.containsKey(Vault.INFO), "no vault made in an account no longer this computer's");
+        round.get();
+    }
 }

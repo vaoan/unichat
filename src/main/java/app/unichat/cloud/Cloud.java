@@ -60,6 +60,12 @@ public final class Cloud {
             return new Status(connected, lastSync, error, uploaded, waiting, a, retrying, nextRetry, conflicts, lastVerified, vault, moving,
                 vaultNotice);
         }
+
+        /** The same, saying the vault's state is {@code v}. */
+        Status vault(VaultState v) {
+            return new Status(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts, lastVerified, v, moving,
+                vaultNotice);
+        }
     }
 
     /** A part of what the vault carries, as the person knows it, and its file (the one place its name is said). */
@@ -365,7 +371,8 @@ public final class Cloud {
 
     /**
      * The vault's state to tell once media is over: the vault part's, unless a vault job ran meanwhile (made, opened,
-     * turned off…), when it's read again, so a round never tells the state from before the job; that failing, the part's.
+     * turned off…), when it's read again, so a round never tells the state from before the job; that failing, the one
+     * last read.
      */
     private VaultState vaultAfter(Storage dav, VaultPass pass) {
         vaultPart.lock();
@@ -373,7 +380,7 @@ public final class Cloud {
             return vault == null ? pass.state() : vault.state();
         } catch (IOException | RuntimeException e) {
             System.err.println("Cloud: the vault after media: " + Errors.message(e)); // read again next round
-            return pass.state();
+            return vaultKnown(pass.state());
         } finally {
             vaultPart.unlock();
         }
@@ -526,17 +533,18 @@ public final class Cloud {
      */
     <T> CompletableFuture<T> onWorker(Job<T> job) {
         return CompletableFuture.supplyAsync(() -> {
-            CloudAccount a = account.get();
             try {
-                if (a == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
                 vaultPart.lock();
                 try {
+                    CloudAccount a = account.get(); // once it's this job's turn: disconnected meanwhile is no account
+                    if (a == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
                     synchronized (keyLock) {
                         return job.run(a.storage());
                     }
                 } finally {
                     vaultJobsDone++;
                     vaultPart.unlock();
+                    toldAsRead();
                 }
             } catch (IOException e) {
                 throw new java.util.concurrent.CompletionException(e);
@@ -606,9 +614,26 @@ public final class Cloud {
         };
     }
 
-    /** Mid-round: the status as it was, saying what it's doing now. */
+    /**
+     * Mid-round: the status as it was, saying what it's doing now and the vault's state last read (a job may have read
+     * another since the round's vault part: the page reloads on a state it doesn't show).
+     */
     private void doing(Activity a) {
-        publish(status.doing(a));
+        publish(status.doing(a).vault(vaultKnown(status.vault())));
+    }
+
+    /** The vault's state last read here, by a round, the texts or a job; {@code otherwise} before any. */
+    private VaultState vaultKnown(VaultState otherwise) {
+        synchronized (vaultLock) {
+            return lastVault == null ? otherwise : lastVault;
+        }
+    }
+
+    /** After a vault job: the state it read told at once, when the status says another (a round may be in its media for hours). */
+    private void toldAsRead() {
+        Status s = status;
+        VaultState read = vaultKnown(s.vault());
+        if (read != s.vault()) publish(s.vault(read));
     }
 
     private Status publish(Status s) {
