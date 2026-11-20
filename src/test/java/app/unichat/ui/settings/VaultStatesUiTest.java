@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -55,5 +56,41 @@ class VaultStatesUiTest extends VaultPageTestBase {
         click(I18n.t("settings.vault.missingYes"));
         FxWait.until("no vault", () -> hasButton(I18n.t("settings.vault.create")));
         assertEquals(Cloud.VaultState.NONE, round(), "back to plain, as the person said");
+    }
+
+    @Test
+    void forgettingTheOnlyComputerWhileTheCodeIsntKeptWarns() throws Exception {
+        page();
+        FxWait.until("no vault yet", () -> hasButton(I18n.t("settings.vault.create")));
+        click(I18n.t("settings.vault.create"));
+        codeShown();
+        click(I18n.t("folders.dialog.cancel"));
+        waitFor(I18n.t("settings.vault.code.notKept"));
+        click(I18n.t("settings.vault.forget"));
+        waitFor(I18n.t("settings.vault.forgetOnly"));
+        click(I18n.t("folders.dialog.cancel"));
+        FxWait.until("the vault's page again", () -> hasButton(I18n.t("settings.vault.newCode")) && !says(I18n.t("settings.vault.forgetOnly")));
+        click(I18n.t("settings.vault.newCode"));
+        typeGroups(codeShown(), true);
+        waitOpen();
+        click(I18n.t("settings.vault.forget"));
+        waitFor(I18n.t("settings.vault.forgetHelp"));
+        assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.forgetOnly"))), "the code kept: nothing to warn of");
+    }
+
+    @Test
+    void aVaultThisComputerCantOpenIsDeletedAskedTwice() throws Exception {
+        account.otherComputerMadeIt(null);
+        page();
+        waitFor(I18n.t("settings.vault.locked"));
+        click(I18n.t("settings.vault.deleteLocked"));
+        waitFor(I18n.t("settings.vault.deleteLockedAsk"));
+        click(I18n.t("settings.vault.turnOffNext"));
+        waitFor(I18n.t("settings.vault.deleteLockedWhat"));
+        assertTrue(account.vaultThere(), "nothing deleted before the second yes");
+        click(I18n.t("settings.vault.deleteLockedYes"));
+        FxWait.until("no vault", () -> hasButton(I18n.t("settings.vault.create")));
+        assertFalse(account.vaultThere());
+        assertEquals(Cloud.VaultState.NONE, round());
     }
 }

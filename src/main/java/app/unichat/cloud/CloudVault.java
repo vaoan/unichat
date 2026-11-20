@@ -43,12 +43,15 @@ public final class CloudVault {
     public CompletableFuture<Cloud.KeyChanged> removeAndChangeKey(String machine, java.util.Set<String> confirmed) {
         java.util.Set<String> asked = java.util.Set.copyOf(confirmed);
         return cloud.onWorker(dav -> {
+            Vault.Info before = Vault.info(dav);
             VaultActions.remove(dav, machine);
             try {
                 return rotate(dav, id -> !id.equals(machine) && asked.contains(id));
             } catch (IOException | RuntimeException e) {
-                // Removed all the same: the person must know the key it holds still opens the vault.
-                throw new IOException(I18n.t("cloud.error.vaultRemovedKeyKept", Errors.message(e)), e);
+                // Removed all the same: the person must know whether the key it holds still opens the vault, and never
+                // read "kept" when the account can't say it is (the change may have gone through, its answer lost).
+                String key = before != null && Vault.at(dav, before) ? "cloud.error.vaultRemovedKeyKept" : "cloud.error.vaultRemovedKeyUnknown";
+                throw new IOException(I18n.t(key, Errors.message(e)), e);
             }
         });
     }
@@ -57,7 +60,9 @@ public final class CloudVault {
         Vault.Rotated r = withKey(dav, (vault, old) -> {
             VaultPeers peers = VaultPeers.load(vault.info().id());
             try {
-                return Vault.rotate(dav, old, Cloud.machine(), peers, confirmed);
+                // Before the generation rises: an answer lost after it never hides that a new code is to be kept.
+                return Vault.rotate(dav, old, Cloud.machine(), peers, confirmed,
+                    () -> Settings.get().set(VaultActions.UNCONFIRMED, vault.info().id()));
             } finally {
                 peers.save(); // a computer seen for the first time is pinned, the change done or not
             }
@@ -68,8 +73,6 @@ public final class CloudVault {
         } catch (IOException | RuntimeException e) {
             System.err.println("Cloud: the vault's new key: " + Errors.message(e)); // the next round takes it
         }
-        Vault.Info now = Vault.info(dav);
-        Settings.get().set(VaultActions.UNCONFIRMED, now == null ? null : now.id()); // a new code, to be confirmed as kept
         return new Cloud.KeyChanged(r.code().shown(), r.dropped().stream().map(Enum::name).collect(java.util.stream.Collectors.toSet()), r.left(), r.refused(), r.resealFailed());
     }
 
@@ -110,6 +113,27 @@ public final class CloudVault {
         return cloud.onWorker(dav -> {
             try (VaultParts.Round vault = cloud.stateOf(dav)) {
                 if (vault.state() != Cloud.VaultState.MISSING) throw new IOException(I18n.t("cloud.error.vaultStillThere"));
+            }
+            VaultParts.gone();
+            return null;
+        });
+    }
+
+    /**
+     * "Borrar esta bóveda y empezar de nuevo": a vault this computer holds no key for ({@link Cloud.VaultState#LOCKED})
+     * deleted whole, and this computer's hold and "declined" forgotten, so it starts again without one. Nothing in it can
+     * be opened again; no mark says it was turned off (that needs its key), so a computer that held it is asked, never
+     * sent plain by itself ({@link Cloud.VaultState#MISSING}). Its file alone goes when its folder won't.
+     */
+    public CompletableFuture<Void> deleteLockedVault() {
+        return cloud.onWorker(dav -> {
+            try (VaultParts.Round vault = cloud.stateOf(dav)) {
+                if (vault.state() != Cloud.VaultState.LOCKED) throw new IOException(I18n.t("cloud.error.vaultNotLocked"));
+            }
+            try {
+                dav.delete(Vault.ROOT);
+            } catch (IOException e) {
+                dav.delete(Vault.INFO); // no computer finds a vault; the rest is cleared by the next one
             }
             VaultParts.gone();
             return null;

@@ -642,4 +642,27 @@ class VaultRotateTest {
         assertEquals(Cloud.VaultState.UNRECOGNIZED, laptop.round().vault());
         assertEquals(0, slot(LAPTOP).generation(), "nothing taken");
     }
+
+    @Test
+    void theVaultUnreadableRightAfterTheChangeStillShowsTheNewCode() throws Exception {
+        cloud.unreadableAfterPut.add(Vault.INFO); // the generation rose, and then the account stopped answering for it
+        Cloud.KeyChanged changed = rotate(desk);
+        assertNotNull(changed.code(), "the new code is shown: it's the only time it can be");
+        assertEquals(made.info().id(), desk.get(VaultActions.UNCONFIRMED), "and is to be confirmed as kept");
+        cloud.unreadableAfterPut.clear();
+        assertEquals(1, Vault.info(dav()).generation());
+    }
+
+    @Test
+    void aRemovalWhoseChangeMayHaveGoneThroughNeverSaysTheKeyWasKept() throws Exception {
+        cloud.failAfterOnce.add(Vault.INFO); // the generation rose, its answer lost
+        cloud.unreadableAfterPut.add(Vault.INFO); // and the account can't say which
+        ExecutionException e = assertThrows(ExecutionException.class,
+            () -> desk.as(() -> desk.cloud.vault().removeAndChangeKey(LAPTOP, Set.of())));
+        String kept = app.unichat.support.I18n.t("cloud.error.vaultRemovedKeyKept", "");
+        assertFalse(e.getCause().getMessage().startsWith(kept.substring(0, kept.indexOf('('))), e.getCause().getMessage());
+        assertEquals(made.info().id(), desk.get(VaultActions.UNCONFIRMED), "a new code may be the vault's now: the page says it isn't kept");
+        cloud.unreadableAfterPut.clear();
+        assertEquals(1, Vault.info(dav()).generation(), "it had gone through");
+    }
 }

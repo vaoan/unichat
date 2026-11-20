@@ -299,4 +299,21 @@ class VaultOutTest {
         assertNull(cloud.files.get("Unichat/Ajustes/boveda-apagada.json"), "a new vault clears it");
         Arrays.fill(later.vk(), (byte) 0);
     }
+
+    @Test
+    void aVaultNoComputerHereCanOpenIsDeletedAndTheOthersAreAskedNotSentPlain() throws Exception {
+        VaultComputer desk = desk();
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
+        assertThrows(ExecutionException.class, () -> desk.as(desk.cloud.vault()::deleteLockedVault), "never one open here");
+        assertTrue(anyVault());
+
+        VaultComputer other = new VaultComputer(cloud, dir, OTHER);
+        assertEquals(Cloud.VaultState.LOCKED, other.round().vault());
+        other.as(other.cloud.vault()::deleteLockedVault);
+        assertFalse(anyVault(), "deleted, whole");
+        assertEquals(Cloud.VaultState.NONE, other.round().vault(), "this one starts again without it");
+        int puts = cloud.puts.get();
+        assertEquals(Cloud.VaultState.MISSING, desk.round().vault(), "one that held it is asked, nothing said it was turned off");
+        assertEquals(puts, cloud.puts.get(), "and sends nothing meanwhile");
+    }
 }

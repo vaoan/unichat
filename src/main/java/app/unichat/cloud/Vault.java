@@ -239,15 +239,16 @@ final class Vault {
      * new key.
      */
     static Rotated rotate(Storage s, byte[] oldVk, String machine, VaultPeers peers) throws IOException {
-        return rotate(s, oldVk, machine, peers, id -> true);
+        return rotate(s, oldVk, machine, peers, id -> true, () -> { });
     }
 
     /**
      * The same, offering the new key only to the computers {@code confirmed} (the person saw them listed and said yes) and
-     * this one: any other, one that came after the list was shown included, is offered nothing and named.
+     * this one: any other, one that came after the list was shown included, is offered nothing and named. {@code rising}
+     * runs right before the generation rises (whatever the account answers then, the new code may be the vault's).
      */
-    static Rotated rotate(Storage s, byte[] oldVk, String machine, VaultPeers peers, java.util.function.Predicate<String> confirmed)
-        throws IOException {
+    static Rotated rotate(Storage s, byte[] oldVk, String machine, VaultPeers peers, java.util.function.Predicate<String> confirmed,
+                          Runnable rising) throws IOException {
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
         Info was = current(s);
         List<VaultSlot> slots = slots(s);
@@ -270,6 +271,7 @@ final class Vault {
                 else refused.put(slot.id(), VaultView.label(slot.label()));
             }
             code = writeRecovery(s, vk, now, written);
+            rising.run();
             s.put(INFO, json(now));
         } catch (IOException e) {
             if (code == null || !at(s, now)) throw withdrawn(s, was, offered, written, vk, e); // risen with its answer lost: done

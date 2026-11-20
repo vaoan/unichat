@@ -30,7 +30,7 @@ class VaultMoveTest {
         PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg", NOTES = "Unichat/Ajustes/notas.txt";
     private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl", NEXT = "3f2a9c1b2d4e 2026-12.jsonl", LATER = "3f2a9c1b2d4e 2027-01.jsonl";
     private static final Instant T = Instant.parse("2026-11-19T08:00:00Z");
-    private static final List<String> KEYS = List.of(VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultMove.SENDERS);
+    private static final List<String> KEYS = List.of(VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultMove.SENDERS, VaultActions.UNCONFIRMED);
 
     private FakeDav cloud;
     private Map<String, String> were;
@@ -346,5 +346,22 @@ class VaultMoveTest {
         };
         VaultMove.run(plain, sealed(), vault.info().id(), T);
         assertTrue(cloud.files.containsKey(text), "the plain copy is the only one left: kept");
+    }
+
+    @Test
+    void noPlainCopyGoesWhileTheCodeIsntKept() throws Exception {
+        plainBundle(SETTINGS, OLD, T, "DARK");
+        plainTexts(OLD, "{\"viejo\":1}\n");
+        Settings.get().set(VaultActions.UNCONFIRMED, vault.info().id()); // the code shown, never confirmed
+        VaultMove.Result r = run(T);
+        assertEquals(List.of(), r.moved(), "nothing deleted: without the code, the vault may be lost with its only computer");
+        assertTrue(cloud.files.containsKey(SETTINGS));
+        assertTrue(cloud.files.containsKey(TextSync.ROOT + "/" + OLD + "/" + TEXT));
+        assertEquals("{\"viejo\":1}\n", opened(TextSync.ROOT + "/" + OLD + "/" + TEXT), "though copied in");
+        assertNull(Settings.get().getString(VaultMove.MOVED_AT, null), "nor the move done");
+
+        Settings.get().set(VaultActions.UNCONFIRMED, null); // kept
+        run(T.plusSeconds(60));
+        assertEquals(Set.of(), plainLeft(), "then they go");
     }
 }

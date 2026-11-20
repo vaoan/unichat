@@ -111,7 +111,7 @@ final class VaultPage {
         })), this::reload));
     }
 
-    /** Not open here: how to open it, and (locked, not removed) going on without it. */
+    /** Not open here: how to open it, and (locked, not removed) going on without it, or deleting it to start again. */
     private void drawLocked(VaultView v, String why, boolean offerDecline) {
         List<Node> rows = new ArrayList<>();
         rows.add(line(why));
@@ -126,6 +126,12 @@ final class VaultPage {
                 }));
             });
             rows.add(stacked(I18n.t("settings.vault.declineTitle"), I18n.t("settings.vault.declineHelp"), decline));
+            Button delete = new Button(I18n.t("settings.vault.deleteLocked"));
+            delete.getStyleClass().add("danger-button");
+            delete.setOnAction(e -> askTwice(I18n.t("settings.vault.deleteLocked"), I18n.t("settings.vault.deleteLockedAsk"),
+                I18n.t("settings.vault.turnOffSure"), I18n.t("settings.vault.deleteLockedWhat"), I18n.t("settings.vault.deleteLockedYes"),
+                () -> job(cloud.vault().deleteLockedVault())));
+            rows.add(stacked(I18n.t("settings.vault.deleteLockedTitle"), I18n.t("settings.vault.deleteLockedHelp"), delete));
         }
         show(rows.toArray(new Node[0]));
     }
@@ -178,7 +184,7 @@ final class VaultPage {
         change.setOnAction(e -> changeKey(null));
         Button forget = new Button(I18n.t("settings.vault.forget"));
         forget.getStyleClass().add("danger-button");
-        forget.setOnAction(e -> forget());
+        forget.setOnAction(e -> forget(v));
         Button off = new Button(I18n.t("settings.vault.turnOff"));
         off.getStyleClass().add("danger-button");
         off.setOnAction(e -> turnOff());
@@ -262,8 +268,11 @@ final class VaultPage {
         }));
     }
 
-    /** "Olvidar la bóveda en este equipo", asked once. */
-    private void forget() {
+    /**
+     * "Olvidar la bóveda en este equipo", asked once; with a warning when this is its only computer and its code isn't
+     * confirmed kept: nothing may open it after.
+     */
+    private void forget(VaultView v) {
         inStep = true;
         Button yes = new Button(I18n.t("settings.vault.forgetYes"));
         yes.getStyleClass().add("danger-button");
@@ -280,7 +289,9 @@ final class VaultPage {
                 reload();
             }));
         });
-        show(stacked(I18n.t("settings.vault.forgetTitle"), I18n.t("settings.vault.forgetHelp"), new VBox(8, new FlowPane(8, 6, yes, cancel(this::reload)), error)));
+        VBox box = new VBox(8, new FlowPane(8, 6, yes, cancel(this::reload)), error);
+        if (v.computers().size() == 1 && v.codeUnconfirmed()) box.getChildren().addFirst(KeyChangeFlow.warning(I18n.t("settings.vault.forgetOnly")));
+        show(stacked(I18n.t("settings.vault.forgetTitle"), I18n.t("settings.vault.forgetHelp"), box));
     }
 
     /** "Apagar la bóveda", asked twice: first whether, then what happens, with the button saying the action. */

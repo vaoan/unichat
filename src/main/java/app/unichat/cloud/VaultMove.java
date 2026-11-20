@@ -316,11 +316,14 @@ final class VaultMove {
     }
 
     /**
-     * Deletes the plain file unless it was written again since it was read (an older computer sending a longer one), or
+     * Deletes the plain file unless the vault's latest recovery code isn't confirmed kept, it was written again since it
+     * was read (an older computer sending a longer one), or
      * the vault moved into is gone meanwhile (turned off elsewhere: the plain copy is the only one). Asked right before
      * the delete; one request apart, a vault turned off in between still loses this copy (its writer sends its own again).
      */
     private static boolean deleteIfSame(Storage plain, String path, String stamp, Tally t) throws IOException {
+        // Its code not yet confirmed kept: this computer may be the vault's only way in, and the plain copy the only one left.
+        if (t.vault.equals(Settings.get().getString(VaultActions.UNCONFIRMED, null))) return false;
         if (stamp == null || !stamp.equals(plain.stamp(path))) return false;
         Vault.Info now = Vault.info(plain);
         if (now == null || !now.id().equals(t.vault)) return false;
