@@ -299,10 +299,13 @@ public final class Cloud {
      */
     private String moveIn(Storage dav, Storage sealed, Instant now) {
         try {
-            VaultMove.Result r = VaultMove.run(dav, sealed, now);
+            VaultMove.Result r;
+            synchronized (texts) { // TextSync.run's own lock: never alongside textsNow, which writes this computer's texts
+                r = VaultMove.run(dav, sealed, now);
+            }
             Map<String, String> strays = r.strays().isEmpty() ? Map.of() : VaultMove.names(dav, r.strays());
             moving = new Moving(moving.files() + r.moved().size(), r.moved().isEmpty() ? moving.at() : now, strays);
-            return null;
+            return r.error();
         } catch (IOException e) {
             return Errors.message(e);
         }

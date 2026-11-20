@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -25,10 +24,9 @@ import java.util.stream.Stream;
  */
 final class TextSync {
     static final String ROOT = CloudAccount.ROOT + "/Textos";
-    static final String INDEX = "index.json";
-    private static final String HERE = "here";
-    /** A file of ours (machines are {@link Ids}): anything else in the account never becomes a path here. */
-    static final Pattern FILE = Pattern.compile("([0-9a-f]{12}) \\d{4}-\\d{2}\\.jsonl");
+    private static final String HERE = "here", INDEX = TextIndex.NAME;
+    /** Names of ours only (machines are {@link Ids}): anything else in the account never becomes a path here. */
+    private static final Pattern FILE = TextIndex.FILE;
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Path local;
@@ -62,10 +60,15 @@ final class TextSync {
         }
     }
 
-    /** The others' indexes are other files now (the vault opened or closed here): each is read again; only what grew comes. */
+    /**
+     * The account is another storage now (the vault opened or closed here): each index of the others' is read again (only
+     * what grew comes), and this computer's own files all go again, since what went up went to the other one and this
+     * computer is the only one to write them.
+     */
     synchronized void unseen() throws IOException {
         load();
         stamps.clear();
+        sent.clear();
         save();
     }
 
@@ -89,11 +92,8 @@ final class TextSync {
             indexDue = true;
         }
         if (!indexDue) return;
-        ObjectNode index = JSON.createObjectNode();
-        ObjectNode sizes = index.putObject("files");
-        sent.forEach(sizes::put);
         if (!made) storage.mkdirs(folder);
-        storage.put(folder + "/" + INDEX, JSON.writeValueAsBytes(index));
+        storage.put(folder + "/" + INDEX, TextIndex.write(sent));
         indexDue = false;
     }
 
@@ -107,13 +107,11 @@ final class TextSync {
             byte[] index = storage.get(folder + "/" + INDEX);
             if (index == null) continue;
             Path into = local.resolve(other);
-            Iterator<Map.Entry<String, JsonNode>> files = JSON.readTree(index).path("files").fields();
-            while (files.hasNext()) {
-                Map.Entry<String, JsonNode> f = files.next();
+            for (Map.Entry<String, Long> f : TextIndex.read(index).entrySet()) {
                 java.util.regex.Matcher name = FILE.matcher(f.getKey());
                 if (!name.matches()) continue;
                 Path here = into.resolve(f.getKey());
-                if (Files.exists(here) && Files.size(here) >= f.getValue().asLong(0)) continue;
+                if (Files.exists(here) && Files.size(here) >= f.getValue()) continue;
                 app.unichat.support.Folders.ownerOnly(local); // what chats said: no other account of the computer reads it
                 Files.createDirectories(into);
                 if (storage.get(folder + "/" + f.getKey(), here)) came.add(name.group(1));

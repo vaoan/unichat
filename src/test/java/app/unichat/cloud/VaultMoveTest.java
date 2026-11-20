@@ -103,6 +103,14 @@ class VaultMoveTest {
         plainFile(folder + "/index.json", "{\"files\":{\"" + TEXT + "\":" + text.getBytes(StandardCharsets.UTF_8).length + "}}");
     }
 
+    /** What a computer of the vault sent of its own texts, sealed. */
+    private void sealedTexts(String machine, String text) throws IOException {
+        String folder = TextSync.ROOT + "/" + machine;
+        SealedStorage s = sealed();
+        s.put(folder + "/" + TEXT, text.getBytes(StandardCharsets.UTF_8));
+        s.put(folder + "/index.json", TextIndex.write(Map.of(TEXT, (long) text.getBytes(StandardCharsets.UTF_8).length)));
+    }
+
     private String opened(String path) throws IOException {
         byte[] b = sealed().get(path);
         return b == null ? null : new String(b, StandardCharsets.UTF_8);
@@ -130,6 +138,7 @@ class VaultMoveTest {
         assertTrue(failed[0], "the read-back was asked");
         assertTrue(cloud.files.containsKey(text), "not read back: the plain copy stays");
         assertFalse(first.moved().contains(text));
+        assertTrue(first.error().contains("se cortó"), "and why is told: " + first.error());
         assertNull(Settings.get().getString(VaultMove.MOVED_AT, null), "the move isn't done until everything went");
 
         VaultMove.Result second = run(T.plusSeconds(60));
@@ -137,6 +146,7 @@ class VaultMoveTest {
         assertTrue(second.moved().contains(text));
         assertEquals("{\"a\":1}\n", opened(text));
         assertEquals(List.of(), second.strays(), "what was left of the move is no stray");
+        assertNull(second.error());
         assertNotNull(Settings.get().getString(VaultMove.MOVED_AT, null));
 
         // A sealed copy that doesn't open (damaged) keeps the plain one too.
@@ -161,6 +171,7 @@ class VaultMoveTest {
         // The round already wrote the vault's settings (newer): the plain ones are only checked, never copied over it.
         SealedStorage s = sealed();
         s.put(SETTINGS, Bundle.of(DESK, T, Map.of("ui.theme", "LIGHT"), null).toBytes());
+        sealedTexts(DESK, "{\"mio\":1}\n"); // this computer's own, sent again sealed by its round (only it writes them)
 
         VaultMove.Result r = run(T);
         assertEquals(new TreeSet<>(Set.of(NOTES, PHOTO, TextSync.ROOT + "/" + LAPTOP + "/rm -rf.jsonl",
@@ -169,8 +180,7 @@ class VaultMoveTest {
         assertEquals("LIGHT", Bundle.parse(s.get(SETTINGS)).settings().get("ui.theme"), "the vault's newer settings kept");
         assertEquals("x", Bundle.parse(s.get(AI)).settings().get("ui.theme"), "a part the vault lacked came in");
         assertEquals("{\"version\":1}", opened("Unichat/Ajustes/unichat-pinned.json"));
-        assertEquals("{\"mio\":1}\n", opened(TextSync.ROOT + "/" + DESK + "/" + TEXT), "this computer's texts sent plain: no need to send again");
-        assertEquals("{\"suyo\":1}\n", opened(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT), "another computer's too");
+        assertEquals("{\"suyo\":1}\n", opened(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT), "a computer without the vault's are brought in");
         assertTrue(opened(TextSync.ROOT + "/" + LAPTOP + "/index.json").contains(TEXT), "and its index says so, for the others");
         assertEquals(T.toString(), Settings.get().getString(VaultMove.MOVED_AT, null));
 
@@ -202,9 +212,10 @@ class VaultMoveTest {
         plainTexts(OLD, "{\"viejo\":1}\n{\"viejo\":2}\n"); // it goes on writing
         run(T.plusSeconds(120));
         assertEquals("{\"viejo\":1}\n{\"viejo\":2}\n", opened(TextSync.ROOT + "/" + OLD + "/" + TEXT), "what grew comes in too");
-        int gets = cloud.gets.get();
+        int[] reads = {0};
+        beforeSealedGet = p -> { if (p.contains(OLD)) reads[0]++; };
         run(T.plusSeconds(180));
-        assertTrue(cloud.gets.get() - gets <= 4, "nothing new: its texts aren't read again (" + (cloud.gets.get() - gets) + " reads)");
+        assertEquals(0, reads[0], "nothing new: its texts aren't read again");
     }
 
     @Test
@@ -251,6 +262,34 @@ class VaultMoveTest {
         VaultMove.run(plain(), sealed(), T.plusSeconds(60));
         assertEquals(longer, opened(text), "it comes in the next round");
         assertFalse(cloud.files.containsKey(text));
+    }
+
+    @Test
+    void aComputerOfTheVaultIsTheOnlyWriterOfItsTextsAndOnlyItsCopyLetsThePlainGo() throws Exception {
+        Vault.addComputer(dav(), vault.vk(), LAPTOP, "Portátil");
+        String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT, longer = "{\"suyo\":1}\n{\"suyo\":2}\n";
+        plainTexts(LAPTOP, "{\"suyo\":1}\n");
+        sealedTexts(LAPTOP, "{}\n"); // it hasn't sent all of it sealed yet
+        int versions = cloud.versions.get(Vault.ROOT + "/Textos/" + LAPTOP + "/" + TEXT);
+        VaultMove.Result r = run(T);
+        assertNull(r.error());
+        assertTrue(cloud.files.containsKey(text), "its sealed copy is shorter: the plain one stays");
+        assertEquals("{}\n", opened(text), "and the move never writes its texts");
+        assertEquals(versions, cloud.versions.get(Vault.ROOT + "/Textos/" + LAPTOP + "/" + TEXT));
+        assertNull(Settings.get().getString(VaultMove.MOVED_AT, null), "the move waits for it");
+
+        boolean[] sent = {false};
+        beforeSealedGet = p -> {
+            if (p.endsWith(LAPTOP + "/index.json") && !sent[0]) { // the laptop sends its own while the move looks
+                sent[0] = true;
+                sealedTexts(LAPTOP, longer);
+            }
+        };
+        run(T.plusSeconds(60));
+        assertTrue(sent[0]);
+        assertEquals(longer, opened(text), "the longer one it sent survives");
+        assertFalse(cloud.files.containsKey(text), "and, as long as the plain one, lets it go");
+        assertFalse(cloud.files.containsKey(TextSync.ROOT + "/" + LAPTOP + "/index.json"));
     }
 
     /** A storage passing everything on, to override one call. */

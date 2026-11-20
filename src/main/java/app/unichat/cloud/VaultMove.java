@@ -3,9 +3,6 @@ package app.unichat.cloud;
 import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
 import app.unichat.support.Hashes;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -14,7 +11,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /**
@@ -22,11 +21,16 @@ import java.util.regex.Pattern;
  * texts under {@code Textos}) goes into the vault, and each plain copy is deleted only once its sealed copy reads back
  * holding all of it. Run every round the vault is open here, so it's idempotent: nothing plain, nothing to do. Media never.
  * <p>
- * Once this computer's move is done ({@link #MOVED_AT}), a plain file is a stray: a computer of the person's still running
- * a Unichat without the vault. Its texts still come in (nothing is lost) but its settings never over the vault's; it's
- * named, and its plain files go only once none has changed for {@link #QUIET}, so they aren't deleted and sent again
- * round after round. Names from the account are untrusted: only ours (a machine's UUID, a file {@link TextSync} makes, an
- * {@code unichat-<part>.json}) are touched.
+ * Each computer of the vault (one with a computer slot) is the only writer of its sealed texts ({@link TextSync} sends
+ * them all again when the vault opens there): its plain ones are only let go once its sealed copy is as long. The texts
+ * of a computer without a slot (before the vault, or still on a Unichat without it) have no other writer there: they're
+ * brought in here.
+ * <p>
+ * Once this computer's move is done ({@link #MOVED_AT}), a plain file of a computer without a slot, or a settings file,
+ * is a stray: a computer of the person's still running a Unichat without the vault. Its texts still come in (nothing is
+ * lost) but its settings never; it's named, and its plain files go only once none has changed for {@link #QUIET}, so they
+ * aren't deleted and sent again round after round. Names from the account are untrusted: only ours (a machine's UUID, a
+ * file {@link TextSync} makes, an {@code unichat-<part>.json}) are touched.
  */
 final class VaultMove {
     /**
@@ -38,15 +42,14 @@ final class VaultMove {
     static final String SETTINGS_DIR = CloudAccount.ROOT + "/Ajustes";
     /** The files Unichat writes in {@link #SETTINGS_DIR}: no other name there is moved or deleted. */
     private static final Pattern OURS = Pattern.compile("unichat-[a-z]+\\.json");
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     private VaultMove() {}
 
     /** A computer still sending plain, and when it last did: its settings' own time, or when its texts were found changed. */
     record Stray(String machine, Instant seen) {}
 
-    /** What a round did: the plain paths it removed, and the computers still sending plain (by machine). */
-    record Result(List<String> moved, List<Stray> strays) {}
+    /** What a round did: the plain paths it removed, the computers still sending plain (by machine), and the first failure (or null). */
+    record Result(List<String> moved, List<Stray> strays, String error) {}
 
     /**
      * What a pass does: moving in (each file comes in where the vault lacks it, and goes once held), taking a stray's
@@ -55,29 +58,63 @@ final class VaultMove {
      */
     private enum Pass { MOVE, TAKE, DROP }
 
-    /** What's plain of ours in the account: the settings files' paths, and each machine's text files' names. */
-    private record Found(List<String> settings, Map<String, List<String>> texts) {
+    /**
+     * What's plain of ours in the account: the settings files' paths, the text files' names of each computer without a
+     * slot, and those of each computer of the vault (left from before it opened the vault there).
+     */
+    private record Found(List<String> settings, Map<String, List<String>> texts, Map<String, List<String>> ofTheVault) {
         boolean none() {
             return settings.isEmpty() && texts.isEmpty();
         }
     }
 
+    /** What a round removed, and the first thing that failed. */
+    private static final class Tally {
+        final List<String> moved = new ArrayList<>();
+        String error;
+
+        boolean failed(IOException e) {
+            if (error == null) error = Errors.message(e);
+            return false;
+        }
+
+        Result result(List<Stray> strays) {
+            return new Result(moved, strays, error);
+        }
+    }
+
+    /** A vault other than the one moved into: everything about the move starts again. */
+    static void forget() {
+        Settings s = Settings.get();
+        for (String k : new String[] {MOVED_AT, QUIET_SINCE, STRAYS_SEEN}) {
+            if (s.getString(k, null) != null) s.set(k, null);
+        }
+    }
+
     /**
      * One round of it, with the vault open: {@code sealed} is the vault over {@code plain}. A file that fails stays plain
-     * for the next round; only a listing that fails stops it.
+     * for the next round (the first failure is the result's error); only a listing that fails stops it.
      */
     static Result run(Storage plain, Storage sealed, Instant now) throws IOException {
         Settings s = Settings.get();
         Found found = find(plain);
-        List<String> moved = new ArrayList<>();
+        Tally t = new Tally();
+        boolean let = true;
+        for (Map.Entry<String, List<String>> m : found.ofTheVault().entrySet()) {
+            try {
+                let &= letGo(plain, sealed, m.getKey(), m.getValue(), t);
+            } catch (IOException e) {
+                let = t.failed(e);
+            }
+        }
         if (s.getString(MOVED_AT, null) == null) {
-            if (carry(plain, sealed, found, Pass.MOVE, moved)) s.set(MOVED_AT, now.toString());
-            return new Result(moved, List.of());
+            if (carry(plain, sealed, found, Pass.MOVE, t) && let) s.set(MOVED_AT, now.toString());
+            return t.result(List.of());
         }
         if (found.none()) {
             s.set(QUIET_SINCE, null);
             s.set(STRAYS_SEEN, null);
-            return new Result(moved, List.of());
+            return t.result(List.of());
         }
         String seen = signature(plain, found);
         Instant quiet = instant(s.getString(QUIET_SINCE, null));
@@ -85,79 +122,88 @@ final class VaultMove {
             quiet = now; // something new from a stray: a day from now, and what it wrote comes in
             s.set(QUIET_SINCE, now.toString());
             s.set(STRAYS_SEEN, seen);
-            carry(plain, sealed, found, Pass.TAKE, moved);
+            carry(plain, sealed, found, Pass.TAKE, t);
         }
-        if (now.isBefore(quiet.plus(QUIET))) return new Result(moved, strays(plain, found, quiet));
-        carry(plain, sealed, found, Pass.DROP, moved);
+        if (now.isBefore(quiet.plus(QUIET))) return t.result(strays(plain, found, quiet));
+        carry(plain, sealed, found, Pass.DROP, t);
         Found left = find(plain);
         if (left.none()) {
             s.set(QUIET_SINCE, null);
             s.set(STRAYS_SEEN, null);
-            return new Result(moved, List.of());
+            return t.result(List.of());
         }
         s.set(STRAYS_SEEN, signature(plain, left)); // what failed to go is no news: the next round tries it again
-        return new Result(moved, strays(plain, left, quiet));
+        return t.result(strays(plain, left, quiet));
     }
 
     /** Each stray's name in the vault (its computer slot's label), "" for a computer that has none there. */
     static Map<String, String> names(Storage plain, List<Stray> strays) throws IOException {
-        Map<String, String> labels = new TreeMap<>();
-        for (VaultSlot slot : Vault.slots(plain)) {
-            if (slot.method() == VaultSlot.Method.COMPUTER) labels.put(slot.id(), slot.label());
-        }
+        Map<String, String> labels = computers(plain);
         Map<String, String> out = new LinkedHashMap<>();
         for (Stray stray : strays) out.put(stray.machine(), labels.getOrDefault(stray.machine(), ""));
         return out;
     }
 
+    /** The vault's computers: each machine with a computer slot, and its label. */
+    private static Map<String, String> computers(Storage plain) throws IOException {
+        Map<String, String> out = new TreeMap<>();
+        for (VaultSlot slot : Vault.slots(plain)) {
+            if (slot.method() == VaultSlot.Method.COMPUTER) out.put(slot.id(), slot.label());
+        }
+        return out;
+    }
+
+    /** The vault's computers are read only when some texts are plain: nothing plain costs no more than the listings. */
     private static Found find(Storage plain) throws IOException {
         List<String> settings = new ArrayList<>();
         for (String name : plain.list(SETTINGS_DIR)) {
             if (OURS.matcher(name).matches()) settings.add(SETTINGS_DIR + "/" + name);
         }
-        Map<String, List<String>> texts = new TreeMap<>();
+        Map<String, List<String>> texts = new TreeMap<>(), ofTheVault = new TreeMap<>();
         for (String machine : plain.list(TextSync.ROOT)) {
             if (!Ids.ours(machine)) continue;
             List<String> names = new ArrayList<>();
             for (String name : plain.list(TextSync.ROOT + "/" + machine)) {
-                if (name.equals(TextSync.INDEX) || TextSync.FILE.matcher(name).matches()) names.add(name);
+                if (name.equals(TextIndex.NAME) || TextIndex.FILE.matcher(name).matches()) names.add(name);
             }
             if (!names.isEmpty()) texts.put(machine, names);
         }
-        return new Found(settings, texts);
+        if (!texts.isEmpty()) {
+            Set<String> computers = computers(plain).keySet();
+            for (String machine : computers) {
+                List<String> names = texts.remove(machine);
+                if (names != null) ofTheVault.put(machine, names);
+            }
+        }
+        return new Found(settings, texts, ofTheVault);
     }
 
     /** One pass over what's plain; whether all of it was done. */
-    private static boolean carry(Storage plain, Storage sealed, Found found, Pass pass, List<String> moved) {
+    private static boolean carry(Storage plain, Storage sealed, Found found, Pass pass, Tally t) {
         boolean all = true, delete = pass != Pass.TAKE;
         for (String path : found.settings()) {
             if (pass == Pass.TAKE) continue;
             try {
-                all &= pass == Pass.DROP ? deleteIfSame(plain, path, plain.stamp(path), moved) : settingIn(plain, sealed, path, moved);
+                all &= pass == Pass.DROP ? deleteIfSame(plain, path, plain.stamp(path), t) : settingIn(plain, sealed, path, t);
             } catch (IOException e) {
-                all = failed(path, e);
+                all = t.failed(e);
             }
         }
         for (Map.Entry<String, List<String>> m : found.texts().entrySet()) {
             try {
-                all &= textsIn(plain, sealed, m.getKey(), m.getValue(), delete, moved);
+                all &= textsIn(plain, sealed, m.getKey(), m.getValue(), delete, t);
             } catch (IOException e) {
-                all = failed(TextSync.ROOT + "/" + m.getKey(), e);
+                all = t.failed(e);
             }
         }
         return all;
-    }
-
-    private static boolean failed(String path, IOException e) {
-        System.err.println("Cloud: vault: moving " + path + " in: " + Errors.message(e));
-        return false;
     }
 
     /**
      * A settings file moving in: copied only where the vault has none (the round already wrote its own parts, newer);
      * the plain one goes once the vault's opens.
      */
-    private static boolean settingIn(Storage plain, Storage sealed, String path, List<String> moved) throws IOException {
+    private static boolean settingIn(Storage plain, Storage sealed, String path, Tally t) throws IOException {
         String stamp = plain.stamp(path);
         byte[] mine = stamp == null ? null : plain.get(path);
         if (mine == null) return false; // gone meanwhile: the next round looks again
@@ -167,46 +213,73 @@ final class VaultMove {
             sealed.put(path, mine);
             kept = sealed.get(path);
         }
-        return kept != null && deleteIfSame(plain, path, stamp, moved);
+        return kept != null && deleteIfSame(plain, path, stamp, t);
     }
 
     /**
-     * One machine's texts: each file the vault's index doesn't already show as long comes in where the vault's is
-     * missing or shorter (they only grow), then the vault's index learns them; with {@code delete}, each plain file goes
-     * once the vault's reads back as long, and the plain index last, once all of them went.
+     * A computer of the vault's plain texts, left from before: never written here. Each goes once its sealed copy, as its
+     * computer sent it, reads back as long; its plain index last, once all of them went. Whether all of them went.
      */
-    private static boolean textsIn(Storage plain, Storage sealed, String machine, List<String> names, boolean delete,
-                                   List<String> moved) throws IOException {
-        String folder = TextSync.ROOT + "/" + machine, indexPath = folder + "/" + TextSync.INDEX;
+    private static boolean letGo(Storage plain, Storage sealed, String machine, List<String> names, Tally t) throws IOException {
+        String folder = TextSync.ROOT + "/" + machine, indexPath = folder + "/" + TextIndex.NAME;
         String indexStamp = plain.stamp(indexPath);
-        Map<String, Long> theirs = sizes(indexStamp == null ? null : plain.get(indexPath)), held = sizes(sealed.get(indexPath));
+        Map<String, Long> theirs = TextIndex.read(indexStamp == null ? null : plain.get(indexPath));
+        Map<String, Long> held = TextIndex.read(sealed.get(indexPath));
+        boolean all = true;
+        for (String name : names) {
+            if (name.equals(TextIndex.NAME)) continue;
+            Long size = theirs.get(name), have = held.get(name);
+            if (have == null || size != null && have < size) { // not sent sealed yet: nothing is read until it is
+                all = false;
+                continue;
+            }
+            try {
+                String path = folder + "/" + name, stamp = plain.stamp(path);
+                byte[] mine = stamp == null ? null : plain.get(path), kept = mine == null ? null : sealed.get(path);
+                all &= kept != null && kept.length >= mine.length && deleteIfSame(plain, path, stamp, t);
+            } catch (IOException e) {
+                all = t.failed(e);
+            }
+        }
+        return all && (indexStamp == null || deleteIfSame(plain, indexPath, indexStamp, t));
+    }
+
+    /**
+     * A computer without a slot's texts: each file the vault's index doesn't already show as long comes in where the
+     * vault's is missing or shorter (they only grow), then the vault's index learns them; with {@code delete}, each plain
+     * file goes once the vault's reads back as long, and the plain index last, once all of them went.
+     */
+    private static boolean textsIn(Storage plain, Storage sealed, String machine, List<String> names, boolean delete, Tally t)
+        throws IOException {
+        String folder = TextSync.ROOT + "/" + machine, indexPath = folder + "/" + TextIndex.NAME;
+        String indexStamp = plain.stamp(indexPath);
+        Map<String, Long> theirs = TextIndex.read(indexStamp == null ? null : plain.get(indexPath));
+        Map<String, Long> held = TextIndex.read(sealed.get(indexPath));
         Map<String, Long> index = new TreeMap<>(held);
         boolean all = true;
         for (String name : names) {
-            if (name.equals(TextSync.INDEX)) continue;
+            if (name.equals(TextIndex.NAME)) continue;
             Long size = theirs.get(name), have = held.get(name);
             if (!delete && size != null && have != null && have >= size) continue; // the vault already has as much
             try {
-                long length = textIn(plain, sealed, folder + "/" + name, delete, moved);
+                long length = textIn(plain, sealed, folder + "/" + name, delete, t);
                 if (length < 0) all = false;
                 else index.merge(name, length, Math::max);
             } catch (IOException e) {
-                all = failed(folder + "/" + name, e);
+                all = t.failed(e);
             }
         }
         if (!index.equals(held)) {
-            ObjectNode n = JSON.createObjectNode();
-            index.forEach(n.putObject("files")::put);
             sealed.mkdirs(folder);
-            sealed.put(indexPath, JSON.writeValueAsBytes(n));
-            all &= sizes(sealed.get(indexPath)).equals(index);
+            sealed.put(indexPath, TextIndex.write(index));
+            all &= TextIndex.read(sealed.get(indexPath)).equals(index);
         }
         if (!all || !delete || indexStamp == null) return all;
-        return deleteIfSame(plain, indexPath, indexStamp, moved);
+        return deleteIfSame(plain, indexPath, indexStamp, t);
     }
 
     /** One text in: the vault's copy's length once it holds all of the plain one, -1 while it doesn't. */
-    private static long textIn(Storage plain, Storage sealed, String path, boolean delete, List<String> moved) throws IOException {
+    private static long textIn(Storage plain, Storage sealed, String path, boolean delete, Tally t) throws IOException {
         String stamp = plain.stamp(path);
         byte[] mine = stamp == null ? null : plain.get(path);
         if (mine == null) return -1;
@@ -217,31 +290,15 @@ final class VaultMove {
             kept = sealed.get(path);
         }
         if (kept == null || kept.length < mine.length) return -1;
-        return !delete || deleteIfSame(plain, path, stamp, moved) ? kept.length : -1;
+        return !delete || deleteIfSame(plain, path, stamp, t) ? kept.length : -1;
     }
 
     /** Deletes the plain file unless it was written again since it was read (an older computer sending a longer one). */
-    private static boolean deleteIfSame(Storage plain, String path, String stamp, List<String> moved) throws IOException {
+    private static boolean deleteIfSame(Storage plain, String path, String stamp, Tally t) throws IOException {
         if (stamp == null || !stamp.equals(plain.stamp(path))) return false;
         plain.delete(path);
-        moved.add(path);
+        t.moved.add(path);
         return true;
-    }
-
-    /** An index's sizes, by name of ours; empty for none or one that isn't. */
-    private static Map<String, Long> sizes(byte[] index) {
-        Map<String, Long> out = new TreeMap<>();
-        if (index == null) return out;
-        try {
-            JsonNode n = JSON.readTree(index);
-            if (n == null) return out;
-            n.path("files").properties().forEach(e -> {
-                if (TextSync.FILE.matcher(e.getKey()).matches() && e.getValue().canConvertToLong()) out.put(e.getKey(), e.getValue().asLong());
-            });
-        } catch (IOException e) {
-            out.clear();
-        }
-        return out;
     }
 
     /** What the strays' plain files are now, without reading them: each settings file's stamp, each machine's index's and names. */
@@ -250,7 +307,7 @@ final class VaultMove {
         for (String path : found.settings()) b.append(path).append('=').append(plain.stamp(path)).append('\n');
         for (Map.Entry<String, List<String>> m : found.texts().entrySet()) {
             String folder = TextSync.ROOT + "/" + m.getKey();
-            b.append(folder).append('=').append(plain.stamp(folder + "/" + TextSync.INDEX)).append(new java.util.TreeSet<>(m.getValue())).append('\n');
+            b.append(folder).append('=').append(plain.stamp(folder + "/" + TextIndex.NAME)).append(new TreeSet<>(m.getValue())).append('\n');
         }
         return Hashes.sha256(b.toString());
     }

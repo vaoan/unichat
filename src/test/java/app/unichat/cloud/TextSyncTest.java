@@ -62,6 +62,21 @@ class TextSyncTest {
     }
 
     @Test
+    void theAccountBeingAnotherOneSendsItsOwnAgain() throws Exception {
+        try (FakeDav cloud = new FakeDav("u", "p")) {
+            WebDav dav = new WebDav(cloud.url(), "u", "p");
+            TextSync desk = computer(DESK);
+            Files.writeString(own(DESK).resolve(FILE), "{\"id\":\"$1\"}\n", StandardCharsets.UTF_8);
+            desk.run(dav);
+            cloud.files.clear(); // the vault opened here: the files are another storage's now, and it has none of them
+            desk.unseen();
+            desk.run(dav);
+            assertTrue(cloud.files.containsKey("Unichat/Textos/" + DESK + "/" + FILE), "this computer is the only one to send its own: again");
+            assertTrue(new String(cloud.files.get("Unichat/Textos/" + DESK + "/index.json"), StandardCharsets.UTF_8).contains(FILE));
+        }
+    }
+
+    @Test
     void anIndexThatFailedToGoUpGoesAtTheNextRoundSoTheOthersSeeTheEnd() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             WebDav dav = new WebDav(cloud.url(), "u", "p");

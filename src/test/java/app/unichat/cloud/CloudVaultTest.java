@@ -430,7 +430,7 @@ class CloudVaultTest {
 
         Computer laptop = new Computer(LAPTOP).opened(made.info(), Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil"));
         laptop.round();
-        assertEquals("{}\n", laptop.read("texts/" + DESK + "/" + TEXT), "the texts sent plain before reach the others sealed, never sent again");
+        assertEquals("{}\n", laptop.read("texts/" + DESK + "/" + TEXT), "the texts sent plain before reach the others, sealed: sent again by the one that wrote them");
         assertEquals(4, desk.round().moving().files(), "and the count stays");
     }
 
@@ -449,5 +449,30 @@ class CloudVaultTest {
         assertEquals("", s.moving().strayName(LAPTOP));
         assertEquals("DARK", desk.get("ui.theme"), "its plain settings are never taken");
         assertTrue(cloud.files.containsKey(SETTINGS), "nor deleted round after round");
+    }
+
+    @Test
+    void aFileThatFailsToMoveInIsTheRoundsErrorAndMediaStillGoes() throws Exception {
+        Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
+        Computer desk = new Computer(DESK).opened(made.info(), made.computer());
+        for (String d : new String[] {"Unichat/Textos", "Unichat/Textos/" + OTHER}) cloud.dirs.add(d);
+        cloud.put("Unichat/Textos/" + OTHER + "/" + TEXT, "{}\n".getBytes(StandardCharsets.UTF_8)); // a computer without the vault's
+        cloud.put(Vault.ROOT + "/Textos/" + OTHER + "/" + TEXT, "dañado".getBytes(StandardCharsets.UTF_8));
+        Cloud.Status s = desk.round();
+        assertTrue(s.error() != null && s.error().contains("bóveda"), "told: " + s.error());
+        assertTrue(cloud.files.containsKey(PHOTO), "media went all the same");
+        assertTrue(cloud.files.containsKey("Unichat/Textos/" + OTHER + "/" + TEXT), "and the plain copy stays");
+    }
+
+    @Test
+    void anotherVaultInTheAccountForgetsTheMoveIntoTheOldOne() throws Exception {
+        Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
+        Computer desk = new Computer(DESK).opened(made.info(), made.computer());
+        desk.round();
+        assertNotNull(desk.get(VaultMove.MOVED_AT));
+        dav().delete(Vault.ROOT);
+        Vault.create(dav(), OTHER, "Otro"); // replaced before any round here saw it gone
+        assertEquals(Cloud.VaultState.LOCKED, desk.round().vault());
+        assertNull(desk.get(VaultMove.MOVED_AT), "the new vault is moved into from the start");
     }
 }

@@ -136,10 +136,12 @@ final class VaultParts {
         if (info == null && file != null) return closed(s);
         if (info == null) {
             if (held != null) {
-                for (String k : new String[] {ID, KEY, PRIVATE, VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN}) s.set(k, null);
+                for (String k : new String[] {ID, KEY, PRIVATE}) s.set(k, null);
+                VaultMove.forget();
             }
             return new Round(Cloud.VaultState.NONE, null);
         }
+        if (!info.id().equals(held)) VaultMove.forget(); // another vault than the one moved into: it's moved into afresh
         String key = s.getString(KEY, null);
         if (key == null || !info.id().equals(held)) return closed(s);
         VaultSlot slot = Vault.slot(plain, info, Cloud.machine());
