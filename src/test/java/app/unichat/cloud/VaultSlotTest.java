@@ -2,12 +2,15 @@ package app.unichat.cloud;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import org.junit.jupiter.api.Test;
 
 class VaultSlotTest {
@@ -47,8 +50,8 @@ class VaultSlotTest {
         assertEquals(65536, a.get("m").asInt());
         assertEquals(3, a.get("t").asInt());
         assertEquals(1, a.get("p").asInt());
-        assertEquals(16, java.util.Base64.getDecoder().decode(a.get("salt").asText()).length);
-        org.junit.jupiter.api.Assertions.assertNotEquals(a.get("salt"), b.get("salt"));
+        assertEquals(16, Base64.getDecoder().decode(a.get("salt").asText()).length);
+        assertNotEquals(a.get("salt"), b.get("salt"));
     }
 
     @Test
@@ -82,10 +85,47 @@ class VaultSlotTest {
         assertArrayEquals(vk, slot.unwrap(key));
     }
 
+    @Test
+    void aPasswordSlotWithABadSaltIsNoSlotAndGivesNoKey() throws Exception {
+        VaultSlot good = VaultSlot.wrap(VaultSlot.Method.PASSWORD, "pw", 1, VaultCrypto.randomKey(), VaultSlot.newPasswordParams(), vk);
+        String json = new String(good.toJson(), StandardCharsets.UTF_8);
+        String salt = good.params().get("salt").asText();
+        String eight = Base64.getEncoder().encodeToString(new byte[8]);
+        for (String bad : new String[] {"\"salt\":\"" + salt + "\",", "\"salt\":\"%%%\"", "\"salt\":\"" + eight + "\"", "\"salt\":7"}) {
+            String changed = json.replace("\"salt\":\"" + salt + "\"", bad.startsWith("\"salt\":\"" + salt + "\",") ? "\"x\":1" : bad);
+            assertNull(VaultSlot.parse(changed.getBytes(StandardCharsets.UTF_8)), changed);
+        }
+        char[] pw = "twelve chars!".toCharArray();
+        assertThrows(VaultCrypto.Broken.class, () -> VaultSlot.passwordKey(pw, empty()));
+        ObjectNode notBase64 = empty().put("salt", "%%%");
+        assertThrows(VaultCrypto.Broken.class, () -> VaultSlot.passwordKey(pw, notBase64));
+        ObjectNode short8 = empty().put("salt", eight);
+        assertThrows(VaultCrypto.Broken.class, () -> VaultSlot.passwordKey(pw, short8));
+    }
+
+    @Test
+    void generationLabelAndParamsMustBeSane() {
+        VaultSlot slot = VaultSlot.wrap(VaultSlot.Method.COMPUTER, "x", 1, VaultCrypto.randomKey(), empty(), vk);
+        String json = new String(slot.toJson(), StandardCharsets.UTF_8);
+        for (String bad : new String[] {"\"generation\":1", "\"generation\":-1", "\"generation\":1.5", "\"generation\":1e30", "\"generation\":99999999999999999999"}) {
+            String changed = json.replace("\"generation\":1", bad.equals("\"generation\":1") ? "\"generation\":1" : bad);
+            if (bad.equals("\"generation\":1")) assertEquals(1, VaultSlot.parse(changed.getBytes(StandardCharsets.UTF_8)).generation());
+            else assertNull(VaultSlot.parse(changed.getBytes(StandardCharsets.UTF_8)), bad);
+        }
+        assertNull(VaultSlot.parse(json.replace("\"label\":\"x\"", "\"label\":null").getBytes(StandardCharsets.UTF_8)));
+        assertThrows(IllegalArgumentException.class, () -> VaultSlot.wrap(VaultSlot.Method.COMPUTER, null, 1, VaultCrypto.randomKey(), empty(), vk));
+        assertThrows(IllegalArgumentException.class, () -> VaultSlot.wrap(VaultSlot.Method.COMPUTER, "x", 1, VaultCrypto.randomKey(), null, vk));
+        assertThrows(IllegalArgumentException.class, () -> VaultSlot.wrap(VaultSlot.Method.COMPUTER, "x", -1, VaultCrypto.randomKey(), empty(), vk));
+    }
+
+    private static ObjectNode empty() {
+        return JsonNodes.empty();
+    }
+
     /** Empty params, as a computer's or the recovery slot's. */
     private static final class JsonNodes {
         static ObjectNode empty() {
-            return new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+            return new ObjectMapper().createObjectNode();
         }
     }
 }

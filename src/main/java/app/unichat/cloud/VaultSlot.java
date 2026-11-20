@@ -24,6 +24,7 @@ record VaultSlot(String id, Method method, String label, Instant created, long g
     private static final int SALT = 16;
 
     static VaultSlot wrap(Method m, String label, long generation, byte[] slotKey, ObjectNode params, byte[] vk) {
+        if (label == null || params == null || generation < 0) throw new IllegalArgumentException("A slot needs a label, params and a generation");
         String id = UUID.randomUUID().toString();
         return new VaultSlot(id, m, label, Instant.now(), generation, params, VaultCrypto.seal(slotKey, path(id), vk));
     }
@@ -36,8 +37,21 @@ record VaultSlot(String id, Method method, String label, Instant created, long g
         return VaultCrypto.hkdf(code.bits(), "unichat-vault recovery");
     }
 
-    static byte[] passwordKey(char[] password, ObjectNode params) {
-        return VaultCrypto.argon2id(password, Base64.getDecoder().decode(params.path("salt").asText()));
+    /** Params come from the account: a salt that isn't 16 bytes of base64 is as broken as a wrong password. */
+    static byte[] passwordKey(char[] password, ObjectNode params) throws VaultCrypto.Broken {
+        byte[] salt = salt(params);
+        if (salt == null) throw new VaultCrypto.Broken();
+        return VaultCrypto.argon2id(password, salt);
+    }
+
+    private static byte[] salt(ObjectNode params) {
+        if (!params.path("salt").isTextual()) return null;
+        try {
+            byte[] salt = Base64.getDecoder().decode(params.get("salt").asText());
+            return salt.length == SALT ? salt : null;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /** The parameters as written in the slot; Argon2id itself runs with {@code VaultCrypto}'s constants. */
@@ -68,8 +82,11 @@ record VaultSlot(String id, Method method, String label, Instant created, long g
         try {
             JsonNode n = JSON.readTree(json);
             if (n == null || !n.isObject() || !n.path("id").isTextual() || !n.path("label").isTextual()
-                || !n.path("generation").isIntegralNumber() || !(n.get("params") instanceof ObjectNode params)) return null;
-            return new VaultSlot(n.get("id").asText(), Method.valueOf(text(n, "method")), n.get("label").asText(),
+                || !n.path("generation").isIntegralNumber() || !n.get("generation").canConvertToLong() || n.get("generation").asLong() < 0
+                || !(n.get("params") instanceof ObjectNode params)) return null;
+            Method method = Method.valueOf(text(n, "method"));
+            if (method == Method.PASSWORD && salt(params) == null) return null;
+            return new VaultSlot(n.get("id").asText(), method, n.get("label").asText(),
                 Instant.parse(text(n, "created")), n.get("generation").asLong(), params,
                 Base64.getDecoder().decode(text(n, "wrapped")));
         } catch (IOException | IllegalArgumentException | DateTimeParseException e) {

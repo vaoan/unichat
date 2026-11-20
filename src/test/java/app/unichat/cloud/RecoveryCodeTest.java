@@ -4,8 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Locale;
 import org.junit.jupiter.api.Test;
 
 class RecoveryCodeTest {
@@ -45,7 +47,34 @@ class RecoveryCodeTest {
     @Test
     void itNeverPrintsItself() {
         RecoveryCode code = RecoveryCode.random();
-        assertFalse(code.toString().contains(code.group(1)) && code.toString().contains(code.group(2)));
+        for (int i = 1; i <= 8; i++) assertFalse(code.toString().contains(code.group(i)));
         assertEquals(code.hashCode(), RecoveryCode.parse(code.shown()).hashCode());
+    }
+
+    @Test
+    void unicodeDashesAndAnyWhitespaceAreForgiven() {
+        RecoveryCode code = RecoveryCode.random();
+        assertEquals(code, RecoveryCode.parse(code.shown().replace("-", "\u2011").replace("\u2011", "\u2013 ")));
+        assertEquals(code, RecoveryCode.parse(code.shown().replace("-", "\u2212\u00a0").toLowerCase()));
+        assertEquals(code, RecoveryCode.parse("\t" + code.shown().replace("-", "\n") + "\u3000"));
+        assertEquals(code, RecoveryCode.parse(code.shown().replace("-", "\u2010\u2012\u2014\u2015")));
+    }
+
+    @Test
+    void caseFoldingIgnoresTheLocale() {
+        Locale was = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.forLanguageTag("tr"));
+            RecoveryCode zeros = RecoveryCode.parse("0000-0000-0000-0000-0000-0000-0000-0001");
+            assertEquals(zeros, RecoveryCode.parse("0000-0000-0000-0000-0000-0000-0000-000i"));
+        } finally {
+            Locale.setDefault(was);
+        }
+    }
+
+    @Test
+    void aCodeNeedsExactlyTwentyBytes() {
+        assertThrows(IllegalArgumentException.class, () -> new RecoveryCode(new byte[19]));
+        assertThrows(IllegalArgumentException.class, () -> new RecoveryCode(null));
     }
 }

@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.Locale;
 
 /**
  * The code the person prints: 160 random bits written as 32 Crockford base32 characters in 8 groups of 4. Typing it
@@ -11,7 +12,12 @@ import java.util.Arrays;
 record RecoveryCode(byte[] bits) {
     private static final String ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
     private static final int BYTES = 20, CHARS = 32, GROUP = 4;
+    private static final String DASHES = "-\u2010\u2011\u2012\u2013\u2014\u2015\u2212";
     private static final SecureRandom RANDOM = new SecureRandom();
+
+    RecoveryCode {
+        if (bits == null || bits.length != BYTES) throw new IllegalArgumentException("A recovery code is 160 bits");
+    }
 
     static RecoveryCode random() {
         byte[] bits = new byte[BYTES];
@@ -40,8 +46,8 @@ record RecoveryCode(byte[] bits) {
     static RecoveryCode parse(String typed) {
         if (typed == null) return null;
         StringBuilder chars = new StringBuilder();
-        for (char c : typed.toUpperCase().toCharArray()) {
-            if (c == ' ' || c == '-' || c == 'U') continue;
+        for (char c : typed.toUpperCase(Locale.ROOT).toCharArray()) {
+            if (Character.isWhitespace(c) || Character.isSpaceChar(c) || DASHES.indexOf(c) >= 0 || c == 'U') continue;
             chars.append(c == 'O' ? '0' : c == 'I' || c == 'L' ? '1' : c);
         }
         if (chars.length() != CHARS) return null;
