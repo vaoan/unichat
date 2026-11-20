@@ -41,7 +41,7 @@ final class VaultMove {
     static final Duration QUIET = Duration.ofDays(1);
     /** The machines sending plain texts when the move started (machine-only): only their folders are ever taken in. */
     static final String SENDERS = "cloud.vault.plainSenders";
-    static final String SETTINGS_DIR = CloudAccount.ROOT + "/Ajustes";
+    static final String SETTINGS_DIR = CloudAccount.SETTINGS_DIR;
     /** The files Unichat writes in {@link #SETTINGS_DIR}: no other name there is moved or deleted. */
     private static final Pattern OURS = Pattern.compile("unichat-[a-z]+\\.json");
 

@@ -29,11 +29,9 @@ final class VaultParts {
     static final String ID = "cloud.vault.id", KEY = "cloud.vault.key", PRIVATE = "cloud.vault.private";
     /** "Seguir sin la bóveda en este equipo": never asked again, nothing personal sent, everything entered by hand. */
     static final String DECLINED = "cloud.vault.declined";
-    static final String SECRETS_FILE = CloudAccount.ROOT + "/Ajustes/unichat-secrets.json",
-        PINNED_FILE = CloudAccount.ROOT + "/Ajustes/unichat-pinned.json",
-        TRANSCRIPTS_FILE = CloudAccount.ROOT + "/Ajustes/unichat-transcripts.json";
+    static final String SECRETS_FILE = Cloud.Part.SECRETS.path(), PINNED_FILE = Cloud.Part.PINNED.path(),
+        TRANSCRIPTS_FILE = Cloud.Part.TRANSCRIPTS.path();
     private static final String PINNED = "pinned-messages.json";
-    private static final String SETTINGS_DIR = CloudAccount.ROOT + "/Ajustes";
     /** A transcript's file as {@code stt.Transcripts} names it (the audio's SHA-256): no other name from the account becomes a path. */
     private static final Pattern TRANSCRIPT = Pattern.compile("[0-9a-f]{64}\\.txt");
 
@@ -141,7 +139,7 @@ final class VaultParts {
          * writer, which isn't this computer for another's.
          */
         private boolean replaceable(Storage plain, String path) {
-            if (!path.startsWith(SETTINGS_DIR + "/") || !Vault.at(plain, vault)) return false;
+            if (!path.startsWith(CloudAccount.SETTINGS_DIR + "/") || !Vault.at(plain, vault)) return false;
             damaged.add(path);
             return true;
         }
@@ -254,9 +252,20 @@ final class VaultParts {
 
     /** The public half of {@link #PRIVATE}; null when there's none here or it isn't one. */
     private static byte[] ownPublicKey(Settings s) {
+        byte[] privateKey = privateKey(s);
+        if (privateKey == null) return null;
         try {
-            String saved = s.getString(PRIVATE, null);
-            return saved == null ? null : VaultNext.publicOf(Base64.getDecoder().decode(saved));
+            return VaultNext.publicOf(privateKey);
+        } finally {
+            Arrays.fill(privateKey, (byte) 0);
+        }
+    }
+
+    /** {@link #PRIVATE} as kept here, for its holder to clear; null when there's none or it isn't base64. */
+    private static byte[] privateKey(Settings s) {
+        String saved = s.getString(PRIVATE, null);
+        try {
+            return saved == null ? null : Base64.getDecoder().decode(saved);
         } catch (IllegalArgumentException e) {
             return null;
         }
@@ -299,12 +308,8 @@ final class VaultParts {
 
     /** The key offered in this computer's slot, vouched for with {@code held}; null when there's none it can take. */
     private static byte[] offered(VaultSlot slot, Vault.Info info, Settings s, byte[] held) {
-        byte[] privateKey;
-        try {
-            privateKey = Base64.getDecoder().decode(s.getString(PRIVATE, ""));
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
+        byte[] privateKey = privateKey(s);
+        if (privateKey == null) return null;
         try {
             return VaultNext.take(slot, privateKey, info.generation(), held);
         } catch (VaultCrypto.Broken e) {

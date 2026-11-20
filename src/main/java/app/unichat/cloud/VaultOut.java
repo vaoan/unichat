@@ -24,7 +24,7 @@ import java.util.TreeMap;
  */
 final class VaultOut {
     /** The parts the plain round carries, at their logical paths. */
-    private static final List<String> PARTS = List.of(CloudAccount.SETTINGS_FILE, CloudAccount.ROOT + "/Ajustes/unichat-ai.json");
+    private static final List<String> PARTS = List.of(Cloud.Part.SETTINGS.path(), Cloud.Part.AI.path());
 
     /** What a run left plain: each path's content, and what was there before each it wrote (null: nothing), to take it back. */
     private static final class Written {

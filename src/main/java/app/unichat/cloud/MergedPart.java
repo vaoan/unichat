@@ -52,7 +52,11 @@ final class MergedPart {
         missing.keySet().removeAll(mine);
         if (!missing.isEmpty()) add.accept(missing);
         Map<String, String> union = new TreeMap<>(theirs);
-        for (String name : mine) if (!union.containsKey(name)) union.put(name, read.apply(name));
+        for (String name : mine) {
+            if (union.containsKey(name)) continue;
+            String text = read.apply(name);
+            if (text != null && !text.isEmpty()) union.put(name, text); // gone since it was listed: never up as ""
+        }
         if (union.size() > theirs.size()) {
             storage.mkdirs(remotePath.substring(0, remotePath.lastIndexOf('/')));
             storage.put(remotePath, json(union));

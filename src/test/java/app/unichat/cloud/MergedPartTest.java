@@ -55,6 +55,19 @@ class MergedPartTest {
     }
 
     @Test
+    void anEntryGoneBetweenItsListingAndItsReadNeverGoesUpEmpty() throws Exception {
+        try (FakeDav cloud = new FakeDav("u", "p")) {
+            Storage dav = new WebDav(cloud.url(), "u", "p");
+            Computer a = new Computer(), b = new Computer();
+            a.entries.put("a1", "hola");
+            a.entries.put("a2", ""); // listed, then gone: read as nothing
+            a.part.sync(dav);
+            b.part.sync(dav);
+            assertEquals(Map.of("a1", "hola"), b.entries, "no empty transcript ever spreads");
+        }
+    }
+
+    @Test
     void twoComputersWritingAtOnceLoseNothing() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             Storage dav = new WebDav(cloud.url(), "u", "p");

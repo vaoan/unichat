@@ -17,7 +17,7 @@ import java.util.Base64;
  * when the mark opens with it; someone with only the account can delete the vault's file but never write the mark.
  */
 final class VaultOff {
-    static final String FILE = CloudAccount.ROOT + "/Ajustes/boveda-apagada.json";
+    static final String FILE = CloudAccount.SETTINGS_DIR + "/boveda-apagada.json";
     /** The key the mark is sealed with, for the vault open here last (machine-only): "<vault>:<generation>:<key>". */
     static final String KEY = "cloud.vault.offKey";
     private static final String INFO = "unichat-vault off";

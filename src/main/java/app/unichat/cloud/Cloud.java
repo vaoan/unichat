@@ -62,7 +62,7 @@ public final class Cloud {
         }
     }
 
-    /** A part of what the vault carries, as the person knows it. */
+    /** A part of what the vault carries, as the person knows it, and its file (the one place its name is said). */
     public enum Part {
         SETTINGS("unichat-settings.json"), AI("unichat-ai.json"), SECRETS("unichat-secrets.json"), PINNED("unichat-pinned.json"),
         TRANSCRIPTS("unichat-transcripts.json");
@@ -71,6 +71,11 @@ public final class Cloud {
 
         Part(String file) {
             this.file = file;
+        }
+
+        /** Its logical path in the account. */
+        String path() {
+            return CloudAccount.SETTINGS_DIR + "/" + file;
         }
 
         /** The part kept in {@code file}; null for none of ours. */
@@ -222,7 +227,7 @@ public final class Cloud {
                     settingsAdopted.run();
                 });
         Path style = dataDir.resolve(STYLE_FILE);
-        SyncedPart learned = new SyncedPart(CloudAccount.ROOT + "/Ajustes/unichat-ai.json", "ai",
+        SyncedPart learned = new SyncedPart(Part.AI.path(), "ai",
                 now -> Bundle.of(machine(), now, Map.of(STYLE_FILE, read(style)), null),
                 theirs -> write(style, theirs.settings().getOrDefault(STYLE_FILE, "")));
         return new Cloud(account, settings, learned,

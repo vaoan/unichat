@@ -190,9 +190,14 @@ final class Vault {
         return writeComputer(s, vk, current(s), machine, name, new ArrayList<>());
     }
 
-    /** At least {@link #MIN_PASSWORD} characters, as the person counts them (an emoji is one). */
+    /** Whether {@code password} has at least {@link #MIN_PASSWORD} characters, as the person counts them (an emoji is one). */
+    static boolean longEnough(char[] password) {
+        return Character.codePointCount(password, 0, password.length) >= MIN_PASSWORD;
+    }
+
+    /** At least {@link #MIN_PASSWORD} characters ({@link #longEnough}). */
     static VaultSlot addPassword(Storage s, byte[] vk, char[] password) throws IOException {
-        if (Character.codePointCount(password, 0, password.length) < MIN_PASSWORD) {
+        if (!longEnough(password)) {
             throw new IllegalArgumentException("A password needs at least " + MIN_PASSWORD + " characters");
         }
         Info vault = current(s);

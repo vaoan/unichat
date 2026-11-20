@@ -167,7 +167,7 @@ final class VaultActions {
 
     /** A password as one more way in; at least {@link Vault#MIN_PASSWORD} characters. */
     static void addPassword(Storage dav, byte[] vk, char[] password) throws IOException {
-        if (Character.codePointCount(password, 0, password.length) < Vault.MIN_PASSWORD) {
+        if (!Vault.longEnough(password)) {
             throw new IOException(I18n.t("cloud.error.vaultShortPassword", Vault.MIN_PASSWORD));
         }
         Vault.addPassword(dav, vk, password);
