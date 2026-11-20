@@ -183,13 +183,15 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
   a change of key and then the turn-off (its mark's key is the older generation's).
 - A removed computer still holds the old vault key, so it can vouch for an offer of its own to a computer that was off
   during the removal (and missed the change that shut it out) and keep reading what that computer then seals. The
-  limit holds until that computer is opened with a way in (recovery code, password), which writes it a slot of its own.
+  limit holds until that computer is opened with the recovery code or a password set after the removal, which writes it
+  a slot of its own (an older password's slot, put back by the removed computer, opens its key).
   The same removed computer can write a turn-off mark such a computer believes (both hold the key the mark is made
   from) and delete `boveda.json`: that computer then goes back to plain. Same class, same limit.
 - Texts come into the vault from plain folders only for the machines sending plain when the move started, and only as
   new files: a folder or a longer copy put in through the account is named, never sealed in. That list is the vault's
-  own, sealed (`Ajustes/unichat-senders.json`), written once by the computer that made the vault; the others adopt it,
-  and one finding none (deleted through the account) takes nothing in.
+  own, sealed (`Registro/remitentes.json`, never under `Ajustes`, whose plain files the move takes in), written once by
+  the computer that made the vault; the others adopt it, one finding none (deleted through the account) takes nothing
+  in, and one damaged, or gone once read, is told and never written again.
 - A stranger in a chat: nothing new (names never become vault paths; nothing from the vault runs).
 
 ### Phases

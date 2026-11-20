@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.regex.Pattern;
 
 /**
  * Moving in: what Unichat kept plain in the account before the vault (its files under {@code Ajustes}, every computer's
@@ -41,9 +40,12 @@ final class VaultMove {
     static final Duration QUIET = Duration.ofDays(1);
     /**
      * The machines sending plain texts when the move started, one list inside the vault (sealed: only a key holder writes
-     * it): only their folders are ever taken in, by any computer of the vault.
+     * it): only their folders are ever taken in, by any computer of the vault. Never under {@link #SETTINGS_DIR}, where a
+     * part that doesn't open reads as none and a plain file of ours is moved in.
      */
-    static final String SENDERS = CloudAccount.SETTINGS_DIR + "/unichat-senders.json";
+    static final String SENDERS = CloudAccount.ROOT + "/Registro/remitentes.json";
+    /** The vault whose list of {@link #SENDERS} this computer has read or written (machine-only): one gone since is told. */
+    static final String KNOWN = "cloud.vault.sendersKnown";
     /**
      * The vault made here, whose list of {@link #SENDERS} this computer is to write (machine-only, until it's written):
      * the one that made it moves first; a later one finding no list was handed a vault without it, and takes nothing in.
@@ -51,8 +53,6 @@ final class VaultMove {
     static final String RECORD = "cloud.vault.recordSenders";
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
     static final String SETTINGS_DIR = CloudAccount.SETTINGS_DIR;
-    /** The files Unichat writes in {@link #SETTINGS_DIR}: no other name there is moved or deleted. */
-    private static final Pattern OURS = Pattern.compile("unichat-[a-z]+\\.json");
 
     private VaultMove() {}
 
@@ -93,8 +93,13 @@ final class VaultMove {
         }
 
         boolean failed(IOException e) {
-            if (error == null) error = Errors.message(e);
+            said(Errors.message(e));
             return false;
+        }
+
+        /** The round's first trouble, told in the status. */
+        void said(String why) {
+            if (error == null) error = why;
         }
 
         Result result(List<Stray> strays) {
@@ -105,7 +110,7 @@ final class VaultMove {
     /** A vault other than the one moved into: everything about the move starts again. */
     static void forget() {
         Settings s = Settings.get();
-        for (String k : new String[] {MOVED_AT, QUIET_SINCE, STRAYS_SEEN}) {
+        for (String k : new String[] {MOVED_AT, QUIET_SINCE, STRAYS_SEEN, KNOWN}) {
             if (s.getString(k, null) != null) s.set(k, null);
         }
     }
@@ -167,7 +172,8 @@ final class VaultMove {
     private static Found find(Storage plain, Storage sealed, Tally t) throws IOException {
         List<String> settings = new ArrayList<>();
         for (String name : plain.list(SETTINGS_DIR)) {
-            if (OURS.matcher(name).matches()) settings.add(SETTINGS_DIR + "/" + name);
+            // Only the parts' own files: no other name there is moved or deleted.
+            if (Cloud.Part.of(name) != null) settings.add(SETTINGS_DIR + "/" + name);
         }
         Map<String, List<String>> texts = new TreeMap<>(), ofTheVault = new TreeMap<>(), unknown = new TreeMap<>();
         for (String machine : plain.list(TextSync.ROOT)) {
@@ -187,7 +193,7 @@ final class VaultMove {
         }
         // Recorded on the first pass, nothing plain or not; read only when some texts are plain.
         boolean recording = t.vault.equals(Settings.get().getString(RECORD, null));
-        Set<String> senders = texts.isEmpty() && !recording ? Set.of() : senders(sealed, recording, texts.keySet());
+        Set<String> senders = texts.isEmpty() && !recording ? Set.of() : senders(sealed, recording, texts.keySet(), t);
         for (String machine : List.copyOf(texts.keySet())) {
             if (!senders.contains(machine)) unknown.put(machine, texts.remove(machine));
         }
@@ -198,19 +204,29 @@ final class VaultMove {
      * The machines sending plain texts when the move started: the vault's list, written once by the computer that made
      * the vault, the first time its move runs (from {@code now}, those without a slot found then). Only those were ever
      * the person's, so only theirs come in. No list and not this computer's to write: none (the account can delete it,
-     * never write one).
+     * never write one); one that doesn't open, or gone once known here, is never written again, and is told.
      */
-    private static Set<String> senders(Storage sealed, boolean mine, Set<String> now) throws IOException {
+    private static Set<String> senders(Storage sealed, boolean mine, Set<String> now, Tally t) throws IOException {
         Settings s = Settings.get();
-        Set<String> kept = machines(sealed.get(SENDERS));
-        if (kept == null && mine) {
-            sealed.mkdirs(SETTINGS_DIR);
+        byte[] file;
+        try {
+            file = sealed.get(SENDERS);
+        } catch (SealedStorage.Damaged e) {
+            file = new byte[0];
+        }
+        Set<String> kept = machines(file);
+        if (file == null && mine) {
+            sealed.mkdirs(SENDERS.substring(0, SENDERS.lastIndexOf('/')));
             sealed.put(SENDERS, JSON.writeValueAsBytes(new TreeSet<>(now)));
             kept = machines(sealed.get(SENDERS));
-            if (kept == null) throw new IOException(app.unichat.support.I18n.t("cloud.error.vaultDamaged"));
         }
+        if (kept == null) {
+            if (file != null || t.vault.equals(s.getString(KNOWN, null))) t.said(app.unichat.support.I18n.t("cloud.error.vaultSendersDamaged"));
+            return Set.of();
+        }
+        if (!t.vault.equals(s.getString(KNOWN, null))) s.set(KNOWN, t.vault);
         if (mine) s.set(RECORD, null); // written, or another computer of the vault's was first: adopted
-        return kept == null ? Set.of() : kept;
+        return kept;
     }
 
     /** The machine ids in a list of {@link #SENDERS}; null for none, or what isn't one (only ids of ours are kept). */

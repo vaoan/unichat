@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -418,34 +419,72 @@ class CloudVaultTest {
         cloud.put(folder + "/index.json", TextIndex.write(Map.of(TEXT, (long) text.getBytes(StandardCharsets.UTF_8).length)));
     }
 
+    /** Where the vault keeps its list of who sent plain, in the account. */
+    private static final String SEALED_LIST = Vault.ROOT + VaultMove.SENDERS.substring(CloudAccount.ROOT.length());
+
     /** The vault made on the desk, which moved in what was plain; then a folder put in through the account. */
-    private Vault.Created movedThenAFolderPutIn() throws Exception {
+    private VaultComputer movedThenAFolderPutIn(Vault.Created made) throws Exception {
         plainTexts(OTHER, "{\"viejo\":1}\n"); // a computer of the person's, without the vault
-        Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
         VaultComputer desk = computer(DESK).madeHere(made);
         assertNull(desk.round().error());
         assertTrue(cloud.files.containsKey(Vault.ROOT + "/Textos/" + OTHER + "/" + TEXT), "its texts taken in");
+        assertTrue(cloud.files.containsKey(SEALED_LIST), "the list kept in the vault, sealed");
         plainTexts(PUT_IN, "{\"puesto\":1}\n");
-        return made;
+        return desk;
     }
 
-    private void aLaterComputerNeverTakesItIn(Vault.Created made) throws Exception {
-        VaultComputer laptop = computer(LAPTOP).opened(made.info(), Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil"));
-        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
-        laptop.round();
+    /** A list naming the folder put in, planted plain where a settings file or the vault's list would be. */
+    private void listPlantedPlain() {
+        byte[] forged = ("[\"" + PUT_IN + "\"]").getBytes(StandardCharsets.UTF_8);
+        cloud.dirs.add(CloudAccount.SETTINGS_DIR);
+        cloud.put(CloudAccount.SETTINGS_DIR + "/unichat-senders.json", forged);
+        cloud.dirs.add(VaultMove.SENDERS.substring(0, VaultMove.SENDERS.lastIndexOf('/')));
+        cloud.put(VaultMove.SENDERS, forged);
+    }
+
+    private void neverTakenIn(VaultComputer c) throws Exception {
+        c.round();
         assertFalse(cloud.files.containsKey(Vault.ROOT + "/Textos/" + PUT_IN + "/" + TEXT), "never sealed in");
         assertTrue(cloud.files.containsKey(TextSync.ROOT + "/" + PUT_IN + "/" + TEXT), "nor deleted");
     }
 
-    @Test
-    void aFolderPutInAfterTheFirstMoveIsNeverTakenInByALaterComputer() throws Exception {
-        aLaterComputerNeverTakesItIn(movedThenAFolderPutIn());
+    private VaultComputer laptop(Vault.Created made) throws Exception {
+        VaultComputer laptop = computer(LAPTOP).opened(made.info(), Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil"));
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
+        return laptop;
     }
 
     @Test
-    void theListOfWhoSentPlainDeletedFromTheVaultTakesNothingIn() throws Exception {
-        Vault.Created made = movedThenAFolderPutIn();
-        assertNotNull(cloud.files.remove(Vault.ROOT + "/Ajustes/unichat-senders.json"), "kept in the vault, sealed");
-        aLaterComputerNeverTakesItIn(made);
+    void aFolderPutInAfterTheFirstMoveIsNeverTakenInByALaterComputer() throws Exception {
+        Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
+        movedThenAFolderPutIn(made);
+        neverTakenIn(laptop(made));
+    }
+
+    @Test
+    void theListDeletedFromTheVaultAndAnotherPlantedPlainTakesNothingInAndIsNamed() throws Exception {
+        Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
+        VaultComputer desk = movedThenAFolderPutIn(made);
+        cloud.files.remove(SEALED_LIST);
+        listPlantedPlain();
+        VaultComputer laptop = laptop(made);
+        neverTakenIn(laptop);
+        neverTakenIn(desk);
+        assertFalse(cloud.files.containsKey(SEALED_LIST), "nobody writes it again");
+        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultSendersDamaged"), desk.round().error(), "the one that knew it says it's gone");
+    }
+
+    @Test
+    void theListDamagedInTheVaultAndAnotherPlantedPlainTakesNothingInAndIsNamed() throws Exception {
+        Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
+        VaultComputer desk = movedThenAFolderPutIn(made);
+        cloud.put(SEALED_LIST, "dañada".getBytes(StandardCharsets.UTF_8));
+        listPlantedPlain();
+        VaultComputer laptop = laptop(made);
+        neverTakenIn(laptop);
+        neverTakenIn(desk);
+        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultSendersDamaged"), laptop.round().error());
+        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultSendersDamaged"), desk.round().error());
+        assertArrayEquals("dañada".getBytes(StandardCharsets.UTF_8), cloud.files.get(SEALED_LIST), "nobody writes it again");
     }
 }
