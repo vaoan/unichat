@@ -25,6 +25,9 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
 - Optional everywhere: without a vault Unichat works as today, everything entered by hand; and a computer that finds a
   vault in the account can choose not to use it ("Seguir sin la bóveda en este equipo"), entering its keys by hand as
   before, without being asked again (it can open the vault later from Ajustes → Nube).
+- The vault and media are independent: each is on or off by itself, neither needs nor implies the other. Media goes up
+  (or not, by its switch) whatever the vault's state; the vault syncs whatever media's switch says (the texts kept go
+  with the vault when it's open, no longer behind media's switch).
 - Accessible and keyboard-reachable like every screen; bilingual.
 
 ## Non-goals
