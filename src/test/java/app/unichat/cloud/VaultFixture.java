@@ -73,6 +73,11 @@ public final class VaultFixture implements AutoCloseable {
             + (info.generation() + 1) + "}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
+    /** {@code boveda.json} deleted by someone with only the account, the vault not turned off. */
+    public void deleteVaultFileByHand() {
+        dav.files.remove(Vault.INFO);
+    }
+
     /** Whether {@code machine}'s slot holds an offer of the vault's current key (it takes it on its next round). */
     public boolean offeredTheKey(String machine) throws Exception {
         Vault.Info info = Vault.info(storage());

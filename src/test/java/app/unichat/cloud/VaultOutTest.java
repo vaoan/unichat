@@ -16,6 +16,7 @@ import java.util.concurrent.ExecutionException;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -140,7 +141,7 @@ class VaultOutTest {
                 super.delete(path);
             }
         };
-        assertTrue(VaultOut.run(plain, new SealedStorage(dav(), () -> made.vk().clone())));
+        assertTrue(VaultOut.run(plain, new SealedStorage(dav(), () -> made.vk().clone()), made.info(), made.vk()));
         assertFalse(anyVault());
         assertEquals("{\"l\":1}\n", plain(text), "put back after the vault went");
     }
@@ -151,7 +152,7 @@ class VaultOutTest {
         cloud.put(Vault.ROOT + "/Ajustes/unichat-ai.json", "dañado".getBytes(StandardCharsets.UTF_8));
         SealedStorage sealed = new SealedStorage(dav(), () -> made.vk().clone());
         sealed.put(SETTINGS, Bundle.of(DESK, java.time.Instant.now(), Map.of("ui.theme", "DARK"), null).toBytes());
-        assertTrue(VaultOut.run(dav(), sealed));
+        assertTrue(VaultOut.run(dav(), sealed, made.info(), made.vk()));
         assertNull(cloud.files.get(AI), "no one can read it: nothing plain");
         assertNotNull(cloud.files.get(SETTINGS), "the others still go");
         assertFalse(anyVault());
@@ -193,7 +194,7 @@ class VaultOutTest {
                 super.delete(path);
             }
         };
-        assertTrue(VaultOut.run(plain, sealed));
+        assertTrue(VaultOut.run(plain, sealed, made.info(), made.vk()));
         assertArrayEquals(shorter, cloud.files.get(SETTINGS), "a bundle isn't a text: shorter is no sign of less");
     }
 
@@ -216,7 +217,7 @@ class VaultOutTest {
                 else super.put(path, data);
             }
         };
-        java.io.IOException e = assertThrows(java.io.IOException.class, () -> VaultOut.run(plain, new SealedStorage(dav(), () -> made.vk().clone())));
+        java.io.IOException e = assertThrows(java.io.IOException.class, () -> VaultOut.run(plain, new SealedStorage(dav(), () -> made.vk().clone()), made.info(), made.vk()));
         assertEquals(app.unichat.support.I18n.t("cloud.error.vaultNotBack"), e.getMessage());
     }
 
@@ -252,6 +253,50 @@ class VaultOutTest {
         assertNull(declined.get(VaultParts.DECLINED), "never declined a vault that's gone");
         Vault.Created later = Vault.create(dav(), DESK, "Escritorio");
         assertEquals(Cloud.VaultState.LOCKED, declined.round().vault(), "a vault made later is asked about afresh");
+        Arrays.fill(later.vk(), (byte) 0);
+    }
+
+    private VaultComputer laptopOpen() throws Exception {
+        Vault.Computer laptopWay = Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil");
+        VaultComputer laptop = new VaultComputer(cloud, dir, LAPTOP).opened(made.info(), laptopWay).write("texts/here/" + TEXT, "{\"l\":1}\n")
+            .set("ui.theme", "SEPIA");
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
+        return laptop;
+    }
+
+    @Test
+    void theVaultsFileDeletedByHandSendsNothingPlain() throws Exception {
+        VaultComputer laptop = laptopOpen();
+        cloud.files.remove(Vault.INFO); // someone with only the account
+        laptop.write("texts/here/" + TEXT, "{\"l\":1}\n{\"l\":2}\n");
+        int puts = cloud.puts.get();
+        Cloud.Status s = laptop.round();
+        assertNotEquals(Cloud.VaultState.NONE, s.vault(), "never back to plain on that alone");
+        assertEquals(puts, cloud.puts.get(), "nothing sent, plain or sealed");
+        assertNull(plain(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT));
+        assertEquals(made.info().id(), laptop.get(VaultParts.ID), "its hold kept");
+        assertNotNull(laptop.get(VaultParts.KEY));
+    }
+
+    @Test
+    void anOffMarkerWrittenByTheAccountIsNotBelieved() throws Exception {
+        VaultComputer laptop = laptopOpen();
+        cloud.files.remove(Vault.INFO);
+        cloud.put("Unichat/Ajustes/boveda-apagada.json", ("{\"vault\":\"" + made.info().id() + "\",\"generation\":0,\"mac\":\"AAAA\"}")
+            .getBytes(StandardCharsets.UTF_8));
+        int puts = cloud.puts.get();
+        assertNotEquals(Cloud.VaultState.NONE, laptop.round().vault());
+        assertEquals(puts, cloud.puts.get());
+    }
+
+    @Test
+    void aVaultTurnedOffLeavesAMarkThatTheNextVaultClears() throws Exception {
+        VaultComputer desk = desk();
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
+        desk.as(desk.cloud.vault()::turnOffVault);
+        assertNotNull(cloud.files.get("Unichat/Ajustes/boveda-apagada.json"), "turned off, and said so outside the vault");
+        Vault.Created later = Vault.create(dav(), DESK, "Escritorio");
+        assertNull(cloud.files.get("Unichat/Ajustes/boveda-apagada.json"), "a new vault clears it");
         Arrays.fill(later.vk(), (byte) 0);
     }
 }

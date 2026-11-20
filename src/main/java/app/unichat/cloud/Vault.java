@@ -125,6 +125,7 @@ final class Vault {
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
         if (s.exists(INFO) && (info(s) != null || !s.list(SLOTS).isEmpty())) throw new Exists();
         if (!s.exists(INFO) && !s.list(ROOT).isEmpty()) s.delete(ROOT); // left from a vault turned off whose folder wouldn't go
+        VaultOff.delete(s); // the last vault's "turned off" says nothing of this one
         Info mine = new Info(UUID.randomUUID().toString(), Instant.now(), 0);
         byte[] vk = VaultCrypto.randomKey();
         List<String> written = new ArrayList<>();

@@ -53,16 +53,19 @@ final class VaultOut {
     private VaultOut() {}
 
     /**
-     * Everything back plain, then the vault deleted; {@code sealed} is the vault, open, over {@code plain}. False when its
-     * folder couldn't be deleted but its file was: no computer finds a vault, though some of it is left in the account.
+     * Everything back plain, then the mark that {@code vault} is turned off ({@link VaultOff}, so the other computers
+     * believe it), then the vault deleted; {@code sealed} is the vault, open with {@code vk}, over {@code plain}. False when
+     * its folder couldn't be deleted but its file was: no computer finds a vault, though some of it is left in the account.
      */
-    static boolean run(Storage plain, Storage sealed) throws IOException {
+    static boolean run(Storage plain, Storage sealed, Vault.Info vault, byte[] vk) throws IOException {
         Written w = new Written();
         try {
             for (String path : PARTS) partOut(plain, sealed, path, w);
             for (String machine : sealed.list(TextSync.ROOT)) {
                 if (Ids.ours(machine)) textsOut(plain, sealed, machine, w);
             }
+            w.before.putIfAbsent(VaultOff.FILE, null); // taken back too: a mark left with the vault still there would be believed
+            VaultOff.write(plain, vault, vk);
         } catch (IOException e) {
             w.takeBack(plain);
             throw new IOException(I18n.t("cloud.error.vaultOffUndone", Errors.message(e)), e);
@@ -81,6 +84,11 @@ final class VaultOut {
             } catch (IOException f) {
                 // The vault may be partly gone: nothing is taken back, everything is plain already.
                 partly = new IOException(I18n.t("cloud.error.vaultPartlyGone"), f);
+                try {
+                    VaultOff.delete(plain); // a vault still there isn't turned off: its file deleted later is no sign it was
+                } catch (IOException g) {
+                    partly.addSuppressed(g);
+                }
             }
         }
         settle(plain, w);

@@ -130,7 +130,7 @@ final class VaultParts {
                 case NONE -> plain;
                 case OPEN -> new SealedStorage(plain, () -> vk.clone(), path -> replaceable(plain, path),
                     path -> { if (damaged.contains(path)) replaced.add(path); });
-                case LOCKED, DECLINED, REMOVED, UNRECOGNIZED -> null;
+                case LOCKED, DECLINED, REMOVED, UNRECOGNIZED, MISSING -> null;
             };
         }
 
@@ -192,6 +192,8 @@ final class VaultParts {
         // and a key held here isn't forgotten over it.
         if (info == null && file != null) return closed(s);
         if (info == null) {
+            // Its file deleted is no sign it was turned off: only the mark that opens with this computer's key is.
+            if (held != null && !VaultOff.says(plain, held)) return new Round(Cloud.VaultState.MISSING, null);
             if (held != null || s.getBool(DECLINED, false)) gone();
             return new Round(Cloud.VaultState.NONE, null);
         }
@@ -210,6 +212,7 @@ final class VaultParts {
             if (info.generation() > slot.generation()) return taken(plain, info, slot, slotKey, s, sentHere, keyTaken);
             byte[] vk = slot.unwrap(slotKey);
             ownKeyBack(plain, info, slot, slotKey, vk, s);
+            VaultOff.remember(info, vk);
             return new Round(Cloud.VaultState.OPEN, vk, info);
         } catch (VaultCrypto.Broken e) {
             return new Round(Cloud.VaultState.REMOVED, null);
@@ -230,7 +233,7 @@ final class VaultParts {
     /** This computer's hold on the vault forgotten here: the vault itself and the other computers left as they are. */
     static void forget() {
         Settings s = Settings.get();
-        for (String k : new String[] {ID, KEY, PRIVATE, VaultActions.UNCONFIRMED}) s.set(k, null);
+        for (String k : new String[] {ID, KEY, PRIVATE, VaultActions.UNCONFIRMED, VaultOff.KEY}) s.set(k, null);
         VaultMove.forget();
         VaultPeers.forget();
     }
@@ -284,6 +287,7 @@ final class VaultParts {
             VaultReseal.run(plain, old, vk, sentHere);
             keyTaken.run();
             Vault.rewrap(plain, info, slot, slotKey, vk, ownPublicKey(s));
+            VaultOff.remember(info, vk);
             return new Round(Cloud.VaultState.OPEN, vk, info);
         } catch (IOException | RuntimeException e) {
             if (vk != null) Arrays.fill(vk, (byte) 0);

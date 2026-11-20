@@ -144,6 +144,7 @@ class CloudVaultTest {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
         VaultComputer desk = computer(DESK).opened(made.info(), made.computer()).set(VaultParts.DECLINED, "true");
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
+        VaultOff.write(dav(), made.info(), made.vk()); // turned off elsewhere: said so, then deleted
         dav().delete(Vault.ROOT);
         Cloud.Status s = desk.round();
         assertEquals(Cloud.VaultState.NONE, s.vault());

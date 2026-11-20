@@ -75,6 +75,7 @@ final class VaultPage {
             case LOCKED -> drawLocked(v, I18n.t("settings.vault.locked"), true);
             case REMOVED -> drawLocked(v, I18n.t("settings.vault.removed"), false);
             case UNRECOGNIZED -> drawLocked(v, I18n.t("settings.vault.unrecognized"), false);
+            case MISSING -> drawMissing();
             case DECLINED -> drawDeclined(v);
             case OPEN -> drawOpen(v);
         }
@@ -137,6 +138,28 @@ final class VaultPage {
             show(line(I18n.t("settings.vault.declined")), new VaultOpenForm(cloud, v.ways(), this::opened), actions(cancel(this::reload)));
         });
         show(stacked(I18n.t("settings.vault.declinedTitle"), I18n.t("settings.vault.declined"), open));
+    }
+
+    /** Gone from the account with nothing saying it was turned off: why nothing is sent, and going back to plain, asked twice. */
+    private void drawMissing() {
+        Button leave = secondary(I18n.t("settings.vault.missingLeave"));
+        leave.setOnAction(e -> askTwice(I18n.t("settings.vault.missingLeave"), I18n.t("settings.vault.missingAsk"),
+            I18n.t("settings.vault.missingSure"), I18n.t("settings.vault.missingWhat"), I18n.t("settings.vault.missingYes"),
+            () -> job(cloud.vault().leaveMissingVault())));
+        show(stacked(I18n.t("settings.vault.missingTitle"), I18n.t("settings.vault.missing"), leave));
+    }
+
+    /** A step that changes how the vault stands here: done, a round and the page drawn again; failed, why and "Intentar de nuevo". */
+    private void job(java.util.concurrent.CompletableFuture<Void> step) {
+        show(line(I18n.t("settings.vault.reading")));
+        step.whenComplete((ok, err) -> Platform.runLater(() -> {
+            if (err != null) {
+                show(actions(KeyChangeFlow.warning(Errors.message(Errors.unwrap(err)))), retry());
+                return;
+            }
+            cloud.syncNow();
+            reload();
+        }));
     }
 
     private void opened() {
@@ -262,17 +285,21 @@ final class VaultPage {
 
     /** "Apagar la bóveda", asked twice: first whether, then what happens, with the button saying the action. */
     private void turnOff() {
-        inStep = true;
-        Button next = secondary(I18n.t("settings.vault.turnOffNext"));
-        next.setOnAction(e -> turnOffSure());
-        show(stacked(I18n.t("settings.vault.turnOffTitle"), I18n.t("settings.vault.turnOffAsk"), new FlowPane(8, 6, next, cancel(this::reload))));
+        askTwice(I18n.t("settings.vault.turnOffTitle"), I18n.t("settings.vault.turnOffAsk"), I18n.t("settings.vault.turnOffSure"),
+            I18n.t("settings.vault.turnOffWhat"), I18n.t("settings.vault.turnOffYes"), this::turningOff);
     }
 
-    private void turnOffSure() {
-        Button yes = new Button(I18n.t("settings.vault.turnOffYes"));
-        yes.getStyleClass().add("danger-button");
-        yes.setOnAction(e -> turningOff());
-        show(stacked(I18n.t("settings.vault.turnOffSure"), I18n.t("settings.vault.turnOffWhat"), new FlowPane(8, 6, yes, cancel(this::reload))));
+    /** Something that can't be undone, asked twice: first whether, then what happens, with the button saying the action. */
+    private void askTwice(String title, String ask, String sureTitle, String what, String yes, Runnable go) {
+        inStep = true;
+        Button next = secondary(I18n.t("settings.vault.turnOffNext"));
+        next.setOnAction(e -> {
+            Button sure = new Button(yes);
+            sure.getStyleClass().add("danger-button");
+            sure.setOnAction(x -> go.run());
+            show(stacked(sureTitle, what, new FlowPane(8, 6, sure, cancel(this::reload))));
+        });
+        show(stacked(title, ask, new FlowPane(8, 6, next, cancel(this::reload))));
     }
 
     /**

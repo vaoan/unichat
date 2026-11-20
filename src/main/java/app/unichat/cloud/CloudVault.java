@@ -102,6 +102,21 @@ public final class CloudVault {
     }
 
     /**
+     * "Volver a sincronizar sin cifrar": the vault this computer holds is gone from the account with nothing saying it was
+     * turned off ({@link Cloud.VaultState#MISSING}), and the person says it was: its hold here forgotten, so the next round
+     * is today's plain one. Only in that state: a vault there again is opened or locked as any other.
+     */
+    public CompletableFuture<Void> leaveMissingVault() {
+        return cloud.onWorker(dav -> {
+            try (VaultParts.Round vault = cloud.stateOf(dav)) {
+                if (vault.state() != Cloud.VaultState.MISSING) throw new IOException(I18n.t("cloud.error.vaultStillThere"));
+            }
+            VaultParts.gone();
+            return null;
+        });
+    }
+
+    /**
      * The vault forgotten on this computer, on the cloud's thread: its slot deleted, then its hold on the vault here (whether
      * it declined is left as it is). The next round finds it locked; it can be opened again later.
      */
@@ -123,7 +138,7 @@ public final class CloudVault {
     public CompletableFuture<Void> turnOffVault() {
         return cloud.onWorker(dav -> withKey(dav, (vault, vk) -> {
             synchronized (cloud.texts()) { // TextSync.run's own lock: no text of this computer's goes up halfway through
-                boolean whole = VaultOut.run(dav, vault.personal(dav));
+                boolean whole = VaultOut.run(dav, vault.personal(dav), vault.info(), vk);
                 VaultParts.gone();
                 cloud.texts().sentAt(TextSync.PLAIN);
                 if (!whole) throw new IOException(I18n.t("cloud.error.vaultLeftovers"));

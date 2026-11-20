@@ -35,9 +35,11 @@ public final class Cloud {
      * this computer chose to go on without it (nothing personal goes up, plain or sealed); open (everything personal goes
      * sealed); or this computer's way in was taken away (nothing is sent); or the vault changed in a way nothing this
      * computer holds vouches for (a generation raised through the account: nothing is sent, its key kept, until a change
-     * it can follow comes or a way in opens it). Media goes by its own switch in every one.
+     * it can follow comes or a way in opens it); or the vault this computer holds is gone from the account with nothing
+     * saying it was turned off (its file deleted by hand: nothing is sent, until the person says to go back to plain).
+     * Media goes by its own switch in every one.
      */
-    public enum VaultState { NONE, LOCKED, DECLINED, OPEN, REMOVED, UNRECOGNIZED }
+    public enum VaultState { NONE, LOCKED, DECLINED, OPEN, REMOVED, UNRECOGNIZED, MISSING }
 
     /** For the settings page: connected or not, when the last round worked, why the last one didn't, what went up. */
     public record Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,

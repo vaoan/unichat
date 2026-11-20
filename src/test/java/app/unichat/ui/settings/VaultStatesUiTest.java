@@ -2,6 +2,7 @@ package app.unichat.ui.settings;
 
 import app.unichat.cloud.Cloud;
 import app.unichat.cloud.VaultView;
+import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import app.unichat.ui.FxWait;
 import org.junit.jupiter.api.Test;
@@ -31,5 +32,28 @@ class VaultStatesUiTest extends VaultPageTestBase {
         click(I18n.t("settings.vault.open.with.RECOVERY"));
         waitOpen();
         assertEquals(Cloud.VaultState.OPEN, round());
+    }
+
+    @Test
+    void aVaultFileGoneByHandSendsNothingUntilThePersonSaysAskedTwice() throws Exception {
+        String code = account.otherComputerMadeIt(null);
+        account.cloud().vault().openVault(VaultView.Way.RECOVERY, code.toCharArray()).get();
+        assertEquals(Cloud.VaultState.OPEN, round());
+        account.deleteVaultFileByHand();
+        assertEquals(Cloud.VaultState.MISSING, round());
+        page();
+        waitFor(I18n.t("settings.vault.missing"));
+        assertTrue(Settings.get().getString("cloud.vault.key", null) != null, "its key kept meanwhile");
+        click(I18n.t("settings.vault.missingLeave"));
+        waitFor(I18n.t("settings.vault.missingAsk"));
+        click(I18n.t("folders.dialog.cancel"));
+        waitFor(I18n.t("settings.vault.missing"));
+        assertEquals(Cloud.VaultState.MISSING, round(), "cancelled: nothing changed");
+        click(I18n.t("settings.vault.missingLeave"));
+        click(I18n.t("settings.vault.turnOffNext"));
+        waitFor(I18n.t("settings.vault.missingWhat"));
+        click(I18n.t("settings.vault.missingYes"));
+        FxWait.until("no vault", () -> hasButton(I18n.t("settings.vault.create")));
+        assertEquals(Cloud.VaultState.NONE, round(), "back to plain, as the person said");
     }
 }

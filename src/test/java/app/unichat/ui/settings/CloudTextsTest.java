@@ -56,6 +56,10 @@ class CloudTextsTest {
         assertEquals(List.of("Bóveda: este equipo sigue sin ella."), CloudTexts.vaultLines(vault(Cloud.VaultState.DECLINED, null, null), NOW));
         assertEquals(List.of("Bóveda: este equipo fue quitado de ella, no se envía nada."),
                 CloudTexts.vaultLines(vault(Cloud.VaultState.REMOVED, null, null), NOW));
+        assertEquals(List.of("Bóveda: cambió de una forma que este equipo no reconoce, no se envía nada nuevo."),
+                CloudTexts.vaultLines(vault(Cloud.VaultState.UNRECOGNIZED, null, null), NOW));
+        assertEquals(List.of("Bóveda: ya no está en tu nube y nada dice que se apagó, no se envía nada personal."),
+                CloudTexts.vaultLines(vault(Cloud.VaultState.MISSING, null, null), NOW));
         assertEquals(List.of(), CloudTexts.vaultLines(vault(Cloud.VaultState.OPEN, null, null), NOW), "open, with nothing to say");
         assertEquals(List.of(), CloudTexts.vaultLines(vault(Cloud.VaultState.NONE, null, null), NOW));
         Cloud.Status locked = vault(Cloud.VaultState.LOCKED, null, null);
