@@ -237,7 +237,7 @@ final class Vault {
      * nothing new. Every computer still listed whose public key {@code oldVk} sealed, and is the one {@code peers} first saw
      * (one never seen is pinned now), is offered it, sealed for its X25519 key ({@link VaultNext}), and takes it on its
      * next round (this one too, right after); any other is offered nothing and named; a new recovery code; the
-     * generation rises; then the old recovery, the password, Google and passkey slots go, and every file is sealed again.
+     * generation rises; then every other way in (the old recovery code, the password) goes, and every file is sealed again.
      * Until the generation rises the old key and every old way in stay as they were, and a change cut short takes back what
      * it wrote ({@link #withdrawn}). After it,
      * nothing fails the change: the person must see the new code, and what's left is done again as each computer takes the

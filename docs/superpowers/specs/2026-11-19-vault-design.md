@@ -167,6 +167,20 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
   computer slot's key; removing that computer and changing the key shuts it out of anything new.
 - Someone who can write to the cloud account can put back an older copy of a part, or delete slots (a denial, which the
   recovery code survives), but can't read or forge one. Rollback protection (a counter per part) is out of scope.
+- Someone who can only write to the cloud account can't hand a computer a new key: every offer (`next`) carries what
+  the old vault key sealed of it (`auth`: its ephemeral key and the hash of what it seals), and `boveda.json` a
+  `vouch` of its generation sealed with the key it replaced. A generation raised without either leaves each computer
+  `UNRECOGNIZED` (its key kept, nothing sent) rather than removed, and a way in from before still opens the vault.
+- Deleting `boveda.json` by hand sends nobody plain: turning the vault off first writes `Unichat/Ajustes/boveda-apagada.json`
+  (the vault and generation sealed with a key made from that generation's vault key, kept by each computer while the
+  vault is open there), and a computer holding a vault goes back to plain only when that mark opens with its key;
+  otherwise it is `MISSING` and the person decides ("Volver a sincronizar sin cifrar", asked twice). A computer that
+  declined the vault, or never opened it, has no key to check the mark with and goes back to plain as before.
+- A removed computer still holds the old vault key, so it can vouch for an offer of its own to a computer that was off
+  during the removal (and missed the change that shut it out) and keep reading what that computer then seals. The
+  limit holds until that computer is opened with a way in (recovery code, password), which writes it a slot of its own.
+- Texts come into the vault from plain folders only for the machines sending plain when the move started, and only as
+  new files: a folder or a longer copy put in through the account is named, never sealed in.
 - A stranger in a chat: nothing new (names never become vault paths; nothing from the vault runs).
 
 ### Phases
