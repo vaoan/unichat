@@ -6,6 +6,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
@@ -14,7 +15,7 @@ import java.util.function.Supplier;
  * A {@link Storage} that seals what goes in and opens what comes out, so the sync classes run over the vault unchanged.
  * A logical path {@code Unichat/<rest>} is kept at {@link Vault#ROOT}{@code /<rest>}, sealed with the logical path as its
  * associated data (a file copied to another name opens nothing). Only for what the vault keeps: media never goes through
- * it, and files are read whole. The key comes from {@code vk} on every call and is never kept.
+ * it, and files are read whole. {@code vk} gives a fresh copy of the key on every call, cleared after each use and never kept.
  */
 final class SealedStorage implements Storage {
     private static final String PREFIX = CloudAccount.ROOT + "/";
@@ -59,19 +60,19 @@ final class SealedStorage implements Storage {
 
     @Override
     public void put(String path, Path file) throws IOException {
-        put(path, Files.readAllBytes(file));
+        put(path, file, null);
     }
 
     @Override
     public void put(String path, Path file, LongConsumer sent) throws IOException {
-        byte[] sealed = VaultCrypto.seal(vk.get(), checked(path), Files.readAllBytes(file));
+        byte[] sealed = seal(path, Files.readAllBytes(file));
         plain.put(stored(path), sealed);
         if (sent != null) sent.accept(sealed.length);
     }
 
     @Override
     public void put(String path, byte[] data) throws IOException {
-        plain.put(stored(path), VaultCrypto.seal(vk.get(), checked(path), data));
+        plain.put(stored(path), seal(path, data));
     }
 
     @Override
@@ -93,24 +94,39 @@ final class SealedStorage implements Storage {
         return exists(path) ? new RemoteFile(-1, null, null) : null;
     }
 
-    private byte[] open(String path, byte[] sealed) throws IOException {
+    private byte[] seal(String path, byte[] data) {
+        stored(path);
+        byte[] key = vk.get();
         try {
-            return VaultCrypto.open(vk.get(), checked(path), sealed);
-        } catch (VaultCrypto.Broken e) {
-            throw new IOException(I18n.t("cloud.error.vaultDamaged"));
+            return VaultCrypto.seal(key, path, data);
+        } finally {
+            Arrays.fill(key, (byte) 0);
         }
     }
 
-    private static String checked(String path) {
-        stored(path);
-        return path;
+    private byte[] open(String path, byte[] sealed) throws IOException {
+        byte[] key = vk.get();
+        try {
+            return VaultCrypto.open(key, path, sealed);
+        } catch (VaultCrypto.Broken e) {
+            throw new IOException(I18n.t("cloud.error.vaultDamaged"));
+        } finally {
+            Arrays.fill(key, (byte) 0);
+        }
     }
 
-    /** Where the logical path is kept; anything outside what the vault keeps is refused. */
+    /**
+     * Where the logical path is kept. Only a named file or folder under {@code Unichat/} that is neither media nor the vault's
+     * own folder: an empty, "." or ".." part would reach other places once a server resolves it.
+     */
     private static String stored(String path) {
-        boolean ok = path.startsWith(PREFIX) && !path.startsWith(Vault.ROOT) && !path.equals(CloudAccount.MEDIA)
-            && !path.startsWith(CloudAccount.MEDIA + "/");
-        if (!ok) throw new IllegalArgumentException("The vault keeps only what is under " + PREFIX + ", not media");
-        return Vault.ROOT + "/" + path.substring(PREFIX.length());
+        boolean ok = path.startsWith(PREFIX) && !path.equals(Vault.ROOT) && !path.startsWith(Vault.ROOT + "/")
+            && !path.equals(CloudAccount.MEDIA) && !path.startsWith(CloudAccount.MEDIA + "/");
+        String rest = ok ? path.substring(PREFIX.length()) : "";
+        for (String part : rest.split("/", -1)) {
+            if (part.isEmpty() || part.equals(".") || part.equals("..")) ok = false;
+        }
+        if (!ok) throw new IllegalArgumentException("The vault keeps only named files under " + PREFIX + ", not media: " + path);
+        return Vault.ROOT + "/" + rest;
     }
 }

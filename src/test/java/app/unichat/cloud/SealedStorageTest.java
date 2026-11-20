@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -71,7 +72,7 @@ class SealedStorageTest {
             assertTrue(sealed.get("Unichat/Ajustes/dos.json", out));
             assertArrayEquals(secret, Files.readAllBytes(out));
 
-            assertNotEquals(sealed.stamp(PATH), (Object) null);
+            assertNotNull(sealed.stamp(PATH));
             sealed.delete("Unichat/Ajustes/dos.json");
             assertFalse(sealed.exists("Unichat/Ajustes/dos.json"));
             sealed.check();
@@ -82,11 +83,17 @@ class SealedStorageTest {
     void whatTheVaultDoesntKeepIsRefused() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             SealedStorage sealed = over(new WebDav(cloud.url(), "u", "p"));
-            for (String path : new String[] {"Otro/x", "Unichat", Vault.ROOT + "/x", CloudAccount.MEDIA + "/a.mp4", CloudAccount.MEDIA, "../x"}) {
+            for (String path : new String[] {"Otro/x", "Unichat", Vault.ROOT + "/x", CloudAccount.MEDIA + "/a.mp4", CloudAccount.MEDIA, "../x",
+                "Unichat/", "Unichat//", "Unichat/../x", "Unichat/../../Unichat/Bóveda/llaves/x", "Unichat/./x", "Unichat/a//b", "Unichat/a/"}) {
                 assertThrows(IllegalArgumentException.class, () -> sealed.put(path, new byte[1]), path);
                 assertThrows(IllegalArgumentException.class, () -> sealed.get(path), path);
+                assertThrows(IllegalArgumentException.class, () -> sealed.list(path), path);
+                assertThrows(IllegalArgumentException.class, () -> sealed.mkdirs(path), path);
+                assertThrows(IllegalArgumentException.class, () -> sealed.delete(path), path);
+                assertThrows(IllegalArgumentException.class, () -> sealed.stamp(path), path);
             }
-            assertTrue(cloud.files.isEmpty());
+            sealed.put("Unichat/BóvedaVieja/x", new byte[1]); // only the vault's own folder is the vault's
+            assertEquals(java.util.Set.of(Vault.ROOT + "/BóvedaVieja/x"), cloud.files.keySet(), "only that one landed");
         }
     }
 
