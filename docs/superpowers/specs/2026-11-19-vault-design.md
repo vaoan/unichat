@@ -1,5 +1,11 @@
 # Vault — design
 
+> **Change (2026-11-20):** no "Google" way in through OAuth. The person wants nothing of theirs registered anywhere
+> (Unichat is public: no client id of theirs can ship in it, and an OAuth app publishes its developer's details). The
+> comfortable way in is the **passkey**, kept in the person's password manager (Google Password Manager or iCloud
+> Keychain), which needs no registration at all; recovery code and password stay. Where this document says Google,
+> read: dropped.
+
 ## Intent
 Everything dangerous, personal or identifying that Unichat keeps lives in one place, the vault, which goes to the
 person's cloud account encrypted with a key the cloud never sees. On a new computer the person connects the cloud,
