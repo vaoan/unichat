@@ -194,6 +194,37 @@ public final class Settings {
         return copy;
     }
 
+    /**
+     * The keys that are the person's, not a computer's, which the vault carries: never anything run here, a path of this
+     * computer, a session or the way to the vault. Plus each GIF service's key ({@link #vaultSecret}).
+     */
+    public static final java.util.Set<String> VAULT_SECRETS = java.util.Set.of("server.telegram.apiId", "server.telegram.apiHash",
+            "cloud.dropboxAppKey", "cloud.pcloudClientId");
+    private static final java.util.regex.Pattern GIF_KEY = java.util.regex.Pattern.compile("gif\\.[a-z0-9]+\\.key");
+
+    public static boolean vaultSecret(String key) {
+        return VAULT_SECRETS.contains(key) || GIF_KEY.matcher(key).matches();
+    }
+
+    /** The vault's secrets set here. */
+    public synchronized java.util.Map<String, String> vaultSecrets() {
+        java.util.Map<String, String> out = new java.util.TreeMap<>();
+        for (Properties p : new Properties[] {props, machine}) {
+            for (String k : p.stringPropertyNames()) if (vaultSecret(k)) out.put(k, p.getProperty(k));
+        }
+        return out;
+    }
+
+    /**
+     * The vault's secrets in place of these, as {@link #replacePortable} does the settings: one cleared on another computer
+     * is cleared here. Any other key in {@code values} (it comes from the account) is ignored.
+     */
+    public synchronized void adoptVaultSecrets(java.util.Map<String, String> values) {
+        for (String k : vaultSecrets().keySet()) if (!values.containsKey(k)) holder(k).remove(k);
+        values.forEach((k, v) -> { if (vaultSecret(k) && v != null) holder(k).setProperty(k, v); });
+        save();
+    }
+
     /** Another computer's settings in place of these (from the cloud), but for the keys {@code keepHere} holds on to. */
     public synchronized void replacePortable(java.util.Map<String, String> values, java.util.function.Predicate<String> keepHere) {
         props.stringPropertyNames().stream().filter(k -> !keepHere.test(k)).forEach(props::remove);

@@ -78,6 +78,14 @@ final class SyncedPart {
         return a;
     }
 
+    /**
+     * The account's file is another one now (the vault opened or closed here, and both may carry the same stamp): read it
+     * again next round. The agreed hash stays, since it's of what's inside.
+     */
+    void unseen() {
+        seenStamp = null;
+    }
+
     private void upload(Storage dav, Bundle mine, String hash) throws IOException {
         dav.mkdirs(remotePath.substring(0, remotePath.lastIndexOf('/')));
         dav.put(remotePath, mine.toBytes());

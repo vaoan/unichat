@@ -87,6 +87,22 @@ public final class PinnedMessages {
         changed(chatId);
     }
 
+    /** The file was written by another computer's pins (through the vault): read again, each chat whose pins may differ told. */
+    public void reload() {
+        java.util.Set<String> chats;
+        synchronized (this) {
+            chats = new java.util.HashSet<>(pins.keySet());
+            pins.clear();
+            try {
+                if (Files.isRegularFile(file) && Files.size(file) > 0) read(JSON.readTree(file.toFile()));
+            } catch (IOException | RuntimeException e) {
+                System.err.println("Pinned messages not read again (" + e.getClass().getSimpleName() + "): none");
+            }
+            chats.addAll(pins.keySet());
+        }
+        chats.forEach(c -> listeners.forEach(l -> l.accept(c)));
+    }
+
     public void addListener(Consumer<String> l) { listeners.add(l); }
 
     public void removeListener(Consumer<String> l) { listeners.remove(l); }

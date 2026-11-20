@@ -28,17 +28,29 @@ import java.util.function.Supplier;
  * then, and one right after something is saved; one at a time, on a thread of its own. Without an account, nothing.
  */
 public final class Cloud {
+    /**
+     * The vault, as this computer stands with it: none in the account (today's plain round); there but not opened here, or
+     * this computer chose to go on without it (nothing personal goes up, plain or sealed); open (everything personal goes
+     * sealed); or this computer's way in was taken away (nothing is sent). Media goes by its own switch in every one.
+     */
+    public enum VaultState { NONE, LOCKED, DECLINED, OPEN, REMOVED }
+
     /** For the settings page: connected or not, when the last round worked, why the last one didn't, what went up. */
     public record Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
-                         int retrying, Instant nextRetry, int conflicts, Instant lastVerified) {
-        static final Status OFF = new Status(false, null, null, 0, 0, null, 0, null, 0, null);
+                         int retrying, Instant nextRetry, int conflicts, Instant lastVerified, VaultState vault) {
+        static final Status OFF = new Status(false, null, null, 0, 0);
 
         public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting) {
             this(connected, lastSync, error, uploaded, waiting, null, 0, null, 0, null);
         }
 
+        public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
+                      int retrying, Instant nextRetry, int conflicts, Instant lastVerified) {
+            this(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts, lastVerified, VaultState.NONE);
+        }
+
         Status doing(Activity a) {
-            return new Status(connected, lastSync, error, uploaded, waiting, a, retrying, nextRetry, conflicts, lastVerified);
+            return new Status(connected, lastSync, error, uploaded, waiting, a, retrying, nextRetry, conflicts, lastVerified, vault);
         }
     }
 
@@ -62,6 +74,9 @@ public final class Cloud {
     private final SyncedPart settingsPart;
     private final MediaUpload media;
     private final TextSync texts;
+    private final VaultParts vaultParts;
+    /** The vault's state in the last round: when it changes, what was seen of the account is another storage's. */
+    private VaultState lastVault;
     private final java.util.function.Consumer<java.util.Set<String>> textsArrived;
     /** Asking for the texts alone, apart from the round: a round may be busy sending a video for minutes. */
     private final ExecutorService textsWorker = Executors.newSingleThreadExecutor(r -> {
@@ -90,9 +105,19 @@ public final class Cloud {
      */
     public record Texts(Path dir, Predicate<Path> made, java.util.function.Consumer<java.util.Set<String>> arrived) {}
 
+    /**
+     * What else is personal, which only the vault carries ({@link VaultParts}).
+     *
+     * @param pinned {@code pinned-messages.json}
+     * @param pinnedAdopted after another computer's pins were written there: whatever holds them reads them again
+     * @param transcripts the voice notes' transcripts' folder
+     */
+    public record Personal(Path pinned, Runnable pinnedAdopted, Path transcripts) {}
+
     Cloud(Supplier<CloudAccount> account, SyncedPart settingsPart, SyncedPart stylePart, MediaUpload media, TextSync texts,
-          java.util.function.Consumer<java.util.Set<String>> textsArrived) {
+          java.util.function.Consumer<java.util.Set<String>> textsArrived, VaultParts vaultParts) {
         this.texts = texts;
+        this.vaultParts = vaultParts;
         this.textsArrived = textsArrived;
         this.account = account;
         this.settingsPart = settingsPart;
@@ -106,9 +131,16 @@ public final class Cloud {
      * @param settingsAdopted after the account's settings were taken: whatever shows them applies them
      * @param mediaFolders where chats save
      * @param texts what chats say
+     * @param personal what only the vault carries
      */
     public static Cloud create(Path dataDir, Supplier<byte[]> preferences, Predicate<byte[]> adoptPreferences,
-                               Runnable settingsAdopted, Supplier<List<Path>> mediaFolders, Texts texts) {
+                               Runnable settingsAdopted, Supplier<List<Path>> mediaFolders, Texts texts, Personal personal) {
+        return create(CloudAccount::saved, dataDir, preferences, adoptPreferences, settingsAdopted, mediaFolders, texts, personal);
+    }
+
+    /** The same with the account given (tests: one that isn't this computer's saved one). */
+    static Cloud create(Supplier<CloudAccount> account, Path dataDir, Supplier<byte[]> preferences, Predicate<byte[]> adoptPreferences,
+                        Runnable settingsAdopted, Supplier<List<Path>> mediaFolders, Texts texts, Personal personal) {
         SyncedPart settings = new SyncedPart(CloudAccount.SETTINGS_FILE, "settings",
                 now -> Bundle.of(machine(), now, Settings.get().portable(), Bundle.readPreferences(preferences.get())),
                 theirs -> {
@@ -126,9 +158,10 @@ public final class Cloud {
         SyncedPart learned = new SyncedPart(CloudAccount.ROOT + "/Ajustes/unichat-ai.json", "ai",
                 now -> Bundle.of(machine(), now, Map.of(STYLE_FILE, read(style)), null),
                 theirs -> write(style, theirs.settings().getOrDefault(STYLE_FILE, "")));
-        return new Cloud(CloudAccount::saved, settings, learned,
+        return new Cloud(account, settings, learned,
                 new MediaUpload(dataDir.resolve("cloud-uploaded.txt"), mediaFolders, texts.made()),
-                new TextSync(texts.dir(), dataDir.resolve("cloud-texts.json"), machine()), texts.arrived());
+                new TextSync(texts.dir(), dataDir.resolve("cloud-texts.json"), machine()), texts.arrived(),
+                new VaultParts(personal.pinned(), personal.pinnedAdopted(), personal.transcripts()));
     }
 
     /** This computer, as the account's files say who wrote them. */
@@ -142,6 +175,9 @@ public final class Cloud {
     }
 
     public Status status() { return status; }
+
+    /** The vault's state as the last round found it. */
+    public VaultState vaultState() { return status.vault(); }
 
     /** Runs on the cloud's thread after each round. */
     public void addListener(Runnable r) { listeners.add(r); }
@@ -169,25 +205,41 @@ public final class Cloud {
         return CompletableFuture.supplyAsync(this::round, worker);
     }
 
+    /**
+     * Without a vault, today's round: the settings and what the AI learned by their switch, the texts by media's. With it
+     * open here, all of that and the vault's own parts, sealed, whatever media's switch says. Locked, declined or removed
+     * here: nothing personal. Media by its own switch in all of them.
+     */
     private Status round() {
         CloudAccount a = account.get();
         if (a == null) return publish(Status.OFF);
         Storage dav = a.storage();
-        try {
+        try (VaultParts.Round vault = VaultParts.open(dav)) {
+            if (vault.state() != lastVault) {
+                lastVault = vault.state();
+                parts.forEach(SyncedPart::unseen);
+                vaultParts.unseen();
+                texts.unseen();
+            }
             Instant now = Instant.now();
-            if (CloudAccount.settings()) {
+            Storage personal = vault.personal(dav);
+            if (personal != null && (vault.open() || CloudAccount.settings())) {
                 doing(new Activity(Step.SETTINGS, 0, 0, null));
-                parts.get(0).sync(dav, now);
+                parts.get(0).sync(personal, now);
                 doing(new Activity(Step.LEARNED, 0, 0, null));
-                parts.get(1).sync(dav, now);
+                parts.get(1).sync(personal, now);
+                if (vault.open()) vaultParts.sync(personal, now);
             }
             String textsFailed = null;
-            if (CloudAccount.media()) {
+            Storage textsTo = textsTo(vault, personal);
+            if (textsTo != null) {
                 try {
-                    syncTexts(dav); // small and what a deleted message is read from: before a long video
+                    syncTexts(textsTo); // small and what a deleted message is read from: before a long video
                 } catch (IOException e) {
                     textsFailed = Errors.message(e); // told, but the media still go up
                 }
+            }
+            if (CloudAccount.media()) {
                 uploaded += media.run(dav, progressOf(Step.UPLOADING));
                 if (verifyNext || verifyDue(now)) {
                     verifyNext = false;
@@ -195,10 +247,15 @@ public final class Cloud {
                     Settings.get().set("cloud.lastVerify", now.toString());
                 }
             }
-            return publish(finished(now, textsFailed));
+            return publish(finished(now, textsFailed, vault.state()));
         } catch (IOException | RuntimeException e) {
-            return publish(finished(status.lastSync(), Errors.message(e)));
+            return publish(finished(status.lastSync(), Errors.message(e), status.vault()));
         }
+    }
+
+    /** The texts go sealed while the vault is open here, plain by media's switch without one, and nowhere otherwise. */
+    private static Storage textsTo(VaultParts.Round vault, Storage personal) {
+        return personal != null && (vault.open() || CloudAccount.media()) ? personal : null;
     }
 
     private void syncTexts(Storage dav) throws IOException {
@@ -220,7 +277,13 @@ public final class Cloud {
             }
             try {
                 CloudAccount a = account.get();
-                if (a != null && CloudAccount.media()) syncTexts(a.storage());
+                if (a != null) {
+                    Storage dav = a.storage();
+                    try (VaultParts.Round vault = VaultParts.open(dav)) {
+                        Storage to = textsTo(vault, vault.personal(dav));
+                        if (to != null) syncTexts(to);
+                    }
+                }
             } catch (IOException | RuntimeException e) {
                 System.err.println("Cloud: texts: " + Errors.message(e));
             }
@@ -234,7 +297,7 @@ public final class Cloud {
         return last == null || Instant.parse(last).plus(VERIFY_EVERY).isBefore(now);
     }
 
-    private Status finished(Instant lastSync, String error) {
+    private Status finished(Instant lastSync, String error, VaultState vault) {
         int waiting;
         try {
             waiting = media.waiting();
@@ -243,7 +306,7 @@ public final class Cloud {
         }
         String verified = Settings.get().getString("cloud.lastVerify", null);
         return new Status(true, lastSync, error, uploaded, waiting, null, media.retrying(), media.nextRetry(), media.conflicts(),
-                verified == null ? null : Instant.parse(verified));
+                verified == null ? null : Instant.parse(verified), vault);
     }
 
     /** Checks everything uploaded against the account now, repairing what differs, then the usual round. */
@@ -308,7 +371,7 @@ public final class Cloud {
 
     SyncedPart settingsPart() { return settingsPart; }
 
-    private static String read(Path file) {
+    static String read(Path file) {
         try {
             return Files.exists(file) ? Files.readString(file, StandardCharsets.UTF_8) : "";
         } catch (IOException e) {
@@ -316,7 +379,7 @@ public final class Cloud {
         }
     }
 
-    private static void write(Path file, String text) {
+    static void write(Path file, String text) {
         try {
             SafeFile.at(file, ".cloud").write(text.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {

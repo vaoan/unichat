@@ -49,7 +49,8 @@ class CloudTextsTest {
         SyncedPart unused = new SyncedPart("Unichat/Ajustes/x.json", "x", now -> null, b -> { });
         return new Cloud(account, unused, unused,
                 new MediaUpload(dir.resolve("cloud-uploaded.txt"), () -> media == null ? List.of() : List.of(media), p -> false),
-                new TextSync(dir.resolve("texts"), dir.resolve("cloud-texts.json"), Cloud.machine()), arrived::add);
+                new TextSync(dir.resolve("texts"), dir.resolve("cloud-texts.json"), Cloud.machine()), arrived::add,
+                new VaultParts(dir.resolve("pinned-messages.json"), () -> { }, dir.resolve("transcripts")));
     }
 
     private CloudAccount account() {

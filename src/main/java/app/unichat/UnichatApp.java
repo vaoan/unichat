@@ -231,7 +231,9 @@ public final class UnichatApp extends Application {
                     () -> Platform.runLater(() -> { if (mainView != null) mainView.settingsSynced(); }),
                     () -> app.unichat.autosave.AutoSave.of(svc).folders(),
                     new app.unichat.cloud.Cloud.Texts(app.unichat.autosave.AutoSave.textsDir(), app.unichat.autosave.AutoSave::isTextCopy,
-                            app.unichat.autosave.AutoSave.of(svc)::textsArrived));
+                            app.unichat.autosave.AutoSave.of(svc)::textsArrived),
+                    new app.unichat.cloud.Cloud.Personal(Settings.dataDir().resolve("pinned-messages.json"),
+                            app.unichat.service.PinnedMessages.get()::reload, Settings.get().dir().resolve("transcripts")));
             app.unichat.cloud.Cloud c = cloud;
             // What a chat says goes up as soon as it's kept, and looking at a deleted message asks the other computers first.
             app.unichat.autosave.AutoSave.of(svc).setTextSync(c::textsNow, c::textsNow);

@@ -54,6 +54,26 @@ class PinnedMessagesTest {
     }
 
     @Test
+    void pinsWrittenByAnotherComputerAreReadAgainAndTheirChatsTold() throws Exception {
+        Path file = dir.resolve("pinned-messages.json");
+        PinnedMessages pins = new PinnedMessages(file);
+        pins.pin("!mine", message("$a", "hola", Instant.now()));
+        pins.flush();
+        List<String> changed = new ArrayList<>();
+        pins.addListener(changed::add);
+        java.nio.file.Files.writeString(file, "{\"!theirs\":[{\"id\":\"$b\",\"sender\":\"Ana\",\"preview\":\"nos vemos\"}]}");
+        pins.reload();
+        assertEquals(List.of(), pins.of("!mine"));
+        assertEquals("nos vemos", pins.of("!theirs").getFirst().preview());
+        assertEquals(java.util.Set.of("!mine", "!theirs"), new java.util.HashSet<>(changed), "both chats' bars redraw");
+
+        java.nio.file.Files.writeString(file, "");
+        pins.reload();
+        assertEquals(List.of(), pins.of("!theirs"), "an empty file is no pins");
+        pins.flush();
+    }
+
+    @Test
     void pinningTwiceKeepsOneAndALongPreviewIsCut() {
         PinnedMessages pins = new PinnedMessages(dir.resolve("p.json"));
         Message m = message("$a", "x".repeat(1000), Instant.now());

@@ -61,6 +61,13 @@ final class TextSync {
         }
     }
 
+    /** The others' indexes are other files now (the vault opened or closed here): each is read again; only what grew comes. */
+    synchronized void unseen() throws IOException {
+        load();
+        stamps.clear();
+        save();
+    }
+
     private void send(Storage storage) throws IOException {
         Path own = local.resolve(HERE);
         if (!Files.isDirectory(own)) return;

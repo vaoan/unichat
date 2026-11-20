@@ -115,12 +115,18 @@ final class Vault {
         for (String name : s.list(SLOTS)) {
             if (!name.endsWith(JSON_FILE)) continue;
             String id = name.substring(0, name.length() - JSON_FILE.length());
-            if (!Ids.ours(id)) continue;
-            byte[] json = s.get(path(id));
-            VaultSlot slot = json == null ? null : VaultSlot.parse(json);
-            if (slot != null && slot.id().equals(id) && slot.vault().equals(vault.id())) out.add(slot);
+            VaultSlot slot = slot(s, vault, id);
+            if (slot != null) out.add(slot);
         }
         return out;
+    }
+
+    /** The slot {@code id} of {@code vault}; null when there's none, it isn't one, or it is another vault's or another id's. */
+    static VaultSlot slot(Storage s, Info vault, String id) throws IOException {
+        if (!Ids.ours(id)) return null;
+        byte[] json = s.get(path(id));
+        VaultSlot slot = json == null ? null : VaultSlot.parse(json);
+        return slot != null && slot.id().equals(id) && slot.vault().equals(vault.id()) ? slot : null;
     }
 
     /** The vault key from one slot and its way in's key. */
