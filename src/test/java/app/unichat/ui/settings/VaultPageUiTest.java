@@ -275,6 +275,33 @@ class VaultPageUiTest extends VaultPageTestBase {
         FxWait.until("the password asked again", () -> hasButton(I18n.t("settings.vault.password.add")) && says(I18n.t("settings.vault.password.help")));
     }
 
+    /**
+     * A reload answered after a step began draws nothing: "Listo" asked for the vault again, "Agregar de nuevo" opened the
+     * password form meanwhile, and the late answer drew the open page over it.
+     */
+    @Test
+    void aLateReloadNeverDrawsOverAStepBegunSince() throws Exception {
+        openedWithOthers();
+        page();
+        waitOpen();
+        click(I18n.t("settings.vault.changeKey"));
+        waitFor(I18n.t("settings.vault.change.receive"));
+        click(I18n.t("settings.vault.change.confirm"));
+        codeShown();
+        waitFor(I18n.t("settings.vault.change.dropped", I18n.t("settings.vault.way.PASSWORD")));
+        account.cloud().syncNow().get(); // the change's own round over: the next look at the vault is the reload's
+        FxWait.settled();
+        Runnable release = account.holdVaultReadOnce();
+        click(I18n.t("settings.vault.change.done")); // the reload, held
+        click(I18n.t("settings.vault.change.addAgain"));
+        FxWait.until("the password asked", () -> hasButton(I18n.t("settings.vault.password.add")));
+        release.run();
+        account.cloud().vault().vaultView().get(); // the worker is one: the held answer came before this one
+        FxWait.settled();
+        assertTrue(FxWait.fx(() -> hasButton(I18n.t("settings.vault.password.add")) && says(I18n.t("settings.vault.password.help"))),
+            "the form still there, not the open page drawn over it");
+    }
+
     @Test
     void aComputerWhoseKeyChangedGetsNothingUntilThePersonSaysItsTheirs() throws Exception {
         openedWithOthers();

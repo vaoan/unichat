@@ -29,6 +29,8 @@ final class FakeDav implements AutoCloseable {
     final Set<String> failDeleteOnce = ConcurrentHashMap.newKeySet();
     /** Paths whose next PUT waits until its latch is let go (a slow network), once each. */
     final Map<String, java.util.concurrent.CountDownLatch> holdOnce = new ConcurrentHashMap<>();
+    /** The next GET of a path waits for its latch: a read on the cloud's worker held, so what's queued after it waits too. */
+    final Map<String, java.util.concurrent.CountDownLatch> holdReadOnce = new ConcurrentHashMap<>();
     /** Paths that can't be read once a PUT of them lands (every GET answers a failure), until taken out of here. */
     final Set<String> unreadableAfterPut = ConcurrentHashMap.newKeySet();
     private final Set<String> unreadable = ConcurrentHashMap.newKeySet();
@@ -108,6 +110,14 @@ final class FakeDav implements AutoCloseable {
                     x.sendResponseHeaders(failAfterOnce.remove(path) ? 503 : 201, -1);
                 }
                 case "GET" -> {
+                    java.util.concurrent.CountDownLatch heldRead = holdReadOnce.remove(path);
+                    if (heldRead != null) {
+                        try {
+                            heldRead.await();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
                     if (unreadable.contains(path) && unreadableAfterPut.contains(path)) {
                         x.sendResponseHeaders(503, -1);
                         return;

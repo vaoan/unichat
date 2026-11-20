@@ -23,7 +23,8 @@ import java.util.function.Consumer;
  * The passkey probe's page: whether this computer's browser and password manager can make a passkey for Unichat and
  * give back the PRF value the vault would be opened with. Served on {@link Loopback} at {@code localhost} (WebAuthn's
  * relying party: a page at 127.0.0.1 is refused), with no script or style from anywhere else; the browser posts each
- * step's result back with {@code state}, never the PRF bytes, only how many came.
+ * step's result back with {@code state}, never the PRF bytes: how many came and a fingerprint of them (the same value
+ * on another call or computer shows as the same).
  */
 public final class PasskeyPage {
     /** What the page did: made a passkey, or used one already made. */

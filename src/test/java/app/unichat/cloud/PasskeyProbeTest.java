@@ -125,14 +125,14 @@ class PasskeyProbeTest {
 
     @Test
     void runningItAgainOnTheSamePortTakesItBack() throws Exception {
-        int port;
-        try (java.net.ServerSocket free = new java.net.ServerSocket(0, 0, java.net.InetAddress.getLoopbackAddress())) {
-            port = free.getLocalPort();
-        }
-        CompletableFuture<Void> first = PasskeyProbe.run(u -> { }, f -> { }, port, dir.resolve("probe.txt"));
-        CompletableFuture<Void> second = PasskeyProbe.run(u -> { }, f -> { }, port, dir.resolve("probe.txt"));
+        URI[] opened = {null};
+        // The first holds the port it got until the second runs: no gap another program could bind in.
+        CompletableFuture<Void> first = PasskeyProbe.run(u -> opened[0] = u, f -> { }, 0, dir.resolve("probe.txt"));
+        int port = opened[0].getPort();
+        CompletableFuture<Void> second = PasskeyProbe.run(u -> opened[0] = u, f -> { }, port, dir.resolve("probe.txt"));
         assertTrue(first.isCancelled());
-        assertFalse(second.isDone(), "the fixed port bound again at once, not busy");
+        assertFalse(second.isDone(), "the same port bound again at once, not busy");
+        assertEquals(port, opened[0].getPort());
     }
 
     @Test

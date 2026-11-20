@@ -114,6 +114,13 @@ public final class VaultFixture implements AutoCloseable {
         return latch::countDown;
     }
 
+    /** The account's next read of the vault's {@code boveda.json} (each look at the vault's state) waits until the returned step runs. */
+    public Runnable holdVaultReadOnce() {
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        dav.holdReadOnce.put(Vault.INFO, latch);
+        return latch::countDown;
+    }
+
     /** Whether the account still holds a vault (anything under its folder). */
     public boolean vaultThere() {
         return dav.files.keySet().stream().anyMatch(p -> p.startsWith(Vault.ROOT + "/"));
@@ -134,6 +141,7 @@ public final class VaultFixture implements AutoCloseable {
     @Override
     public void close() throws Exception {
         dav.holdOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown); // nothing waits past the test
+        dav.holdReadOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown);
         try {
             cloud.stop();
             cloud.syncNow().get(); // what a step asked for runs before the account goes

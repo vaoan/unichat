@@ -123,8 +123,9 @@ isn't built; the person is told.
 The relying party `localhost` is shared by every page on `localhost`, on any port, and the salt is public (it's in
 this page): any program on the computer that serves a page on `localhost` can ask for the same passkey and, after the
 one prompt the person accepts, get the same PRF value, and so the slot's key. Steps 2–4 must not make this PRF alone
-the slot key. Options: a per-vault random salt kept sealed in the slot (the PRF asked for is unknown until the slot is
-read, so a page elsewhere asks for another value), and/or Unichat's passkey screen showing a short code the page also
+the slot key. Options: a per-vault random salt in the slot's params, in the clear (it's needed before the slot opens,
+so it can't be sealed: hidden from a page on this computer, which doesn't know it and asks for another value, but not
+from the account), and/or Unichat's passkey screen showing a short code the page also
 shows, so the person only accepts a prompt that came from Unichat's own page.
 
 ## Results

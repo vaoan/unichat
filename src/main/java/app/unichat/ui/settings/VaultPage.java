@@ -346,6 +346,7 @@ final class VaultPage {
                     noticeFor = v.state();
                     shown = v.state();
                     inStep = false;
+                    asked++; // drawn without a reload: one still on its way is older than this
                     draw(v);
                     cloud.syncNow();
                     return;
