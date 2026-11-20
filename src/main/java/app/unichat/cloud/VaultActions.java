@@ -137,6 +137,19 @@ final class VaultActions {
         Arrays.fill(computer.key(), (byte) 0);
     }
 
+    /** Another computer's way into the vault taken away; this one's own goes by {@link Cloud#forgetHere}. */
+    static void remove(Storage dav, String machine) throws IOException {
+        if (Cloud.machine().equals(machine)) throw new IllegalArgumentException("This computer is forgotten with forgetHere");
+        if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
+        Vault.Info info = Vault.info(dav);
+        if (info == null) throw new IOException(I18n.t("cloud.error.noVault"));
+        // Kept out here first: a slot that can't be deleted now is never offered the next key either.
+        VaultPeers peers = VaultPeers.load(info.id());
+        peers.removed(machine);
+        peers.save();
+        Vault.removeComputer(dav, info, machine);
+    }
+
     /** "Seguir sin la bóveda en este equipo", or taken back: never asked again while it holds. */
     static void decline(boolean declined) {
         Settings.get().set(VaultParts.DECLINED, declined ? "true" : null);

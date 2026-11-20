@@ -299,6 +299,13 @@ class VaultActionsTest {
         String clean = VaultView.label(nasty);
         assertTrue(clean.startsWith("Mal vado exe.txt") && clean.length() <= 65, clean);
         assertEquals(clean, Vault.computers(dav()).get(OTHER), "what strays and damaged texts are named by");
+        for (String hidden : new String[] {"\u200E", "\u200F", "\u061C", "\u200B", "\u200C", "\u200D", "\u2060", "\uFEFF"}) {
+            assertEquals("ab", VaultView.label("a" + hidden + "b"), "U+" + Integer.toHexString(hidden.charAt(0)) + " taken out");
+        }
+        String flags = "\uD83C\uDDEA\uD83C\uDDF8".repeat(70); // 70 flags: two code points each
+        String cut = VaultView.label(flags);
+        assertTrue(cut.endsWith("\uD83C\uDDF8…"), "cut between whole flags, never half of one");
+        assertEquals(64 * 4 + 1, cut.length(), "64 flags and the ellipsis");
         assertEquals(clean, as(desk, () -> desk.cloud.rotateKey(Set.of())).refused().get(OTHER), "and refused computers");
         assertNotNull(code);
     }

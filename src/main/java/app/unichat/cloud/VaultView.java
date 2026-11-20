@@ -30,15 +30,27 @@ public record VaultView(Cloud.VaultState state, Set<Way> ways, List<Computer> co
                            boolean unseen) {}
 
     private static final int LABEL = 64;
+    /** Marks that change how a name reads without showing (direction marks, zero-width spaces and joiners, the BOM). */
+    private static final java.util.regex.Pattern INVISIBLE = java.util.regex.Pattern.compile("[\\u200B-\\u200F\\u061C\\u2060\\uFEFF]");
 
     /**
      * A computer's name from the account as it may be shown: one line (line ends, controls and the marks that turn text
-     * around become a space), at most 64 characters. The one cleaner for every place a name is shown.
+     * around become a space; invisible marks go), at most 64 characters as the eye counts them. The one cleaner for every
+     * place a name is shown.
      */
     public static String label(String s) {
         if (s == null) return "";
-        String one = Lines.one(s);
-        return one.codePointCount(0, one.length()) <= LABEL ? one : one.substring(0, one.offsetByCodePoints(0, LABEL)) + "…";
+        String one = Lines.one(INVISIBLE.matcher(s).replaceAll(""));
+        // Cut between whole characters as seen (a flag, an accented letter, an emoji with its skin tone), never inside one.
+        java.text.BreakIterator chars = java.text.BreakIterator.getCharacterInstance(app.unichat.support.I18n.locale());
+        chars.setText(one);
+        int end = 0;
+        for (int i = 0; i < LABEL; i++) {
+            int next = chars.next();
+            if (next == java.text.BreakIterator.DONE) return one;
+            end = next;
+        }
+        return chars.next() == java.text.BreakIterator.DONE ? one : one.substring(0, end) + "…";
     }
 
     static final VaultView NONE = new VaultView(Cloud.VaultState.NONE, Set.of(), List.of(), false);

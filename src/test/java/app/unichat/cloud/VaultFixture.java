@@ -66,6 +66,13 @@ public final class VaultFixture implements AutoCloseable {
         Vault.removeComputer(storage(), Vault.info(storage()), HERE);
     }
 
+    /** Whether {@code machine}'s slot holds an offer of the vault's current key (it takes it on its next round). */
+    public boolean offeredTheKey(String machine) throws Exception {
+        Vault.Info info = Vault.info(storage());
+        VaultSlot slot = Vault.slot(storage(), info, machine);
+        return slot != null && slot.params().has(VaultNext.NEXT);
+    }
+
     /** The vault's computers in the account (machine → label). */
     public Map<String, String> computers() throws Exception {
         return Vault.computers(storage());

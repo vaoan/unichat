@@ -40,7 +40,9 @@ final class KeyChangeFlow {
         for (VaultView.Computer c : view.computers()) {
             if (removing != null && c.machine().equals(removing.machine())) continue;
             if (c.keyChanged()) {
-                who.getChildren().add(accept(cloud, c, I18n.t("settings.vault.change.refused", CloudTexts.computer(c.label())), () -> { }));
+                // Accepted here, it's listed as getting the key: added to those offered it.
+                who.getChildren().add(accept(cloud, c, I18n.t("settings.vault.change.refused", CloudTexts.computer(c.label())),
+                    () -> confirmed.add(c.machine())));
                 continue;
             }
             confirmed.add(c.machine());

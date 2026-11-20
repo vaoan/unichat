@@ -472,7 +472,7 @@ public final class Cloud {
     public CompletableFuture<KeyChanged> removeAndChangeKey(String machine, java.util.Set<String> confirmed) {
         java.util.Set<String> asked = java.util.Set.copyOf(confirmed);
         return onWorker(dav -> {
-            remove(dav, machine);
+            VaultActions.remove(dav, machine);
             try {
                 return rotate(dav, id -> !id.equals(machine) && asked.contains(id));
             } catch (IOException | RuntimeException e) {
@@ -525,21 +525,9 @@ public final class Cloud {
     /** Another computer's way into the vault taken away, on the cloud's thread; this one's own goes by {@link #forgetHere}. */
     public CompletableFuture<Void> removeComputer(String machine) {
         return onWorker(dav -> {
-            remove(dav, machine);
+            VaultActions.remove(dav, machine);
             return null;
         });
-    }
-
-    private static void remove(Storage dav, String machine) throws IOException {
-        if (machine().equals(machine)) throw new IllegalArgumentException("This computer is forgotten with forgetHere");
-        if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
-        Vault.Info info = Vault.info(dav);
-        if (info == null) throw new IOException(I18n.t("cloud.error.noVault"));
-        // Kept out here first: a slot that can't be deleted now is never offered the next key either.
-        VaultPeers peers = VaultPeers.load(info.id());
-        peers.removed(machine);
-        peers.save();
-        Vault.removeComputer(dav, info, machine);
     }
 
     /**

@@ -414,9 +414,13 @@ class VaultPageUiTest {
             .findFirst().orElseThrow().keyChanged(), "nothing without a yes");
         clickNamed(I18n.t("settings.vault.change.acceptOf", "Escritorio"));
         click(I18n.t("settings.vault.change.acceptYes"));
-        waitFor(I18n.t("settings.vault.change.accepted", "Escritorio"));
-        FxWait.until("drawn again", () -> says(I18n.t("settings.vault.open")) && !says(I18n.t("settings.vault.change.accepted", "Escritorio"))
+        // In the list the page is drawn again at once, so the "accepted" line may never be seen: wait for where it ends,
+        // the question gone with it (while it shows, the warning doesn't).
+        FxWait.until("accepted and drawn again", () -> says(I18n.t("settings.vault.open"))
+            && !says(I18n.t("settings.vault.change.acceptAsk", "Escritorio")) && !says(I18n.t("settings.vault.change.accepted", "Escritorio"))
             && !says(I18n.t("settings.vault.change.keyChanged", "Escritorio")));
+        assertFalse(account.cloud().vaultView().get().computers().stream().filter(c -> c.machine().equals(VaultFixture.OTHER))
+            .findFirst().orElseThrow().keyChanged(), "accepted");
         click(I18n.t("settings.vault.changeKey"));
         waitFor(I18n.t("settings.vault.change.receive"));
         assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.change.refused", "Escritorio"))), "it gets the new key");
@@ -453,6 +457,40 @@ class VaultPageUiTest {
         FxWait.settled();
         assertTrue(FxWait.fx(() -> s.getScene().getRoot().lookupAll(".label").stream().anyMatch(n -> before.equals(((Labeled) n).getText()))),
             "a round after it closed changes nothing in it");
+    }
+
+    @Test
+    void aChangedKeyAcceptedInTheConfirmationGetsTheNewKey() throws Exception {
+        String code = openedWithOthers();
+        account.anotherComputer(VaultFixture.OTHER, "Escritorio"); // set up again: another key under the same machine
+        page();
+        waitOpen();
+        click(I18n.t("settings.vault.changeKey"));
+        waitFor(I18n.t("settings.vault.change.refused", "Escritorio"));
+        clickNamed(I18n.t("settings.vault.change.acceptOf", "Escritorio"));
+        click(I18n.t("settings.vault.change.acceptYes"));
+        waitFor(I18n.t("settings.vault.change.accepted", "Escritorio"));
+        click(I18n.t("settings.vault.change.confirm"));
+        codeShown();
+        FxWait.settled();
+        assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.change.refusedAfter", "Escritorio"))), "not refused");
+        assertTrue(account.offeredTheKey(VaultFixture.OTHER), "offered the new key: it opens on its next round");
+        assertTrue(code != null);
+    }
+
+    @Test
+    void aNewCodeThatCouldntBeNotedAsKeptAfterAChangeSaysSo() throws Exception {
+        openedWithOthers();
+        page();
+        waitOpen();
+        click(I18n.t("settings.vault.changeKey"));
+        waitFor(I18n.t("settings.vault.change.receive"));
+        click(I18n.t("settings.vault.change.confirm"));
+        String code = codeShown();
+        app.unichat.cloud.CloudAccount.forget(); // the account gone meanwhile: nothing can be noted
+        typeGroups(code, true);
+        waitFor(I18n.t("settings.vault.code.keptFailed", "").substring(0, 20));
+        assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.code.keptLine"))));
     }
 
     @Test
