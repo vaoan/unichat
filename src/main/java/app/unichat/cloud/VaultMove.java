@@ -68,10 +68,15 @@ final class VaultMove {
         }
     }
 
-    /** What a round removed, and the first thing that failed. */
+    /** What a round removed, and the first thing that failed; and the vault moved into. */
     private static final class Tally {
         final List<String> moved = new ArrayList<>();
+        final String vault;
         String error;
+
+        Tally(String vault) {
+            this.vault = vault;
+        }
 
         boolean failed(IOException e) {
             if (error == null) error = Errors.message(e);
@@ -92,13 +97,13 @@ final class VaultMove {
     }
 
     /**
-     * One round of it, with the vault open: {@code sealed} is the vault over {@code plain}. A file that fails stays plain
+     * One round of it, with the vault open: {@code sealed} is the vault ({@code vaultId}) over {@code plain}. A file that fails stays plain
      * for the next round (the first failure is the result's error); only a listing that fails stops it.
      */
-    static Result run(Storage plain, Storage sealed, Instant now) throws IOException {
+    static Result run(Storage plain, Storage sealed, String vaultId, Instant now) throws IOException {
         Settings s = Settings.get();
         Found found = find(plain);
-        Tally t = new Tally();
+        Tally t = new Tally(vaultId);
         boolean let = true;
         for (Map.Entry<String, List<String>> m : found.ofTheVault().entrySet()) {
             try {
@@ -284,9 +289,15 @@ final class VaultMove {
         return !delete || deleteIfSame(plain, path, stamp, t) ? kept.length : -1;
     }
 
-    /** Deletes the plain file unless it was written again since it was read (an older computer sending a longer one). */
+    /**
+     * Deletes the plain file unless it was written again since it was read (an older computer sending a longer one), or
+     * the vault moved into is gone meanwhile (turned off elsewhere: the plain copy is the only one). Asked right before
+     * the delete; one request apart, a vault turned off in between still loses this copy (its writer sends its own again).
+     */
     private static boolean deleteIfSame(Storage plain, String path, String stamp, Tally t) throws IOException {
         if (stamp == null || !stamp.equals(plain.stamp(path))) return false;
+        Vault.Info now = Vault.info(plain);
+        if (now == null || !now.id().equals(t.vault)) return false;
         plain.delete(path);
         t.moved.add(path);
         return true;

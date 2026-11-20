@@ -603,6 +603,8 @@ class VaultPageUiTest {
             && says(I18n.t("cloud.error.vaultLeftovers")));
         assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.turnOffFailed"))), "never \"left as it was\"");
         assertEquals(Cloud.VaultState.NONE, round());
+        FxWait.settled();
+        assertTrue(FxWait.fx(() -> says(I18n.t("cloud.error.vaultLeftovers"))), "a round redrawing the page keeps it");
     }
 
     @Test

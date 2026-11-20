@@ -78,7 +78,7 @@ class VaultMoveTest {
     }
 
     private VaultMove.Result run(Instant now) throws IOException {
-        return VaultMove.run(plain(), sealed(), now);
+        return VaultMove.run(plain(), sealed(), vault.info().id(), now);
     }
 
     private void plainFile(String path, String text) {
@@ -254,11 +254,11 @@ class VaultMoveTest {
                 return super.stamp(path);
             }
         };
-        VaultMove.run(plain, sealed(), T);
+        VaultMove.run(plain, sealed(), vault.info().id(), T);
         assertEquals(2, stamps[0]);
         assertArrayEquals(longer.getBytes(StandardCharsets.UTF_8), cloud.files.get(text), "the longer one isn't lost");
         assertNull(Settings.get().getString(VaultMove.MOVED_AT, null), "nor the move done");
-        VaultMove.run(plain(), sealed(), T.plusSeconds(60));
+        VaultMove.run(plain(), sealed(), vault.info().id(), T.plusSeconds(60));
         assertEquals(longer, opened(text), "it comes in the next round");
         assertFalse(cloud.files.containsKey(text));
     }
@@ -289,5 +289,21 @@ class VaultMoveTest {
         assertEquals(longer, opened(text), "the longer one it sent survives");
         assertFalse(cloud.files.containsKey(text), "and, as long as the plain one, lets it go");
         assertFalse(cloud.files.containsKey(TextSync.ROOT + "/" + LAPTOP + "/index.json"));
+    }
+
+    @Test
+    void aPlainCopyIsNeverDeletedOnceTheVaultIsGone() throws Exception {
+        plainTexts(LAPTOP, "{\"a\":1}\n");
+        String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT;
+        int[] stamps = {0};
+        Storage plain = new Through(dav()) {
+            @Override public String stamp(String path) throws IOException {
+                // The vault turned off by another computer right as the plain copy is about to go (its stamp read again).
+                if (path.equals(text) && ++stamps[0] == 2) cloud.files.remove(Vault.INFO);
+                return super.stamp(path);
+            }
+        };
+        VaultMove.run(plain, sealed(), vault.info().id(), T);
+        assertTrue(cloud.files.containsKey(text), "the plain copy is the only one left: kept");
     }
 }

@@ -32,6 +32,9 @@ final class VaultPage {
     /** The state last drawn; a round finding another redraws the page, unless a step is under way (a code on screen). */
     private Cloud.VaultState shown;
     private boolean inStep;
+    /** Why turning the vault off ended as it did, said above the page while it shows {@link #noticeFor}: a redraw keeps it. */
+    private String notice;
+    private Cloud.VaultState noticeFor;
 
     private VaultPage(Cloud cloud) {
         this.cloud = cloud;
@@ -74,6 +77,8 @@ final class VaultPage {
             case DECLINED -> drawDeclined(v);
             case OPEN -> drawOpen(v);
         }
+        if (notice != null && v.state() != noticeFor) notice = null; // another state since: no longer what it's about
+        if (notice != null) body.getChildren().add(0, actions(KeyChangeFlow.warning(notice)));
     }
 
     /** No vault yet: what it is, and "Crear bóveda". */
@@ -284,11 +289,12 @@ final class VaultPage {
             String why = Errors.message(Errors.unwrap(err));
             cloud.vaultView().whenComplete((v, unread) -> Platform.runLater(() -> {
                 if (v != null && v.state() != Cloud.VaultState.OPEN) {
-                    cloud.syncNow();
+                    notice = why;
+                    noticeFor = v.state();
                     shown = v.state();
                     inStep = false;
                     draw(v);
-                    body.getChildren().add(0, actions(KeyChangeFlow.warning(why)));
+                    cloud.syncNow();
                     return;
                 }
                 Button again = secondary(I18n.t("settings.vault.retry"));

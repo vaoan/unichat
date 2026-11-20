@@ -10,3 +10,4 @@ The window (Ajustes) over the preferences of `settings/` (`settings/CLAUDE.md`, 
 
 ## Lessons
 - Ajustes → Nube's status line stopped listening to the cloud when its node left its scene, but a closed window keeps its scene: every closed settings window heard each round for good, reading `CloudPage`'s static `cloud` (null in a later session: an exception on the UI thread each round). A page listens through `Showing.whileShowing`, with the `Cloud` it was built with (`VaultPageUiTest.aClosedWindowNoLongerHearsTheCloud`).
+- `VaultPage` added "the vault is off but part of its folder was left" above the page by hand, and a round's mid-way `doing()` (which still carries the last state, OPEN) made the page reload and drop it: `VaultPageUiTest` timed out only in the full run. A line that must outlive a redraw is page state (`notice`, drawn by `draw` while the page shows its state), never a node added after drawing.

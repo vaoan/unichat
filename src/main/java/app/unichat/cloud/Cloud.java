@@ -297,7 +297,7 @@ public final class Cloud {
                 }
             }
             if (vault.open()) {
-                String moveFailed = moveIn(dav, personal, now);
+                String moveFailed = moveIn(dav, personal, vault.info().id(), now);
                 if (textsFailed == null) textsFailed = moveFailed;
             }
             if (CloudAccount.media()) {
@@ -398,11 +398,11 @@ public final class Cloud {
      * What's still plain goes into the vault, after the vault's own parts and texts went (so they're never copied over),
      * and who still sends plain is named; why it couldn't, or null.
      */
-    private String moveIn(Storage dav, Storage sealed, Instant now) {
+    private String moveIn(Storage dav, Storage sealed, String vaultId, Instant now) {
         try {
             VaultMove.Result r;
             synchronized (texts) { // TextSync.run's own lock: never alongside textsNow, which writes this computer's texts
-                r = VaultMove.run(dav, sealed, now);
+                r = VaultMove.run(dav, sealed, vaultId, now);
             }
             Map<String, String> strays = r.strays().isEmpty() ? Map.of() : VaultMove.names(dav, r.strays());
             moving = new Moving(moving.files() + r.moved().size(), r.moved().isEmpty() ? moving.at() : now, strays);

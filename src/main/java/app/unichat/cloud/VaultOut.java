@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 
 import java.io.IOException;
@@ -62,26 +63,43 @@ final class VaultOut {
             for (String machine : sealed.list(TextSync.ROOT)) {
                 if (Ids.ours(machine)) textsOut(plain, sealed, machine, w);
             }
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException e) {
+            w.takeBack(plain);
+            throw new IOException(I18n.t("cloud.error.vaultOffUndone", Errors.message(e)), e);
+        } catch (RuntimeException e) {
             w.takeBack(plain);
             throw e;
         }
         boolean whole = true;
+        IOException partly = null;
         try {
             plain.delete(Vault.ROOT);
         } catch (IOException e) {
-            plain.delete(Vault.INFO); // failing too: the vault may be partly there, and everything is plain: nothing taken back
             whole = false;
+            try {
+                plain.delete(Vault.INFO);
+            } catch (IOException f) {
+                // The vault may be partly gone: nothing is taken back, everything is plain already.
+                partly = new IOException(I18n.t("cloud.error.vaultPartlyGone"), f);
+            }
         }
         settle(plain, w);
+        if (partly != null) throw partly;
         return whole;
     }
 
-    /** After the delete: each plain copy this run left, put back where it's missing or shorter. */
+    /**
+     * After the delete: each plain copy this run left, put back where it's missing (or, a text, shorter: texts only grow;
+     * a part is a whole file, and another one there is a computer's own, newer), and read back.
+     */
     private static void settle(Storage plain, Written w) throws IOException {
         for (Map.Entry<String, byte[]> f : new LinkedHashMap<>(w.now).entrySet()) {
-            byte[] there = plain.get(f.getKey());
-            if (there == null || there.length < f.getValue().length) w.put(plain, f.getKey(), f.getValue(), there);
+            String path = f.getKey();
+            byte[] there = plain.get(path), mine = f.getValue();
+            boolean text = TextIndex.FILE.matcher(path.substring(path.lastIndexOf('/') + 1)).matches();
+            if (there != null && (!text || there.length >= mine.length)) continue;
+            w.put(plain, path, mine, there);
+            if (!Arrays.equals(mine, plain.get(path))) throw notBack();
         }
     }
 

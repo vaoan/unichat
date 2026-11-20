@@ -94,10 +94,10 @@ class VaultOutTest {
         cloud.failOnce.add(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT); // the network drops on the last plain copy
         ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud::turnOffVault));
         assertNotNull(failed.getCause().getMessage(), "the failure is told");
-        before.forEach((p, b) -> {
-            if (p.startsWith(Vault.ROOT + "/")) assertArrayEquals(b, cloud.files.get(p), "the vault intact: " + p);
-        });
-        assertEquals(before.keySet(), cloud.files.keySet(), "and what was copied plain before the failure taken back: as it was");
+        assertTrue(failed.getCause().getMessage().contains(app.unichat.support.I18n.t("cloud.error.vaultOffUndone", "")),
+            "says the vault is as it was: " + failed.getCause().getMessage());
+        before.forEach((p, b) -> assertArrayEquals(b, cloud.files.get(p), "as it was: " + p));
+        assertEquals(before.keySet(), cloud.files.keySet(), "and what was copied plain before the failure taken back");
         assertEquals(made.info().id(), desk.get(VaultParts.ID), "still held here");
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault(), "and still open: the person can try again");
 
@@ -168,6 +168,56 @@ class VaultOutTest {
         assertNotNull(cloud.files.get(SETTINGS), "everything plain");
         assertNull(desk.get(VaultParts.ID), "forgotten here all the same");
         assertEquals(Cloud.VaultState.NONE, desk.round().vault());
+    }
+
+    @Test
+    void aVaultThatWontGoAtAllSaysItMayBePartlyGone() throws Exception {
+        VaultComputer desk = desk();
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
+        cloud.failDeleteOnce.add(Vault.ROOT);
+        cloud.failDeleteOnce.add(Vault.INFO);
+        ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud::turnOffVault));
+        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultPartlyGone"), failed.getCause().getMessage(), "never \"as it was\"");
+        assertNotNull(cloud.files.get(SETTINGS), "everything plain");
+        assertEquals("{\"d\":1}\n", plain(TextSync.ROOT + "/" + DESK + "/" + TEXT));
+    }
+
+    @Test
+    void aSettingsPartRewrittenMeanwhileIsNotPutBack() throws Exception {
+        SealedStorage sealed = new SealedStorage(dav(), () -> made.vk().clone());
+        sealed.put(SETTINGS, Bundle.of(DESK, java.time.Instant.now(), Map.of("ui.theme", "DARK", "ui.x", "y".repeat(40)), null).toBytes());
+        byte[] shorter = Bundle.of(OTHER, java.time.Instant.now(), Map.of("ui.theme", "LIGHT"), null).toBytes();
+        Storage plain = new Through(dav()) {
+            @Override public void delete(String path) throws java.io.IOException {
+                if (path.equals(Vault.ROOT)) cloud.put(SETTINGS, shorter); // a computer, plain already, sent its own
+                super.delete(path);
+            }
+        };
+        assertTrue(VaultOut.run(plain, sealed));
+        assertArrayEquals(shorter, cloud.files.get(SETTINGS), "a bundle isn't a text: shorter is no sign of less");
+    }
+
+    @Test
+    void aCopyPutBackThatDoesntReadBackIsTold() throws Exception {
+        offlineLaptopSent("{\"l\":1}\n");
+        String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT;
+        boolean[] gone = {false};
+        Storage plain = new Through(dav()) {
+            @Override public void delete(String path) throws java.io.IOException {
+                if (path.equals(Vault.ROOT)) {
+                    cloud.files.remove(text); // let go meanwhile
+                    gone[0] = true;
+                }
+                super.delete(path);
+            }
+
+            @Override public void put(String path, byte[] data) throws java.io.IOException {
+                if (gone[0] && path.equals(text)) cloud.put(text, new byte[] {'{'}); // landed cut short
+                else super.put(path, data);
+            }
+        };
+        java.io.IOException e = assertThrows(java.io.IOException.class, () -> VaultOut.run(plain, new SealedStorage(dav(), () -> made.vk().clone())));
+        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultNotBack"), e.getMessage());
     }
 
     @Test
