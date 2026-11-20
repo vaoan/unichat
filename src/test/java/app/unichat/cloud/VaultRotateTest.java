@@ -215,6 +215,7 @@ class VaultRotateTest {
 
     @Test
     void whatAComputerSentWithTheOldKeyAfterTheChangeIsSealedAgainByIt() throws Exception {
+        assertNull(laptop.write("texts/here/" + TEXT, "{}\n").round().error()); // sent, as any text
         rotate(desk);
         // The laptop's round had opened the vault with the old key just before, and wrote after the change: its own text,
         // and the secrets part as it agreed on it.
@@ -239,12 +240,102 @@ class VaultRotateTest {
         // A computer removed before the change still has the old key and the account.
         new SealedStorage(dav(), () -> made.vk().clone()).put(VaultParts.SECRETS_FILE,
             Bundle.of(OTHER, java.time.Instant.now().plusSeconds(60), Map.of("gif.giphy.key", "falsa"), null).toBytes());
-        laptop.round();
-        desk.round();
+        Cloud.Status s = laptop.round();
+        assertNull(s.error(), "a part that doesn't open never stops the round");
+        assertTrue(s.vaultNotice() != null && s.vaultNotice().contains("unichat-secrets.json"), "said: " + s.vaultNotice());
+        assertNull(desk.round().error());
         assertFalse("falsa".equals(laptop.get("gif.giphy.key")), "no computer of the vault takes it in");
         assertFalse("falsa".equals(desk.get("gif.giphy.key")));
-        assertFalse(opens(keyOf(laptop), VaultParts.SECRETS_FILE, cloud.files.get(Vault.ROOT + "/Ajustes/unichat-secrets.json")),
-            "nor seals it with the new key");
+        byte[] now = VaultCrypto.open(keyOf(laptop), VaultParts.SECRETS_FILE, cloud.files.get(Vault.ROOT + "/Ajustes/unichat-secrets.json"));
+        assertEquals(LAPTOP, Bundle.parse(now).machine(), "this computer's own copy went up in its place, with the new key");
+        assertFalse(Bundle.parse(now).settings().containsKey("gif.giphy.key"));
+    }
+
+    @Test
+    void aPartSealedAtANewerGenerationIsNeverOverwrittenWithAnOlderKey() throws Exception {
+        String stored = Vault.ROOT + "/Ajustes/unichat-secrets.json";
+        try (VaultParts.Round old = laptop.as(() -> java.util.concurrent.CompletableFuture.completedFuture(
+            VaultParts.open(dav(), (p, b) -> false)))) {
+            rotate(desk); // meanwhile: every part sealed again at the next generation
+            byte[] sealedNow = cloud.files.get(stored);
+            Storage personal = old.personal(dav());
+            assertThrows(SealedStorage.Damaged.class, () -> personal.get(VaultParts.SECRETS_FILE), "fails as before");
+            assertArrayEquals(sealedNow, cloud.files.get(stored), "and nothing written over it");
+        }
+    }
+
+    @Test
+    void anotherComputersTextThatDoesntOpenIsLeftAndNamedAndTheRoundGoesOn() throws Exception {
+        String folder = Vault.ROOT + "/Textos/" + OTHER;
+        cloud.dirs.add(folder);
+        cloud.put(folder + "/index.json", "dañado".getBytes(StandardCharsets.UTF_8));
+        int before = cloud.puts.get();
+        Cloud.Status s = desk.round();
+        assertNull(s.error());
+        assertTrue(s.vaultNotice() != null && s.vaultNotice().contains(OTHER), "named: " + s.vaultNotice());
+        assertArrayEquals("dañado".getBytes(StandardCharsets.UTF_8), cloud.files.get(folder + "/index.json"), "never written over");
+        assertTrue(cloud.puts.get() >= before);
+    }
+
+    @Test
+    void aTextForgedInAComputersFolderWithTheOldKeyIsLeftAndNeverSpread() throws Exception {
+        String mine = "{\"mio\":12345}\n", forged = "{\"forjado\":1}\n"; // the same size: only what it says differs
+        assertNull(laptop.write("texts/here/" + TEXT, mine).round().error());
+        assertNull(desk.round().error());
+        rotate(desk);
+        SealedStorage old = new SealedStorage(dav(), () -> made.vk().clone());
+        String folder = "Unichat/Textos/" + LAPTOP;
+        old.put(folder + "/" + TEXT, forged.getBytes(StandardCharsets.UTF_8));
+        old.put(folder + "/index.json", TextIndex.write(Map.of(TEXT, (long) forged.length())));
+        assertNull(laptop.round().error());
+        assertFalse(opens(keyOf(laptop), folder + "/" + TEXT, cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/" + TEXT)),
+            "not what this computer has: left");
+        assertTrue(opens(keyOf(laptop), folder + "/index.json", cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/index.json")),
+            "its index sent anew");
+        desk.round();
+        assertEquals(mine, desk.read("texts/" + LAPTOP + "/" + TEXT), "and no other computer takes the forged one in");
+    }
+
+    @Test
+    void aSlotGoneAndPutBackWithAnotherKeyIsRefused() throws Exception {
+        goneAndPutBackWithAnotherKey();
+        Cloud.KeyChanged changed = rotate(desk);
+        assertEquals(Map.of(LAPTOP, "Portátil"), changed.refused(), "pinned as first seen, though its slot was gone a while");
+        assertFalse(slot(LAPTOP).params().has("next"));
+    }
+
+    @Test
+    void aKeyAcceptedByThePersonIsOfferedTheNext() throws Exception {
+        goneAndPutBackWithAnotherKey();
+        desk.as(() -> desk.cloud.acceptKey(LAPTOP)); // the person says it's the laptop's, set up again
+        assertEquals(Map.of(), rotate(desk).refused());
+        assertTrue(slot(LAPTOP).params().has("next"), "offered now");
+    }
+
+    private void goneAndPutBackWithAnotherKey() throws Exception {
+        cloud.files.remove(Vault.SLOTS + "/" + LAPTOP + ".json");
+        assertNull(desk.round().error());
+        laptopSlotWithKey(KeyPairGenerator.getInstance("X25519").generateKeyPair().getPublic().getEncoded());
+        assertNull(desk.round().error());
+    }
+
+    @Test
+    void aComputerRemovedHereIsNeverOfferedAgainEvenPutBack() throws Exception {
+        VaultSlot laptopSlot = slot(LAPTOP);
+        desk.as(() -> desk.cloud.removeComputer(LAPTOP));
+        cloud.put(Vault.SLOTS + "/" + LAPTOP + ".json", laptopSlot.toJson()); // put back as it was, by whoever kept a copy
+        assertNull(desk.round().error());
+        Cloud.KeyChanged changed = rotate(desk);
+        assertEquals(Map.of(LAPTOP, "Portátil"), changed.refused());
+        assertFalse(slot(LAPTOP).params().has("next"));
+    }
+
+    /** {@link #LAPTOP}'s slot written anew with {@code publicKey} sealed with the vault key: what one holding it can do. */
+    private void laptopSlotWithKey(byte[] publicKey) throws Exception {
+        ObjectNode params = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+        VaultNext.bind(params, made.vk(), made.info().id(), LAPTOP, publicKey);
+        VaultSlot slot = VaultSlot.wrap(made.info().id(), LAPTOP, VaultSlot.Method.COMPUTER, "Portátil", 0, VaultCrypto.randomKey(), params, made.vk());
+        cloud.put(Vault.SLOTS + "/" + LAPTOP + ".json", slot.toJson());
     }
 
     @Test

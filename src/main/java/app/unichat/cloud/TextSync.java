@@ -40,6 +40,8 @@ final class TextSync {
     /** A file went up and the index saying so not yet: until it does, the others never look for what's new. */
     private boolean indexDue;
     private boolean loaded;
+    /** The other machines whose texts in the vault didn't open at the last run: left as they are, never written here. */
+    private final Set<String> damaged = new TreeSet<>();
 
     /** @param local where the texts are kept, "here" and one folder per other machine */
     TextSync(Path local, Path record, String machine) {
@@ -115,28 +117,64 @@ final class TextSync {
         indexDue = false;
     }
 
+    /**
+     * Whether {@code plain} at {@code path} is a text this computer sent: one of its own, whose content is the start of
+     * the file here (texts only grow). Its index never is: it's sent anew, so it says what this computer has.
+     */
+    synchronized boolean sentHere(String path, byte[] plain) throws IOException {
+        String folder = ROOT + "/" + machine + "/";
+        if (!path.startsWith(folder)) return false;
+        String name = path.substring(folder.length());
+        if (name.equals(INDEX)) {
+            load();
+            indexDue = true;
+            save();
+            return false;
+        }
+        if (!FILE.matcher(name).matches()) return false;
+        Path here = local.resolve(HERE).resolve(name);
+        if (!Files.exists(here) || Files.size(here) < plain.length) return false;
+        byte[] mine = Files.readAllBytes(here);
+        return java.util.Arrays.equals(mine, 0, plain.length, plain, 0, plain.length);
+    }
+
+    /** The other machines whose texts in the vault didn't open at the last run. */
+    synchronized Set<String> damaged() {
+        return Set.copyOf(damaged);
+    }
+
     private Set<String> bring(Storage storage) throws IOException {
         Set<String> came = new TreeSet<>();
+        damaged.clear();
         for (String other : storage.list(ROOT)) {
             if (other.equals(machine) || !Ids.ours(other)) continue;
-            String folder = ROOT + "/" + other;
-            String stamp = storage.stamp(folder + "/" + INDEX);
-            if (stamp == null || stamp.equals(stamps.get(other))) continue;
-            byte[] index = storage.get(folder + "/" + INDEX);
-            if (index == null) continue;
-            Path into = local.resolve(other);
-            for (Map.Entry<String, Long> f : TextIndex.read(index).entrySet()) {
-                java.util.regex.Matcher name = FILE.matcher(f.getKey());
-                if (!name.matches()) continue;
-                Path here = into.resolve(f.getKey());
-                if (Files.exists(here) && Files.size(here) >= f.getValue()) continue;
-                app.unichat.support.Folders.ownerOnly(local); // what chats said: no other account of the computer reads it
-                Files.createDirectories(into);
-                if (storage.get(folder + "/" + f.getKey(), here)) came.add(name.group(1));
+            try {
+                bring(storage, other, came);
+            } catch (SealedStorage.Damaged e) {
+                damaged.add(other); // read again next round; the others still come
             }
-            stamps.put(other, stamp); // only once all of it came: a failure above reads the index again next time
         }
         return came;
+    }
+
+    /** One other machine's texts, when its index changed. */
+    private void bring(Storage storage, String other, Set<String> came) throws IOException {
+        String folder = ROOT + "/" + other;
+        String stamp = storage.stamp(folder + "/" + INDEX);
+        if (stamp == null || stamp.equals(stamps.get(other))) return;
+        byte[] index = storage.get(folder + "/" + INDEX);
+        if (index == null) return;
+        Path into = local.resolve(other);
+        for (Map.Entry<String, Long> f : TextIndex.read(index).entrySet()) {
+            java.util.regex.Matcher name = FILE.matcher(f.getKey());
+            if (!name.matches()) continue;
+            Path here = into.resolve(f.getKey());
+            if (Files.exists(here) && Files.size(here) >= f.getValue()) continue;
+            app.unichat.support.Folders.ownerOnly(local); // what chats said: no other account of the computer reads it
+            Files.createDirectories(into);
+            if (storage.get(folder + "/" + f.getKey(), here)) came.add(name.group(1));
+        }
+        stamps.put(other, stamp); // only once all of it came: a failure above reads the index again next time
     }
 
     private void load() throws IOException {

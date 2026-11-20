@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.LongConsumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -19,12 +20,26 @@ import java.util.function.Supplier;
  */
 final class SealedStorage implements Storage {
     private static final String PREFIX = CloudAccount.ROOT + "/";
+
+    /** A file of the vault that doesn't open with this key: damaged, or sealed with another one. */
+    static final class Damaged extends IOException {
+        Damaged() {
+            super(I18n.t("cloud.error.vaultDamaged"));
+        }
+    }
     private final Storage plain;
     private final Supplier<byte[]> vk;
+    private final Predicate<String> absentIfDamaged;
 
     SealedStorage(Storage plain, Supplier<byte[]> vk) {
+        this(plain, vk, path -> false);
+    }
+
+    /** @param absentIfDamaged whether a file at this logical path that doesn't open reads as none (asked only then) */
+    SealedStorage(Storage plain, Supplier<byte[]> vk, Predicate<String> absentIfDamaged) {
         this.plain = plain;
         this.vk = vk;
+        this.absentIfDamaged = absentIfDamaged;
     }
 
     @Override
@@ -78,7 +93,13 @@ final class SealedStorage implements Storage {
     @Override
     public byte[] get(String path) throws IOException {
         byte[] sealed = plain.get(stored(path));
-        return sealed == null ? null : open(path, sealed);
+        if (sealed == null) return null;
+        try {
+            return open(path, sealed);
+        } catch (Damaged e) {
+            if (absentIfDamaged.test(path)) return null;
+            throw e;
+        }
     }
 
     @Override
@@ -104,12 +125,12 @@ final class SealedStorage implements Storage {
         }
     }
 
-    private byte[] open(String path, byte[] sealed) throws IOException {
+    private byte[] open(String path, byte[] sealed) throws Damaged {
         byte[] key = vk.get();
         try {
             return VaultCrypto.open(key, path, sealed);
         } catch (VaultCrypto.Broken e) {
-            throw new IOException(I18n.t("cloud.error.vaultDamaged"));
+            throw new Damaged();
         } finally {
             Arrays.fill(key, (byte) 0);
         }

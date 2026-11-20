@@ -271,7 +271,7 @@ final class Vault {
     }
 
     /** Whether the account's vault is {@code info}'s, at its generation; false when it can't be read. */
-    private static boolean at(Storage s, Info info) {
+    static boolean at(Storage s, Info info) {
         try {
             Info read = info(s);
             return read != null && read.id().equals(info.id()) && read.generation() == info.generation();

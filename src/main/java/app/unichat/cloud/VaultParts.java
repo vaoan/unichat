@@ -33,6 +33,7 @@ final class VaultParts {
         PINNED_FILE = CloudAccount.ROOT + "/Ajustes/unichat-pinned.json",
         TRANSCRIPTS_FILE = CloudAccount.ROOT + "/Ajustes/unichat-transcripts.json";
     private static final String PINNED = "pinned-messages.json";
+    private static final String SETTINGS_DIR = CloudAccount.ROOT + "/Ajustes";
     /** A transcript's file as {@code stt.Transcripts} names it (the audio's SHA-256): no other name from the account becomes a path. */
     private static final Pattern TRANSCRIPT = Pattern.compile("[0-9a-f]{64}\\.txt");
 
@@ -93,6 +94,8 @@ final class VaultParts {
         private final Cloud.VaultState state;
         private final byte[] vk;
         private final Vault.Info vault;
+        /** The vault's parts that didn't open this round and went up anew from here (their file names). */
+        private final List<String> replaced = new java.util.concurrent.CopyOnWriteArrayList<>();
 
         private Round(Cloud.VaultState state, byte[] vk) {
             this(state, vk, null);
@@ -124,10 +127,25 @@ final class VaultParts {
         Storage personal(Storage plain) {
             return switch (state) {
                 case NONE -> plain;
-                case OPEN -> new SealedStorage(plain, () -> vk.clone());
+                case OPEN -> new SealedStorage(plain, () -> vk.clone(), path -> replaceable(plain, path));
                 case LOCKED, DECLINED, REMOVED -> null;
             };
         }
+
+        /**
+         * A part of the vault that doesn't open (a removed computer's, sealed with the old key, or damaged) is taken for
+         * none, so this computer's own copy goes up in its place, only while the vault is still at this round's generation:
+         * one sealed with a newer key than this round's is never written over with this one. Texts never: each has one
+         * writer, which isn't this computer for another's.
+         */
+        private boolean replaceable(Storage plain, String path) {
+            if (!path.startsWith(SETTINGS_DIR + "/") || !Vault.at(plain, vault)) return false;
+            replaced.add(path.substring(path.lastIndexOf('/') + 1));
+            return true;
+        }
+
+        /** The parts that went up anew this round in place of one that didn't open. */
+        List<String> replaced() { return List.copyOf(replaced); }
 
         @Override
         public void close() {

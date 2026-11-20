@@ -62,10 +62,11 @@ final class MergedPart {
         seenNames = Set.copyOf(union.keySet());
     }
 
-    /** Whether {@code plain} at {@code path} holds only entries this computer has, as it has them. */
+    /** Whether {@code plain} at {@code path} is this part's file holding only entries this computer has, as it has them. */
     boolean holds(String path, byte[] plain) {
         if (!path.equals(remotePath)) return false;
-        Map<String, String> theirs = parse(plain);
+        Map<String, String> theirs = strict(plain);
+        if (theirs == null) return false;
         Set<String> mine = names.get();
         return theirs.entrySet().stream().allMatch(e -> mine.contains(e.getKey()) && e.getValue().equals(read.apply(e.getKey())));
     }
@@ -73,6 +74,22 @@ final class MergedPart {
     /** The account's file may be another's after the vault opened or closed here: read it again next round. */
     synchronized void unseen() {
         seenStamp = null;
+    }
+
+    /** The entries, or null when {@code data} isn't this part's file: an object of texts under "entries". */
+    private static Map<String, String> strict(byte[] data) {
+        try {
+            JsonNode entries = JSON.readTree(data).path("entries");
+            if (!entries.isObject()) return null;
+            Map<String, String> out = new TreeMap<>();
+            for (var e : entries.properties()) {
+                if (!e.getValue().isTextual()) return null;
+                out.put(e.getKey(), e.getValue().asText());
+            }
+            return out;
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
     }
 
     /** What isn't an object of texts reads as nothing. */

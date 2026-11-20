@@ -39,7 +39,8 @@ public final class Cloud {
 
     /** For the settings page: connected or not, when the last round worked, why the last one didn't, what went up. */
     public record Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
-                         int retrying, Instant nextRetry, int conflicts, Instant lastVerified, VaultState vault, Moving moving) {
+                         int retrying, Instant nextRetry, int conflicts, Instant lastVerified, VaultState vault, Moving moving,
+                         String vaultNotice) {
         static final Status OFF = new Status(false, null, null, 0, 0);
 
         public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting) {
@@ -48,11 +49,12 @@ public final class Cloud {
 
         public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
                       int retrying, Instant nextRetry, int conflicts, Instant lastVerified) {
-            this(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts, lastVerified, VaultState.NONE, Moving.NONE);
+            this(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts, lastVerified, VaultState.NONE, Moving.NONE, null);
         }
 
         Status doing(Activity a) {
-            return new Status(connected, lastSync, error, uploaded, waiting, a, retrying, nextRetry, conflicts, lastVerified, vault, moving);
+            return new Status(connected, lastSync, error, uploaded, waiting, a, retrying, nextRetry, conflicts, lastVerified, vault, moving,
+                vaultNotice);
         }
     }
 
@@ -278,9 +280,9 @@ public final class Cloud {
                     Settings.get().set("cloud.lastVerify", now.toString());
                 }
             }
-            return publish(finished(now, textsFailed, vault.state()));
+            return publish(finished(now, textsFailed, vault.state(), notice(vault)));
         } catch (IOException | RuntimeException e) {
-            return publish(finished(status.lastSync(), Errors.message(e), status.vault()));
+            return publish(finished(status.lastSync(), Errors.message(e), status.vault(), null));
         }
     }
 
@@ -306,20 +308,34 @@ public final class Cloud {
         }
     }
 
-    /** The other computers' keys pinned as first seen here ({@link VaultPeers}), for the next change of key. */
-    private static void seePeers(Storage dav, VaultParts.Round vault) throws IOException {
+    /** The other computers' keys pinned as first seen here ({@link VaultPeers}), for the next change of key; best effort. */
+    private static void seePeers(Storage dav, VaultParts.Round vault) {
         byte[] vk = vault.key();
         try {
             VaultPeers.see(dav, vault.info(), vk);
+        } catch (IOException | RuntimeException e) {
+            System.err.println("Cloud: the vault's computers: " + Errors.message(e)); // seen next round
         } finally {
             Arrays.fill(vk, (byte) 0);
         }
     }
 
-    /** Whether a file of the vault is one this computer sent itself: its own texts, or a part as it agreed on it. */
+    /** What the vault left or replaced this round, in the person's words; null when nothing. */
+    private String notice(VaultParts.Round vault) {
+        List<String> lines = new java.util.ArrayList<>();
+        if (!vault.replaced().isEmpty()) lines.add(I18n.t("cloud.vault.partReplaced", String.join(", ", vault.replaced())));
+        java.util.Set<String> damaged = vault.open() ? texts.damaged() : java.util.Set.of();
+        if (!damaged.isEmpty()) lines.add(I18n.t("cloud.vault.textsDamaged", String.join(", ", damaged)));
+        return lines.isEmpty() ? null : String.join("\n", lines);
+    }
+
+    /** Whether a file of the vault is one this computer sent itself: its own texts as it has them, or a part as it agreed on it. */
     private boolean sentHere(String path, byte[] plain) {
-        return path.startsWith(TextSync.ROOT + "/" + machine() + "/") || parts.stream().anyMatch(p -> p.holds(path, plain))
-            || vaultParts.sentHere(path, plain);
+        try {
+            return texts.sentHere(path, plain) || parts.stream().anyMatch(p -> p.holds(path, plain)) || vaultParts.sentHere(path, plain);
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /** The texts go sealed while the vault is open here, plain by media's switch without one, and nowhere otherwise. */
@@ -409,11 +425,43 @@ public final class Cloud {
         });
     }
 
+    /**
+     * The person says {@code machine}'s key, as its slot shows it now, is that computer's (it was set up again): pinned in
+     * place of what this computer saw, so the next change of key offers it one. Only with the vault open here, and only a
+     * key the vault key sealed.
+     */
+    public CompletableFuture<Void> acceptKey(String machine) {
+        return onWorker(dav -> {
+            if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
+            try (VaultParts.Round vault = VaultParts.open(dav, this::sentHere)) {
+                if (!vault.open()) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
+                VaultSlot slot = Vault.slot(dav, vault.info(), machine);
+                byte[] vk = vault.key();
+                try {
+                    byte[] key = slot == null || slot.method() != VaultSlot.Method.COMPUTER ? null : VaultNext.publicKey(slot, vk);
+                    if (key == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
+                    VaultPeers peers = VaultPeers.load(vault.info().id());
+                    peers.accept(machine, key);
+                    peers.save();
+                } finally {
+                    Arrays.fill(vk, (byte) 0);
+                }
+            }
+            return null;
+        });
+    }
+
     /** Another computer's way into the vault taken away, on the cloud's thread; this one's own goes by {@link #forgetHere}. */
     public CompletableFuture<Void> removeComputer(String machine) {
         return onWorker(dav -> {
             if (machine().equals(machine)) throw new IllegalArgumentException("This computer is forgotten with forgetHere");
             Vault.removeComputer(dav, machine);
+            Vault.Info info = Vault.info(dav);
+            if (info != null) {
+                VaultPeers peers = VaultPeers.load(info.id());
+                peers.removed(machine);
+                peers.save();
+            }
             return null;
         });
     }
@@ -454,7 +502,7 @@ public final class Cloud {
         return last == null || Instant.parse(last).plus(VERIFY_EVERY).isBefore(now);
     }
 
-    private Status finished(Instant lastSync, String error, VaultState vault) {
+    private Status finished(Instant lastSync, String error, VaultState vault, String vaultNotice) {
         int waiting;
         try {
             waiting = media.waiting();
@@ -463,7 +511,7 @@ public final class Cloud {
         }
         String verified = Settings.get().getString("cloud.lastVerify", null);
         return new Status(true, lastSync, error, uploaded, waiting, null, media.retrying(), media.nextRetry(), media.conflicts(),
-                verified == null ? null : Instant.parse(verified), vault, moving);
+                verified == null ? null : Instant.parse(verified), vault, moving, vaultNotice);
     }
 
     /** Checks everything uploaded against the account now, repairing what differs, then the usual round. */
