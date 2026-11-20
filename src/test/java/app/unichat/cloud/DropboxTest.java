@@ -44,6 +44,13 @@ class DropboxTest {
     }
 
     @Test
+    void aFileAndAFolderAreDeleted() throws Exception {
+        try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
+            StorageDeleting.check(api(fake, DropboxApi.SINGLE, 1024));
+        }
+    }
+
+    @Test
     void filesWhetherTheyChangedAndNamesWithAccents() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
             DropboxApi api = api(fake, DropboxApi.SINGLE, 1024);

@@ -26,6 +26,9 @@ public interface Storage {
     /** The names of what's right in {@code dir}, files and folders; empty when there's no such folder. */
     java.util.List<String> list(String dir) throws IOException;
 
+    /** Deletes the file at {@code path}, or the folder with all in it; nothing there is fine. */
+    void delete(String path) throws IOException;
+
     void put(String path, Path file) throws IOException;
 
     /** The same, telling {@code sent} the running total of bytes gone out (null: nobody listens). */

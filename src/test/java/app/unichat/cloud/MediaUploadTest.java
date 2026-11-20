@@ -32,6 +32,7 @@ class MediaUploadTest {
 
         @Override public void check() { }
         @Override public boolean exists(String path) { return files.containsKey(path); }
+        @Override public void delete(String path) { files.remove(path); }
         @Override public String stamp(String path) { return null; }
         @Override public void mkdirs(String d) { }
 

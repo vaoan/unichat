@@ -92,6 +92,20 @@ final class FakePCloud implements AutoCloseable {
                     put(p, body);
                     json(x, "{\"result\": 0}");
                 }
+                case "deletefile" -> {
+                    if (files.remove(q.get("path")) == null) json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
+                    else json(x, "{\"result\": 0}");
+                }
+                case "deletefolderrecursive" -> {
+                    String p = q.get("path");
+                    if (!dirs.contains(p)) {
+                        json(x, "{\"result\": 2005, \"error\": \"Directory does not exist.\"}");
+                        return;
+                    }
+                    files.keySet().removeIf(f -> f.startsWith(p + "/"));
+                    dirs.removeIf(d -> d.equals(p) || d.startsWith(p + "/"));
+                    json(x, "{\"result\": 0, \"metadata\": {\"isfolder\": true}}");
+                }
                 case "getfilelink" -> {
                     String p = q.get("path");
                     if (!files.containsKey(p)) json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");

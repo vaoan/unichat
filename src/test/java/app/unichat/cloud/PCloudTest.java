@@ -35,6 +35,13 @@ class PCloudTest {
     }
 
     @Test
+    void aFileAndAFolderAreDeleted() throws Exception {
+        try (FakePCloud cloud = new FakePCloud("tok")) {
+            StorageDeleting.check(new PCloudApi(cloud.host(), "tok"));
+        }
+    }
+
+    @Test
     void foldersFilesAndWhetherTheyChanged() throws Exception {
         try (FakePCloud cloud = new FakePCloud("tok")) {
             PCloudApi api = new PCloudApi(cloud.host(), "tok");

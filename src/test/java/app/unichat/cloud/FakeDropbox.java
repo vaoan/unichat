@@ -128,6 +128,19 @@ final class FakeDropbox implements AutoCloseable {
                     if (path.endsWith("finish")) put(arg.path("commit").path("path").asText(), s.toByteArray());
                     reply(x, 200, "{}");
                 }
+                case "/2/files/delete_v2" -> {
+                    String p = arg.path("path").asText();
+                    boolean there = files.containsKey(p) || folders.contains(p) // a folder is there when anything is in it, as on Dropbox
+                            || files.keySet().stream().anyMatch(f -> f.startsWith(p + "/")) || folders.stream().anyMatch(d -> d.startsWith(p + "/"));
+                    if (!there) {
+                        reply(x, 409, "{\"error_summary\": \"path_lookup/not_found/..\"}");
+                        return;
+                    }
+                    files.remove(p);
+                    files.keySet().removeIf(f -> f.startsWith(p + "/"));
+                    folders.removeIf(d -> d.equals(p) || d.startsWith(p + "/"));
+                    reply(x, 200, "{\"metadata\": {\".tag\": \"file\"}}");
+                }
                 case "/2/files/download" -> {
                     byte[] f = files.get(arg.path("path").asText());
                     if (f == null) reply(x, 409, "{\"error_summary\": \"path/not_found/..\"}");

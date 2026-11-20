@@ -93,6 +93,16 @@ final class FakeDav implements AutoCloseable {
                     x.sendResponseHeaders(200, f.length);
                     x.getResponseBody().write(f);
                 }
+                case "DELETE" -> {
+                    if (!files.containsKey(path) && !dirs.contains(path)) {
+                        x.sendResponseHeaders(404, -1);
+                        return;
+                    }
+                    files.remove(path);
+                    files.keySet().removeIf(p -> p.startsWith(path + "/"));
+                    dirs.removeIf(d -> d.equals(path) || d.startsWith(path + "/"));
+                    x.sendResponseHeaders(204, -1);
+                }
                 default -> x.sendResponseHeaders(405, -1);
             }
         }

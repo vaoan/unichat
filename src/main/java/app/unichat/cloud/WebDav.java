@@ -16,7 +16,7 @@ import java.util.Base64;
 /**
  * The person's own storage over WebDAV, the one way pCloud, Icedrive, Nextcloud, Koofr… all offer: whether something
  * is there, folders, putting and getting a file. Paths are relative to the account's root, "/"-separated; each part is
- * encoded here. Nothing is ever deleted nor overwritten by mistake: callers ask {@link #exists} first.
+ * encoded here. Nothing is overwritten by mistake (callers ask {@link #exists} first); {@link #delete} only when asked.
  */
 public final class WebDav implements Storage {
     private final String base;
@@ -127,6 +127,13 @@ public final class WebDav implements Storage {
             int code = send("MKCOL", at.toString(), HttpRequest.BodyPublishers.noBody(), false).statusCode();
             if (code != 201 && code != 405 && code != 200) throw failure(code); // 405: it was already there
         }
+    }
+
+    /** DELETE: on a collection it removes all in it (RFC 4918); 404 means nothing was there. */
+    @Override
+    public void delete(String path) throws IOException {
+        int code = send("DELETE", path, HttpRequest.BodyPublishers.noBody(), false).statusCode();
+        if (code != 404 && code != 200 && code != 204) throw failure(code);
     }
 
     @Override

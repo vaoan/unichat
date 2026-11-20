@@ -35,6 +35,13 @@ class WebDavTest {
     }
 
     @Test
+    void aFileAndAFolderAreDeleted() throws Exception {
+        try (FakeDav cloud = new FakeDav("u", "p")) {
+            StorageDeleting.check(new WebDav(cloud.url(), "u", "p"));
+        }
+    }
+
+    @Test
     void aFolderIsListedFromWholeAddressesToo() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             cloud.wholeHrefs = true;
