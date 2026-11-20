@@ -129,7 +129,7 @@ final class VaultPage {
             Button delete = new Button(I18n.t("settings.vault.deleteLocked"));
             delete.getStyleClass().add("danger-button");
             delete.setOnAction(e -> askTwice(I18n.t("settings.vault.deleteLocked"), I18n.t("settings.vault.deleteLockedAsk"),
-                I18n.t("settings.vault.turnOffSure"), I18n.t("settings.vault.deleteLockedWhat"), I18n.t("settings.vault.deleteLockedYes"),
+                I18n.t("settings.vault.missingSure"), I18n.t("settings.vault.deleteLockedWhat"), I18n.t("settings.vault.deleteLockedYes"),
                 () -> job(cloud.vault().deleteLockedVault())));
             rows.add(stacked(I18n.t("settings.vault.deleteLockedTitle"), I18n.t("settings.vault.deleteLockedHelp"), delete));
         }
