@@ -34,6 +34,8 @@ final class TextSync {
     private final String machine;
     /** What went up of each own file (its size), and each other machine's index as last read (its stamp). */
     private final Map<String, Long> sent = new HashMap<>();
+    /** Where {@link #sent} went: a record from before the vault knew only the plain account. */
+    private String sentTo = PLAIN;
     private final Map<String, String> stamps = new HashMap<>();
     /** A file went up and the index saying so not yet: until it does, the others never look for what's new. */
     private boolean indexDue;
@@ -50,8 +52,26 @@ final class TextSync {
      * Sends what grew here, then brings what grew on the other computers; the chats (their keys) that something came
      * for. A failure stops the round where it was: what was done is remembered, the rest is tried at the next.
      */
+    /** The account itself, as {@link #run}'s {@code to} says where the texts go: plain, or a vault ("vault:" and its id). */
+    static final String PLAIN = "plain";
+
+    /** {@link #run(Storage, String)} to the plain account. */
     synchronized Set<String> run(Storage storage) throws IOException {
+        return run(storage, PLAIN);
+    }
+
+    /**
+     * {@code to} names where {@code storage} keeps them (plain, or which vault): what was sent is of one of them, so when
+     * it's another this computer's own files all go again (it's the only one to write them); a launch to the same one
+     * sends nothing again.
+     */
+    synchronized Set<String> run(Storage storage, String to) throws IOException {
         load();
+        if (!to.equals(sentTo)) {
+            sent.clear();
+            indexDue = false;
+            sentTo = to;
+        }
         try {
             send(storage);
             return bring(storage);
@@ -61,14 +81,12 @@ final class TextSync {
     }
 
     /**
-     * The account is another storage now (the vault opened or closed here): each index of the others' is read again (only
-     * what grew comes), and this computer's own files all go again, since what went up went to the other one and this
-     * computer is the only one to write them.
+     * The others' indexes may be other files now (the vault opened or closed here): each is read again; only what grew
+     * comes. What this computer sent goes again only if it goes somewhere else ({@link #run(Storage, String)}).
      */
     synchronized void unseen() throws IOException {
         load();
         stamps.clear();
-        sent.clear();
         save();
     }
 
@@ -129,6 +147,7 @@ final class TextSync {
         n.path("sent").fields().forEachRemaining(e -> sent.put(e.getKey(), e.getValue().asLong()));
         n.path("stamps").fields().forEachRemaining(e -> stamps.put(e.getKey(), e.getValue().asText()));
         indexDue = n.path("indexDue").asBoolean(false);
+        sentTo = n.path("sentTo").asText(PLAIN);
     }
 
     private void save() throws IOException {
@@ -136,6 +155,7 @@ final class TextSync {
         sent.forEach(n.putObject("sent")::put);
         stamps.forEach(n.putObject("stamps")::put);
         n.put("indexDue", indexDue);
+        n.put("sentTo", sentTo);
         SafeFile.at(record).write(JSON.writeValueAsBytes(n));
     }
 }

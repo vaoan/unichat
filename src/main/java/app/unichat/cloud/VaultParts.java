@@ -86,15 +86,24 @@ final class VaultParts {
     static final class Round implements AutoCloseable {
         private final Cloud.VaultState state;
         private final byte[] vk;
+        private final String vault;
 
         private Round(Cloud.VaultState state, byte[] vk) {
+            this(state, vk, null);
+        }
+
+        private Round(Cloud.VaultState state, byte[] vk, String vault) {
             this.state = state;
             this.vk = vk;
+            this.vault = vault;
         }
 
         Cloud.VaultState state() { return state; }
 
         boolean open() { return state == Cloud.VaultState.OPEN; }
+
+        /** Where the texts go this round, for {@link TextSync#run(Storage, String)}: this vault, or the plain account. */
+        String textsTo() { return open() ? "vault:" + vault : TextSync.PLAIN; }
 
         /** Where the personal parts go this round: the account itself without a vault, the vault when open, nowhere otherwise. */
         Storage personal(Storage plain) {
@@ -153,7 +162,7 @@ final class VaultParts {
             return new Round(Cloud.VaultState.REMOVED, null);
         }
         try {
-            return new Round(Cloud.VaultState.OPEN, slot.unwrap(slotKey));
+            return new Round(Cloud.VaultState.OPEN, slot.unwrap(slotKey), info.id());
         } catch (VaultCrypto.Broken e) {
             return new Round(Cloud.VaultState.REMOVED, null);
         } finally {

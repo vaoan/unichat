@@ -243,7 +243,7 @@ public final class Cloud {
             Storage textsTo = textsTo(vault, personal);
             if (textsTo != null) {
                 try {
-                    syncTexts(textsTo); // small and what a deleted message is read from: before a long video
+                    syncTexts(textsTo, vault.textsTo()); // small and what a deleted message is read from: before a long video
                 } catch (IOException e) {
                     textsFailed = Errors.message(e); // told, but the media still go up
                 }
@@ -311,8 +311,8 @@ public final class Cloud {
         }
     }
 
-    private void syncTexts(Storage dav) throws IOException {
-        java.util.Set<String> came = texts.run(dav);
+    private void syncTexts(Storage dav, String to) throws IOException {
+        java.util.Set<String> came = texts.run(dav, to);
         if (!came.isEmpty()) textsArrived.accept(came);
     }
 
@@ -334,7 +334,7 @@ public final class Cloud {
                     Storage dav = a.storage();
                     try (VaultParts.Round vault = vault(dav)) {
                         Storage to = textsTo(vault, vault.personal(dav));
-                        if (to != null) syncTexts(to);
+                        if (to != null) syncTexts(to, vault.textsTo());
                     }
                 }
             } catch (IOException | RuntimeException e) {

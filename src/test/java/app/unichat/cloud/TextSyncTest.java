@@ -62,17 +62,26 @@ class TextSyncTest {
     }
 
     @Test
-    void theAccountBeingAnotherOneSendsItsOwnAgain() throws Exception {
+    void aRestartSendsNothingAgainAndAnotherAccountSendsItsOwnOnce() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
-            TextSync desk = computer(DESK);
             Files.writeString(own(DESK).resolve(FILE), "{\"id\":\"$1\"}\n", StandardCharsets.UTF_8);
-            desk.run(dav);
-            cloud.files.clear(); // the vault opened here: the files are another storage's now, and it has none of them
-            desk.unseen();
-            desk.run(dav);
+            computer(DESK).run(dav, TextSync.PLAIN);
+            int puts = cloud.puts.get();
+            TextSync restarted = computer(DESK); // the same record, as after a launch
+            restarted.unseen();
+            restarted.run(dav, TextSync.PLAIN);
+            assertEquals(puts, cloud.puts.get(), "the same account: nothing sent again");
+
+            cloud.files.clear(); // the vault opened here: its files are another storage's, which has none of them
+            TextSync opened = computer(DESK);
+            opened.unseen();
+            opened.run(dav, "vault:1");
             assertTrue(cloud.files.containsKey("Unichat/Textos/" + DESK + "/" + FILE), "this computer is the only one to send its own: again");
             assertTrue(new String(cloud.files.get("Unichat/Textos/" + DESK + "/index.json"), StandardCharsets.UTF_8).contains(FILE));
+            puts = cloud.puts.get();
+            computer(DESK).run(dav, "vault:1");
+            assertEquals(puts, cloud.puts.get(), "once");
         }
     }
 

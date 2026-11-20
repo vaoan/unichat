@@ -475,4 +475,30 @@ class CloudVaultTest {
         assertEquals(Cloud.VaultState.LOCKED, desk.round().vault());
         assertNull(desk.get(VaultMove.MOVED_AT), "the new vault is moved into from the start");
     }
+
+    @Test
+    void aLaunchSendsNoTextAgainAndTheVaultOpeningHereSendsThemOnce() throws Exception {
+        Computer desk = withEverything(new Computer(DESK));
+        desk.round(); // plain
+        Computer launched = new Computer(DESK);
+        launched.values.putAll(desk.values);
+        int puts = cloud.puts.get();
+        assertNull(launched.round().error());
+        assertEquals(puts, cloud.puts.get(), "a launch, plain: nothing goes up again");
+
+        Vault.Created made = Vault.create(dav(), OTHER, "Otro");
+        puts = cloud.puts.get();
+        assertEquals(Cloud.VaultState.LOCKED, launched.round().vault());
+        assertEquals(puts, cloud.puts.get(), "a vault elsewhere, not opened here: nothing");
+        String sealedText = Vault.ROOT + "/Textos/" + DESK + "/" + TEXT;
+        launched.opened(made.info(), Vault.addComputer(dav(), made.vk(), DESK, "Escritorio"));
+        assertNull(launched.round().error());
+        assertTrue(cloud.files.containsKey(sealedText), "opened here: its texts go again, sealed");
+        int sent = cloud.versions.get(sealedText);
+
+        Computer again = new Computer(DESK);
+        again.values.putAll(launched.values);
+        assertNull(again.round().error());
+        assertEquals(sent, cloud.versions.get(sealedText), "a launch with the vault open: not again");
+    }
 }
