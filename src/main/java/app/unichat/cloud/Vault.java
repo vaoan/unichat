@@ -60,7 +60,7 @@ final class Vault {
         if (json == null) return null;
         try {
             JsonNode n = JSON.readTree(json);
-            if (n == null || !n.path("id").isTextual() || n.get("id").asText().isBlank() || !n.path("created").isTextual()
+            if (n == null || !n.path("id").isTextual() || !Ids.ours(n.get("id").asText()) || !n.path("created").isTextual()
                 || !n.path("generation").isIntegralNumber() || !n.get("generation").canConvertToLong() || n.get("generation").asLong() < 0) {
                 return null;
             }
@@ -77,19 +77,21 @@ final class Vault {
     /**
      * Makes the vault with its recovery code and this computer's slot. Two computers may do it at once: whoever reads back
      * another's {@link #INFO}, after writing its own or after writing its slots, takes its slots back and stops, leaving
-     * the other's vault as it is. Any other failure takes back all it wrote, so no half-made vault is left in the way.
+     * the other's vault as it is. Any other failure, the vault's own file included (it may land with its answer lost),
+     * takes back all it wrote, so no half-made vault is left in the way. A vault file that isn't one is replaced only
+     * while no slot is there: nothing anyone could open.
      */
     static Created create(Storage s, String machine, String machineName) throws IOException, Exists {
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
-        if (s.exists(INFO)) throw new Exists();
+        if (s.exists(INFO) && (info(s) != null || !s.list(SLOTS).isEmpty())) throw new Exists();
         Info mine = new Info(UUID.randomUUID().toString(), Instant.now(), 0);
-        s.mkdirs(ROOT);
-        s.put(INFO, json(mine));
-        if (!stillOurs(s, mine)) throw new Exists();
         byte[] vk = VaultCrypto.randomKey();
         List<String> written = new ArrayList<>();
         boolean made = false;
         try {
+            s.mkdirs(ROOT);
+            s.put(INFO, json(mine));
+            if (!stillOurs(s, mine)) throw new Exists();
             s.mkdirs(SLOTS);
             RecoveryCode code = writeRecovery(s, vk, mine, written);
             Computer computer = writeComputer(s, vk, mine, machine, machineName, written);

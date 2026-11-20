@@ -152,6 +152,53 @@ class VaultTest {
     }
 
     @Test
+    void anAnswerLostAfterTheVaultFileLandedLeavesNoVaultBehind() throws Exception {
+        Storage lost = new Racing(storage, path -> {
+            if (path.equals(Vault.INFO)) throw new IOException("the answer never came");
+        }, NOTHING);
+        assertThrows(IOException.class, () -> Vault.create(lost, MAC, "Mac"));
+        assertFalse(cloud.files.containsKey(Vault.INFO), "the file that landed is taken back");
+        Vault.create(storage, MAC, "Mac");
+        assertNotNull(Vault.info(storage));
+    }
+
+    @Test
+    void aReadBackThatFailsLeavesNoVaultBehind() throws Exception {
+        java.util.concurrent.atomic.AtomicBoolean failed = new java.util.concurrent.atomic.AtomicBoolean();
+        Storage flaky = new Racing(storage, NOTHING, NOTHING, path -> {
+            if (path.equals(Vault.INFO) && failed.compareAndSet(false, true)) throw new IOException("the network dropped");
+        });
+        assertThrows(IOException.class, () -> Vault.create(flaky, MAC, "Mac"));
+        assertTrue(failed.get());
+        assertFalse(cloud.files.containsKey(Vault.INFO));
+        assertNull(Vault.info(storage));
+        Vault.create(storage, MAC, "Mac");
+        assertEquals(2, Vault.slots(storage).size());
+    }
+
+    @Test
+    void aVaultFileThatIsntOneIsReplacedOnlyWhenNoSlotIsThere() throws Exception {
+        cloud.put(Vault.INFO, "{garbage".getBytes(StandardCharsets.UTF_8));
+        Vault.Created made = Vault.create(storage, MAC, "Mac");
+        assertEquals(made.info(), Vault.info(storage), "nothing anyone could open was there");
+
+        cloud.put(Vault.INFO, "{garbage".getBytes(StandardCharsets.UTF_8));
+        Map<String, byte[]> before = Map.copyOf(cloud.files);
+        assertThrows(Vault.Exists.class, () -> Vault.create(storage, PC, "PC"), "slots are there: never replaced");
+        assertEquals(before.keySet(), cloud.files.keySet());
+        assertArrayEquals("{garbage".getBytes(StandardCharsets.UTF_8), cloud.files.get(Vault.INFO));
+    }
+
+    @Test
+    void aVaultIdThatIsntOursReadsAsNone() throws Exception {
+        cloud.put(Vault.INFO, "{\"id\":\"../x\",\"created\":\"2026-11-19T10:00:00Z\",\"generation\":0}".getBytes(StandardCharsets.UTF_8));
+        assertNull(Vault.info(storage));
+        String good = UUID.randomUUID().toString();
+        cloud.put(Vault.INFO, ("{\"id\":\"" + good + "\",\"created\":\"2026-11-19T10:00:00Z\",\"generation\":0}").getBytes(StandardCharsets.UTF_8));
+        assertEquals(good, Vault.info(storage).id());
+    }
+
+    @Test
     void aSlotOfAnotherVaultIsntListed() throws Exception {
         Vault.create(storage, MAC, "Mac");
         VaultSlot stranger = VaultSlot.wrap(UUID.randomUUID().toString(), VaultSlot.Method.PASSWORD, "password", 0,
@@ -270,7 +317,9 @@ class VaultTest {
         assertNull(Vault.info(storage));
         cloud.put(Vault.INFO, "{\"id\":\"x\",\"created\":\"yesterday\",\"generation\":0}".getBytes(StandardCharsets.UTF_8));
         assertNull(Vault.info(storage));
-        assertThrows(Vault.Exists.class, () -> Vault.create(storage, MAC, "Mac"), "something is there: never overwritten");
+        cloud.dirs.addAll(List.of(CloudAccount.ROOT, Vault.ROOT, Vault.SLOTS));
+        cloud.put(Vault.SLOTS + "/" + UUID.randomUUID() + ".json", "{}".getBytes(StandardCharsets.UTF_8));
+        assertThrows(Vault.Exists.class, () -> Vault.create(storage, MAC, "Mac"), "something is in the slots: never overwritten");
     }
 
     @Test
@@ -308,8 +357,12 @@ class VaultTest {
 
     private static final Hook NOTHING = path -> { };
 
-    /** The account, with something else happening right after each small file goes up and before each delete. */
-    private record Racing(Storage s, Hook afterPut, Hook beforeDelete) implements Storage {
+    /** The account, with something else happening right after each small file goes up, before each delete and each read. */
+    private record Racing(Storage s, Hook afterPut, Hook beforeDelete, Hook beforeGet) implements Storage {
+        Racing(Storage s, Hook afterPut, Hook beforeDelete) {
+            this(s, afterPut, beforeDelete, NOTHING);
+        }
+
         @Override public void check() throws IOException { s.check(); }
         @Override public boolean exists(String path) throws IOException { return s.exists(path); }
         @Override public String stamp(String path) throws IOException { return s.stamp(path); }
@@ -317,7 +370,7 @@ class VaultTest {
         @Override public List<String> list(String dir) throws IOException { return s.list(dir); }
         @Override public void delete(String path) throws IOException { beforeDelete.at(path); s.delete(path); }
         @Override public void put(String path, Path file) throws IOException { s.put(path, file); }
-        @Override public byte[] get(String path) throws IOException { return s.get(path); }
+        @Override public byte[] get(String path) throws IOException { beforeGet.at(path); return s.get(path); }
         @Override public boolean get(String path, Path target) throws IOException { return s.get(path, target); }
 
         @Override
