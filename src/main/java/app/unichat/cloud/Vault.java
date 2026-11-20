@@ -25,12 +25,25 @@ import java.util.UUID;
 final class Vault {
     static final String ROOT = CloudAccount.ROOT + "/Bóveda", SLOTS = ROOT + "/llaves", INFO = ROOT + "/boveda.json";
     static final int MIN_PASSWORD = 12;
-    private static final String JSON_FILE = ".json";
+    private static final String JSON_FILE = ".json", VOUCH = "vouch";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private Vault() {}
 
-    record Info(String id, Instant created, long generation) {}
+    /**
+     * The vault's file: its id, when it was made, its generation, and, from a change of key on, what vouches for that
+     * generation ({@link #vouched}: sealed with the key it replaced; null before any change, or when it isn't one).
+     */
+    record Info(String id, Instant created, long generation, byte[] vouch) {
+        Info(String id, Instant created, long generation) {
+            this(id, created, generation, null);
+        }
+
+        @Override
+        public String toString() {
+            return "Vault.Info[" + id + ", " + generation + "]";
+        }
+    }
 
     /** A new vault: its key, the code to print (shown once) and this computer's way in. */
     record Created(byte[] vk, RecoveryCode code, Computer computer, Info info) {
@@ -83,7 +96,15 @@ final class Vault {
                 || !n.path("generation").isIntegralNumber() || !n.get("generation").canConvertToLong() || n.get("generation").asLong() < 0) {
                 return null;
             }
-            return new Info(n.get("id").asText(), Instant.parse(n.get("created").asText()), n.get("generation").asLong());
+            byte[] vouch = null;
+            if (n.path(VOUCH).isTextual()) {
+                try {
+                    vouch = java.util.Base64.getDecoder().decode(n.get(VOUCH).asText());
+                } catch (IllegalArgumentException e) {
+                    vouch = null; // not one: nothing vouches for this generation
+                }
+            }
+            return new Info(n.get("id").asText(), Instant.parse(n.get("created").asText()), n.get("generation").asLong(), vouch);
         } catch (IOException | DateTimeParseException e) {
             return null;
         }
@@ -233,7 +254,8 @@ final class Vault {
             .findFirst().orElse(null);
         byte[] ownKey = own == null ? null : VaultNext.publicKey(own, oldVk);
         if (ownKey == null || !peers.trusts(own, ownKey)) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
-        Info now = new Info(was.id(), was.created(), was.generation() + 1);
+        Info now = new Info(was.id(), was.created(), was.generation() + 1, null);
+        now = new Info(now.id(), now.created(), now.generation(), VaultCrypto.seal(oldVk, vouchPath(now), vouched(now)));
         byte[] vk = VaultCrypto.randomKey();
         List<String> written = new ArrayList<>();
         List<VaultSlot> offered = new ArrayList<>();
@@ -290,6 +312,25 @@ final class Vault {
         return undo(s, written, null, cause);
     }
 
+    /**
+     * Whether {@code vault}'s generation is vouched for with {@code held}: its file says so, sealed with that key by the
+     * change, or some computer is offered it by one who held that key ({@link VaultNext#vouched}). A generation raised
+     * through the account alone never is.
+     */
+    static boolean vouched(Storage s, Info vault, byte[] held) throws IOException {
+        if (vault.vouch() != null) {
+            try {
+                if (java.security.MessageDigest.isEqual(vouched(vault), VaultCrypto.open(held, vouchPath(vault), vault.vouch()))) return true;
+            } catch (VaultCrypto.Broken e) {
+                // Not this key's: an offer may still say so.
+            }
+        }
+        for (VaultSlot slot : slots(s)) {
+            if (slot.method() == VaultSlot.Method.COMPUTER && VaultNext.vouched(slot, held, vault.generation())) return true;
+        }
+        return false;
+    }
+
     /** Whether the account's vault is {@code info}'s, at its generation; false when it can't be read. */
     static boolean at(Storage s, Info info) {
         try {
@@ -311,7 +352,7 @@ final class Vault {
         if (publicKey == null || !peers.trusts(slot, publicKey)) return false;
         ObjectNode params = slot.params().deepCopy();
         try {
-            VaultNext.offer(params, publicKey, slot.vault(), slot.id(), generation, vk);
+            VaultNext.offer(params, publicKey, slot.vault(), slot.id(), generation, vk, oldVk);
         } catch (IllegalArgumentException e) {
             return false;
         }
@@ -406,6 +447,14 @@ final class Vault {
         return slot;
     }
 
+    private static String vouchPath(Info info) {
+        return "generation:" + info.id() + ":" + info.generation();
+    }
+
+    private static byte[] vouched(Info info) {
+        return (info.id() + ":" + info.generation()).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     private static String path(String id) {
         return SLOTS + "/" + id + JSON_FILE;
     }
@@ -413,6 +462,7 @@ final class Vault {
     private static byte[] json(Info info) {
         ObjectNode n = JSON.createObjectNode();
         n.put("id", info.id()).put("created", info.created().toString()).put("generation", info.generation());
+        if (info.vouch() != null) n.put(VOUCH, java.util.Base64.getEncoder().encodeToString(info.vouch()));
         try {
             return JSON.writeValueAsBytes(n);
         } catch (IOException e) {

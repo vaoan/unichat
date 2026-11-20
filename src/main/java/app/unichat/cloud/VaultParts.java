@@ -130,7 +130,7 @@ final class VaultParts {
                 case NONE -> plain;
                 case OPEN -> new SealedStorage(plain, () -> vk.clone(), path -> replaceable(plain, path),
                     path -> { if (damaged.contains(path)) replaced.add(path); });
-                case LOCKED, DECLINED, REMOVED -> null;
+                case LOCKED, DECLINED, REMOVED, UNRECOGNIZED -> null;
             };
         }
 
@@ -261,42 +261,52 @@ final class VaultParts {
 
     /**
      * The vault's key changed since this computer's slot was written: the new one offered to it, opened with its private
-     * key; what it sent with the old one meanwhile sealed again (its slot still opens the old key); its slot then taken to
-     * the new key. Until that last write, the next round does it all again. No offer for it: it was removed first.
+     * key and vouched for with the key it holds; what it sent with the old one meanwhile sealed again (its slot still
+     * opens the old key); its slot then taken to the new key. Until that last write, the next round does it all again.
+     * No offer it can take: removed, when another computer's offer says the change is real; otherwise a change nobody it
+     * knows made (a generation raised through the account), where it keeps its key and sends nothing.
      */
     private static Round taken(Storage plain, Vault.Info info, VaultSlot slot, byte[] slotKey, Settings s,
                                BiPredicate<String, byte[]> sentHere, Runnable keyTaken) throws IOException {
-        byte[] privateKey;
+        byte[] old;
         try {
-            privateKey = Base64.getDecoder().decode(s.getString(PRIVATE, ""));
-        } catch (IllegalArgumentException e) {
-            return new Round(Cloud.VaultState.REMOVED, null);
-        }
-        byte[] vk;
-        try {
-            vk = VaultNext.take(slot, privateKey, info.generation());
+            old = slot.unwrap(slotKey);
         } catch (VaultCrypto.Broken e) {
             return new Round(Cloud.VaultState.REMOVED, null);
-        } finally {
-            Arrays.fill(privateKey, (byte) 0);
         }
-        byte[] old = null;
+        byte[] vk = null;
         try {
-            try {
-                old = slot.unwrap(slotKey);
-            } catch (VaultCrypto.Broken e) {
-                // Nothing of the old key to seal again.
+            vk = offered(slot, info, s, old);
+            if (vk == null) {
+                return new Round(Vault.vouched(plain, info, old) ? Cloud.VaultState.REMOVED : Cloud.VaultState.UNRECOGNIZED, null);
             }
             // What can't be read is left: a stray entry never holds this computer on the old key.
-            if (old != null) VaultReseal.run(plain, old, vk, sentHere);
+            VaultReseal.run(plain, old, vk, sentHere);
             keyTaken.run();
             Vault.rewrap(plain, info, slot, slotKey, vk, ownPublicKey(s));
             return new Round(Cloud.VaultState.OPEN, vk, info);
         } catch (IOException | RuntimeException e) {
-            Arrays.fill(vk, (byte) 0);
+            if (vk != null) Arrays.fill(vk, (byte) 0);
             throw e;
         } finally {
-            if (old != null) Arrays.fill(old, (byte) 0);
+            Arrays.fill(old, (byte) 0);
+        }
+    }
+
+    /** The key offered in this computer's slot, vouched for with {@code held}; null when there's none it can take. */
+    private static byte[] offered(VaultSlot slot, Vault.Info info, Settings s, byte[] held) {
+        byte[] privateKey;
+        try {
+            privateKey = Base64.getDecoder().decode(s.getString(PRIVATE, ""));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        try {
+            return VaultNext.take(slot, privateKey, info.generation(), held);
+        } catch (VaultCrypto.Broken e) {
+            return null;
+        } finally {
+            Arrays.fill(privateKey, (byte) 0);
         }
     }
 }

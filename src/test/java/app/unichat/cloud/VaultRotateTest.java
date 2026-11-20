@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutionException;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -578,5 +579,67 @@ class VaultRotateTest {
         assertNull(laptop.round().error());
         assertEquals(Map.of(TEXT, 3L), TextIndex.read(VaultCrypto.open(keyOf(laptop), index, cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/index.json"))),
             "never sealed again: what it has, sent anew");
+    }
+
+    /** {@code boveda.json} rewritten at {@code generation} by someone with only the account: nothing vouches for it. */
+    private void raiseByHand(long generation) throws Exception {
+        cloud.put(Vault.INFO, ("{\"id\":\"" + made.info().id() + "\",\"created\":\"" + made.info().created()
+            + "\",\"generation\":" + generation + "}").getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void anOfferForgedThroughTheAccountIsNeverTaken() throws Exception {
+        byte[] theirs = VaultCrypto.randomKey();
+        VaultSlot was = slot(LAPTOP);
+        ObjectNode params = was.params().deepCopy();
+        // Someone with only the account: an agreement with the slot's own public key, a key of their own, the generation raised.
+        VaultNext.offer(params, Base64.getDecoder().decode(params.get("x25519").asText()), was.vault(), LAPTOP, 1, theirs, VaultCrypto.randomKey());
+        cloud.put(Vault.SLOTS + "/" + LAPTOP + ".json", new VaultSlot(was.id(), was.vault(), was.method(), was.label(), was.created(),
+            was.generation(), params, was.wrapped()).toJson());
+        raiseByHand(1);
+        int puts = cloud.puts.get();
+        Cloud.Status s = laptop.write("texts/here/" + TEXT, "{}\n{\"más\":1}\n").round();
+        assertEquals(Cloud.VaultState.UNRECOGNIZED, s.vault(), "their key is never taken");
+        assertEquals(puts, cloud.puts.get(), "nothing sealed with it, nothing sent");
+        sealedFiles().forEach((p, d) -> assertFalse(opens(theirs, p, d), "nothing opens with their key: " + p));
+        assertEquals(0, slot(LAPTOP).generation(), "its slot left on the key it had");
+    }
+
+    @Test
+    void aGenerationRaisedByHandLocksNobodyOut() throws Exception {
+        raiseByHand(1);
+        int puts = cloud.puts.get();
+        Cloud.Status s = laptop.write("texts/here/" + TEXT, "{}\n{\"más\":1}\n").set("ui.theme", "SEPIA").round();
+        assertEquals(Cloud.VaultState.UNRECOGNIZED, s.vault(), "never removed for a change nobody vouches for");
+        assertEquals(puts, cloud.puts.get(), "it sends nothing new");
+        assertNotNull(laptop.get(VaultParts.KEY), "and keeps its key");
+        laptop.as(() -> laptop.cloud.vault().openVault(VaultView.Way.RECOVERY, made.code().shown().toCharArray()));
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault(), "the recovery code still opens it");
+        assertArrayEquals(made.vk(), keyOf(laptop), "on the key it always had");
+    }
+
+    @Test
+    void aComputerLeftOutOfARealChangeIsRemoved() throws Exception {
+        VaultComputer third = new VaultComputer(cloud, dir, OTHER).opened(made.info(), Vault.addComputer(dav(), made.vk(), OTHER, "Tercero"));
+        assertNull(third.round().error());
+        assertNull(desk.round().error()); // pinned here
+        desk.as(() -> desk.cloud.vault().rotateKey(Set.of(OTHER))); // the laptop not confirmed: offered nothing
+        assertEquals(Cloud.VaultState.REMOVED, laptop.round().vault(), "the third one's offer says the change is real");
+        assertEquals(Cloud.VaultState.OPEN, third.round().vault());
+    }
+
+    @Test
+    void anOfferForgedOnTopOfARealOneIsNeverTaken() throws Exception {
+        rotate(desk); // the laptop, off, is offered generation 1
+        byte[] theirs = VaultCrypto.randomKey();
+        VaultSlot was = slot(LAPTOP);
+        ObjectNode params = was.params().deepCopy();
+        // Kept behind theirs as an offer not yet taken is, vouched for with a key they don't have.
+        VaultNext.offer(params, Base64.getDecoder().decode(params.get("x25519").asText()), was.vault(), LAPTOP, 2, theirs, VaultCrypto.randomKey());
+        cloud.put(Vault.SLOTS + "/" + LAPTOP + ".json", new VaultSlot(was.id(), was.vault(), was.method(), was.label(), was.created(),
+            was.generation(), params, was.wrapped()).toJson());
+        raiseByHand(2);
+        assertEquals(Cloud.VaultState.UNRECOGNIZED, laptop.round().vault());
+        assertEquals(0, slot(LAPTOP).generation(), "nothing taken");
     }
 }

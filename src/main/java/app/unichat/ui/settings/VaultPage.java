@@ -74,6 +74,7 @@ final class VaultPage {
             case NONE -> drawNone();
             case LOCKED -> drawLocked(v, I18n.t("settings.vault.locked"), true);
             case REMOVED -> drawLocked(v, I18n.t("settings.vault.removed"), false);
+            case UNRECOGNIZED -> drawLocked(v, I18n.t("settings.vault.unrecognized"), false);
             case DECLINED -> drawDeclined(v);
             case OPEN -> drawOpen(v);
         }

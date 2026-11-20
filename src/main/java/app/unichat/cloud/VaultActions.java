@@ -44,7 +44,10 @@ final class VaultActions {
             String here = Cloud.machine();
             for (VaultSlot slot : Vault.slots(dav)) {
                 if (slot.method() != VaultSlot.Method.COMPUTER) {
-                    if (slot.generation() == info.generation()) ways.add(VaultView.Way.valueOf(slot.method().name()));
+                    // A change nobody vouches for leaves the ways in from before it as the ones that open the vault.
+                    if (slot.generation() == info.generation() || round.state() == Cloud.VaultState.UNRECOGNIZED) {
+                        ways.add(VaultView.Way.valueOf(slot.method().name()));
+                    }
                 } else if (vk != null) {
                     boolean mine = slot.id().equals(here);
                     byte[] key = VaultNext.publicKey(slot, vk);
@@ -78,18 +81,25 @@ final class VaultActions {
 
     /**
      * The vault opened here with {@code way}'s {@code secret} (the recovery code as typed, or the password): this
-     * computer gets a slot of its own and goes on with it. A secret that opens nothing writes nothing. Only slots of the
-     * vault's current key count: one left from before a change of key would open the old one.
+     * computer gets a slot of its own and goes on with it. A secret that opens nothing writes nothing. A slot of the
+     * vault's current key counts first; one left from before a change opens the old key, so it counts only while nothing
+     * vouches for the change ({@link Vault#vouched}: a generation raised through the account alone locks no one out).
      */
     static void open(Storage dav, VaultView.Way way, char[] secret) throws IOException {
         Vault.Info info = Vault.info(dav);
         if (info == null) throw new IOException(I18n.t("cloud.error.noVault"));
         byte[] vk = null;
+        List<VaultSlot> older = new ArrayList<>();
         for (VaultSlot slot : Vault.slots(dav)) {
-            if (slot.method().name().equals(way.name()) && slot.generation() == info.generation()) {
-                vk = unwrap(slot, way, secret);
-                if (vk != null) break;
-            }
+            if (!slot.method().name().equals(way.name())) continue;
+            if (slot.generation() < info.generation()) older.add(slot);
+            else if (slot.generation() == info.generation() && vk == null) vk = unwrap(slot, way, secret);
+        }
+        for (VaultSlot slot : older) {
+            if (vk != null) break;
+            byte[] old = unwrap(slot, way, secret);
+            if (old != null && !Vault.vouched(dav, info, old)) vk = old;
+            else if (old != null) Arrays.fill(old, (byte) 0);
         }
         if (vk == null) throw new WrongSecret();
         try {

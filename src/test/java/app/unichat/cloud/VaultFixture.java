@@ -66,6 +66,13 @@ public final class VaultFixture implements AutoCloseable {
         Vault.removeComputer(storage(), Vault.info(storage()), HERE);
     }
 
+    /** {@code boveda.json}'s generation raised by someone with only the account: nothing vouches for it. */
+    public void raiseGenerationByHand() throws Exception {
+        Vault.Info info = Vault.info(storage());
+        dav.put(Vault.INFO, ("{\"id\":\"" + info.id() + "\",\"created\":\"" + info.created() + "\",\"generation\":"
+            + (info.generation() + 1) + "}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     /** Whether {@code machine}'s slot holds an offer of the vault's current key (it takes it on its next round). */
     public boolean offeredTheKey(String machine) throws Exception {
         Vault.Info info = Vault.info(storage());

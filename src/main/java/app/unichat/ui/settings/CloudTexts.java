@@ -47,6 +47,7 @@ public final class CloudTexts {
             case LOCKED -> out.add(I18n.t("settings.vault.line.LOCKED"));
             case DECLINED -> out.add(I18n.t("settings.vault.line.DECLINED"));
             case REMOVED -> out.add(I18n.t("settings.vault.line.REMOVED"));
+            case UNRECOGNIZED -> out.add(I18n.t("settings.vault.line.UNRECOGNIZED"));
             case NONE, OPEN -> { }
         }
         Cloud.Moving m = s.moving();

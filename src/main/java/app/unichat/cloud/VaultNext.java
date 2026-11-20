@@ -7,6 +7,7 @@ import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.NamedParameterSpec;
@@ -23,10 +24,18 @@ import javax.crypto.KeyAgreement;
  * key too ({@link #PUBLIC_SEALED}): someone who can only write to the account can't put in a key of theirs to be offered
  * the next one. An offer seals it with the new key as well, so a change cut short leaves the old seal as it was and a
  * second change before the computer took the first still trusts it.
+ * <p>
+ * Every offer is vouched for with the key it replaces ({@link #AUTH}: its ephemeral key and what it seals, sealed with
+ * the old vault key), so someone with only the account can't offer a key of their own: the computer takes it only when
+ * the key it holds opens that. An offer to a computer that hasn't taken the one before keeps it ({@link #PRIOR}), so a
+ * computer off through two changes follows the chain from the key it holds.
  */
 final class VaultNext {
     static final String PUBLIC = "x25519", PUBLIC_SEALED = "x25519Sealed", NEXT = "next";
-    private static final String EPHEMERAL = "x25519", SEALED = "sealed", INFO = "unichat-vault rotate";
+    private static final String EPHEMERAL = "x25519", SEALED = "sealed", INFO = "unichat-vault rotate", AUTH = "auth",
+        PRIOR = "prior", GENERATION = "generation";
+    /** Changes followed back from an offer at most: a chain from the account is untrusted. */
+    private static final int CHAIN = 64;
 
     private VaultNext() {}
 
@@ -54,37 +63,101 @@ final class VaultNext {
         }
     }
 
-    /** {@code newVk} sealed for {@code publicKey}'s computer, as {@link #NEXT} in {@code params}, for {@code generation}. */
-    static void offer(ObjectNode params, byte[] publicKey, String vault, String id, long generation, byte[] newVk) {
+    /**
+     * {@code newVk} sealed for {@code publicKey}'s computer, as {@link #NEXT} in {@code params}, for {@code generation},
+     * vouched for with {@code oldVk}; an offer it hadn't taken yet kept behind it.
+     */
+    static void offer(ObjectNode params, byte[] publicKey, String vault, String id, long generation, byte[] newVk, byte[] oldVk) {
         KeyPair ephemeral = generate();
-        byte[] key = key(ephemeral.getPrivate(), decodePublic(publicKey), ephemeral.getPublic().getEncoded(), publicKey);
+        byte[] mine = ephemeral.getPublic().getEncoded();
+        byte[] key = key(ephemeral.getPrivate(), decodePublic(publicKey), mine, publicKey);
         try {
+            ObjectNode prior = params.get(NEXT) instanceof ObjectNode was ? was : null;
+            byte[] sealed = VaultCrypto.seal(key, nextPath(vault, id, generation), newVk);
             ObjectNode next = params.putObject(NEXT);
-            next.put(EPHEMERAL, Base64.getEncoder().encodeToString(ephemeral.getPublic().getEncoded()));
-            next.put(SEALED, Base64.getEncoder().encodeToString(VaultCrypto.seal(key, nextPath(vault, id, generation), newVk)));
+            next.put(EPHEMERAL, Base64.getEncoder().encodeToString(mine));
+            next.put(SEALED, Base64.getEncoder().encodeToString(sealed));
             next.put(PUBLIC_SEALED, Base64.getEncoder().encodeToString(VaultCrypto.seal(newVk, publicPath(vault, id), publicKey)));
+            next.put(GENERATION, generation);
+            next.put(AUTH, Base64.getEncoder().encodeToString(VaultCrypto.seal(oldVk, offerPath(vault, id, generation), vouching(mine, sealed))));
+            if (prior != null) next.set(PRIOR, prior);
         } finally {
             Arrays.fill(key, (byte) 0);
         }
     }
 
-    /** The new vault key offered in {@code slot} for {@code generation}, opened with this computer's private key. */
-    static byte[] take(VaultSlot slot, byte[] privateKey, long generation) throws VaultCrypto.Broken {
+    /**
+     * The new vault key offered in {@code slot} for {@code generation}, opened with this computer's private key, only
+     * when {@code held} (the key it has) vouches for the offer, itself or through the offers before it.
+     */
+    static byte[] take(VaultSlot slot, byte[] privateKey, long generation, byte[] held) throws VaultCrypto.Broken {
         if (!(slot.params().get(NEXT) instanceof ObjectNode next)) throw new VaultCrypto.Broken();
-        byte[] ephemeral = bytes(next, EPHEMERAL), sealed = bytes(next, SEALED);
-        if (ephemeral == null || sealed == null) throw new VaultCrypto.Broken();
         byte[] mine = publicOf(privateKey);
         if (mine == null) throw new VaultCrypto.Broken();
+        PrivateKey own;
+        try {
+            own = KeyFactory.getInstance("X25519").generatePrivate(new PKCS8EncodedKeySpec(privateKey));
+        } catch (GeneralSecurityException | IllegalArgumentException e) {
+            throw new VaultCrypto.Broken();
+        }
+        return taken(slot, next, own, mine, generation, held, CHAIN);
+    }
+
+    /** Whether {@code slot}'s offer for {@code generation} is vouched for with {@code oldVk} itself: the change is real. */
+    static boolean vouched(VaultSlot slot, byte[] oldVk, long generation) {
+        return slot.params().get(NEXT) instanceof ObjectNode next && vouches(next, slot, generation, oldVk);
+    }
+
+    private static byte[] taken(VaultSlot slot, ObjectNode next, PrivateKey own, byte[] mine, long generation, byte[] held, int depth)
+        throws VaultCrypto.Broken {
+        byte[] ephemeral = bytes(next, EPHEMERAL), sealed = bytes(next, SEALED);
+        if (ephemeral == null || sealed == null) throw new VaultCrypto.Broken();
+        if (!vouches(next, slot, generation, held)) {
+            // Vouched for with a key this computer never took: the offer before it, if it's that key's.
+            if (depth == 0 || !(next.get(PRIOR) instanceof ObjectNode prior) || !prior.path(GENERATION).canConvertToLong()
+                || prior.get(GENERATION).asLong() >= generation) {
+                throw new VaultCrypto.Broken();
+            }
+            byte[] between = taken(slot, prior, own, mine, prior.get(GENERATION).asLong(), held, depth - 1);
+            try {
+                if (!vouches(next, slot, generation, between)) throw new VaultCrypto.Broken();
+            } finally {
+                Arrays.fill(between, (byte) 0);
+            }
+        }
         byte[] key;
         try {
-            key = key(KeyFactory.getInstance("X25519").generatePrivate(new PKCS8EncodedKeySpec(privateKey)), decodePublic(ephemeral), ephemeral, mine);
-        } catch (GeneralSecurityException | IllegalArgumentException e) {
+            key = key(own, decodePublic(ephemeral), ephemeral, mine);
+        } catch (IllegalArgumentException e) {
             throw new VaultCrypto.Broken();
         }
         try {
             return VaultCrypto.open(key, nextPath(slot.vault(), slot.id(), generation), sealed);
         } finally {
             Arrays.fill(key, (byte) 0);
+        }
+    }
+
+    /** Whether {@code next}'s vouching opens with {@code oldVk} and names this very offer (its ephemeral key, what it seals). */
+    private static boolean vouches(ObjectNode next, VaultSlot slot, long generation, byte[] oldVk) {
+        byte[] ephemeral = bytes(next, EPHEMERAL), sealed = bytes(next, SEALED), auth = bytes(next, AUTH);
+        if (ephemeral == null || sealed == null || auth == null) return false;
+        try {
+            return MessageDigest.isEqual(vouching(ephemeral, sealed), VaultCrypto.open(oldVk, offerPath(slot.vault(), slot.id(), generation), auth));
+        } catch (VaultCrypto.Broken e) {
+            return false;
+        }
+    }
+
+    /** What an offer's vouching seals: its ephemeral key, then the SHA-256 of what it seals. */
+    private static byte[] vouching(byte[] ephemeral, byte[] sealed) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(sealed);
+            byte[] out = Arrays.copyOf(ephemeral, ephemeral.length + hash.length);
+            System.arraycopy(hash, 0, out, ephemeral.length, hash.length);
+            return out;
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
         }
     }
 
@@ -157,5 +230,9 @@ final class VaultNext {
 
     private static String nextPath(String vault, String id, long generation) {
         return "next:" + vault + ":" + id + ":" + generation;
+    }
+
+    private static String offerPath(String vault, String id, long generation) {
+        return "offer:" + vault + ":" + id + ":" + generation;
     }
 }
