@@ -91,12 +91,13 @@ class VaultOutTest {
         offlineLaptopSent("{\"l\":1}\n");
         Map<String, byte[]> before = new HashMap<>(cloud.files);
 
-        cloud.failOnce.add(AI); // the network drops on one plain copy
+        cloud.failOnce.add(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT); // the network drops on the last plain copy
         ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud::turnOffVault));
         assertNotNull(failed.getCause().getMessage(), "the failure is told");
         before.forEach((p, b) -> {
             if (p.startsWith(Vault.ROOT + "/")) assertArrayEquals(b, cloud.files.get(p), "the vault intact: " + p);
         });
+        assertEquals(before.keySet(), cloud.files.keySet(), "and what was copied plain before the failure taken back: as it was");
         assertEquals(made.info().id(), desk.get(VaultParts.ID), "still held here");
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault(), "and still open: the person can try again");
 
@@ -126,6 +127,47 @@ class VaultOutTest {
         assertNull(s.error());
         assertEquals(Cloud.VaultState.NONE, s.vault(), "today's plain round");
         assertEquals(sent, cloud.versions.get(own), "what was just copied isn't sent again");
+    }
+
+    @Test
+    void aPlainCopyLetGoMeanwhileIsPutBackOnceTheVaultIsGone() throws Exception {
+        offlineLaptopSent("{\"l\":1}\n");
+        String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT;
+        Storage plain = new Through(dav()) {
+            @Override public void delete(String path) throws java.io.IOException {
+                // Another computer's round, still open, lets the plain copy go: its sealed one is as long.
+                if (path.equals(Vault.ROOT)) cloud.files.remove(text);
+                super.delete(path);
+            }
+        };
+        assertTrue(VaultOut.run(plain, new SealedStorage(dav(), () -> made.vk().clone())));
+        assertFalse(anyVault());
+        assertEquals("{\"l\":1}\n", plain(text), "put back after the vault went");
+    }
+
+    @Test
+    void aPartThatDoesntOpenIsLeft() throws Exception {
+        cloud.dirs.add(Vault.ROOT + "/Ajustes");
+        cloud.put(Vault.ROOT + "/Ajustes/unichat-ai.json", "dañado".getBytes(StandardCharsets.UTF_8));
+        SealedStorage sealed = new SealedStorage(dav(), () -> made.vk().clone());
+        sealed.put(SETTINGS, Bundle.of(DESK, java.time.Instant.now(), Map.of("ui.theme", "DARK"), null).toBytes());
+        assertTrue(VaultOut.run(dav(), sealed));
+        assertNull(cloud.files.get(AI), "no one can read it: nothing plain");
+        assertNotNull(cloud.files.get(SETTINGS), "the others still go");
+        assertFalse(anyVault());
+    }
+
+    @Test
+    void aVaultFolderThatWontGoStillEndsTheVaultEverywhere() throws Exception {
+        VaultComputer desk = desk();
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
+        cloud.failDeleteOnce.add(Vault.ROOT);
+        ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud::turnOffVault));
+        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultLeftovers"), failed.getCause().getMessage(), "told apart");
+        assertFalse(cloud.files.containsKey(Vault.INFO), "its file gone: no computer finds a vault");
+        assertNotNull(cloud.files.get(SETTINGS), "everything plain");
+        assertNull(desk.get(VaultParts.ID), "forgotten here all the same");
+        assertEquals(Cloud.VaultState.NONE, desk.round().vault());
     }
 
     @Test

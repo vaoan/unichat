@@ -269,7 +269,10 @@ final class VaultPage {
         show(stacked(I18n.t("settings.vault.turnOffSure"), I18n.t("settings.vault.turnOffWhat"), new FlowPane(8, 6, yes, cancel(this::reload))));
     }
 
-    /** While it runs, a line; failed, why (the vault is as it was) and "Intentar de nuevo"; done, the page without a vault. */
+    /**
+     * While it runs, a line; done, the page without a vault. Failed, the vault read again: still open, why (the vault is
+     * as it was) and "Intentar de nuevo"; off all the same (only part of its folder left), the page as it is and why.
+     */
     private void turningOff() {
         show(line(I18n.t("settings.vault.turnOffWorking")));
         cloud.turnOffVault().whenComplete((ok, err) -> Platform.runLater(() -> {
@@ -278,10 +281,20 @@ final class VaultPage {
                 reload();
                 return;
             }
-            Button again = secondary(I18n.t("settings.vault.retry"));
-            again.setOnAction(e -> turningOff());
-            show(actions(KeyChangeFlow.warning(I18n.t("settings.vault.turnOffFailed"))), line(Errors.message(Errors.unwrap(err))),
-                new FlowPane(8, 6, again, cancel(this::reload)));
+            String why = Errors.message(Errors.unwrap(err));
+            cloud.vaultView().whenComplete((v, unread) -> Platform.runLater(() -> {
+                if (v != null && v.state() != Cloud.VaultState.OPEN) {
+                    cloud.syncNow();
+                    shown = v.state();
+                    inStep = false;
+                    draw(v);
+                    body.getChildren().add(0, actions(KeyChangeFlow.warning(why)));
+                    return;
+                }
+                Button again = secondary(I18n.t("settings.vault.retry"));
+                again.setOnAction(e -> turningOff());
+                show(actions(KeyChangeFlow.warning(I18n.t("settings.vault.turnOffFailed"))), line(why), new FlowPane(8, 6, again, cancel(this::reload)));
+            }));
         }));
     }
 

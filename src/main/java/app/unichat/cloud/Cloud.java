@@ -545,15 +545,17 @@ public final class Cloud {
     /**
      * The vault turned off, on the cloud's thread, only with it open here: everything with a plain place back there, read
      * back, and only then the vault deleted ({@link VaultOut}); then this computer's hold on it forgotten, its texts
-     * counted as sent plain (they were just copied). A failure before the delete leaves the vault as it was. The other
+     * counted as sent plain (they were just copied). A failure before the delete leaves the vault as it was; a folder that
+     * won't go once its file did is told apart ({@code vaultLeftovers}: off all the same, cleared by the next vault). The other
      * computers find it gone on their next round and go back to plain by themselves.
      */
     public CompletableFuture<Void> turnOffVault() {
         return onWorker(dav -> withKey(dav, (vault, vk) -> {
             synchronized (texts) { // TextSync.run's own lock: no text of this computer's goes up halfway through
-                VaultOut.run(dav, vault.personal(dav));
+                boolean whole = VaultOut.run(dav, vault.personal(dav));
                 VaultParts.gone();
                 texts.sentAt(TextSync.PLAIN);
+                if (!whole) throw new IOException(I18n.t("cloud.error.vaultLeftovers"));
             }
             return null;
         }));

@@ -42,6 +42,19 @@ class VaultTest {
     }
 
     @Test
+    void leftoversOfADeletedVaultAreClearedBeforeANewOne() throws Exception {
+        Vault.Created old = Vault.create(storage, MAC, "Escritorio");
+        new SealedStorage(storage, () -> old.vk().clone()).put(TextSync.ROOT + "/" + MAC + "/3f2a9c1b2d4e 2026-11.jsonl", new byte[] {1});
+        storage.delete(Vault.INFO); // its folder couldn't go when it was turned off
+        Vault.Created made = Vault.create(storage, MAC, "Escritorio");
+        assertEquals(java.util.Set.of(Vault.INFO), new java.util.TreeSet<>(cloud.files.keySet().stream()
+            .filter(p -> !p.startsWith(Vault.SLOTS + "/")).toList()), "nothing of the old one left");
+        assertEquals(2, cloud.files.keySet().stream().filter(p -> p.startsWith(Vault.SLOTS + "/")).count(), "the new one's slots only");
+        java.util.Arrays.fill(old.vk(), (byte) 0);
+        java.util.Arrays.fill(made.vk(), (byte) 0);
+    }
+
+    @Test
     void aVaultIsMadeWithItsRecoveryAndThisComputer() throws Exception {
         assertNull(Vault.info(storage), "no vault yet");
         Vault.Created made = Vault.create(storage, MAC, "Mac de Ana");

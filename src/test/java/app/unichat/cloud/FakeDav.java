@@ -27,6 +27,8 @@ final class FakeDav implements AutoCloseable {
     volatile boolean filesAreNoFolders;
     /** Paths whose next DELETE fails, once each. */
     final Set<String> failDeleteOnce = ConcurrentHashMap.newKeySet();
+    /** Paths whose next PUT waits until its latch is let go (a slow network), once each. */
+    final Map<String, java.util.concurrent.CountDownLatch> holdOnce = new ConcurrentHashMap<>();
     /** Paths whose next PUT lands but answers a failure (the answer lost), once each. */
     final Set<String> failAfterOnce = ConcurrentHashMap.newKeySet();
     private final HttpServer server;
@@ -85,6 +87,14 @@ final class FakeDav implements AutoCloseable {
                 }
                 case "MKCOL" -> x.sendResponseHeaders(dirs.add(path) ? 201 : 405, -1);
                 case "PUT" -> {
+                    java.util.concurrent.CountDownLatch held = holdOnce.remove(path);
+                    if (held != null) {
+                        try {
+                            held.await();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
                     if (failOnce.remove(path)) {
                         x.sendResponseHeaders(503, -1);
                         return;

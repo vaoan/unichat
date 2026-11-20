@@ -90,6 +90,18 @@ public final class VaultFixture implements AutoCloseable {
         dav.failOnce.add(path);
     }
 
+    /** The account's next DELETE of the vault's folder fails, once (its file can still go). */
+    public void failVaultDeleteOnce() {
+        dav.failDeleteOnce.add(Vault.ROOT);
+    }
+
+    /** The account's next PUT of {@code path} waits until the returned step runs (also on {@link #close}). */
+    public Runnable holdOnce(String path) {
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        dav.holdOnce.put(path, latch);
+        return latch::countDown;
+    }
+
     /** Whether the account still holds a vault (anything under its folder). */
     public boolean vaultThere() {
         return dav.files.keySet().stream().anyMatch(p -> p.startsWith(Vault.ROOT + "/"));
@@ -109,6 +121,7 @@ public final class VaultFixture implements AutoCloseable {
 
     @Override
     public void close() throws Exception {
+        dav.holdOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown); // nothing waits past the test
         try {
             cloud.stop();
             cloud.syncNow().get(); // what a step asked for runs before the account goes

@@ -559,6 +559,9 @@ class VaultPageUiTest {
         click(I18n.t("settings.vault.turnOffNext"));
         waitFor(I18n.t("settings.vault.turnOffWhat"));
         assertTrue(account.vaultThere(), "nor after the first yes");
+        String what = I18n.t("settings.vault.turnOffWhat");
+        assertTrue(what.contains("llaves") && what.contains("mensajes fijados") && what.contains("transcripciones"),
+            "says what stays on each computer: " + what);
         click(I18n.t("folders.dialog.cancel"));
         waitOpen();
         assertTrue(account.vaultThere(), "cancelled: the vault as it was");
@@ -585,6 +588,21 @@ class VaultPageUiTest {
         click(I18n.t("settings.vault.retry"));
         FxWait.until("the vault off", () -> hasButton(I18n.t("settings.vault.create")));
         assertFalse(account.vaultThere());
+    }
+
+    @Test
+    void aVaultFolderThatWontGoIsStillOffAndSaysWhatsLeft() throws Exception {
+        openedWithOthers();
+        page();
+        waitOpen();
+        account.failVaultDeleteOnce();
+        click(I18n.t("settings.vault.turnOff"));
+        click(I18n.t("settings.vault.turnOffNext"));
+        click(I18n.t("settings.vault.turnOffYes"));
+        FxWait.until("off, and what's left told", () -> hasButton(I18n.t("settings.vault.create"))
+            && says(I18n.t("cloud.error.vaultLeftovers")));
+        assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.turnOffFailed"))), "never \"left as it was\"");
+        assertEquals(Cloud.VaultState.NONE, round());
     }
 
     @Test
@@ -619,6 +637,16 @@ class VaultPageUiTest {
         click(I18n.t("settings.vault.turnOffNext"));
         waitFor(I18n.t("settings.vault.turnOffWhat"));
         bad.addAll(FxWait.fx(() -> unreachable("turn off, what happens")));
+        account.failOnce(app.unichat.cloud.CloudAccount.SETTINGS_FILE);
+        click(I18n.t("settings.vault.turnOffYes"));
+        FxWait.until("the failure told", () -> hasButton(I18n.t("settings.vault.retry")));
+        bad.addAll(FxWait.fx(() -> unreachable("turn off failed")));
+        Runnable release = account.holdOnce(app.unichat.cloud.CloudAccount.SETTINGS_FILE);
+        click(I18n.t("settings.vault.retry"));
+        waitFor(I18n.t("settings.vault.turnOffWorking"));
+        bad.addAll(FxWait.fx(() -> unreachable("turning off")));
+        release.run();
+        FxWait.until("the vault off", () -> hasButton(I18n.t("settings.vault.create")));
         assertTrue(bad.isEmpty(), "out of the keyboard's reach or unnamed:\n" + String.join("\n", bad));
     }
 
@@ -660,6 +688,13 @@ class VaultPageUiTest {
             bad.addAll(squeezedOnCloudPage(svc, "open"));
             bad.addAll(squeezedOnCloudPage(svc, "confirmation", I18n.t("settings.vault.changeKey")));
             bad.addAll(squeezedOnCloudPage(svc, "turning off", I18n.t("settings.vault.turnOff"), I18n.t("settings.vault.turnOffNext")));
+            String[] through = {I18n.t("settings.vault.turnOff"), I18n.t("settings.vault.turnOffNext"), I18n.t("settings.vault.turnOffYes")};
+            account.failOnce(app.unichat.cloud.CloudAccount.SETTINGS_FILE);
+            bad.addAll(squeezedUntil(svc, "turning off failed", I18n.t("settings.vault.turnOffFailed"), through));
+            Runnable release = account.holdOnce(app.unichat.cloud.CloudAccount.SETTINGS_FILE);
+            bad.addAll(squeezedUntil(svc, "turning off, working", I18n.t("settings.vault.turnOffWorking"), through));
+            release.run();
+            FxWait.until("the vault off", () -> !account.vaultThere());
         } finally {
             Settings.get().set("ui.fontScale", scale);
             svc.stop();
@@ -669,6 +704,11 @@ class VaultPageUiTest {
 
     /** The squeezed texts on Nube with the vault drawn, after pressing {@code press} if given (a step: the code, a confirmation). */
     private List<String> squeezedOnCloudPage(MockChatService svc, String where, String... presses) throws Exception {
+        return squeezedUntil(svc, where, null, presses);
+    }
+
+    /** The same, measured once a label saying {@code until} shows (null: a code, or a confirmation). */
+    private List<String> squeezedUntil(MockChatService svc, String where, String until, String... presses) throws Exception {
         Stage owner = FxWait.fx(() -> {
             Stage o = new Stage();
             o.setOpacity(0);
@@ -688,7 +728,7 @@ class VaultPageUiTest {
             });
         }
         if (presses.length > 0) {
-            Set<String> steps = Set.of(I18n.t("settings.vault.change.receive"), I18n.t("settings.vault.turnOffWhat"));
+            Set<String> steps = until != null ? Set.of(until) : Set.of(I18n.t("settings.vault.change.receive"), I18n.t("settings.vault.turnOffWhat"));
             FxWait.until("the step shown", () -> SettingsWindow.current().getScene().getRoot().lookup(".recovery-code-sheet") != null
                 || SettingsWindow.current().getScene().getRoot().lookupAll(".label").stream().anyMatch(n -> steps.contains(((Labeled) n).getText())));
         }
