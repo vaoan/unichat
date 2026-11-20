@@ -2,7 +2,6 @@ package app.unichat.cloud;
 
 import java.security.SecureRandom;
 import java.util.Arrays;
-import java.util.Locale;
 
 /**
  * The code the person prints: 160 random bits written as 32 Crockford base32 characters in 8 groups of 4. Typing it
@@ -47,32 +46,61 @@ record RecoveryCode(byte[] bits) {
     /** What was typed, or null when it isn't exactly 160 bits of this alphabet. */
     static RecoveryCode parse(String typed) {
         if (typed == null) return null;
-        String chars = normalized(typed);
-        if (chars.length() != CHARS) return null;
-        byte[] bits = new byte[BYTES];
-        int acc = 0, have = 0, at = 0;
-        for (int i = 0; i < CHARS; i++) {
-            int v = ALPHABET.indexOf(chars.charAt(i));
-            if (v < 0) return null;
-            acc = (acc << 5) | v;
-            have += 5;
-            if (have >= 8) {
-                have -= 8;
-                bits[at++] = (byte) (acc >> have);
-                acc &= (1 << have) - 1;
-            }
+        char[] chars = typed.toCharArray();
+        try {
+            return parse(chars);
+        } finally {
+            Arrays.fill(chars, '\0');
         }
-        return new RecoveryCode(bits);
+    }
+
+    /** The same from the characters as typed, never made into a {@code String} (one stays in memory until collected). */
+    static RecoveryCode parse(char[] typed) {
+        if (typed == null) return null;
+        char[] chars = new char[CHARS];
+        try {
+            int n = 0;
+            for (char t : typed) {
+                char c = own(t);
+                if (c == 0) continue;
+                if (n == CHARS) return null;
+                chars[n++] = c;
+            }
+            if (n != CHARS) return null;
+            byte[] bits = new byte[BYTES];
+            int acc = 0, have = 0, at = 0;
+            for (char c : chars) {
+                int v = ALPHABET.indexOf(c);
+                if (v < 0) return null;
+                acc = (acc << 5) | v;
+                have += 5;
+                if (have >= 8) {
+                    have -= 8;
+                    bits[at++] = (byte) (acc >> have);
+                    acc &= (1 << have) - 1;
+                }
+            }
+            return new RecoveryCode(bits);
+        } finally {
+            Arrays.fill(chars, '\0');
+        }
     }
 
     /** What was typed as the code's own characters: case, spaces and dashes dropped, O read as 0, I and L as 1. */
     static String normalized(String typed) {
         StringBuilder chars = new StringBuilder();
-        for (char c : typed.toUpperCase(Locale.ROOT).toCharArray()) {
-            if (Character.isWhitespace(c) || Character.isSpaceChar(c) || DASHES.indexOf(c) >= 0 || c == 'U') continue;
-            chars.append(c == 'O' ? '0' : c == 'I' || c == 'L' ? '1' : c);
+        for (char t : typed.toCharArray()) {
+            char c = own(t);
+            if (c != 0) chars.append(c);
         }
         return chars.toString();
+    }
+
+    /** One typed character as the code's own: 0 for one that's dropped (space, dash, U), O read as 0, I and L as 1. */
+    private static char own(char typed) {
+        char c = Character.toUpperCase(typed);
+        if (Character.isWhitespace(c) || Character.isSpaceChar(c) || DASHES.indexOf(c) >= 0 || c == 'U') return 0;
+        return c == 'O' ? '0' : c == 'I' || c == 'L' ? '1' : c;
     }
 
     private String plain() {

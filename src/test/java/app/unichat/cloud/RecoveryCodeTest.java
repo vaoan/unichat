@@ -35,9 +35,18 @@ class RecoveryCodeTest {
     }
 
     @Test
+    void aCodeTypedIsReadFromItsCharactersAsTyped() {
+        RecoveryCode code = RecoveryCode.random();
+        char[] typed = code.shown().toLowerCase(java.util.Locale.ROOT).replace("-", " ").replace('0', 'o').toCharArray();
+        assertEquals(code, RecoveryCode.parse(typed), "never made into a text that stays in memory");
+        assertNull(RecoveryCode.parse("ABCD".toCharArray()));
+        assertNull(RecoveryCode.parse((char[]) null));
+    }
+
+    @Test
     void aCodeOfTheWrongLengthIsNone() {
         String shown = RecoveryCode.random().shown();
-        assertNull(RecoveryCode.parse(null));
+        assertNull(RecoveryCode.parse((String) null));
         assertNull(RecoveryCode.parse(""));
         assertNull(RecoveryCode.parse(shown.substring(0, shown.length() - 1)));
         assertNull(RecoveryCode.parse(shown + "A"));

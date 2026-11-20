@@ -115,7 +115,7 @@ final class VaultActions {
         byte[] key = null;
         try {
             if (way == VaultView.Way.RECOVERY) {
-                RecoveryCode code = RecoveryCode.parse(new String(secret));
+                RecoveryCode code = RecoveryCode.parse(secret);
                 if (code == null) return null;
                 key = VaultSlot.recoveryKey(code);
                 Arrays.fill(code.bits(), (byte) 0);

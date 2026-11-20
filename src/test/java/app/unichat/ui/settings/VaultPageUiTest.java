@@ -135,6 +135,10 @@ class VaultPageUiTest extends VaultPageTestBase {
         assertEquals(List.of(code), copied);
         click(I18n.t("settings.vault.code.save"));
         assertTrue(Files.readString(dir.resolve("codigo.txt")).contains(code), "saved as a text file");
+        if (dir.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            assertEquals("rw-------", java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(dir.resolve("codigo.txt"))),
+                "nobody else on this computer reads it");
+        }
         click(I18n.t("settings.vault.code.print"));
         assertTrue(printed.size() == 1 && printed.get(0).contains(code), "printed through the system's dialog");
         waitFor(I18n.t("settings.vault.code.printed"));
@@ -143,8 +147,10 @@ class VaultPageUiTest extends VaultPageTestBase {
         waitFor(I18n.t("settings.vault.code.wrongGroups"));
         assertTrue(account.cloud().vault().vaultView().get().codeUnconfirmed(), "not taken as kept");
         FxWait.fx(() -> { button(I18n.t("settings.vault.code.showAgain")).fire(); return null; });
+        assertEquals(code, clip, "still copied while it's being kept");
         typeGroups(code, true);
         waitOpen();
+        assertEquals(null, clip, "the clipboard emptied once the code is known kept");
         assertFalse(account.cloud().vault().vaultView().get().codeUnconfirmed());
         assertTrue(FxWait.fx(() -> says(I18n.t("settings.vault.way.RECOVERY"))), "the ways in");
         click(I18n.t("settings.vault.password.add"));
@@ -161,13 +167,28 @@ class VaultPageUiTest extends VaultPageTestBase {
         FxWait.until("no vault yet", () -> hasButton(I18n.t("settings.vault.create")));
         click(I18n.t("settings.vault.create"));
         String first = codeShown();
+        click(I18n.t("settings.vault.code.copy"));
         click(I18n.t("folders.dialog.cancel"));
         waitFor(I18n.t("settings.vault.code.notKept"));
+        assertEquals(null, clip, "the sheet gone: the code never left on the clipboard");
         click(I18n.t("settings.vault.newCode"));
         FxWait.until("a new code", () -> root().lookup(".text-area.vault-code") instanceof TextArea t && !t.getText().replace("\n", "").equals(first));
         typeGroups(codeShown(), true);
         waitOpen();
         assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.code.notKept"))));
+    }
+
+    @Test
+    void whatThePersonCopiedOverTheCodeIsLeftOnTheClipboard() throws Exception {
+        page();
+        FxWait.until("no vault yet", () -> hasButton(I18n.t("settings.vault.create")));
+        click(I18n.t("settings.vault.create"));
+        String code = codeShown();
+        click(I18n.t("settings.vault.code.copy"));
+        clip = "algo suyo"; // pasted somewhere, then something else copied
+        typeGroups(code, true);
+        waitOpen();
+        assertEquals("algo suyo", clip, "never theirs to empty");
     }
 
     @Test

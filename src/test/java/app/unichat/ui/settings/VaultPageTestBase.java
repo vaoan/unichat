@@ -54,7 +54,9 @@ abstract class VaultPageTestBase {
     protected Stage stage;
     protected Function<javafx.stage.Window, File> saveWas;
     protected BiPredicate<javafx.stage.Window, String> printWas;
-    protected Consumer<String> clipboardWas;
+    protected RecoveryCodeSheet.Clip clipboardWas;
+    /** What the system's clipboard holds now, as the sheet put it there or the person copied over it. */
+    protected String clip;
     protected final List<String> copied = new ArrayList<>(), printed = new ArrayList<>();
 
     @BeforeAll
@@ -77,7 +79,20 @@ abstract class VaultPageTestBase {
         clipboardWas = RecoveryCodeSheet.clipboard;
         RecoveryCodeSheet.saveTo = w -> dir.resolve("codigo.txt").toFile();
         RecoveryCodeSheet.printer = (w, text) -> printed.add(text);
-        RecoveryCodeSheet.clipboard = copied::add;
+        RecoveryCodeSheet.clipboard = new RecoveryCodeSheet.Clip() {
+            @Override public void put(String text) {
+                copied.add(text);
+                clip = text;
+            }
+
+            @Override public String now() {
+                return clip;
+            }
+
+            @Override public void clear() {
+                clip = null;
+            }
+        };
     }
 
     @AfterEach

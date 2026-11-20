@@ -2,6 +2,7 @@ package app.unichat.ui.settings;
 
 import app.unichat.cloud.RecoveryCheck;
 import app.unichat.support.I18n;
+import app.unichat.support.SafeFile;
 import app.unichat.ui.Labels;
 import app.unichat.ui.Nodes;
 import javafx.scene.control.Button;
@@ -18,10 +19,8 @@ import javafx.stage.Window;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.security.SecureRandom;
 import java.util.function.BiPredicate;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static app.unichat.ui.settings.SettingsForm.actions;
@@ -36,11 +35,31 @@ final class RecoveryCodeSheet extends VBox {
     static Function<Window, File> saveTo = RecoveryCodeSheet::chooseFile;
     /** "Imprimir": through the system's print dialog; whether it was printed. Tests replace it. */
     static BiPredicate<Window, String> printer = RecoveryCodeSheet::print;
-    /** "Copiar": the system's clipboard. */
-    static Consumer<String> clipboard = text -> {
-        ClipboardContent c = new ClipboardContent();
-        c.putString(text);
-        Clipboard.getSystemClipboard().setContent(c);
+    /** The system's clipboard as "Copiar" uses it: the code put there, and emptied after while it still holds it. */
+    interface Clip {
+        void put(String text);
+
+        /** What it holds as text now; null for none. */
+        String now();
+
+        void clear();
+    }
+
+    /** The system's clipboard; tests give one of their own. */
+    static Clip clipboard = new Clip() {
+        @Override public void put(String text) {
+            ClipboardContent c = new ClipboardContent();
+            c.putString(text);
+            Clipboard.getSystemClipboard().setContent(c);
+        }
+
+        @Override public String now() {
+            return Clipboard.getSystemClipboard().getString();
+        }
+
+        @Override public void clear() {
+            Clipboard.getSystemClipboard().clear();
+        }
     };
 
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -66,6 +85,13 @@ final class RecoveryCodeSheet extends VBox {
         java.util.Arrays.sort(asked);
         Nodes.show(said, false);
         showCode();
+        // However the sheet goes (kept, cancelled, the page drawn again or closed), the code doesn't stay on the clipboard.
+        sceneProperty().addListener((o, was, now) -> { if (now == null) forgetCopy(); });
+    }
+
+    /** The clipboard emptied if it still holds the code: something the person copied since is theirs. */
+    private void forgetCopy() {
+        if (code.equals(clipboard.now())) clipboard.clear();
     }
 
     /** The groups asked back, from 1 (for tests). */
@@ -82,7 +108,7 @@ final class RecoveryCodeSheet extends VBox {
         field.getStyleClass().add("vault-code");
         field.setAccessibleText(I18n.t("settings.vault.code.title"));
         Button copy = secondary(I18n.t("settings.vault.code.copy"), () -> {
-            clipboard.accept(code);
+            clipboard.put(code);
             say(I18n.t("settings.vault.code.copied"));
         });
         Button save = secondary(I18n.t("settings.vault.code.save"), this::save);
@@ -91,7 +117,7 @@ final class RecoveryCodeSheet extends VBox {
         Button done = new Button(I18n.t("settings.vault.code.keptIt"));
         done.getStyleClass().add("primary-button");
         done.setOnAction(e -> askBack());
-        Button cancel = secondary(I18n.t("folders.dialog.cancel"), cancelled);
+        Button cancel = secondary(I18n.t("folders.dialog.cancel"), this::cancel);
         getChildren().setAll(stacked(I18n.t("settings.vault.code.title"), I18n.t("settings.vault.code.help"),
                 new VBox(8, field, new FlowPane(8, 6, copy, save, print), said)),
             actions(new FlowPane(8, 6, done, cancel)));
@@ -116,6 +142,7 @@ final class RecoveryCodeSheet extends VBox {
         check.setDefaultButton(true);
         check.setOnAction(e -> {
             if (RecoveryCheck.matches(code, asked[0], first.getText()) && RecoveryCheck.matches(code, asked[1], second.getText())) {
+                forgetCopy();
                 kept.run();
             } else {
                 Nodes.show(wrong, true);
@@ -123,11 +150,16 @@ final class RecoveryCodeSheet extends VBox {
             }
         });
         Button back = secondary(I18n.t("settings.vault.code.showAgain"), this::showCode);
-        Button cancel = secondary(I18n.t("folders.dialog.cancel"), cancelled);
+        Button cancel = secondary(I18n.t("folders.dialog.cancel"), this::cancel);
         getChildren().setAll(stacked(I18n.t("settings.vault.code.askTitle"), I18n.t("settings.vault.code.ask", asked[0], asked[1]),
                 new VBox(8, new FlowPane(8, 6, first, second), wrong)),
             actions(new FlowPane(8, 6, check, back, cancel)));
         first.requestFocus();
+    }
+
+    private void cancel() {
+        forgetCopy();
+        cancelled.run();
     }
 
     private static TextField group(int i) {
@@ -148,7 +180,7 @@ final class RecoveryCodeSheet extends VBox {
         File file = saveTo.apply(getScene() == null ? null : getScene().getWindow());
         if (file == null) return;
         try {
-            Files.writeString(file.toPath(), text(), StandardCharsets.UTF_8);
+            SafeFile.replace(file.toPath(), text().getBytes(StandardCharsets.UTF_8), true); // the code: nobody else reads it
             say(I18n.t("settings.vault.code.saved", file.getName()));
         } catch (IOException e) {
             say(I18n.t("settings.vault.code.notSaved"));
