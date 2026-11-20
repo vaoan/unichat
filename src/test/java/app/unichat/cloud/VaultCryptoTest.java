@@ -30,6 +30,31 @@ class VaultCryptoTest {
         otherVersion[0] = 2;
         assertThrows(VaultCrypto.Broken.class, () -> VaultCrypto.open(key, "texts/a.jsonl", otherVersion));
         assertThrows(VaultCrypto.Broken.class, () -> VaultCrypto.open(key, "texts/a.jsonl", new byte[5]));
+        for (int at : new int[] {1, 13}) { // a nonce byte and a ciphertext byte
+            byte[] changed = sealed.clone();
+            changed[at] ^= 1;
+            assertThrows(VaultCrypto.Broken.class, () -> VaultCrypto.open(key, "texts/a.jsonl", changed));
+        }
+    }
+
+    @Test
+    void onlyA32ByteKeyIsAccepted() throws Exception {
+        byte[] sealed = VaultCrypto.seal(VaultCrypto.randomKey(), "p", PLAIN);
+        assertThrows(IllegalArgumentException.class, () -> VaultCrypto.seal(new byte[16], "p", PLAIN));
+        assertThrows(VaultCrypto.Broken.class, () -> VaultCrypto.open(new byte[16], "p", sealed));
+        assertThrows(VaultCrypto.Broken.class, () -> VaultCrypto.open(new byte[0], "p", sealed));
+    }
+
+    @Test
+    void argonNeedsA16ByteSalt() {
+        assertThrows(IllegalArgumentException.class, () -> VaultCrypto.argon2id("x".toCharArray(), new byte[8]));
+    }
+
+    /** RFC 5869 test case 3: 22 bytes of 0x0b, no salt, empty info. */
+    @Test
+    void hkdfMatchesRfc5869() {
+        assertEquals("8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d",
+            HexFormat.of().formatHex(VaultCrypto.hkdf(filled(22, 0x0b), "")));
     }
 
     @Test

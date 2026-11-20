@@ -20,7 +20,8 @@ import org.bouncycastle.crypto.params.Argon2Parameters;
 final class VaultCrypto {
     /** Sealed form: version | nonce | ciphertext and tag. */
     private static final byte VERSION = 1;
-    private static final int KEY = 32, NONCE = 12, TAG_BITS = 128, ARGON_KIB = 64 * 1024, ARGON_ITERATIONS = 3;
+    private static final String AAD_PREFIX = "unichat-vault/" + VERSION + ":";
+    private static final int KEY = 32, SALT = 16, NONCE = 12, TAG_BITS = 128, ARGON_KIB = 64 * 1024, ARGON_ITERATIONS = 3;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private VaultCrypto() {}
@@ -40,6 +41,7 @@ final class VaultCrypto {
 
     /** The path is authenticated, not stored: a file copied under another name no longer opens. */
     static byte[] seal(byte[] key, String path, byte[] plain) {
+        if (key.length != KEY) throw new IllegalArgumentException("The vault's key must be 32 bytes");
         try {
             byte[] nonce = new byte[NONCE];
             RANDOM.nextBytes(nonce);
@@ -58,7 +60,7 @@ final class VaultCrypto {
     }
 
     static byte[] open(byte[] key, String path, byte[] sealed) throws Broken {
-        if (sealed.length < 1 + NONCE + TAG_BITS / 8 || sealed[0] != VERSION) throw new Broken();
+        if (key.length != KEY || sealed.length < 1 + NONCE + TAG_BITS / 8 || sealed[0] != VERSION) throw new Broken();
         try {
             Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
             c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(TAG_BITS, Arrays.copyOfRange(sealed, 1, 1 + NONCE)));
@@ -75,10 +77,14 @@ final class VaultCrypto {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(new byte[KEY], "HmacSHA256"));
             byte[] prk = mac.doFinal(secret);
-            mac.init(new SecretKeySpec(prk, "HmacSHA256"));
-            mac.update(info.getBytes(StandardCharsets.UTF_8));
-            mac.update((byte) 1);
-            return mac.doFinal();
+            try {
+                mac.init(new SecretKeySpec(prk, "HmacSHA256"));
+                mac.update(info.getBytes(StandardCharsets.UTF_8));
+                mac.update((byte) 1);
+                return mac.doFinal();
+            } finally {
+                Arrays.fill(prk, (byte) 0);
+            }
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("The vault could not derive a key", e);
         }
@@ -86,17 +92,18 @@ final class VaultCrypto {
 
     /** 64 MiB, 3 iterations, parallelism 1: heavy for a guesser, about a second for the person. */
     static byte[] argon2id(char[] password, byte[] salt) {
+        if (salt.length != SALT) throw new IllegalArgumentException("The vault's salt must be 16 bytes");
         Argon2Parameters params = new Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
             .withVersion(Argon2Parameters.ARGON2_VERSION_13).withMemoryAsKB(ARGON_KIB).withIterations(ARGON_ITERATIONS)
             .withParallelism(1).withSalt(salt).build();
         ByteBuffer encoded = StandardCharsets.UTF_8.encode(CharBuffer.wrap(password));
         byte[] bytes = new byte[encoded.remaining()]; // the buffer's array can be longer than what it holds
         encoded.get(bytes);
-        Arrays.fill(encoded.array(), (byte) 0);
+        Arrays.fill(encoded.array(), (byte) 0); // best effort: the JVM may have copied them already
         try {
             return argon2id(bytes, params);
         } finally {
-            Arrays.fill(bytes, (byte) 0);
+            Arrays.fill(bytes, (byte) 0); // best effort, as above
         }
     }
 
@@ -110,6 +117,6 @@ final class VaultCrypto {
     }
 
     private static byte[] aad(String path) {
-        return ("unichat-vault/1:" + path).getBytes(StandardCharsets.UTF_8);
+        return (AAD_PREFIX + path).getBytes(StandardCharsets.UTF_8);
     }
 }

@@ -40,7 +40,7 @@
       <!-- Argon2id for the vault's password key (the JDK has none). -->
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
-      <version>1.80</version>
+      <version>1.87</version>
     </dependency>
     <dependency>
       <groupId>net.java.dev.jna</groupId>

@@ -97,7 +97,7 @@ COMPONENTS = [
      [("LICENSE", fetch(GH + "jcodec/jcodec/master/LICENSE"))]),
     ("jsoup", "1.18.3", "MIT", "reading messages' HTML", [("LICENSE", fetch(GH + "jhy/jsoup/master/LICENSE"))]),
     ("Concentus", "1.0.2", "BSD-3-Clause", "decoding Opus voice notes", [("LICENSE", fetch(GH + "lostromb/concentus/master/LICENSE"))]),
-    ("Bouncy Castle (bcprov)", "1.80", "MIT", "the vault's password key (Argon2id)", [("LICENSE", BC_LICENSE)]),
+    ("Bouncy Castle (bcprov)", "1.87", "MIT", "the vault's password key (Argon2id)", [("LICENSE", BC_LICENSE)]),
     ("InstaTray core (instatray.core)", "core-1.0.2", "0BSD", "saving what links in chats lead to (sites, cookies, yt-dlp/gallery-dl)",
      [("LICENSE", fetch(GH + "vaoan/InstaTray/core-1.0.2/LICENSE"))]),
 ]
