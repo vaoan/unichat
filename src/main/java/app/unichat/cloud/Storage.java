@@ -29,6 +29,19 @@ public interface Storage {
     /** Deletes the file at {@code path}, or the folder with all in it; nothing there is fine. */
     void delete(String path) throws IOException;
 
+    /**
+     * What every {@link #delete} asks first: a path with no name in it (the account's root) or a "." or ".." part could reach
+     * more than was meant, so it is refused before anything is sent.
+     */
+    static void deletable(String path) throws IOException {
+        boolean named = false;
+        for (String part : path.split("/")) {
+            if (part.equals(".") || part.equals("..")) throw new IOException(app.unichat.support.I18n.t("cloud.error.badPath"));
+            named |= !part.isEmpty();
+        }
+        if (!named) throw new IOException(app.unichat.support.I18n.t("cloud.error.badPath"));
+    }
+
     void put(String path, Path file) throws IOException;
 
     /** The same, telling {@code sent} the running total of bytes gone out (null: nobody listens). */

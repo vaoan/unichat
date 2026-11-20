@@ -132,6 +132,7 @@ public final class WebDav implements Storage {
     /** DELETE: on a collection it removes all in it (RFC 4918); 404 means nothing was there. */
     @Override
     public void delete(String path) throws IOException {
+        Storage.deletable(path);
         int code = send("DELETE", path, HttpRequest.BodyPublishers.noBody(), false).statusCode();
         if (code != 404 && code != 200 && code != 204) throw failure(code);
     }

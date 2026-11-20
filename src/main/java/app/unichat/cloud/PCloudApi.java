@@ -109,6 +109,7 @@ public final class PCloudApi implements Storage {
     /** A folder goes with all in it ({@code deletefolderrecursive}), a file by {@code deletefile}; missing is fine. */
     @Override
     public void delete(String path) throws IOException {
+        Storage.deletable(path);
         JsonNode meta = stat(path);
         if (meta == null) return;
         try {

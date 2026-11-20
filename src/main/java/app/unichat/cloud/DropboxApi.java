@@ -120,6 +120,7 @@ public final class DropboxApi implements Storage {
     /** {@code delete_v2} takes a folder with all in it; not found is fine. */
     @Override
     public void delete(String path) throws IOException {
+        Storage.deletable(path);
         try {
             rpc("/2/files/delete_v2", JSON.createObjectNode().put("path", abs(path)));
         } catch (Missing gone) {

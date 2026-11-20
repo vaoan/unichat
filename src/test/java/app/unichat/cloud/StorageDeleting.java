@@ -5,6 +5,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** What every {@link Storage} must do when deleting: the same checks for each service. */
@@ -26,6 +27,12 @@ final class StorageDeleting {
         assertFalse(storage.exists("Unichat/Vault/slots"));
         assertFalse(storage.exists("Unichat/Vault/slots/a b/one.json"), "all in a folder goes");
         assertEquals(Set.of("keep.json"), Set.copyOf(storage.list("Unichat/Vault")), "the folder's neighbours stay");
+
+        for (String bad : new String[] {"", "/", "//", "a/../b", "./x", "Unichat/Vault/.."}) {
+            assertThrows(java.io.IOException.class, () -> storage.delete(bad), "refused: '" + bad + "'");
+        }
+        assertTrue(storage.exists("Unichat/Vault/keep.json"), "a refused path deletes nothing");
+        assertEquals(Set.of("keep.json"), Set.copyOf(storage.list("Unichat/Vault")));
 
         storage.delete("Unichat/Vault/slots"); // already gone
         storage.delete("Unichat/Nada/nunca.json");
