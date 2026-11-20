@@ -412,6 +412,34 @@ class VaultRotateTest {
     }
 
     @Test
+    void aChangeTakenBackBeforeTheGenerationRoseLeavesNoCodeToConfirm() throws Exception {
+        cloud.failOnce.add(Vault.INFO);
+        assertThrows(ExecutionException.class, () -> rotate(desk));
+        assertEquals(0, Vault.info(dav()).generation(), "taken back");
+        assertNull(desk.get(VaultActions.UNCONFIRMED), "no new code came of it: nothing to confirm, no plain copy held back");
+    }
+
+    @Test
+    void aChangeTakenBackLeavesACodeStillToConfirmAsItWas() throws Exception {
+        desk.set(VaultActions.UNCONFIRMED, made.info().id()); // the code made with the vault not yet confirmed
+        cloud.failOnce.add(Vault.INFO);
+        assertThrows(ExecutionException.class, () -> rotate(desk));
+        assertEquals(made.info().id(), desk.get(VaultActions.UNCONFIRMED));
+    }
+
+    @Test
+    void aComputerOffThroughAChangeOfKeyAndATurnOffAsksOnce() throws Exception {
+        rotate(desk); // the laptop, off, still holds the mark's key of generation 0
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
+        desk.as(desk.cloud.vault()::turnOffVault);
+        int puts = cloud.puts.get();
+        assertEquals(Cloud.VaultState.MISSING, laptop.round().vault(), "the mark is generation 1's: its key can't believe it");
+        assertEquals(puts, cloud.puts.get(), "nothing sent meanwhile");
+        laptop.as(laptop.cloud.vault()::leaveMissingVault);
+        assertEquals(Cloud.VaultState.NONE, laptop.round().vault(), "asked once, then plain");
+    }
+
+    @Test
     void aChangeCutBeforeTheGenerationRoseLeavesEveryoneOnTheOldKey() throws Exception {
         cloud.failOnce.add(Vault.INFO);
         assertThrows(ExecutionException.class, () -> rotate(desk));

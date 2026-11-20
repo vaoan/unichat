@@ -59,10 +59,15 @@ public final class CloudVault {
     private Cloud.KeyChanged rotate(Storage dav, java.util.function.Predicate<String> confirmed) throws IOException {
         Vault.Rotated r = withKey(dav, (vault, old) -> {
             VaultPeers peers = VaultPeers.load(vault.info().id());
+            String unconfirmed = Settings.get().getString(VaultActions.UNCONFIRMED, null);
             try {
                 // Before the generation rises: an answer lost after it never hides that a new code is to be kept.
                 return Vault.rotate(dav, old, Cloud.machine(), peers, confirmed,
                     () -> Settings.get().set(VaultActions.UNCONFIRMED, vault.info().id()));
+            } catch (IOException | RuntimeException e) {
+                // Taken back before the rise: no new code came of it, so what was to confirm is as it was.
+                if (Vault.at(dav, vault.info())) Settings.get().set(VaultActions.UNCONFIRMED, unconfirmed);
+                throw e;
             } finally {
                 peers.save(); // a computer seen for the first time is pinned, the change done or not
             }

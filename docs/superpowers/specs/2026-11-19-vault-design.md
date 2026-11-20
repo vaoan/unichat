@@ -180,10 +180,13 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
   vault is open there), and a computer holding a vault goes back to plain only when that mark opens with its key;
   otherwise it is `MISSING` and the person decides ("Volver a sincronizar sin cifrar", asked twice). A computer that
   declined the vault, or never opened it, has no key to check the mark with: it keeps the id of the vault it last saw
-  (`cloud.vault.seen`, any state) and is `MISSING` too, so a real turn-off asks it once.
+  (`cloud.vault.seen`, any state) and is `MISSING` too, so a real turn-off asks it once; so is one that was off through
+  a change of key and then the turn-off (its mark's key is the older generation's).
 - A removed computer still holds the old vault key, so it can vouch for an offer of its own to a computer that was off
   during the removal (and missed the change that shut it out) and keep reading what that computer then seals. The
   limit holds until that computer is opened with a way in (recovery code, password), which writes it a slot of its own.
+  The same removed computer can write a turn-off mark such a computer believes (both hold the key the mark is made
+  from) and delete `boveda.json`: that computer then goes back to plain. Same class, same limit.
 - Texts come into the vault from plain folders only for the machines sending plain when the move started, and only as
   new files: a folder or a longer copy put in through the account is named, never sealed in. That list is the vault's
   own, sealed (`Ajustes/unichat-senders.json`), written once by the computer that made the vault; the others adopt it,
