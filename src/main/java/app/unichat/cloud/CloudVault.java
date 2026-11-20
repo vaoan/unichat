@@ -9,8 +9,9 @@ import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * What Ajustes → Nube → Bóveda does with the vault, through {@link Cloud}: each job on its worker, never alongside a round
- * or the texts alone; the page never sees a key, and a secret given is cleared once used.
+ * What Ajustes → Nube → Bóveda does with the vault, through {@link Cloud}: each job on the vault's thread, never alongside
+ * a round's vault part or the texts alone, and never waiting for a round's media; the page never sees a key, and a secret
+ * given is cleared once used.
  */
 public final class CloudVault {
     private final Cloud cloud;
@@ -20,7 +21,7 @@ public final class CloudVault {
     }
 
     /**
-     * A new key for the vault ({@link Vault#rotate}), on the cloud's thread: only with the vault open here. This computer
+     * A new key for the vault ({@link Vault#rotate}), on the vault's thread: only with the vault open here. This computer
      * then takes it at once, as the others do on their next round; if that fails, its next round does it.
      */
     CompletableFuture<Cloud.KeyChanged> rotateKey() {
@@ -106,7 +107,7 @@ public final class CloudVault {
         });
     }
 
-    /** Another computer's way into the vault taken away, on the cloud's thread; this one's own goes by {@link #forgetHere}. */
+    /** Another computer's way into the vault taken away, on the vault's thread; this one's own goes by {@link #forgetHere}. */
     public CompletableFuture<Void> removeComputer(String machine) {
         return cloud.onWorker(dav -> {
             VaultActions.remove(dav, machine);
@@ -151,7 +152,7 @@ public final class CloudVault {
     }
 
     /**
-     * The vault forgotten on this computer, on the cloud's thread: its slot deleted, then its hold on the vault here (whether
+     * The vault forgotten on this computer, on the vault's thread: its slot deleted, then its hold on the vault here (whether
      * it declined is left as it is). The next round finds it locked; it can be opened again later.
      */
     public CompletableFuture<Void> forgetHere() {
@@ -163,7 +164,7 @@ public final class CloudVault {
     }
 
     /**
-     * The vault turned off, on the cloud's thread, only with it open here: everything with a plain place back there, read
+     * The vault turned off, on the vault's thread, only with it open here: everything with a plain place back there, read
      * back, and only then the vault deleted ({@link VaultOut}); then this computer's hold on it forgotten, its texts
      * counted as sent plain (they were just copied). A failure before the delete leaves the vault as it was; a folder that
      * won't go once its file did is told apart ({@code vaultLeftovers}: off all the same, cleared by the next vault). The other

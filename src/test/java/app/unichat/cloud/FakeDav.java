@@ -31,18 +31,28 @@ final class FakeDav implements AutoCloseable {
     final Map<String, java.util.concurrent.CountDownLatch> holdOnce = new ConcurrentHashMap<>();
     /** The next GET of a path waits for its latch: a read on the cloud's worker held, so what's queued after it waits too. */
     final Map<String, java.util.concurrent.CountDownLatch> holdReadOnce = new ConcurrentHashMap<>();
+    /** Paths whose held PUT or GET (above) let this latch go once it arrived and waits: the test knows the request is there. */
+    final Map<String, java.util.concurrent.CountDownLatch> arrived = new ConcurrentHashMap<>();
+    /** Each request as it was answered ("PUT path", "GET path"), in order: what came before what. */
+    final java.util.List<String> log = new java.util.concurrent.CopyOnWriteArrayList<>();
     /** Paths that can't be read once a PUT of them lands (every GET answers a failure), until taken out of here. */
     final Set<String> unreadableAfterPut = ConcurrentHashMap.newKeySet();
     private final Set<String> unreadable = ConcurrentHashMap.newKeySet();
     /** Paths whose next PUT lands but answers a failure (the answer lost), once each. */
     final Set<String> failAfterOnce = ConcurrentHashMap.newKeySet();
     private final HttpServer server;
+    private final java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "fake-dav");
+        t.setDaemon(true);
+        return t;
+    });
     private final String auth;
 
     FakeDav(String user, String secret) throws IOException {
         auth = "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(StandardCharsets.UTF_8));
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", this::handle);
+        server.setExecutor(pool); // a request held never holds the others: as a real server, many at once
         server.start();
     }
 
@@ -94,6 +104,7 @@ final class FakeDav implements AutoCloseable {
                 case "PUT" -> {
                     java.util.concurrent.CountDownLatch held = holdOnce.remove(path);
                     if (held != null) {
+                        arrivedAt(path);
                         try {
                             held.await();
                         } catch (InterruptedException e) {
@@ -106,18 +117,21 @@ final class FakeDav implements AutoCloseable {
                     }
                     puts.incrementAndGet();
                     put(path, body);
+                    log.add("PUT " + path);
                     if (unreadableAfterPut.contains(path)) unreadable.add(path);
                     x.sendResponseHeaders(failAfterOnce.remove(path) ? 503 : 201, -1);
                 }
                 case "GET" -> {
                     java.util.concurrent.CountDownLatch heldRead = holdReadOnce.remove(path);
                     if (heldRead != null) {
+                        arrivedAt(path);
                         try {
                             heldRead.await();
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                         }
                     }
+                    log.add("GET " + path);
                     if (unreadable.contains(path) && unreadableAfterPut.contains(path)) {
                         x.sendResponseHeaders(503, -1);
                         return;
@@ -151,6 +165,11 @@ final class FakeDav implements AutoCloseable {
         }
     }
 
+    private void arrivedAt(String path) {
+        java.util.concurrent.CountDownLatch a = arrived.remove(path);
+        if (a != null) a.countDown();
+    }
+
     /** The names right in {@code dir}, as a server says them: each once. */
     private java.util.Set<String> children(String dir) {
         java.util.Set<String> out = new java.util.TreeSet<>();
@@ -172,5 +191,6 @@ final class FakeDav implements AutoCloseable {
 
     @Override public void close() {
         server.stop(0);
+        pool.shutdownNow();
     }
 }

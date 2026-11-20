@@ -146,6 +146,14 @@ public final class Cloud {
     /** The vault's state last read: when it changes, what was seen of the account is another storage's. */
     private VaultState lastVault;
     private final Object vaultLock = new Object();
+    /**
+     * Held by a round's vault part (everything but media) and by every vault job: a job never runs alongside what reads or
+     * writes the vault and the personal parts, and never waits for media (hours: a day's check, a long video). Always
+     * taken before {@link #keyLock}, {@link #vaultLock} and {@code TextSync}'s own.
+     */
+    private final java.util.concurrent.locks.ReentrantLock vaultPart = new java.util.concurrent.locks.ReentrantLock();
+    /** How many vault jobs ran, under {@link #vaultPart}: one since a round's vault part means its state is read again. */
+    private long vaultJobsDone;
     /** The texts alone never run while the vault's key changes or is forgotten here: they'd go with a key just replaced. */
     private final Object keyLock = new Object();
     private final java.util.function.Consumer<java.util.Set<String>> textsArrived;
@@ -159,6 +167,12 @@ public final class Cloud {
     private CompletableFuture<Void> textsPending;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "cloud");
+        t.setDaemon(true);
+        return t;
+    });
+    /** Ajustes → Nube → Bóveda's jobs, one at a time, apart from the round's thread: they never queue behind its media. */
+    private final ExecutorService vaultWorker = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "cloud-vault");
         t.setDaemon(true);
         return t;
     });
@@ -286,30 +300,14 @@ public final class Cloud {
         CloudAccount a = account.get();
         if (a == null) return publish(Status.OFF);
         Storage dav = a.storage();
-        try (VaultParts.Round vault = stateOf(dav)) {
-            Instant now = Instant.now();
-            if (vault.open()) seePeers(dav, vault);
-            Storage personal = vault.personal(dav);
-            if (personal != null && (vault.open() || CloudAccount.settings())) {
-                doing(new Activity(Step.SETTINGS, 0, 0, null));
-                parts.get(0).sync(personal, now);
-                doing(new Activity(Step.LEARNED, 0, 0, null));
-                parts.get(1).sync(personal, now);
-                if (vault.open()) vaultParts.sync(personal, now);
-            }
-            String textsFailed = null;
-            Storage textsTo = textsTo(vault, personal);
-            if (textsTo != null) {
-                try {
-                    syncTexts(textsTo, vault.textsTo()); // small and what a deleted message is read from: before a long video
-                } catch (IOException e) {
-                    textsFailed = Errors.message(e); // told, but the media still go up
-                }
-            }
-            if (vault.open()) {
-                String moveFailed = moveIn(dav, personal, vault.info().id(), now);
-                if (textsFailed == null) textsFailed = moveFailed;
-            }
+        Instant now = Instant.now();
+        VaultPass pass;
+        try {
+            pass = vaultPass(dav, now);
+        } catch (IOException | RuntimeException e) {
+            return publish(finished(status.lastSync(), Errors.message(e), status.vault(), null));
+        }
+        try {
             if (CloudAccount.media()) {
                 uploaded += media.run(dav, progressOf(Step.UPLOADING));
                 if (verifyNext || verifyDue(now)) {
@@ -318,9 +316,66 @@ public final class Cloud {
                     Settings.get().set("cloud.lastVerify", now.toString());
                 }
             }
-            return publish(finished(now, textsFailed, vault.state(), notice(dav, vault)));
         } catch (IOException | RuntimeException e) {
-            return publish(finished(status.lastSync(), Errors.message(e), status.vault(), null));
+            return publish(finished(status.lastSync(), Errors.message(e), vaultAfter(dav, pass), null));
+        }
+        VaultState vault = vaultAfter(dav, pass);
+        return publish(finished(now, pass.textsFailed(), vault, vault == pass.state() ? pass.notice() : null));
+    }
+
+    /** What a round's vault part found: the state, why the texts or the move failed (or null), and what the vault left. */
+    private record VaultPass(VaultState state, String textsFailed, Notice notice, long jobsSeen) {}
+
+    /**
+     * Everything of a round but media: the vault's state, the personal parts, the texts and the move in, under
+     * {@link #vaultPart}, so no vault job runs alongside; its hold on the vault (the key) cleared before media starts.
+     */
+    private VaultPass vaultPass(Storage dav, Instant now) throws IOException {
+        vaultPart.lock();
+        try {
+            try (VaultParts.Round vault = stateOf(dav)) {
+                if (vault.open()) seePeers(dav, vault);
+                Storage personal = vault.personal(dav);
+                if (personal != null && (vault.open() || CloudAccount.settings())) {
+                    doing(new Activity(Step.SETTINGS, 0, 0, null));
+                    parts.get(0).sync(personal, now);
+                    doing(new Activity(Step.LEARNED, 0, 0, null));
+                    parts.get(1).sync(personal, now);
+                    if (vault.open()) vaultParts.sync(personal, now);
+                }
+                String textsFailed = null;
+                Storage textsTo = textsTo(vault, personal);
+                if (textsTo != null) {
+                    try {
+                        syncTexts(textsTo, vault.textsTo()); // small and what a deleted message is read from: before a long video
+                    } catch (IOException e) {
+                        textsFailed = Errors.message(e); // told, but the media still go up
+                    }
+                }
+                if (vault.open()) {
+                    String moveFailed = moveIn(dav, personal, vault.info().id(), now);
+                    if (textsFailed == null) textsFailed = moveFailed;
+                }
+                return new VaultPass(vault.state(), textsFailed, notice(dav, vault), vaultJobsDone);
+            }
+        } finally {
+            vaultPart.unlock();
+        }
+    }
+
+    /**
+     * The vault's state to tell once media is over: the vault part's, unless a vault job ran meanwhile (made, opened,
+     * turned off…), when it's read again, so a round never tells the state from before the job; that failing, the part's.
+     */
+    private VaultState vaultAfter(Storage dav, VaultPass pass) {
+        vaultPart.lock();
+        try (VaultParts.Round vault = vaultJobsDone == pass.jobsSeen() ? null : stateOf(dav)) {
+            return vault == null ? pass.state() : vault.state();
+        } catch (IOException | RuntimeException e) {
+            System.err.println("Cloud: the vault after media: " + Errors.message(e)); // read again next round
+            return pass.state();
+        } finally {
+            vaultPart.unlock();
         }
     }
 
@@ -458,26 +513,45 @@ public final class Cloud {
         return f;
     }
 
-    /** What Ajustes → Nube → Bóveda does with the vault, each job on the cloud's thread ({@link CloudVault}). */
+    /** What Ajustes → Nube → Bóveda does with the vault, each job on the vault's thread ({@link CloudVault}). */
     public CloudVault vault() { return vaultJobs; }
 
     interface Job<T> {
         T run(Storage dav) throws IOException;
     }
 
-    /** {@code job} on the cloud's thread, never alongside a round or the texts alone; a failure completes the future with it. */
+    /**
+     * {@code job} on the vault's thread, never alongside a round's vault part nor the texts alone, and never waiting for a
+     * round's media; a failure completes the future with it.
+     */
     <T> CompletableFuture<T> onWorker(Job<T> job) {
         return CompletableFuture.supplyAsync(() -> {
             CloudAccount a = account.get();
             try {
                 if (a == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
-                synchronized (keyLock) {
-                    return job.run(a.storage());
+                vaultPart.lock();
+                try {
+                    synchronized (keyLock) {
+                        return job.run(a.storage());
+                    }
+                } finally {
+                    vaultJobsDone++;
+                    vaultPart.unlock();
                 }
             } catch (IOException e) {
                 throw new java.util.concurrent.CompletionException(e);
             }
-        }, worker);
+        }, vaultWorker);
+    }
+
+    /** Whether a vault job waits for a round's vault part to end (tests: the job is asked and held, not yet run). */
+    boolean vaultJobWaiting() {
+        return vaultPart.hasQueuedThreads();
+    }
+
+    /** Done once every vault job asked before it is (tests: nothing of theirs runs after the account goes). */
+    CompletableFuture<Void> vaultJobsOver() {
+        return CompletableFuture.runAsync(() -> { }, vaultWorker);
     }
 
     private static boolean verifyDue(Instant now) {

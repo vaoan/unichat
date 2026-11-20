@@ -16,7 +16,7 @@ import java.util.Set;
 /**
  * What the person does with the vault from Ajustes → Nube → Bóveda, over the account: make it, open it here with a way
  * in, go on without it, add a password, make a new recovery code, and what the page shows of it. {@link Cloud} runs
- * each on its worker; the secrets given are cleared once used, and never said.
+ * each on its vault thread; the secrets given are cleared once used, and never said.
  */
 final class VaultActions {
     /** The vault id whose latest recovery code the person hasn't yet confirmed they kept (machine-only). */

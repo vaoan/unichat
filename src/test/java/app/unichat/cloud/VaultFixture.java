@@ -144,7 +144,8 @@ public final class VaultFixture implements AutoCloseable {
         dav.holdReadOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown);
         try {
             cloud.stop();
-            cloud.syncNow().get(); // what a step asked for runs before the account goes
+            cloud.vaultJobsOver().get(); // what a step asked for runs before the account goes
+            cloud.syncNow().get();
         } finally {
             // Put back even when the wait above is cut short (a test's time ran out): the settings outlive the run.
             dav.close();
