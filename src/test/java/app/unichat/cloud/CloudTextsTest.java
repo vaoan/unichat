@@ -27,10 +27,13 @@ class CloudTextsTest {
     private FakeDav cloud;
     private final List<Set<String>> arrived = new CopyOnWriteArrayList<>();
     private boolean settingsWere;
+    private java.util.Map<String, String> keysWere;
 
     @BeforeEach
     void start() throws Exception {
         cloud = new FakeDav("u", "p");
+        keysWere = VaultComputer.kept(); // no vault held here: one left by another run would keep the texts home
+        for (String k : VaultComputer.KEYS) if (!k.equals("cloud.machine")) app.unichat.settings.Settings.get().set(k, null);
         settingsWere = CloudAccount.settings();
         CloudAccount.setSettings(false); // the settings' own round is SyncedPartTest's
     }
@@ -38,6 +41,7 @@ class CloudTextsTest {
     @AfterEach
     void stop() {
         CloudAccount.setSettings(settingsWere);
+        keysWere.forEach(app.unichat.settings.Settings.get()::set);
         cloud.close();
     }
 
