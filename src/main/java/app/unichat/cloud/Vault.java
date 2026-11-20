@@ -140,6 +140,15 @@ final class Vault {
         return out;
     }
 
+    /** The vault's computers: each machine with a computer slot, and its label (from the account: plain text only). */
+    static Map<String, String> computers(Storage s) throws IOException {
+        Map<String, String> out = new TreeMap<>();
+        for (VaultSlot slot : slots(s)) {
+            if (slot.method() == VaultSlot.Method.COMPUTER) out.put(slot.id(), slot.label());
+        }
+        return out;
+    }
+
     /** The slot {@code id} of {@code vault}; null when there's none, it isn't one, or it is another vault's or another id's. */
     static VaultSlot slot(Storage s, Info vault, String id) throws IOException {
         if (!Ids.ours(id)) return null;

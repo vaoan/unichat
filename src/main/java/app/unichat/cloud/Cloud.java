@@ -40,7 +40,7 @@ public final class Cloud {
     /** For the settings page: connected or not, when the last round worked, why the last one didn't, what went up. */
     public record Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
                          int retrying, Instant nextRetry, int conflicts, Instant lastVerified, VaultState vault, Moving moving,
-                         String vaultNotice) {
+                         Notice vaultNotice) {
         static final Status OFF = new Status(false, null, null, 0, 0);
 
         public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting) {
@@ -55,6 +55,34 @@ public final class Cloud {
         Status doing(Activity a) {
             return new Status(connected, lastSync, error, uploaded, waiting, a, retrying, nextRetry, conflicts, lastVerified, vault, moving,
                 vaultNotice);
+        }
+    }
+
+    /** A part of what the vault carries, as the person knows it. */
+    public enum Part {
+        SETTINGS("unichat-settings.json"), AI("unichat-ai.json"), SECRETS("unichat-secrets.json"), PINNED("unichat-pinned.json"),
+        TRANSCRIPTS("unichat-transcripts.json");
+
+        private final String file;
+
+        Part(String file) {
+            this.file = file;
+        }
+
+        /** The part kept in {@code file}; null for none of ours. */
+        static Part of(String file) {
+            for (Part p : values()) if (p.file.equals(file)) return p;
+            return null;
+        }
+    }
+
+    /**
+     * What the vault left or replaced in a round: its parts that didn't open and went up anew from here, those that didn't
+     * open and are left, and the computers whose texts didn't open (machine → its name in the vault, "" when it has none).
+     */
+    public record Notice(List<Part> replaced, List<Part> damaged, Map<String, String> textsDamaged) {
+        public boolean none() {
+            return replaced.isEmpty() && damaged.isEmpty() && textsDamaged.isEmpty();
         }
     }
 
@@ -280,7 +308,7 @@ public final class Cloud {
                     Settings.get().set("cloud.lastVerify", now.toString());
                 }
             }
-            return publish(finished(now, textsFailed, vault.state(), notice(vault)));
+            return publish(finished(now, textsFailed, vault.state(), notice(dav, vault)));
         } catch (IOException | RuntimeException e) {
             return publish(finished(status.lastSync(), Errors.message(e), status.vault(), null));
         }
@@ -320,14 +348,25 @@ public final class Cloud {
         }
     }
 
-    /** What the vault left or replaced this round, in the person's words; null when nothing. */
-    private String notice(VaultParts.Round vault) {
-        List<String> lines = new java.util.ArrayList<>();
-        if (!vault.replaced().isEmpty()) lines.add(I18n.t("cloud.vault.partReplaced", String.join(", ", vault.replaced())));
-        if (!vault.damaged().isEmpty()) lines.add(I18n.t("cloud.vault.partDamaged", String.join(", ", vault.damaged())));
-        java.util.Set<String> damaged = vault.open() ? texts.damaged() : java.util.Set.of();
-        if (!damaged.isEmpty()) lines.add(I18n.t("cloud.vault.textsDamaged", String.join(", ", damaged)));
-        return lines.isEmpty() ? null : String.join("\n", lines);
+    /** What the vault left or replaced this round; null when nothing. */
+    private Notice notice(Storage dav, VaultParts.Round vault) {
+        java.util.Set<String> texts = vault.open() ? this.texts.damaged() : java.util.Set.of();
+        Map<String, String> named = new java.util.TreeMap<>();
+        if (!texts.isEmpty()) {
+            Map<String, String> labels;
+            try {
+                labels = Vault.computers(dav);
+            } catch (IOException e) {
+                labels = Map.of(); // named by machine alone this round
+            }
+            for (String machine : texts) named.put(machine, VaultActions.label(labels.getOrDefault(machine, "")));
+        }
+        Notice n = new Notice(parts(vault.replaced()), parts(vault.damaged()), named);
+        return n.none() ? null : n;
+    }
+
+    private static List<Part> parts(List<String> files) {
+        return files.stream().map(Part::of).filter(java.util.Objects::nonNull).toList();
     }
 
     /** The vault's state here ({@link VaultParts#open}), knowing what this computer sent and that its texts' index goes anew. */
@@ -414,27 +453,38 @@ public final class Cloud {
      * then takes it at once, as the others do on their next round; if that fails, its next round does it.
      */
     public CompletableFuture<KeyChanged> rotateKey() {
+        return onWorker(this::rotate);
+    }
+
+    /**
+     * Another computer taken out of the vault and the key changed, in one: a removed computer still holds the key, so
+     * only a new one shuts it out of anything new. Kept out first, so it's never offered the new key.
+     */
+    public CompletableFuture<KeyChanged> removeAndChangeKey(String machine) {
         return onWorker(dav -> {
-            Vault.Rotated r;
-            try (VaultParts.Round vault = openVault(dav)) {
-                if (!vault.open()) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
-                byte[] old = vault.key();
-                VaultPeers peers = VaultPeers.load(vault.info().id());
-                try {
-                    r = Vault.rotate(dav, old, machine(), peers);
-                } finally {
-                    Arrays.fill(old, (byte) 0);
-                    peers.save(); // a computer seen for the first time is pinned, the change done or not
-                }
-            }
-            Arrays.fill(r.vk(), (byte) 0);
-            try {
-                openVault(dav).close();
-            } catch (IOException | RuntimeException e) {
-                System.err.println("Cloud: the vault's new key: " + Errors.message(e)); // the next round takes it
-            }
-            return new KeyChanged(r.code().shown(), r.dropped().stream().map(Enum::name).collect(java.util.stream.Collectors.toSet()), r.left(), r.refused(), r.resealFailed());
+            remove(dav, machine);
+            return rotate(dav);
         });
+    }
+
+    private KeyChanged rotate(Storage dav) throws IOException {
+        Vault.Rotated r = withKey(dav, (vault, old) -> {
+            VaultPeers peers = VaultPeers.load(vault.info().id());
+            try {
+                return Vault.rotate(dav, old, machine(), peers);
+            } finally {
+                peers.save(); // a computer seen for the first time is pinned, the change done or not
+            }
+        });
+        Arrays.fill(r.vk(), (byte) 0);
+        try {
+            openVault(dav).close();
+        } catch (IOException | RuntimeException e) {
+            System.err.println("Cloud: the vault's new key: " + Errors.message(e)); // the next round takes it
+        }
+        Vault.Info now = Vault.info(dav);
+        Settings.get().set(VaultActions.UNCONFIRMED, now == null ? null : now.id()); // a new code, to be confirmed as kept
+        return new KeyChanged(r.code().shown(), r.dropped().stream().map(Enum::name).collect(java.util.stream.Collectors.toSet()), r.left(), r.refused(), r.resealFailed());
     }
 
     /**
@@ -445,38 +495,36 @@ public final class Cloud {
     public CompletableFuture<Void> acceptKey(String machine) {
         return onWorker(dav -> {
             if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
-            try (VaultParts.Round vault = openVault(dav)) {
-                if (!vault.open()) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
+            return withKey(dav, (vault, vk) -> {
                 VaultSlot slot = Vault.slot(dav, vault.info(), machine);
-                byte[] vk = vault.key();
-                try {
-                    byte[] key = slot == null || slot.method() != VaultSlot.Method.COMPUTER ? null : VaultNext.publicKey(slot, vk);
-                    if (key == null) throw new IOException(I18n.t("cloud.error.vaultNoSuchKey"));
-                    VaultPeers peers = VaultPeers.load(vault.info().id());
-                    peers.accept(machine, key);
-                    peers.save();
-                } finally {
-                    Arrays.fill(vk, (byte) 0);
-                }
-            }
-            return null;
+                byte[] key = slot == null || slot.method() != VaultSlot.Method.COMPUTER ? null : VaultNext.publicKey(slot, vk);
+                if (key == null) throw new IOException(I18n.t("cloud.error.vaultNoSuchKey"));
+                VaultPeers peers = VaultPeers.load(vault.info().id());
+                peers.accept(machine, key);
+                peers.save();
+                return null;
+            });
         });
     }
 
     /** Another computer's way into the vault taken away, on the cloud's thread; this one's own goes by {@link #forgetHere}. */
     public CompletableFuture<Void> removeComputer(String machine) {
         return onWorker(dav -> {
-            if (machine().equals(machine)) throw new IllegalArgumentException("This computer is forgotten with forgetHere");
-            if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
-            Vault.Info info = Vault.info(dav);
-            if (info == null) throw new IOException(I18n.t("cloud.error.noVault"));
-            // Kept out here first: a slot that can't be deleted now is never offered the next key either.
-            VaultPeers peers = VaultPeers.load(info.id());
-            peers.removed(machine);
-            peers.save();
-            Vault.removeComputer(dav, info, machine);
+            remove(dav, machine);
             return null;
         });
+    }
+
+    private static void remove(Storage dav, String machine) throws IOException {
+        if (machine().equals(machine)) throw new IllegalArgumentException("This computer is forgotten with forgetHere");
+        if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
+        Vault.Info info = Vault.info(dav);
+        if (info == null) throw new IOException(I18n.t("cloud.error.noVault"));
+        // Kept out here first: a slot that can't be deleted now is never offered the next key either.
+        VaultPeers peers = VaultPeers.load(info.id());
+        peers.removed(machine);
+        peers.save();
+        Vault.removeComputer(dav, info, machine);
     }
 
     /**
@@ -489,6 +537,81 @@ public final class Cloud {
             VaultParts.forget();
             return null;
         });
+    }
+
+    /** What Ajustes → Nube → Bóveda shows: the vault as it stands here, its ways in and, open, its computers. */
+    public CompletableFuture<VaultView> vaultView() {
+        return onWorker(dav -> {
+            try (VaultParts.Round vault = vault(dav)) {
+                return VaultActions.view(dav, vault);
+            }
+        });
+    }
+
+    /** A new vault, open here; its recovery code as printed, shown once and never kept. */
+    public CompletableFuture<String> createVault() {
+        return onWorker(VaultActions::create);
+    }
+
+    /**
+     * The vault opened here with a way in ({@code secret}: the recovery code as typed, or the password). A
+     * secret that opens nothing fails with "wrong" and writes nothing. {@code secret} is cleared once used.
+     */
+    public CompletableFuture<Void> openVault(VaultView.Way way, char[] secret) {
+        CompletableFuture<Void> f = onWorker(dav -> {
+            VaultActions.open(dav, way, secret);
+            return null;
+        });
+        f.whenComplete((r, e) -> Arrays.fill(secret, '\0'));
+        return f;
+    }
+
+    /** "Seguir sin la bóveda en este equipo" ({@code true}), or taken back. */
+    public CompletableFuture<Void> declineVault(boolean declined) {
+        return onWorker(dav -> {
+            VaultActions.decline(declined);
+            return null;
+        });
+    }
+
+    /** A password as one more way in, only with the vault open here; {@code password} is cleared once used. */
+    public CompletableFuture<Void> addPassword(char[] password) {
+        CompletableFuture<Void> f = onWorker(dav -> withKey(dav, (vault, vk) -> {
+            VaultActions.addPassword(dav, vk, password);
+            return null;
+        }));
+        f.whenComplete((r, e) -> Arrays.fill(password, '\0'));
+        return f;
+    }
+
+    /** A new recovery code in place of the old one (which no longer opens it), only with the vault open here. */
+    public CompletableFuture<String> newRecoveryCode() {
+        return onWorker(dav -> withKey(dav, (vault, vk) -> VaultActions.newRecovery(dav, vk, vault.info())));
+    }
+
+    /** The person typed back the groups asked of the latest recovery code: kept. */
+    public CompletableFuture<Void> codeKept() {
+        return onWorker(dav -> {
+            VaultActions.codeKept();
+            return null;
+        });
+    }
+
+    private interface KeyJob<T> {
+        T run(VaultParts.Round vault, byte[] vk) throws IOException;
+    }
+
+    /** {@code job} with the vault open here and a copy of its key, cleared after; not open → "the vault isn't open". */
+    private <T> T withKey(Storage dav, KeyJob<T> job) throws IOException {
+        try (VaultParts.Round vault = openVault(dav)) {
+            if (!vault.open()) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
+            byte[] vk = vault.key();
+            try {
+                return job.run(vault, vk);
+            } finally {
+                Arrays.fill(vk, (byte) 0);
+            }
+        }
     }
 
     private interface Job<T> {
@@ -515,7 +638,7 @@ public final class Cloud {
         return last == null || Instant.parse(last).plus(VERIFY_EVERY).isBefore(now);
     }
 
-    private Status finished(Instant lastSync, String error, VaultState vault, String vaultNotice) {
+    private Status finished(Instant lastSync, String error, VaultState vault, Notice vaultNotice) {
         int waiting;
         try {
             waiting = media.waiting();

@@ -44,4 +44,43 @@ class CloudTextsTest {
         assertEquals(3, lines.size(), "and the one that differs: " + lines);
         assertEquals(List.of(), CloudTexts.menuLines(new Cloud.Status(false, null, null, 0, 0), NOW), "no account: nothing in the menu");
     }
+
+    private static Cloud.Status vault(Cloud.VaultState state, Cloud.Moving moving, Cloud.Notice notice) {
+        return new Cloud.Status(true, NOW, null, 0, 0, null, 0, null, 0, null, state, moving, notice);
+    }
+
+    @Test
+    void theVaultsStateHereIsSaidWhereverTheCloudIs() {
+        assertEquals(List.of("Bóveda: no está abierta en este equipo, no sube nada personal."),
+                CloudTexts.vaultLines(vault(Cloud.VaultState.LOCKED, null, null), NOW));
+        assertEquals(List.of("Bóveda: este equipo sigue sin ella."), CloudTexts.vaultLines(vault(Cloud.VaultState.DECLINED, null, null), NOW));
+        assertEquals(List.of("Bóveda: este equipo fue quitado de ella, no se envía nada."),
+                CloudTexts.vaultLines(vault(Cloud.VaultState.REMOVED, null, null), NOW));
+        assertEquals(List.of(), CloudTexts.vaultLines(vault(Cloud.VaultState.OPEN, null, null), NOW), "open, with nothing to say");
+        assertEquals(List.of(), CloudTexts.vaultLines(vault(Cloud.VaultState.NONE, null, null), NOW));
+        Cloud.Status locked = vault(Cloud.VaultState.LOCKED, null, null);
+        assertTrue(CloudTexts.status(locked, NOW).endsWith("\nBóveda: no está abierta en este equipo, no sube nada personal."), "in Ajustes → Nube");
+        assertTrue(CloudTexts.menuLines(locked, NOW).contains("Bóveda: no está abierta en este equipo, no sube nada personal."), "and the tray");
+    }
+
+    @Test
+    void whatMovedInAndWhoStillSendsPlainByName() {
+        Cloud.Moving moving = new Cloud.Moving(4, NOW.minusSeconds(180), new java.util.LinkedHashMap<>(java.util.Map.of("m1", "Viejo")));
+        assertEquals(List.of("4 archivos pasaron a la bóveda (hace 3 min)", "Viejo usa una versión sin bóveda: actualízalo."),
+                CloudTexts.vaultLines(vault(Cloud.VaultState.OPEN, moving, null), NOW));
+        Cloud.Moving unnamed = new Cloud.Moving(0, null, java.util.Map.of("m2", ""));
+        assertEquals(List.of("Un equipo sin nombre usa una versión sin bóveda: actualízalo."),
+                CloudTexts.vaultLines(vault(Cloud.VaultState.OPEN, unnamed, null), NOW));
+    }
+
+    @Test
+    void partsThatDidntOpenAreNamedAsThePersonKnowsThem() {
+        Cloud.Notice n = new Cloud.Notice(List.of(Cloud.Part.SECRETS), List.of(Cloud.Part.TRANSCRIPTS, Cloud.Part.PINNED),
+                java.util.Map.of("m1", "Portátil"));
+        List<String> lines = CloudTexts.vaultLines(vault(Cloud.VaultState.OPEN, null, n), NOW);
+        assertEquals(3, lines.size(), lines.toString());
+        assertTrue(lines.get(0).contains("tus llaves") && lines.get(0).contains("subió la de este equipo"), lines.get(0));
+        assertTrue(lines.get(1).contains("las transcripciones de las notas de voz, los mensajes fijados"), lines.get(1));
+        assertTrue(lines.get(2).contains("(Portátil)"), lines.get(2));
+    }
 }

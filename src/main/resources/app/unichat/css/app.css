@@ -1009,3 +1009,10 @@
 
 /* Stickers of the one emoji typed, above the message box: one row that scrolls sideways. */
 .sticker-suggestions { -fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0.25em 0.5em; }
+
+/* Ajustes → Nube → Bóveda: the recovery code reads character by character. */
+.vault-code, .vault-code-group { -fx-font-family: "SF Mono", "Menlo", "Consolas", monospace; }
+.text-field.vault-code, .text-area.vault-code { -fx-font-size: 1.15em; }
+.vault-computer { -fx-font-weight: 600; }
+/* Two lines of the code at its own size (rows alone left the second one cut). */
+.text-area.vault-code { -fx-pref-height: 5em; -fx-min-height: 5em; }

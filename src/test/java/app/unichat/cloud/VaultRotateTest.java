@@ -242,7 +242,7 @@ class VaultRotateTest {
             Bundle.of(OTHER, java.time.Instant.now().plusSeconds(60), Map.of("gif.giphy.key", "falsa"), null).toBytes());
         Cloud.Status s = laptop.round();
         assertNull(s.error(), "a part that doesn't open never stops the round");
-        assertEquals(app.unichat.support.I18n.t("cloud.vault.partReplaced", "unichat-secrets.json"), s.vaultNotice(), "said");
+        assertEquals(new Cloud.Notice(List.of(Cloud.Part.SECRETS), List.of(), Map.of()), s.vaultNotice(), "said");
         assertNull(desk.round().error());
         assertFalse("falsa".equals(laptop.get("gif.giphy.key")), "no computer of the vault takes it in");
         assertFalse("falsa".equals(desk.get("gif.giphy.key")));
@@ -272,7 +272,7 @@ class VaultRotateTest {
         int before = cloud.puts.get();
         Cloud.Status s = desk.round();
         assertNull(s.error());
-        assertTrue(s.vaultNotice() != null && s.vaultNotice().contains(OTHER), "named: " + s.vaultNotice());
+        assertEquals(Map.of(OTHER, ""), s.vaultNotice().textsDamaged(), "named: " + s.vaultNotice());
         assertArrayEquals("dañado".getBytes(StandardCharsets.UTF_8), cloud.files.get(folder + "/index.json"), "never written over");
         assertTrue(cloud.puts.get() >= before);
     }
@@ -526,7 +526,7 @@ class VaultRotateTest {
         assertNull(s.error());
         assertEquals("{}\n{\"b\":1}\n", desk.read("texts/" + LAPTOP + "/" + second), "the one after it still comes");
         assertEquals("{}\n", desk.read("texts/" + LAPTOP + "/" + first), "the forged one never");
-        assertTrue(s.vaultNotice() != null && s.vaultNotice().contains(LAPTOP), "named: " + s.vaultNotice());
+        assertEquals(Map.of(LAPTOP, "Portátil"), s.vaultNotice().textsDamaged(), "named by its computer's name: " + s.vaultNotice());
 
         assertNull(laptop.round().error());
         assertNull(desk.round().error());
@@ -566,7 +566,7 @@ class VaultRotateTest {
         cloud.put(stored, "dañado".getBytes(StandardCharsets.UTF_8));
         Cloud.Status s = desk.round(); // no transcripts here: nothing goes up in its place
         assertArrayEquals("dañado".getBytes(StandardCharsets.UTF_8), cloud.files.get(stored));
-        assertEquals(app.unichat.support.I18n.t("cloud.vault.partDamaged", "unichat-transcripts.json"), s.vaultNotice());
+        assertEquals(new Cloud.Notice(List.of(), List.of(Cloud.Part.TRANSCRIPTS), Map.of()), s.vaultNotice());
     }
 
     @Test

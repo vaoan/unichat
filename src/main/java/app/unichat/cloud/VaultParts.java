@@ -221,7 +221,7 @@ final class VaultParts {
     /** This computer's hold on the vault forgotten here: the vault itself and the other computers left as they are. */
     static void forget() {
         Settings s = Settings.get();
-        for (String k : new String[] {ID, KEY, PRIVATE}) s.set(k, null);
+        for (String k : new String[] {ID, KEY, PRIVATE, VaultActions.UNCONFIRMED}) s.set(k, null);
         VaultMove.forget();
         VaultPeers.forget();
     }

@@ -74,7 +74,8 @@ class SettingsLayoutUiTest {
         assertTrue(bad.isEmpty(), "cut or squeezed:\n" + String.join("\n", bad));
     }
 
-    private static List<String> squeezed(Node root, String where) {
+    /** Every option name or help under {@code root} that is cut or squeezed into a column. */
+    static List<String> squeezed(Node root, String where) {
         List<String> out = new ArrayList<>();
         for (Node n : root.lookupAll(".settings-label")) check((Label) n, where, out);
         for (Node n : root.lookupAll(".settings-row .settings-help")) if (n instanceof Label l) check(l, where, out);

@@ -77,4 +77,19 @@ class RecoveryCodeTest {
         assertThrows(IllegalArgumentException.class, () -> new RecoveryCode(new byte[19]));
         assertThrows(IllegalArgumentException.class, () -> new RecoveryCode(null));
     }
+
+    @Test
+    void aGroupTypedBackIsForgivenAsTheCodeIs() {
+        RecoveryCode c = RecoveryCode.random();
+        String shown = c.shown();
+        for (int g = 1; g <= RecoveryCheck.GROUPS; g++) {
+            String group = shown.split("-")[g - 1];
+            assertTrue(RecoveryCheck.matches(shown, g, " " + group.toLowerCase(java.util.Locale.ROOT).replace('0', 'o').replace('1', 'l') + " "), group);
+            assertFalse(RecoveryCheck.matches(shown, g, group.substring(1)), "not all of it");
+        }
+        assertFalse(RecoveryCheck.matches(shown, 0, "ABCD"));
+        assertFalse(RecoveryCheck.matches(shown, 9, "ABCD"));
+        assertFalse(RecoveryCheck.matches("no es un código", 1, "NOES"));
+        assertFalse(RecoveryCheck.matches(shown, 1, null));
+    }
 }

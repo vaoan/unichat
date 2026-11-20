@@ -12,6 +12,8 @@ import java.util.Locale;
 record RecoveryCode(byte[] bits) {
     private static final String ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
     private static final int BYTES = 20, CHARS = 32, GROUP = 4;
+    /** Groups in a code. */
+    static final int GROUPS = CHARS / GROUP;
     private static final String DASHES = "-\u2010\u2011\u2012\u2013\u2014\u2015\u2212";
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -45,11 +47,7 @@ record RecoveryCode(byte[] bits) {
     /** What was typed, or null when it isn't exactly 160 bits of this alphabet. */
     static RecoveryCode parse(String typed) {
         if (typed == null) return null;
-        StringBuilder chars = new StringBuilder();
-        for (char c : typed.toUpperCase(Locale.ROOT).toCharArray()) {
-            if (Character.isWhitespace(c) || Character.isSpaceChar(c) || DASHES.indexOf(c) >= 0 || c == 'U') continue;
-            chars.append(c == 'O' ? '0' : c == 'I' || c == 'L' ? '1' : c);
-        }
+        String chars = normalized(typed);
         if (chars.length() != CHARS) return null;
         byte[] bits = new byte[BYTES];
         int acc = 0, have = 0, at = 0;
@@ -65,6 +63,16 @@ record RecoveryCode(byte[] bits) {
             }
         }
         return new RecoveryCode(bits);
+    }
+
+    /** What was typed as the code's own characters: case, spaces and dashes dropped, O read as 0, I and L as 1. */
+    static String normalized(String typed) {
+        StringBuilder chars = new StringBuilder();
+        for (char c : typed.toUpperCase(Locale.ROOT).toCharArray()) {
+            if (Character.isWhitespace(c) || Character.isSpaceChar(c) || DASHES.indexOf(c) >= 0 || c == 'U') continue;
+            chars.append(c == 'O' ? '0' : c == 'I' || c == 'L' ? '1' : c);
+        }
+        return chars.toString();
     }
 
     private String plain() {

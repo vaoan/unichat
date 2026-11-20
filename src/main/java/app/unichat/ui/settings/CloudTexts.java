@@ -31,8 +31,46 @@ public final class CloudTexts {
         String files = I18n.n("settings.cloud.uploaded", s.uploaded()) + (s.waiting() > 0 ? " · " + I18n.n("settings.cloud.waiting", s.waiting()) : "")
                 + retrying(s) + (s.conflicts() > 0 ? " · " + I18n.n("settings.cloud.conflicts", s.conflicts()) : "")
                 + (s.lastVerified() != null ? " · " + I18n.t("settings.cloud.verified", when(s.lastVerified(), now)) : "");
-        if (s.error() != null) return I18n.t("settings.cloud.error", s.error()) + "\n" + when + " · " + files;
-        return I18n.t("settings.cloud.ok") + " · " + when + " · " + files;
+        String vault = vaultLines(s, now).stream().map(l -> "\n" + l).collect(java.util.stream.Collectors.joining());
+        if (s.error() != null) return I18n.t("settings.cloud.error", s.error()) + "\n" + when + " · " + files + vault;
+        return I18n.t("settings.cloud.ok") + " · " + when + " · " + files + vault;
+    }
+
+    /**
+     * The vault's lines: how it stands here (not open, gone on without, removed), what came into it, the computers still
+     * sending plain copies, and what of it didn't open. None without a vault and with nothing to say.
+     */
+    public static List<String> vaultLines(Cloud.Status s, Instant now) {
+        List<String> out = new ArrayList<>();
+        if (!s.connected() || s.vault() == null) return out;
+        switch (s.vault()) {
+            case LOCKED -> out.add(I18n.t("settings.vault.line.LOCKED"));
+            case DECLINED -> out.add(I18n.t("settings.vault.line.DECLINED"));
+            case REMOVED -> out.add(I18n.t("settings.vault.line.REMOVED"));
+            case NONE, OPEN -> { }
+        }
+        Cloud.Moving m = s.moving();
+        if (m != null && m.files() > 0) out.add(I18n.n("settings.vault.line.moved", m.files(), when(m.at(), now)));
+        if (m != null) m.strays().keySet().forEach(machine -> out.add(I18n.t("settings.vault.line.stray", computer(m.strayName(machine)))));
+        Cloud.Notice n = s.vaultNotice();
+        if (n != null) {
+            if (!n.replaced().isEmpty()) out.add(I18n.t("settings.vault.line.replaced", parts(n.replaced())));
+            if (!n.damaged().isEmpty()) out.add(I18n.t("settings.vault.line.damaged", parts(n.damaged())));
+            if (!n.textsDamaged().isEmpty()) {
+                out.add(I18n.t("settings.vault.line.textsDamaged",
+                        String.join(", ", n.textsDamaged().values().stream().map(CloudTexts::computer).toList())));
+            }
+        }
+        return out;
+    }
+
+    /** A computer's name in the vault (from the account: shown as text), or words for one that has none. */
+    static String computer(String label) {
+        return label == null || label.isBlank() ? I18n.t("settings.vault.unnamed") : label;
+    }
+
+    private static String parts(List<Cloud.Part> parts) {
+        return String.join(", ", parts.stream().map(p -> I18n.t("settings.vault.part." + p.name())).toList());
     }
 
     /** The tray menu's lines: what it's doing and how fast, the file and how far, how many are left. None without an account. */
@@ -53,6 +91,7 @@ public final class CloudTexts {
             out.add((s.waiting() > 0 ? I18n.n("settings.cloud.waiting", s.waiting()) : "") + (s.waiting() > 0 ? retrying(s) : retrying(s).substring(3)));
         }
         if (s.conflicts() > 0) out.add(I18n.n("settings.cloud.conflicts", s.conflicts()));
+        out.addAll(vaultLines(s, now));
         return out;
     }
 

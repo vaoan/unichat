@@ -69,6 +69,13 @@ final class SettingsForm {
         return box;
     }
 
+    /** A row with no name of its own: a form's buttons, or a line of text. */
+    static VBox actions(Node... content) {
+        VBox row = new VBox(8, content);
+        row.getStyleClass().add("settings-row");
+        return row;
+    }
+
     static CheckBox toggle(boolean value, Consumer<Boolean> save) {
         CheckBox c = new CheckBox();
         c.getStyleClass().add("switch");

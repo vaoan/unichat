@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
 
+import static app.unichat.ui.settings.SettingsForm.actions;
 import static app.unichat.ui.settings.SettingsForm.chips;
 import static app.unichat.ui.settings.SettingsForm.group;
 import static app.unichat.ui.settings.SettingsForm.page;
@@ -52,7 +53,10 @@ public final class CloudPage {
         if (cloud == null) return page(I18n.t("settings.nav.cloud"), intro, Labels.help(I18n.t("settings.cloud.unavailable")));
         VBox account = new VBox();
         Runnable[] redraw = {null};
-        redraw[0] = () -> account.getChildren().setAll(CloudAccount.saved() == null ? connectForm(toast, redraw[0]) : connected(redraw[0]));
+        redraw[0] = () -> {
+            if (CloudAccount.saved() == null) account.getChildren().setAll(connectForm(toast, redraw[0]));
+            else account.getChildren().setAll(new VBox(16, connected(redraw[0]), VaultPage.build(cloud)));
+        };
         redraw[0].run();
         return page(I18n.t("settings.nav.cloud"), intro, account,
                 group(I18n.t("settings.cloud.what"),
@@ -202,6 +206,7 @@ public final class CloudPage {
 
     /** Who's connected, how the last round went (kept current while shown), "Sincronizar ahora" and "Desconectar". */
     private static Node connected(Runnable redraw) {
+        Cloud c = cloud; // this page's: the field may be another session's (or none) by the time a round tells
         CloudAccount a = CloudAccount.saved();
         Label who = new Label(I18n.t("settings.cloud.as", I18n.t("settings.cloud.service." + a.service().name()), a.user()));
         who.setWrapText(true);
@@ -215,7 +220,7 @@ public final class CloudPage {
         Button verify = new Button(I18n.t("settings.cloud.verifyNow"));
         verify.getStyleClass().add("secondary-button");
         Runnable show = () -> {
-            Cloud.Status st = cloud.status();
+            Cloud.Status st = c.status();
             state.setText(statusText(st, Instant.now()));
             Cloud.Activity act = st.now();
             Nodes.show(working, act != null);
@@ -227,21 +232,19 @@ public final class CloudPage {
             verify.setDisable(act != null);
         };
         Runnable listener = () -> Platform.runLater(show);
-        cloud.addListener(listener);
-        state.sceneProperty().addListener((o, was, scene) -> {
-            if (scene == null) cloud.removeListener(listener);
-        });
+        // Only while its window shows: a closed window keeps its scene, and its page kept hearing every round.
+        app.unichat.ui.Showing.whileShowing(state, () -> c.addListener(listener), () -> c.removeListener(listener));
         show.run();
         now.getStyleClass().add("secondary-button");
         now.setOnAction(e -> {
             now.setDisable(true);
             state.setText(I18n.t("settings.cloud.syncing"));
-            cloud.syncNow();
+            c.syncNow();
         });
         verify.setOnAction(e -> {
             verify.setDisable(true);
             now.setDisable(true);
-            cloud.verifyNow();
+            c.verifyNow();
         });
         Button off = new Button(I18n.t("settings.cloud.disconnect"));
         off.getStyleClass().add("secondary-button");
@@ -256,13 +259,6 @@ public final class CloudPage {
     /** "Al día · hace 2 min · 28 archivos subidos", or the step going on (CloudTexts). */
     static String statusText(Cloud.Status s, Instant now) {
         return CloudTexts.status(s, now);
-    }
-
-    /** A row with no name of its own: the form's buttons. */
-    private static Node actions(Node content) {
-        VBox row = new VBox(content);
-        row.getStyleClass().add("settings-row");
-        return row;
     }
 
     private static void say(Label status, String text) {

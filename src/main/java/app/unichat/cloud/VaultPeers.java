@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Map;
@@ -29,17 +30,29 @@ final class VaultPeers {
     private final Map<String, String> pins;
     /** The computers removed here. */
     private final Set<String> removed;
+    /** Slot id → when it was first pinned here (unknown for pins older than this record). */
+    private final Map<String, String> seen;
+    /** Slot id → how many computers had been removed here when it was pinned: one pinned after the last is new since. */
+    private final Map<String, Integer> after;
+    /** How many computers were removed here. */
+    private int removals;
 
-    private VaultPeers(String vault, Map<String, String> pins, Set<String> removed) {
+    private VaultPeers(String vault, Map<String, String> pins, Set<String> removed, Map<String, String> seen, Map<String, Integer> after,
+                       int removals) {
         this.vault = vault;
         this.pins = pins;
         this.removed = removed;
+        this.seen = seen;
+        this.after = after;
+        this.removals = removals;
     }
 
     /** What this computer saw of {@code vault}; nothing when what it holds is another vault's or none. */
     static VaultPeers load(String vault) {
-        Map<String, String> pins = new TreeMap<>();
+        Map<String, String> pins = new TreeMap<>(), seen = new TreeMap<>();
+        Map<String, Integer> after = new TreeMap<>();
         Set<String> removed = new TreeSet<>();
+        int removals = 0;
         String saved = Settings.get().getString(KEY, null);
         if (saved != null) {
             try {
@@ -47,19 +60,26 @@ final class VaultPeers {
                 if (n != null && vault.equals(n.path("vault").asText()) && n.path("pins").isObject()) {
                     n.get("pins").fields().forEachRemaining(e -> { if (e.getValue().isTextual()) pins.put(e.getKey(), e.getValue().asText()); });
                     n.path("removed").forEach(id -> { if (id.isTextual()) removed.add(id.asText()); });
+                    n.path("seen").fields().forEachRemaining(e -> { if (e.getValue().isTextual()) seen.put(e.getKey(), e.getValue().asText()); });
+                    n.path("after").fields().forEachRemaining(e -> { if (e.getValue().isInt()) after.put(e.getKey(), e.getValue().asInt()); });
+                    removals = Math.max(0, n.path("removals").asInt(0));
                 }
             } catch (IOException e) {
                 // Not ours: seen afresh.
             }
         }
-        return new VaultPeers(vault, pins, removed);
+        return new VaultPeers(vault, pins, removed, seen, after, removals);
     }
 
     void save() {
-        ObjectNode n = JSON.createObjectNode().put("vault", vault);
+        ObjectNode n = JSON.createObjectNode().put("vault", vault).put("removals", removals);
         ObjectNode p = n.putObject("pins");
         pins.forEach(p::put);
         removed.forEach(n.putArray("removed")::add);
+        ObjectNode at = n.putObject("seen");
+        seen.forEach(at::put);
+        ObjectNode epoch = n.putObject("after");
+        after.forEach(epoch::put);
         Settings.get().set(KEY, n.toString());
     }
 
@@ -75,7 +95,7 @@ final class VaultPeers {
         if (removed.contains(slot.id())) return false;
         String pinned = pins.get(slot.id());
         if (pinned == null || pinned.equals(NOT_A_COMPUTER)) {
-            pins.put(slot.id(), Base64.getEncoder().encodeToString(publicKey));
+            pin(slot.id(), publicKey);
             return true;
         }
         return Arrays.equals(Base64.getDecoder().decode(pinned), publicKey);
@@ -84,13 +104,49 @@ final class VaultPeers {
     /** {@code machine} removed here: its pin dropped, and it's never pinned nor offered a key again (until accepted). */
     void removed(String machine) {
         pins.remove(machine);
+        seen.remove(machine);
+        after.remove(machine);
         removed.add(machine);
+        removals++;
     }
 
     /** The person says {@code publicKey} is {@code machine}'s: pinned in place of what was, offered again. */
     void accept(String machine, byte[] publicKey) {
         removed.remove(machine);
+        pin(machine, publicKey);
+    }
+
+    private void pin(String machine, byte[] publicKey) {
         pins.put(machine, Base64.getEncoder().encodeToString(publicKey));
+        seen.put(machine, Instant.now().toString());
+        after.put(machine, removals);
+    }
+
+    /** When {@code machine} was first pinned here; null when unknown (never, or pinned before this was kept). */
+    Instant firstSeen(String machine) {
+        try {
+            String at = seen.get(machine);
+            return at == null ? null : Instant.parse(at);
+        } catch (java.time.format.DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Whether the next key would be refused to {@code machine}, whose slot shows {@code publicKey} (null: none the vault
+     * key sealed): removed here, or another key than the one pinned.
+     */
+    boolean keyChanged(String machine, byte[] publicKey) {
+        if (removed.contains(machine) || publicKey == null) return true;
+        String pinned = pins.get(machine);
+        return pinned != null && !pinned.equals(NOT_A_COMPUTER) && !Arrays.equals(Base64.getDecoder().decode(pinned), publicKey);
+    }
+
+    /** Whether {@code machine} came after the last computer removed here (never seen yet, or pinned after it). */
+    boolean newSinceRemoval(String machine) {
+        if (removals == 0) return false;
+        Integer at = after.get(machine);
+        return at == null ? !pins.containsKey(machine) || pins.get(machine).equals(NOT_A_COMPUTER) : at >= removals;
     }
 
     /**

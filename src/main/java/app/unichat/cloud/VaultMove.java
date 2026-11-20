@@ -138,18 +138,9 @@ final class VaultMove {
 
     /** Each stray's name in the vault (its computer slot's label), "" for a computer that has none there. */
     static Map<String, String> names(Storage plain, List<Stray> strays) throws IOException {
-        Map<String, String> labels = computers(plain);
+        Map<String, String> labels = Vault.computers(plain);
         Map<String, String> out = new LinkedHashMap<>();
         for (Stray stray : strays) out.put(stray.machine(), labels.getOrDefault(stray.machine(), ""));
-        return out;
-    }
-
-    /** The vault's computers: each machine with a computer slot, and its label. */
-    private static Map<String, String> computers(Storage plain) throws IOException {
-        Map<String, String> out = new TreeMap<>();
-        for (VaultSlot slot : Vault.slots(plain)) {
-            if (slot.method() == VaultSlot.Method.COMPUTER) out.put(slot.id(), slot.label());
-        }
         return out;
     }
 
@@ -169,7 +160,7 @@ final class VaultMove {
             if (!names.isEmpty()) texts.put(machine, names);
         }
         if (!texts.isEmpty()) {
-            Set<String> computers = computers(plain).keySet();
+            Set<String> computers = Vault.computers(plain).keySet();
             for (String machine : computers) {
                 List<String> names = texts.remove(machine);
                 if (names != null) ofTheVault.put(machine, names);
