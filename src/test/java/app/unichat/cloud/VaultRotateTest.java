@@ -160,6 +160,7 @@ class VaultRotateTest {
 
         Cloud.KeyChanged changed = rotate(desk);
         assertEquals(List.of(), changed.left(), "every file re-sealed");
+        assertFalse(changed.resealFailed());
         byte[] vk = keyOf(desk);
         Map<String, byte[]> after = sealedFiles();
         assertEquals(before.keySet(), after.keySet());
@@ -177,7 +178,7 @@ class VaultRotateTest {
         laptop.as(laptop.cloud::forgetHere);
         assertNull(slot(LAPTOP), "its slot gone");
         assertNotNull(slot(DESK), "the other's stays");
-        for (String k : new String[] {VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultMove.MOVED_AT}) assertNull(laptop.get(k), k);
+        for (String k : new String[] {VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultPeers.KEY, VaultMove.MOVED_AT}) assertNull(laptop.get(k), k);
         assertEquals("true", laptop.get(VaultParts.DECLINED), "declining is left as it was");
         assertEquals(Cloud.VaultState.DECLINED, laptop.round().vault(), "closed here, never removed: it can open again later");
         laptop.set(VaultParts.DECLINED, null);
@@ -213,14 +214,99 @@ class VaultRotateTest {
     }
 
     @Test
-    void aFileSentWithTheOldKeyAfterTheChangeIsSealedAgainByWhoSentIt() throws Exception {
+    void whatAComputerSentWithTheOldKeyAfterTheChangeIsSealedAgainByIt() throws Exception {
         rotate(desk);
-        // The laptop's round had opened the vault with the old key just before, and wrote after the change.
-        new SealedStorage(dav(), () -> made.vk().clone()).put(VaultParts.PINNED_FILE, "tarde".getBytes(StandardCharsets.UTF_8));
-        String stored = Vault.ROOT + "/Ajustes/unichat-pinned.json";
+        // The laptop's round had opened the vault with the old key just before, and wrote after the change: its own text,
+        // and the secrets part as it agreed on it.
+        SealedStorage old = new SealedStorage(dav(), () -> made.vk().clone());
+        String text = "Unichat/Textos/" + LAPTOP + "/" + TEXT;
+        old.mkdirs("Unichat/Textos/" + LAPTOP);
+        old.put(text, "{}\n".getBytes(StandardCharsets.UTF_8));
+        Bundle secrets = Bundle.of(LAPTOP, java.time.Instant.now(), Map.of(), null);
+        assertEquals(laptop.get("cloud.base.secrets"), secrets.hash(), "what the laptop agreed on");
+        old.put(VaultParts.SECRETS_FILE, secrets.toBytes());
+
         assertNull(laptop.round().error(), "never taken for damaged");
-        assertTrue(opens(keyOf(laptop), VaultParts.PINNED_FILE, cloud.files.get(stored)), "sealed again with the new key");
+        assertTrue(opens(keyOf(laptop), text, cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/" + TEXT)), "its text sealed again");
+        assertTrue(opens(keyOf(laptop), VaultParts.SECRETS_FILE, cloud.files.get(Vault.ROOT + "/Ajustes/unichat-secrets.json")),
+            "and the part it agreed on");
         assertNull(desk.round().error());
+    }
+
+    @Test
+    void aPartSentWithTheOldKeyByAnotherIsNeverTakenIn() throws Exception {
+        rotate(desk);
+        // A computer removed before the change still has the old key and the account.
+        new SealedStorage(dav(), () -> made.vk().clone()).put(VaultParts.SECRETS_FILE,
+            Bundle.of(OTHER, java.time.Instant.now().plusSeconds(60), Map.of("gif.giphy.key", "falsa"), null).toBytes());
+        laptop.round();
+        desk.round();
+        assertFalse("falsa".equals(laptop.get("gif.giphy.key")), "no computer of the vault takes it in");
+        assertFalse("falsa".equals(desk.get("gif.giphy.key")));
+        assertFalse(opens(keyOf(laptop), VaultParts.SECRETS_FILE, cloud.files.get(Vault.ROOT + "/Ajustes/unichat-secrets.json")),
+            "nor seals it with the new key");
+    }
+
+    @Test
+    void aKeyPutInByOneHoldingTheVaultKeyIsRefusedAndNamed() throws Exception {
+        tamper(LAPTOP);
+        Cloud.KeyChanged changed = rotate(desk);
+        assertEquals(Map.of(LAPTOP, "Portátil"), changed.refused(), "its key isn't the one this computer saw: said, by name");
+        assertFalse(slot(LAPTOP).params().has("next"), "the one who put it in is offered nothing");
+    }
+
+    @Test
+    void aComputerPutsBackItsOwnKeyAndIsOfferedTheNext() throws Exception {
+        tamper(LAPTOP);
+        assertNull(laptop.round().error());
+        assertArrayEquals(laptopWay.pair().getPublic().getEncoded(),
+            Base64.getDecoder().decode(slot(LAPTOP).params().get("x25519").asText()), "its own key back in its slot");
+        Cloud.KeyChanged changed = rotate(desk);
+        assertEquals(Map.of(), changed.refused());
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
+        assertArrayEquals(keyOf(desk), keyOf(laptop));
+    }
+
+    /** {@code id}'s slot given another public key, sealed with the vault key: what a computer removed but not yet shut out can do. */
+    private void tamper(String id) throws Exception {
+        VaultSlot was = slot(id);
+        ObjectNode params = was.params().deepCopy();
+        VaultNext.bind(params, made.vk(), was.vault(), id, KeyPairGenerator.getInstance("X25519").generateKeyPair().getPublic().getEncoded());
+        cloud.put(Vault.SLOTS + "/" + id + ".json", new VaultSlot(was.id(), was.vault(), was.method(), was.label(), was.created(),
+            was.generation(), params, was.wrapped()).toJson());
+    }
+
+    @Test
+    void aKeyThatIsntOneGetsNoOfferAndTheChangeGoesOn() throws Exception {
+        byte[] lowOrder = java.security.KeyFactory.getInstance("X25519").generatePublic(
+            new java.security.spec.XECPublicKeySpec(java.security.spec.NamedParameterSpec.X25519, java.math.BigInteger.ZERO)).getEncoded();
+        ObjectNode params = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+        VaultNext.bind(params, made.vk(), made.info().id(), OTHER, lowOrder);
+        cloud.put(Vault.SLOTS + "/" + OTHER + ".json", VaultSlot.wrap(made.info().id(), OTHER, VaultSlot.Method.COMPUTER, "Raro", 0,
+            VaultCrypto.randomKey(), params, made.vk()).toJson());
+        Cloud.KeyChanged changed = rotate(desk);
+        assertEquals(Map.of(OTHER, "Raro"), changed.refused());
+        assertEquals(1, Vault.info(dav()).generation(), "the change went on for the others");
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
+    }
+
+    @Test
+    void aStrayEntryInTheVaultNeverHoldsTheChangeBack() throws Exception {
+        cloud.filesAreNoFolders = true; // as Dropbox answers a listing of a file (path/not_folder)
+        cloud.put(Vault.ROOT + "/raro", "x".getBytes(StandardCharsets.UTF_8));
+        Cloud.KeyChanged changed = rotate(desk);
+        assertTrue(changed.resealFailed(), "said");
+        Cloud.Status s = laptop.round();
+        assertEquals(Cloud.VaultState.OPEN, s.vault());
+        assertNull(s.error());
+        assertEquals(1, slot(LAPTOP).generation(), "it took the new key all the same");
+        assertNull(desk.round().error());
+    }
+
+    @Test
+    void aComputersPublicKeyIsTheOneItsPrivateKeyMakes() {
+        assertArrayEquals(laptopWay.pair().getPublic().getEncoded(), VaultNext.publicOf(laptopWay.pair().getPrivate().getEncoded()));
+        assertNull(VaultNext.publicOf(new byte[] {1, 2, 3}));
     }
 
     @Test
@@ -312,7 +398,7 @@ class VaultRotateTest {
 
     @Test
     void aWrongKeyChangesNothing() throws Exception {
-        assertThrows(java.io.IOException.class, () -> Vault.rotate(dav(), VaultCrypto.randomKey(), DESK));
+        assertThrows(java.io.IOException.class, () -> Vault.rotate(dav(), VaultCrypto.randomKey(), DESK, VaultPeers.load(made.info().id())));
         assertEquals(0, Vault.info(dav()).generation());
         assertFalse(slot(LAPTOP).params().has("next"));
     }

@@ -12,7 +12,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 
 /**
@@ -48,12 +50,15 @@ final class Vault {
 
     /**
      * The vault's new key, the new recovery code (shown once), the ways in that were dropped (they can't be wrapped again
-     * without their secret: added again by the person), and the files that opened with neither key, left as they were.
+     * without their secret: added again by the person), the files that opened with neither key (left as they were), the
+     * computers offered nothing because their key isn't the one seen here (machine → its slot's label), and whether some
+     * file couldn't be sealed again (each computer seals its own again as it takes the new key).
      */
-    record Rotated(byte[] vk, RecoveryCode code, Set<VaultSlot.Method> dropped, List<String> left) {
+    record Rotated(byte[] vk, RecoveryCode code, Set<VaultSlot.Method> dropped, List<String> left, Map<String, String> refused,
+                   boolean resealFailed) {
         @Override
         public String toString() {
-            return "Vault.Rotated[" + dropped + ", " + left.size() + " left]";
+            return "Vault.Rotated[" + dropped + ", " + left.size() + " left, " + refused.keySet() + " refused]";
         }
     }
 
@@ -192,29 +197,34 @@ final class Vault {
 
     /**
      * A new vault key, so that whoever copied a slot and its secret before (a computer removed, a way in taken away) reads
-     * nothing new. Every computer still listed whose public key {@code oldVk} sealed is offered it, sealed for its X25519
-     * key ({@link VaultNext}), and takes it on its next round (this one too, right after); a new recovery code; the
+     * nothing new. Every computer still listed whose public key {@code oldVk} sealed, and is the one {@code peers} first saw
+     * (one never seen is pinned now), is offered it, sealed for its X25519 key ({@link VaultNext}), and takes it on its
+     * next round (this one too, right after); any other is offered nothing and named; a new recovery code; the
      * generation rises; then the old recovery, the password, Google and passkey slots go, and every file is sealed again.
      * Until the generation rises the old key and every old way in stay as they were, and a change cut short takes back what
      * it wrote ({@link #withdrawn}). After it,
      * nothing fails the change: the person must see the new code, and what's left is done again as each computer takes the
      * new key.
      */
-    static Rotated rotate(Storage s, byte[] oldVk, String machine) throws IOException {
+    static Rotated rotate(Storage s, byte[] oldVk, String machine, VaultPeers peers) throws IOException {
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
         Info was = current(s);
         List<VaultSlot> slots = slots(s);
         VaultSlot own = slots.stream().filter(slot -> slot.id().equals(machine) && slot.method() == VaultSlot.Method.COMPUTER)
             .findFirst().orElse(null);
-        if (own == null || VaultNext.publicKey(own, oldVk) == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
+        byte[] ownKey = own == null ? null : VaultNext.publicKey(own, oldVk);
+        if (ownKey == null || !peers.trusts(own, ownKey)) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
         Info now = new Info(was.id(), was.created(), was.generation() + 1);
         byte[] vk = VaultCrypto.randomKey();
         List<String> written = new ArrayList<>();
         List<VaultSlot> offered = new ArrayList<>();
+        Map<String, String> refused = new TreeMap<>();
         RecoveryCode code = null;
         try {
             for (VaultSlot slot : slots) {
-                if (slot.method() == VaultSlot.Method.COMPUTER && offer(s, slot, oldVk, vk, now.generation())) offered.add(slot);
+                if (slot.method() != VaultSlot.Method.COMPUTER) continue;
+                if (offer(s, slot, oldVk, vk, now.generation(), peers)) offered.add(slot);
+                else refused.put(slot.id(), slot.label());
             }
             code = writeRecovery(s, vk, now, written);
             s.put(INFO, json(now));
@@ -234,13 +244,8 @@ final class Vault {
                     // It opens only the old key now; the next change or new code takes it.
                 }
             }
-            List<String> left;
-            try {
-                left = VaultReseal.run(s, oldVk, vk);
-            } catch (IOException e) {
-                left = List.of(); // done again as this computer takes the new key
-            }
-            return new Rotated(vk, code, dropped, left);
+            VaultReseal.Result resealed = VaultReseal.run(s, oldVk, vk);
+            return new Rotated(vk, code, dropped, resealed.left(), refused, !resealed.failed().isEmpty());
         } catch (RuntimeException e) {
             Arrays.fill(vk, (byte) 0);
             throw e;
@@ -277,21 +282,29 @@ final class Vault {
 
     /**
      * {@code slot}'s computer offered {@code vk}; its own key and wrapping stay until it takes it. A slot whose public key
-     * the vault key didn't seal (put in through the account, or a slot from before) is offered nothing (false).
+     * the vault key didn't seal (put in through the account), isn't the one first seen here, or isn't a key one can agree
+     * with (malformed, of small order) is offered nothing (false).
      */
-    private static boolean offer(Storage s, VaultSlot slot, byte[] oldVk, byte[] vk, long generation) throws IOException {
+    private static boolean offer(Storage s, VaultSlot slot, byte[] oldVk, byte[] vk, long generation, VaultPeers peers)
+        throws IOException {
         byte[] publicKey = VaultNext.publicKey(slot, oldVk);
-        if (publicKey == null) return false;
+        if (publicKey == null || !peers.trusts(slot, publicKey)) return false;
         ObjectNode params = slot.params().deepCopy();
-        VaultNext.offer(params, publicKey, slot.vault(), slot.id(), generation, vk);
+        try {
+            VaultNext.offer(params, publicKey, slot.vault(), slot.id(), generation, vk);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
         s.put(path(slot.id()), new VaultSlot(slot.id(), slot.vault(), slot.method(), slot.label(), slot.created(), slot.generation(),
             params, slot.wrapped()).toJson());
         return true;
     }
 
-    /** This computer's slot taking the vault's new key: wrapped again with its own key, at the vault's generation, no offer left. */
-    static void rewrap(Storage s, Info vault, VaultSlot own, byte[] slotKey, byte[] vk) throws IOException {
-        byte[] publicKey = VaultNext.publicKey(own, vk);
+    /**
+     * This computer's slot wrapped again with its own key for {@code vk}, at the vault's generation, no offer left, showing
+     * {@code publicKey} (its own, from its private key) sealed with {@code vk}.
+     */
+    static void rewrap(Storage s, Info vault, VaultSlot own, byte[] slotKey, byte[] vk, byte[] publicKey) throws IOException {
         if (publicKey == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
         ObjectNode params = own.params().deepCopy();
         params.remove(VaultNext.NEXT);

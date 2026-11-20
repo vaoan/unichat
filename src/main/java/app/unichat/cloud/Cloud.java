@@ -71,9 +71,11 @@ public final class Cloud {
 
     /**
      * The vault's key changed: the new recovery code (shown once; its text form never says it), the ways in that went (each
-     * method's name: added again by the person) and the files that opened with neither key, left as they were.
+     * method's name: added again by the person), the files that opened with neither key, left as they were, the computers
+     * offered nothing because their key changed since this one saw it (machine → its name in the vault: "the key of … changed"),
+     * and whether some file couldn't be sealed again (each computer seals its own again as it takes the new key).
      */
-    public record KeyChanged(String code, java.util.Set<String> dropped, List<String> left) {
+    public record KeyChanged(String code, java.util.Set<String> dropped, List<String> left, Map<String, String> refused, boolean resealFailed) {
         @Override
         public String toString() {
             return "Cloud.KeyChanged[" + dropped + ", " + left.size() + " left]";
@@ -246,6 +248,7 @@ public final class Cloud {
         Storage dav = a.storage();
         try (VaultParts.Round vault = vault(dav)) {
             Instant now = Instant.now();
+            if (vault.open()) seePeers(dav, vault);
             Storage personal = vault.personal(dav);
             if (personal != null && (vault.open() || CloudAccount.settings())) {
                 doing(new Activity(Step.SETTINGS, 0, 0, null));
@@ -286,7 +289,7 @@ public final class Cloud {
      * stamps it saw, since a plain file and its sealed copy may carry the same.
      */
     private VaultParts.Round vault(Storage dav) throws IOException {
-        VaultParts.Round vault = VaultParts.open(dav); // asked outside the lock: the other thread never waits on the network for it
+        VaultParts.Round vault = VaultParts.open(dav, this::sentHere); // asked outside the lock: the other thread never waits on the network for it
         try {
             synchronized (vaultLock) {
                 if (vault.state() != lastVault) {
@@ -301,6 +304,22 @@ public final class Cloud {
             vault.close();
             throw e;
         }
+    }
+
+    /** The other computers' keys pinned as first seen here ({@link VaultPeers}), for the next change of key. */
+    private static void seePeers(Storage dav, VaultParts.Round vault) throws IOException {
+        byte[] vk = vault.key();
+        try {
+            VaultPeers.see(dav, vault.info(), vk);
+        } finally {
+            Arrays.fill(vk, (byte) 0);
+        }
+    }
+
+    /** Whether a file of the vault is one this computer sent itself: its own texts, or a part as it agreed on it. */
+    private boolean sentHere(String path, byte[] plain) {
+        return path.startsWith(TextSync.ROOT + "/" + machine() + "/") || parts.stream().anyMatch(p -> p.holds(path, plain))
+            || vaultParts.sentHere(path, plain);
     }
 
     /** The texts go sealed while the vault is open here, plain by media's switch without one, and nowhere otherwise. */
@@ -369,22 +388,24 @@ public final class Cloud {
     public CompletableFuture<KeyChanged> rotateKey() {
         return onWorker(dav -> {
             Vault.Rotated r;
-            try (VaultParts.Round vault = VaultParts.open(dav)) {
+            try (VaultParts.Round vault = VaultParts.open(dav, this::sentHere)) {
                 if (!vault.open()) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
                 byte[] old = vault.key();
+                VaultPeers peers = VaultPeers.load(vault.info().id());
                 try {
-                    r = Vault.rotate(dav, old, machine());
+                    r = Vault.rotate(dav, old, machine(), peers);
                 } finally {
                     Arrays.fill(old, (byte) 0);
+                    peers.save(); // a computer seen for the first time is pinned, the change done or not
                 }
             }
             Arrays.fill(r.vk(), (byte) 0);
             try {
-                VaultParts.open(dav).close();
+                VaultParts.open(dav, this::sentHere).close();
             } catch (IOException | RuntimeException e) {
                 System.err.println("Cloud: the vault's new key: " + Errors.message(e)); // the next round takes it
             }
-            return new KeyChanged(r.code().shown(), r.dropped().stream().map(Enum::name).collect(java.util.stream.Collectors.toSet()), r.left());
+            return new KeyChanged(r.code().shown(), r.dropped().stream().map(Enum::name).collect(java.util.stream.Collectors.toSet()), r.left(), r.refused(), r.resealFailed());
         });
     }
 

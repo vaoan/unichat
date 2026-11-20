@@ -94,6 +94,14 @@ final class SyncedPart {
         return a;
     }
 
+    /** Whether {@code plain} at {@code path} is this part as this computer last agreed on it. */
+    boolean holds(String path, byte[] plain) {
+        if (!path.equals(remotePath)) return false;
+        Bundle b = Bundle.parse(plain);
+        String base = Settings.get().getString(baseKey, null);
+        return b != null && base != null && b.hash().equals(base);
+    }
+
     /**
      * The account's file is another one now (the vault opened or closed here, and both may carry the same stamp): read it
      * again next round. The agreed hash stays, since it's of what's inside.

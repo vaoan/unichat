@@ -73,13 +73,18 @@ final class VaultCrypto {
 
     /** HKDF-SHA-256 (RFC 5869) with no salt: extract, then expand to one 32-byte block. */
     static byte[] hkdf(byte[] secret, String info) {
+        return hkdf(secret, info.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** The same with {@code info} as bytes (one that carries keys, not only a label). */
+    static byte[] hkdf(byte[] secret, byte[] info) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(new byte[KEY], "HmacSHA256"));
             byte[] prk = mac.doFinal(secret);
             try {
                 mac.init(new SecretKeySpec(prk, "HmacSHA256"));
-                mac.update(info.getBytes(StandardCharsets.UTF_8));
+                mac.update(info);
                 mac.update((byte) 1);
                 return mac.doFinal();
             } finally {

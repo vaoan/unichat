@@ -12,6 +12,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -69,6 +70,11 @@ final class VaultParts {
         transcripts.unseen();
     }
 
+    /** Whether the file at {@code path} holding {@code plain} is one of these parts as this computer sent or agreed on it. */
+    boolean sentHere(String path, byte[] plain) {
+        return parts.stream().anyMatch(p -> p.holds(path, plain)) || transcripts.holds(path, plain);
+    }
+
     /** The transcripts' names here, each one of ours. */
     private static Set<String> transcriptsIn(Path dir) {
         if (!Files.isDirectory(dir)) return Set.of();
@@ -86,13 +92,13 @@ final class VaultParts {
     static final class Round implements AutoCloseable {
         private final Cloud.VaultState state;
         private final byte[] vk;
-        private final String vault;
+        private final Vault.Info vault;
 
         private Round(Cloud.VaultState state, byte[] vk) {
             this(state, vk, null);
         }
 
-        private Round(Cloud.VaultState state, byte[] vk, String vault) {
+        private Round(Cloud.VaultState state, byte[] vk, Vault.Info vault) {
             this.state = state;
             this.vk = vk;
             this.vault = vault;
@@ -109,7 +115,10 @@ final class VaultParts {
         }
 
         /** Where the texts go this round, for {@link TextSync#run(Storage, String)}: this vault, or the plain account. */
-        String textsTo() { return open() ? "vault:" + vault : TextSync.PLAIN; }
+        String textsTo() { return open() ? "vault:" + vault.id() : TextSync.PLAIN; }
+
+        /** The vault open this round; null when it isn't. */
+        Vault.Info info() { return vault; }
 
         /** Where the personal parts go this round: the account itself without a vault, the vault when open, nowhere otherwise. */
         Storage personal(Storage plain) {
@@ -140,8 +149,10 @@ final class VaultParts {
      * The vault's state here, read from the account: none there (and one this computer held is gone, so its hold here is
      * forgotten); there but not this computer's to open (a vault file that doesn't read, another vault, no key here, or
      * declined); this computer's slot gone or not opening with its key (removed: nothing is sent, nothing deleted); or open.
+     * {@code sentHere} says which files this computer sent itself, by logical path and content: after the key changed, only
+     * those are sealed again with the new key.
      */
-    static Round open(Storage plain) throws IOException {
+    static Round open(Storage plain, BiPredicate<String, byte[]> sentHere) throws IOException {
         Settings s = Settings.get();
         byte[] file = plain.get(Vault.INFO);
         Vault.Info info = Vault.parse(file);
@@ -165,8 +176,10 @@ final class VaultParts {
             return new Round(Cloud.VaultState.REMOVED, null);
         }
         try {
-            if (info.generation() > slot.generation()) return taken(plain, info, slot, slotKey, s);
-            return new Round(Cloud.VaultState.OPEN, slot.unwrap(slotKey), info.id());
+            if (info.generation() > slot.generation()) return taken(plain, info, slot, slotKey, s, sentHere);
+            byte[] vk = slot.unwrap(slotKey);
+            ownKeyBack(plain, info, slot, slotKey, vk, s);
+            return new Round(Cloud.VaultState.OPEN, vk, info);
         } catch (VaultCrypto.Broken e) {
             return new Round(Cloud.VaultState.REMOVED, null);
         } finally {
@@ -179,6 +192,31 @@ final class VaultParts {
         Settings s = Settings.get();
         for (String k : new String[] {ID, KEY, PRIVATE}) s.set(k, null);
         VaultMove.forget();
+        VaultPeers.forget();
+    }
+
+    /**
+     * This computer's slot showing another public key than its own (put in by someone holding the vault key, to be offered
+     * the next one): its own put back. Best effort: the next round tries again.
+     */
+    private static void ownKeyBack(Storage plain, Vault.Info info, VaultSlot slot, byte[] slotKey, byte[] vk, Settings s) {
+        byte[] own = ownPublicKey(s);
+        if (own == null || Arrays.equals(own, VaultNext.publicKey(slot, vk))) return;
+        try {
+            Vault.rewrap(plain, info, slot, slotKey, vk, own);
+        } catch (IOException e) {
+            // Put back next round.
+        }
+    }
+
+    /** The public half of {@link #PRIVATE}; null when there's none here or it isn't one. */
+    private static byte[] ownPublicKey(Settings s) {
+        try {
+            String saved = s.getString(PRIVATE, null);
+            return saved == null ? null : VaultNext.publicOf(Base64.getDecoder().decode(saved));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /**
@@ -186,7 +224,8 @@ final class VaultParts {
      * key; what it sent with the old one meanwhile sealed again (its slot still opens the old key); its slot then taken to
      * the new key. Until that last write, the next round does it all again. No offer for it: it was removed first.
      */
-    private static Round taken(Storage plain, Vault.Info info, VaultSlot slot, byte[] slotKey, Settings s) throws IOException {
+    private static Round taken(Storage plain, Vault.Info info, VaultSlot slot, byte[] slotKey, Settings s,
+                               BiPredicate<String, byte[]> sentHere) throws IOException {
         byte[] privateKey;
         try {
             privateKey = Base64.getDecoder().decode(s.getString(PRIVATE, ""));
@@ -208,9 +247,10 @@ final class VaultParts {
             } catch (VaultCrypto.Broken e) {
                 // Nothing of the old key to seal again.
             }
-            if (old != null) VaultReseal.run(plain, old, vk);
-            Vault.rewrap(plain, info, slot, slotKey, vk);
-            return new Round(Cloud.VaultState.OPEN, vk, info.id());
+            // What can't be read is left: a stray entry never holds this computer on the old key.
+            if (old != null) VaultReseal.run(plain, old, vk, sentHere);
+            Vault.rewrap(plain, info, slot, slotKey, vk, ownPublicKey(s));
+            return new Round(Cloud.VaultState.OPEN, vk, info);
         } catch (IOException | RuntimeException e) {
             Arrays.fill(vk, (byte) 0);
             throw e;

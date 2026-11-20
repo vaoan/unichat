@@ -1,14 +1,18 @@
 package app.unichat.cloud;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.spec.NamedParameterSpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.security.spec.XECPublicKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
 import javax.crypto.KeyAgreement;
@@ -53,7 +57,7 @@ final class VaultNext {
     /** {@code newVk} sealed for {@code publicKey}'s computer, as {@link #NEXT} in {@code params}, for {@code generation}. */
     static void offer(ObjectNode params, byte[] publicKey, String vault, String id, long generation, byte[] newVk) {
         KeyPair ephemeral = generate();
-        byte[] key = key(ephemeral.getPrivate(), decodePublic(publicKey));
+        byte[] key = key(ephemeral.getPrivate(), decodePublic(publicKey), ephemeral.getPublic().getEncoded(), publicKey);
         try {
             ObjectNode next = params.putObject(NEXT);
             next.put(EPHEMERAL, Base64.getEncoder().encodeToString(ephemeral.getPublic().getEncoded()));
@@ -69,9 +73,11 @@ final class VaultNext {
         if (!(slot.params().get(NEXT) instanceof ObjectNode next)) throw new VaultCrypto.Broken();
         byte[] ephemeral = bytes(next, EPHEMERAL), sealed = bytes(next, SEALED);
         if (ephemeral == null || sealed == null) throw new VaultCrypto.Broken();
+        byte[] mine = publicOf(privateKey);
+        if (mine == null) throw new VaultCrypto.Broken();
         byte[] key;
         try {
-            key = key(KeyFactory.getInstance("X25519").generatePrivate(new PKCS8EncodedKeySpec(privateKey)), decodePublic(ephemeral));
+            key = key(KeyFactory.getInstance("X25519").generatePrivate(new PKCS8EncodedKeySpec(privateKey)), decodePublic(ephemeral), ephemeral, mine);
         } catch (GeneralSecurityException | IllegalArgumentException e) {
             throw new VaultCrypto.Broken();
         }
@@ -79,6 +85,22 @@ final class VaultNext {
             return VaultCrypto.open(key, nextPath(slot.vault(), slot.id(), generation), sealed);
         } finally {
             Arrays.fill(key, (byte) 0);
+        }
+    }
+
+    /** The public half of an X25519 private key (PKCS #8), as X.509: its agreement with the base point; null when it isn't one. */
+    static byte[] publicOf(byte[] privateKey) {
+        try {
+            KeyFactory keys = KeyFactory.getInstance("X25519");
+            KeyAgreement agreement = KeyAgreement.getInstance("X25519");
+            agreement.init(keys.generatePrivate(new PKCS8EncodedKeySpec(privateKey)));
+            agreement.doPhase(keys.generatePublic(new XECPublicKeySpec(NamedParameterSpec.X25519, BigInteger.valueOf(9))), true);
+            byte[] u = agreement.generateSecret(); // little-endian, as RFC 7748 encodes it
+            byte[] bigEndian = new byte[u.length];
+            for (int i = 0; i < u.length; i++) bigEndian[i] = u[u.length - 1 - i];
+            return keys.generatePublic(new XECPublicKeySpec(NamedParameterSpec.X25519, new BigInteger(1, bigEndian))).getEncoded();
+        } catch (GeneralSecurityException | IllegalArgumentException e) {
+            return null;
         }
     }
 
@@ -99,15 +121,21 @@ final class VaultNext {
         }
     }
 
-    private static byte[] key(PrivateKey mine, PublicKey theirs) {
+    /** Bound to both public keys (ephemeral, then the computer's), so the key is of this one offer to this one computer. */
+    private static byte[] key(PrivateKey mine, PublicKey theirs, byte[] ephemeral, byte[] recipient) {
         byte[] shared = null;
         try {
             KeyAgreement agreement = KeyAgreement.getInstance("X25519");
             agreement.init(mine);
             agreement.doPhase(theirs, true);
             shared = agreement.generateSecret();
-            return VaultCrypto.hkdf(shared, INFO);
-        } catch (GeneralSecurityException e) {
+            byte[] label = INFO.getBytes(StandardCharsets.UTF_8);
+            byte[] info = new byte[label.length + ephemeral.length + recipient.length];
+            System.arraycopy(label, 0, info, 0, label.length);
+            System.arraycopy(ephemeral, 0, info, label.length, ephemeral.length);
+            System.arraycopy(recipient, 0, info, label.length + ephemeral.length, recipient.length);
+            return VaultCrypto.hkdf(shared, info);
+        } catch (GeneralSecurityException | IllegalStateException e) {
             throw new IllegalArgumentException("The keys don't agree");
         } finally {
             if (shared != null) Arrays.fill(shared, (byte) 0);
