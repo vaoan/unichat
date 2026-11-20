@@ -19,9 +19,9 @@ final class SyncedPart {
     private final String remotePath;
     private final String baseKey;
     private final Function<Instant, Bundle> local;
-    private final Consumer<Bundle> adopt;
+    private final java.util.function.Predicate<Bundle> adopt;
     /** The account's version when last seen: while it's the same, nothing is downloaded. */
-    private String seenStamp;
+    private volatile String seenStamp;
     private String lastLocal;
     private Instant localChangedAt = Instant.EPOCH;
 
@@ -30,6 +30,21 @@ final class SyncedPart {
      * @param adopt takes the account's version in place of this computer's, at once
      */
     SyncedPart(String remotePath, String name, Function<Instant, Bundle> local, Consumer<Bundle> adopt) {
+        this(theirs -> {
+            adopt.accept(theirs);
+            return false;
+        }, remotePath, name, local);
+    }
+
+    /**
+     * The same for a part merged rather than replaced ({@code adopt} keeps some of this computer's): {@code adopt} says
+     * whether this computer now holds more than the account's, which then goes up in the next round.
+     */
+    static SyncedPart merged(String remotePath, String name, Function<Instant, Bundle> local, java.util.function.Predicate<Bundle> adopt) {
+        return new SyncedPart(adopt, remotePath, name, local);
+    }
+
+    private SyncedPart(java.util.function.Predicate<Bundle> adopt, String remotePath, String name, Function<Instant, Bundle> local) {
         this.remotePath = remotePath;
         this.baseKey = "cloud.base." + name;
         this.local = local;
@@ -67,11 +82,12 @@ final class SyncedPart {
         switch (a) {
             case UPLOAD -> upload(dav, mine, mineHash);
             case ADOPT -> {
-                adopt.accept(theirs);
+                boolean more = adopt.test(theirs);
                 // What this computer holds now is the agreed one, even if writing it here put it a bit differently:
-                // agreeing on the account's own hash would send it back up next round, to and fro forever.
+                // agreeing on the account's own hash would send it back up next round, to and fro forever. Unless it
+                // kept more than the account has: then only the account's is agreed, and the next round sends this one.
                 lastLocal = local.apply(now).hash();
-                agreed(lastLocal, stamp);
+                agreed(more ? theirsHash : lastLocal, stamp);
             }
             case NOTHING -> agreed(mineHash, stamp);
         }

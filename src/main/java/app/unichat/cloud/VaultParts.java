@@ -3,6 +3,7 @@ package app.unichat.cloud;
 import app.unichat.settings.Settings;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -10,8 +11,11 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
+import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -35,24 +39,23 @@ final class VaultParts {
     private final MergedPart transcripts;
 
     /**
-     * @param pinned {@code pinned-messages.json}
-     * @param pinnedAdopted after another computer's pins were written there: whatever holds them reads them again
+     * @param pins the pinned messages as {@code pinned-messages.json} holds them
+     * @param adoptPins takes another computer's in their place, at once
      * @param transcripts the transcripts' folder
      */
-    VaultParts(Path pinned, Runnable pinnedAdopted, Path transcripts) {
-        SyncedPart secrets = new SyncedPart(SECRETS_FILE, "secrets",
+    VaultParts(Supplier<byte[]> pins, Consumer<byte[]> adoptPins, Path transcripts) {
+        // Merged: a key only this computer had stays, and goes up next round.
+        SyncedPart secrets = SyncedPart.merged(SECRETS_FILE, "secrets",
             now -> Bundle.of(Cloud.machine(), now, Settings.get().vaultSecrets(), null),
             theirs -> Settings.get().adoptVaultSecrets(theirs.settings()));
-        SyncedPart pins = new SyncedPart(PINNED_FILE, "pinned",
-            now -> Bundle.of(Cloud.machine(), now, Map.of(PINNED, Cloud.read(pinned)), null),
-            theirs -> {
-                Cloud.write(pinned, theirs.settings().getOrDefault(PINNED, ""));
-                pinnedAdopted.run();
-            });
-        this.parts = List.of(secrets, pins);
-        this.transcripts = new MergedPart(TRANSCRIPTS_FILE, () -> transcriptsIn(transcripts), theirs -> theirs.forEach((name, text) -> {
-            if (TRANSCRIPT.matcher(name).matches() && !Files.exists(transcripts.resolve(name))) Cloud.write(transcripts.resolve(name), text);
-        }));
+        SyncedPart pinned = new SyncedPart(PINNED_FILE, "pinned",
+            now -> Bundle.of(Cloud.machine(), now, Map.of(PINNED, new String(pins.get(), StandardCharsets.UTF_8)), null),
+            theirs -> adoptPins.accept(theirs.settings().getOrDefault(PINNED, "").getBytes(StandardCharsets.UTF_8)));
+        this.parts = List.of(secrets, pinned);
+        this.transcripts = new MergedPart(TRANSCRIPTS_FILE, () -> transcriptsIn(transcripts), name -> Cloud.read(transcripts.resolve(name)),
+            theirs -> theirs.forEach((name, text) -> {
+                if (TRANSCRIPT.matcher(name).matches() && !Files.exists(transcripts.resolve(name))) Cloud.write(transcripts.resolve(name), text);
+            }));
     }
 
     /** One round of the vault's own parts, over the vault. */
@@ -66,16 +69,14 @@ final class VaultParts {
         transcripts.unseen();
     }
 
-    private static Map<String, String> transcriptsIn(Path dir) {
-        Map<String, String> out = new TreeMap<>();
-        if (!Files.isDirectory(dir)) return out;
+    /** The transcripts' names here, each one of ours. */
+    private static Set<String> transcriptsIn(Path dir) {
+        if (!Files.isDirectory(dir)) return Set.of();
         try (Stream<Path> files = Files.list(dir)) {
-            files.filter(p -> TRANSCRIPT.matcher(p.getFileName().toString()).matches())
-                .forEach(p -> out.put(p.getFileName().toString(), Cloud.read(p)));
+            return files.map(p -> p.getFileName().toString()).filter(n -> TRANSCRIPT.matcher(n).matches()).collect(Collectors.toSet());
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
-        return out;
     }
 
     /**
@@ -115,27 +116,32 @@ final class VaultParts {
         }
     }
 
+    /** A vault there and not this computer's to open: locked, or declined if this computer chose to go on without it. */
+    private static Round closed(Settings s) {
+        return new Round(s.getBool(DECLINED, false) ? Cloud.VaultState.DECLINED : Cloud.VaultState.LOCKED, null);
+    }
+
     /**
      * The vault's state here, read from the account: none there (and one this computer held is gone, so its hold here is
-     * forgotten); there but not this computer's to open (another vault, no key here, or declined); this computer's slot
-     * gone or not opening with its key (removed: nothing is sent, nothing deleted); or open.
+     * forgotten); there but not this computer's to open (a vault file that doesn't read, another vault, no key here, or
+     * declined); this computer's slot gone or not opening with its key (removed: nothing is sent, nothing deleted); or open.
      */
     static Round open(Storage plain) throws IOException {
         Settings s = Settings.get();
-        Vault.Info info = Vault.info(plain);
+        byte[] file = plain.get(Vault.INFO);
+        Vault.Info info = Vault.parse(file);
         String held = s.getString(ID, null);
+        // A vault file that doesn't read (damaged, half written, another's) is no sign of no vault: nothing goes up plain,
+        // and a key held here isn't forgotten over it.
+        if (info == null && file != null) return closed(s);
         if (info == null) {
-            // A vault file that doesn't read isn't a vault gone: the key here is never forgotten over it.
-            if (held != null && plain.exists(Vault.INFO)) return new Round(Cloud.VaultState.LOCKED, null);
             if (held != null) {
                 for (String k : new String[] {ID, KEY, PRIVATE}) s.set(k, null);
             }
             return new Round(Cloud.VaultState.NONE, null);
         }
         String key = s.getString(KEY, null);
-        if (key == null || !info.id().equals(held)) {
-            return new Round(s.getBool(DECLINED, false) ? Cloud.VaultState.DECLINED : Cloud.VaultState.LOCKED, null);
-        }
+        if (key == null || !info.id().equals(held)) return closed(s);
         VaultSlot slot = Vault.slot(plain, info, Cloud.machine());
         if (slot == null || slot.method() != VaultSlot.Method.COMPUTER) return new Round(Cloud.VaultState.REMOVED, null);
         byte[] slotKey;

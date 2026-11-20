@@ -79,8 +79,25 @@ class CloudVaultTest {
             in(); // its machine id, which the texts are made with
             cloud = Cloud.create(() -> account, data, () -> null, b -> true, () -> { }, () -> List.of(photos),
                 new Cloud.Texts(data.resolve("texts"), p -> false, s -> { }),
-                new Cloud.Personal(data.resolve("pinned-messages.json"), pinnedAdopted::incrementAndGet, data.resolve("transcripts")));
+                new Cloud.Personal(this::pins, theirs -> {
+                    pinnedAdopted.incrementAndGet();
+                    try {
+                        Files.write(data.resolve("pinned-messages.json"), theirs);
+                    } catch (java.io.IOException e) {
+                        throw new java.io.UncheckedIOException(e);
+                    }
+                }, data.resolve("transcripts")));
             out();
+        }
+
+        /** As {@code PinnedMessages.json} gives them: what the file holds, here. */
+        private byte[] pins() {
+            try {
+                Path p = data.resolve("pinned-messages.json");
+                return Files.exists(p) ? Files.readAllBytes(p) : "{}".getBytes(StandardCharsets.UTF_8);
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
         }
 
         private void in() {
@@ -234,7 +251,7 @@ class CloudVaultTest {
         cloud.put(Vault.INFO, "{no es una bóveda".getBytes(StandardCharsets.UTF_8));
         desk.opened(again.info(), again.computer());
         Map<String, byte[]> before = files();
-        assertEquals(Cloud.VaultState.LOCKED, desk.round().vault(), "a vault file that doesn't read: locked, never forgotten");
+        assertEquals(Cloud.VaultState.DECLINED, desk.round().vault(), "a vault file that doesn't read: closed (declined here), never forgotten");
         assertEquals(again.info().id(), desk.get(VaultParts.ID));
         assertEquals(Set.of(), written(before).stream().filter(CloudVaultTest::plain).collect(java.util.stream.Collectors.toSet()));
     }
@@ -319,6 +336,55 @@ class CloudVaultTest {
         desk.textsNow();
         assertEquals(Set.of(Vault.ROOT + "/Textos/" + DESK + "/" + TEXT, Vault.ROOT + "/Textos/" + DESK + "/index.json"), written(before),
             "open: sealed, media's switch off or not");
+    }
+
+    @Test
+    void aKeyOnlyThisComputerHadStaysAndReachesTheOthers() throws Exception {
+        Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
+        Vault.Computer laptopWay = Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil");
+        Computer desk = new Computer(DESK).opened(made.info(), made.computer()).set("server.telegram.apiId", "12345");
+        desk.round(); // the vault's secrets: the Telegram id only
+        Computer laptop = new Computer(LAPTOP).opened(made.info(), laptopWay).set("gif.giphy.key", "de-la-portátil");
+        laptop.round();
+        assertEquals("de-la-portátil", laptop.get("gif.giphy.key"), "opening the vault never loses a key typed here");
+        assertEquals("12345", laptop.get("server.telegram.apiId"), "and takes the vault's");
+        laptop.round();
+        desk.round();
+        assertEquals("de-la-portátil", desk.get("gif.giphy.key"), "the next round sends it to the others");
+        assertEquals("12345", desk.get("server.telegram.apiId"));
+        int puts = cloud.puts.get();
+        laptop.round();
+        desk.round();
+        assertEquals(puts, cloud.puts.get(), "and then it rests");
+    }
+
+    @Test
+    void aVaultFileThatDoesntReadIsNeverTakenForNoVault() throws Exception {
+        cloud.dirs.add("Unichat");
+        cloud.dirs.add(Vault.ROOT);
+        cloud.put(Vault.INFO, "{no es una bóveda".getBytes(StandardCharsets.UTF_8));
+        Computer desk = withEverything(new Computer(DESK));
+        Map<String, byte[]> before = files();
+        assertEquals(Cloud.VaultState.LOCKED, desk.round().vault());
+        assertEquals(Set.of(PHOTO), written(before), "nothing plain, though no vault was ever opened here");
+        assertEquals(Cloud.VaultState.DECLINED, desk.set(VaultParts.DECLINED, "true").round().vault());
+    }
+
+    @Test
+    void textsAskedAloneAfterTheVaultOpenedReadItsIndexesAfresh() throws Exception {
+        String later = "3f2a9c1b2d4e 2026-12.jsonl";
+        Computer laptop = new Computer(LAPTOP).write("texts/here/" + TEXT, "{}\n");
+        laptop.round(); // plain: its index at its first version
+        Computer desk = new Computer(DESK);
+        desk.round();
+        assertEquals("{}\n", desk.read("texts/" + LAPTOP + "/" + TEXT));
+        Vault.Created made = Vault.create(dav(), LAPTOP, "Portátil");
+        laptop.opened(made.info(), made.computer()).write("texts/here/" + later, "{\"x\":1}\n");
+        laptop.round(); // the vault's index of the laptop at its first version too
+        assertEquals(cloud.versions.get("Unichat/Textos/" + LAPTOP + "/index.json"), cloud.versions.get(Vault.ROOT + "/Textos/" + LAPTOP + "/index.json"));
+        desk.opened(made.info(), Vault.addComputer(dav(), made.vk(), DESK, "Escritorio"));
+        desk.textsNow(); // before any round here with the vault open
+        assertEquals("{\"x\":1}\n", desk.read("texts/" + LAPTOP + "/" + later), "the vault's index read, not taken for the plain one seen");
     }
 
     @Test

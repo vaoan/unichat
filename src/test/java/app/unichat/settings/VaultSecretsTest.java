@@ -71,7 +71,7 @@ class VaultSecretsTest {
     }
 
     @Test
-    void theSecretsAreThoseSetHereAndTheVaultsReplaceThem() {
+    void adoptingKeepsWhatTheVaultLacksAndSaysSo() {
         Settings s = settings();
         assertEquals(Map.of(), s.vaultSecrets());
         s.set("server.telegram.apiId", "12345");
@@ -82,15 +82,31 @@ class VaultSecretsTest {
         s.set("server.port", "8008");
         s.set("ui.theme", "DARK");
         assertEquals(Map.of("server.telegram.apiId", "12345", "server.telegram.apiHash", "0123456789abcdef0123456789abcdef",
-            "gif.tenor.key", "t", "cloud.dropboxAppKey", "d"), s.vaultSecrets());
+            "gif.tenor.key", "t", "cloud.dropboxAppKey", "d"), s.vaultSecrets(), "only the person's keys, from both files");
 
-        s.adoptVaultSecrets(Map.of("server.telegram.apiId", "999", "cloud.pcloudClientId", "p"));
-        assertEquals(Map.of("server.telegram.apiId", "999", "cloud.pcloudClientId", "p"), s.vaultSecrets(),
-            "what another computer cleared is cleared here too, as the settings are");
+        assertTrue(s.adoptVaultSecrets(Map.of("server.telegram.apiId", "999", "cloud.pcloudClientId", "p")),
+            "this computer has keys the vault's copy lacks: it says so, for them to go up");
+        assertEquals(Map.of("server.telegram.apiId", "999", "server.telegram.apiHash", "0123456789abcdef0123456789abcdef",
+            "gif.tenor.key", "t", "cloud.dropboxAppKey", "d", "cloud.pcloudClientId", "p"), s.vaultSecrets(),
+            "the vault's win where both have one; what only this computer has stays");
+        assertFalse(s.adoptVaultSecrets(s.vaultSecrets()), "the same as the vault's: nothing more to send");
         assertEquals("never", s.getString("cloud.secret", null));
         assertEquals("8008", s.getString("server.port", null));
         assertEquals("DARK", s.getString("ui.theme", null));
         assertTrue(Settings.vaultSecret("gif.giphy.key"));
         assertFalse(Settings.vaultSecret("gif.giphy.enabled"));
+    }
+
+    @Test
+    void telegramKeysThatArentOnesAreRefused() {
+        Settings s = settings();
+        s.set("server.telegram.apiId", "12345");
+        s.set("server.telegram.apiHash", "0123456789abcdef0123456789abcdef");
+        assertTrue(s.adoptVaultSecrets(Map.of("server.telegram.apiId", "-1; rm", "server.telegram.apiHash", "no es un hash")));
+        assertEquals("12345", s.getString("server.telegram.apiId", null), "kept: what the vault had isn't a key");
+        assertEquals("0123456789abcdef0123456789abcdef", s.getString("server.telegram.apiHash", null));
+        s.adoptVaultSecrets(Map.of("server.telegram.apiId", "777", "server.telegram.apiHash", "FEDCBA9876543210fedcba9876543210"));
+        assertEquals("777", s.getString("server.telegram.apiId", null));
+        assertEquals("FEDCBA9876543210fedcba9876543210", s.getString("server.telegram.apiHash", null));
     }
 }

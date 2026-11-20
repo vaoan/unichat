@@ -87,19 +87,45 @@ public final class PinnedMessages {
         changed(chatId);
     }
 
-    /** The file was written by another computer's pins (through the vault): read again, each chat whose pins may differ told. */
-    public void reload() {
+    /** Every chat's pins as {@code pinned-messages.json} holds them: what travels to the person's other computers. */
+    public byte[] json() {
+        ObjectNode root = JSON.createObjectNode();
+        synchronized (this) {
+            pins.forEach((chat, list) -> {
+                ArrayNode a = root.putArray(chat);
+                for (PinnedMessage p : list) {
+                    ObjectNode o = a.addObject().put("id", p.messageId()).put("sender", p.sender()).put("preview", p.preview());
+                    if (p.sentAt() != null) o.put("sentAt", p.sentAt().toEpochMilli());
+                    if (p.pinnedAt() != null) o.put("pinnedAt", p.pinnedAt().toEpochMilli());
+                }
+            });
+        }
+        try {
+            return JSON.writeValueAsBytes(root);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * Another computer's pins in place of these (through the person's vault), saved as any change is, and each chat whose
+     * pins may differ told. Nothing, or what isn't pins, is no pins.
+     */
+    public void adopt(byte[] theirs) {
         java.util.Set<String> chats;
         synchronized (this) {
             chats = new java.util.HashSet<>(pins.keySet());
             pins.clear();
             try {
-                if (Files.isRegularFile(file) && Files.size(file) > 0) read(JSON.readTree(file.toFile()));
+                JsonNode root = theirs.length == 0 ? null : JSON.readTree(theirs);
+                if (root != null && root.isObject()) read(root);
             } catch (IOException | RuntimeException e) {
-                System.err.println("Pinned messages not read again (" + e.getClass().getSimpleName() + "): none");
+                pins.clear();
+                System.err.println("Pinned messages from another computer not read (" + e.getClass().getSimpleName() + "): none");
             }
             chats.addAll(pins.keySet());
         }
+        writer.request();
         chats.forEach(c -> listeners.forEach(l -> l.accept(c)));
     }
 
@@ -124,6 +150,7 @@ public final class PinnedMessages {
         root.properties().forEach(e -> {
             List<PinnedMessage> list = new ArrayList<>();
             for (JsonNode p : e.getValue()) {
+                if (!p.path("id").isTextual()) continue; // not a pin (the file may come from another computer)
                 list.add(new PinnedMessage(p.path("id").asText(), p.path("sender").asText(""), p.path("preview").asText(""),
                         instant(p.path("sentAt")), instant(p.path("pinnedAt"))));
             }
@@ -136,19 +163,8 @@ public final class PinnedMessages {
     }
 
     private void save() {
-        ObjectNode root = JSON.createObjectNode();
-        synchronized (this) {
-            pins.forEach((chat, list) -> {
-                ArrayNode a = root.putArray(chat);
-                for (PinnedMessage p : list) {
-                    ObjectNode o = a.addObject().put("id", p.messageId()).put("sender", p.sender()).put("preview", p.preview());
-                    if (p.sentAt() != null) o.put("sentAt", p.sentAt().toEpochMilli());
-                    if (p.pinnedAt() != null) o.put("pinnedAt", p.pinnedAt().toEpochMilli());
-                }
-            });
-        }
         try {
-            SafeFile.replace(file, JSON.writeValueAsBytes(root), false);
+            SafeFile.replace(file, json(), false);
         } catch (IOException e) {
             System.err.println("Pinned messages not saved: " + e.getMessage());
         }

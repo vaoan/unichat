@@ -198,7 +198,7 @@ public final class Settings {
      * The keys that are the person's, not a computer's, which the vault carries: never anything run here, a path of this
      * computer, a session or the way to the vault. Plus each GIF service's key ({@link #vaultSecret}).
      */
-    public static final java.util.Set<String> VAULT_SECRETS = java.util.Set.of("server.telegram.apiId", "server.telegram.apiHash",
+    public static final java.util.Set<String> VAULT_SECRETS = java.util.Set.of(TelegramKeyFormat.ID, TelegramKeyFormat.HASH,
             "cloud.dropboxAppKey", "cloud.pcloudClientId");
     private static final java.util.regex.Pattern GIF_KEY = java.util.regex.Pattern.compile("gif\\.[a-z0-9]+\\.key");
 
@@ -216,13 +216,17 @@ public final class Settings {
     }
 
     /**
-     * The vault's secrets in place of these, as {@link #replacePortable} does the settings: one cleared on another computer
-     * is cleared here. Any other key in {@code values} (it comes from the account) is ignored.
+     * The vault's secrets merged into these: the vault's win where both have one, and what only this computer has stays
+     * (so a key typed here before opening the vault is never lost; a key cleared on another computer isn't cleared here
+     * either). Any other key in {@code values} (it comes from the account) is ignored, and so is a Telegram key that isn't
+     * one ({@link TelegramKeyFormat}). True when this computer's secrets now differ from {@code values}: they're to go up.
      */
-    public synchronized void adoptVaultSecrets(java.util.Map<String, String> values) {
-        for (String k : vaultSecrets().keySet()) if (!values.containsKey(k)) holder(k).remove(k);
-        values.forEach((k, v) -> { if (vaultSecret(k) && v != null) holder(k).setProperty(k, v); });
+    public synchronized boolean adoptVaultSecrets(java.util.Map<String, String> values) {
+        values.forEach((k, v) -> {
+            if (v != null && vaultSecret(k) && TelegramKeyFormat.fits(k, v)) holder(k).setProperty(k, v);
+        });
         save();
+        return !vaultSecrets().equals(new java.util.TreeMap<>(values));
     }
 
     /** Another computer's settings in place of these (from the cloud), but for the keys {@code keepHere} holds on to. */

@@ -75,8 +75,9 @@ public final class Cloud {
     private final MediaUpload media;
     private final TextSync texts;
     private final VaultParts vaultParts;
-    /** The vault's state in the last round: when it changes, what was seen of the account is another storage's. */
+    /** The vault's state last read: when it changes, what was seen of the account is another storage's. */
     private VaultState lastVault;
+    private final Object vaultLock = new Object();
     private final java.util.function.Consumer<java.util.Set<String>> textsArrived;
     /** Asking for the texts alone, apart from the round: a round may be busy sending a video for minutes. */
     private final ExecutorService textsWorker = Executors.newSingleThreadExecutor(r -> {
@@ -108,11 +109,11 @@ public final class Cloud {
     /**
      * What else is personal, which only the vault carries ({@link VaultParts}).
      *
-     * @param pinned {@code pinned-messages.json}
-     * @param pinnedAdopted after another computer's pins were written there: whatever holds them reads them again
+     * @param pins the pinned messages, as {@code pinned-messages.json} holds them
+     * @param adoptPins takes another computer's in their place, at once
      * @param transcripts the voice notes' transcripts' folder
      */
-    public record Personal(Path pinned, Runnable pinnedAdopted, Path transcripts) {}
+    public record Personal(Supplier<byte[]> pins, java.util.function.Consumer<byte[]> adoptPins, Path transcripts) {}
 
     Cloud(Supplier<CloudAccount> account, SyncedPart settingsPart, SyncedPart stylePart, MediaUpload media, TextSync texts,
           java.util.function.Consumer<java.util.Set<String>> textsArrived, VaultParts vaultParts) {
@@ -161,7 +162,7 @@ public final class Cloud {
         return new Cloud(account, settings, learned,
                 new MediaUpload(dataDir.resolve("cloud-uploaded.txt"), mediaFolders, texts.made()),
                 new TextSync(texts.dir(), dataDir.resolve("cloud-texts.json"), machine()), texts.arrived(),
-                new VaultParts(personal.pinned(), personal.pinnedAdopted(), personal.transcripts()));
+                new VaultParts(personal.pins(), personal.adoptPins(), personal.transcripts()));
     }
 
     /** This computer, as the account's files say who wrote them. */
@@ -214,13 +215,7 @@ public final class Cloud {
         CloudAccount a = account.get();
         if (a == null) return publish(Status.OFF);
         Storage dav = a.storage();
-        try (VaultParts.Round vault = VaultParts.open(dav)) {
-            if (vault.state() != lastVault) {
-                lastVault = vault.state();
-                parts.forEach(SyncedPart::unseen);
-                vaultParts.unseen();
-                texts.unseen();
-            }
+        try (VaultParts.Round vault = vault(dav)) {
             Instant now = Instant.now();
             Storage personal = vault.personal(dav);
             if (personal != null && (vault.open() || CloudAccount.settings())) {
@@ -253,6 +248,28 @@ public final class Cloud {
         }
     }
 
+    /**
+     * The vault's state now, for a round or the texts alone: when it isn't the one last read, every part forgets the
+     * stamps it saw, since a plain file and its sealed copy may carry the same.
+     */
+    private VaultParts.Round vault(Storage dav) throws IOException {
+        VaultParts.Round vault = VaultParts.open(dav); // asked outside the lock: the other thread never waits on the network for it
+        try {
+            synchronized (vaultLock) {
+                if (vault.state() != lastVault) {
+                    lastVault = vault.state();
+                    parts.forEach(SyncedPart::unseen);
+                    vaultParts.unseen();
+                    texts.unseen();
+                }
+            }
+            return vault;
+        } catch (IOException | RuntimeException e) {
+            vault.close();
+            throw e;
+        }
+    }
+
     /** The texts go sealed while the vault is open here, plain by media's switch without one, and nowhere otherwise. */
     private static Storage textsTo(VaultParts.Round vault, Storage personal) {
         return personal != null && (vault.open() || CloudAccount.media()) ? personal : null;
@@ -279,7 +296,7 @@ public final class Cloud {
                 CloudAccount a = account.get();
                 if (a != null) {
                     Storage dav = a.storage();
-                    try (VaultParts.Round vault = VaultParts.open(dav)) {
+                    try (VaultParts.Round vault = vault(dav)) {
                         Storage to = textsTo(vault, vault.personal(dav));
                         if (to != null) syncTexts(to);
                     }

@@ -3,7 +3,10 @@ package app.unichat.cloud;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -12,10 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class MergedPartTest {
     private static final String PATH = "Unichat/Ajustes/prueba-unida.json";
 
-    /** One computer's entries, in memory. */
+    /** One computer's entries, in memory; which of them were read whole. */
     private static final class Computer {
         final Map<String, String> entries = new TreeMap<>();
-        final MergedPart part = new MergedPart(PATH, () -> new TreeMap<>(entries), entries::putAll);
+        final List<String> read = new ArrayList<>();
+        final MergedPart part = new MergedPart(PATH, () -> Set.copyOf(entries.keySet()), name -> {
+            read.add(name);
+            return entries.get(name);
+        }, entries::putAll);
     }
 
     @Test
@@ -75,6 +82,24 @@ class MergedPartTest {
             cloud.put(PATH, "{\"entries\":{\"n\":{\"no\":\"texto\"},\"b1\":\"y\"}}".getBytes(StandardCharsets.UTF_8));
             a.part.sync(dav);
             assertEquals(Map.of("a1", "x", "b1", "y"), a.entries, "only text values are taken");
+        }
+    }
+
+    @Test
+    void onlyWhatGoesUpIsReadWhole() throws Exception {
+        try (FakeDav cloud = new FakeDav("u", "p")) {
+            Storage dav = new WebDav(cloud.url(), "u", "p");
+            Computer a = new Computer(), b = new Computer();
+            a.entries.put("a1", "x");
+            a.part.sync(dav);
+            assertEquals(List.of("a1"), a.read);
+            b.entries.put("a1", "x"); // b has it too (it came some other way): only its own goes up
+            b.entries.put("b1", "y");
+            b.part.sync(dav);
+            assertEquals(List.of("b1"), b.read);
+            a.part.sync(dav);
+            a.part.sync(dav);
+            assertEquals(List.of("a1"), a.read, "nothing more of a's to send: nothing of it read again");
         }
     }
 }

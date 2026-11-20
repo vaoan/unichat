@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -22,34 +23,37 @@ final class MergedPart {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final String remotePath;
-    private final Supplier<Map<String, String>> local;
+    private final Supplier<Set<String>> names;
+    private final Function<String, String> read;
     private final Consumer<Map<String, String>> add;
     /** The account's file when last seen, and the names it held: while it's the same and nothing new is here, nothing is read. */
     private String seenStamp;
     private Set<String> seenNames = Set.of();
 
     /**
-     * @param local this computer's entries, name to text
+     * @param names this computer's entries' names (cheap: asked every round)
+     * @param read one entry's text, only for what goes up
      * @param add takes the account's entries this computer lacks
      */
-    MergedPart(String remotePath, Supplier<Map<String, String>> local, Consumer<Map<String, String>> add) {
+    MergedPart(String remotePath, Supplier<Set<String>> names, Function<String, String> read, Consumer<Map<String, String>> add) {
         this.remotePath = remotePath;
-        this.local = local;
+        this.names = names;
+        this.read = read;
         this.add = add;
     }
 
     /** One round with the account. */
     synchronized void sync(Storage storage) throws IOException {
-        Map<String, String> mine = local.get();
+        Set<String> mine = names.get();
         String stamp = storage.stamp(remotePath);
-        if (stamp != null && stamp.equals(seenStamp) && seenNames.containsAll(mine.keySet())) return;
+        if (stamp != null && stamp.equals(seenStamp) && seenNames.containsAll(mine)) return;
         Map<String, String> theirs = stamp == null ? Map.of() : parse(storage.get(remotePath));
         Map<String, String> missing = new TreeMap<>(theirs);
-        missing.keySet().removeAll(mine.keySet());
+        missing.keySet().removeAll(mine);
         if (!missing.isEmpty()) add.accept(missing);
         Map<String, String> union = new TreeMap<>(theirs);
-        mine.forEach(union::putIfAbsent);
-        if (!union.keySet().equals(theirs.keySet())) {
+        for (String name : mine) if (!union.containsKey(name)) union.put(name, read.apply(name));
+        if (union.size() > theirs.size()) {
             storage.mkdirs(remotePath.substring(0, remotePath.lastIndexOf('/')));
             storage.put(remotePath, json(union));
             stamp = storage.stamp(remotePath);

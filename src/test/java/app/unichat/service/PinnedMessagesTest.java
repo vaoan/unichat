@@ -54,22 +54,26 @@ class PinnedMessagesTest {
     }
 
     @Test
-    void pinsWrittenByAnotherComputerAreReadAgainAndTheirChatsTold() throws Exception {
+    void anotherComputersPinsTakeTheirPlaceAndTheirChatsAreTold() throws Exception {
         Path file = dir.resolve("pinned-messages.json");
         PinnedMessages pins = new PinnedMessages(file);
         pins.pin("!mine", message("$a", "hola", Instant.now()));
-        pins.flush();
         List<String> changed = new ArrayList<>();
         pins.addListener(changed::add);
-        java.nio.file.Files.writeString(file, "{\"!theirs\":[{\"id\":\"$b\",\"sender\":\"Ana\",\"preview\":\"nos vemos\"}]}");
-        pins.reload();
+        byte[] theirs = "{\"!theirs\":[{\"id\":\"$b\",\"sender\":\"Ana\",\"preview\":\"nos vemos\"}]}"
+            .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        pins.adopt(theirs);
         assertEquals(List.of(), pins.of("!mine"));
         assertEquals("nos vemos", pins.of("!theirs").getFirst().preview());
         assertEquals(java.util.Set.of("!mine", "!theirs"), new java.util.HashSet<>(changed), "both chats' bars redraw");
+        pins.flush();
+        assertEquals(new String(pins.json(), java.nio.charset.StandardCharsets.UTF_8),
+            new String(new PinnedMessages(file).json(), java.nio.charset.StandardCharsets.UTF_8), "written through its own writer");
 
-        java.nio.file.Files.writeString(file, "");
-        pins.reload();
-        assertEquals(List.of(), pins.of("!theirs"), "an empty file is no pins");
+        pins.adopt(new byte[0]);
+        assertEquals(List.of(), pins.of("!theirs"), "nothing is no pins");
+        pins.adopt("[1, {\"x\": 2}]".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(List.of(), pins.of("!theirs"), "nor is what isn't pins");
         pins.flush();
     }
 

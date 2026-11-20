@@ -9,7 +9,7 @@ import app.unichat.support.I18n;
  */
 public final class TelegramKeys {
     public static final String URL = "https://my.telegram.org";
-    private static final String ID = "server.telegram.apiId", HASH = "server.telegram.apiHash";
+    private static final String ID = app.unichat.settings.TelegramKeyFormat.ID, HASH = app.unichat.settings.TelegramKeyFormat.HASH;
 
     private TelegramKeys() {}
 
@@ -17,13 +17,9 @@ public final class TelegramKeys {
     public static String problem(String apiId, String apiHash) {
         String id = apiId == null ? "" : apiId.strip(), hash = apiHash == null ? "" : apiHash.strip();
         if (id.isEmpty()) return I18n.t("telegramKeys.noId");
-        try {
-            if (Integer.parseInt(id) <= 0) return I18n.t("telegramKeys.badId");
-        } catch (NumberFormatException e) {
-            return I18n.t("telegramKeys.badId");
-        }
+        if (!app.unichat.settings.TelegramKeyFormat.id(id)) return I18n.t("telegramKeys.badId");
         if (hash.isEmpty()) return I18n.t("telegramKeys.noHash");
-        if (!hash.matches("[0-9a-fA-F]{32}")) return I18n.t("telegramKeys.badHash");
+        if (!app.unichat.settings.TelegramKeyFormat.hash(hash)) return I18n.t("telegramKeys.badHash");
         return null;
     }
 

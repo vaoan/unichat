@@ -56,7 +56,11 @@ final class Vault {
 
     /** The vault in the account, or null when there's none (or what's there isn't one). */
     static Info info(Storage s) throws IOException {
-        byte[] json = s.get(INFO);
+        return parse(s.get(INFO));
+    }
+
+    /** The vault {@code json} says, or null when it says none (null) or isn't one. */
+    static Info parse(byte[] json) {
         if (json == null) return null;
         try {
             JsonNode n = JSON.readTree(json);
