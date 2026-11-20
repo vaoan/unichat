@@ -22,6 +22,9 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
   the vault, in that computer's own part, so a computer that replaces a lost one comes back without signing in again.
 - Once the vault is on, nothing of the above is left in the cloud unencrypted (the old plain copies are removed, after
   saying so).
+- Optional everywhere: without a vault Unichat works as today, everything entered by hand; and a computer that finds a
+  vault in the account can choose not to use it ("Seguir sin la bóveda en este equipo"), entering its keys by hand as
+  before, without being asked again (it can open the vault later from Ajustes → Nube).
 - Accessible and keyboard-reachable like every screen; bilingual.
 
 ## Non-goals
@@ -139,7 +142,8 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
   `http://localhost:43117` (a secure context; the passkey's relying party is `localhost`), which runs WebAuthn with the
   PRF extension and posts the result back.
 - While a vault exists but isn't opened here, nothing personal is sent up unencrypted from this computer: its shared
-  parts wait.
+  parts wait. The same on a computer that chose to go on without it: its settings, AI and texts stay on it (media go
+  up as today), and its keys are entered by hand.
 - A computer of the person's still running a Unichat without the vault keeps sending plain copies. Computers with the
   vault don't delete them over and over: they notice plain files newer than the move, say which computer sends them
   ("<name> usa una versión sin bóveda: actualízalo"), and delete them once it's updated (no newer plain files for a
