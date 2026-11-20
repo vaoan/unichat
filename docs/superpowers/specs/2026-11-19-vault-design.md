@@ -170,7 +170,11 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
 - Someone who can only write to the cloud account can't hand a computer a new key: every offer (`next`) carries what
   the old vault key sealed of it (`auth`: its ephemeral key and the hash of what it seals), and `boveda.json` a
   `vouch` of its generation sealed with the key it replaced. A generation raised without either leaves each computer
-  `UNRECOGNIZED` (its key kept, nothing sent) rather than removed, and a way in from before still opens the vault.
+  `UNRECOGNIZED` (its key kept, nothing sent) rather than removed, and a way in from before still opens the vault there,
+  only for the key its own slot opens. A new computer uses the current generation's ways in only, and each slot is
+  sealed with its generation ("slot:<vault>:<method>:<id>:<generation>"), so an older one put back claiming the current
+  generation opens nothing. A slot written before that (no generation in what sealed it) still opens and is written
+  again by whoever opens it; until then its generation is the account's to say.
 - Deleting `boveda.json` by hand sends nobody plain: turning the vault off first writes `Unichat/Ajustes/boveda-apagada.json`
   (the vault and generation sealed with a key made from that generation's vault key, kept by each computer while the
   vault is open there), and a computer holding a vault goes back to plain only when that mark opens with its key;

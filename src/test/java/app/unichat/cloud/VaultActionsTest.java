@@ -160,6 +160,92 @@ class VaultActionsTest {
         assertTrue(view(desk).codeUnconfirmed(), "the new code is to be confirmed too");
     }
 
+    /**
+     * Eve kept the password's slot from before a change of key (she held the old key: a removed computer), and with the
+     * account she puts it back in place of the new password's, its generation as {@code claims} (null: as it was), and
+     * strips {@code boveda.json}'s vouch.
+     */
+    private void oldPasswordSlotPutBack(Long claims) throws Exception {
+        create(desk);
+        as(desk, () -> desk.cloud.vault().addPassword(PASSWORD.toCharArray()));
+        String slotPath = passwordSlot();
+        byte[] stale = cloud.files.get(slotPath);
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
+        as(desk, desk.cloud.vault()::rotateKey);
+        as(desk, () -> desk.cloud.vault().addPassword(PASSWORD.toCharArray()));
+        cloud.files.remove(passwordSlot());
+        com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+        com.fasterxml.jackson.databind.node.ObjectNode slot = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(stale);
+        if (claims != null) slot.put("generation", claims);
+        cloud.put(slotPath, json.writeValueAsBytes(slot));
+        com.fasterxml.jackson.databind.node.ObjectNode info = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(cloud.files.get(Vault.INFO));
+        info.remove("vouch");
+        cloud.put(Vault.INFO, json.writeValueAsBytes(info));
+    }
+
+    private String passwordSlot() throws Exception {
+        return Vault.slots(dav()).stream().filter(s -> s.method() == VaultSlot.Method.PASSWORD).map(s -> Vault.SLOTS + "/" + s.id() + ".json")
+            .findFirst().orElseThrow();
+    }
+
+    @Test
+    void aNewComputerNeverJoinsTheOldKeyThroughAWayInPutBackFromBeforeTheChange() throws Exception {
+        oldPasswordSlotPutBack(null);
+        ExecutionException e = assertThrows(ExecutionException.class,
+            () -> as(laptop, () -> laptop.cloud.vault().openVault(VaultView.Way.PASSWORD, PASSWORD.toCharArray())));
+        assertEquals(I18n.t("cloud.error.vaultWrongSecret"), message(e), "it would open the key Eve still holds");
+        assertNull(laptop.get(VaultParts.ID));
+    }
+
+    @Test
+    void aWayInPutBackClaimingTheCurrentGenerationOpensNothing() throws Exception {
+        oldPasswordSlotPutBack(1L);
+        ExecutionException e = assertThrows(ExecutionException.class,
+            () -> as(laptop, () -> laptop.cloud.vault().openVault(VaultView.Way.PASSWORD, PASSWORD.toCharArray())));
+        assertEquals(I18n.t("cloud.error.vaultWrongSecret"), message(e), "its generation is sealed with it");
+        assertNull(laptop.get(VaultParts.ID));
+    }
+
+    /** {@code slot} as it was written before its generation was sealed with it, opening with {@code key}. */
+    private void writtenTheOldWay(VaultSlot slot, byte[] key, byte[] vk) {
+        cloud.put(Vault.SLOTS + "/" + slot.id() + ".json", new VaultSlot(slot.id(), slot.vault(), slot.method(), slot.label(), slot.created(),
+            slot.generation(), slot.params(), VaultCrypto.seal(key, "slot:" + slot.vault() + ":" + slot.method() + ":" + slot.id(), vk)).toJson());
+    }
+
+    private VaultSlot ownSlot(VaultComputer c) throws Exception {
+        return Vault.slot(dav(), Vault.info(dav()), c.get("cloud.machine"));
+    }
+
+    private byte[] ownKey(VaultComputer c) {
+        return java.util.Base64.getDecoder().decode(c.get(VaultParts.KEY));
+    }
+
+    @Test
+    void aWayInWrittenTheOldWayStillOpensAndIsWrittenAgain() throws Exception {
+        String code = create(desk);
+        byte[] vk = ownSlot(desk).unwrap(ownKey(desk));
+        VaultSlot recovery = Vault.slots(dav()).stream().filter(x -> x.method() == VaultSlot.Method.RECOVERY).findFirst().orElseThrow();
+        byte[] key = VaultSlot.recoveryKey(RecoveryCode.parse(code));
+        writtenTheOldWay(recovery, key, vk);
+        assertTrue(Vault.slot(dav(), Vault.info(dav()), recovery.id()).open(key).old());
+        as(laptop, () -> laptop.cloud.vault().openVault(VaultView.Way.RECOVERY, code.toCharArray()));
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault(), "it still opens");
+        VaultSlot.Opened now = Vault.slot(dav(), Vault.info(dav()), recovery.id()).open(key);
+        assertFalse(now.old(), "written again, its generation sealed with it");
+        assertArrayEquals(vk, now.vk());
+    }
+
+    @Test
+    void aComputersOwnSlotWrittenTheOldWayIsWrittenAgainByItsRound() throws Exception {
+        create(desk);
+        byte[] vk = ownSlot(desk).unwrap(ownKey(desk));
+        writtenTheOldWay(ownSlot(desk), ownKey(desk), vk);
+        assertTrue(ownSlot(desk).open(ownKey(desk)).old());
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault(), "it still opens");
+        assertFalse(ownSlot(desk).open(ownKey(desk)).old(), "written again");
+        assertArrayEquals(vk, ownSlot(desk).unwrap(ownKey(desk)));
+    }
+
     @Test
     void goingOnWithoutItIsRememberedAndOpeningLaterEndsIt() throws Exception {
         String code = create(desk);

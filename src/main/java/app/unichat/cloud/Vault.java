@@ -382,6 +382,15 @@ final class Vault {
             new ArrayList<>());
     }
 
+    /** A slot written again in its place ({@link VaultSlot#sealedAgain}); best effort: one that fails is written next time. */
+    static void writeAgain(Storage s, VaultSlot slot) {
+        try {
+            s.put(path(slot.id()), slot.toJson());
+        } catch (IOException e) {
+            // Still opens as it was: whoever opens it next writes it again.
+        }
+    }
+
     /** Another computer's way into {@code vault} taken away: only a computer's slot, by its machine id; none there is fine. */
     static void removeComputer(Storage s, Info vault, String machine) throws IOException {
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");

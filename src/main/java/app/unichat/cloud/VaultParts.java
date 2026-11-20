@@ -215,7 +215,9 @@ final class VaultParts {
         }
         try {
             if (info.generation() > slot.generation()) return taken(plain, info, slot, slotKey, s, sentHere, keyTaken);
-            byte[] vk = slot.unwrap(slotKey);
+            VaultSlot.Opened opened = slot.open(slotKey);
+            byte[] vk = opened.vk();
+            if (opened.old()) Vault.writeAgain(plain, slot.sealedAgain(slotKey, vk)); // sealed with its generation from now on
             ownKeyBack(plain, info, slot, slotKey, vk, s);
             VaultOff.remember(info, vk);
             return new Round(Cloud.VaultState.OPEN, vk, info);

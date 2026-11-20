@@ -145,4 +145,28 @@ class VaultSlotTest {
             return new ObjectMapper().createObjectNode();
         }
     }
+
+    @Test
+    void aSlotClaimingAnotherGenerationOpensNothing() {
+        byte[] key = VaultCrypto.randomKey();
+        VaultSlot was = VaultSlot.wrap(VAULT, VaultSlot.Method.PASSWORD, "password", 0, key, VaultSlot.newPasswordParams(), vk);
+        VaultSlot claims = new VaultSlot(was.id(), was.vault(), was.method(), was.label(), was.created(), 1, was.params(), was.wrapped());
+        assertThrows(VaultCrypto.Broken.class, () -> claims.unwrap(key), "the generation is sealed with it");
+    }
+
+    @Test
+    void aSlotWrittenBeforeTheGenerationWasSealedStillOpensAndSaysItsToBeWrittenAgain() throws Exception {
+        byte[] key = VaultCrypto.randomKey();
+        String id = "9b2f3c1e-0000-4000-8000-0000000000aa";
+        VaultSlot old = new VaultSlot(id, VAULT, VaultSlot.Method.RECOVERY, "recovery", Instant.now(), 2, JsonNodes.empty(),
+            VaultCrypto.seal(key, "slot:" + VAULT + ":RECOVERY:" + id, vk));
+        VaultSlot.Opened opened = old.open(key);
+        assertArrayEquals(vk, opened.vk());
+        assertEquals(true, opened.old(), "to be written again");
+        VaultSlot again = old.sealedAgain(key, vk);
+        assertEquals(old.generation(), again.generation());
+        assertEquals(old.created(), again.created());
+        assertEquals(false, again.open(key).old());
+        assertEquals(false, VaultSlot.wrap(VAULT, VaultSlot.Method.RECOVERY, "r", 0, key, JsonNodes.empty(), vk).open(key).old(), "a new one never is");
+    }
 }

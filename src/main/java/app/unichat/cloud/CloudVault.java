@@ -191,7 +191,9 @@ public final class CloudVault {
      */
     public CompletableFuture<Void> openVault(VaultView.Way way, char[] secret) {
         CompletableFuture<Void> f = cloud.onWorker(dav -> {
-            VaultActions.open(dav, way, secret);
+            try (VaultParts.Round here = cloud.stateOf(dav)) {
+                VaultActions.open(dav, way, secret, here.state());
+            }
             return null;
         });
         f.whenComplete((r, e) -> Arrays.fill(secret, '\0'));

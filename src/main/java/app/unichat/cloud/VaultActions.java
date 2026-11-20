@@ -82,11 +82,13 @@ final class VaultActions {
 
     /**
      * The vault opened here with {@code way}'s {@code secret} (the recovery code as typed, or the password): this
-     * computer gets a slot of its own and goes on with it. A secret that opens nothing writes nothing. A slot of the
-     * vault's current key counts first; one left from before a change opens the old key, so it counts only while nothing
-     * vouches for the change ({@link Vault#vouched}: a generation raised through the account alone locks no one out).
+     * computer gets a slot of its own and goes on with it. A secret that opens nothing writes nothing. Only a slot of
+     * the vault's current generation counts, but on a computer that holds this vault and finds it {@code UNRECOGNIZED}
+     * (a generation raised through the account): there one left from before counts too, only when it opens the key its
+     * own slot opens, so a generation raised by hand locks no one out and a way in put back from before a real change
+     * never hands anyone the old key.
      */
-    static void open(Storage dav, VaultView.Way way, char[] secret) throws IOException {
+    static void open(Storage dav, VaultView.Way way, char[] secret, Cloud.VaultState here) throws IOException {
         Vault.Info info = Vault.info(dav);
         if (info == null) throw new IOException(I18n.t("cloud.error.noVault"));
         byte[] vk = null;
@@ -94,14 +96,9 @@ final class VaultActions {
         for (VaultSlot slot : Vault.slots(dav)) {
             if (!slot.method().name().equals(way.name())) continue;
             if (slot.generation() < info.generation()) older.add(slot);
-            else if (slot.generation() == info.generation() && vk == null) vk = unwrap(slot, way, secret);
+            else if (slot.generation() == info.generation() && vk == null) vk = unwrap(dav, slot, way, secret);
         }
-        for (VaultSlot slot : older) {
-            if (vk != null) break;
-            byte[] old = unwrap(slot, way, secret);
-            if (old != null && !Vault.vouched(dav, info, old)) vk = old;
-            else if (old != null) Arrays.fill(old, (byte) 0);
-        }
+        if (vk == null && here == Cloud.VaultState.UNRECOGNIZED) vk = heldBefore(dav, info, older, way, secret);
         if (vk == null) throw new WrongSecret();
         try {
             Vault.Computer computer = Vault.addComputer(dav, vk, Cloud.machine(), computerName());
@@ -111,8 +108,39 @@ final class VaultActions {
         }
     }
 
-    /** The vault key from {@code slot} with this secret; null when it doesn't open it. */
-    private static byte[] unwrap(VaultSlot slot, VaultView.Way way, char[] secret) {
+    /**
+     * The key this computer's own slot opens (it holds {@code vault}, its slot older than the generation), when one of
+     * {@code older} opens it with this secret too; null otherwise.
+     */
+    private static byte[] heldBefore(Storage dav, Vault.Info vault, List<VaultSlot> older, VaultView.Way way, char[] secret)
+        throws IOException {
+        Settings s = Settings.get();
+        VaultSlot own = vault.id().equals(s.getString(VaultParts.ID, null)) ? Vault.slot(dav, vault, Cloud.machine()) : null;
+        String key = s.getString(VaultParts.KEY, null);
+        if (own == null || own.method() != VaultSlot.Method.COMPUTER || key == null) return null;
+        byte[] slotKey = null, held = null;
+        try {
+            slotKey = Base64.getDecoder().decode(key);
+            held = own.unwrap(slotKey);
+            for (VaultSlot slot : older) {
+                byte[] old = unwrap(dav, slot, way, secret);
+                if (old != null && java.security.MessageDigest.isEqual(old, held)) return old;
+                if (old != null) Arrays.fill(old, (byte) 0);
+            }
+            return null;
+        } catch (IllegalArgumentException | VaultCrypto.Broken e) {
+            return null;
+        } finally {
+            if (slotKey != null) Arrays.fill(slotKey, (byte) 0);
+            if (held != null) Arrays.fill(held, (byte) 0);
+        }
+    }
+
+    /**
+     * The vault key from {@code slot} with this secret; null when it doesn't open it. A slot written before its
+     * generation was sealed is written again so (best effort: the next opening tries again).
+     */
+    private static byte[] unwrap(Storage dav, VaultSlot slot, VaultView.Way way, char[] secret) {
         byte[] key = null;
         try {
             if (way == VaultView.Way.RECOVERY) {
@@ -125,7 +153,9 @@ final class VaultActions {
             } else {
                 return null; // Google and the passkey open in the browser
             }
-            return slot.unwrap(key);
+            VaultSlot.Opened opened = slot.open(key);
+            if (opened.old()) Vault.writeAgain(dav, slot.sealedAgain(key, opened.vk()));
+            return opened.vk();
         } catch (VaultCrypto.Broken e) {
             return null;
         } finally {

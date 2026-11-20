@@ -12,8 +12,9 @@ import java.util.Base64;
 import java.util.UUID;
 
 /**
- * One way into the vault: the vault key sealed by that way's own key. The vault's id, the method and the slot's id are
- * the sealing path, so the same bytes in another vault, as another method or under another id open nothing. A slot is
+ * One way into the vault: the vault key sealed by that way's own key. The vault's id, the method, the slot's id and its
+ * generation are the sealing path, so the same bytes in another vault, as another method, under another id or claiming
+ * another generation open nothing. A slot is
  * a small JSON file in the account; the recovery code, the password or the computer's key that opens it is never in it.
  */
 record VaultSlot(String id, String vault, Method method, String label, Instant created, long generation, ObjectNode params, byte[] wrapped) {
@@ -32,11 +33,36 @@ record VaultSlot(String id, String vault, Method method, String label, Instant c
         if (vault == null || id == null || m == null || label == null || params == null || generation < 0) {
             throw new IllegalArgumentException("A slot needs a vault, an id, a method, a label, params and a generation");
         }
-        return new VaultSlot(id, vault, m, label, Instant.now(), generation, params, VaultCrypto.seal(slotKey, path(vault, m, id), vk));
+        return new VaultSlot(id, vault, m, label, Instant.now(), generation, params, VaultCrypto.seal(slotKey, path(vault, m, id, generation), vk));
+    }
+
+    /** The vault key a slot holds, and whether it was sealed before its generation was ({@code old}: to be written again). */
+    record Opened(byte[] vk, boolean old) {
+        @Override
+        public String toString() {
+            return "VaultSlot.Opened[" + old + "]";
+        }
+    }
+
+    /**
+     * The vault key, from a slot sealed with its generation or, once, one written before the generation was sealed (it
+     * opens under the old path alone); whoever opens such a slot writes it again ({@link #sealedAgain}).
+     */
+    Opened open(byte[] slotKey) throws VaultCrypto.Broken {
+        try {
+            return new Opened(VaultCrypto.open(slotKey, path(vault, method, id, generation), wrapped), false);
+        } catch (VaultCrypto.Broken e) {
+            return new Opened(VaultCrypto.open(slotKey, "slot:" + vault + ":" + method + ":" + id, wrapped), true);
+        }
     }
 
     byte[] unwrap(byte[] slotKey) throws VaultCrypto.Broken {
-        return VaultCrypto.open(slotKey, path(vault, method, id), wrapped);
+        return open(slotKey).vk();
+    }
+
+    /** This slot as it is, sealed again with its generation: an {@link Opened#old} one written anew. */
+    VaultSlot sealedAgain(byte[] slotKey, byte[] vk) {
+        return new VaultSlot(id, vault, method, label, created, generation, params, VaultCrypto.seal(slotKey, path(vault, method, id, generation), vk));
     }
 
     static byte[] recoveryKey(RecoveryCode code) {
@@ -105,8 +131,9 @@ record VaultSlot(String id, String vault, Method method, String label, Instant c
         return n.get(field).asText();
     }
 
-    private static String path(String vault, Method m, String id) {
-        return "slot:" + vault + ":" + m + ":" + id;
+    /** What a slot is sealed under: its vault, method, id and generation, so a copy put back claiming a later one opens nothing. */
+    private static String path(String vault, Method m, String id, long generation) {
+        return "slot:" + vault + ":" + m + ":" + id + ":" + generation;
     }
 
     @Override
