@@ -59,7 +59,7 @@ final class VaultPage {
     private void reload() {
         inStep = false;
         if (shown == null) show(actions(Labels.help(I18n.t("settings.vault.reading"))));
-        cloud.vaultView().whenComplete((v, err) -> Platform.runLater(() -> {
+        cloud.vault().vaultView().whenComplete((v, err) -> Platform.runLater(() -> {
             if (err != null) {
                 show(line(I18n.t("settings.vault.unreadable", Errors.message(Errors.unwrap(err)))), retry());
                 return;
@@ -87,7 +87,7 @@ final class VaultPage {
         Label error = error();
         create.setOnAction(e -> {
             create.setDisable(true);
-            cloud.createVault().whenComplete((code, err) -> Platform.runLater(() -> {
+            cloud.vault().createVault().whenComplete((code, err) -> Platform.runLater(() -> {
                 create.setDisable(false);
                 if (err != null) {
                     say(error, Errors.message(Errors.unwrap(err)));
@@ -103,7 +103,7 @@ final class VaultPage {
     /** A code to keep, shown once and asked back; then the vault as it is now. */
     private void showCode(String code, String before) {
         inStep = true;
-        show(line(before), new RecoveryCodeSheet(code, () -> cloud.codeKept().whenComplete((ok, err) -> Platform.runLater(() -> {
+        show(line(before), new RecoveryCodeSheet(code, () -> cloud.vault().codeKept().whenComplete((ok, err) -> Platform.runLater(() -> {
             if (err == null) reload();
             else show(actions(KeyChangeFlow.warning(I18n.t("settings.vault.code.keptFailed", Errors.message(Errors.unwrap(err))))), retry());
         })), this::reload));
@@ -118,7 +118,7 @@ final class VaultPage {
             Button decline = secondary(I18n.t("settings.vault.decline"));
             decline.setOnAction(e -> {
                 decline.setDisable(true);
-                cloud.declineVault(true).whenComplete((ok, err) -> Platform.runLater(() -> {
+                cloud.vault().declineVault(true).whenComplete((ok, err) -> Platform.runLater(() -> {
                     cloud.syncNow();
                     reload();
                 }));
@@ -182,7 +182,7 @@ final class VaultPage {
         Button b = secondary(I18n.t("settings.vault.newCode"));
         b.setOnAction(e -> {
             b.setDisable(true);
-            cloud.newRecoveryCode().whenComplete((code, err) -> Platform.runLater(() -> {
+            cloud.vault().newRecoveryCode().whenComplete((code, err) -> Platform.runLater(() -> {
                 b.setDisable(false);
                 if (err != null) show(line(Errors.message(Errors.unwrap(err))), retry());
                 else showCode(code, I18n.t("settings.vault.newCodeMade"));
@@ -226,7 +226,7 @@ final class VaultPage {
     private void changeKey(VaultView.Computer removing) {
         inStep = true;
         show(line(I18n.t("settings.vault.reading")));
-        cloud.vaultView().whenComplete((now, err) -> Platform.runLater(() -> {
+        cloud.vault().vaultView().whenComplete((now, err) -> Platform.runLater(() -> {
             if (err != null || now.state() != Cloud.VaultState.OPEN) {
                 show(line(err != null ? I18n.t("settings.vault.unreadable", Errors.message(Errors.unwrap(err))) : I18n.t("cloud.error.vaultNotOpen")), retry());
                 return;
@@ -246,7 +246,7 @@ final class VaultPage {
         Label error = error();
         yes.setOnAction(e -> {
             yes.setDisable(true);
-            cloud.forgetHere().whenComplete((ok, err) -> Platform.runLater(() -> {
+            cloud.vault().forgetHere().whenComplete((ok, err) -> Platform.runLater(() -> {
                 yes.setDisable(false);
                 if (err != null) {
                     say(error, Errors.message(Errors.unwrap(err)));
@@ -280,14 +280,14 @@ final class VaultPage {
      */
     private void turningOff() {
         show(line(I18n.t("settings.vault.turnOffWorking")));
-        cloud.turnOffVault().whenComplete((ok, err) -> Platform.runLater(() -> {
+        cloud.vault().turnOffVault().whenComplete((ok, err) -> Platform.runLater(() -> {
             if (err == null) {
                 cloud.syncNow();
                 reload();
                 return;
             }
             String why = Errors.message(Errors.unwrap(err));
-            cloud.vaultView().whenComplete((v, unread) -> Platform.runLater(() -> {
+            cloud.vault().vaultView().whenComplete((v, unread) -> Platform.runLater(() -> {
                 if (v != null && v.state() != Cloud.VaultState.OPEN) {
                     notice = why;
                     noticeFor = v.state();

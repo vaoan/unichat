@@ -69,7 +69,7 @@ class VaultRotateTest {
     }
 
     private Cloud.KeyChanged rotate(VaultComputer c) throws Exception {
-        return c.as(c.cloud::rotateKey);
+        return c.as(c.cloud.vault()::rotateKey);
     }
 
     private VaultSlot slot(String id) throws Exception {
@@ -129,7 +129,7 @@ class VaultRotateTest {
 
     @Test
     void aRemovedComputerReadsNothingNew() throws Exception {
-        desk.as(() -> desk.cloud.removeComputer(LAPTOP));
+        desk.as(() -> desk.cloud.vault().removeComputer(LAPTOP));
         assertNull(slot(LAPTOP), "its slot gone");
         rotate(desk);
         byte[] oldVk = made.vk();
@@ -175,7 +175,7 @@ class VaultRotateTest {
     @Test
     void forgettingHereLeavesTheOthersAlone() throws Exception {
         laptop.set(VaultParts.DECLINED, "true");
-        laptop.as(laptop.cloud::forgetHere);
+        laptop.as(laptop.cloud.vault()::forgetHere);
         assertNull(slot(LAPTOP), "its slot gone");
         assertNotNull(slot(DESK), "the other's stays");
         for (String k : new String[] {VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultPeers.KEY, VaultMove.MOVED_AT}) assertNull(laptop.get(k), k);
@@ -308,7 +308,7 @@ class VaultRotateTest {
     @Test
     void aKeyAcceptedByThePersonIsOfferedTheNext() throws Exception {
         goneAndPutBackWithAnotherKey();
-        desk.as(() -> desk.cloud.acceptKey(LAPTOP)); // the person says it's the laptop's, set up again
+        desk.as(() -> desk.cloud.vault().acceptKey(LAPTOP)); // the person says it's the laptop's, set up again
         assertEquals(Map.of(), rotate(desk).refused());
         assertTrue(slot(LAPTOP).params().has("next"), "offered now");
     }
@@ -323,7 +323,7 @@ class VaultRotateTest {
     @Test
     void aComputerRemovedHereIsNeverOfferedAgainEvenPutBack() throws Exception {
         VaultSlot laptopSlot = slot(LAPTOP);
-        desk.as(() -> desk.cloud.removeComputer(LAPTOP));
+        desk.as(() -> desk.cloud.vault().removeComputer(LAPTOP));
         cloud.put(Vault.SLOTS + "/" + LAPTOP + ".json", laptopSlot.toJson()); // put back as it was, by whoever kept a copy
         assertNull(desk.round().error());
         Cloud.KeyChanged changed = rotate(desk);
@@ -468,15 +468,15 @@ class VaultRotateTest {
 
     @Test
     void thisComputerIsntRemovedThatWayNorAnythingThatIsntAMachine() throws Exception {
-        ExecutionException own = assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.removeComputer(DESK)));
+        ExecutionException own = assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.vault().removeComputer(DESK)));
         assertTrue(own.getCause() instanceof IllegalArgumentException);
-        ExecutionException bad = assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.removeComputer("../boveda")));
+        ExecutionException bad = assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.vault().removeComputer("../boveda")));
         assertTrue(bad.getCause() instanceof IllegalArgumentException);
         String recovery = Vault.slots(dav()).stream().filter(s -> s.method() == VaultSlot.Method.RECOVERY).findFirst().orElseThrow().id();
-        desk.as(() -> desk.cloud.removeComputer(recovery));
+        desk.as(() -> desk.cloud.vault().removeComputer(recovery));
         assertNotNull(slot(recovery), "only a computer's slot goes this way");
         assertNotNull(slot(DESK));
-        desk.as(() -> desk.cloud.removeComputer(OTHER)); // none such: nothing
+        desk.as(() -> desk.cloud.vault().removeComputer(OTHER)); // none such: nothing
     }
 
     @Test
@@ -538,7 +538,7 @@ class VaultRotateTest {
         String recovery = Vault.slots(dav()).stream().filter(v -> v.method() == VaultSlot.Method.RECOVERY).findFirst().orElseThrow().id();
         tamperWithoutTheVaultKey(LAPTOP);
         for (String id : new String[] {OTHER, recovery, LAPTOP}) {
-            ExecutionException e = assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.acceptKey(id)), id);
+            ExecutionException e = assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.vault().acceptKey(id)), id);
             assertEquals(app.unichat.support.I18n.t("cloud.error.vaultNoSuchKey"), e.getCause().getMessage(), id);
         }
     }
@@ -555,7 +555,7 @@ class VaultRotateTest {
     @Test
     void aComputerIsKeptOutThoughItsSlotCouldntBeDeleted() throws Exception {
         cloud.failDeleteOnce.add(Vault.SLOTS + "/" + LAPTOP + ".json");
-        assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.removeComputer(LAPTOP)));
+        assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.vault().removeComputer(LAPTOP)));
         assertNotNull(slot(LAPTOP), "still there");
         assertEquals(Map.of(LAPTOP, "Portátil"), rotate(desk).refused(), "but never offered the next key");
     }

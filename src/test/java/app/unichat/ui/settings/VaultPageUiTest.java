@@ -215,7 +215,7 @@ class VaultPageUiTest {
             assertEquals(Cloud.VaultState.NONE, round());
             keysByHand("none");
             account.otherComputerMadeIt(null);
-            account.cloud().declineVault(true).get();
+            account.cloud().vault().declineVault(true).get();
             assertEquals(Cloud.VaultState.DECLINED, round());
             keysByHand("declined");
         } finally {
@@ -273,11 +273,11 @@ class VaultPageUiTest {
 
         typeGroups(code, false);
         waitFor(I18n.t("settings.vault.code.wrongGroups"));
-        assertTrue(account.cloud().vaultView().get().codeUnconfirmed(), "not taken as kept");
+        assertTrue(account.cloud().vault().vaultView().get().codeUnconfirmed(), "not taken as kept");
         FxWait.fx(() -> { button(I18n.t("settings.vault.code.showAgain")).fire(); return null; });
         typeGroups(code, true);
         waitOpen();
-        assertFalse(account.cloud().vaultView().get().codeUnconfirmed());
+        assertFalse(account.cloud().vault().vaultView().get().codeUnconfirmed());
         assertTrue(FxWait.fx(() -> says(I18n.t("settings.vault.way.RECOVERY"))), "the ways in");
         click(I18n.t("settings.vault.password.add"));
         type(I18n.t("settings.vault.password.field"), PASSWORD);
@@ -346,7 +346,7 @@ class VaultPageUiTest {
     @Test
     void aComputerRemovedFromTheVaultSaysSoAndOpensAgain() throws Exception {
         String code = account.otherComputerMadeIt(null);
-        account.cloud().openVault(app.unichat.cloud.VaultView.Way.RECOVERY, code.toCharArray()).get();
+        account.cloud().vault().openVault(app.unichat.cloud.VaultView.Way.RECOVERY, code.toCharArray()).get();
         account.cloud().syncNow().get();
         account.removeHere();
         assertEquals(Cloud.VaultState.REMOVED, round());
@@ -362,7 +362,7 @@ class VaultPageUiTest {
     private String openedWithOthers() throws Exception {
         String code = account.otherComputerMadeIt(PASSWORD);
         account.anotherComputer(LAPTOP, "Portátil");
-        account.cloud().openVault(app.unichat.cloud.VaultView.Way.RECOVERY, code.toCharArray()).get();
+        account.cloud().vault().openVault(app.unichat.cloud.VaultView.Way.RECOVERY, code.toCharArray()).get();
         assertEquals(Cloud.VaultState.OPEN, round()); // the others seen, and pinned, here
         return code;
     }
@@ -397,7 +397,7 @@ class VaultPageUiTest {
         click(I18n.t("settings.vault.change.confirm"));
         codeShown();
         waitFor(I18n.t("settings.vault.change.refusedAfter", "Escritorio"));
-        assertTrue(account.cloud().vaultView().get().computers().stream().filter(c -> c.machine().equals(VaultFixture.OTHER))
+        assertTrue(account.cloud().vault().vaultView().get().computers().stream().filter(c -> c.machine().equals(VaultFixture.OTHER))
             .findFirst().orElseThrow().keyChanged(), "still refused");
     }
 
@@ -410,7 +410,7 @@ class VaultPageUiTest {
         clickNamed(I18n.t("settings.vault.change.acceptOf", "Escritorio"));
         waitFor(I18n.t("settings.vault.change.acceptAsk", "Escritorio"));
         click(I18n.t("folders.dialog.cancel"));
-        assertTrue(account.cloud().vaultView().get().computers().stream().filter(c -> c.machine().equals(VaultFixture.OTHER))
+        assertTrue(account.cloud().vault().vaultView().get().computers().stream().filter(c -> c.machine().equals(VaultFixture.OTHER))
             .findFirst().orElseThrow().keyChanged(), "nothing without a yes");
         clickNamed(I18n.t("settings.vault.change.acceptOf", "Escritorio"));
         click(I18n.t("settings.vault.change.acceptYes"));
@@ -419,7 +419,7 @@ class VaultPageUiTest {
         FxWait.until("accepted and drawn again", () -> says(I18n.t("settings.vault.open"))
             && !says(I18n.t("settings.vault.change.acceptAsk", "Escritorio")) && !says(I18n.t("settings.vault.change.accepted", "Escritorio"))
             && !says(I18n.t("settings.vault.change.keyChanged", "Escritorio")));
-        assertFalse(account.cloud().vaultView().get().computers().stream().filter(c -> c.machine().equals(VaultFixture.OTHER))
+        assertFalse(account.cloud().vault().vaultView().get().computers().stream().filter(c -> c.machine().equals(VaultFixture.OTHER))
             .findFirst().orElseThrow().keyChanged(), "accepted");
         click(I18n.t("settings.vault.changeKey"));
         waitFor(I18n.t("settings.vault.change.receive"));
@@ -618,7 +618,7 @@ class VaultPageUiTest {
         bad.addAll(FxWait.fx(() -> unreachable("code")));
         click(I18n.t("settings.vault.code.keptIt"));
         bad.addAll(FxWait.fx(() -> unreachable("groups")));
-        account.cloud().forgetHere().get();
+        account.cloud().vault().forgetHere().get();
         page();
         waitFor(I18n.t("settings.vault.locked"));
         bad.addAll(FxWait.fx(() -> unreachable("locked")));
@@ -677,7 +677,7 @@ class VaultPageUiTest {
             }
             Settings.get().setFontScale(1.6);
             bad.addAll(squeezedOnCloudPage(svc, "code", I18n.t("settings.vault.create")));
-            account.cloud().forgetHere().get();
+            account.cloud().vault().forgetHere().get();
             account.close();
             account = new VaultFixture(dir.resolve("fits"));
             CloudPage.use(account.cloud());
@@ -685,7 +685,7 @@ class VaultPageUiTest {
             Settings.get().setFontScale(1.6);
             bad.addAll(squeezedOnCloudPage(svc, "locked"));
             account.anotherComputer(LAPTOP, "Un portátil con un nombre bastante largo");
-            account.cloud().openVault(app.unichat.cloud.VaultView.Way.RECOVERY, code.toCharArray()).get();
+            account.cloud().vault().openVault(app.unichat.cloud.VaultView.Way.RECOVERY, code.toCharArray()).get();
             account.cloud().syncNow().get();
             bad.addAll(squeezedOnCloudPage(svc, "open"));
             bad.addAll(squeezedOnCloudPage(svc, "confirmation", I18n.t("settings.vault.changeKey")));

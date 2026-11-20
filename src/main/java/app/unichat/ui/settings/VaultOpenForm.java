@@ -61,7 +61,7 @@ final class VaultOpenForm extends VBox {
             field.clear();
             Nodes.show(error, false);
             buttons.forEach(b -> b.setDisable(true));
-            cloud.openVault(way, secret).whenComplete((ok, err) -> Platform.runLater(() -> {
+            cloud.vault().openVault(way, secret).whenComplete((ok, err) -> Platform.runLater(() -> {
                 buttons.forEach(b -> b.setDisable(false));
                 if (err == null) {
                     opened.run();

@@ -92,7 +92,7 @@ class VaultOutTest {
         Map<String, byte[]> before = new HashMap<>(cloud.files);
 
         cloud.failOnce.add(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT); // the network drops on the last plain copy
-        ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud::turnOffVault));
+        ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud.vault()::turnOffVault));
         assertNotNull(failed.getCause().getMessage(), "the failure is told");
         assertTrue(failed.getCause().getMessage().contains(app.unichat.support.I18n.t("cloud.error.vaultOffUndone", "")),
             "says the vault is as it was: " + failed.getCause().getMessage());
@@ -101,7 +101,7 @@ class VaultOutTest {
         assertEquals(made.info().id(), desk.get(VaultParts.ID), "still held here");
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault(), "and still open: the person can try again");
 
-        desk.as(desk.cloud::turnOffVault); // again: this time it goes through
+        desk.as(desk.cloud.vault()::turnOffVault); // again: this time it goes through
         assertFalse(anyVault(), "the vault deleted, whole");
         Bundle settings = Bundle.parse(cloud.files.get(SETTINGS));
         assertNotNull(settings, "the settings back plain");
@@ -162,7 +162,7 @@ class VaultOutTest {
         VaultComputer desk = desk();
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
         cloud.failDeleteOnce.add(Vault.ROOT);
-        ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud::turnOffVault));
+        ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud.vault()::turnOffVault));
         assertEquals(app.unichat.support.I18n.t("cloud.error.vaultLeftovers"), failed.getCause().getMessage(), "told apart");
         assertFalse(cloud.files.containsKey(Vault.INFO), "its file gone: no computer finds a vault");
         assertNotNull(cloud.files.get(SETTINGS), "everything plain");
@@ -176,7 +176,7 @@ class VaultOutTest {
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
         cloud.failDeleteOnce.add(Vault.ROOT);
         cloud.failDeleteOnce.add(Vault.INFO);
-        ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud::turnOffVault));
+        ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud.vault()::turnOffVault));
         assertEquals(app.unichat.support.I18n.t("cloud.error.vaultPartlyGone"), failed.getCause().getMessage(), "never \"as it was\"");
         assertNotNull(cloud.files.get(SETTINGS), "everything plain");
         assertEquals("{\"d\":1}\n", plain(TextSync.ROOT + "/" + DESK + "/" + TEXT));
@@ -224,7 +224,7 @@ class VaultOutTest {
     void turningOffNeedsTheVaultOpenHere() throws Exception {
         VaultComputer other = new VaultComputer(cloud, dir, OTHER);
         Map<String, byte[]> before = new HashMap<>(cloud.files);
-        assertThrows(ExecutionException.class, () -> other.as(other.cloud::turnOffVault));
+        assertThrows(ExecutionException.class, () -> other.as(other.cloud.vault()::turnOffVault));
         assertEquals(before.keySet(), cloud.files.keySet(), "nothing touched");
     }
 
@@ -238,7 +238,7 @@ class VaultOutTest {
         assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
         assertEquals(Cloud.VaultState.DECLINED, declined.round().vault());
 
-        desk.as(desk.cloud::turnOffVault);
+        desk.as(desk.cloud.vault()::turnOffVault);
         Cloud.Status s = laptop.round();
         assertNull(s.error());
         assertEquals(Cloud.VaultState.NONE, s.vault(), "it finds the vault gone");

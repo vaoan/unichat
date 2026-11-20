@@ -65,7 +65,7 @@ final class KeyChangeFlow {
             go.setDisable(true);
             no.setDisable(true);
             Nodes.show(error, false);
-            (removing == null ? cloud.rotateKey(confirmed) : cloud.removeAndChangeKey(removing.machine(), confirmed)).whenComplete((r, err) -> Platform.runLater(() -> {
+            (removing == null ? cloud.vault().rotateKey(confirmed) : cloud.vault().removeAndChangeKey(removing.machine(), confirmed)).whenComplete((r, err) -> Platform.runLater(() -> {
                 go.setDisable(false);
                 no.setDisable(false);
                 if (err == null) {
@@ -89,7 +89,7 @@ final class KeyChangeFlow {
     static Node result(Cloud cloud, Cloud.KeyChanged r, Runnable addPassword, Runnable finished) {
         VBox box = new VBox();
         VBox code = new VBox();
-        Runnable kept = () -> cloud.codeKept().whenComplete((ok, err) -> Platform.runLater(() -> {
+        Runnable kept = () -> cloud.vault().codeKept().whenComplete((ok, err) -> Platform.runLater(() -> {
             Label said = err == null ? Labels.help(I18n.t("settings.vault.code.keptLine"))
                 : warning(I18n.t("settings.vault.code.keptFailed", Errors.message(Errors.unwrap(err))));
             code.getChildren().setAll(actions(said));
@@ -139,7 +139,7 @@ final class KeyChangeFlow {
             no.setOnAction(x -> row.getChildren().setAll(warning(why), accept));
             yes.setOnAction(x -> {
                 yes.setDisable(true);
-                cloud.acceptKey(c.machine()).whenComplete((ok, err) -> Platform.runLater(() -> {
+                cloud.vault().acceptKey(c.machine()).whenComplete((ok, err) -> Platform.runLater(() -> {
                     row.getChildren().setAll(Labels.help(err == null ? I18n.t("settings.vault.change.accepted", name) : Errors.message(Errors.unwrap(err))));
                     if (err == null) accepted.run();
                 }));
