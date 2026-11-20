@@ -31,11 +31,13 @@ public final class PasskeyPage {
 
     /**
      * One step's result as the browser told it. {@code prfEnabled}: what the browser said at creation, null when it said
-     * nothing; {@code prfLength}: how many PRF bytes came back, -1 none. Every text one line, cut short: the record is
-     * the browser's to write into.
+     * nothing; {@code prfLength}: how many PRF bytes came back, -1 none; {@code fingerprint}: the first 8 bytes, in hex,
+     * of SHA-256("unichat probe fp" + PRF), "" none, so the same value on another call or computer shows as the same
+     * (a passkey answering 32 bytes of another value would open nothing) and the value itself stays on the page. Every
+     * text one line, cut short: the record is the browser's to write into.
      */
-    public record Finding(Step step, Boolean prfEnabled, int prfLength, String credentialId, String attachment,
-                          String userAgent, String error) {
+    public record Finding(Step step, Boolean prfEnabled, int prfLength, String fingerprint, String credentialId,
+                          String attachment, String userAgent, String error) {
         public boolean prf() {
             return prfLength > 0;
         }
@@ -53,6 +55,7 @@ public final class PasskeyPage {
             return "step=" + step.name().toLowerCase(java.util.Locale.ROOT)
                     + " prfEnabled=" + (prfEnabled == null ? "unknown" : prfEnabled)
                     + " prfLength=" + (prfLength < 0 ? "none" : prfLength)
+                    + " prfFingerprint=" + (fingerprint.isEmpty() ? "none" : fingerprint)
                     + " credentialId=" + credentialId + " attachment=" + (attachment.isEmpty() ? "unknown" : attachment)
                     + " error=\"" + error + "\" userAgent=\"" + userAgent + "\"";
         }
@@ -72,7 +75,7 @@ public final class PasskeyPage {
         server.createContext("/passkey/result", this::result);
         server.createContext("/passkey", this::page);
         server.start();
-        Loopback.until(server, session, deadline);
+        Loopback.until(server, session, deadline, "cloud.passkey.expired");
     }
 
     /**
@@ -98,19 +101,40 @@ public final class PasskeyPage {
         }
     }
 
+    /**
+     * Asked for by this page's own name: a site whose name was made to point at 127.0.0.1 (DNS rebinding) would read the
+     * page, its state with it, and post as the page.
+     */
+    private boolean ours(HttpExchange x) {
+        int port = server.getAddress().getPort();
+        String host = x.getRequestHeaders().getFirst("Host");
+        if (!("localhost:" + port).equals(host) && !("127.0.0.1:" + port).equals(host)) return false;
+        String origin = x.getRequestHeaders().getFirst("Origin");
+        return origin == null || ("http://localhost:" + port).equals(origin);
+    }
+
     private void page(HttpExchange x) throws IOException {
+        if (!ours(x)) {
+            Loopback.reply(x, 403, "text/plain; charset=utf-8", "");
+            return;
+        }
         if (!"GET".equals(x.getRequestMethod()) || !"/passkey".equals(x.getRequestURI().getPath())) {
             Loopback.reply(x, 404, "text/plain; charset=utf-8", "");
             return;
         }
         // Nothing but this page's own script and style, and answers only to itself.
         x.getResponseHeaders().set("Content-Security-Policy",
-                "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'");
+                "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'");
+        x.getResponseHeaders().set("X-Frame-Options", "DENY");
         x.getResponseHeaders().set("Cache-Control", "no-store");
         Loopback.reply(x, 200, "text/html; charset=utf-8", PasskeyHtml.page(state, Base64.getEncoder().encodeToString(salt()), texts()));
     }
 
     private void result(HttpExchange x) throws IOException {
+        if (!ours(x)) {
+            Loopback.reply(x, 403, "text/plain; charset=utf-8", "");
+            return;
+        }
         if (!"POST".equals(x.getRequestMethod())) {
             Loopback.reply(x, 405, "text/plain; charset=utf-8", "");
             return;
@@ -131,6 +155,7 @@ public final class PasskeyPage {
             return;
         }
         Finding f = new Finding(step, bool(q.get("prfEnabled")), length(q.get("prfLength")),
+                q.getOrDefault("prfFingerprint", "").matches("[0-9a-f]{16}") ? q.get("prfFingerprint") : "",
                 kept(q.get("credentialId"), "[A-Za-z0-9_-]*"), kept(q.get("attachment"), "[a-z-]*"),
                 line(q.get("userAgent")), line(q.get("error")));
         found.accept(f);

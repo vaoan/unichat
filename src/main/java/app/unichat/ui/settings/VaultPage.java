@@ -34,6 +34,8 @@ final class VaultPage {
     /** The state last drawn; a round finding another redraws the page, unless a step is under way (a code on screen). */
     private Cloud.VaultState shown;
     private boolean inStep;
+    /** Which reload is the last asked for: an older answer, or one landing on a step begun since, draws nothing. */
+    private int asked;
     /** Why turning the vault off ended as it did, said above the page while it shows {@link #noticeFor}: a redraw keeps it. */
     private String notice;
     private Cloud.VaultState noticeFor;
@@ -50,7 +52,10 @@ final class VaultPage {
         app.unichat.ui.Showing.whileShowing(page.body, () -> cloud.addListener(listener), () -> cloud.removeListener(listener));
         page.reload();
         // Only with the probe asked for (-Dunichat.passkeyProbe=true or --passkey-probe): a test for phase 3's passkey.
-        return PasskeyProbeRow.ifAsked(told -> PasskeyProbe.run(uri -> Browser.open(uri.toString()), told))
+        return PasskeyProbeRow.ifAsked((opened, told) -> PasskeyProbe.run(uri -> {
+                    opened.accept(uri);
+                    Browser.open(uri.toString());
+                }, told))
                 .map(probe -> group(I18n.t("settings.vault.title"), page.body, probe))
                 .orElseGet(() -> group(I18n.t("settings.vault.title"), page.body));
     }
@@ -63,8 +68,12 @@ final class VaultPage {
     /** Asks the cloud for the vault as it stands here, then draws it. */
     private void reload() {
         inStep = false;
+        int mine = ++asked;
         if (shown == null) show(actions(Labels.help(I18n.t("settings.vault.reading"))));
         cloud.vault().vaultView().whenComplete((v, err) -> Platform.runLater(() -> {
+            // Two in flight (the sheet closed, and a round saying the state changed): the later one drew over the step
+            // opened after the first, "Olvidar la bóveda en este equipo" gone as soon as shown.
+            if (mine != asked || inStep) return;
             if (err != null) {
                 show(line(I18n.t("settings.vault.unreadable", Errors.message(Errors.unwrap(err)))), retry());
                 return;

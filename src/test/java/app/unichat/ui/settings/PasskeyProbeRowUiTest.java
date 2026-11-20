@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -49,8 +50,11 @@ class PasskeyProbeRowUiTest {
     private final AtomicReference<Consumer<PasskeyPage.Finding>> told = new AtomicReference<>();
     private final CompletableFuture<Void> session = new CompletableFuture<>();
 
-    private CompletableFuture<Void> start(Consumer<PasskeyPage.Finding> f) {
+    private static final URI ADDRESS = URI.create("http://localhost:43117/passkey");
+
+    private CompletableFuture<Void> start(Consumer<URI> opened, Consumer<PasskeyPage.Finding> f) {
         told.set(f);
+        opened.accept(ADDRESS);
         return session;
     }
 
@@ -89,8 +93,9 @@ class PasskeyProbeRowUiTest {
         assertTrue(run.isFocusTraversable(), "reachable by keyboard");
         FxWait.fx(() -> { run.fire(); return null; });
         assertTrue(told.get() != null, "the probe started");
-        FxWait.until("says it's open", () -> says(row, I18n.t("settings.vault.probe.opened")));
-        told.get().accept(new PasskeyPage.Finding(PasskeyPage.Step.GET, null, 32, "id", "platform", "UA", ""));
+        FxWait.until("says it's open, at which address", () -> says(row, I18n.t("settings.vault.probe.opened", ADDRESS)));
+        assertTrue(I18n.t("settings.vault.probe.opened", ADDRESS).contains(ADDRESS.toString()), "on screen, for no browser");
+        told.get().accept(new PasskeyPage.Finding(PasskeyPage.Step.GET, null, 32, "0123456789abcdef", "id", "platform", "UA", ""));
         FxWait.until("says what it found", () -> says(row, I18n.t("cloud.passkey.gotPrf")));
         FxWait.fx(() -> { stage.close(); return null; });
     }
@@ -102,7 +107,17 @@ class PasskeyProbeRowUiTest {
         FxWait.fx(() -> { button(row).fire(); return null; });
         session.completeExceptionally(new IOException("puerto ocupado"));
         FxWait.until("says why", () -> says(row, "puerto ocupado"));
-        assertFalse(says(row, I18n.t("settings.vault.probe.opened")));
+        FxWait.fx(() -> { stage.close(); return null; });
+    }
+
+    @Test
+    void aProbeLeftToItsDeadlineSaysSoInItsOwnWords() throws Exception {
+        Node row = FxWait.fx(() -> PasskeyProbeRow.build(this::start));
+        Stage stage = show(row);
+        FxWait.fx(() -> { button(row).fire(); return null; });
+        session.completeExceptionally(new IOException(I18n.t("cloud.passkey.expired")));
+        FxWait.until("says the test stopped", () -> says(row, I18n.t("cloud.passkey.expired")));
+        assertFalse(I18n.t("cloud.passkey.expired").equals(I18n.t("cloud.signIn.expired")), "a probe, not a sign-in");
         FxWait.fx(() -> { stage.close(); return null; });
     }
 }

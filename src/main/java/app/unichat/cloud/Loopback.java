@@ -35,17 +35,29 @@ final class Loopback {
         return HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
     }
 
+    /** The browser left past the deadline: nothing went wrong, the person didn't finish. */
+    static final class Expired extends IOException {
+        Expired(String message) {
+            super(message);
+        }
+    }
+
     /**
      * Listens until {@code result} ends (answered, declined, cancelled), or until {@code deadline} if the person leaves the
      * browser: then it fails, and the port is free again before anyone hears it (the next "Connect" found it busy until
      * a restart).
      */
     static void until(HttpServer server, CompletableFuture<?> result, Duration deadline) {
+        until(server, result, deadline, "cloud.signIn.expired");
+    }
+
+    /** As above, the deadline told with {@code expiredKey}'s words. */
+    static void until(HttpServer server, CompletableFuture<?> result, Duration deadline, String expiredKey) {
         result.whenComplete((a, e) -> server.stop(0));
         CompletableFuture.delayedExecutor(deadline.toNanos(), TimeUnit.NANOSECONDS).execute(() -> {
             if (result.isDone()) return;
             server.stop(0);
-            result.completeExceptionally(new IOException(I18n.t("cloud.signIn.expired")));
+            result.completeExceptionally(new Expired(I18n.t(expiredKey)));
         });
     }
 

@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
@@ -43,13 +44,31 @@ public final class PasskeyProbe {
         return Settings.dataDir().resolve("logs").resolve("passkey-probe.txt");
     }
 
-    /** At start: the page in the browser if the probe was asked for, else nothing (null). */
+    /**
+     * At start: the page in the browser if the probe was asked for, else nothing (null). Its address goes to the log too
+     * (no browser opened: it can be typed), and so does why it couldn't start (the port busy); the future ends once
+     * anything is told.
+     */
     public static CompletableFuture<Void> onStart(Consumer<URI> browser) {
-        return onStart(browser, Loopback.PORT, file());
+        return onStart(browser, Loopback.PORT, file(), System.err::println);
     }
 
-    static CompletableFuture<Void> onStart(Consumer<URI> browser, int port, Path file) {
-        return asked() ? run(browser, f -> { }, port, file) : null;
+    static CompletableFuture<Void> onStart(Consumer<URI> browser, int port, Path file, Consumer<String> log) {
+        return onStart(browser, port, file, log, Loopback.DEADLINE);
+    }
+
+    static CompletableFuture<Void> onStart(Consumer<URI> browser, int port, Path file, Consumer<String> log, Duration deadline) {
+        if (!asked()) return null;
+        Consumer<URI> told = uri -> {
+            log.accept("Passkey probe: open " + uri + " in the browser");
+            browser.accept(uri);
+        };
+        return run(told, f -> { }, port, file, deadline).whenComplete((ok, e) -> {
+            Throwable why = e == null ? null : Errors.unwrap(e);
+            if (why != null && !(why instanceof java.util.concurrent.CancellationException) && !(why instanceof Loopback.Expired)) {
+                log.accept("Passkey probe: couldn't start: " + Errors.message(why));
+            }
+        });
     }
 
     /** Opens the page (a probe already running ends first); {@code told} hears each finding once it's written down. */
@@ -57,13 +76,18 @@ public final class PasskeyProbe {
         return run(browser, told, Loopback.PORT, file());
     }
 
-    static synchronized CompletableFuture<Void> run(Consumer<URI> browser, Consumer<PasskeyPage.Finding> told, int port, Path file) {
+    static CompletableFuture<Void> run(Consumer<URI> browser, Consumer<PasskeyPage.Finding> told, int port, Path file) {
+        return run(browser, told, port, file, Loopback.DEADLINE);
+    }
+
+    private static synchronized CompletableFuture<Void> run(Consumer<URI> browser, Consumer<PasskeyPage.Finding> told, int port,
+                                                            Path file, Duration deadline) {
         stop();
         try {
             current = PasskeyPage.start(browser, f -> {
                 record(file, f);
                 told.accept(f);
-            }, port, Loopback.DEADLINE);
+            }, port, deadline);
             return current;
         } catch (BindException e) {
             return CompletableFuture.failedFuture(new IOException(I18n.t("settings.cloud.portBusy", port), e));

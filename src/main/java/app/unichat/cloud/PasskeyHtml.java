@@ -4,7 +4,7 @@ package app.unichat.cloud;
  * The passkey probe's HTML: two buttons, one makes a passkey for Unichat and one uses one (any made for {@code localhost},
  * here or synced from another computer or a phone), both asking for PRF with the fixed salt; each result goes back to
  * Unichat, whose answer, in the person's words, is what the page shows. The PRF bytes never leave the page: only how
- * many came.
+ * many came and a fingerprint of them.
  */
 final class PasskeyHtml {
     private PasskeyHtml() {}
@@ -26,6 +26,12 @@ final class PasskeyHtml {
                 <p><button id="use"></button><br><span id="useHelp"></span></p>
                 <ul id="log" aria-live="polite"></ul>
                 </main>
+                """ + script(texts, state, salt);
+    }
+
+    /** What runs on the page: the two steps and the report back. */
+    private static String script(String texts, String state, String salt) {
+        return """
                 <script>
                 const T = %s;
                 const STATE = "%s";
@@ -41,7 +47,7 @@ final class PasskeyHtml {
                   li.textContent = text;
                   document.getElementById('log').appendChild(li);
                 }
-                // Only what was found, never the PRF's bytes: how many came is all Unichat needs to know.
+                // Only what was found, never the PRF's bytes: how many came and their fingerprint.
                 async function report(found) {
                   found.state = STATE;
                   found.userAgent = navigator.userAgent;
@@ -52,10 +58,24 @@ final class PasskeyHtml {
                     say(T.notSent);
                   }
                 }
-                function prfOf(credential) {
+                // The same PRF value shows as the same fingerprint, here and on another computer; the value stays here.
+                async function fingerprint(value) {
+                  const label = new TextEncoder().encode('unichat probe fp');
+                  const both = new Uint8Array(label.length + value.byteLength);
+                  both.set(label);
+                  both.set(new Uint8Array(value), label.length);
+                  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', both));
+                  return Array.from(hash.slice(0, 8), b => b.toString(16).padStart(2, '0')).join('');
+                }
+                async function prfOf(credential, found) {
                   const prf = credential.getClientExtensionResults().prf || {};
                   const first = prf.results && prf.results.first;
-                  return {enabled: prf.enabled, length: first ? first.byteLength : null};
+                  if (prf.enabled !== undefined) found.prfEnabled = String(prf.enabled);
+                  if (first) {
+                    found.prfLength = String(first.byteLength);
+                    found.prfFingerprint = await fingerprint(first);
+                  }
+                  return found;
                 }
                 function failed(step, e) {
                   report({step: step, error: (e && e.name ? e.name : 'Error') + ': ' + (e && e.message ? e.message : e)});
@@ -72,11 +92,7 @@ final class PasskeyHtml {
                       authenticatorSelection: {residentKey: 'required', requireResidentKey: true, userVerification: 'required'},
                       extensions: {prf: {eval: {first: SALT}}}
                     }});
-                    const prf = prfOf(c);
-                    const found = {step: 'create', credentialId: c.id, attachment: c.authenticatorAttachment || ''};
-                    if (prf.enabled !== undefined) found.prfEnabled = String(prf.enabled);
-                    if (prf.length !== null) found.prfLength = String(prf.length);
-                    report(found);
+                    report(await prfOf(c, {step: 'create', credentialId: c.id, attachment: c.authenticatorAttachment || ''}));
                   } catch (e) {
                     failed('create', e);
                   }
@@ -92,10 +108,7 @@ final class PasskeyHtml {
                       userVerification: 'required',
                       extensions: {prf: {eval: {first: SALT}}}
                     }});
-                    const prf = prfOf(a);
-                    const found = {step: 'get', credentialId: a.id, attachment: a.authenticatorAttachment || ''};
-                    if (prf.length !== null) found.prfLength = String(prf.length);
-                    report(found);
+                    report(await prfOf(a, {step: 'get', credentialId: a.id, attachment: a.authenticatorAttachment || ''}));
                   } catch (e) {
                     failed('get', e);
                   }

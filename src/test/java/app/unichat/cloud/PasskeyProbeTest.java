@@ -28,6 +28,8 @@ class PasskeyProbeTest {
     @TempDir
     Path dir;
 
+    private final List<String> log = new CopyOnWriteArrayList<>();
+
     @AfterEach
     void flagOff() {
         System.clearProperty(PasskeyProbe.FLAG);
@@ -46,7 +48,7 @@ class PasskeyProbeTest {
     @Test
     void withoutTheFlagNothingOpens() throws Exception {
         URI[] opened = {null};
-        assertNull(PasskeyProbe.onStart(u -> opened[0] = u, 0, dir.resolve("probe.txt")));
+        assertNull(PasskeyProbe.onStart(u -> opened[0] = u, 0, dir.resolve("probe.txt"), log::add));
         assertNull(opened[0], "no browser, no port");
     }
 
@@ -54,9 +56,37 @@ class PasskeyProbeTest {
     void withTheFlagItOpensThePage() throws Exception {
         System.setProperty(PasskeyProbe.FLAG, "true");
         URI[] opened = {null};
-        CompletableFuture<Void> probe = PasskeyProbe.onStart(u -> opened[0] = u, 0, dir.resolve("probe.txt"));
+        CompletableFuture<Void> probe = PasskeyProbe.onStart(u -> opened[0] = u, 0, dir.resolve("probe.txt"), log::add);
         assertEquals("/passkey", opened[0].getPath());
         assertFalse(probe.isDone());
+        assertTrue(log.stream().anyMatch(l -> l.contains(opened[0].toString())), "the address is in the log, for no browser: " + log);
+        PasskeyProbe.stop();
+        org.junit.jupiter.api.Assertions.assertThrows(Exception.class, probe::get); // ends once anything was told
+        assertEquals(1, log.size(), "a probe cancelled says nothing more: " + log);
+    }
+
+    @Test
+    void aProbeThatCantStartAtLaunchSaysWhy() throws Exception {
+        System.setProperty(PasskeyProbe.FLAG, "true");
+        var taken = Loopback.server(0);
+        try {
+            int port = taken.getAddress().getPort();
+            CompletableFuture<Void> probe = PasskeyProbe.onStart(u -> { }, port, dir.resolve("probe.txt"), log::add);
+            org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class, probe::get);
+            assertTrue(log.stream().anyMatch(l -> l.contains(app.unichat.support.I18n.t("settings.cloud.portBusy", port))),
+                    "the port busy is told, not swallowed: " + log);
+        } finally {
+            taken.stop(0);
+        }
+    }
+
+    @Test
+    void aProbeLeftToItsDeadlineAtLaunchSaysNothingMore() throws Exception {
+        System.setProperty(PasskeyProbe.FLAG, "true");
+        CompletableFuture<Void> probe = PasskeyProbe.onStart(u -> { }, 0, dir.resolve("probe.txt"), log::add, java.time.Duration.ZERO);
+        assertTrue(org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class, probe::get).getCause()
+                instanceof Loopback.Expired);
+        assertEquals(1, log.size(), "only the address: " + log);
     }
 
     @Test
@@ -91,6 +121,18 @@ class PasskeyProbeTest {
         PasskeyProbe.run(u -> opened[0] = u, f -> { }, 0, dir.resolve("probe.txt"));
         assertTrue(first.isCancelled(), "the port 43117 is one: the one before gives it back");
         PCloudTest.portIsFree(firstAddress.toString());
+    }
+
+    @Test
+    void runningItAgainOnTheSamePortTakesItBack() throws Exception {
+        int port;
+        try (java.net.ServerSocket free = new java.net.ServerSocket(0, 0, java.net.InetAddress.getLoopbackAddress())) {
+            port = free.getLocalPort();
+        }
+        CompletableFuture<Void> first = PasskeyProbe.run(u -> { }, f -> { }, port, dir.resolve("probe.txt"));
+        CompletableFuture<Void> second = PasskeyProbe.run(u -> { }, f -> { }, port, dir.resolve("probe.txt"));
+        assertTrue(first.isCancelled());
+        assertFalse(second.isDone(), "the fixed port bound again at once, not busy");
     }
 
     @Test

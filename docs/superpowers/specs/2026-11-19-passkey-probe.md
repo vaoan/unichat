@@ -17,14 +17,17 @@ are only for this test (they can be deleted afterwards from the password manager
 
 - `cloud/PasskeyPage` serves a page on `http://localhost:43117/passkey` (the same port and rules as the cloud sign-ins,
   `Loopback`: 127.0.0.1 only, a random `state`, ten minutes, then the port is free). The page has no script or style
-  from anywhere else (`Content-Security-Policy: default-src 'none'`).
+  from anywhere else and can't be framed (`Content-Security-Policy: default-src 'none'; … frame-ancestors 'none'`); it
+  answers only when asked for as `localhost:43117` or `127.0.0.1:43117` (a site renamed to 127.0.0.1, DNS rebinding,
+  gets 403), and takes results only from its own origin.
 - **Crear una llave**: `navigator.credentials.create` with `rp.id = "localhost"`, a random user, ES256 or RS256, a
   discoverable key (`residentKey: required`), `userVerification: required`, and `extensions.prf.eval.first` = the
   fixed salt (SHA-256 of "unichat-vault passkey prf").
 - **Usar una llave**: `navigator.credentials.get` with `rpId = "localhost"`, `allowCredentials: []` (any passkey made
   for Unichat, here or synced), `userVerification: required`, the same PRF salt.
 - Each step posts back, with `state`: the step, whether PRF was enabled at creation, **how many** PRF bytes came back
-  (never the bytes), the passkey's id, whether it was this computer's own authenticator (`platform`) or another
+  and their **fingerprint** (the first 8 bytes, in hex, of SHA-256("unichat probe fp" ‖ PRF), made on the page; never
+  the bytes), the passkey's id, whether it was this computer's own authenticator (`platform`) or another
   (`cross-platform`: a phone, a security key), the browser's user agent, and any error's name and message. Unichat
   answers in plain words, which the page shows:
   - "La llave devolvió la clave que necesita la bóveda." — PRF works with that passkey;
@@ -67,7 +70,8 @@ when it starts.
    "%LOCALAPPDATA%\Unichat\Unichat.exe" --passkey-probe
    ```
 
-   If Windows says it can't find it (Unichat installed elsewhere): Start menu → right click "Unichat" → Más →
+   That is the folder the installer proposes, but the installer lets you choose another one (its destination folder
+   step): then `Unichat.exe` is in the folder chosen there. If Windows says it can't find it: Start menu → right click "Unichat" → Más →
    Abrir ubicación del archivo → right click the shortcut → Propiedades → copy "Destino", and use that path in its
    place, keeping `--passkey-probe` after it.
 3. Unichat starts and opens the probe page in the default browser (Chrome 147 or later: Chrome → ⋮ → Ayuda →
@@ -95,7 +99,10 @@ start again to go on.
 
 ## What the results mean
 
-- `step=get … prfLength=32` → **PRF works** with that passkey on that browser: it can open the vault there.
+- `step=get … prfLength=32 prfFingerprint=<16 hex>` → **PRF works** with that passkey on that browser. It can open
+  the vault only if the **fingerprint is the same** every time that passkey is used (two `get` lines here) and on every
+  computer (the same `credentialId` there must show the same fingerprint): 32 bytes of another value would open
+  nothing. A `create` line with a fingerprint must match the `get` lines too.
 - `step=get … prfLength=none` with no error → that passkey/browser gives no PRF: it can't be a way in there.
 - `step=create … prfEnabled=true` → made with PRF; `false` → without (it won't give one at `get` either);
   `unknown` → the browser didn't say: the `get` line decides.
@@ -103,25 +110,35 @@ start again to go on.
   `cross-platform` → a phone or a security key.
 - `error="NotAllowedError: …"` → cancelled or timed out; `"SecurityError: …"` → the page wasn't at `localhost`;
   `"NoWebAuthn: …"` → the browser has no passkeys.
-- The second computer's `step=get` line with the **same `credentialId`** as the first's `step=create` → the passkey
-  travels: it can open the vault on a new computer. If not, the passkey is offered only as a quick way in on the
+- The second computer's `step=get` line with the **same `credentialId`** as the first's `step=create`, and the
+  **same `prfFingerprint`** as the first computer's `get` → the passkey travels: it can open the vault on a new
+  computer. If not, the passkey is offered only as a quick way in on the
   computer that made it, and the screen will say so (design, phase 3).
 
 **Stop rule (task 13):** if Windows (Windows Hello or Google Password Manager on Chrome 147+) gives no PRF, the passkey
 isn't built; the person is told.
+
+## Design note for steps 2–4
+
+The relying party `localhost` is shared by every page on `localhost`, on any port, and the salt is public (it's in
+this page): any program on the computer that serves a page on `localhost` can ask for the same passkey and, after the
+one prompt the person accepts, get the same PRF value, and so the slot's key. Steps 2–4 must not make this PRF alone
+the slot key. Options: a per-vault random salt kept sealed in the slot (the PRF asked for is unknown until the slot is
+read, so a page elsewhere asks for another value), and/or Unichat's passkey screen showing a short code the page also
+shows, so the person only accepts a prompt that came from Unichat's own page.
 
 ## Results
 
 Fill one row per try (Sí / No / — not tried); "Ofrecida en el otro" = the passkey made here is offered on the other
 computer.
 
-| Computer | Browser (version) | Where the passkey is kept | Created | PRF at create | PRF at use (length) | Offered on the other computer | Notes |
-|---|---|---|---|---|---|---|---|
-| Windows 11 (build: ) | Chrome ( ) | Windows Hello | | | | | |
-| Windows 11 | Chrome ( ) | Google Password Manager | | | | | |
-| Mac (macOS ) | Safari ( ) | iCloud Keychain | | | | | |
-| Mac | Chrome ( ) | iCloud Keychain | | | | | |
-| Mac | Chrome ( ) | Google Password Manager | | | | | |
-| Phone (QR, from either) | | | | | | | |
+| Computer | Browser (version) | Where the passkey is kept | Created | PRF at create | PRF at use (length) | Fingerprint (same each use?) | Offered on the other computer (same fingerprint?) | Notes |
+|---|---|---|---|---|---|---|---|---|
+| Windows 11 (build: ) | Chrome ( ) | Windows Hello | | | | | | |
+| Windows 11 | Chrome ( ) | Google Password Manager | | | | | | |
+| Mac (macOS ) | Safari ( ) | iCloud Keychain | | | | | | |
+| Mac | Chrome ( ) | iCloud Keychain | | | | | | |
+| Mac | Chrome ( ) | Google Password Manager | | | | | | |
+| Phone (QR, from either) | | | | | | | | |
 
 Conclusion (to fill): PRF on Windows: … · passkey travels Windows ↔ Mac through: … · phase 3 goes ahead as: …
