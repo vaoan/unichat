@@ -56,7 +56,8 @@ ese almacenamiento: ni a un servidor de Unichat ni a otro tercero.
   llave puede leer todo lo de la bóveda; «Cambiar la llave» en la página deja fuera a un computador que quites. Un
   computador toma una llave nueva solo cuando la llave que tiene la avala, así que quien solo tenga tu almacenamiento no
   puede darle una; pero un computador quitado sigue teniendo la llave anterior, y uno tuyo que estaba apagado mientras lo
-  quitabas puede ser engañado por él hasta que abras allí la bóveda con el código o una contraseña: puede darle una llave
+  quitabas puede ser engañado por él hasta que abras allí la bóveda con el código de recuperación o una contraseña puesta después de quitarlo (una contraseña
+  anterior, devuelta por el computador quitado, puede abrir su llave): puede darle una llave
   suya, o hacerle creer que la bóveda se apagó, para que suba sin cifrar.
 - **Si otro cambia el almacenamiento**: si el archivo de la bóveda se borra, o su llave cambia, sin que lo haga Unichat,
   tus computadores dejan de enviar nada personal y lo dicen en Ajustes → Nube → Bóveda; no vuelven a subir sin cifrar

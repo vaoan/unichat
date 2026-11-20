@@ -46,10 +46,14 @@ public record CloudAccount(Service service, String url, String user, String secr
         s.set("cloud.secret", secret);
     }
 
-    /** Disconnected: the login goes; what's in the account and on this computer stays. */
+    /**
+     * Disconnected: the login goes, and this computer's hold on a vault there (and that it saw one), since the next
+     * account connected has another vault or none; what's in the account and the rest on this computer stays.
+     */
     public static void forget() {
         Settings s = Settings.get();
         for (String k : new String[] {"cloud.service", "cloud.url", "cloud.user", "cloud.secret", "cloud.settingsBase"}) s.set(k, null);
+        VaultParts.gone();
     }
 
     /** pCloud and Dropbox through their own APIs (signed in in the browser); every other service through WebDAV. */

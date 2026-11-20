@@ -55,7 +55,8 @@ storage: no server of Unichat's, no other third party.
   everything in the vault; "Change the key" in the page cuts off a computer you remove. A computer takes a new key only
   when the key it holds vouches for it, so someone with only your storage can't hand it one; but a removed computer
   still holds the old key, and a computer of yours that was off during the removal can be fooled by it until you open
-  the vault there with the code or a password: it can hand that computer a key of its own, or make it believe the
+  the vault there with the recovery code or a password set after the removal (an older password, put back by the removed
+  computer, can open its key): it can hand that computer a key of its own, or make it believe the
   vault was turned off, so that it sends unencrypted.
 - **Someone else changing the storage**: if the vault's file is deleted, or its key changed, without Unichat doing it,
   your computers stop sending anything personal and say so in Settings → Cloud → Vault; they don't go back to

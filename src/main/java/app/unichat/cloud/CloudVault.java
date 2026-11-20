@@ -65,8 +65,13 @@ public final class CloudVault {
                 return Vault.rotate(dav, old, Cloud.machine(), peers, confirmed,
                     () -> Settings.get().set(VaultActions.UNCONFIRMED, vault.info().id()));
             } catch (IOException | RuntimeException e) {
-                // Taken back before the rise: no new code came of it, so what was to confirm is as it was.
-                if (Vault.at(dav, vault.info())) Settings.get().set(VaultActions.UNCONFIRMED, unconfirmed);
+                // Taken back before the rise: no new code came of it, so what was to confirm is as it was. The change's
+                // own failure is the one told, whatever putting it back does.
+                try {
+                    if (Vault.at(dav, vault.info())) Settings.get().set(VaultActions.UNCONFIRMED, unconfirmed);
+                } catch (RuntimeException f) {
+                    e.addSuppressed(f);
+                }
                 throw e;
             } finally {
                 peers.save(); // a computer seen for the first time is pinned, the change done or not
