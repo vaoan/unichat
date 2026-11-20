@@ -106,11 +106,94 @@ class VaultTest {
             .getBytes(StandardCharsets.UTF_8);
         Storage racing = new Racing(storage, path -> {
             if (path.equals(Vault.INFO)) cloud.put(Vault.INFO, theirs);
-        });
+        }, NOTHING);
 
         assertThrows(Vault.Exists.class, () -> Vault.create(racing, MAC, "Mac"));
         assertArrayEquals(theirs, cloud.files.get(Vault.INFO), "the winner's vault untouched");
         assertTrue(Vault.slots(storage).isEmpty(), "the loser wrote no slot");
+    }
+
+    @Test
+    void aVaultMadeElsewhereAfterOursWasReadBackStillWins() throws Exception {
+        // Both found no vault; ours was read back as ours, then theirs overwrote it while our slots went up.
+        String other = UUID.randomUUID().toString();
+        byte[] theirs = ("{\"id\":\"" + other + "\",\"created\":\"2026-11-19T10:00:00Z\",\"generation\":0}")
+            .getBytes(StandardCharsets.UTF_8);
+        VaultSlot theirSlot = VaultSlot.wrap(other, VaultSlot.Method.RECOVERY, "recovery", 0, VaultCrypto.randomKey(),
+            com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode(), VaultCrypto.randomKey());
+        String theirPath = Vault.SLOTS + "/" + theirSlot.id() + ".json";
+        Storage racing = new Racing(storage, path -> {
+            if (path.startsWith(Vault.SLOTS + "/") && !cloud.files.containsKey(theirPath)) {
+                cloud.put(Vault.INFO, theirs);
+                cloud.put(theirPath, theirSlot.toJson());
+            }
+        }, NOTHING);
+
+        assertThrows(Vault.Exists.class, () -> Vault.create(racing, MAC, "Mac"));
+        assertArrayEquals(theirs, cloud.files.get(Vault.INFO), "their vault stays");
+        assertEquals(Set.of(theirPath), slotFiles(), "ours are gone, theirs is intact");
+        assertEquals(List.of(theirSlot), Vault.slots(storage));
+    }
+
+    @Test
+    void aFailureHalfwayLeavesNoVaultBehind() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger slotsPut = new java.util.concurrent.atomic.AtomicInteger();
+        Storage failing = new Racing(storage, path -> {
+            if (path.startsWith(Vault.SLOTS + "/") && slotsPut.incrementAndGet() == 2) throw new IOException("the network dropped");
+        }, NOTHING);
+
+        assertThrows(IOException.class, () -> Vault.create(failing, MAC, "Mac"));
+        assertNull(Vault.info(storage), "no half-made vault blocks the account");
+        assertEquals(Set.of(), slotFiles());
+        Vault.Created made = Vault.create(storage, MAC, "Mac");
+        assertEquals(2, Vault.slots(storage).size());
+        assertArrayEquals(made.vk(), Vault.open(storage, byMethod(Vault.slots(storage)).get(VaultSlot.Method.RECOVERY),
+            VaultSlot.recoveryKey(made.code())));
+    }
+
+    @Test
+    void aSlotOfAnotherVaultIsntListed() throws Exception {
+        Vault.create(storage, MAC, "Mac");
+        VaultSlot stranger = VaultSlot.wrap(UUID.randomUUID().toString(), VaultSlot.Method.PASSWORD, "password", 0,
+            VaultCrypto.randomKey(), VaultSlot.newPasswordParams(), VaultCrypto.randomKey());
+        cloud.put(Vault.SLOTS + "/" + stranger.id() + ".json", stranger.toJson());
+        assertEquals(Set.of(VaultSlot.Method.RECOVERY, VaultSlot.Method.COMPUTER), byMethod(Vault.slots(storage)).keySet());
+    }
+
+    @Test
+    void aSlotWhoseMethodWasChangedDoesntOpen() throws Exception {
+        Vault.Created made = Vault.create(storage, MAC, "Mac");
+        String path = Vault.SLOTS + "/" + MAC + ".json";
+        cloud.put(path, new String(cloud.files.get(path), StandardCharsets.UTF_8).replace("\"COMPUTER\"", "\"PASSKEY\"")
+            .getBytes(StandardCharsets.UTF_8));
+        VaultSlot changed = byMethod(Vault.slots(storage)).get(VaultSlot.Method.PASSKEY);
+        assertThrows(VaultCrypto.Broken.class, () -> Vault.open(storage, changed, made.computer().key()));
+    }
+
+    @Test
+    void aNewCodeIsGivenEvenWhenTheOldOneCantBeDeleted() throws Exception {
+        Vault.Created made = Vault.create(storage, MAC, "Mac");
+        Storage stuck = new Racing(storage, NOTHING, path -> {
+            throw new IOException("the network dropped");
+        });
+        RecoveryCode fresh = Vault.newRecovery(stuck, made.vk());
+        VaultSlot newest = recoveries().stream().filter(s -> opens(s, fresh, made.vk())).findFirst().orElseThrow();
+        assertEquals(2, recoveries().size(), "the old one is still there");
+
+        RecoveryCode third = Vault.newRecovery(storage, made.vk());
+        assertEquals(1, recoveries().size(), "the next one prunes every other");
+        assertTrue(opens(recoveries().getFirst(), third, made.vk()));
+        assertFalse(recoveries().contains(newest));
+    }
+
+    @Test
+    void aPasswordIsCountedInCharactersNotChars() throws Exception {
+        Vault.Created made = Vault.create(storage, MAC, "Mac");
+        String six = "\uD83D\uDE00".repeat(6); // 12 chars, 6 characters
+        assertThrows(IllegalArgumentException.class, () -> Vault.addPassword(storage, made.vk(), six.toCharArray()));
+        char[] twelve = "\uD83D\uDE00".repeat(12).toCharArray();
+        VaultSlot slot = Vault.addPassword(storage, made.vk(), twelve);
+        assertArrayEquals(made.vk(), Vault.open(storage, slot, VaultSlot.passwordKey(twelve, slot.params())));
     }
 
     @Test
@@ -194,22 +277,45 @@ class VaultTest {
     void aSlotOfAnotherGenerationStillOpens() throws Exception {
         Vault.Created made = Vault.create(storage, MAC, "Mac");
         byte[] key = VaultCrypto.randomKey();
-        VaultSlot old = VaultSlot.wrap(VaultSlot.Method.COMPUTER, "old", 7, key, VaultSlot.newPasswordParams(), made.vk());
+        VaultSlot old = VaultSlot.wrap(made.info().id(), VaultSlot.Method.COMPUTER, "old", 7, key, VaultSlot.newPasswordParams(), made.vk());
         assertArrayEquals(made.vk(), Vault.open(storage, old, key));
+    }
+
+    private Set<String> slotFiles() {
+        return cloud.files.keySet().stream().filter(p -> p.startsWith(Vault.SLOTS + "/")).collect(Collectors.toSet());
+    }
+
+    private List<VaultSlot> recoveries() throws IOException {
+        return Vault.slots(storage).stream().filter(s -> s.method() == VaultSlot.Method.RECOVERY).toList();
+    }
+
+    private static boolean opens(VaultSlot slot, RecoveryCode code, byte[] vk) {
+        try {
+            return java.util.Arrays.equals(vk, slot.unwrap(VaultSlot.recoveryKey(code)));
+        } catch (VaultCrypto.Broken e) {
+            return false;
+        }
     }
 
     private static Map<VaultSlot.Method, VaultSlot> byMethod(List<VaultSlot> slots) {
         return slots.stream().collect(Collectors.toMap(VaultSlot::method, Function.identity()));
     }
 
-    /** The account, with something else happening right after each small file goes up. */
-    private record Racing(Storage s, java.util.function.Consumer<String> after) implements Storage {
+    /** What a {@link Racing} account does around a call, by path. */
+    private interface Hook {
+        void at(String path) throws IOException;
+    }
+
+    private static final Hook NOTHING = path -> { };
+
+    /** The account, with something else happening right after each small file goes up and before each delete. */
+    private record Racing(Storage s, Hook afterPut, Hook beforeDelete) implements Storage {
         @Override public void check() throws IOException { s.check(); }
         @Override public boolean exists(String path) throws IOException { return s.exists(path); }
         @Override public String stamp(String path) throws IOException { return s.stamp(path); }
         @Override public void mkdirs(String dir) throws IOException { s.mkdirs(dir); }
         @Override public List<String> list(String dir) throws IOException { return s.list(dir); }
-        @Override public void delete(String path) throws IOException { s.delete(path); }
+        @Override public void delete(String path) throws IOException { beforeDelete.at(path); s.delete(path); }
         @Override public void put(String path, Path file) throws IOException { s.put(path, file); }
         @Override public byte[] get(String path) throws IOException { return s.get(path); }
         @Override public boolean get(String path, Path target) throws IOException { return s.get(path, target); }
@@ -217,7 +323,7 @@ class VaultTest {
         @Override
         public void put(String path, byte[] data) throws IOException {
             s.put(path, data);
-            after.accept(path);
+            afterPut.at(path);
         }
     }
 }

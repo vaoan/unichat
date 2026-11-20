@@ -14,30 +14,31 @@ import java.util.Base64;
 import org.junit.jupiter.api.Test;
 
 class VaultSlotTest {
+    private static final String VAULT = "9b2f3c1e-0000-4000-8000-000000000001";
     private final byte[] vk = VaultCrypto.randomKey();
 
     @Test
     void eachSlotOpensTheVaultKeyWithItsOwnSecretOnly() throws Exception {
         RecoveryCode code = RecoveryCode.random();
-        VaultSlot recovery = VaultSlot.wrap(VaultSlot.Method.RECOVERY, "printed", 1, VaultSlot.recoveryKey(code), JsonNodes.empty(), vk);
+        VaultSlot recovery = VaultSlot.wrap(VAULT, VaultSlot.Method.RECOVERY, "printed", 1, VaultSlot.recoveryKey(code), JsonNodes.empty(), vk);
         assertArrayEquals(vk, recovery.unwrap(VaultSlot.recoveryKey(code)));
         assertThrows(VaultCrypto.Broken.class, () -> recovery.unwrap(VaultSlot.recoveryKey(RecoveryCode.random())));
 
         ObjectNode params = VaultSlot.newPasswordParams();
         char[] pw = "correct horse battery".toCharArray();
-        VaultSlot password = VaultSlot.wrap(VaultSlot.Method.PASSWORD, "password", 1, VaultSlot.passwordKey(pw, params), params, vk);
+        VaultSlot password = VaultSlot.wrap(VAULT, VaultSlot.Method.PASSWORD, "password", 1, VaultSlot.passwordKey(pw, params), params, vk);
         assertArrayEquals(vk, password.unwrap(VaultSlot.passwordKey(pw, password.params())));
         assertThrows(VaultCrypto.Broken.class, () -> password.unwrap(VaultSlot.passwordKey("another horse battery".toCharArray(), password.params())));
 
         byte[] computerKey = VaultCrypto.randomKey();
-        VaultSlot computer = VaultSlot.wrap(VaultSlot.Method.COMPUTER, "this Mac", 2, computerKey, JsonNodes.empty(), vk);
+        VaultSlot computer = VaultSlot.wrap(VAULT, VaultSlot.Method.COMPUTER, "this Mac", 2, computerKey, JsonNodes.empty(), vk);
         assertArrayEquals(vk, computer.unwrap(computerKey));
         assertThrows(VaultCrypto.Broken.class, () -> computer.unwrap(VaultCrypto.randomKey()));
     }
 
     @Test
     void wrongSecretsOpenNothing() {
-        VaultSlot slot = VaultSlot.wrap(VaultSlot.Method.COMPUTER, "x", 1, VaultCrypto.randomKey(), JsonNodes.empty(), vk);
+        VaultSlot slot = VaultSlot.wrap(VAULT, VaultSlot.Method.COMPUTER, "x", 1, VaultCrypto.randomKey(), JsonNodes.empty(), vk);
         assertThrows(VaultCrypto.Broken.class, () -> slot.unwrap(vk));
         assertThrows(VaultCrypto.Broken.class, () -> slot.unwrap(new byte[5]));
         assertThrows(VaultCrypto.Broken.class, () -> slot.unwrap(new byte[32]));
@@ -57,9 +58,10 @@ class VaultSlotTest {
     @Test
     void aSlotSurvivesItsJson() throws Exception {
         byte[] key = VaultCrypto.randomKey();
-        VaultSlot slot = VaultSlot.wrap(VaultSlot.Method.PASSWORD, "pw", 7, key, VaultSlot.newPasswordParams(), vk);
+        VaultSlot slot = VaultSlot.wrap(VAULT, VaultSlot.Method.PASSWORD, "pw", 7, key, VaultSlot.newPasswordParams(), vk);
         VaultSlot back = VaultSlot.parse(slot.toJson());
         assertEquals(slot.id(), back.id());
+        assertEquals(VAULT, back.vault());
         assertEquals(VaultSlot.Method.PASSWORD, back.method());
         assertEquals("pw", back.label());
         assertEquals(slot.created(), back.created());
@@ -71,6 +73,7 @@ class VaultSlotTest {
         assertNull(VaultSlot.parse("garbage".getBytes(StandardCharsets.UTF_8)));
         assertNull(VaultSlot.parse("[]".getBytes(StandardCharsets.UTF_8)));
         assertNull(VaultSlot.parse("{}".getBytes(StandardCharsets.UTF_8)));
+        assertNull(VaultSlot.parse(new String(slot.toJson(), StandardCharsets.UTF_8).replace("\"vault\":\"" + VAULT + "\"", "\"vault\":7").getBytes(StandardCharsets.UTF_8)), "a slot names its vault");
         assertNull(VaultSlot.parse(new String(slot.toJson(), StandardCharsets.UTF_8).replace("PASSWORD", "MAGIC").getBytes(StandardCharsets.UTF_8)));
         assertNull(VaultSlot.parse(new String(slot.toJson(), StandardCharsets.UTF_8).replaceAll("\"wrapped\":\"[^\"]*\"", "\"wrapped\":\"***\"").getBytes(StandardCharsets.UTF_8)));
         assertNull(VaultSlot.parse(new String(slot.toJson(), StandardCharsets.UTF_8).replaceAll("\"created\":\"[^\"]*\"", "\"created\":\"yesterday\"").getBytes(StandardCharsets.UTF_8)));
@@ -79,15 +82,28 @@ class VaultSlotTest {
     @Test
     void aSlotMovedToAnotherIdDoesntOpen() throws Exception {
         byte[] key = VaultCrypto.randomKey();
-        VaultSlot slot = VaultSlot.wrap(VaultSlot.Method.COMPUTER, "x", 1, key, JsonNodes.empty(), vk);
-        VaultSlot moved = new VaultSlot("another-id", slot.method(), slot.label(), Instant.now(), 1, slot.params(), slot.wrapped());
+        VaultSlot slot = VaultSlot.wrap(VAULT, VaultSlot.Method.COMPUTER, "x", 1, key, JsonNodes.empty(), vk);
+        VaultSlot moved = new VaultSlot("another-id", VAULT, slot.method(), slot.label(), Instant.now(), 1, slot.params(), slot.wrapped());
         assertThrows(VaultCrypto.Broken.class, () -> moved.unwrap(key));
         assertArrayEquals(vk, slot.unwrap(key));
     }
 
     @Test
+    void aSlotMovedToAnotherVaultOrMethodDoesntOpen() throws Exception {
+        byte[] key = VaultCrypto.randomKey();
+        VaultSlot slot = VaultSlot.wrap(VAULT, VaultSlot.Method.COMPUTER, "x", 1, key, JsonNodes.empty(), vk);
+        VaultSlot otherVault = new VaultSlot(slot.id(), "9b2f3c1e-0000-4000-8000-000000000002", slot.method(), slot.label(), slot.created(), 1, slot.params(), slot.wrapped());
+        VaultSlot otherMethod = new VaultSlot(slot.id(), VAULT, VaultSlot.Method.PASSKEY, slot.label(), slot.created(), 1, slot.params(), slot.wrapped());
+        assertThrows(VaultCrypto.Broken.class, () -> otherVault.unwrap(key));
+        assertThrows(VaultCrypto.Broken.class, () -> otherMethod.unwrap(key));
+        VaultSlot sameId = VaultSlot.wrap(VAULT, "9b2f3c1e-0000-4000-8000-0000000000aa", VaultSlot.Method.COMPUTER, "x", 1, key, JsonNodes.empty(), vk);
+        assertEquals("9b2f3c1e-0000-4000-8000-0000000000aa", sameId.id(), "a given id is kept");
+        assertArrayEquals(vk, sameId.unwrap(key));
+    }
+
+    @Test
     void aPasswordSlotWithABadSaltIsNoSlotAndGivesNoKey() throws Exception {
-        VaultSlot good = VaultSlot.wrap(VaultSlot.Method.PASSWORD, "pw", 1, VaultCrypto.randomKey(), VaultSlot.newPasswordParams(), vk);
+        VaultSlot good = VaultSlot.wrap(VAULT, VaultSlot.Method.PASSWORD, "pw", 1, VaultCrypto.randomKey(), VaultSlot.newPasswordParams(), vk);
         String json = new String(good.toJson(), StandardCharsets.UTF_8);
         String salt = good.params().get("salt").asText();
         String eight = Base64.getEncoder().encodeToString(new byte[8]);
@@ -105,7 +121,7 @@ class VaultSlotTest {
 
     @Test
     void generationLabelAndParamsMustBeSane() {
-        VaultSlot slot = VaultSlot.wrap(VaultSlot.Method.COMPUTER, "x", 1, VaultCrypto.randomKey(), empty(), vk);
+        VaultSlot slot = VaultSlot.wrap(VAULT, VaultSlot.Method.COMPUTER, "x", 1, VaultCrypto.randomKey(), empty(), vk);
         String json = new String(slot.toJson(), StandardCharsets.UTF_8);
         for (String bad : new String[] {"\"generation\":1", "\"generation\":-1", "\"generation\":1.5", "\"generation\":1e30", "\"generation\":99999999999999999999"}) {
             String changed = json.replace("\"generation\":1", bad.equals("\"generation\":1") ? "\"generation\":1" : bad);
@@ -113,9 +129,10 @@ class VaultSlotTest {
             else assertNull(VaultSlot.parse(changed.getBytes(StandardCharsets.UTF_8)), bad);
         }
         assertNull(VaultSlot.parse(json.replace("\"label\":\"x\"", "\"label\":null").getBytes(StandardCharsets.UTF_8)));
-        assertThrows(IllegalArgumentException.class, () -> VaultSlot.wrap(VaultSlot.Method.COMPUTER, null, 1, VaultCrypto.randomKey(), empty(), vk));
-        assertThrows(IllegalArgumentException.class, () -> VaultSlot.wrap(VaultSlot.Method.COMPUTER, "x", 1, VaultCrypto.randomKey(), null, vk));
-        assertThrows(IllegalArgumentException.class, () -> VaultSlot.wrap(VaultSlot.Method.COMPUTER, "x", -1, VaultCrypto.randomKey(), empty(), vk));
+        assertThrows(IllegalArgumentException.class, () -> VaultSlot.wrap(VAULT, VaultSlot.Method.COMPUTER, null, 1, VaultCrypto.randomKey(), empty(), vk));
+        assertThrows(IllegalArgumentException.class, () -> VaultSlot.wrap(VAULT, VaultSlot.Method.COMPUTER, "x", 1, VaultCrypto.randomKey(), null, vk));
+        assertThrows(IllegalArgumentException.class, () -> VaultSlot.wrap(VAULT, VaultSlot.Method.COMPUTER, "x", -1, VaultCrypto.randomKey(), empty(), vk));
+        assertThrows(IllegalArgumentException.class, () -> VaultSlot.wrap(null, VaultSlot.Method.COMPUTER, "x", 1, VaultCrypto.randomKey(), empty(), vk));
     }
 
     private static ObjectNode empty() {

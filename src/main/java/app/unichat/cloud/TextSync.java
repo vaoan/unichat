@@ -26,8 +26,7 @@ import java.util.stream.Stream;
 final class TextSync {
     static final String ROOT = CloudAccount.ROOT + "/Textos";
     private static final String HERE = "here", INDEX = "index.json";
-    /** A machine's name ({@link Cloud#machine}) and a file of ours: anything else in the account never becomes a path here. */
-    static final Pattern MACHINE = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+    /** A file of ours (machines are {@link Ids}): anything else in the account never becomes a path here. */
     private static final Pattern FILE = Pattern.compile("([0-9a-f]{12}) \\d{4}-\\d{2}\\.jsonl");
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -93,7 +92,7 @@ final class TextSync {
     private Set<String> bring(Storage storage) throws IOException {
         Set<String> came = new TreeSet<>();
         for (String other : storage.list(ROOT)) {
-            if (other.equals(machine) || !MACHINE.matcher(other).matches()) continue;
+            if (other.equals(machine) || !Ids.ours(other)) continue;
             String folder = ROOT + "/" + other;
             String stamp = storage.stamp(folder + "/" + INDEX);
             if (stamp == null || stamp.equals(stamps.get(other))) continue;

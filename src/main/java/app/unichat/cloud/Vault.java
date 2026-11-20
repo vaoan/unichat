@@ -71,39 +71,52 @@ final class Vault {
     }
 
     static long generation(Storage s) throws IOException {
-        Info info = info(s);
-        if (info == null) throw new IOException(I18n.t("cloud.error.noVault"));
-        return info.generation();
+        return current(s).generation();
     }
 
     /**
      * Makes the vault with its recovery code and this computer's slot. Two computers may do it at once: whoever reads back
-     * another's {@link #INFO} after writing its own stops before writing any slot, leaving the other's vault as it is.
+     * another's {@link #INFO}, after writing its own or after writing its slots, takes its slots back and stops, leaving
+     * the other's vault as it is. Any other failure takes back all it wrote, so no half-made vault is left in the way.
      */
     static Created create(Storage s, String machine, String machineName) throws IOException, Exists {
+        if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
         if (s.exists(INFO)) throw new Exists();
         Info mine = new Info(UUID.randomUUID().toString(), Instant.now(), 0);
         s.mkdirs(ROOT);
         s.put(INFO, json(mine));
-        Info read = info(s);
-        if (read == null || !read.id().equals(mine.id())) throw new Exists();
-        s.mkdirs(SLOTS);
+        if (!stillOurs(s, mine)) throw new Exists();
         byte[] vk = VaultCrypto.randomKey();
-        RecoveryCode code = writeRecovery(s, vk, mine.generation());
-        Computer computer = writeComputer(s, vk, machine, machineName, mine.generation());
-        return new Created(vk, code, computer, mine);
+        List<String> written = new ArrayList<>();
+        boolean made = false;
+        try {
+            s.mkdirs(SLOTS);
+            RecoveryCode code = writeRecovery(s, vk, mine, written);
+            Computer computer = writeComputer(s, vk, mine, machine, machineName, written);
+            if (!stillOurs(s, mine)) throw undo(s, written, null, new Exists());
+            made = true;
+            return new Created(vk, code, computer, mine);
+        } catch (IOException e) {
+            throw undo(s, written, mine, e);
+        } catch (RuntimeException e) {
+            throw undo(s, written, mine, e);
+        } finally {
+            if (!made) Arrays.fill(vk, (byte) 0);
+        }
     }
 
-    /** Every slot in the account; a file that isn't one, or whose name isn't its id, is skipped. */
+    /** Every slot of the account's vault; a file that isn't one, of another vault, or whose name isn't its id, is skipped. */
     static List<VaultSlot> slots(Storage s) throws IOException {
+        Info vault = info(s);
         List<VaultSlot> out = new ArrayList<>();
+        if (vault == null) return out;
         for (String name : s.list(SLOTS)) {
             if (!name.endsWith(JSON_FILE)) continue;
             String id = name.substring(0, name.length() - JSON_FILE.length());
-            if (!ours(id)) continue;
+            if (!Ids.ours(id)) continue;
             byte[] json = s.get(path(id));
             VaultSlot slot = json == null ? null : VaultSlot.parse(json);
-            if (slot != null && slot.id().equals(id)) out.add(slot);
+            if (slot != null && slot.id().equals(id) && slot.vault().equals(vault.id())) out.add(slot);
         }
         return out;
     }
@@ -115,11 +128,15 @@ final class Vault {
 
     /** This computer's way in, as {@code machine}'s own slot (one per computer: a second replaces its first). */
     static Computer addComputer(Storage s, byte[] vk, String machine, String name) throws IOException {
-        return writeComputer(s, vk, machine, name, generation(s));
+        return writeComputer(s, vk, current(s), machine, name, new ArrayList<>());
     }
 
+    /** At least {@link #MIN_PASSWORD} characters, as the person counts them (an emoji is one). */
     static VaultSlot addPassword(Storage s, byte[] vk, char[] password) throws IOException {
-        if (password.length < MIN_PASSWORD) throw new IllegalArgumentException("A password needs at least " + MIN_PASSWORD + " characters");
+        if (Character.codePointCount(password, 0, password.length) < MIN_PASSWORD) {
+            throw new IllegalArgumentException("A password needs at least " + MIN_PASSWORD + " characters");
+        }
+        Info vault = current(s);
         ObjectNode params = VaultSlot.newPasswordParams();
         byte[] key;
         try {
@@ -127,48 +144,94 @@ final class Vault {
         } catch (VaultCrypto.Broken e) {
             throw new IllegalStateException("Fresh password params were refused", e);
         }
-        return write(s, VaultSlot.wrap(VaultSlot.Method.PASSWORD, "password", generation(s), key, params, vk), key);
+        try {
+            return write(s, VaultSlot.wrap(vault.id(), VaultSlot.Method.PASSWORD, "password", vault.generation(), key, params, vk), new ArrayList<>());
+        } finally {
+            Arrays.fill(key, (byte) 0);
+        }
     }
 
-    /** A new recovery code; the old one's slot goes once the new one is there, so there's always one. */
+    /**
+     * A new recovery code. Its slot is written first and every other recovery slot goes after, so there's always one; one
+     * that can't be deleted now goes on the next call, and the new code is given anyway (it is already a way in).
+     */
     static RecoveryCode newRecovery(Storage s, byte[] vk) throws IOException {
-        List<VaultSlot> old = slots(s).stream().filter(slot -> slot.method() == VaultSlot.Method.RECOVERY).toList();
-        RecoveryCode code = writeRecovery(s, vk, generation(s));
-        for (VaultSlot slot : old) removeSlot(s, slot.id());
+        List<String> written = new ArrayList<>();
+        RecoveryCode code = writeRecovery(s, vk, current(s), written);
+        try {
+            for (VaultSlot slot : slots(s)) {
+                if (slot.method() == VaultSlot.Method.RECOVERY && !written.contains(path(slot.id()))) removeSlot(s, slot.id());
+            }
+        } catch (IOException e) {
+            // Left for the next call; the person must see the new code now, or it is lost.
+        }
         return code;
     }
 
     /** Ids are ours (UUIDs): one from the account that isn't never becomes a path to delete. */
     static void removeSlot(Storage s, String id) throws IOException {
-        if (!ours(id)) throw new IllegalArgumentException("Not a slot id");
+        if (!Ids.ours(id)) throw new IllegalArgumentException("Not a slot id");
         s.delete(path(id));
     }
 
-    private static RecoveryCode writeRecovery(Storage s, byte[] vk, long generation) throws IOException {
-        RecoveryCode code = RecoveryCode.random();
-        byte[] key = VaultSlot.recoveryKey(code);
-        write(s, VaultSlot.wrap(VaultSlot.Method.RECOVERY, "recovery", generation, key, JSON.createObjectNode(), vk), key);
-        return code;
+    private static Info current(Storage s) throws IOException {
+        Info info = info(s);
+        if (info == null) throw new IOException(I18n.t("cloud.error.noVault"));
+        return info;
     }
 
-    private static Computer writeComputer(Storage s, byte[] vk, String machine, String name, long generation) throws IOException {
-        if (!ours(machine)) throw new IllegalArgumentException("Not a machine id");
+    private static boolean stillOurs(Storage s, Info mine) throws IOException {
+        Info read = info(s);
+        return read != null && read.id().equals(mine.id());
+    }
+
+    /**
+     * Deletes the slots {@code written} and, when {@code mine} is given and the account's vault is still it, the vault's
+     * file too; what can't be deleted is told with {@code cause}, which is returned to be thrown.
+     */
+    private static <E extends Exception> E undo(Storage s, List<String> written, Info mine, E cause) {
+        for (String path : written) {
+            try {
+                s.delete(path);
+            } catch (IOException e) {
+                cause.addSuppressed(e);
+            }
+        }
+        try {
+            if (mine != null && stillOurs(s, mine)) s.delete(INFO);
+        } catch (IOException e) {
+            cause.addSuppressed(e);
+        }
+        return cause;
+    }
+
+    private static RecoveryCode writeRecovery(Storage s, byte[] vk, Info vault, List<String> written) throws IOException {
+        RecoveryCode code = RecoveryCode.random();
+        byte[] key = VaultSlot.recoveryKey(code);
+        try {
+            write(s, VaultSlot.wrap(vault.id(), VaultSlot.Method.RECOVERY, "recovery", vault.generation(), key, JSON.createObjectNode(), vk), written);
+            return code;
+        } finally {
+            Arrays.fill(key, (byte) 0);
+        }
+    }
+
+    private static Computer writeComputer(Storage s, byte[] vk, Info vault, String machine, String name, List<String> written)
+        throws IOException {
+        if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
         KeyPair pair = x25519();
         ObjectNode params = JSON.createObjectNode();
         params.put("x25519", Base64.getEncoder().encodeToString(pair.getPublic().getEncoded()));
         byte[] key = VaultCrypto.randomKey();
-        s.put(path(machine), VaultSlot.wrap(machine, VaultSlot.Method.COMPUTER, name, generation, key, params, vk).toJson());
+        write(s, VaultSlot.wrap(vault.id(), machine, VaultSlot.Method.COMPUTER, name, vault.generation(), key, params, vk), written);
         return new Computer(key, pair);
     }
 
-    /** Writes the slot and forgets its key, which only the way in can make again. */
-    private static VaultSlot write(Storage s, VaultSlot slot, byte[] key) throws IOException {
-        try {
-            s.put(path(slot.id()), slot.toJson());
-            return slot;
-        } finally {
-            Arrays.fill(key, (byte) 0);
-        }
+    /** Notes the path before writing, so a write that fails halfway is taken back too. */
+    private static VaultSlot write(Storage s, VaultSlot slot, List<String> written) throws IOException {
+        written.add(path(slot.id()));
+        s.put(path(slot.id()), slot.toJson());
+        return slot;
     }
 
     private static KeyPair x25519() {
@@ -177,10 +240,6 @@ final class Vault {
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException(e);
         }
-    }
-
-    private static boolean ours(String id) {
-        return id != null && TextSync.MACHINE.matcher(id).matches();
     }
 
     private static String path(String id) {

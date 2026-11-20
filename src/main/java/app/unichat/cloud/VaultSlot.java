@@ -12,29 +12,31 @@ import java.util.Base64;
 import java.util.UUID;
 
 /**
- * One way into the vault: the vault key sealed by that way's own key. The slot's id is the sealing path, so the same
- * bytes under another id open nothing. A slot is a small JSON file in the account; the recovery code, the password or
- * the computer's key that opens it is never in it.
+ * One way into the vault: the vault key sealed by that way's own key. The vault's id, the method and the slot's id are
+ * the sealing path, so the same bytes in another vault, as another method or under another id open nothing. A slot is
+ * a small JSON file in the account; the recovery code, the password or the computer's key that opens it is never in it.
  */
-record VaultSlot(String id, Method method, String label, Instant created, long generation, ObjectNode params, byte[] wrapped) {
+record VaultSlot(String id, String vault, Method method, String label, Instant created, long generation, ObjectNode params, byte[] wrapped) {
     enum Method { RECOVERY, PASSWORD, COMPUTER, GOOGLE, PASSKEY }
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int SALT = 16;
 
-    static VaultSlot wrap(Method m, String label, long generation, byte[] slotKey, ObjectNode params, byte[] vk) {
-        return wrap(UUID.randomUUID().toString(), m, label, generation, slotKey, params, vk);
+    static VaultSlot wrap(String vault, Method m, String label, long generation, byte[] slotKey, ObjectNode params, byte[] vk) {
+        return wrap(vault, UUID.randomUUID().toString(), m, label, generation, slotKey, params, vk);
     }
 
     /** The same under a given id: a computer's slot is its machine's id, so it has one and only one. */
-    static VaultSlot wrap(String id, Method m, String label, long generation, byte[] slotKey, ObjectNode params, byte[] vk) {
-        if (id == null || label == null || params == null || generation < 0) throw new IllegalArgumentException("A slot needs an id, a label, params and a generation");
-        return new VaultSlot(id, m, label, Instant.now(), generation, params, VaultCrypto.seal(slotKey, path(id), vk));
+    static VaultSlot wrap(String vault, String id, Method m, String label, long generation, byte[] slotKey, ObjectNode params, byte[] vk) {
+        if (vault == null || id == null || m == null || label == null || params == null || generation < 0) {
+            throw new IllegalArgumentException("A slot needs a vault, an id, a method, a label, params and a generation");
+        }
+        return new VaultSlot(id, vault, m, label, Instant.now(), generation, params, VaultCrypto.seal(slotKey, path(vault, m, id), vk));
     }
 
     byte[] unwrap(byte[] slotKey) throws VaultCrypto.Broken {
-        return VaultCrypto.open(slotKey, path(id), wrapped);
+        return VaultCrypto.open(slotKey, path(vault, method, id), wrapped);
     }
 
     static byte[] recoveryKey(RecoveryCode code) {
@@ -70,7 +72,7 @@ record VaultSlot(String id, Method method, String label, Instant created, long g
 
     byte[] toJson() {
         ObjectNode n = JSON.createObjectNode();
-        n.put("id", id).put("method", method.name()).put("label", label).put("created", created.toString());
+        n.put("id", id).put("vault", vault).put("method", method.name()).put("label", label).put("created", created.toString());
         n.put("generation", generation);
         n.set("params", params);
         n.put("wrapped", Base64.getEncoder().encodeToString(wrapped));
@@ -85,12 +87,12 @@ record VaultSlot(String id, Method method, String label, Instant created, long g
     static VaultSlot parse(byte[] json) {
         try {
             JsonNode n = JSON.readTree(json);
-            if (n == null || !n.isObject() || !n.path("id").isTextual() || !n.path("label").isTextual()
+            if (n == null || !n.isObject() || !n.path("id").isTextual() || !n.path("vault").isTextual() || !n.path("label").isTextual()
                 || !n.path("generation").isIntegralNumber() || !n.get("generation").canConvertToLong() || n.get("generation").asLong() < 0
                 || !(n.get("params") instanceof ObjectNode params)) return null;
             Method method = Method.valueOf(text(n, "method"));
             if (method == Method.PASSWORD && salt(params) == null) return null;
-            return new VaultSlot(n.get("id").asText(), method, n.get("label").asText(),
+            return new VaultSlot(n.get("id").asText(), n.get("vault").asText(), method, n.get("label").asText(),
                 Instant.parse(text(n, "created")), n.get("generation").asLong(), params,
                 Base64.getDecoder().decode(text(n, "wrapped")));
         } catch (IOException | IllegalArgumentException | DateTimeParseException e) {
@@ -103,13 +105,13 @@ record VaultSlot(String id, Method method, String label, Instant created, long g
         return n.get(field).asText();
     }
 
-    private static String path(String id) {
-        return "slot:" + id;
+    private static String path(String vault, Method m, String id) {
+        return "slot:" + vault + ":" + m + ":" + id;
     }
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof VaultSlot s && id.equals(s.id) && method == s.method && label.equals(s.label)
+        return o instanceof VaultSlot s && id.equals(s.id) && vault.equals(s.vault) && method == s.method && label.equals(s.label)
             && created.equals(s.created) && generation == s.generation && params.equals(s.params) && Arrays.equals(wrapped, s.wrapped);
     }
 
