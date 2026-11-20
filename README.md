@@ -123,6 +123,11 @@ memory, with simulated incoming messages, "typing…" and read receipts.
   said…" in its menu, or the chat's readable `.txt` in its folder); every computer of yours adds what it saw.
 - **Your own cloud**: Settings → Cloud keeps your settings, chat options, what the AI learned and the saved files in
   your pCloud, Dropbox or WebDAV storage (Icedrive, Nextcloud…), the same on every computer.
+- **The vault** (optional, Settings → Cloud → Vault): your settings, the keys of Unichat (Telegram's, the GIF
+  services', the cloud apps'), what the AI learned, the texts kept, pinned messages and voice-note transcripts go to
+  your storage encrypted with AES-256-GCM before they leave the computer; the service never sees the key. Another
+  computer opens it with the recovery code or a password. You can go on without it (and enter keys by hand, as
+  before) and turn it off any time. It doesn't depend on uploading media, which has its own switch.
 - Chat actions: mark read/unread, favorite, pin, mute, low priority, archive,
   **reminders** (1 h, 3 h, tomorrow, Monday), leave.
 - Info panel: participants, shared media, description.

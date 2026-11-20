@@ -37,6 +37,28 @@ as read on its own if you open the chat there.
 
 Voice notes are transcribed on your computer with Whisper: the audio doesn't leave it.
 
+## The vault
+
+Optional (Settings → Cloud → Vault), only with your own storage connected. Nothing is sent to anyone but that
+storage: no server of Unichat's, no other third party.
+
+- **What goes up, sealed**: your settings and chat options, what the AI learned, the texts of chats that keep them, your
+  keys (Telegram's, the GIF services', the cloud apps'), pinned messages and voice notes' transcripts. Each file is
+  encrypted on your computer with AES-256-GCM before it leaves. The saved media isn't part of it.
+- **What stays on each computer**: the vault key itself, your login to the storage, the session and logins of the
+  networks, and what is this computer's own (paths, commands). The vault key is kept in your data folder, readable by
+  your account alone, like the rest of what's stored there.
+- **Who can read what**: your storage service, and anyone who gets into your account there, sees only encrypted files
+  and their names and sizes, never their content. Anyone with your recovery code or password and access to the
+  storage can open it, so keep the code somewhere safe: without it, a computer you lose can't be replaced and
+  nobody, not even whoever made Unichat, can recover the vault. A computer that holds the key can read everything in the
+  vault; "Change the key" in the page cuts off a computer you remove.
+- **Turning it off** (Settings → Cloud → Vault): your settings, what the AI learned and the texts go back to the
+  storage unencrypted and the vault is deleted from the account. Your keys, pinned messages and transcripts, which only
+  the vault carries, stay on each computer, and aren't put back unencrypted.
+- You can also go on without it on a computer ("Go on without the vault on this computer"): nothing personal then goes
+  up or comes down from it, and you enter your keys by hand.
+
 ## Logs
 
 Errors are saved in `logs/unichat.log` inside the data folder. Before each line is written,

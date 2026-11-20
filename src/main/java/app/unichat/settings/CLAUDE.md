@@ -3,6 +3,7 @@
 `Settings`: `settings.properties` (portable: travels with the person and through their cloud) and `session.properties` (this machine: `Settings.staysOnThisMachine`). Both are written by `support/SafeFile` (temp, fsync, rename), on a daemon thread of their own (`support/BackgroundWriter`): `set()` never waits for the disk, and `Settings.flush()` waits for it (quitting does, `Shutdown` and the shutdown hook; a test reading the files does).
 
 - A key that holds a secret, a path of this computer, or anything that is run (a command, an engine that runs one) stays on this machine: from the cloud, whoever can write there would choose it for every computer (`SettingsSplitTest`).
+- `cloud.vault.*` (the vault's id, key, private key, pins, markers) are machine-only: never in the synced settings, never in the vault (`Settings.staysOnThisMachine`). `Settings.VAULT_SECRETS` (+ `gif.<id>.key`, `Settings.vaultSecret`) are the opposite case: personal secrets (Telegram's id and hash, the cloud apps' keys, each GIF service's key) that stay out of the plain cloud but travel inside the vault, merged by `Settings.vaultSecrets`/`adoptVaultSecrets`; a new secret of the person's goes in that list, anything of this computer (a path, a session, a command) never does (`cloud/CLAUDE.md`).
 - The settings window and a new key's proof that it applies live: `ui/settings/CLAUDE.md`.
 
 ## Lessons

@@ -37,6 +37,29 @@ leído por su cuenta si abres el chat allí.
 
 Las notas de voz se transcriben en tu computador con Whisper: el audio no sale de él.
 
+## La bóveda
+
+Opcional (Ajustes → Nube → Bóveda), solo con tu propio almacenamiento conectado. No se envía nada a nadie más que a
+ese almacenamiento: ni a un servidor de Unichat ni a otro tercero.
+
+- **Lo que sube, sellado**: tus ajustes y las opciones de los chats, lo que aprendió la IA, los textos de los chats que
+  los guardan, tus claves (las de Telegram, las de los servicios de GIF, las de las apps de la nube), los mensajes fijados
+  y las transcripciones de las notas de voz. Cada archivo se cifra en tu computador con AES-256-GCM antes de salir. La
+  multimedia guardada no forma parte de ella.
+- **Lo que queda en cada computador**: la llave de la bóveda, tu acceso al almacenamiento, la sesión y los inicios de
+  sesión de las redes, y lo propio de ese computador (rutas, comandos). La llave de la bóveda se guarda en tu carpeta de
+  datos, legible solo por tu cuenta, como el resto de lo que hay allí.
+- **Quién puede leer qué**: tu servicio de almacenamiento, y quien entre a tu cuenta allí, ve solo archivos cifrados y
+  sus nombres y tamaños, nunca su contenido. Quien tenga tu código de recuperación o tu contraseña y acceso al
+  almacenamiento puede abrirla, así que guarda el código en un lugar seguro: sin él, un computador perdido no se puede
+  reemplazar y nadie, ni quien hizo Unichat, puede recuperar la bóveda. Un computador que tiene la llave puede leer todo
+  lo de la bóveda; «Cambiar la llave» en la página deja fuera a un computador que quites.
+- **Apagarla** (Ajustes → Nube → Bóveda): tus ajustes, lo que aprendió la IA y los textos vuelven al almacenamiento sin
+  cifrar y la bóveda se borra de la cuenta. Tus claves, los mensajes fijados y las transcripciones, que solo lleva la
+  bóveda, quedan en cada computador y no se suben sin cifrar.
+- También puedes seguir sin ella en un computador («Seguir sin la bóveda en este equipo»): entonces nada personal sube
+  ni baja desde él, y pones tus claves a mano.
+
 ## Registros
 
 Los errores se guardan en `logs/unichat.log` dentro de la carpeta de datos. Antes de escribir cada línea se

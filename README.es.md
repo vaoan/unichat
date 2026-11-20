@@ -124,6 +124,12 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   computador tuyo suma lo que vio.
 - **Tu propia nube**: Ajustes → Nube guarda tus ajustes, las opciones de los chats, lo que aprendió la IA y los archivos
   guardados en tu pCloud, Dropbox o WebDAV (Icedrive, Nextcloud…), iguales en cada computador.
+- **La bóveda** (opcional, Ajustes → Nube → Bóveda): tus ajustes, las claves de Unichat (las de Telegram, las de los
+  servicios de GIF, las de las apps de la nube), lo que aprendió la IA, los textos guardados, los mensajes fijados y las
+  transcripciones de las notas de voz suben a tu almacenamiento cifrados con AES-256-GCM antes de salir del computador;
+  el servicio nunca ve la llave. Otro computador la abre con el código de recuperación o una contraseña. Puedes seguir
+  sin ella (y poner las claves a mano, como antes) y apagarla cuando quieras. No depende de subir multimedia, que tiene
+  su propio interruptor.
 - Acciones por chat: marcar leído/no leído, favorito, fijar, silenciar, prioridad baja, archivar,
   **recordatorios** (1 h, 3 h, mañana, el lunes), salir.
 - Panel de información: participantes, multimedia compartida, descripción.
