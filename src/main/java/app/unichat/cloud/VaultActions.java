@@ -144,6 +144,7 @@ final class VaultActions {
         s.set(VaultParts.KEY, Base64.getEncoder().encodeToString(computer.key()));
         s.set(VaultParts.PRIVATE, Base64.getEncoder().encodeToString(computer.pair().getPrivate().getEncoded()));
         s.set(VaultParts.DECLINED, null);
+        VaultParts.seen(vault);
         Arrays.fill(computer.key(), (byte) 0);
     }
 

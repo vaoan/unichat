@@ -58,7 +58,8 @@ storage: no server of Unichat's, no other third party.
   the vault there with the code or a password.
 - **Someone else changing the storage**: if the vault's file is deleted, or its key changed, without Unichat doing it,
   your computers stop sending anything personal and say so in Settings → Cloud → Vault; they don't go back to
-  unencrypted by themselves. Only a vault really turned off (it leaves a mark only its key could write) does that.
+  unencrypted by themselves. Only a vault really turned off (it leaves a mark only its key could write) does that, on the
+  computers that had it open; one that went on without it or never opened it asks you once even then.
 - **Turning it off** (Settings → Cloud → Vault): your settings, what the AI learned and the texts go back to the
   storage unencrypted, a mark that it was turned off is left in `Unichat/Ajustes`, and the vault is deleted from the
   account. Your keys, pinned messages and transcripts, which only

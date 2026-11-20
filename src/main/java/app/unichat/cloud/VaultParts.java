@@ -29,6 +29,11 @@ final class VaultParts {
     static final String ID = "cloud.vault.id", KEY = "cloud.vault.key", PRIVATE = "cloud.vault.private";
     /** "Seguir sin la bóveda en este equipo": never asked again, nothing personal sent, everything entered by hand. */
     static final String DECLINED = "cloud.vault.declined";
+    /**
+     * The vault this computer last found in the account, in any state (machine-only): its file gone with none held here
+     * (declined, or never opened) is no sign it was turned off either, so nothing goes plain until the person says.
+     */
+    static final String SEEN = "cloud.vault.seen";
     static final String SECRETS_FILE = Cloud.Part.SECRETS.path(), PINNED_FILE = Cloud.Part.PINNED.path(),
         TRANSCRIPTS_FILE = Cloud.Part.TRANSCRIPTS.path();
     private static final String PINNED = "pinned-messages.json";
@@ -190,11 +195,13 @@ final class VaultParts {
         // and a key held here isn't forgotten over it.
         if (info == null && file != null) return closed(s);
         if (info == null) {
-            // Its file deleted is no sign it was turned off: only the mark that opens with this computer's key is.
-            if (held != null && !VaultOff.says(plain, held)) return new Round(Cloud.VaultState.MISSING, null);
+            // Its file deleted is no sign it was turned off: only the mark that opens with this computer's key is, and a
+            // computer that saw the vault without holding it has no key to believe a mark with.
+            if (held != null ? !VaultOff.says(plain, held) : s.getString(SEEN, null) != null) return new Round(Cloud.VaultState.MISSING, null);
             if (held != null || s.getBool(DECLINED, false)) gone();
             return new Round(Cloud.VaultState.NONE, null);
         }
+        seen(info);
         if (!info.id().equals(held)) VaultMove.forget(); // another vault than the one moved into: it's moved into afresh
         String key = s.getString(KEY, null);
         if (key == null || !info.id().equals(held)) return closed(s);
@@ -226,9 +233,19 @@ final class VaultParts {
     static void gone() {
         forget();
         Settings.get().set(DECLINED, null);
+        Settings.get().set(SEEN, null);
     }
 
-    /** This computer's hold on the vault forgotten here: the vault itself and the other computers left as they are. */
+    /** {@code vault} found in the account (or made here): kept as the one seen, in place of any other. */
+    static void seen(Vault.Info vault) {
+        Settings s = Settings.get();
+        if (!vault.id().equals(s.getString(SEEN, null))) s.set(SEEN, vault.id());
+    }
+
+    /**
+     * This computer's hold on the vault forgotten here: the vault itself and the other computers left as they are, and
+     * that it saw one ({@link #SEEN}) kept.
+     */
     static void forget() {
         Settings s = Settings.get();
         for (String k : new String[] {ID, KEY, PRIVATE, VaultActions.UNCONFIRMED, VaultOff.KEY}) s.set(k, null);

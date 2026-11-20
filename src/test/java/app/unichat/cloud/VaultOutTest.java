@@ -249,7 +249,9 @@ class VaultOutTest {
         assertEquals("{\"l\":1}\n", plain(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT), "its texts plain");
         assertEquals("DARK", laptop.get("ui.theme"), "the settings, plain, as they were in the vault");
 
-        assertEquals(Cloud.VaultState.NONE, declined.round().vault(), "one that went on without it too");
+        assertEquals(Cloud.VaultState.MISSING, declined.round().vault(), "one that went on without it holds no key to believe the mark with");
+        declined.as(declined.cloud.vault()::leaveMissingVault); // asked once
+        assertEquals(Cloud.VaultState.NONE, declined.round().vault(), "then back to plain");
         assertNull(declined.get(VaultParts.DECLINED), "never declined a vault that's gone");
         Vault.Created later = Vault.create(dav(), DESK, "Escritorio");
         assertEquals(Cloud.VaultState.LOCKED, declined.round().vault(), "a vault made later is asked about afresh");
@@ -315,5 +317,61 @@ class VaultOutTest {
         int puts = cloud.puts.get();
         assertEquals(Cloud.VaultState.MISSING, desk.round().vault(), "one that held it is asked, nothing said it was turned off");
         assertEquals(puts, cloud.puts.get(), "and sends nothing meanwhile");
+    }
+
+    /** A computer that saw the vault and never opened it: the file deleted by hand is no sign it was turned off. */
+    private void neverOpenedFindsTheFileGone(VaultComputer other, Cloud.VaultState was) throws Exception {
+        other.write("texts/here/" + TEXT, "{\"o\":1}\n").set("ui.theme", "LIGHT");
+        assertEquals(was, other.round().vault());
+        cloud.files.remove(Vault.INFO); // someone with only the account
+        int puts = cloud.puts.get();
+        assertEquals(Cloud.VaultState.MISSING, other.round().vault(), "never back to plain on that alone");
+        assertEquals(Cloud.VaultState.MISSING, other.round().vault(), "nor the round after");
+        assertEquals(puts, cloud.puts.get(), "nothing sent, plain or sealed");
+        assertNull(plain(TextSync.ROOT + "/" + OTHER + "/" + TEXT));
+        assertNull(cloud.files.get(SETTINGS));
+
+        other.as(other.cloud.vault()::leaveMissingVault); // the person says it's gone, asked twice on the page
+        assertEquals(Cloud.VaultState.NONE, other.round().vault(), "then today's plain round");
+        assertEquals("{\"o\":1}\n", plain(TextSync.ROOT + "/" + OTHER + "/" + TEXT), "its texts plain");
+        assertNull(other.get(VaultParts.DECLINED));
+        assertNull(other.get(VaultParts.SEEN), "the vault it saw forgotten");
+    }
+
+    @Test
+    void aComputerThatDeclinedSendsNothingPlainWhenTheVaultsFileIsDeletedByHand() throws Exception {
+        neverOpenedFindsTheFileGone(new VaultComputer(cloud, dir, OTHER).set(VaultParts.DECLINED, "true"), Cloud.VaultState.DECLINED);
+    }
+
+    @Test
+    void aComputerThatNeverOpenedTheVaultSendsNothingPlainWhenItsFileIsDeletedByHand() throws Exception {
+        neverOpenedFindsTheFileGone(new VaultComputer(cloud, dir, OTHER), Cloud.VaultState.LOCKED);
+    }
+
+    @Test
+    void aComputerThatForgotTheVaultHereStillRemembersItSawOne() throws Exception {
+        VaultComputer laptop = laptopOpen();
+        laptop.as(laptop.cloud.vault()::forgetHere);
+        assertEquals(Cloud.VaultState.LOCKED, laptop.round().vault());
+        cloud.files.remove(Vault.INFO);
+        assertEquals(Cloud.VaultState.MISSING, laptop.round().vault(), "forgotten here is not gone from the account");
+    }
+
+    @Test
+    void aComputerThatNeverSawAVaultIsTodaysRound() throws Exception {
+        cloud.files.remove(Vault.INFO);
+        assertEquals(Cloud.VaultState.NONE, new VaultComputer(cloud, dir, OTHER).round().vault());
+    }
+
+    @Test
+    void anotherVaultSeenReplacesTheOneSeenBefore() throws Exception {
+        VaultComputer other = new VaultComputer(cloud, dir, OTHER);
+        assertEquals(Cloud.VaultState.LOCKED, other.round().vault());
+        assertEquals(made.info().id(), other.get(VaultParts.SEEN));
+        cloud.files.remove(Vault.INFO);
+        Vault.Created later = Vault.create(dav(), DESK, "Escritorio");
+        assertEquals(Cloud.VaultState.LOCKED, other.round().vault());
+        assertEquals(later.info().id(), other.get(VaultParts.SEEN));
+        Arrays.fill(later.vk(), (byte) 0);
     }
 }

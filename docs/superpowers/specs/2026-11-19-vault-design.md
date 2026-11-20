@@ -175,7 +175,8 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
   (the vault and generation sealed with a key made from that generation's vault key, kept by each computer while the
   vault is open there), and a computer holding a vault goes back to plain only when that mark opens with its key;
   otherwise it is `MISSING` and the person decides ("Volver a sincronizar sin cifrar", asked twice). A computer that
-  declined the vault, or never opened it, has no key to check the mark with and goes back to plain as before.
+  declined the vault, or never opened it, has no key to check the mark with: it keeps the id of the vault it last saw
+  (`cloud.vault.seen`, any state) and is `MISSING` too, so a real turn-off asks it once.
 - A removed computer still holds the old vault key, so it can vouch for an offer of its own to a computer that was off
   during the removal (and missed the change that shut it out) and keep reading what that computer then seals. The
   limit holds until that computer is opened with a way in (recovery code, password), which writes it a slot of its own.

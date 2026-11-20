@@ -59,6 +59,24 @@ class VaultStatesUiTest extends VaultPageTestBase {
     }
 
     @Test
+    void aComputerThatDeclinedIsAskedBeforeSendingPlainWhenTheVaultsFileIsGone() throws Exception {
+        account.otherComputerMadeIt(null);
+        account.cloud().vault().declineVault(true).get();
+        assertEquals(Cloud.VaultState.DECLINED, round());
+        account.deleteVaultFileByHand();
+        assertEquals(Cloud.VaultState.MISSING, round(), "it holds no key to believe the vault was turned off");
+        page();
+        waitFor(I18n.t("settings.vault.missing"));
+        click(I18n.t("settings.vault.missingLeave"));
+        waitFor(I18n.t("settings.vault.missingAsk"));
+        click(I18n.t("settings.vault.turnOffNext"));
+        waitFor(I18n.t("settings.vault.missingWhat"));
+        click(I18n.t("settings.vault.missingYes"));
+        FxWait.until("no vault", () -> hasButton(I18n.t("settings.vault.create")));
+        assertEquals(Cloud.VaultState.NONE, round(), "back to plain, as the person said");
+    }
+
+    @Test
     void forgettingTheOnlyComputerWhileTheCodeIsntKeptWarns() throws Exception {
         page();
         FxWait.until("no vault yet", () -> hasButton(I18n.t("settings.vault.create")));

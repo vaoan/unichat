@@ -59,7 +59,8 @@ ese almacenamiento: ni a un servidor de Unichat ni a otro tercero.
   quitabas puede ser engañado por él hasta que abras allí la bóveda con el código o una contraseña.
 - **Si otro cambia el almacenamiento**: si el archivo de la bóveda se borra, o su llave cambia, sin que lo haga Unichat,
   tus computadores dejan de enviar nada personal y lo dicen en Ajustes → Nube → Bóveda; no vuelven a subir sin cifrar
-  por su cuenta. Solo una bóveda apagada de verdad (deja una marca que solo su llave pudo escribir) lo hace.
+  por su cuenta. Solo una bóveda apagada de verdad (deja una marca que solo su llave pudo escribir) lo hace, en los
+  computadores que la tenían abierta; uno que siguió sin ella o nunca la abrió te pregunta una vez incluso entonces.
 - **Apagarla** (Ajustes → Nube → Bóveda): tus ajustes, lo que aprendió la IA y los textos vuelven al almacenamiento sin
   cifrar, queda en `Unichat/Ajustes` una marca de que se apagó y la bóveda se borra de la cuenta. Tus claves, los mensajes fijados y las transcripciones, que solo lleva la
   bóveda, quedan en cada computador y no se suben sin cifrar.
