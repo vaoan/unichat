@@ -1,0 +1,165 @@
+package app.unichat.cloud;
+
+import app.unichat.settings.Settings;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Turning the vault off: everything with a plain place goes back there, read back, and only then the vault is deleted;
+ * the other computers find it gone and go back to plain by themselves. Media is never touched.
+ */
+class VaultOutTest {
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
+        OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
+    private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl", TRANSCRIPT = "a".repeat(64) + ".txt";
+    private static final String SETTINGS = CloudAccount.SETTINGS_FILE, AI = "Unichat/Ajustes/unichat-ai.json",
+        PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg";
+
+    @TempDir
+    Path dir;
+    private FakeDav cloud;
+    private Map<String, String> portableWere, keysWere;
+    private Vault.Created made;
+
+    @BeforeEach
+    void start() throws Exception {
+        cloud = new FakeDav("u", "p");
+        portableWere = Settings.get().portable();
+        keysWere = VaultComputer.kept();
+        made = Vault.create(dav(), DESK, "Escritorio");
+    }
+
+    @AfterEach
+    void stop() {
+        cloud.close();
+        Settings.get().replacePortable(portableWere, k -> false);
+        keysWere.forEach(Settings.get()::set);
+    }
+
+    private Storage dav() {
+        return new WebDav(cloud.url(), "u", "p");
+    }
+
+    private VaultComputer desk() throws Exception {
+        return new VaultComputer(cloud, dir, DESK).opened(made.info(), made.computer()).set("ui.theme", "DARK")
+            .write("writing-style.md", "escribo corto").write("texts/here/" + TEXT, "{\"d\":1}\n")
+            .write("pinned-messages.json", "{\"!c\":[]}").write("transcripts/" + TRANSCRIPT, "hola")
+            .set("server.telegram.apiId", "12345");
+    }
+
+    private String plain(String path) {
+        byte[] b = cloud.files.get(path);
+        return b == null ? null : new String(b, StandardCharsets.UTF_8);
+    }
+
+    private boolean anyVault() {
+        return cloud.files.keySet().stream().anyMatch(p -> p.startsWith(Vault.ROOT + "/")) || cloud.dirs.contains(Vault.ROOT);
+    }
+
+    /** A computer of the vault that's off now: what it sent while it ran, sealed. */
+    private void offlineLaptopSent(String text) throws Exception {
+        Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil");
+        SealedStorage sealed = new SealedStorage(dav(), () -> made.vk().clone());
+        String folder = TextSync.ROOT + "/" + LAPTOP;
+        sealed.mkdirs(folder);
+        byte[] data = text.getBytes(StandardCharsets.UTF_8);
+        sealed.put(folder + "/" + TEXT, data);
+        sealed.put(folder + "/index.json", TextIndex.write(Map.of(TEXT, (long) data.length)));
+    }
+
+    @Test
+    void turningOffPutsEverythingBackPlainBeforeDeletingTheVault() throws Exception {
+        VaultComputer desk = desk();
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
+        offlineLaptopSent("{\"l\":1}\n");
+        Map<String, byte[]> before = new HashMap<>(cloud.files);
+
+        cloud.failOnce.add(AI); // the network drops on one plain copy
+        ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud::turnOffVault));
+        assertNotNull(failed.getCause().getMessage(), "the failure is told");
+        before.forEach((p, b) -> {
+            if (p.startsWith(Vault.ROOT + "/")) assertArrayEquals(b, cloud.files.get(p), "the vault intact: " + p);
+        });
+        assertEquals(made.info().id(), desk.get(VaultParts.ID), "still held here");
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault(), "and still open: the person can try again");
+
+        desk.as(desk.cloud::turnOffVault); // again: this time it goes through
+        assertFalse(anyVault(), "the vault deleted, whole");
+        Bundle settings = Bundle.parse(cloud.files.get(SETTINGS));
+        assertNotNull(settings, "the settings back plain");
+        assertEquals("DARK", settings.settings().get("ui.theme"));
+        assertTrue(plain(AI).contains("escribo corto"), "what the AI learned");
+        assertEquals("{\"d\":1}\n", plain(TextSync.ROOT + "/" + DESK + "/" + TEXT), "this computer's texts");
+        assertEquals("{\"l\":1}\n", plain(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT), "an offline computer's texts survive");
+        assertEquals(Map.of(TEXT, 8L), TextIndex.read(cloud.files.get(TextSync.ROOT + "/" + LAPTOP + "/index.json")), "with its index");
+        assertArrayEquals(before.get(PHOTO), cloud.files.get(PHOTO), "media untouched");
+        assertEquals(before.get(PHOTO).length, cloud.files.get(PHOTO).length);
+        for (String p : cloud.files.keySet()) {
+            assertFalse(p.contains("secrets") || p.contains("pinned") || p.contains("transcripts"), "the vault's own parts never go plain: " + p);
+            assertFalse(new String(cloud.files.get(p), StandardCharsets.ISO_8859_1).contains("12345"), "no secret plain: " + p);
+        }
+        for (String k : new String[] {VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultParts.DECLINED, VaultPeers.KEY,
+            VaultMove.MOVED_AT, VaultActions.UNCONFIRMED}) {
+            assertNull(desk.get(k), "forgotten here: " + k);
+        }
+
+        String own = TextSync.ROOT + "/" + DESK + "/" + TEXT;
+        int sent = cloud.versions.get(own);
+        Cloud.Status s = desk.round();
+        assertNull(s.error());
+        assertEquals(Cloud.VaultState.NONE, s.vault(), "today's plain round");
+        assertEquals(sent, cloud.versions.get(own), "what was just copied isn't sent again");
+    }
+
+    @Test
+    void turningOffNeedsTheVaultOpenHere() throws Exception {
+        VaultComputer other = new VaultComputer(cloud, dir, OTHER);
+        Map<String, byte[]> before = new HashMap<>(cloud.files);
+        assertThrows(ExecutionException.class, () -> other.as(other.cloud::turnOffVault));
+        assertEquals(before.keySet(), cloud.files.keySet(), "nothing touched");
+    }
+
+    @Test
+    void anotherComputerFindsItGoneAndGoesBackByItself() throws Exception {
+        VaultComputer desk = desk();
+        Vault.Computer laptopWay = Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil");
+        VaultComputer laptop = new VaultComputer(cloud, dir, LAPTOP).opened(made.info(), laptopWay).write("texts/here/" + TEXT, "{\"l\":1}\n");
+        VaultComputer declined = new VaultComputer(cloud, dir, OTHER).set(VaultParts.DECLINED, "true").set("ui.theme", "LIGHT");
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
+        assertEquals(Cloud.VaultState.DECLINED, declined.round().vault());
+
+        desk.as(desk.cloud::turnOffVault);
+        Cloud.Status s = laptop.round();
+        assertNull(s.error());
+        assertEquals(Cloud.VaultState.NONE, s.vault(), "it finds the vault gone");
+        assertNull(laptop.get(VaultParts.ID));
+        assertNull(laptop.get(VaultParts.KEY), "and forgets its key");
+        assertNull(laptop.get(VaultParts.PRIVATE));
+        assertEquals("{\"l\":1}\n", plain(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT), "its texts plain");
+        assertEquals("DARK", laptop.get("ui.theme"), "the settings, plain, as they were in the vault");
+
+        assertEquals(Cloud.VaultState.NONE, declined.round().vault(), "one that went on without it too");
+        assertNull(declined.get(VaultParts.DECLINED), "never declined a vault that's gone");
+        Vault.Created later = Vault.create(dav(), DESK, "Escritorio");
+        assertEquals(Cloud.VaultState.LOCKED, declined.round().vault(), "a vault made later is asked about afresh");
+        Arrays.fill(later.vk(), (byte) 0);
+    }
+}

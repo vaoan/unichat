@@ -137,6 +137,16 @@ final class TextSync {
         return false;
     }
 
+    /**
+     * What was sent is now at {@code to} too (the vault turned off here copied it there as it was): nothing goes again
+     * for the change of place.
+     */
+    synchronized void sentAt(String to) throws IOException {
+        load();
+        sentTo = to;
+        save();
+    }
+
     /** The index goes up again at the next run, so it says what this computer has (after the vault's key changed). */
     synchronized void indexAgain() throws IOException {
         load();

@@ -85,6 +85,16 @@ public final class VaultFixture implements AutoCloseable {
         return out;
     }
 
+    /** The account's next PUT of {@code path} fails (the network dropped), once. */
+    public void failOnce(String path) {
+        dav.failOnce.add(path);
+    }
+
+    /** Whether the account still holds a vault (anything under its folder). */
+    public boolean vaultThere() {
+        return dav.files.keySet().stream().anyMatch(p -> p.startsWith(Vault.ROOT + "/"));
+    }
+
     /** Every file in the account, as it is now. */
     public Map<String, byte[]> files() {
         Map<String, byte[]> out = new HashMap<>();

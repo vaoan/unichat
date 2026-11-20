@@ -151,13 +151,14 @@ class CloudVaultTest {
         assertNull(desk.get(VaultParts.KEY));
         assertNull(desk.get(VaultParts.PRIVATE));
         assertNull(desk.get(VaultMove.MOVED_AT), "a vault made later is moved into again");
+        assertNull(desk.get(VaultParts.DECLINED), "and asked about afresh");
         assertTrue(cloud.files.containsKey(SETTINGS), "back to the plain settings");
 
         Vault.Created again = Vault.create(dav(), OTHER, "Otro");
         cloud.put(Vault.INFO, "{no es una bóveda".getBytes(StandardCharsets.UTF_8));
         desk.opened(again.info(), again.computer());
         Map<String, byte[]> before = files();
-        assertEquals(Cloud.VaultState.DECLINED, desk.round().vault(), "a vault file that doesn't read: closed (declined here), never forgotten");
+        assertEquals(Cloud.VaultState.LOCKED, desk.round().vault(), "a vault file that doesn't read: closed, never forgotten");
         assertEquals(again.info().id(), desk.get(VaultParts.ID));
         assertEquals(Set.of(), written(before).stream().filter(CloudVaultTest::plain).collect(java.util.stream.Collectors.toSet()));
     }

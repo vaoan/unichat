@@ -542,6 +542,23 @@ public final class Cloud {
         });
     }
 
+    /**
+     * The vault turned off, on the cloud's thread, only with it open here: everything with a plain place back there, read
+     * back, and only then the vault deleted ({@link VaultOut}); then this computer's hold on it forgotten, its texts
+     * counted as sent plain (they were just copied). A failure before the delete leaves the vault as it was. The other
+     * computers find it gone on their next round and go back to plain by themselves.
+     */
+    public CompletableFuture<Void> turnOffVault() {
+        return onWorker(dav -> withKey(dav, (vault, vk) -> {
+            synchronized (texts) { // TextSync.run's own lock: no text of this computer's goes up halfway through
+                VaultOut.run(dav, vault.personal(dav));
+                VaultParts.gone();
+                texts.sentAt(TextSync.PLAIN);
+            }
+            return null;
+        }));
+    }
+
     /** What Ajustes → Nube → Bóveda shows: the vault as it stands here, its ways in and, open, its computers. */
     public CompletableFuture<VaultView> vaultView() {
         return onWorker(dav -> {

@@ -150,7 +150,10 @@ final class VaultPage {
         Button forget = new Button(I18n.t("settings.vault.forget"));
         forget.getStyleClass().add("danger-button");
         forget.setOnAction(e -> forget());
-        rows.add(stacked(I18n.t("settings.vault.keyTitle"), I18n.t("settings.vault.keyHelp"), new FlowPane(8, 6, change, forget)));
+        Button off = new Button(I18n.t("settings.vault.turnOff"));
+        off.getStyleClass().add("danger-button");
+        off.setOnAction(e -> turnOff());
+        rows.add(stacked(I18n.t("settings.vault.keyTitle"), I18n.t("settings.vault.keyHelp"), new FlowPane(8, 6, change, forget, off)));
         show(rows.toArray(new Node[0]));
     }
 
@@ -249,6 +252,37 @@ final class VaultPage {
             }));
         });
         show(stacked(I18n.t("settings.vault.forgetTitle"), I18n.t("settings.vault.forgetHelp"), new VBox(8, new FlowPane(8, 6, yes, cancel(this::reload)), error)));
+    }
+
+    /** "Apagar la bóveda", asked twice: first whether, then what happens, with the button saying the action. */
+    private void turnOff() {
+        inStep = true;
+        Button next = secondary(I18n.t("settings.vault.turnOffNext"));
+        next.setOnAction(e -> turnOffSure());
+        show(stacked(I18n.t("settings.vault.turnOffTitle"), I18n.t("settings.vault.turnOffAsk"), new FlowPane(8, 6, next, cancel(this::reload))));
+    }
+
+    private void turnOffSure() {
+        Button yes = new Button(I18n.t("settings.vault.turnOffYes"));
+        yes.getStyleClass().add("danger-button");
+        yes.setOnAction(e -> turningOff());
+        show(stacked(I18n.t("settings.vault.turnOffSure"), I18n.t("settings.vault.turnOffWhat"), new FlowPane(8, 6, yes, cancel(this::reload))));
+    }
+
+    /** While it runs, a line; failed, why (the vault is as it was) and "Intentar de nuevo"; done, the page without a vault. */
+    private void turningOff() {
+        show(line(I18n.t("settings.vault.turnOffWorking")));
+        cloud.turnOffVault().whenComplete((ok, err) -> Platform.runLater(() -> {
+            if (err == null) {
+                cloud.syncNow();
+                reload();
+                return;
+            }
+            Button again = secondary(I18n.t("settings.vault.retry"));
+            again.setOnAction(e -> turningOff());
+            show(actions(KeyChangeFlow.warning(I18n.t("settings.vault.turnOffFailed"))), line(Errors.message(Errors.unwrap(err))),
+                new FlowPane(8, 6, again, cancel(this::reload)));
+        }));
     }
 
     private void show(Node... rows) {

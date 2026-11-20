@@ -192,7 +192,7 @@ final class VaultParts {
         // and a key held here isn't forgotten over it.
         if (info == null && file != null) return closed(s);
         if (info == null) {
-            if (held != null) forget();
+            if (held != null || s.getBool(DECLINED, false)) gone();
             return new Round(Cloud.VaultState.NONE, null);
         }
         if (!info.id().equals(held)) VaultMove.forget(); // another vault than the one moved into: it's moved into afresh
@@ -216,6 +216,15 @@ final class VaultParts {
         } finally {
             Arrays.fill(slotKey, (byte) 0);
         }
+    }
+
+    /**
+     * The vault gone from the account (turned off here or elsewhere): this computer's hold on it forgotten, and going on
+     * without it too, so a vault made later is asked about afresh.
+     */
+    static void gone() {
+        forget();
+        Settings.get().set(DECLINED, null);
     }
 
     /** This computer's hold on the vault forgotten here: the vault itself and the other computers left as they are. */

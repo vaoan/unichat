@@ -548,6 +548,46 @@ class VaultPageUiTest {
     }
 
     @Test
+    void turningOffAsksTwice() throws Exception {
+        openedWithOthers();
+        page();
+        waitOpen();
+        click(I18n.t("settings.vault.turnOff"));
+        waitFor(I18n.t("settings.vault.turnOffTitle"));
+        assertTrue(FxWait.fx(() -> !says(I18n.t("settings.vault.turnOffWhat"))), "the first time, only whether");
+        assertTrue(account.vaultThere(), "nothing yet");
+        click(I18n.t("settings.vault.turnOffNext"));
+        waitFor(I18n.t("settings.vault.turnOffWhat"));
+        assertTrue(account.vaultThere(), "nor after the first yes");
+        click(I18n.t("folders.dialog.cancel"));
+        waitOpen();
+        assertTrue(account.vaultThere(), "cancelled: the vault as it was");
+
+        click(I18n.t("settings.vault.turnOff"));
+        click(I18n.t("settings.vault.turnOffNext"));
+        click(I18n.t("settings.vault.turnOffYes"));
+        FxWait.until("the vault off", () -> hasButton(I18n.t("settings.vault.create")));
+        assertFalse(account.vaultThere(), "deleted from the account");
+        assertEquals(Cloud.VaultState.NONE, round());
+    }
+
+    @Test
+    void turningOffThatFailsSaysSoAndTriesAgain() throws Exception {
+        openedWithOthers();
+        page();
+        waitOpen();
+        account.failOnce(app.unichat.cloud.CloudAccount.SETTINGS_FILE);
+        click(I18n.t("settings.vault.turnOff"));
+        click(I18n.t("settings.vault.turnOffNext"));
+        click(I18n.t("settings.vault.turnOffYes"));
+        FxWait.until("the failure told", () -> says(I18n.t("settings.vault.turnOffFailed")) && hasButton(I18n.t("settings.vault.retry")));
+        assertTrue(account.vaultThere(), "the vault left as it was");
+        click(I18n.t("settings.vault.retry"));
+        FxWait.until("the vault off", () -> hasButton(I18n.t("settings.vault.create")));
+        assertFalse(account.vaultThere());
+    }
+
+    @Test
     void everyControlIsReachedByKeyboardAndNamed() throws Exception {
         List<String> bad = new ArrayList<>();
         page();
@@ -571,6 +611,14 @@ class VaultPageUiTest {
         click(I18n.t("settings.vault.changeKey"));
         waitFor(I18n.t("settings.vault.change.receive"));
         bad.addAll(FxWait.fx(() -> unreachable("change")));
+        page();
+        waitOpen();
+        click(I18n.t("settings.vault.turnOff"));
+        waitFor(I18n.t("settings.vault.turnOffTitle"));
+        bad.addAll(FxWait.fx(() -> unreachable("turn off")));
+        click(I18n.t("settings.vault.turnOffNext"));
+        waitFor(I18n.t("settings.vault.turnOffWhat"));
+        bad.addAll(FxWait.fx(() -> unreachable("turn off, what happens")));
         assertTrue(bad.isEmpty(), "out of the keyboard's reach or unnamed:\n" + String.join("\n", bad));
     }
 
@@ -595,7 +643,7 @@ class VaultPageUiTest {
         try {
             for (double fontScale : new double[] {1.0, 1.6}) {
                 Settings.get().setFontScale(fontScale);
-                bad.addAll(squeezedOnCloudPage(svc, "none @" + fontScale, null));
+                bad.addAll(squeezedOnCloudPage(svc, "none @" + fontScale));
             }
             Settings.get().setFontScale(1.6);
             bad.addAll(squeezedOnCloudPage(svc, "code", I18n.t("settings.vault.create")));
@@ -605,12 +653,13 @@ class VaultPageUiTest {
             CloudPage.use(account.cloud());
             String code = account.otherComputerMadeIt(PASSWORD);
             Settings.get().setFontScale(1.6);
-            bad.addAll(squeezedOnCloudPage(svc, "locked", null));
+            bad.addAll(squeezedOnCloudPage(svc, "locked"));
             account.anotherComputer(LAPTOP, "Un portátil con un nombre bastante largo");
             account.cloud().openVault(app.unichat.cloud.VaultView.Way.RECOVERY, code.toCharArray()).get();
             account.cloud().syncNow().get();
-            bad.addAll(squeezedOnCloudPage(svc, "open", null));
+            bad.addAll(squeezedOnCloudPage(svc, "open"));
             bad.addAll(squeezedOnCloudPage(svc, "confirmation", I18n.t("settings.vault.changeKey")));
+            bad.addAll(squeezedOnCloudPage(svc, "turning off", I18n.t("settings.vault.turnOff"), I18n.t("settings.vault.turnOffNext")));
         } finally {
             Settings.get().set("ui.fontScale", scale);
             svc.stop();
@@ -619,7 +668,7 @@ class VaultPageUiTest {
     }
 
     /** The squeezed texts on Nube with the vault drawn, after pressing {@code press} if given (a step: the code, a confirmation). */
-    private List<String> squeezedOnCloudPage(MockChatService svc, String where, String press) throws Exception {
+    private List<String> squeezedOnCloudPage(MockChatService svc, String where, String... presses) throws Exception {
         Stage owner = FxWait.fx(() -> {
             Stage o = new Stage();
             o.setOpacity(0);
@@ -631,15 +680,17 @@ class VaultPageUiTest {
         });
         FxWait.until("the vault drawn", () -> SettingsWindow.current().getScene().getRoot().lookup(".vault-page") instanceof VBox v
             && !v.getChildren().isEmpty() && v.lookupAll(".button").size() > 0);
-        if (press != null) {
+        for (String press : presses) {
             FxWait.fx(() -> {
                 ((ButtonBase) SettingsWindow.current().getScene().getRoot().lookupAll(".button").stream()
                     .filter(n -> press.equals(((ButtonBase) n).getText())).findFirst().orElseThrow()).fire();
                 return null;
             });
-            String receive = I18n.t("settings.vault.change.receive");
+        }
+        if (presses.length > 0) {
+            Set<String> steps = Set.of(I18n.t("settings.vault.change.receive"), I18n.t("settings.vault.turnOffWhat"));
             FxWait.until("the step shown", () -> SettingsWindow.current().getScene().getRoot().lookup(".recovery-code-sheet") != null
-                || SettingsWindow.current().getScene().getRoot().lookupAll(".label").stream().anyMatch(n -> receive.equals(((Labeled) n).getText())));
+                || SettingsWindow.current().getScene().getRoot().lookupAll(".label").stream().anyMatch(n -> steps.contains(((Labeled) n).getText())));
         }
         FxWait.settled();
         List<String> bad = FxWait.fx(() -> SettingsLayoutUiTest.squeezed(SettingsWindow.current().getScene().getRoot(), where));
