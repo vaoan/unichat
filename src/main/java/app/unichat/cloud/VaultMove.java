@@ -39,6 +39,8 @@ final class VaultMove {
      */
     static final String MOVED_AT = "cloud.vault.movedAt", QUIET_SINCE = "cloud.vault.strayQuietSince", STRAYS_SEEN = "cloud.vault.straySeen";
     static final Duration QUIET = Duration.ofDays(1);
+    /** The machines sending plain texts when the move started (machine-only): only their folders are ever taken in. */
+    static final String SENDERS = "cloud.vault.plainSenders";
     static final String SETTINGS_DIR = CloudAccount.ROOT + "/Ajustes";
     /** The files Unichat writes in {@link #SETTINGS_DIR}: no other name there is moved or deleted. */
     private static final Pattern OURS = Pattern.compile("unichat-[a-z]+\\.json");
@@ -60,11 +62,14 @@ final class VaultMove {
 
     /**
      * What's plain of ours in the account: the settings files' paths, the text files' names of each computer without a
-     * slot, and those of each computer of the vault (left from before it opened the vault there).
+     * slot that was sending plain when the move started, those of each computer of the vault (left from before it opened
+     * the vault there), and those of any other folder (put in through the account, or a computer that came later: named,
+     * never taken).
      */
-    private record Found(List<String> settings, Map<String, List<String>> texts, Map<String, List<String>> ofTheVault) {
+    private record Found(List<String> settings, Map<String, List<String>> texts, Map<String, List<String>> ofTheVault,
+                         Map<String, List<String>> unknown) {
         boolean none() {
-            return settings.isEmpty() && texts.isEmpty();
+            return settings.isEmpty() && texts.isEmpty() && unknown.isEmpty();
         }
     }
 
@@ -91,7 +96,7 @@ final class VaultMove {
     /** A vault other than the one moved into: everything about the move starts again. */
     static void forget() {
         Settings s = Settings.get();
-        for (String k : new String[] {MOVED_AT, QUIET_SINCE, STRAYS_SEEN}) {
+        for (String k : new String[] {MOVED_AT, QUIET_SINCE, STRAYS_SEEN, SENDERS}) {
             if (s.getString(k, null) != null) s.set(k, null);
         }
     }
@@ -155,7 +160,7 @@ final class VaultMove {
         for (String name : plain.list(SETTINGS_DIR)) {
             if (OURS.matcher(name).matches()) settings.add(SETTINGS_DIR + "/" + name);
         }
-        Map<String, List<String>> texts = new TreeMap<>(), ofTheVault = new TreeMap<>();
+        Map<String, List<String>> texts = new TreeMap<>(), ofTheVault = new TreeMap<>(), unknown = new TreeMap<>();
         for (String machine : plain.list(TextSync.ROOT)) {
             if (!Ids.ours(machine)) continue;
             List<String> names = new ArrayList<>();
@@ -171,7 +176,25 @@ final class VaultMove {
                 if (names != null) ofTheVault.put(machine, names);
             }
         }
-        return new Found(settings, texts, ofTheVault);
+        Set<String> senders = senders(texts.keySet()); // recorded on the first pass, nothing plain or not
+        for (String machine : List.copyOf(texts.keySet())) {
+            if (!senders.contains(machine)) unknown.put(machine, texts.remove(machine));
+        }
+        return new Found(settings, texts, ofTheVault, unknown);
+    }
+
+    /**
+     * The machines sending plain texts when the move started, recorded the first time it runs (from {@code now}, those
+     * without a slot found then): only those were ever the person's, so only theirs come in.
+     */
+    private static Set<String> senders(Set<String> now) {
+        Settings s = Settings.get();
+        String kept = s.getString(SENDERS, null);
+        if (kept == null) {
+            kept = String.join(",", now);
+            s.set(SENDERS, kept);
+        }
+        return kept.isEmpty() ? Set.of() : Set.of(kept.split(","));
     }
 
     /** One pass over what's plain; whether all of it was done. */
@@ -274,13 +297,16 @@ final class VaultMove {
         return deleteIfSame(plain, indexPath, indexStamp, t);
     }
 
-    /** One text in: the vault's copy's length once it holds all of the plain one, -1 while it doesn't. */
+    /**
+     * One text in, only as a new name (a plain file is never written over a sealed one: who wrote the plain one is the
+     * account's to say): the vault's copy's length once it holds all of the plain one, -1 while it doesn't.
+     */
     private static long textIn(Storage plain, Storage sealed, String path, boolean delete, Tally t) throws IOException {
         String stamp = plain.stamp(path);
         byte[] mine = stamp == null ? null : plain.get(path);
         if (mine == null) return -1;
         byte[] kept = sealed.get(path);
-        if (kept == null || kept.length < mine.length) {
+        if (kept == null) {
             sealed.mkdirs(path.substring(0, path.lastIndexOf('/')));
             sealed.put(path, mine);
             kept = sealed.get(path);
@@ -322,6 +348,7 @@ final class VaultMove {
             if (b != null && Ids.ours(b.machine())) seen.merge(b.machine(), b.savedAt(), (x, y) -> x.isAfter(y) ? x : y);
         }
         for (String machine : found.texts().keySet()) seen.merge(machine, quiet, (x, y) -> x.isAfter(y) ? x : y);
+        for (String machine : found.unknown().keySet()) seen.merge(machine, quiet, (x, y) -> x.isAfter(y) ? x : y);
         List<Stray> out = new ArrayList<>();
         seen.forEach((m, at) -> out.add(new Stray(m, at)));
         return out;

@@ -22,7 +22,7 @@ final class VaultComputer {
     static final List<String> KEYS = List.of("cloud.machine", VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultParts.DECLINED,
         "cloud.base.settings", "cloud.base.ai", "cloud.base.secrets", "cloud.base.pinned", "cloud.media", "cloud.settings", "cloud.lastVerify",
         "server.telegram.apiId", "server.telegram.apiHash", "gif.giphy.key", "cloud.dropboxAppKey", "cloud.pcloudClientId", "stt.command",
-        "ui.theme", VaultPeers.KEY, VaultActions.UNCONFIRMED, VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultOff.KEY);
+        "ui.theme", VaultPeers.KEY, VaultActions.UNCONFIRMED, VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultOff.KEY, VaultMove.SENDERS);
 
     final Map<String, String> values = new HashMap<>();
     final Path data;
