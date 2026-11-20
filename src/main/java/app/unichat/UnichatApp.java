@@ -152,6 +152,8 @@ public final class UnichatApp extends Application {
         String snapshot = System.getProperty("unichat.snapshot");
         if (snapshot != null) new SnapshotRun(mainView, scene, this::quit).start(snapshot);
         else UpdateChecker.get().start(); // diagnostics never ask GitHub
+        // The passkey probe, only when asked for (-Dunichat.passkeyProbe=true or --passkey-probe), never in a snapshot.
+        if (snapshot == null) app.unichat.cloud.PasskeyProbe.onStart(uri -> Browser.open(uri.toString()));
     }
 
     /** The demo keeps its choices and folders in the same files as the real service. */

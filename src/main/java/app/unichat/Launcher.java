@@ -8,6 +8,7 @@ public final class Launcher {
     private Launcher() {}
 
     public static void main(String[] args) {
+        app.unichat.cloud.PasskeyProbe.fromArguments(args); // the installed app takes arguments, not -D
         Recovery.Start start = Recovery.Start.of(args);
         start.waitForThePrevious(); // started again by Recovery: the run before must be gone first
         // Tests and snapshot runs keep their output on the console only, and never start again by themselves.

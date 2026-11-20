@@ -1,9 +1,11 @@
 package app.unichat.ui.settings;
 
 import app.unichat.cloud.Cloud;
+import app.unichat.cloud.PasskeyProbe;
 import app.unichat.cloud.VaultView;
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
+import app.unichat.ui.Browser;
 import app.unichat.ui.Labels;
 import app.unichat.ui.Nodes;
 import javafx.application.Platform;
@@ -47,7 +49,10 @@ final class VaultPage {
         Runnable listener = () -> Platform.runLater(page::stateMaybeChanged);
         app.unichat.ui.Showing.whileShowing(page.body, () -> cloud.addListener(listener), () -> cloud.removeListener(listener));
         page.reload();
-        return group(I18n.t("settings.vault.title"), page.body);
+        // Only with the probe asked for (-Dunichat.passkeyProbe=true or --passkey-probe): a test for phase 3's passkey.
+        return PasskeyProbeRow.ifAsked(told -> PasskeyProbe.run(uri -> Browser.open(uri.toString()), told))
+                .map(probe -> group(I18n.t("settings.vault.title"), page.body, probe))
+                .orElseGet(() -> group(I18n.t("settings.vault.title"), page.body));
     }
 
     private void stateMaybeChanged() {

@@ -1,0 +1,92 @@
+package app.unichat.cloud;
+
+import app.unichat.settings.Settings;
+import app.unichat.support.Errors;
+import app.unichat.support.I18n;
+
+import java.io.IOException;
+import java.net.BindException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+
+/**
+ * Runs the passkey probe ({@link PasskeyPage}) when the person asks for it: started with {@code -Dunichat.passkeyProbe=true}
+ * or the argument {@link #ARGUMENT} (the installed app takes arguments, not {@code -D}). Each finding goes to
+ * {@code <data>/logs/passkey-probe.txt}, which the person sends back, and to the log; never the PRF's bytes.
+ */
+public final class PasskeyProbe {
+    public static final String FLAG = "unichat.passkeyProbe";
+    public static final String ARGUMENT = "--passkey-probe";
+
+    /** The one probe running: the port is one, so a new one ends it first. */
+    private static CompletableFuture<Void> current;
+
+    private PasskeyProbe() {}
+
+    public static boolean asked() {
+        return Boolean.getBoolean(FLAG);
+    }
+
+    /** {@link #ARGUMENT} among the app's arguments asks for it as the flag does. */
+    public static void fromArguments(String[] args) {
+        if (Arrays.asList(args).contains(ARGUMENT)) System.setProperty(FLAG, "true");
+    }
+
+    public static Path file() {
+        return Settings.dataDir().resolve("logs").resolve("passkey-probe.txt");
+    }
+
+    /** At start: the page in the browser if the probe was asked for, else nothing (null). */
+    public static CompletableFuture<Void> onStart(Consumer<URI> browser) {
+        return onStart(browser, Loopback.PORT, file());
+    }
+
+    static CompletableFuture<Void> onStart(Consumer<URI> browser, int port, Path file) {
+        return asked() ? run(browser, f -> { }, port, file) : null;
+    }
+
+    /** Opens the page (a probe already running ends first); {@code told} hears each finding once it's written down. */
+    public static CompletableFuture<Void> run(Consumer<URI> browser, Consumer<PasskeyPage.Finding> told) {
+        return run(browser, told, Loopback.PORT, file());
+    }
+
+    static synchronized CompletableFuture<Void> run(Consumer<URI> browser, Consumer<PasskeyPage.Finding> told, int port, Path file) {
+        stop();
+        try {
+            current = PasskeyPage.start(browser, f -> {
+                record(file, f);
+                told.accept(f);
+            }, port, Loopback.DEADLINE);
+            return current;
+        } catch (BindException e) {
+            return CompletableFuture.failedFuture(new IOException(I18n.t("settings.cloud.portBusy", port), e));
+        } catch (IOException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    static synchronized void stop() {
+        if (current != null) current.cancel(false);
+        current = null;
+    }
+
+    private static void record(Path file, PasskeyPage.Finding f) {
+        String line = Instant.now() + " unichatOs=\"" + System.getProperty("os.name") + " " + System.getProperty("os.version")
+                + "\" " + f.line();
+        System.err.println("Passkey probe: " + line);
+        try {
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, line + System.lineSeparator(), StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            System.err.println("Passkey probe: couldn't write " + file + ": " + Errors.message(e));
+        }
+    }
+}
