@@ -25,9 +25,10 @@ import java.util.stream.Stream;
  */
 final class TextSync {
     static final String ROOT = CloudAccount.ROOT + "/Textos";
-    private static final String HERE = "here", INDEX = "index.json";
+    static final String INDEX = "index.json";
+    private static final String HERE = "here";
     /** A file of ours (machines are {@link Ids}): anything else in the account never becomes a path here. */
-    private static final Pattern FILE = Pattern.compile("([0-9a-f]{12}) \\d{4}-\\d{2}\\.jsonl");
+    static final Pattern FILE = Pattern.compile("([0-9a-f]{12}) \\d{4}-\\d{2}\\.jsonl");
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Path local;

@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,7 +38,7 @@ class CloudVaultTest {
     private static final List<String> KEYS = List.of("cloud.machine", VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultParts.DECLINED,
         "cloud.base.settings", "cloud.base.ai", "cloud.base.secrets", "cloud.base.pinned", "cloud.media", "cloud.settings", "cloud.lastVerify",
         "server.telegram.apiId", "server.telegram.apiHash", "gif.giphy.key", "cloud.dropboxAppKey", "cloud.pcloudClientId", "stt.command",
-        "ui.theme");
+        "ui.theme", VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN);
 
     @TempDir
     Path dir;
@@ -245,6 +246,7 @@ class CloudVaultTest {
         assertNull(desk.get(VaultParts.ID));
         assertNull(desk.get(VaultParts.KEY));
         assertNull(desk.get(VaultParts.PRIVATE));
+        assertNull(desk.get(VaultMove.MOVED_AT), "a vault made later is moved into again");
         assertTrue(cloud.files.containsKey(SETTINGS), "back to the plain settings");
 
         Vault.Created again = Vault.create(dav(), OTHER, "Otro");
@@ -410,5 +412,42 @@ class CloudVaultTest {
                 assertEquals(vault ? Cloud.VaultState.OPEN : Cloud.VaultState.NONE, s.vault(), what + ": and media the vault");
             }
         }
+    }
+
+    @Test
+    void aVaultMadeHereMovesWhatWasPlainIn() throws Exception {
+        Computer desk = withEverything(new Computer(DESK));
+        desk.round(); // today's: plain
+        Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
+        desk.opened(made.info(), made.computer());
+        Cloud.Status s = desk.round();
+        assertNull(s.error());
+        assertEquals(Set.of(PHOTO), cloud.files.keySet().stream().filter(p -> !p.startsWith(Vault.ROOT + "/"))
+            .collect(java.util.stream.Collectors.toSet()), "nothing plain left but media");
+        assertEquals(4, s.moving().files(), "the settings, the AI's, the text and its index");
+        assertNotNull(s.moving().at());
+        assertEquals(Map.of(), s.moving().strays());
+
+        Computer laptop = new Computer(LAPTOP).opened(made.info(), Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil"));
+        laptop.round();
+        assertEquals("{}\n", laptop.read("texts/" + DESK + "/" + TEXT), "the texts sent plain before reach the others sealed, never sent again");
+        assertEquals(4, desk.round().moving().files(), "and the count stays");
+    }
+
+    @Test
+    void anOlderComputerStillSendingPlainIsNamedAndNeverTaken() throws Exception {
+        Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
+        Computer desk = new Computer(DESK).opened(made.info(), made.computer()).set("ui.theme", "DARK");
+        desk.round();
+        Vault.addComputer(dav(), made.vk(), OTHER, "Viejo");
+        cloud.dirs.add("Unichat/Ajustes"); // the older computer's folder, as it makes it
+        cloud.put(SETTINGS, Bundle.of(OTHER, java.time.Instant.now().plusSeconds(60), Map.of("ui.theme", "LIGHT"), null).toBytes());
+        Cloud.Status s = desk.round();
+        assertNull(s.error());
+        assertEquals(Map.of(OTHER, "Viejo"), s.moving().strays(), "named by its computer's name in the vault");
+        assertEquals("Viejo", s.moving().strayName(OTHER));
+        assertEquals("", s.moving().strayName(LAPTOP));
+        assertEquals("DARK", desk.get("ui.theme"), "its plain settings are never taken");
+        assertTrue(cloud.files.containsKey(SETTINGS), "nor deleted round after round");
     }
 }

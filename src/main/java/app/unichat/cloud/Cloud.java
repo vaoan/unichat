@@ -37,7 +37,7 @@ public final class Cloud {
 
     /** For the settings page: connected or not, when the last round worked, why the last one didn't, what went up. */
     public record Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
-                         int retrying, Instant nextRetry, int conflicts, Instant lastVerified, VaultState vault) {
+                         int retrying, Instant nextRetry, int conflicts, Instant lastVerified, VaultState vault, Moving moving) {
         static final Status OFF = new Status(false, null, null, 0, 0);
 
         public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting) {
@@ -46,11 +46,24 @@ public final class Cloud {
 
         public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
                       int retrying, Instant nextRetry, int conflicts, Instant lastVerified) {
-            this(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts, lastVerified, VaultState.NONE);
+            this(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts, lastVerified, VaultState.NONE, Moving.NONE);
         }
 
         Status doing(Activity a) {
-            return new Status(connected, lastSync, error, uploaded, waiting, a, retrying, nextRetry, conflicts, lastVerified, vault);
+            return new Status(connected, lastSync, error, uploaded, waiting, a, retrying, nextRetry, conflicts, lastVerified, vault, moving);
+        }
+    }
+
+    /**
+     * What came into the vault from the plain copies here (how many files, and when the last did), and the computers still
+     * sending plain, each machine with its computer's name in the vault ("" for one that has none there).
+     */
+    public record Moving(int files, Instant at, Map<String, String> strays) {
+        static final Moving NONE = new Moving(0, null, Map.of());
+
+        /** A stray's name to show: its computer's in the vault, "" when unknown. */
+        public String strayName(String machine) {
+            return strays.getOrDefault(machine, "");
         }
     }
 
@@ -96,6 +109,7 @@ public final class Cloud {
     private ScheduledExecutorService timer;
     private volatile Status status = Status.OFF;
     private int uploaded;
+    private Moving moving = Moving.NONE;
 
     /**
      * What chats say, kept on every computer ({@link TextSync}).
@@ -234,6 +248,10 @@ public final class Cloud {
                     textsFailed = Errors.message(e); // told, but the media still go up
                 }
             }
+            if (vault.open()) {
+                String moveFailed = moveIn(dav, personal, now);
+                if (textsFailed == null) textsFailed = moveFailed;
+            }
             if (CloudAccount.media()) {
                 uploaded += media.run(dav, progressOf(Step.UPLOADING));
                 if (verifyNext || verifyDue(now)) {
@@ -273,6 +291,21 @@ public final class Cloud {
     /** The texts go sealed while the vault is open here, plain by media's switch without one, and nowhere otherwise. */
     private static Storage textsTo(VaultParts.Round vault, Storage personal) {
         return personal != null && (vault.open() || CloudAccount.media()) ? personal : null;
+    }
+
+    /**
+     * What's still plain goes into the vault, after the vault's own parts and texts went (so they're never copied over),
+     * and who still sends plain is named; why it couldn't, or null.
+     */
+    private String moveIn(Storage dav, Storage sealed, Instant now) {
+        try {
+            VaultMove.Result r = VaultMove.run(dav, sealed, now);
+            Map<String, String> strays = r.strays().isEmpty() ? Map.of() : VaultMove.names(dav, r.strays());
+            moving = new Moving(moving.files() + r.moved().size(), r.moved().isEmpty() ? moving.at() : now, strays);
+            return null;
+        } catch (IOException e) {
+            return Errors.message(e);
+        }
     }
 
     private void syncTexts(Storage dav) throws IOException {
@@ -323,7 +356,7 @@ public final class Cloud {
         }
         String verified = Settings.get().getString("cloud.lastVerify", null);
         return new Status(true, lastSync, error, uploaded, waiting, null, media.retrying(), media.nextRetry(), media.conflicts(),
-                verified == null ? null : Instant.parse(verified), vault);
+                verified == null ? null : Instant.parse(verified), vault, moving);
     }
 
     /** Checks everything uploaded against the account now, repairing what differs, then the usual round. */
