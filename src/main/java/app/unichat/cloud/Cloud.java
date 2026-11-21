@@ -61,10 +61,10 @@ public final class Cloud {
                 vaultNotice);
         }
 
-        /** The same, saying the vault's state is {@code v}. */
+        /** The same, saying the vault's state is {@code v}; another state than this one's drops its notice, as a round does. */
         Status vault(VaultState v) {
-            return new Status(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts, lastVerified, v, moving,
-                vaultNotice);
+            return v == vault ? this : new Status(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts,
+                lastVerified, v, moving, null);
         }
     }
 
@@ -184,7 +184,10 @@ public final class Cloud {
     });
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private ScheduledExecutorService timer;
-    private volatile Status status = Status.OFF;
+    /** A round and a vault job both tell it: what changes a part of it does so in one step ({@code updateAndGet}). */
+    private final java.util.concurrent.atomic.AtomicReference<Status> status = new java.util.concurrent.atomic.AtomicReference<>(Status.OFF);
+    /** Tests: runs once, after a vault job read the status to tell its state and before it's told (a round may publish meanwhile). */
+    volatile Runnable beforeTold;
     private int uploaded;
     private Moving moving = Moving.NONE;
 
@@ -266,10 +269,10 @@ public final class Cloud {
         return id;
     }
 
-    public Status status() { return status; }
+    public Status status() { return status.get(); }
 
     /** The vault's state as the last round found it. */
-    public VaultState vaultState() { return status.vault(); }
+    public VaultState vaultState() { return status().vault(); }
 
     /** Runs on the cloud's thread after each round. */
     public void addListener(Runnable r) { listeners.add(r); }
@@ -311,7 +314,7 @@ public final class Cloud {
         try {
             pass = vaultPass(dav, now);
         } catch (IOException | RuntimeException e) {
-            return publish(finished(status.lastSync(), Errors.message(e), status.vault(), null));
+            return publish(finished(status().lastSync(), Errors.message(e), status().vault(), null));
         }
         try {
             if (CloudAccount.media()) {
@@ -323,7 +326,7 @@ public final class Cloud {
                 }
             }
         } catch (IOException | RuntimeException e) {
-            return publish(finished(status.lastSync(), Errors.message(e), vaultAfter(dav, pass), null));
+            return publish(finished(status().lastSync(), Errors.message(e), vaultAfter(dav, pass), null));
         }
         VaultState vault = vaultAfter(dav, pass);
         return publish(finished(now, pass.textsFailed(), vault, vault == pass.state() ? pass.notice() : null));
@@ -572,7 +575,7 @@ public final class Cloud {
         try {
             waiting = media.waiting();
         } catch (IOException ignored) {
-            waiting = status.waiting();
+            waiting = status().waiting();
         }
         String verified = Settings.get().getString("cloud.lastVerify", null);
         return new Status(true, lastSync, error, uploaded, waiting, null, media.retrying(), media.nextRetry(), media.conflicts(),
@@ -619,7 +622,8 @@ public final class Cloud {
      * another since the round's vault part: the page reloads on a state it doesn't show).
      */
     private void doing(Activity a) {
-        publish(status.doing(a).vault(vaultKnown(status.vault())));
+        status.updateAndGet(s -> s.doing(a).vault(vaultKnown(s.vault())));
+        told();
     }
 
     /** The vault's state last read here, by a round, the texts or a job; {@code otherwise} before any. */
@@ -629,17 +633,32 @@ public final class Cloud {
         }
     }
 
-    /** After a vault job: the state it read told at once, when the status says another (a round may be in its media for hours). */
+    /**
+     * After a vault job: the state it read told at once, when the status says another (a round may be in its media for
+     * hours). In one step: a round telling its end meanwhile is changed in turn, never written over with its middle.
+     */
     private void toldAsRead() {
-        Status s = status;
-        VaultState read = vaultKnown(s.vault());
-        if (read != s.vault()) publish(s.vault(read));
+        Status[] was = {null};
+        Status now = status.updateAndGet(s -> {
+            was[0] = s;
+            Status next = s.vault(vaultKnown(s.vault()));
+            Runnable hook = beforeTold;
+            beforeTold = null;
+            if (hook != null) hook.run();
+            return next;
+        });
+        if (now != was[0]) told();
     }
 
+    /** {@code s} told, after a round or as one goes (the listeners told each time, even of the same). */
     private Status publish(Status s) {
-        status = s;
-        for (Runnable r : listeners) r.run();
+        status.set(s);
+        told();
         return s;
+    }
+
+    private void told() {
+        for (Runnable r : listeners) r.run();
     }
 
     /** Whether {@code a} answers with this login: the account to keep (pCloud's with its email, to show who), or why not. */

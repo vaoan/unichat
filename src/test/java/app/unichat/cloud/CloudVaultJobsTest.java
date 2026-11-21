@@ -201,4 +201,38 @@ class CloudVaultJobsTest {
         assertFalse(account.files.containsKey(Vault.INFO), "no vault made in an account no longer this computer's");
         round.get();
     }
+
+    @Test
+    void aStateToldAfterAJobNeverPutsBackTheRoundsProgressOverItsEnd() throws Exception {
+        VaultComputer desk = desk();
+        CompletableFuture<?>[] round = {null};
+        CountDownLatch release = roundInMedia(desk, round);
+        desk.cloud.vault().createVault().get();
+        desk.cloud.beforeTold = () -> { // the view read the status mid-round; the round ends before it tells its state
+            release.countDown();
+            try {
+                round[0].get();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        };
+        desk.cloud.vault().vaultView().get();
+        assertTrue(round[0].isDone());
+        assertNull(desk.cloud.status().now(), "the round's end stays told: no \"uploading\" left from its middle");
+        assertEquals(Cloud.VaultState.OPEN, desk.cloud.status().vault());
+    }
+
+    @Test
+    void aStateChangedByAJobDropsTheNoticeOfTheOneBefore() throws Exception {
+        VaultComputer desk = desk();
+        desk.cloud.vault().createVault().get();
+        account.put(Vault.ROOT + "/Ajustes/unichat-transcripts.json", "dañado".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        Cloud.Status s = desk.cloud.syncNow().get();
+        assertEquals(Cloud.VaultState.OPEN, s.vault());
+        assertNotNull(s.vaultNotice(), "the damaged part said");
+        desk.cloud.vault().forgetHere().get();
+        desk.cloud.vault().vaultView().get(); // reads it locked here now
+        assertEquals(Cloud.VaultState.LOCKED, desk.cloud.status().vault());
+        assertNull(desk.cloud.status().vaultNotice(), "what the open vault left is no longer what the page shows");
+    }
 }
