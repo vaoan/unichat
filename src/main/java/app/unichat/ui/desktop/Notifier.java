@@ -282,32 +282,31 @@ public final class Notifier {
      */
     /**
      * What the cloud is doing: its lines at the top of the menu (what, how fast, how far, how many left; informative,
-     * not clickable), and the icon's ring while files go up and nothing is being saved. Any thread.
+     * not clickable), and the icon's ring while files go up and nothing is being saved. AWT thread ({@code ui/CloudShown}
+     * reads the status there: one read before posting could land after a newer one).
      */
     public void setCloud(app.unichat.cloud.Cloud.Status s) {
+        if (menu == null) return;
         java.util.List<String> lines = CloudTexts.menuLines(s, java.time.Instant.now());
         double ring = Settings.get().getBool(TRAY_PROGRESS, true) ? CloudTexts.ring(s) : Double.NaN;
-        awt(() -> {
-            if (menu == null) return;
-            if (!lines.equals(cloudLines)) {
-                cloudItems.forEach(menu::remove);
-                cloudItems.clear();
-                for (String line : lines) {
-                    MenuItem info = new MenuItem(line);
-                    info.setEnabled(false);
-                    cloudItems.add(info);
-                }
-                if (!lines.isEmpty()) cloudItems.add(new MenuItem("-"));
-                for (int i = 0; i < cloudItems.size(); i++) menu.insert(cloudItems.get(i), i);
-                cloudLines = lines;
-                NativeBar b = bar;
-                if (b != null) b.syncMenu();
+        if (!lines.equals(cloudLines)) {
+            cloudItems.forEach(menu::remove);
+            cloudItems.clear();
+            for (String line : lines) {
+                MenuItem info = new MenuItem(line);
+                info.setEnabled(false);
+                cloudItems.add(info);
             }
-            if (Double.compare(ring, upload) != 0) {
-                upload = ring;
-                showProgress();
-            }
-        });
+            if (!lines.isEmpty()) cloudItems.add(new MenuItem("-"));
+            for (int i = 0; i < cloudItems.size(); i++) menu.insert(cloudItems.get(i), i);
+            cloudLines = lines;
+            NativeBar b = bar;
+            if (b != null) b.syncMenu();
+        }
+        if (Double.compare(ring, upload) != 0) {
+            upload = ring;
+            showProgress();
+        }
     }
 
     /** The ring shows saving first, else uploading. AWT thread. */

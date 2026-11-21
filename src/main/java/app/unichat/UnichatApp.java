@@ -240,11 +240,8 @@ public final class UnichatApp extends Application {
             // What a chat says goes up as soon as it's kept, and looking at a deleted message asks the other computers first.
             app.unichat.autosave.AutoSave.of(svc).setTextSync(c::textsNow, c::textsNow);
             // What it's doing: on the tray (its menu's lines and ring) and on the settings gear.
-            c.addListener(() -> {
-                app.unichat.cloud.Cloud.Status st = c.status();
-                notifier.setCloud(st);
-                Platform.runLater(() -> { if (mainView != null) mainView.cloudChanged(st); });
-            });
+            c.addListener(new app.unichat.ui.CloudShown(c::status, notifier::setCloud, java.awt.EventQueue::invokeLater,
+                    st -> { if (mainView != null) mainView.cloudChanged(st); }, Platform::runLater));
             cloud.start(java.time.Duration.ofMinutes(1));
         }
         mainView.useCloud(cloud);
