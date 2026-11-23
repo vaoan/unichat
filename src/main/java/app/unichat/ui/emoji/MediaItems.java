@@ -17,7 +17,6 @@ public final class MediaItems {
         return m.outgoing() ? MediaLibrary.original(item) : item;
     }
 
-    /** A stand-in message so a library item loads like any chat media (thumbnail, then the animation). */
     /** The saved stickers and GIFs (and their previews) stay on disk whatever the cache's limit. */
     public static void keepCached(app.unichat.service.MediaSource svc, MediaLibrary library) {
         java.util.Set<String> urls = new java.util.HashSet<>();
@@ -39,6 +38,7 @@ public final class MediaItems {
         if (preview != null) urls.add(preview);
     }
 
+    /** A stand-in message so a library item loads like any chat media (thumbnail, then the animation). */
     static Message message(MediaLibrary.Item i) {
         Message m = new Message("lib-" + i.url(), "", "", "", false, Instant.EPOCH);
         m.setType(i.kind() == MediaLibrary.Kind.STICKER ? MessageType.STICKER : MessageType.IMAGE);

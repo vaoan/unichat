@@ -14,7 +14,6 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-import java.io.File;
 import java.lang.reflect.Proxy;
 import java.nio.file.Path;
 import java.util.List;
@@ -60,7 +59,7 @@ class CloakBarUiTest {
             String shot = System.getProperty("unichat.barShot");
             if (shot != null) {
                 var img = FxWait.fx(() -> bar.snapshot(null, null));
-                ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", new File(shot + (int) px + ".png"));
+                ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", java.nio.file.Path.of(shot + (int) px + ".png").toFile());
             }
             for (Node n : FxWait.fx(() -> List.copyOf(bar.lookupAll(".label")))) {
                 Labeled l = (Labeled) n;

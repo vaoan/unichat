@@ -128,7 +128,7 @@ public final class ChromiumCookies {
     }
 
     private static Path defaultRoot(Browser b) {
-        return Paths.get(System.getProperty("user.home", "."), "Library", "Application Support")
+        return Path.of(System.getProperty("user.home", "."), "Library", "Application Support")
                 .resolve(b.relativeRoot());
     }
 

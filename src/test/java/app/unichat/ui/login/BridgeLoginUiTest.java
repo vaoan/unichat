@@ -157,7 +157,7 @@ class BridgeLoginUiTest {
         String dir = System.getProperty("unichat.loginShots");
         if (dir == null) return;
         java.awt.image.BufferedImage img = fx(() -> javafx.embed.swing.SwingFXUtils.fromFXImage(s.snapshot(null), null));
-        javax.imageio.ImageIO.write(img, "png", new java.io.File(dir, name + ".png"));
+        javax.imageio.ImageIO.write(img, "png", java.nio.file.Path.of(dir, name + ".png").toFile());
     }
 
     /** From a test thread. */

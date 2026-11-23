@@ -125,7 +125,7 @@ public final class Theme {
             r = (int) (r * 0.93);
             g = (int) (g * 0.93);
             b = (int) (b * 0.93);
-            cur = String.format("#%02X%02X%02X", r, g, b);
+            cur = "#%02X%02X%02X".formatted(r, g, b);
         }
         return cur;
     }

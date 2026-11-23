@@ -247,7 +247,7 @@ class SendQueueUiTest {
 
     @Test
     void aFileSentAfterATextGoesAfterIt() throws Exception {
-        int before = (int) svc.messages(CHAT).size();
+        int before = svc.messages(CHAT).size();
         send("mira esto q chévere");
         java.io.File photo = java.nio.file.Files.writeString(java.nio.file.Files.createTempFile("foto", ".txt"), "x").toFile();
         FxWait.fx(() -> { thread.composer().sendFiles(List.of(photo)); return null; });

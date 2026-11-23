@@ -698,7 +698,6 @@ public final class MainView extends StackPane {
         SettingsWindow.show(stage, svc, this::appearanceChanged, onLogout, this::openChatId, this::toast);
     }
 
-    /** What Ajustes does after a change: the theme, the lists and the open chat drawn again. */
     /** The stickers of the one emoji typed, above the message box. */
     private void suggestStickers() {
         Composer box = thread.composer();
@@ -707,6 +706,7 @@ public final class MainView extends StackPane {
         box.showJustAbove(suggestions.node());
     }
 
+    /** What Ajustes does after a change: the theme, the lists and the open chat drawn again. */
     private void appearanceChanged() {
         Theme.applyAll();
         suggestions.refresh();

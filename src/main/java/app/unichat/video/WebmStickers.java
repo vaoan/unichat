@@ -29,6 +29,9 @@ public final class WebmStickers {
 
     /** Thrown when there's no ffmpeg to convert with (none installed, and installing isn't possible or is off). */
     public static final class NoConverter extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         NoConverter() { super(I18n.t("video.noConverter")); }
     }
 

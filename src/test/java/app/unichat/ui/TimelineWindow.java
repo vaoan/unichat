@@ -106,7 +106,6 @@ final class TimelineWindow {
         untilAtBottom();
     }
 
-    @SuppressWarnings("unchecked")
     /** The row drawing {@code m}, or null when it isn't drawn. */
     javafx.scene.control.ListCell<?> cellOf(Message m) {
         for (Node n : list().lookupAll(".row-cell")) {
@@ -143,6 +142,7 @@ final class TimelineWindow {
                 true, false, false, true, false, true, null));
     }
 
+    @SuppressWarnings("unchecked") // the timeline's ListView holds rows of several types, all read as Object
     ListView<Object> list() { return (ListView<Object>) scene.getRoot().lookup(".timeline"); }
 
     VirtualFlow<?> flow() { return (VirtualFlow<?>) list().lookup(".virtual-flow"); }

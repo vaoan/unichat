@@ -280,6 +280,9 @@ public final class DropboxApi implements Storage {
 
     /** Not there: an answer, not a failure. */
     static final class Missing extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         Missing() {
             super("missing");
         }
@@ -287,6 +290,9 @@ public final class DropboxApi implements Storage {
 
     /** Already there (a folder): fine. */
     static final class Conflict extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         Conflict() {
             super("conflict");
         }

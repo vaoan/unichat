@@ -52,7 +52,7 @@ public final class LinkVideo {
     static Path fetch(String url, Path cache, Fetch engine) throws IOException, InterruptedException {
         String name = "reel-" + Hashes.sha256(url).substring(0, 32);
         Optional<Path> have = finished(cache, name);
-        if (have.isPresent()) return have.get();
+        if (have.isPresent()) return have.orElseThrow();
         // The engine's own folder, hidden and named ".part" so the cache's trimming takes it for a leftover if cut short.
         Path work = Files.createDirectories(cache.resolve("." + name + ".part"));
         try {

@@ -131,7 +131,7 @@ public final class LinkInspector {
             if (a.response().statusCode() != 200) return null;
             String mime = mimeOf(a);
             Optional<LinkMedia> media = mediaOf(a, mime);
-            if (media.isPresent()) return LinkPreview.of(url, media.get(), null);
+            if (media.isPresent()) return LinkPreview.of(url, media.orElseThrow(), null);
             if (mime.startsWith("image/")) return LinkPreview.of(url, null, a.uri().toString());
             if (!(mime.equals("text/html") || mime.equals("application/xhtml+xml"))) return null;
             String page = new String(in.readNBytes(MAX_PAGE_BYTES), StandardCharsets.UTF_8);
@@ -141,7 +141,7 @@ public final class LinkInspector {
             // A page can name thousands, each a request from this computer: the first few are the page's own.
             for (String candidate : pageMedia(page, a.uri().toString()).stream().limit(MAX_PAGE_MEDIA).toList()) {
                 Optional<LinkMedia> video = media(candidate);
-                if (video.isPresent()) return preview.withVideo(video.get(), false);
+                if (video.isPresent()) return preview.withVideo(video.orElseThrow(), false);
             }
             return preview;
         }
@@ -150,7 +150,7 @@ public final class LinkInspector {
     /** A page's video or audio, if its address really is one. */
     private Optional<LinkMedia> media(String url) throws IOException, InterruptedException {
         Answer a = open(url);
-        try (InputStream ignored = a.response().body()) {
+        try (InputStream _ = a.response().body()) {
             return a.response().statusCode() == 200 ? mediaOf(a, mimeOf(a)) : Optional.empty();
         }
     }
@@ -206,7 +206,7 @@ public final class LinkInspector {
             Optional<String> next = response.headers().firstValue("Location");
             if (code < 300 || code >= 400 || next.isEmpty()) return new Answer(uri, response);
             response.body().close();
-            uri = uri.resolve(next.get());
+            uri = uri.resolve(next.orElseThrow());
         }
         throw new IOException(I18n.t("link.tooManyRedirects"));
     }

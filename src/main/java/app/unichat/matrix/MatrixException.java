@@ -5,6 +5,9 @@ package app.unichat.matrix;
  * user-facing Spanish message. {@code status} is the HTTP status, 0 when no response was received.
  */
 public final class MatrixException extends RuntimeException {
+    @java.io.Serial
+    private static final long serialVersionUID = 1L;
+
     private final int status;
     private final String errcode;
 

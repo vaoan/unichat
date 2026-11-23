@@ -19,8 +19,10 @@ import java.util.function.Consumer;
 public final class LibraryMenu {
     private LibraryMenu() {}
 
-    /** {@code use}: sends the sticker/GIF or inserts the emoji; null when it can't be used here. */
-    /** {@code svc}: where the sticker or GIF comes from, for "see it big". */
+    /**
+     * {@code use}: sends the sticker/GIF or inserts the emoji; null when it can't be used here. {@code svc}: where the
+     * sticker or GIF comes from, for "see it big".
+     */
     static void attach(Node tile, MediaLibrary library, MediaLibrary.Item item, Runnable use, Consumer<String> toast,
                        app.unichat.service.MediaSource svc) {
         attach(tile, library, item, use, toast, svc, null);

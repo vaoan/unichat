@@ -280,10 +280,6 @@ public final class Notifier {
     }
 
     /**
-     * Saving what chats receive: {@code done} of {@code total}, a ring that fills on the icon's corner (spinning until
-     * the first is done); total 0 puts the icon back. Off in Ajustes, the icon stays as it is. Any thread.
-     */
-    /**
      * What the cloud is doing: its lines at the top of the menu (what, how fast, how far, how many left; informative,
      * not clickable), and the icon's ring while files go up and nothing is being saved. AWT thread ({@code ui/CloudShown}
      * reads the status there: one read before posting could land after a newer one).
@@ -323,6 +319,10 @@ public final class Notifier {
         if (b != null) b.setProgress(progress());
     }
 
+    /**
+     * Saving what chats receive: {@code done} of {@code total}, a ring that fills on the icon's corner (spinning until
+     * the first is done); total 0 puts the icon back. Off in Ajustes, the icon stays as it is. Any thread.
+     */
     public void setDownloadProgress(int done, int total) {
         double f = total <= 0 || !Settings.get().getBool(TRAY_PROGRESS, true) ? Double.NaN : done == 0 ? -1 : (double) done / total;
         awt(() -> {
@@ -339,8 +339,10 @@ public final class Notifier {
         system(chat.id(), I18n.t("notifier.downloadsDone"), I18n.n("notifier.downloadsSaved", saved, chat.title()), TrayIcon.MessageType.INFO);
     }
 
-    /** Something couldn't be saved: always told, with what, why and from where, whatever the other notices. Any thread. */
-    /** {@code messageId}: where the click goes (null: the chat). */
+    /**
+     * Something couldn't be saved: always told, with what, why and from where, whatever the other notices. Any thread.
+     * {@code messageId}: where the click goes (null: the chat).
+     */
     public void downloadFailed(String what, Chat chat, String messageId, String why) {
         system(NotificationTarget.of(chat.id(), messageId), I18n.t("notifier.downloadFailed", what), why + " · " + chat.title(),
                 TrayIcon.MessageType.ERROR);

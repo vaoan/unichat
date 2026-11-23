@@ -29,14 +29,14 @@ public final class FirefoxCookies {
 
     static Path profilesRoot(String osName) {
         String os = osName == null ? "" : osName.toLowerCase(Locale.ROOT);
-        Path home = Paths.get(System.getProperty("user.home", "."));
+        Path home = Path.of(System.getProperty("user.home", "."));
         if (os.contains("mac")) {
             return home.resolve("Library").resolve("Application Support").resolve("Firefox").resolve("Profiles");
         }
         if (os.contains("win")) {
             String appData = System.getenv("APPDATA");
             Path base = appData != null && !appData.isBlank()
-                    ? Paths.get(appData) : home.resolve("AppData").resolve("Roaming");
+                    ? Path.of(appData) : home.resolve("AppData").resolve("Roaming");
             return base.resolve("Mozilla").resolve("Firefox").resolve("Profiles");
         }
         return home.resolve(".mozilla").resolve("firefox");
@@ -99,7 +99,7 @@ public final class FirefoxCookies {
         if (override == null || override.isBlank()) return null;
         List<Path> out = new ArrayList<>();
         for (String part : override.split(";|" + java.util.regex.Pattern.quote(java.io.File.pathSeparator))) {
-            if (!part.isBlank()) out.add(Paths.get(part.trim()));
+            if (!part.isBlank()) out.add(Path.of(part.trim()));
         }
         return out;
     }

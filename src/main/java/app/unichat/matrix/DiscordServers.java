@@ -102,7 +102,7 @@ final class DiscordServers {
                 runs.add(CompletableFuture.runAsync(() -> setGuildPausedNow(guild, r.paused(), r.retry()), core.io));
             }
         }
-        return CompletableFuture.allOf(runs.toArray(new CompletableFuture[0]));
+        return CompletableFuture.allOf(runs.toArray(new CompletableFuture<?>[0]));
     }
 
     /** Never throws: a failure is logged and tried again later; {@code failedBefore} is null for a first try. */

@@ -135,6 +135,9 @@ final class ConversationShot {
 
     /** Too long a stretch to draw, said in the person's words. */
     static final class TooLong extends RuntimeException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         TooLong() {
             super(I18n.t("capture.tooLong", MAX_MESSAGES));
         }

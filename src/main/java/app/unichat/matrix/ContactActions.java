@@ -58,7 +58,7 @@ final class ContactActions {
                 noSearch.add(a.id());
                 throw new UnsupportedOperationException("search");
             }
-            return r.get();
+            return r.orElseThrow();
         });
     }
 

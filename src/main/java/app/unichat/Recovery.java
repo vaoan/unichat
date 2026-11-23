@@ -118,7 +118,7 @@ final class Recovery {
         if (mayRestart(restartsSoFar, uptime) && info.command().isPresent()) {
             List<String> args = info.arguments().map(Arrays::asList).orElse(List.of());
             try {
-                new ProcessBuilder(command(info.command().get(), args, ProcessHandle.current().pid(),
+                new ProcessBuilder(command(info.command().orElseThrow(), args, ProcessHandle.current().pid(),
                         nextCount(restartsSoFar, uptime))).inheritIO().start();
             } catch (Exception e) {
                 System.err.println("Recovery: could not start again: " + e);

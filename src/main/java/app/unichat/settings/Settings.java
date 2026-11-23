@@ -415,8 +415,10 @@ public final class Settings {
     /** The session is on the server Unichat runs on this computer (app.unichat.server.LocalServer). */
     public boolean localServer() { return getBool("server.local", false); }
     public void setLocalServer(boolean v) { setBool("server.local", v); }
-    /** Off by default: archiving a chat means it shouldn't interrupt you. */
-    /** Archived chats notify too; while on, archived Discord rooms never rest out of the sync. */
+    /**
+     * Archived chats notify too; while on, archived Discord rooms never rest out of the sync. Off by default: archiving
+     * a chat means it shouldn't interrupt you.
+     */
     public static final String NOTIFY_ARCHIVED = "notify.archived";
     public boolean notifyArchived() { return getBool(NOTIFY_ARCHIVED, false); }
     public void setNotifyArchived(boolean v) { setBool(NOTIFY_ARCHIVED, v); }
@@ -458,11 +460,11 @@ public final class Settings {
     public boolean showInDock() { return getBool("app.showInDock", false); }
     public void setShowInDock(boolean v) { setBool("app.showInDock", v); }
     public void setMinimizeToTray(boolean v) { setBool("app.minimizeToTray", v); }
-    /** Ask GitHub once a day whether there's a newer Unichat (update/UpdateChecker). */
     /** Opens the links in messages to show their video (links/LinkInspector): it visits sites nobody chose. */
     public boolean linkPreviews() { return getBool("privacy.linkPreviews", true); }
     public void setLinkPreviews(boolean v) { setBool("privacy.linkPreviews", v); }
 
+    /** Ask GitHub once a day whether there's a newer Unichat (update/UpdateChecker). */
     public boolean checkUpdates() { return getBool("app.checkUpdates", true); }
     public void setCheckUpdates(boolean v) { setBool("app.checkUpdates", v); }
 }

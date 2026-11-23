@@ -3,7 +3,6 @@ package app.unichat;
 import app.unichat.settings.Settings;
 import app.unichat.support.Redactor;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -11,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 
 /**
@@ -31,7 +31,7 @@ final class AppLog {
             if (Files.exists(log) && Files.size(log) > MAX) {
                 Files.move(log, dir.resolve("unichat.log.1"), StandardCopyOption.REPLACE_EXISTING);
             }
-            OutputStream file = new FileOutputStream(log.toFile(), true);
+            OutputStream file = Files.newOutputStream(log, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             String header = "\n=== Unichat " + LocalDateTime.now() + " ===\n";
             file.write(header.getBytes(StandardCharsets.UTF_8));
             OutputStream redacted = new RedactingLines(file);

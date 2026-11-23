@@ -6,7 +6,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
 
@@ -17,7 +16,7 @@ class CookieTxtTest {
     private final CookieSpec spec = CookieSpec.forNetwork(Network.INSTAGRAM);
 
     private Path sample() throws Exception {
-        return Paths.get(getClass().getResource("sample-cookies.txt").toURI());
+        return Path.of(getClass().getResource("sample-cookies.txt").toURI());
     }
 
     @Test

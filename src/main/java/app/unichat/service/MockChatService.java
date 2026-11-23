@@ -68,6 +68,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     /** Demo mode whose choices and folders live in {@code prefs}, like the real service. */
+    @SuppressWarnings("this-escape") // the demo seeds its own chats; subclasses (tests) only change how it answers
     public MockChatService(PreferencesFile prefs) {
         this.prefs = prefs;
         this.folders = new FolderActions(prefs, this::fireChats);

@@ -22,6 +22,7 @@ public class ScriptedChatService extends MockChatService {
     private final Map<String, Integer> olderToLoad = new ConcurrentHashMap<>();
     private volatile CompletableFuture<Void> downloads = CompletableFuture.completedFuture(null);
 
+    @SuppressWarnings("this-escape") // turns the demo's own replies and pauses off, before any test drives it
     public ScriptedChatService() {
         noAutoReplies();
         skipDemoPauses();

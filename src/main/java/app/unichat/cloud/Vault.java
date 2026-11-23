@@ -77,6 +77,9 @@ final class Vault {
 
     /** There already is a vault in the account (perhaps another computer made it a moment ago): open it instead. */
     static final class Exists extends Exception {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         Exists() {
             super("There already is a vault in the account");
         }

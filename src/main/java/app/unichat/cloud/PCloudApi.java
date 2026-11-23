@@ -222,6 +222,9 @@ public final class PCloudApi implements Storage {
 
     /** A file or folder that isn't there: an answer, not a failure. */
     static final class Missing extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         Missing() {
             super("missing");
         }

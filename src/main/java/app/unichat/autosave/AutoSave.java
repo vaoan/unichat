@@ -55,6 +55,9 @@ public final class AutoSave implements ChatService.Listener {
 
     /** A file that can never be downloaded: deleted, expired, not on the server any more. */
     static final class Gone extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         Gone(String why, Throwable cause) {
             super(why, cause);
         }

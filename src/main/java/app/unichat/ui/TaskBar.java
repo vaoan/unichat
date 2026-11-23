@@ -37,6 +37,7 @@ public abstract class TaskBar extends HBox {
     private final HBox actions = new HBox(4);
 
     /** {@code kind}: the bar's own style class. */
+    @SuppressWarnings("this-escape") // a JavaFX node styles and fills itself as it's built; the bars only add to it
     protected TaskBar(String kind) {
         super(10);
         getStyleClass().addAll("audio-bar", "task-bar", kind);

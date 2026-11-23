@@ -28,6 +28,9 @@ final class VaultCrypto {
 
     /** Wrong key, another path, a changed byte or a version we don't know: the same answer, so nothing tells which. */
     static final class Broken extends Exception {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         Broken() {
             super("The vault's data could not be opened");
         }

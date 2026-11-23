@@ -10,6 +10,12 @@ Tests run in Spanish (`unichat.language=es` in the pom), with `unichat.dataDir`,
 - A flaky test is a bug, never tolerated nor retried away: find the race and fix it (usually a wait on time, or work still running when the test ends: wait for it).
 - A wait for something that can fail waits for the failure too and says it, never runs to the limit.
 
+## Watching a test fail
+- Code is broken on purpose (a mutation, to see a test fail without the fix) only in a throwaway worktree: `git worktree add <session scratchpad>/<name> HEAD`, copy the change over, break it there, run, then `git worktree remove`. Never in the person's working tree: an `if (Boolean.TRUE) return at;` left there by an agent nearly got committed.
+
+## Build rules
+- `BuildRulesTest` reads `pom.xml` and fails when a check that fails the build is turned off: javac's `-Xlint:all -Werror` (a `-Xlint:-name` needs its reason in a comment just before it), the Enforcer's rules, Modernizer at the project's Java, and any `<skip>`. A new tool that fails the build gets its case there.
+
 ## Flags
 Off by default, only the person runs them: `-Dunichat.networkTests=true` (real downloads and CLIs), `-Dunichat.chromeTests=true` (real Chrome, off screen), `-Dunichat.perfTests=true` (`ScrollPerfUiTest`, `EmojiScrollPerfUiTest`: the real display), `-Dunichat.realInputTests=true` (`MenuDismissUiTest`: the real mouse). `MatrixLiveIT` needs `UNICHAT_IT_HOMESERVER`.
 

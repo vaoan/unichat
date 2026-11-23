@@ -53,6 +53,9 @@ public final class BridgeLogin {
 
     /** The bridge refused a request; {@code errcode} like M_FORBIDDEN, message from the bridge. */
     public static final class BridgeLoginException extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         private final String errcode;
 
         public BridgeLoginException(String errcode, String message) {

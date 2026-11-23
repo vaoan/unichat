@@ -14,11 +14,11 @@ public final class StylePrompt {
     static final int MAX_BULLETS = 40;
 
     /**
-     * A draft the AI wrote, and what the person actually sent instead.
+     * A draft the AI wrote, what the person actually sent instead, what it answered and the chat (null where older
+     * entries didn't keep them).
      * @param context what the others had written, that the draft answered (so style can be told from content); null
      *                when unknown, as in corrections kept before it was
      */
-    /** A draft, what was sent instead, what it answered and the chat (null where older entries didn't keep them). */
     public record Correction(String draft, String sent, String context, String chatId) {
         public Correction(String draft, String sent) { this(draft, sent, null, null); }
         public Correction(String draft, String sent, String context) { this(draft, sent, context, null); }

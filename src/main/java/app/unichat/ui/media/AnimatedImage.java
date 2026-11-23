@@ -289,7 +289,7 @@ public final class AnimatedImage {
         if (hit != null) return hit;
         // What it may hold while it's decoded: its frames (capped) and the raw ones they're made from.
         long need = 2 * Math.min((long) maxW * maxH * 4 * MAX_FRAMES, MAX_ANIMATION_BYTES);
-        try (DecodeBudget.Lease lease = DecodeBudget.SHARED.take(need)) {
+        try (DecodeBudget.Lease _ = DecodeBudget.SHARED.take(need)) {
             if (webm) return decodeVideo(file, maxW, maxH);
             return webp ? decodeWebp(file, maxW, maxH) : decodeGif(file, maxW, maxH);
         } catch (InterruptedException e) {

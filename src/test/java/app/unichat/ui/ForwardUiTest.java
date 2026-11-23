@@ -190,7 +190,6 @@ class ForwardUiTest {
         }
     }
 
-    /** {@code m}'s row on screen, or null. */
     /** The header's "Reenviar", which asks where the picked ones go. */
     private void forwardPicked() throws Exception {
         FxWait.fx(() -> {

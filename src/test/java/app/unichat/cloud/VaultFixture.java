@@ -180,7 +180,7 @@ public final class VaultFixture implements AutoCloseable {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() throws java.util.concurrent.ExecutionException, java.io.InterruptedIOException {
         dav.holdOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown); // nothing waits past the test
         dav.holdReadOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown);
         held.forEach(java.util.concurrent.CountDownLatch::countDown); // a held upload let go, also once it's under way
@@ -188,6 +188,10 @@ public final class VaultFixture implements AutoCloseable {
             cloud.stop();
             cloud.vaultJobsOver().get(); // what a step asked for runs before the account goes
             cloud.syncNow().get();
+        } catch (InterruptedException e) {
+            // Not thrown as it is: try-with-resources would lose the interrupt when it's suppressed (javac's "try" lint).
+            Thread.currentThread().interrupt();
+            throw (java.io.InterruptedIOException) new java.io.InterruptedIOException("closing the vault fixture").initCause(e);
         } finally {
             // Put back even when the wait above is cut short (a test's time ran out): the settings outlive the run.
             dav.close();

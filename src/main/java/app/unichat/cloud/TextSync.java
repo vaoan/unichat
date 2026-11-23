@@ -50,10 +50,6 @@ final class TextSync {
         this.machine = machine;
     }
 
-    /**
-     * Sends what grew here, then brings what grew on the other computers; the chats (their keys) that something came
-     * for. A failure stops the round where it was: what was done is remembered, the rest is tried at the next.
-     */
     /** The account itself, as {@link #run}'s {@code to} says where the texts go: plain, or a vault ("vault:" and its id). */
     static final String PLAIN = "plain";
 
@@ -63,6 +59,8 @@ final class TextSync {
     }
 
     /**
+     * Sends what grew here, then brings what grew on the other computers; the chats (their keys) that something came
+     * for. A failure stops the round where it was: what was done is remembered, the rest is tried at the next.
      * {@code to} names where {@code storage} keeps them (plain, or which vault): what was sent is of one of them, so when
      * it's another this computer's own files all go again (it's the only one to write them); a launch to the same one
      * sends nothing again.

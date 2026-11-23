@@ -74,7 +74,7 @@ class FavoritesRowUiTest {
         if (shot != null) FxWait.fx(() -> {
             Node row = scene.getRoot().lookup(".favorites");
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(row.snapshot(null, null), null), "png",
-                    new java.io.File(shot + "-" + Math.round(Settings.get().fontScale() * 100) + ".png"));
+                    java.nio.file.Path.of(shot + "-" + Math.round(Settings.get().fontScale() * 100) + ".png").toFile());
             return null;
         });
         List<String> problems = FxWait.fx(() -> {
@@ -129,7 +129,7 @@ class FavoritesRowUiTest {
         if (shot != null) FxWait.fx(() -> {
             Node row = scene.getRoot().lookup(".favorites").getParent();
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(row.snapshot(null, null), null), "png",
-                    new java.io.File(shot + "-row-" + scene.getRoot().lookupAll(".favorite-tile").size() + ".png"));
+                    java.nio.file.Path.of(shot + "-row-" + scene.getRoot().lookupAll(".favorite-tile").size() + ".png").toFile());
             return null;
         });
         return FxWait.fx(() -> {

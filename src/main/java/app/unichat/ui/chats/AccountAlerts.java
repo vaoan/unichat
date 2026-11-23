@@ -16,11 +16,11 @@ public final class AccountAlerts {
     private AccountAlerts() {}
 
     /**
-     * @param who    the network, and the account when it has several
-     * @param text   the whole explanation (tooltip, screen readers)
-     * @param relink only a new login fixes it (button shown); otherwise Unichat is recovering it by itself
+     * @param who     the network, and the account when it has several
+     * @param text    the whole explanation (tooltip, screen readers)
+     * @param relink  only a new login fixes it (button shown); otherwise Unichat is recovering it by itself
+     * @param syncing the account is reconnecting to its network, so its chats are still catching up (top bar)
      */
-    /** {@code syncing}: the account is reconnecting to its network, so its chats are still catching up (top bar). */
     public record Alert(Network network, String who, String text, boolean relink, boolean syncing) {}
 
     /**

@@ -168,8 +168,8 @@ public final class ChatOptions {
     /**
      * "Lo anterior": going back through the chat's history to its beginning, saving the kinds chosen of what's still
      * there ({@link AutoSave#explore}); how far it got, and a way to stop it. Only while saving is on.
+     * @param on whether the chat saves anything (the button needs something to look for)
      */
-    /** @param on whether the chat saves anything (the button needs something to look for) */
     private Node past(Chat chat, javafx.beans.binding.BooleanExpression on) {
         AutoSave save = AutoSave.of(svc);
         Label help = Labels.help(I18n.t("chatOptions.pastHelp"));

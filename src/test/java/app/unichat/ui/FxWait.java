@@ -18,6 +18,9 @@ public final class FxWait {
 
     /** Waiting on the FX thread, which would wait for itself: a condition of {@link #until} may only look. */
     public static final class OnFxThread extends IllegalStateException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         OnFxThread(String what) {
             super("waiting for \"" + what + "\" on the FX thread (inside an until's condition?) would never end: look, don't wait");
         }

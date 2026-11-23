@@ -20,6 +20,7 @@ public final class MarkOfTheWeb {
      * Marks {@code file}, on Windows only. Failing is ignored: FAT and exFAT drives have no streams. java.io, not
      * {@code Path.of}: NIO refuses the colon in a Windows path.
      */
+    @org.gaul.modernizer_maven_annotations.SuppressModernizer // java.io on purpose: NIO refuses the stream's colon
     public static void mark(Path file) {
         if (!Os.windows()) return;
         try (OutputStream out = new FileOutputStream(stream(file))) {

@@ -10,7 +10,6 @@ import app.unichat.ui.FxWait;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.application.Platform;
-import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.stage.Stage;
@@ -116,7 +115,7 @@ class FavoritesRebuildUiTest {
         });
 
         Button rebuild = FxWait.fx(() -> (Button) grid.lookupAll(".button").stream()
-                .filter(n -> "Actualizar los favoritos desde sus sets".equals(((Node) n).getAccessibleText())).findFirst().orElseThrow());
+                .filter(n -> "Actualizar los favoritos desde sus sets".equals(n.getAccessibleText())).findFirst().orElseThrow());
         FxWait.fx(() -> { rebuild.fire(); return null; });
 
         FxWait.until("rebuilt", () -> toasts.contains("1 favorito actualizado"));

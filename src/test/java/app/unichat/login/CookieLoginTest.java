@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,7 +23,7 @@ class CookieLoginTest {
 
     @Test
     void sampleCookiesTxtIsOk() throws Exception {
-        Path f = Paths.get(getClass().getResource("/app/unichat/login/sample-cookies.txt").toURI());
+        Path f = Path.of(getClass().getResource("/app/unichat/login/sample-cookies.txt").toURI());
         CookieLogin.TxtResult r = CookieLogin.fromCookieTxt(f, Network.INSTAGRAM);
         assertEquals(CookieLogin.TxtResult.Kind.OK, r.kind());
         assertTrue(r.cookies().complete());

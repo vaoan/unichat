@@ -26,6 +26,9 @@ final class VaultActions {
 
     /** A secret that opens none of the vault's ways in: nothing was written. */
     static final class WrongSecret extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         WrongSecret() {
             super(I18n.t("cloud.error.vaultWrongSecret"));
         }

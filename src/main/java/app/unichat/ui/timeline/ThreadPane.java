@@ -654,13 +654,13 @@ public final class ThreadPane extends BorderPane {
         }
     }
 
-    /** Keyboard control of the focused timeline. Arrow keys move the selection (ListView default). */
     /** A message's actions a plain key does, under the same rules as its menu ({@link MessageActionsUi#run}). */
     private static final java.util.Map<javafx.scene.input.KeyCode, MessageActions.Action> KEY_ACTIONS = java.util.Map.of(
             javafx.scene.input.KeyCode.R, MessageActions.Action.REPLY,
             javafx.scene.input.KeyCode.T, MessageActions.Action.TRANSCRIBE,
             javafx.scene.input.KeyCode.E, MessageActions.Action.EDIT);
 
+    /** Keyboard control of the focused timeline. Arrow keys move the selection (ListView default). */
     private void onTimelineKey(javafx.scene.input.KeyEvent e) {
         Message m = selectedMessage();
         if (selection.key(e, m)) return;

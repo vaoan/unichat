@@ -7,6 +7,9 @@ import java.io.IOException;
  * change it. The message says why, in the person's words; {@link UploadQueue} gives it up at once and shows it.
  */
 public final class CantSend extends IOException {
+    @java.io.Serial
+    private static final long serialVersionUID = 1L;
+
     public CantSend(String why) {
         super(why);
     }

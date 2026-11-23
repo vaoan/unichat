@@ -17,12 +17,6 @@ final class NetworkFormats {
             LOTTIE = "video/lottie+json";
 
     /**
-     * {@code asIs}: the sticker formats its bridge sends on (the chat's room_features may still refuse one); {@code animated}
-     * and {@code still}: what one in another format becomes; {@code gifVideosAsIs}: its bridge sends a GIF that came as an
-     * MP4 (marked {@code fi.mau.gif}) on as a GIF; {@code ifUnmade}: what it still shows as it is when the conversion
-     * can't be made.
-     */
-    /**
      * Whether a sticker that couldn't be made what {@code n} should get (no tool) goes as it is rather than as a still
      * picture: an animated one where that format still plays; never by room_features alone (null network).
      */
@@ -30,6 +24,12 @@ final class NetworkFormats {
         return n != null && animated && of(n).takesIfUnmade(mime);
     }
 
+    /**
+     * {@code asIs}: the sticker formats its bridge sends on (the chat's room_features may still refuse one); {@code animated}
+     * and {@code still}: what one in another format becomes; {@code gifVideosAsIs}: its bridge sends a GIF that came as an
+     * MP4 (marked {@code fi.mau.gif}) on as a GIF; {@code ifUnmade}: what it still shows as it is when the conversion
+     * can't be made.
+     */
     record Rule(Set<String> asIs, String animated, String still, boolean gifVideosAsIs, Set<String> ifUnmade) {
         /** Whether a {@code mime} sticker still goes as it is when it can't be made what it should be (no tool). */
         boolean takesIfUnmade(String mime) {

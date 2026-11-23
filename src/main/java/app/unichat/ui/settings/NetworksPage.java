@@ -53,7 +53,6 @@ final class NetworksPage {
         return new VBox(6, where, new javafx.scene.layout.FlowPane(8, 6, change, reset));
     }
 
-    /** Options that only make sense for one network; each network gets its own group. */
     /**
      * What holds for every network first (where saved things go, voice notes, the converter), then each network's own,
      * in order of name, under headings that say which is which.

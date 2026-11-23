@@ -116,7 +116,7 @@ class SupervisorTest {
         Supervisor next = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run, app.unichat.support.Storage.SHARED);
         next.reapOrphans();
         var left = ProcessHandle.of(orphan);
-        if (left.isPresent()) left.get().onExit().get();
+        if (left.isPresent()) left.orElseThrow().onExit().get();
         assertFalse(Files.exists(run.resolve("svc.pid")));
     }
 

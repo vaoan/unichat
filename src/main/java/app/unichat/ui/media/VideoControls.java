@@ -381,6 +381,6 @@ final class VideoControls extends VBox {
         String base = FileNames.safe(title == null ? "" : title.replaceAll("\\.[A-Za-z0-9]{1,5}$", ""));
         if (base.isEmpty()) base = "video";
         long s = (long) Math.max(0, seconds);
-        return base + "-" + (s / 60) + "m" + String.format("%02d", s % 60) + "s.png";
+        return base + "-" + (s / 60) + "m" + "%02d".formatted(s % 60) + "s.png";
     }
 }

@@ -25,10 +25,6 @@ final class DemoChats {
 
     private DemoChats() {}
 
-    /**
-     * Gives a demo chat its key and applies what the file has chosen. Only fields the file has override the demo's own
-     * values ({@link PreferencesFile#preview} falls back to them), so an empty file changes nothing.
-     */
     /** The phone's contacts the demo's WhatsApp offers. */
     static List<Contact> contacts() {
         return List.of(
@@ -40,6 +36,10 @@ final class DemoChats {
                 new Contact("c-pedro", I18n.t("demo.name.pedro"), List.of("tel:+573001110006"), null, null));
     }
 
+    /**
+     * Gives a demo chat its key and applies what the file has chosen. Only fields the file has override the demo's own
+     * values ({@link PreferencesFile#preview} falls back to them), so an empty file changes nothing.
+     */
     static void adopt(PreferencesFile prefs, Chat c) {
         c.setPrefKey(ChatKeys.of(null, null, c.id()));
         var demo = new PreferencesFile.ServerValues(c.archived(), c.muted(), c.favorite(), c.lowPriority(), c.pinned(),

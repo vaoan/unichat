@@ -89,7 +89,7 @@ class ArchivesTest {
         byte[] h = new byte[512];
         byte[] n = name.getBytes(StandardCharsets.US_ASCII);
         System.arraycopy(n, 0, h, 0, n.length);
-        byte[] size = String.format("%011o", data.length).getBytes(StandardCharsets.US_ASCII);
+        byte[] size = "%011o".formatted(data.length).getBytes(StandardCharsets.US_ASCII);
         System.arraycopy(size, 0, h, 124, size.length);
         h[156] = (byte) type;
         System.arraycopy("ustar".getBytes(StandardCharsets.US_ASCII), 0, h, 257, 5);

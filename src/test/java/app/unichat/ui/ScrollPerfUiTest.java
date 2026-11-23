@@ -255,7 +255,7 @@ class ScrollPerfUiTest {
                 return null;
             });
             List<Long> s = new ArrayList<>(gaps);
-            Collections.sort(s);
+            s.sort(java.util.Comparator.naturalOrder());
             long total = s.stream().mapToLong(x -> x).sum();
             System.out.printf("PERF %s: fps=%.0f p50=%.1f p95=%.1f p99=%.1f max=%.0f over25ms=%d%% over100ms=%d gc=%dms busy=%d%% live=%dMB%n   %s%n",
                     name, s.size() * 1e9 / Math.max(1, total), s.get(s.size() / 2) / 1e6, s.get(s.size() * 95 / 100) / 1e6,

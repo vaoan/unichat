@@ -57,7 +57,7 @@ final class ForwardedContent {
         String name = app.unichat.video.GifVideos.webpName(content.path("filename").asText(content.path("body").asText("gif")));
         if (content.path("body").asText().equals(content.path("filename").asText())) content.put("body", name);
         content.put("msgtype", "m.image").put("filename", name);
-        ObjectNode info = content.with("info");
+        ObjectNode info = content.withObjectProperty("info");
         info.put("mimetype", StickerConverter.WEBP).put("size", size);
         info.remove(List.of("duration", "thumbnail_url", "thumbnail_info"));
     }

@@ -46,6 +46,9 @@ public final class GifVideos {
 
     /** Thrown by {@link #toWebp} for a video the size of a camera's ({@link #camera}): it stays a video. */
     public static final class RealVideo extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         RealVideo() { super("a real video"); }
     }
 
@@ -60,6 +63,9 @@ public final class GifVideos {
 
     /** Thrown by {@link #toWebp} for a video with sound: it stays a video. */
     public static final class HasSound extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         HasSound() { super("it has sound"); }
     }
 

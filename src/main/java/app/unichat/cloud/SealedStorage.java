@@ -25,6 +25,9 @@ final class SealedStorage implements Storage {
 
     /** A file of the vault that doesn't open with this key: damaged, or sealed with another one. */
     static final class Damaged extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         Damaged() {
             super(I18n.t("cloud.error.vaultDamaged"));
         }

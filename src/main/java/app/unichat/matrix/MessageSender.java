@@ -243,10 +243,6 @@ final class MessageSender {
     }
 
     /**
-     * Adds m.relates_to. No "> quote" in the body: Matrix dropped that fallback (v1.13) and bridges pass the body on as
-     * it is, so the network would show the quote, Matrix ids included, under the real reply.
-     */
-    /**
      * The marks in {@code text} (*bold*, _italic_… {@link Markup}) as HTML, which each bridge writes its network's way;
      * the body keeps them as written. Returns the HTML, or null when there are none (plain text, as always).
      */
@@ -256,6 +252,10 @@ final class MessageSender {
         return html;
     }
 
+    /**
+     * Adds m.relates_to. No "> quote" in the body: Matrix dropped that fallback (v1.13) and bridges pass the body on as
+     * it is, so the network would show the quote, Matrix ids included, under the real reply.
+     */
     private static void addReply(ObjectNode content, String replyToId) {
         if (replyToId == null || replyToId.startsWith(SyncProcessor.LOCAL_PREFIX)) return;
         content.putObject("m.relates_to").putObject("m.in_reply_to").put("event_id", replyToId);
@@ -411,7 +411,7 @@ final class MessageSender {
         RoomFeatures.VoiceSend how = (c == null ? RoomFeatures.UNKNOWN : c.features()).voiceSend();
         if (how == null) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("send.noVoice")));
         return sendMedia(chatId, note.file(), replyToId, new Kind(how.mime(), 0, 0, note.durationMs(), false, p -> { }), content -> {
-            content.with("info").put("duration", note.durationMs());
+            content.withObjectProperty("info").put("duration", note.durationMs());
             if (how.voice()) markVoice(content, note.durationMs(), note.waveform());
         }).thenApply(id -> null);
     }
@@ -433,14 +433,14 @@ final class MessageSender {
         if (m.voiceWaveform() == null) return;
         RoomFeatures.VoiceSend how = (chat == null ? RoomFeatures.UNKNOWN : chat.features()).voiceSend();
         if (how == null || !how.voice()) return;
-        if (m.mimeType() != null && m.mimeType().startsWith("audio/ogg")) content.with("info").put("mimetype", how.mime());
+        if (m.mimeType() != null && m.mimeType().startsWith("audio/ogg")) content.withObjectProperty("info").put("mimetype", how.mime());
         markVoice(content, m.durationMs(), m.voiceWaveform());
     }
 
     private CompletableFuture<Void> sendMedia(String chatId, Path file, String replyToId, String mime, int width, int height,
                                               boolean gif) {
         return sendMedia(chatId, file, replyToId, new Kind(mime, width, height, 0, false, p -> { }), content -> {
-            if (gif) content.with("info").put("fi.mau.gif", true);
+            if (gif) content.withObjectProperty("info").put("fi.mau.gif", true);
         }).thenApply(id -> null);
     }
 
@@ -451,8 +451,10 @@ final class MessageSender {
         }
     }
 
-    /** @param extra adds what's particular to this kind of media to the event's content */
-    /** @return the event's id once our server has it */
+    /**
+     * @param extra adds what's particular to this kind of media to the event's content
+     * @return the event's id once our server has it
+     */
     private CompletableFuture<String> sendMedia(String chatId, Path file, String replyToId, Kind kind,
                                                 java.util.function.Consumer<ObjectNode> extra) {
         String mime = kind.mime();

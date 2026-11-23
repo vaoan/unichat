@@ -15,7 +15,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
-import java.io.File;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import javax.imageio.ImageIO;
@@ -96,8 +95,8 @@ class EmojiPickerUiTest {
             return g;
         });
         // The list itself: the box measuring a button is styled as the list too.
-        javafx.scene.control.ListView<EmojiRows.Row> list = FxWait.fx(() -> grid.lookupAll(".emoji-list").stream()
-                .filter(n -> n instanceof javafx.scene.control.ListView).map(n -> (javafx.scene.control.ListView<EmojiRows.Row>) n)
+        javafx.scene.control.ListView<?> list = FxWait.fx(() -> grid.lookupAll(".emoji-list").stream()
+                .filter(n -> n instanceof javafx.scene.control.ListView).map(n -> (javafx.scene.control.ListView<?>) n)
                 .findFirst().orElseThrow());
         FxWait.until("the rows are laid out", () -> !list.getItems().isEmpty());
         List<String> listed = FxWait.fx(() -> list.getItems().stream().filter(r -> r instanceof EmojiRows.Emojis)
@@ -120,7 +119,7 @@ class EmojiPickerUiTest {
         String shot = System.getProperty("unichat.emojiShot");
         if (shot != null) {
             var img = FxWait.fx(() -> grid.snapshot(null, null));
-            ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", new File(shot));
+            ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", java.nio.file.Path.of(shot).toFile());
         }
         FxWait.fx(() -> { grid.getScene().getWindow().hide(); return null; });
     }
@@ -144,12 +143,12 @@ class EmojiPickerUiTest {
             stage.show();
             return g;
         });
-        javafx.scene.control.ListView<EmojiRows.Row> list = FxWait.fx(() -> grid.lookupAll(".emoji-list").stream()
-                .filter(n -> n instanceof javafx.scene.control.ListView).map(n -> (javafx.scene.control.ListView<EmojiRows.Row>) n)
+        javafx.scene.control.ListView<?> list = FxWait.fx(() -> grid.lookupAll(".emoji-list").stream()
+                .filter(n -> n instanceof javafx.scene.control.ListView).map(n -> (javafx.scene.control.ListView<?>) n)
                 .findFirst().orElseThrow());
         FxWait.until("laid out", () -> !list.getItems().isEmpty());
         FxWait.fx(() -> { grid.searchField().setText("cara derrit"); return null; });
-        List<EmojiRows.Row> rows = FxWait.fx(() -> List.copyOf(list.getItems()));
+        List<?> rows = FxWait.fx(() -> List.copyOf(list.getItems()));
         assertEquals(new EmojiRows.Title("Resultados"), rows.get(0));
         assertEquals(List.of("🫠"), rows.stream().filter(r -> r instanceof EmojiRows.Emojis).flatMap(r -> ((EmojiRows.Emojis) r).emoji().stream()).toList());
         FxWait.fx(() -> {

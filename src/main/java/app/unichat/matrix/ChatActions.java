@@ -171,7 +171,7 @@ final class ChatActions {
         if (writes.isEmpty()) return chatNotFound();
         core.fire(Listener::chatsChanged);
         restChanged.run();
-        return CompletableFuture.allOf(writes.toArray(new CompletableFuture[0]));
+        return CompletableFuture.allOf(writes.toArray(new CompletableFuture<?>[0]));
     }
 
     /** Muted on the phone: archived too, as a rule and not a choice, so it never overrides what the person chose. */

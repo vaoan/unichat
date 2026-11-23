@@ -54,9 +54,15 @@ class LogPumpTest {
             done.take(); // the pump handled it; JUnit's global timeout is the only limit
         }
 
-        @Override public void close() throws Exception {
+        @Override public void close() throws IOException {
             feed.close();
-            thread.join(); // lesson-ok: test-future-join (a Thread's join, interruptible; the pump ends with its input)
+            try {
+                thread.join(); // lesson-ok: test-future-join (a Thread's join, interruptible; the pump ends with its input)
+            } catch (InterruptedException e) {
+                // Not thrown as it is: try-with-resources would lose the interrupt when it's suppressed (javac's "try" lint).
+                Thread.currentThread().interrupt();
+                throw (java.io.InterruptedIOException) new java.io.InterruptedIOException("closing the pump").initCause(e);
+            }
         }
     }
 

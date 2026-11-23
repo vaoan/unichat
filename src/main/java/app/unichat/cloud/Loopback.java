@@ -37,6 +37,9 @@ final class Loopback {
 
     /** The browser left past the deadline: nothing went wrong, the person didn't finish. */
     static final class Expired extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         Expired(String message) {
             super(message);
         }

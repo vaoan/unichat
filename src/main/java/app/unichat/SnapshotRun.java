@@ -119,7 +119,7 @@ final class SnapshotRun {
             if (subject != shot.getRoot() && shot.getRoot() instanceof javafx.scene.layout.Region r && r.getBackground() != null
                     && !r.getBackground().getFills().isEmpty()) params.setFill(r.getBackground().getFills().getFirst().getFill());
             var img = subject.snapshot(params, null);
-            javax.imageio.ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", new File(out));
+            javax.imageio.ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", java.nio.file.Path.of(out).toFile());
         } catch (Exception ex) {
             ex.printStackTrace();
         }
