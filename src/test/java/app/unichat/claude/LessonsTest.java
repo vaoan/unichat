@@ -42,6 +42,11 @@ class LessonsTest {
     void theRepositoryKeepsEveryLesson() throws IOException {
         var lessons = new Lessons(ROOT);
         var found = new ArrayList<Lessons.Finding>();
+        // The scripts at the root (install-mac.sh, package.sh, package.ps1…), without the folders below it, which
+        // are walked only where they are ours (target/ and .git/ are not).
+        try (Stream<Path> top = Files.list(ROOT)) {
+            for (Path f : top.filter(Files::isRegularFile).toList()) found.addAll(lessons.check(f));
+        }
         for (String dir : new String[] {"src", "native", "packaging", "server", "tools", ".github"}) {
             if (!Files.isDirectory(ROOT.resolve(dir))) continue;
             try (Stream<Path> files = Files.walk(ROOT.resolve(dir))) {

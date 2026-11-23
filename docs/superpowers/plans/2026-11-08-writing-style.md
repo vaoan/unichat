@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-08-writing-style-design.md`
 
+> **Historical note (2026-11-23):** the Spanish prompt copy quoted below is what was built then. The prompts have been English since the English-first change (`docs/superpowers/specs/2026-11-23-english-first-design.md`); the test examples in Spanish stand for what the person writes.
+
 ## Global Constraints
 
 - Style file: `<dataDir>/writing-style.md`, at most **40 bullets / 3 000 characters**; a learned reply over 3 000 characters or blank is discarded.

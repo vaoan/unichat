@@ -109,7 +109,7 @@
 
 - [ ] **Step 1: Write the failing tests** — outgoing text in WhatsApp 10 min old → contains EDIT and DELETE_FOR_EVERYONE; 20 min old → no EDIT, still DELETE; incoming image → SAVE_AS and OPEN_FILE, no EDIT; sticker/GIF → FAVORITE; Google Messages outgoing → DELETE_FOR_ME, no DELETE_FOR_EVERYONE; deleted message → empty.
 - [ ] **Step 2: Run** — FAIL.
-- [ ] **Step 3: Implement** and use it in `messageMenu` (labels: "Responder", "Copiar texto", "Abrir archivo", "Guardar como…", "Editar", "Eliminar para todos", "Eliminar para mí", "Agregar a favoritos"); reactions in the menu and the 1…6 keys use `f.reactionsOffered(EmojiPicker.QUICK)`.
+- [ ] **Step 3: Implement** and use it in `messageMenu` (labels, as the Spanish UI shows them: "Responder" (Reply), "Copiar texto" (Copy text), "Abrir archivo" (Open file), "Guardar como…" (Save as…), "Editar" (Edit), "Eliminar para todos" (Delete for everyone), "Eliminar para mí" (Delete for me), "Agregar a favoritos" (Add to favorites)); reactions in the menu and the 1…6 keys use `f.reactionsOffered(EmojiPicker.QUICK)`.
 - [ ] **Step 4: Run** — PASS.
 - [ ] **Step 5: Commit** `feat(thread): message actions follow what the network supports`.
 

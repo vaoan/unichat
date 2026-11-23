@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- UI text and docs in Spanish (as the repo was then); code, comments and commits in English.
+- UI text and docs were in Spanish when this was written (today: UI text through I18n in both languages, docs in English); code, comments and commits in English.
 - Java files < 800 lines and methods < 100 (Checkstyle). `ChatListPane` already has 723: what's new goes in classes of its own.
 - The layers of `docs/ARCHITECTURE.md`: `service` may use `model`, `settings`, `login`; JavaFX only in `ui`.
 - It must keep working on Windows: no POSIX permissions without checking that the file system supports them.

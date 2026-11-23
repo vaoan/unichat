@@ -36,7 +36,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The "Cuentas" sheet: every connected account one per row, "Agregar cuenta" → pick a network (one per row,
+ * The settings page "accounts": every connected account one per row, "Agregar cuenta" (add account) → pick a network (one per row,
  * any number of accounts per network) → a login wizard that drives the bridge bot behind the scenes and shows
  * its QR code, asks for cookies/e-mail/codes, and confirms when the account is connected.
  */

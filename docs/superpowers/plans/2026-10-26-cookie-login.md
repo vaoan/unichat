@@ -14,7 +14,7 @@
 
 ## Global Constraints
 
-- Code and comments in English; visible text and docs in **Spanish** (as the repo was then). It must keep working on **Windows**.
+- Code and comments in English; visible text and docs were in **Spanish** when this was written (today: visible text through I18n in both languages, docs in English). It must keep working on **Windows**.
 - `./mvnw test` passes before each commit; surefire sets `unichat.dataDir` (don't touch the real folder).
 - New dependencies with an exact version at least 2 weeks old: `org.openjfx:javafx-web:23.0.1`, `org.xerial:sqlite-jdbc:3.46.1.3`. The WebP config (`imageio-webp`) is already there.
 - No source reads cookies of domains outside the requested network. No session is written to disk nor logged.
@@ -160,7 +160,7 @@
 **Files:**
 - Modify: `src/main/java/app/unichat/ui/AccountsPane.java`
 - Modify: `src/main/java/app/unichat/service/ChatService.java` (and `MockChatService`, `MatrixChatService` if a method to send the cookie JSON is needed — reuse `sendLoginInput`)
-- Modify: `docs/BRIDGES.md` (describe the new flow, in Spanish as the docs were then)
+- Modify: `docs/BRIDGES.md` (describe the new flow)
 - Test: the UI by hand with snapshots (`-Dunichat.snapshot`), more than automated.
 
 **Interfaces:**

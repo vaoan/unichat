@@ -29,29 +29,43 @@ class EnglishFirstTest {
 
     /** Letters and marks only Spanish uses among the app's two languages. */
     private static final Pattern MARKS = Pattern.compile("[áéíóúñÁÉÍÓÚÑ¿¡]");
-    /** Common Spanish words that are no English word nor a code token (so not "no", "me", "de", "en", "es", "con"). */
+    /**
+     * Common Spanish words that are no English word nor a code token (so not "no", "me", "de", "en", "es", "con",
+     * "ver", "el", "la", "un", "se", "por"), the usual UI verbs among them, which carry no accent.
+     */
     private static final Set<String> WORDS = Set.of("que", "para", "pero", "los", "las", "una", "unos", "unas",
             "porque", "cuando", "donde", "desde", "hasta", "tambien", "muy", "nuevo", "nueva", "archivo", "carpeta",
             "ajustes", "mensaje", "mensajes", "cuenta", "cuentas", "idioma", "nota", "notas", "voz", "nube", "redes",
-            "perfil", "teclado", "acerca", "escribir", "hola", "gracias", "yo");
+            "perfil", "teclado", "acerca", "escribir", "hola", "gracias", "yo", "sin", "buscar", "cancelar", "aceptar",
+            "guardar", "abrir", "eliminar", "responder", "copiar", "cerrar", "todos", "enviar");
     private static final Pattern WORD = Pattern.compile("\\p{L}+");
 
-    /** A literal allowed to hold Spanish: the file, a part of the literal as written in the source, and why. */
-    record Allowed(String file, String literal, String why) { }
+    /**
+     * A literal allowed to hold Spanish: the file, the literal as written in the source and why. It must be that
+     * literal exactly, unless {@code part} says a part is enough (one name inside several paths, a long prompt).
+     */
+    record Allowed(String file, String literal, boolean part, String why) {
+        static Allowed exact(String file, String literal, String why) { return new Allowed(file, literal, false, why); }
+        static Allowed part(String file, String literal, String why) { return new Allowed(file, literal, true, why); }
+
+        boolean allows(String rel, String text) {
+            return file.equals(rel) && (part ? text.contains(literal) : text.equals(literal));
+        }
+    }
 
     private static final List<Allowed> ALLOWED = List.of(
-            new Allowed("app/unichat/cloud/CloudNames.java", "Ajustes",
+            Allowed.part("app/unichat/cloud/CloudNames.java", "Ajustes",
                     "the old settings folder (\"Ajustes\", \"/Ajustes\", \"Ajustes/boveda-apagada.json\"), which the "
                             + "migration must find to move it"),
-            new Allowed("app/unichat/cloud/CloudNames.java", "/Bóveda",
+            Allowed.exact("app/unichat/cloud/CloudNames.java", "/Bóveda",
                     "the old vault folder, which the migration must find to move it"),
-            new Allowed("app/unichat/stt/SttSettings.java", "{archivo}",
+            Allowed.exact("app/unichat/stt/SttSettings.java", "{archivo}",
                     "a command saved with the old Spanish placeholder is rewritten to {file}"),
-            new Allowed("app/unichat/stt/SttSettings.java", "{idioma}",
+            Allowed.exact("app/unichat/stt/SttSettings.java", "{idioma}",
                     "a command saved with the old Spanish placeholder is rewritten to {language}"),
-            new Allowed("app/unichat/server/LocalServer.java", "yo",
+            Allowed.exact("app/unichat/server/LocalServer.java", "yo",
                     "the account on every existing local server is @yo:localhost; another name would lose it"),
-            new Allowed("app/unichat/assist/FixPrompt.java", "in Spanish á é í ó ú ü ñ ¿ ¡",
+            Allowed.part("app/unichat/assist/FixPrompt.java", "in Spanish á é í ó ú ü ñ ¿ ¡",
                     "the English prompt names the marks the AI must add back to a Spanish text"));
 
     @Test
@@ -64,8 +78,7 @@ class EnglishFirstTest {
                 if (rel.equals(I18N)) continue;
                 for (Literal l : literals(Files.readString(f, StandardCharsets.UTF_8))) {
                     if (!spanish(l.text())) continue;
-                    Allowed a = ALLOWED.stream().filter(x -> x.file().equals(rel) && l.text().contains(x.literal()))
-                            .findFirst().orElse(null);
+                    Allowed a = allowedFor(rel, l.text());
                     if (a != null) used.add(a);
                     else found.add(rel + ":" + l.line() + ": \"" + l.text() + "\"");
                 }
@@ -77,12 +90,32 @@ class EnglishFirstTest {
         assertTrue(stale.isEmpty(), "Allowed literals no longer in the code (remove them): " + stale);
     }
 
+    /** The entry that lets {@code text} in file {@code rel} be Spanish, or null. */
+    static Allowed allowedFor(String rel, String text) {
+        return ALLOWED.stream().filter(a -> a.allows(rel, text)).findFirst().orElse(null);
+    }
+
+    @Test
+    void anExactEntryAllowsOnlyItsOwnLiteral() {
+        assertTrue(allowedFor("app/unichat/server/LocalServer.java", "yo") != null);
+        assertTrue(allowedFor("app/unichat/server/LocalServer.java", "yo no sé") == null, "more Spanish beside it");
+        assertTrue(allowedFor("app/unichat/stt/SttSettings.java", "Falta {archivo}") == null);
+        assertTrue(allowedFor("app/unichat/cloud/CloudNames.java", "/Bóveda/llaves nuevas") == null);
+        assertTrue(allowedFor("app/unichat/cloud/CloudNames.java", "Ajustes/boveda-apagada.json") != null, "a part entry");
+        assertTrue(allowedFor("app/unichat/ui/MainView.java", "yo") == null, "only in its own file");
+    }
+
     @Test
     void catchesMarksAndWholeWordsOnly() {
         assertTrue(spanish("Sofía"));
         assertTrue(spanish("¿listo?"));
         assertTrue(spanish("Atajos de teclado"));
         assertTrue(spanish("Algo para ti"));
+        for (String verb : List.of("sin", "buscar", "cancelar", "aceptar", "guardar", "abrir", "eliminar", "responder",
+                "copiar", "cerrar", "todos", "enviar")) {
+            assertTrue(spanish("Boton " + verb), verb);
+        }
+        assertTrue(!spanish("ver el la un se por"), "Spanish words that are English or code too are left out");
         assertTrue(!spanish("no file"), "English words that are Spanish too");
         assertTrue(!spanish("--no-config"));
         assertTrue(!spanish("paragraph queue notary"), "a word inside another is no word");
