@@ -90,6 +90,7 @@ public final class MainView extends StackPane {
     private final UploadBar uploads;
     private final app.unichat.ui.timeline.ForwardBar forwards;
     private final ExploreBar exploring;
+    private final app.unichat.ui.chats.RestBar resting;
     private final Consumer<String> openLink;
     private String pendingOpenId;
     private long pendingOpenUntil;
@@ -199,8 +200,9 @@ public final class MainView extends StackPane {
         java.nio.file.Path pendingUploads = Settings.dataDir().resolve(svc instanceof app.unichat.service.MockChatService ? "uploads-demo.json" : "uploads.json");
         uploads = new UploadBar(app.unichat.service.UploadQueue.of(svc, pendingUploads), svc, this::openChatId);
         exploring = new ExploreBar(app.unichat.autosave.AutoSave.of(svc), svc, this::openChatId);
+        resting = app.unichat.ui.chats.RestBar.of(svc, stage, listPane.filterProperty());
         main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true)), uploads, forwards, exploring,
-                new CloakBar(app.unichat.cloak.CloakJob.get())));
+                resting, new CloakBar(app.unichat.cloak.CloakJob.get())));
 
         overlay.getStyleClass().add("overlay");
         overlay.setVisible(false);
@@ -258,6 +260,7 @@ public final class MainView extends StackPane {
         audio.stop();
         uploads.dispose();
         exploring.dispose();
+        resting.dispose();
         updateBar.dispose();
         svc.removeListener(listener);
         app.unichat.support.Storage.SHARED.removeListener(onStorage);

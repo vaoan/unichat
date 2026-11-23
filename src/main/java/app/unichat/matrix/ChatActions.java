@@ -35,10 +35,12 @@ final class ChatActions {
     private final ChatReader chats;
     private final DiscordServers discord;
     private final PreferencesFile prefs;
+    /** What's archived changed: what rests follows at once ({@link ArchiveRest#update}). */
+    private final Runnable restChanged;
     /** The last mute rule write queued; guarded by the processor's lock. */
     private CompletableFuture<Void> muteWrites = CompletableFuture.completedFuture(null);
 
-    ChatActions(MatrixCore core, ChatReader chats, DiscordServers discord, PreferencesFile prefs) {
+    ChatActions(MatrixCore core, ChatReader chats, DiscordServers discord, PreferencesFile prefs, Runnable restChanged) {
         this.core = core;
         this.client = core.client;
         this.proc = core.proc;
@@ -46,6 +48,7 @@ final class ChatActions {
         this.chats = chats;
         this.discord = discord;
         this.prefs = prefs;
+        this.restChanged = restChanged;
     }
 
     private final Map<String, String> lastReadSent = new ConcurrentHashMap<>();
@@ -152,12 +155,11 @@ final class ChatActions {
     /**
      * Muted = archived ({@link app.unichat.service.QuietRule}): both, for the chat and a server's channels. The file
      * takes it right away and the mute rule follows; a rule that can't be written doesn't undo the choice, it's
-     * retried from {@link #applyMutes}.
+     * retried from {@link #applyMutes}. What rests out of the sync (an archived Discord server and its bridge) follows.
      */
     private CompletableFuture<Void> quiet(String chatId, boolean on) {
         List<String> targets = QuietRule.targets(chats, chatId);
         List<CompletableFuture<Void>> writes = new ArrayList<>();
-        String guild;
         synchronized (proc) {
             prefs.batch(() -> {
                 for (String id : targets) {
@@ -165,11 +167,10 @@ final class ChatActions {
                     if (found) writes.add(queueMuteWrite(id, on));
                 }
             });
-            guild = discord.guildOf(chatId);
         }
         if (writes.isEmpty()) return chatNotFound();
         core.fire(Listener::chatsChanged);
-        if (guild != null) discord.setGuildPaused(guild, on);
+        restChanged.run();
         return CompletableFuture.allOf(writes.toArray(new CompletableFuture[0]));
     }
 
@@ -185,22 +186,17 @@ final class ChatActions {
     /**
      * Arrived inside an archived server: quiet like its siblings, as a rule and not a choice. What the person chose
      * stays, however often this runs (every start), and the phone can still change the rest. {@link #applyMutes} writes
-     * the rule. A chat that stays out of the archive doesn't pause its Discord server.
+     * the rule. A chat that stays out of the archive doesn't pause its Discord server ({@link ArchiveRest} decides).
      */
     void followQuiet(List<String> chatIds) {
         if (chatIds.isEmpty()) return;
         Set<String> targets = new LinkedHashSet<>();
         for (String id : chatIds) targets.addAll(QuietRule.targets(chats, id));
-        List<String> guilds = new ArrayList<>();
         synchronized (proc) {
             follow(targets, Flag.ARCHIVED, Flag.MUTED);
-            for (String id : chatIds) {
-                String guild = discord.guildOf(id);
-                if (guild != null && proc.room(id).chat.archived()) guilds.add(guild);
-            }
         }
         core.fire(Listener::chatsChanged);
-        for (String guild : guilds) discord.setGuildPaused(guild, true);
+        restChanged.run();
     }
 
     /** Caller holds the processor's lock. */

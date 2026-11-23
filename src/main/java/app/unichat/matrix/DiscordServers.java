@@ -54,17 +54,6 @@ final class DiscordServers {
         return Settings.get().getSet(PAUSED_GUILDS_KEY);
     }
 
-    /**
-     * An archived server brings nothing (no messages, no attachments filling the disk) while its rooms stay in the
-     * archive; brought back, it brings messages again, creating channels as people write.
-     */
-    CompletableFuture<Void> setGuildPaused(String guildId, boolean paused) {
-        synchronized (pauseRetries) {
-            pauseRetries.remove(guildId); // the latest choice is the one that's tried again
-        }
-        return CompletableFuture.runAsync(() -> setGuildPausedNow(guildId, paused, null), core.io);
-    }
-
     /** A pause (or resume) the bridge didn't take, waiting to be tried again. */
     private record PauseRetry(boolean paused, Retry retry) {}
 
@@ -104,29 +93,49 @@ final class DiscordServers {
         }
     }
 
-    private final java.util.concurrent.atomic.AtomicBoolean pausedArchivedGuilds = new java.util.concurrent.atomic.AtomicBoolean();
+    /** What follows Discord being connected: servers set the way the archive wants ({@link ArchiveRest}). */
+    private volatile Runnable whenConnected = () -> { };
 
-    /** Once per run, with Discord connected: servers archived earlier (or elsewhere) stop bringing anything too. */
+    void onConnected(Runnable r) { whenConnected = r; }
+
+    /** With Discord connected, servers archived earlier (or elsewhere) stop bringing anything too. */
     void maybePauseArchivedGuilds(Network n, List<Login> known) {
         if (n != Network.DISCORD || known.stream().noneMatch(l -> "CONNECTED".equals(l.state()))) return;
-        if (!core.initialSyncDone || !pausedArchivedGuilds.compareAndSet(false, true)) return;
+        if (core.initialSyncDone) whenConnected.run();
+    }
+
+    private boolean connected() {
+        return accounts.get().stream().anyMatch(a -> a.network() == Network.DISCORD && a.status() == AccountStatus.CONNECTED);
+    }
+
+    /**
+     * Of the servers in {@code paused} (guild id → whether it should bring nothing), those to be set to {@code to} at the
+     * bridge: not already so, nor waiting to be tried again so. None while Discord isn't connected: its bot can't answer.
+     */
+    List<String> toSet(Map<String, Boolean> paused, boolean to) {
+        if (!connected()) return List.of();
         Set<String> done = pausedGuilds();
-        List<String> todo = new ArrayList<>();
-        synchronized (proc) {
-            for (MatrixRoom r : proc.rooms()) {
-                String g = r.chat.archived() ? guildOf(r.id) : null;
-                if (g != null && !done.contains(g)) todo.add(g);
+        List<String> out = new ArrayList<>();
+        synchronized (pauseRetries) {
+            for (var e : paused.entrySet()) {
+                if (e.getValue() != to || done.contains(e.getKey()) == to) continue;
+                PauseRetry r = pauseRetries.get(e.getKey());
+                if (r == null || r.paused() != to) out.add(e.getKey());
             }
         }
-        if (todo.isEmpty()) return;
-        System.err.println("Discord: pausing " + todo.size() + " archived servers");
-        // One after another in a single task: the bridge takes one command at a time anyway.
-        core.io.execute(() -> {
-            for (String g : todo) {
-                if (!core.running) return;
-                setGuildPausedNow(g, true, null);
-            }
-        });
+        return out;
+    }
+
+    /**
+     * An archived server brings nothing (no messages, no attachments filling the disk) while its rooms rest; woken or
+     * brought back, it brings messages again, creating channels as people write. On the caller's thread, which waits
+     * for the bot's answer; never throws (a refusal is tried again).
+     */
+    void setGuildPaused(String guildId, boolean paused) {
+        synchronized (pauseRetries) {
+            pauseRetries.remove(guildId); // the latest choice is the one that's tried again
+        }
+        setGuildPausedNow(guildId, paused, null);
     }
 
     /** The bridge's guild list, asked at most every few minutes (each ask is a message in the bot chat). */

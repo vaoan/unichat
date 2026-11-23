@@ -90,7 +90,7 @@ class DiscordPauseRetryTest {
     @Test
     void aRefusedPauseIsTriedAgainWhenItsTimeComes() throws Exception {
         answers.addAll(List.of("Failed to get guild", "Set guild bridging mode to nothing"));
-        discord.setGuildPaused(GUILD, true).get();
+        discord.setGuildPaused(GUILD, true);
         assertFalse(DiscordServers.pausedGuilds().contains(GUILD), "the bridge refused it");
 
         discord.retryGuildPauses(Instant.now()).get();
@@ -108,8 +108,8 @@ class DiscordPauseRetryTest {
     @Test
     void theLatestChoiceIsTheOneTriedAgain() throws Exception {
         answers.addAll(List.of("Failed to get guild", "Failed to get guild", "Set guild bridging mode to create-on-message"));
-        discord.setGuildPaused(GUILD, true).get();
-        discord.setGuildPaused(GUILD, false).get();
+        discord.setGuildPaused(GUILD, true);
+        discord.setGuildPaused(GUILD, false);
 
         discord.retryGuildPauses(Instant.now().plus(Retry.LAST)).get();
         assertEquals(3, commands.size(), "one retry, not one per choice: " + commands);

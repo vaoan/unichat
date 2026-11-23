@@ -234,6 +234,7 @@ public final class Settings {
         props.stringPropertyNames().stream().filter(k -> !keepHere.test(k)).forEach(props::remove);
         values.forEach((k, v) -> { if (!keepHere.test(k) && !staysOnThisMachine(k)) props.setProperty(k, v); });
         save();
+        changed(null);
     }
 
     public synchronized String getString(String key, String def) { return holder(key).getProperty(key, def); }
@@ -241,6 +242,21 @@ public final class Settings {
     public synchronized void set(String key, String value) {
         if (value == null) holder(key).remove(key); else holder(key).setProperty(key, value);
         save();
+        changed(key);
+    }
+
+    private final java.util.List<java.util.function.Consumer<String>> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /**
+     * Told each key that changes, or null when many may have (settings from the cloud). Called with this object's lock
+     * held: a listener only schedules its work, never waits on another lock.
+     */
+    public void addListener(java.util.function.Consumer<String> l) { listeners.add(l); }
+
+    public void removeListener(java.util.function.Consumer<String> l) { listeners.remove(l); }
+
+    private void changed(String key) {
+        for (java.util.function.Consumer<String> l : listeners) l.accept(key);
     }
 
     public boolean getBool(String key, boolean def) {
@@ -400,8 +416,10 @@ public final class Settings {
     public boolean localServer() { return getBool("server.local", false); }
     public void setLocalServer(boolean v) { setBool("server.local", v); }
     /** Off by default: archiving a chat means it shouldn't interrupt you. */
-    public boolean notifyArchived() { return getBool("notify.archived", false); }
-    public void setNotifyArchived(boolean v) { setBool("notify.archived", v); }
+    /** Archived chats notify too; while on, archived Discord rooms never rest out of the sync. */
+    public static final String NOTIFY_ARCHIVED = "notify.archived";
+    public boolean notifyArchived() { return getBool(NOTIFY_ARCHIVED, false); }
+    public void setNotifyArchived(boolean v) { setBool(NOTIFY_ARCHIVED, v); }
     /** {@code privacy.readReceipts} was an on/off switch before; it still decides until a choice is made. */
     public ReadReceipts readReceipts() {
         return getEnum("privacy.readReceiptsWhen", getBool("privacy.readReceipts", true) ? ReadReceipts.ALWAYS : ReadReceipts.NEVER);

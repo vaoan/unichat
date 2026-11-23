@@ -49,8 +49,6 @@ import static app.unichat.support.Urls.enc;
  * End-to-end encryption is not supported: bridges must be configured without encryption.
  */
 public final class MatrixChatService implements ChatService, BridgeAccess, FolderForwarding {
-    private static final String SYNC_FILTER =
-            "{\"room\":{\"state\":{\"lazy_load_members\":true},\"timeline\":{\"limit\":30,\"lazy_load_members\":true}}}";
     private static final String HISTORY_FILTER = "{\"lazy_load_members\":true}";
     private final MatrixClient client;
     private final String userId;
@@ -80,6 +78,8 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private final ContactActions contacts;
     private final StickerPackActions stickerPacks;
     private final DiscordServers discord;
+    private final SyncFilter syncFilter;
+    private final ArchiveRest rest;
     private final Profiles profiles;
     private final Invites invites;
     private final FetchedMessages fetched;
@@ -111,7 +111,11 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         BotChat bots = new BotChat(core, sender);
         this.discord = new DiscordServers(core, bots, this::accounts);
         this.bridges = new BridgeAccounts(core, bots, discord);
-        this.chatActions = new ChatActions(core, this, discord, prefs);
+        this.syncFilter = new SyncFilter(client, userId);
+        this.rest = new ArchiveRest(core, syncFilter, discord, r -> dispatch(r, false));
+        syncFilter.onChange(this::dropLongPoll);
+        discord.onConnected(rest::update);
+        this.chatActions = new ChatActions(core, this, discord, prefs, rest::update);
         this.contacts = new ContactActions(core);
         this.stickerPacks = new StickerPackActions(core, this::accounts);
         this.profiles = new Profiles(core);
@@ -133,6 +137,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         core.running = true;
         prefs.useServer(serverIdentity);
         bridges.loadCachedLogins();
+        rest.start();
         syncThread = new Thread(this::syncLoop, "matrix-sync");
         syncThread.setDaemon(true);
         syncThread.start();
@@ -148,6 +153,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         synchronized (this) {
             bridges.unwatchLiveStates();
             WakeWatch.removeListener(onWake);
+            rest.stop();
             core.running = false;
             if (syncThread != null) syncThread.interrupt();
             timer.shutdownNow();
@@ -203,7 +209,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
             try {
                 Thread.sleep(30_000);
                 if (!core.running) return;
-                String path = CLIENT + "/sync?filter=" + enc(SYNC_FILTER) + "&timeout=0";
+                String path = CLIENT + "/sync?filter=" + enc(SyncFilter.BASE) + "&timeout=0";
                 cache.save(client.request("GET", path, null, Duration.ofSeconds(300)));
             } catch (Exception e) {
                 System.err.println("Sync cache refresh failed: " + e);
@@ -261,7 +267,10 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 if (initial) setState(ConnectionState.SYNCING);
                 // A catch-up (from the cached token, or after waking) must return at once, not long-poll for 30 s.
                 int timeout = initial || catchUp || quick ? 0 : 30000;
-                String path = CLIENT + "/sync?filter=" + enc(SYNC_FILTER) + "&timeout=" + timeout
+                synchronized (pollLock) {
+                    longPolling = timeout > 0; // before the filter is read: a change from here on drops this poll
+                }
+                String path = CLIENT + "/sync?filter=" + enc(syncFilter.forRequest(initial)) + "&timeout=" + timeout
                         + (initial ? "" : "&since=" + enc(nextBatch));
                 JsonNode resp;
                 try {
@@ -278,6 +287,8 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                         continue;
                     }
                     throw e;
+                } finally {
+                    dropped = pollEnded();
                 }
                 if (!core.running) return;
                 // Missed messages during the catch-up don't notify, like the initial sync.
@@ -315,10 +326,40 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                     quick = true;
                     continue;
                 }
+                if (dropped) continue; // the filter changed: the next request has it
                 failures = backoff(++failures, e);
             } catch (Exception e) {
                 failures = backoff(++failures, e);
             }
+        }
+    }
+
+    private final Object pollLock = new Object();
+    /** The sync thread is in (or about to start) a long poll; guarded by {@link #pollLock}. */
+    private boolean longPolling;
+    /** A long poll was dropped for a new filter, its interrupt not yet spent; guarded by {@link #pollLock}. */
+    private boolean refiltered;
+    /** The last request ended so (sync thread only). */
+    private boolean dropped;
+
+    /** The sync's filter changed ({@link ArchiveRest}): a long poll open with the one before is dropped, and the next has it. */
+    private void dropLongPoll() {
+        synchronized (pollLock) {
+            Thread t = syncThread;
+            if (!longPolling || t == null) return;
+            refiltered = true;
+            t.interrupt();
+        }
+    }
+
+    /** A request ended: true when it was a long poll dropped for a new filter, whose interrupt is spent here. */
+    private boolean pollEnded() {
+        synchronized (pollLock) {
+            longPolling = false;
+            if (!refiltered) return false;
+            refiltered = false;
+            Thread.interrupted();
+            return true;
         }
     }
 
@@ -344,6 +385,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         // A channel that arrived in an archived server goes quiet like its siblings.
         chatActions.followQuiet(inArchivedServer);
         chatActions.applyMutes();
+        rest.update();
     }
 
     /**
@@ -542,6 +584,10 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     }
     @Override public boolean mediaHidden(String chatId) { return chatActions.mediaHidden(chatId); }
     @Override public CompletableFuture<Void> setArchived(String chatId, boolean archived) { return chatActions.setArchived(chatId, archived); }
+    @Override public void setArchiveOpen(boolean open) { rest.setArchiveOpen(open); }
+    @Override public Waking waking() { return rest.waking(); }
+    @Override public void addWakingListener(Runnable l) { rest.addListener(l); }
+    @Override public void removeWakingListener(Runnable l) { rest.removeListener(l); }
     @Override public CompletableFuture<Void> setPinned(String chatId, boolean pinned) { return chatActions.setPinned(chatId, pinned); }
     @Override public CompletableFuture<Void> setMuted(String chatId, boolean muted) { return chatActions.setMuted(chatId, muted); }
     @Override public CompletableFuture<Void> setReminder(String chatId, Instant at) { return chatActions.setReminder(chatId, at); }
