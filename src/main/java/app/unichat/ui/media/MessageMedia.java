@@ -2,6 +2,7 @@ package app.unichat.ui.media;
 
 import app.unichat.ui.Formats;
 import app.unichat.ui.Icons;
+import app.unichat.ui.Showing;
 import app.unichat.ui.emoji.MediaItems;
 import app.unichat.ui.timeline.MessageActions;
 import app.unichat.model.Chat;
@@ -213,6 +214,7 @@ public final class MessageMedia {
         ProgressIndicator wait = new ProgressIndicator();
         wait.setMaxSize(28, 28);
         wait.setAccessibleText(I18n.t("media.preparingSticker"));
+        Showing.spinWhileSeen(wait);
         box.getChildren().addAll(view, wait);
         int px = (int) (Math.max(width, height) * 2);
         svc.media(m.mediaUrl(), 0, 0)

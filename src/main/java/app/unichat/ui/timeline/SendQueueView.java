@@ -4,6 +4,7 @@ import app.unichat.support.I18n;
 import app.unichat.ui.FxCoalescer;
 import app.unichat.ui.Icons;
 import app.unichat.ui.Nodes;
+import app.unichat.ui.Showing;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -94,6 +95,7 @@ final class SendQueueView extends ScrollPane {
         String preview = p.text().length() > PREVIEW ? p.text().substring(0, PREVIEW) + "…" : p.text();
         ProgressIndicator wheel = new ProgressIndicator();
         wheel.getStyleClass().add("message-fixing-wheel");
+        Showing.spinWhileSeen(wheel);
         Label what = new Label(I18n.t("sendQueue.waiting", preview.replace('\n', ' ')), wheel);
         what.getStyleClass().add("send-queue-text");
         what.setMinWidth(0);

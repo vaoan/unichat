@@ -7,6 +7,7 @@ import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 import app.unichat.ui.Chips;
 import app.unichat.ui.Sheets;
+import app.unichat.ui.Showing;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Pos;
@@ -116,6 +117,7 @@ public final class CaptureSheet {
             title.getStyleClass().add("sheet-title");
             status.setWrapText(true);
             working.setMaxWidth(Double.MAX_VALUE);
+            Showing.spinWhileSeen(working);
             ToggleButton lon = Chips.sticky(I18n.t("capture.long"), formats, true, this::refresh);
             lon.setUserData(Format.LONG);
             ToggleButton phone = Chips.sticky(I18n.t("capture.phone"), formats, false, this::refresh);

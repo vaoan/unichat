@@ -83,6 +83,36 @@ class SeenAnimationsUiTest {
         assertFalse(FxWait.fx(() -> Showing.animating(line.node())), "done: seen again doesn't start it");
     }
 
+    @Test
+    void aTaskBarsBarRestsWhileUnseenAndKeepsWhatItSays() throws Exception {
+        TaskBar task = FxWait.fx(() -> new TaskBar("test-bar") { });
+        Stage stage = window(FxWait.fx(() -> new StackPane(task)));
+        java.util.concurrent.Callable<Boolean> spinning = () -> task.bar.isIndeterminate();
+        FxWait.fx(() -> { task.bar.setProgress(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS); return null; });
+        assertTrue(FxWait.fx(spinning), "it moves while seen");
+
+        Seen.reset(false);
+        FxWait.until("resting while nobody can see it", () -> !spinning.call());
+        Seen.reset(true);
+        FxWait.until("moving again once seen", spinning);
+
+        FxWait.fx(() -> { stage.setIconified(true); return null; });
+        FxWait.until("resting while its window is minimised", () -> !spinning.call());
+        FxWait.fx(() -> {
+            task.bar.setProgress(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS); // told again meanwhile
+            return null;
+        });
+        assertFalse(FxWait.fx(spinning), "told to move while minimised, it still rests");
+        FxWait.fx(() -> { stage.setIconified(false); return null; });
+        FxWait.until("moving again once restored", spinning);
+
+        FxWait.fx(() -> { task.bar.setProgress(0.4); return null; });
+        Seen.reset(false);
+        Seen.reset(true);
+        FxWait.fx(() -> null); // both changes reached the FX thread
+        assertEquals(0.4, FxWait.fx(() -> task.bar.getProgress()), "a count it showed stays as it was");
+    }
+
     /** Seen's listeners run under its lock: Showing's work is handed to the FX thread, even when set from there. */
     @Test
     void workNeverRunsInsideSeensOwnCall() throws Exception {

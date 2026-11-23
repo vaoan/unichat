@@ -110,4 +110,40 @@ class StyleLearningUnseenTest {
         assertEquals(0, started.get());
         assertFalse(done.isDone());
     }
+
+    /** Released requests wait behind the run going on, but never behind every request that comes in meanwhile. */
+    @Test
+    void aReleasedRequestRunsEvenWithARequestArrivingDuringEveryRun() throws Exception {
+        StyleLearning learning = new StyleLearning(() -> new WritingStyle(dir), starter); // released by hand below
+        List<String> order = new CopyOnWriteArrayList<>();
+        List<CompletableFuture<Void>> asked = new CopyOnWriteArrayList<>();
+        CompletableFuture<Void> go = new CompletableFuture<>();
+        AtomicInteger aRuns = new AtomicInteger();
+        StyleLearner.Program[] a = new StyleLearner.Program[1];
+        a[0] = p -> {
+            int n = aRuns.incrementAndGet();
+            order.add("a");
+            try {
+                if (n == 1) go.get();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            if (n < 3) asked.add(learning.request("!a", mine("!a", "$a" + n, "texto número " + n), a[0]));
+            return "- tutea";
+        };
+        CompletableFuture<Void> first = learning.request("!a", mine("!a", "$a0", "texto número cero"), a[0]);
+        Seen.reset(false);
+        CompletableFuture<Void> b = learning.request("!b", mine("!b", "$b", "del chat b"), p -> {
+            order.add("b");
+            return "- saluda";
+        });
+        Seen.reset(true);
+        learning.releaseHeld(); // into the backlog: a run is going on
+        go.complete(null);
+        first.get();
+        b.get();
+        asked.get(0).get();
+        asked.get(1).get();
+        assertEquals(List.of("a", "b", "a", "a"), List.copyOf(order), "the released one ran right after the run it waited behind");
+    }
 }

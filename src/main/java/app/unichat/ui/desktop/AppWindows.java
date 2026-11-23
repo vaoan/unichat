@@ -20,6 +20,12 @@ import java.util.function.Consumer;
  * handed to {@link MenuDismiss}.
  */
 public final class AppWindows {
+    /**
+     * Key of a window's {@code getProperties()} marking it as one nobody looks at (a notification card): it is on
+     * screen, but it doesn't make anyone see Unichat ({@link #onScreen}).
+     */
+    public static final String NOT_LOOKED_AT = "unichat.notLookedAt";
+
     private static final EventHandler<KeyEvent> KEYS = e -> {
         if (isCycleKey(e)) {
             e.consume();
@@ -114,8 +120,9 @@ public final class AppWindows {
         return w.isShowing() && !(w instanceof PopupWindow);
     }
 
-    /** A window someone can see: one that {@link #counts}, not minimised. */
+    /** A window someone can see: one that {@link #counts}, not minimised, not marked {@link #NOT_LOOKED_AT}. */
     static boolean onScreen(Window w) {
-        return counts(w) && !(w instanceof Stage s && s.isIconified());
+        return counts(w) && !(w instanceof Stage s && s.isIconified())
+                && !w.getProperties().containsKey(NOT_LOOKED_AT);
     }
 }

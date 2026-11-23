@@ -6,6 +6,7 @@ import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.ProgressIndicator;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -54,6 +55,15 @@ public final class Showing {
         return a;
     }
 
+    /**
+     * Keeps {@code p} (a wheel or a {@code ProgressBar}) still while it can't be seen: its skin turns an indeterminate
+     * one while its window shows, minimised or with the screen locked too. Unseen it shows 0, and moves again once seen;
+     * a count its owner sets is left as it is, and one told to move while unseen waits to be seen.
+     */
+    public static Watch spinWhileSeen(ProgressIndicator p) {
+        return new Spinner(p).watch;
+    }
+
     /** Whether the animation {@link #animate} gave {@code node} runs now (for tests: it rests while nobody sees it). */
     public static boolean animating(Node node) {
         return node.getProperties().get(Animated.class) instanceof Animated a && a.running();
@@ -94,6 +104,47 @@ public final class Showing {
         public void cancel() {
             watch.cancel();
             want(false);
+        }
+    }
+
+    /** What {@link #spinWhileSeen} keeps for its indicator. FX thread. */
+    private static final class Spinner {
+        private final ProgressIndicator p;
+        private final Watch watch;
+        /** Told to move while it can't be seen: it does once seen. */
+        private boolean resting;
+        private boolean seen;
+        private boolean setting;
+
+        Spinner(ProgressIndicator p) {
+            this.p = p;
+            p.progressProperty().addListener((o, a, v) -> {
+                if (setting) return;
+                resting = false;
+                if (!seen && p.isIndeterminate()) rest();
+            });
+            watch = whileShowing(p, () -> {
+                seen = true;
+                if (resting) set(ProgressIndicator.INDETERMINATE_PROGRESS);
+                resting = false;
+            }, () -> {
+                seen = false;
+                if (p.isIndeterminate()) rest();
+            });
+        }
+
+        private void rest() {
+            resting = true;
+            set(0);
+        }
+
+        private void set(double v) {
+            setting = true;
+            try {
+                p.setProgress(v);
+            } finally {
+                setting = false;
+            }
         }
     }
 

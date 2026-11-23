@@ -22,6 +22,8 @@ final class MediaTurn {
     private final AtomicInteger asked = new AtomicInteger();
     /** Whether this turn left media waiting for being seen. */
     private boolean waited;
+    /** How many files this turn sent (or sent back up), even when it failed after. */
+    private int sent;
 
     MediaTurn(MediaUpload media, BooleanSupplier seen) {
         this.media = media;
@@ -33,21 +35,26 @@ final class MediaTurn {
         asked.incrementAndGet();
     }
 
-    /** The turn; how many files went up (or back up). */
-    int run(Storage dav, Instant now, MediaUpload.Progress uploading, MediaUpload.Progress verifying) throws IOException {
+    /** The turn; how many files went up (or back up) is {@link #sent}, also when it throws. */
+    void run(Storage dav, Instant now, MediaUpload.Progress uploading, MediaUpload.Progress verifying) throws IOException {
         waited = false;
-        if (!CloudAccount.media()) return 0;
+        sent = 0;
+        if (!CloudAccount.media()) return;
         if (!seen.getAsBoolean()) {
             waited = waits(now);
-            return 0;
+            return;
         }
-        int sent = media.run(dav, uploading, this::mayGoOn);
-        if (waited || !due(now)) return sent;
+        sent = media.run(dav, uploading, this::mayGoOn);
+        if (waited || !due(now)) return;
         int pressed = asked.get();
         sent += media.verify(dav, verifying, this::mayGoOn);
-        if (waited) return sent;
+        if (waited) return;
         asked.compareAndSet(pressed, 0);
         Settings.get().set(LAST_VERIFY, now.toString());
+    }
+
+    /** How many files the last turn sent (or sent back up), what it did before a failure included. */
+    int sent() {
         return sent;
     }
 

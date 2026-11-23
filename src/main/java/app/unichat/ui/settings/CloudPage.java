@@ -3,6 +3,7 @@ package app.unichat.ui.settings;
 import app.unichat.ui.Browser;
 import app.unichat.ui.Labels;
 import app.unichat.ui.Nodes;
+import app.unichat.ui.Showing;
 import app.unichat.cloud.Cloud;
 import app.unichat.cloud.CloudAccount;
 import app.unichat.cloud.CloudAccount.Service;
@@ -216,6 +217,7 @@ public final class CloudPage {
         state.setMinHeight(Region.USE_PREF_SIZE);
         javafx.scene.control.ProgressBar working = new javafx.scene.control.ProgressBar();
         working.setMaxWidth(Double.MAX_VALUE);
+        Showing.spinWhileSeen(working);
         Button now = new Button(I18n.t("settings.cloud.syncNow"));
         Button verify = new Button(I18n.t("settings.cloud.verifyNow"));
         verify.getStyleClass().add("secondary-button");
@@ -234,7 +236,7 @@ public final class CloudPage {
         Runnable listener = () -> Platform.runLater(show);
         // Only while it can be seen: a closed window keeps its scene, and its page kept hearing every round. Seen again
         // (restored, unlocked) it draws what it missed at once, or it kept saying "syncing" with its buttons off.
-        app.unichat.ui.Showing.whileShowing(state, () -> {
+        Showing.whileShowing(state, () -> {
             c.addListener(listener);
             show.run();
         }, () -> c.removeListener(listener));

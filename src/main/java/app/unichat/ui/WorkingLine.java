@@ -27,9 +27,7 @@ public final class WorkingLine {
         ProgressIndicator spinner = new ProgressIndicator();
         spinner.setMaxSize(14, 14);
         Nodes.show(spinner, !Theme.reduceMotion());
-        // Its skin turns it while its window shows, minimised or with the screen locked too: still while unseen.
-        Showing.whileShowing(spinner, () -> spinner.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS),
-                () -> spinner.setProgress(0));
+        Showing.spinWhileSeen(spinner);
         text.getStyleClass().add("settings-help");
         node = new HBox(6, spinner, text);
         node.setAlignment(Pos.CENTER_LEFT);

@@ -194,10 +194,13 @@ public final class Cloud {
         return t;
     });
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
-    /** A round asked by being seen again and not started yet: being seen again meanwhile joins it. */
-    private final java.util.concurrent.atomic.AtomicBoolean seenRoundQueued = new java.util.concurrent.atomic.AtomicBoolean();
+    /**
+     * A round asked by the timer or by being seen again and not started yet: either asking meanwhile joins it, so a long
+     * round has at most one behind it.
+     */
+    private final java.util.concurrent.atomic.AtomicBoolean roundQueued = new java.util.concurrent.atomic.AtomicBoolean();
     private final java.util.function.Consumer<Boolean> onSeen = seen -> {
-        if (seen) seenAgain();
+        if (seen) queueRound("the round on being seen");
     };
     private ScheduledExecutorService timer;
     /** A round and a vault job both tell it: what changes a part of it does so in one step ({@code updateAndGet}). */
@@ -298,7 +301,7 @@ public final class Cloud {
 
     /**
      * A round every {@code every} from now; a round also right after anything is saved ({@link #syncNow}), and one when
-     * Unichat is seen again, for the media that waited ({@link #seenAgain}).
+     * Unichat is seen again, for the media that waited; the timer's and that one share {@link #queueRound}.
      */
     public synchronized void start(Duration every) {
         if (timer != null) return;
@@ -308,7 +311,12 @@ public final class Cloud {
             t.setDaemon(true);
             return t;
         });
-        timer.scheduleWithFixedDelay(this::syncNow, 0, every.toMillis(), TimeUnit.MILLISECONDS);
+        timer.scheduleWithFixedDelay(this::tick, 0, every.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    /** The timer's round, joining one already queued (tests call it directly). */
+    void tick() {
+        queueRound("the timer's round");
     }
 
     public synchronized void stop() {
@@ -318,17 +326,18 @@ public final class Cloud {
     }
 
     /**
-     * Seen again: one round on the cloud's thread, for the media that waited. Called under {@code Seen}'s lock, so it takes
-     * none: a flag says one is queued and not started, and more asks meanwhile join it (at most one behind a running round).
+     * The timer's round, or seen again (for the media that waited): one round on the cloud's thread. Seen calls it under
+     * its lock, so it takes none: a flag says one is queued and not started, and more asks meanwhile join it (at most one
+     * behind a running round). {@code what} names it in the log.
      */
-    private void seenAgain() {
-        if (!seenRoundQueued.compareAndSet(false, true)) return;
+    private void queueRound(String what) {
+        if (!roundQueued.compareAndSet(false, true)) return;
         worker.execute(() -> {
-            seenRoundQueued.set(false);
+            roundQueued.set(false);
             try {
                 round();
             } catch (RuntimeException e) {
-                System.err.println("Cloud: the round on being seen: " + Errors.message(e)); // the next round tries again
+                System.err.println("Cloud: " + what + ": " + Errors.message(e)); // the next round tries again
             }
         });
     }
@@ -354,10 +363,15 @@ public final class Cloud {
         } catch (IOException | RuntimeException e) {
             return publish(finished(status().lastSync(), Errors.message(e), status().vault(), null, mediaTurn.waitsNow(now)));
         }
+        String mediaFailed = null;
         try {
-            uploaded += mediaTurn.run(dav, now, progressOf(Step.UPLOADING), progressOf(Step.VERIFYING));
+            mediaTurn.run(dav, now, progressOf(Step.UPLOADING), progressOf(Step.VERIFYING));
         } catch (IOException | RuntimeException e) {
-            return publish(finished(status().lastSync(), Errors.message(e), vaultAfter(dav, pass), null, mediaTurn.waited()));
+            mediaFailed = Errors.message(e);
+        }
+        uploaded += mediaTurn.sent(); // a check that failed doesn't take back what went up before it
+        if (mediaFailed != null) {
+            return publish(finished(status().lastSync(), mediaFailed, vaultAfter(dav, pass), null, mediaTurn.waited()));
         }
         VaultState vault = vaultAfter(dav, pass);
         return publish(finished(now, pass.textsFailed(), vault, vault == pass.state() ? pass.notice() : null, mediaTurn.waited()));

@@ -124,6 +124,26 @@ class SeenWindowsUiTest {
     }
 
     @Test
+    void aNotificationCardWithTheMainWindowInTheTrayIsNotSeen() throws Exception {
+        Stage main = FxWait.fx(() -> stage("main"));
+        watchFromNothing();
+        DesktopToast toast = FxWait.fx(() -> new DesktopToast(id -> { }));
+        try {
+            assertFalse(FxWait.fx(() -> {
+                main.show();
+                main.hide();
+                toast.show("Andrés", "¿Estás?", "!andres:demo");
+                return Seen.get().now();
+            }), "a card nobody looks at isn't someone seeing Unichat");
+        } finally {
+            FxWait.fx(() -> {
+                toast.hide();
+                return null;
+            });
+        }
+    }
+
+    @Test
     void aMessageWhileNotSeenStillNotifies() throws Exception {
         ScriptedChatService svc = new ScriptedChatService();
         Notifier notifier = FxWait.fx(() -> new Notifier(() -> { }, () -> { }, id -> { }, () -> { }));

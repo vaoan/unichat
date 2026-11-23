@@ -58,6 +58,7 @@ public abstract class TaskBar extends HBox {
 
         stage.getStyleClass().add("audio-time");
         bar.setMaxWidth(Double.MAX_VALUE);
+        Showing.spinWhileSeen(bar); // ExploreBar's and CloakBar's move with no count
         bar.setMinWidth(80);
         VBox middle = new VBox(3, bar, stage);
         middle.setAlignment(Pos.CENTER_LEFT);

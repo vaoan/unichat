@@ -123,4 +123,18 @@ class SeenTimelineAnimationsUiTest {
         FxWait.until("waiting for the next try", () -> queue.status().phase() == UploadQueue.Phase.RETRYING);
         restsWhileUnseen("the upload bar's countdown", () -> Showing.animating(bar));
     }
+
+    @Test
+    void aTextWaitingToBeCorrectedHasAWheelThatRestsWhileUnseen() throws Exception {
+        SendQueue queue = new SendQueue(new MockChatService(), () -> new AiReplyButton.Writer() {
+            @Override public String write(String prompt) { return null; }
+            @Override public void cancel() { }
+        }, said -> { }, never -> { }); // its correction never runs: it waits for good
+        SendQueueView view = FxWait.fx(() -> new SendQueueView(queue, () -> "!familia:demo"));
+        after.add(() -> Platform.runLater(view::dispose));
+        window(view);
+        FxWait.fx(() -> { queue.submit("!familia:demo", "ola", null); return null; });
+        restsWhileUnseen("the waiting text's wheel", () -> view.lookupAll(".message-fixing-wheel").stream()
+                .anyMatch(n -> ((javafx.scene.control.ProgressIndicator) n).isIndeterminate()));
+    }
 }

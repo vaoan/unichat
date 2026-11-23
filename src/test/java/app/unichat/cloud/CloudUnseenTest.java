@@ -154,6 +154,45 @@ class CloudUnseenTest {
     }
 
     @Test
+    void theTimerWhileARoundRunsQueuesAtMostOneRound() throws Exception {
+        started();
+        desk.write("Ana/b.jpg", "otra foto");
+        CountDownLatch there = new CountDownLatch(1);
+        CountDownLatch release = holdPut(SECOND, there);
+        long before = rounds();
+        CompletableFuture<Cloud.Status> round = desk.cloud.syncNow();
+        there.await();
+        for (int i = 0; i < 5; i++) desk.cloud.tick(); // a long upload: the minute passes five times
+        Seen.reset(false);
+        Seen.reset(true); // and seen again meanwhile joins the same one
+        release.countDown();
+        round.get();
+        desk.cloud.syncNow().get(); // runs after whatever the timer queued
+        assertEquals(before + 3, rounds(), "the held round, one queued by the timer, and the one asked after");
+    }
+
+    @Test
+    void aCheckThatFailsStillCountsWhatWentUpBeforeIt() throws Exception {
+        java.util.concurrent.atomic.AtomicBoolean failed = new java.util.concurrent.atomic.AtomicBoolean();
+        Runnable breaksTheCheck = () -> {
+            Cloud.Activity a = desk.cloud.status().now();
+            if (a != null && a.step() == Cloud.Step.VERIFYING && failed.compareAndSet(false, true)) {
+                throw new IllegalStateException("the check broke");
+            }
+        };
+        desk.cloud.addListener(breaksTheCheck);
+        try {
+            Cloud.Status s = desk.cloud.syncNow().get(); // the photo goes up, then the day's check, due, fails
+            assertTrue(failed.get(), "the check began");
+            assertTrue(s.error() != null, "and its failure is told");
+            assertEquals(List.of("PUT " + PHOTO), mediaPuts());
+            assertEquals(1, s.uploaded(), "what went up before it still counts");
+        } finally {
+            desk.cloud.removeListener(breaksTheCheck);
+        }
+    }
+
+    @Test
     void aVerifyDueWhileUnseenRunsWhenSeen() throws Exception {
         assertNull(desk.cloud.syncNow().get().error()); // the photo went up and the day's check ran
         Instant old = Instant.now().minus(Cloud.VERIFY_EVERY.multipliedBy(2));

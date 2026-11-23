@@ -123,8 +123,11 @@ public final class StyleLearning {
     private void finished(Job job) {
         Job then;
         synchronized (this) {
-            then = next != null ? next : backlog.poll();
-            next = null;
+            then = backlog.poll(); // first: a request coming in during every run must never keep them waiting
+            if (then == null) {
+                then = next;
+                next = null;
+            }
             running = then != null;
         }
         job.done().complete(null);

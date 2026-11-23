@@ -4,6 +4,7 @@ import app.unichat.ui.Browser;
 import app.unichat.ui.Icons;
 import app.unichat.ui.Labels;
 import app.unichat.ui.Nodes;
+import app.unichat.ui.Showing;
 import app.unichat.autosave.AutoSave;
 import app.unichat.autosave.SaveFolders;
 import app.unichat.model.Chat;
@@ -180,6 +181,7 @@ public final class ChatOptions {
         javafx.scene.control.ProgressBar working = new javafx.scene.control.ProgressBar(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS);
         working.setMaxWidth(Double.MAX_VALUE);
         working.setAccessibleText(I18n.t("chatOptions.pastRunning"));
+        Showing.spinWhileSeen(working);
         javafx.beans.property.BooleanProperty halting = new javafx.beans.property.SimpleBooleanProperty();
         Runnable redraw = () -> {
             AutoSave.Exploring e = save.exploring(chat.id());
