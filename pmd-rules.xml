@@ -4,11 +4,12 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
   <description>
-    Every Java category of PMD, on main and test code; any finding fails the build (pom.xml, failurePriority 5).
-    A rule is left out only when it is noise here, with its reason on the line before (BuildRulesTest checks it).
-    Rules that find defects stay on; a finding is fixed, or suppressed on one line or member with its reason
-    (SuppressionsHaveReasonsTest). Size and complexity rules keep their place with thresholds set to the
-    repo's Checkstyle limits (files under 800 lines, methods under 100).
+    Every Java category of PMD, on main and test code; any finding fails the build (pom.xml, failurePriority 5,
+    and a file PMD can't process too: skipPmdError false). A rule is left out only when it is noise here, with its
+    reason on the line before (BuildRulesTest checks it). Rules that find defects stay on; a finding is fixed, or
+    suppressed on one line or member with its reason (SuppressionsHaveReasonsTest). Length rules follow Checkstyle's
+    limits (files under 800 lines, methods under 100); complexity has its own limits; a class's breadth (methods,
+    public members, types used, imports, fields) is held just above today's largest, measured and written below.
   </description>
 
   <rule ref="category/java/bestpractices.xml">
