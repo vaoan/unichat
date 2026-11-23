@@ -8,3 +8,4 @@ Logging in to the bridges and browser cookies.
 
 ## Lessons
 - `ChromeLogin` left Chrome's debugging port (any local program can drive the browser through it) open up to 15 minutes, and a cancel waited for the next look. Now `MAX_WAIT` is 5 minutes and `cancel` wakes every wait at once, so `run` closes Chrome right away (`ChromeLoginTest`).
+- Keeping a cause for the log changed what the login screen said: ChromeLogin's "can't connect to Chrome" got its socket error as cause (Error Prone's UnusedException), and the screen, which shows the deepest cause (`LoginTexts.rootMessage` → `Errors.shown`), said "Connection refused". An exception whose message is the person's text implements `Errors.Told`: `shown` stops there and the cause stays for the log (`ChromeLoginTest.aSocketThatFailsSaysSoInThePersonsWordsAndKeepsItsCauseForTheLog`).

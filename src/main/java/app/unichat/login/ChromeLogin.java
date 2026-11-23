@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 import app.unichat.support.Os;
 import app.unichat.model.Network;
@@ -313,6 +314,21 @@ public final class ChromeLogin {
         return out;
     }
 
+    /** Chrome's debugging socket failed: the text {@code key} for the person, {@code cause} for the log. */
+    static IOException failure(String key, Throwable cause) {
+        return new Failure(I18n.t(key), cause);
+    }
+
+    /** A failure already said in the person's words. */
+    private static final class Failure extends IOException implements Errors.Told {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
+        Failure(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
     /** One request to the browser over its debugging socket, connected only for this. */
     private String send(int port, String message) throws IOException, InterruptedException {
         try (DevTools browser = new DevTools(JSON.readTree(get(port, "/json/version")).path("webSocketDebuggerUrl").asText())) {
@@ -330,7 +346,7 @@ public final class ChromeLogin {
             try {
                 socket = http.newWebSocketBuilder().buildAsync(URI.create(url), this).get(5, TimeUnit.SECONDS);
             } catch (ExecutionException | TimeoutException e) {
-                throw new IOException(I18n.t("login.chrome.noConnect"), e);
+                throw failure("login.chrome.noConnect", e);
             }
         }
 
@@ -340,7 +356,7 @@ public final class ChromeLogin {
             try {
                 return answer.get(10, TimeUnit.SECONDS);
             } catch (ExecutionException | TimeoutException e) {
-                throw new IOException(I18n.t("login.chrome.noAnswer"), e);
+                throw failure("login.chrome.noAnswer", e);
             }
         }
 

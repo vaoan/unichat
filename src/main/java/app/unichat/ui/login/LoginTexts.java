@@ -93,10 +93,8 @@ final class LoginTexts {
         };
     }
 
-    /** The deepest cause: what these screens show comes from a bridge's login step, wrapped in whatever carried it here. */
+    /** What these screens show of a failure: {@link Errors#shown}. */
     static String rootMessage(Throwable t) {
-        Throwable root = t;
-        while (root.getCause() != null) root = root.getCause();
-        return Errors.message(root);
+        return Errors.shown(t);
     }
 }

@@ -28,6 +28,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 class ChromeLoginTest {
+    /**
+     * 2026-11-23: Chrome's socket failing kept its cause (Error Prone's UnusedException), and the login screen, which
+     * shows the deepest cause, said "Connection refused" instead of what went wrong in the person's words.
+     */
+    @Test
+    void aSocketThatFailsSaysSoInThePersonsWordsAndKeepsItsCauseForTheLog() {
+        java.net.ConnectException refused = new java.net.ConnectException("Connection refused");
+        for (String key : List.of("login.chrome.noConnect", "login.chrome.noAnswer")) {
+            java.io.IOException e = ChromeLogin.failure(key, refused);
+            assertEquals(app.unichat.support.I18n.t(key), app.unichat.support.Errors.shown(e));
+            assertEquals(refused, e.getCause(), "the cause stays, for the log");
+        }
+    }
+
     private static final Duration NO_LIMIT = Duration.ofMillis(Long.MAX_VALUE);
 
     @TempDir Path dir;
