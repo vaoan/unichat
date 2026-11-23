@@ -13,7 +13,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -52,12 +51,12 @@ class LogPumpTest {
         void send(String line) throws Exception {
             feed.write((line + "\n").getBytes(StandardCharsets.UTF_8));
             feed.flush();
-            assertTrue(done.poll(30, TimeUnit.SECONDS) != null, "the line was never handled");
+            done.take(); // the pump handled it; JUnit's global timeout is the only limit
         }
 
         @Override public void close() throws Exception {
             feed.close();
-            thread.join(30_000);
+            thread.join(); // lesson-ok: test-future-join (a Thread's join, interruptible; the pump ends with its input)
         }
     }
 

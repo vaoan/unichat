@@ -173,6 +173,13 @@ public final class NativeBar {
     private static volatile java.util.function.Consumer<Boolean> screen = away -> { };
     /** The helper's last "screen" line; null before it says one and once it ends. */
     private static volatile Boolean lastScreen;
+    /**
+     * Storing a screen value and telling it is one step, for {@link #onScreen} and the reader alike: else a replayed
+     * lock could land after the unlock or the helper's end, and Unichat would stay unseen for good. Always taken before
+     * {@code Seen}'s lock, and no {@code Seen} listener calls back here. No test can make that race happen without
+     * timing it ({@code src/test/CLAUDE.md}), so this lock is what rules it out.
+     */
+    private static final Object SCREEN = new Object();
 
     /**
      * From now on {@code away} hears the helper's "screen" lines, and not away once when it ends. What the running
@@ -180,11 +187,12 @@ public final class NativeBar {
      * once; with no helper running there's no way to know: it hears not away at once.
      */
     static void onScreen(java.util.function.Consumer<Boolean> away) {
-        screen = away;
-        NativeBar b = current;
-        Boolean said = lastScreen;
-        if (b == null || !b.alive) away.accept(false);
-        else if (said != null) away.accept(said);
+        synchronized (SCREEN) {
+            screen = away;
+            NativeBar b = current;
+            if (b == null || !b.alive) away.accept(false);
+            else if (lastScreen != null) away.accept(lastScreen);
+        }
     }
 
     /** "screen 1" (locked or asleep) is true, "screen 0" false; anything else null. */
@@ -223,8 +231,10 @@ public final class NativeBar {
                 }
                 Boolean away = screenLine(line);
                 if (away != null) {
-                    lastScreen = away;
-                    screen.accept(away);
+                    synchronized (SCREEN) {
+                        lastScreen = away;
+                        screen.accept(away);
+                    }
                     continue;
                 }
                 if (!line.startsWith("click\t")) continue;
@@ -242,8 +252,10 @@ public final class NativeBar {
         } catch (IOException ignored) {
         }
         alive = false;
-        lastScreen = null;
-        screen.accept(false); // gone: nothing says the screen is away any more
+        synchronized (SCREEN) {
+            lastScreen = null;
+            screen.accept(false); // gone: nothing says the screen is away any more
+        }
         onExit.run();
     }
 
