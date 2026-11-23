@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -22,7 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * taken out, a rule dropped, a {@code skip}) fails here.
  */
 class BuildRulesTest {
-    private static final Document POM = read();
+    private static final Document POM = read("pom.xml");
+    /** The lifecycle's phases up to verify: a check bound to one of them runs in {@code ./mvnw verify}. */
+    private static final List<String> BEFORE_INSTALL = List.of("validate", "initialize", "generate-sources", "process-sources",
+            "generate-resources", "process-resources", "compile", "process-classes", "generate-test-sources",
+            "process-test-sources", "generate-test-resources", "process-test-resources", "test-compile", "process-test-classes",
+            "test", "prepare-package", "package", "pre-integration-test", "integration-test", "post-integration-test", "verify");
 
     @Test
     void everyJavacLintIsAnError() {
@@ -54,7 +60,7 @@ class BuildRulesTest {
     void aLintTurnedOffSaysWhy() {
         for (Element arg : elements(child(configuration("maven-compiler-plugin"), "compilerArgs"), "arg")) {
             if (!arg.getTextContent().trim().startsWith("-Xlint:-")) continue;
-            assertTrue(previous(arg) instanceof Comment, arg.getTextContent() + " has its reason in a comment just before it");
+            assertInstanceOf(Comment.class, previous(arg), arg.getTextContent() + " has its reason in a comment just before it");
         }
     }
 
@@ -124,7 +130,7 @@ class BuildRulesTest {
 
     @Test
     void noExecutionIsUnbound() {
-        for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin")) {
+        for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin")) {
             Element executions = elements(plugin(plugin), "executions").stream().findFirst().orElse(null);
             if (executions == null) continue;
             for (Element e : elements(executions, "execution")) {
@@ -136,7 +142,7 @@ class BuildRulesTest {
     @Test
     void noProfileChangesTheChecks() {
         for (Element profile : elements(child(POM.getDocumentElement(), "profiles"), "profile")) {
-            for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin")) {
+            for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin")) {
                 assertFalse(profile.getTextContent().contains(plugin), text(profile, "id") + " leaves " + plugin + " as it is");
             }
         }
@@ -145,8 +151,44 @@ class BuildRulesTest {
     @Test
     void noCheckIsSkipped() {
         assertEquals(0, POM.getElementsByTagName("skip").getLength(), "no <skip> anywhere in pom.xml");
-        for (String property : List.of("enforcer.skip", "modernizer.skip", "maven.compiler.failOnWarning")) {
+        for (String property : List.of("enforcer.skip", "modernizer.skip", "maven.compiler.failOnWarning", "pmd.skip", "cpd.skip",
+                "pmd.failOnViolation", "pmd.failurePriority")) {
             assertEquals(0, POM.getElementsByTagName(property).getLength(), property + " isn't set in pom.xml");
+        }
+    }
+
+    @Test
+    void pmdChecksTheWholeRuleSetAndFailsOnAnyFinding() {
+        Element execution = execution("maven-pmd-plugin", "check");
+        assertTrue(BEFORE_INSTALL.contains(text(execution, "phase")), "PMD runs in verify or before: " + text(execution, "phase"));
+        Element config = child(execution, "configuration");
+        assertEquals(List.of("pmd-rules.xml"), texts(child(config, "rulesets"), "ruleset"), "the project's rule set, only it");
+        assertEquals("true", text(config, "failOnViolation"), "a finding fails the build");
+        assertEquals("5", text(config, "failurePriority"), "every priority fails, down to 5");
+        assertEquals("true", text(config, "includeTests"), "the tests are checked too");
+        for (Element c : List.of(config, configuration("maven-pmd-plugin"))) {
+            for (String leftOut : List.of("excludes", "excludeRoots", "excludeFromFailureFile", "minimumPriority", "skipPmdError")) {
+                assertTrue(elements(c, leftOut).isEmpty(), "no <" + leftOut + ">: nothing is left out of PMD's sight");
+            }
+        }
+        execution("maven-pmd-plugin", "cpd-check");
+    }
+
+    @Test
+    void everyPmdRuleLeftOutSaysWhy() {
+        Document rules = read("pmd-rules.xml");
+        assertEquals(0, rules.getElementsByTagName("exclude-pattern").getLength(), "no file is left out");
+        NodeList excludes = rules.getElementsByTagName("exclude");
+        assertTrue(excludes.getLength() > 0, "the rule set is read");
+        for (int i = 0; i < excludes.getLength(); i++) {
+            Element e = (Element) excludes.item(i);
+            assertTrue(previous(e) instanceof Comment c && !c.getData().isBlank(),
+                    e.getAttribute("name") + " is left out with its reason in a comment just before it");
+        }
+        NodeList properties = rules.getElementsByTagName("property");
+        for (int i = 0; i < properties.getLength(); i++) {
+            String name = ((Element) properties.item(i)).getAttribute("name");
+            assertFalse(name.startsWith("violationSuppress"), name + ": a suppression is one line's NOPMD, with its reason");
         }
     }
 
@@ -222,13 +264,13 @@ class BuildRulesTest {
         return p;
     }
 
-    private static Document read() {
+    private static Document read(String file) {
         try {
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
             f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            return f.newDocumentBuilder().parse(Path.of("pom.xml").toFile());
+            return f.newDocumentBuilder().parse(Path.of(file).toFile());
         } catch (Exception e) {
-            throw new IllegalStateException("pom.xml can't be read", e);
+            throw new IllegalStateException(file + " can't be read", e);
         }
     }
 }

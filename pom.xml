@@ -301,18 +301,41 @@
           </execution>
         </executions>
       </plugin>
-      <!-- Copied code: fails the build at the plugin's default of 100 tokens. -->
+      <!-- PMD, two checks in verify. cpd-check: copied code, failing at the plugin's default of 100 tokens (main code).
+           check: every Java category of PMD (pmd-rules.xml, where each rule left out has its reason) on main and test
+           code; any finding fails, at every priority. A finding kept on purpose is one line's "// NOPMD: why" or one
+           member's @SuppressWarnings("PMD.Rule") // why (SuppressionsHaveReasonsTest). The analysis cache keeps a
+           second run to the files that changed. BuildRulesTest keeps all of this on. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-pmd-plugin</artifactId>
-        <version>3.26.0</version>
+        <version>3.28.0</version>
+        <dependencies>
+          <dependency><groupId>net.sourceforge.pmd</groupId><artifactId>pmd-core</artifactId><version>7.29.0</version></dependency>
+          <dependency><groupId>net.sourceforge.pmd</groupId><artifactId>pmd-java</artifactId><version>7.29.0</version></dependency>
+          <dependency><groupId>net.sourceforge.pmd</groupId><artifactId>pmd-javascript</artifactId><version>7.29.0</version></dependency>
+          <dependency><groupId>net.sourceforge.pmd</groupId><artifactId>pmd-jsp</artifactId><version>7.29.0</version></dependency>
+        </dependencies>
         <configuration>
+          <targetJdk>25</targetJdk>
           <printFailingErrors>true</printFailingErrors>
         </configuration>
         <executions>
           <execution>
             <phase>verify</phase>
             <goals><goal>cpd-check</goal></goals>
+          </execution>
+          <execution>
+            <id>pmd</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+            <configuration>
+              <rulesets><ruleset>pmd-rules.xml</ruleset></rulesets>
+              <includeTests>true</includeTests>
+              <analysisCache>true</analysisCache>
+              <failOnViolation>true</failOnViolation>
+              <failurePriority>5</failurePriority>
+            </configuration>
           </execution>
         </executions>
       </plugin>
