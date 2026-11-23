@@ -51,6 +51,8 @@ final class RestServer implements AutoCloseable {
     /** A tags sync, and a filter post, wait for these (a computer waking mid-way). */
     volatile CountDownLatch tagsGate = new CountDownLatch(0);
     volatile CountDownLatch filterGate = new CountDownLatch(0);
+    /** Tags syncs answered before the rest fail (the server busy). */
+    final AtomicInteger tagsToAnswer = new AtomicInteger(Integer.MAX_VALUE);
 
     /** A room's tags change on the server now. */
     void setTag(String room, String tagsJson) {
@@ -222,6 +224,11 @@ final class RestServer implements AutoCloseable {
         try {
             tagsGate.await();
         } catch (InterruptedException e) {
+            return;
+        }
+        if (tagsToAnswer.getAndDecrement() <= 0) {
+            log.add("tags failed");
+            answer(ex, 503, "{\"errcode\":\"M_UNKNOWN\"}");
             return;
         }
         long from = since == null ? -1 : Long.parseLong(since.replaceAll("\\D", ""));

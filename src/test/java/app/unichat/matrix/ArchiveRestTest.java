@@ -539,6 +539,24 @@ class ArchiveRestTest {
     }
 
     @Test
+    void aForcedTagsSyncThatFailsLeavesTheNextOneBringingEverything() throws Exception {
+        everyKind();
+        rest.update().get();
+        now = now.plus(ArchiveRest.TAGS_EVERY);
+        server.setTag("!open:x", "{\"m.favourite\":{}}"); // on a room about to rest, before the round's tags sync
+        archive(true, "!open:x");
+        server.tagsToAnswer.set(1); // the due tags sync works, the forced one after it doesn't
+        rest.update().get();
+        assertTrue(server.log.contains("tags failed"), server.log.toString());
+        server.tagsToAnswer.set(Integer.MAX_VALUE);
+        now = now.plus(ArchiveRest.TAGS_EVERY);
+        rest.update().get();
+        synchronized (proc) {
+            assertTrue(proc.room("!open:x").chat.favorite(), "heard: the next tags sync started over: " + server.log);
+        }
+    }
+
+    @Test
     void wakingTheComputerMidTagsSyncIsNotLostAndAsksAgain() throws Exception {
         everyKind();
         rest.update().get();

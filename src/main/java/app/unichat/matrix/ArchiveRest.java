@@ -236,11 +236,11 @@ final class ArchiveRest {
             for (String r : resting) if (!target.contains(r)) owed.add(r);
             // Their tags from the point the main sync stops bringing them, or a change between the two is never heard.
             if (!resting.containsAll(target)) {
-                // Those resting already first catch up on their tags up to now, from where their last tags sync was;
-                // if that fails, the older point stays (it covers the new ones too). Never synced yet: the first
-                // tags sync, with no point, brings everything anyway.
-                boolean before = tagsSince == null || resting.isEmpty() || tagsSync(resting);
-                if (before && (tagsSince != null || resting.isEmpty())) tagsSince = mainSince.get();
+                // Those resting already first catch up on their tags up to now, from where their last tags sync was.
+                // If that fails, no point at all: the next tags sync brings everything, always safe (the old point may
+                // be newer than a change on a room just come to rest). Never synced yet: the same, already.
+                if (tagsSince != null && !resting.isEmpty() && !tagsSync(resting)) tagsSince = null;
+                else if (tagsSince != null || resting.isEmpty()) tagsSince = mainSince.get();
                 if (tagsDue == null) tagsDue = now.plus(TAGS_EVERY);
             }
             resting = target;
