@@ -35,7 +35,7 @@ class MediaSaverTest {
 
     @Test
     void namedFromTheMessageTimeWhenThereIsNoName() {
-        assertEquals("imagen-20261026-100405.jpg", MediaSaver.suggestedName(media(MessageType.IMAGE, null, "image/jpeg"), BOGOTA));
+        assertEquals("image-20261026-100405.jpg", MediaSaver.suggestedName(media(MessageType.IMAGE, null, "image/jpeg"), BOGOTA));
         assertEquals("sticker-20261026-100405.webp", MediaSaver.suggestedName(media(MessageType.STICKER, "sticker", "image/webp"), BOGOTA));
         assertEquals("video-20261026-100405.mp4", MediaSaver.suggestedName(media(MessageType.VIDEO, "", "video/mp4"), BOGOTA));
     }

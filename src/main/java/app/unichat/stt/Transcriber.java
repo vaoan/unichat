@@ -24,8 +24,8 @@ import java.util.function.Consumer;
 public final class Transcriber {
     public enum Engine { WHISPER, CUSTOM }
 
-    /** Example for "Comando propio"; {archivo} is a WAV/MP3/FLAC file, {idioma} "es", "en"… or "auto". */
-    public static final String EXAMPLE_COMMAND = "whisper-cli -m /ruta/al/modelo.bin -f {archivo} -l {idioma} -nt -np";
+    /** Example for the person's own command; {file} is a WAV/MP3/FLAC file, {language} "es", "en"… or "auto". */
+    public static final String EXAMPLE_COMMAND = "whisper-cli -m /path/to/model.bin -f {file} -l {language} -nt -np";
 
     /** A long note takes minutes on a slow computer; one stuck that long isn't coming. */
     private static final long TIMEOUT_SECONDS = 15 * 60;
@@ -50,9 +50,9 @@ public final class Transcriber {
             String lang = s.sttLanguage();
             List<String> cmd;
             if (SttSettings.engine() == Engine.CUSTOM) {
-                String template = s.sttCommand();
+                String template = SttSettings.command();
                 if (template.isBlank()) throw new IOException(I18n.t("stt.writeCommand"));
-                cmd = CommandLine.expand(template, Map.of("archivo", input.toString(), "original", audio.toString(), "idioma", lang));
+                cmd = CommandLine.expand(template, Map.of("file", input.toString(), "original", audio.toString(), "language", lang));
             } else {
                 Path bin = whisperBinary();
                 if (bin == null) throw new IOException(I18n.t("stt.noWhisper"));

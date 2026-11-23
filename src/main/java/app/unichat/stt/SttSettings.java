@@ -17,4 +17,16 @@ public final class SttSettings {
     }
 
     public static void setModel(WhisperModel m) { Settings.get().set("stt.model", m.name()); }
+
+    /**
+     * The person's own command, its placeholders by their English names ({file}, {language}, {original}): one saved
+     * with the old Spanish ones ({archivo}, {idioma}) is rewritten to them once, here, and runs the same.
+     */
+    public static String command() {
+        Settings s = Settings.get();
+        String saved = s.sttCommand();
+        String now = saved.replace("{archivo}", "{file}").replace("{idioma}", "{language}");
+        if (!now.equals(saved)) s.setSttCommand(now);
+        return now;
+    }
 }

@@ -72,8 +72,35 @@ class FileNamesTest {
         Files.writeString(dir.resolve(saved), "x");
         org.junit.jupiter.api.Assertions.assertTrue(FileNames.savedIn(dir, m), "a hidden one was saved again on every explore");
         m.setFileName("...");
-        org.junit.jupiter.api.Assertions.assertTrue(FileNames.forMessage(m, java.time.ZoneOffset.UTC).startsWith("archivo-20261103"),
+        org.junit.jupiter.api.Assertions.assertTrue(FileNames.forMessage(m, java.time.ZoneOffset.UTC).startsWith("file-20261103"),
                 "nothing left: the made-up name");
+    }
+
+    /** A name on disk isn't UI: the same in every language, and what was saved under the Spanish names is known again. */
+    @Test
+    void savedFilesAreNamedInEnglishWhateverTheUiLanguage(@TempDir Path dir) throws Exception {
+        assertEquals("es", app.unichat.support.I18n.locale().getLanguage(), "the tests run in Spanish");
+        var kinds = java.util.Map.of(app.unichat.model.MessageType.IMAGE, "image-20261103-100000.jpg",
+                app.unichat.model.MessageType.VIDEO, "video-20261103-100000.mp4",
+                app.unichat.model.MessageType.AUDIO, "audio-20261103-100000.ogg",
+                app.unichat.model.MessageType.STICKER, "sticker-20261103-100000.webp",
+                app.unichat.model.MessageType.FILE, "file-20261103-100000.pdf");
+        var mimes = java.util.Map.of(app.unichat.model.MessageType.IMAGE, "image/jpeg", app.unichat.model.MessageType.VIDEO, "video/mp4",
+                app.unichat.model.MessageType.AUDIO, "audio/ogg", app.unichat.model.MessageType.STICKER, "image/webp",
+                app.unichat.model.MessageType.FILE, "application/pdf");
+        for (var k : kinds.entrySet()) {
+            app.unichat.model.Message m = new app.unichat.model.Message("$id" + k.getKey(), "!c", "@a", "Ana", false,
+                    java.time.Instant.parse("2026-11-03T10:00:00Z"));
+            m.setType(k.getKey());
+            m.setMimeType(mimes.get(k.getKey()));
+            assertEquals(k.getValue(), FileNames.forMessage(m, java.time.ZoneOffset.UTC));
+        }
+        app.unichat.model.Message old = new app.unichat.model.Message("$viejo", "!c", "@a", "Ana", false,
+                java.time.Instant.parse("2026-11-03T10:00:00Z"));
+        old.setType(app.unichat.model.MessageType.IMAGE);
+        old.setMimeType("image/jpeg");
+        Files.writeString(dir.resolve("imagen-20261103-100000 [viejo].jpg"), "x");
+        org.junit.jupiter.api.Assertions.assertTrue(FileNames.savedIn(dir, old), "found by its [id]: not saved again");
     }
 
     @Test

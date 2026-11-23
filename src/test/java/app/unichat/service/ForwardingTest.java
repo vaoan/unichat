@@ -63,9 +63,9 @@ class ForwardingTest {
         MockChatService svc = svc();
         Message m = svc.messages(FROM).stream().filter(x -> x.type() == MessageType.TEXT).findFirst().orElseThrow();
         int to = svc.messages(TO).size();
-        Forwarding.send(svc, List.of(m), List.of(TO), x -> "↪ Reenviado de *Ana*", true).done().get();
+        Forwarding.send(svc, List.of(m), List.of(TO), x -> "↪ Forwarded from *Ana*", true).done().get();
         Message note = sentTo(svc, TO, to).getFirst();
-        assertEquals("↪ Reenviado de *Ana*", note.body());
+        assertEquals("↪ Forwarded from *Ana*", note.body());
         assertNull(note.html(), "a stranger's name with marks isn't formatted");
     }
 

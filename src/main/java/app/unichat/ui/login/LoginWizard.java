@@ -22,7 +22,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.Consumer;
 
 /** Mirrors the bridge-bot conversation as a friendly form. */
@@ -168,19 +167,16 @@ final class LoginWizard implements ChatService.Listener {
             else if (!m.body().isBlank()) lastText = m;
         }
         if (lastText != null) {
-            String b = lastText.body().toLowerCase(Locale.ROOT);
-            if (b.contains("successfully logged in") || b.contains("sesión iniciada")) {
+            if (LoginTexts.loggedIn(lastText.body())) {
                 success(lastText.body());
                 return;
             }
-            if (b.contains("login failed") || b.contains("login cancelled") || b.contains("invalid")
-                    || b.contains("timed out")) {
+            if (LoginTexts.failed(lastText.body())) {
                 failure(lastText.body());
                 return;
             }
             botText.setText(I18n.t("login.wizard.bridgeSays", lastText.body()));
-            boolean asksInput = !LoginTexts.qrNetwork(network) || b.contains("password") || b.contains("contraseña")
-                    || ((b.contains("code") || b.contains("código")) && !b.contains("qr"));
+            boolean asksInput = LoginTexts.asksInput(lastText.body(), network);
             // after a session was sent, only a prompt newer than that send re-opens the input
             boolean showInput = asksInput && (!sent || lastText.timestamp().isAfter(sentAt));
             Nodes.show(inputRow, showInput);

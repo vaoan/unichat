@@ -96,7 +96,7 @@ memory, with simulated incoming messages, "typing…" and read receipts.
 - **Voice notes to text**: "Transcribe" under each audio (or the T key). It uses Whisper, which comes with Unichat and
   runs on your computer, free and without sending the audio to any service; the model (60 or 190 MB) is downloaded
   the first time. In Settings → Voice to text you can choose the model and language, or set your own command
-  (`{archivo}`, `{idioma}`). Claude Code and Codex don't work for this: they don't take audio.
+  (`{file}`, `{language}`). Claude Code and Codex don't work for this: they don't take audio.
 - **Media on demand**: photos, videos and files are downloaded only when you open them; what's downloaded takes up at
   most what you choose in Settings → Privacy (1 GB by default).
 - Delivery states (sending → sent → delivered → read) and a "typing…" indicator.

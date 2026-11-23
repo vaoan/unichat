@@ -96,7 +96,7 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
 - **Notas de voz a texto**: "Transcribir" bajo cada audio (o la tecla T). Usa Whisper, que viene con Unichat y
   corre en tu computador, gratis y sin enviar el audio a ningún servicio; el modelo (60 o 190 MB) se descarga
   la primera vez. En Ajustes → Voz a texto puedes elegir modelo e idioma, o poner tu propio comando
-  (`{archivo}`, `{idioma}`). Claude Code y Codex no sirven para esto: no reciben audio.
+  (`{file}`, `{language}`). Claude Code y Codex no sirven para esto: no reciben audio.
 - **Medios bajo demanda**: fotos, videos y archivos se descargan solo cuando los abres; lo descargado ocupa como
   máximo lo que elijas en Ajustes → Privacidad (1 GB por defecto).
 - Estados de entrega (enviando → enviado → entregado → leído) e indicador de "escribiendo…".

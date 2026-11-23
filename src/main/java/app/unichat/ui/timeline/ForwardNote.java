@@ -3,18 +3,21 @@ package app.unichat.ui.timeline;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.settings.Settings;
-import app.unichat.support.I18n;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * What a forward says about where it came from: who wrote it, the chat and network, and when, each the person's choice
- * ("↪ Reenviado de Ana · Familia (WhatsApp) · 12 nov 09:14"); none chosen, nothing (the default). Pure, tested.
+ * ("↪ Forwarded from Ana · Familia (WhatsApp) · Nov 12 09:14"); none chosen, nothing (the default). Pure, tested.
+ * It goes to other people, who may not read the person's language: English in every UI language.
  */
 record ForwardNote(boolean who, boolean where, boolean when) {
+    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("MMM d HH:mm", Locale.ENGLISH);
+
     /** The choices Ajustes starts each forward with. */
     static ForwardNote saved() {
         Settings s = Settings.get();
@@ -27,9 +30,9 @@ record ForwardNote(boolean who, boolean where, boolean when) {
     String of(Message m, Chat from, ZoneId zone) {
         if (!saysAnything()) return null;
         List<String> parts = new ArrayList<>();
-        parts.add(who ? I18n.t("forward.note.from", shown(m.senderName())) : I18n.t("forward.note.plain"));
-        if (where && from != null) parts.add(I18n.t("forward.note.where", shown(from.title()), from.network().displayName()));
-        if (when) parts.add(DateTimeFormatter.ofPattern(I18n.t("forward.note.stamp"), I18n.locale()).format(m.timestamp().atZone(zone)));
+        parts.add(who ? "Forwarded from " + shown(m.senderName()) : "Forwarded");
+        if (where && from != null) parts.add(shown(from.title()) + " (" + from.network().displayName() + ")");
+        if (when) parts.add(STAMP.format(m.timestamp().atZone(zone)));
         return "↪ " + String.join(" · ", parts);
     }
 

@@ -32,6 +32,27 @@ class TranscriberRunTest {
         assertFalse(e.getMessage().contains("uno"), e.getMessage());
     }
 
+    /** A command saved with the Spanish names ({archivo}, {idioma}) still gets the audio and the language, and is saved again with the English ones. */
+    @Test
+    void anOldSpeechCommandStillRuns() throws Exception {
+        app.unichat.settings.Settings s = app.unichat.settings.Settings.get();
+        String engine = s.getString("stt.engine", null), command = s.getString("stt.command", null), lang = s.getString("stt.language", null);
+        try {
+            Path audio = dir.resolve("nota.wav");
+            Files.write(audio, "RIFF\0\0\0\0WAVEfmt ".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+            s.set("stt.engine", "CUSTOM");
+            s.setSttLanguage("es");
+            s.setSttCommand("/bin/echo {archivo} {idioma} {original}");
+            assertEquals(audio + " es " + audio, Transcriber.transcribe(audio, x -> { }));
+            assertEquals("/bin/echo {file} {language} {original}", s.sttCommand(), "rewritten once to the new names");
+            assertEquals(audio + " es " + audio, Transcriber.transcribe(audio, x -> { }), "and the new names run");
+        } finally {
+            s.set("stt.engine", engine);
+            s.set("stt.command", command);
+            s.set("stt.language", lang);
+        }
+    }
+
     @Test
     void interruptingStopsTheProgram() throws Exception {
         Path started = dir.resolve("started");

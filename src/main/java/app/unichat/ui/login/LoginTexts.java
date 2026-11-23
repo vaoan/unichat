@@ -6,6 +6,7 @@ import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 
 import java.util.List;
+import java.util.Locale;
 
 /** What the login screens say, and which way each network signs in. */
 final class LoginTexts {
@@ -62,6 +63,26 @@ final class LoginTexts {
             case WHATSAPP, SIGNAL, TELEGRAM, DISCORD -> true;
             default -> false;
         };
+    }
+
+    /**
+     * Whether a bridge's reply says the login went through. The mautrix bridges answer only in English (their login
+     * steps' texts), so only their words are read: "Successfully logged in as …", "Login failed: …", "… timed out".
+     */
+    static boolean loggedIn(String reply) {
+        return reply.toLowerCase(Locale.ROOT).contains("successfully logged in");
+    }
+
+    /** Whether a bridge's reply says the login failed, was cancelled or ran out of time. */
+    static boolean failed(String reply) {
+        String b = reply.toLowerCase(Locale.ROOT);
+        return b.contains("login failed") || b.contains("login cancelled") || b.contains("invalid") || b.contains("timed out");
+    }
+
+    /** Whether a bridge's reply asks for something typed: always off a QR network, a password or a code (not the QR's) on one. */
+    static boolean asksInput(String reply, Network n) {
+        String b = reply.toLowerCase(Locale.ROOT);
+        return !qrNetwork(n) || b.contains("password") || (b.contains("code") && !b.contains("qr"));
     }
 
     static String promptFor(Network n) {

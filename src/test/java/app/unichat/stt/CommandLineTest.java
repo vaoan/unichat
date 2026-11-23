@@ -24,8 +24,8 @@ class CommandLineTest {
 
     @Test
     void aPathWithSpacesStaysOneArgument() {
-        List<String> cmd = CommandLine.expand("mlx_whisper {archivo} --language {idioma} --output-dir={archivo}.d",
-                Map.of("archivo", "/Users/Ana María/nota.wav", "idioma", "es"));
+        List<String> cmd = CommandLine.expand("mlx_whisper {file} --language {language} --output-dir={file}.d",
+                Map.of("file", "/Users/Ana María/nota.wav", "language", "es"));
         assertEquals(List.of("mlx_whisper", "/Users/Ana María/nota.wav", "--language", "es",
                 "--output-dir=/Users/Ana María/nota.wav.d"), cmd);
     }

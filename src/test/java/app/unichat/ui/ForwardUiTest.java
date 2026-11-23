@@ -65,7 +65,7 @@ class ForwardUiTest {
             checkBox(sheet, "Quién lo escribió").setSelected(true);
             return null;
         });
-        String line = "↪ Reenviado de " + theirs.senderName();
+        String line = "↪ Forwarded from " + theirs.senderName(); // the label is the UI's, the line goes in English
         assertEquals("Antes irá: " + line, FxWait.fx(() -> ((Label) sheet.lookup(".forward-preview")).getText()));
         int before = w.svc.messages(TO).size();
         FxWait.fx(() -> {

@@ -56,10 +56,10 @@ public final class Redactor {
         s = MXC.matcher(s).replaceAll(m -> Matcher.quoteReplacement("mxc://" + m.group(1) + "/…"));
         s = MATRIX_ID.matcher(s).replaceAll(m -> Matcher.quoteReplacement(m.group(1) + "…:" + m.group(2)));
         s = BARE_ID.matcher(s).replaceAll(m -> Matcher.quoteReplacement(m.group(1) + "…"));
-        s = EMAIL.matcher(s).replaceAll("<correo>");
+        s = EMAIL.matcher(s).replaceAll("<email>");
         s = PHONE.matcher(s).replaceAll(m -> digits(m.group()) >= 7 && !DATE.matcher(m.group()).lookingAt()
-                ? "<número>" : Matcher.quoteReplacement(m.group()));
-        s = LONG_NUMBER.matcher(s).replaceAll("<número>");
+                ? "<number>" : Matcher.quoteReplacement(m.group()));
+        s = LONG_NUMBER.matcher(s).replaceAll("<number>");
         return s;
     }
 

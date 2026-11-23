@@ -32,6 +32,12 @@ class RedactorTest {
     }
 
     @Test
+    void redactionWritesEnglishPlaceholders() {
+        assertEquals("mail <email>, phone <number>, id <number>",
+                Redactor.redact("mail ana.perez@gmail.com, phone +57 300 111 2233, id 900000042"));
+    }
+
+    @Test
     void secretJsonFieldsAndCookies() {
         hidden("{\"refresh_token\":\"rt_secret1\",\"client_secret\":\"cs_secret2\",\"Session\":\"ss_secret3\"}",
                 "rt_secret1", "cs_secret2", "ss_secret3");

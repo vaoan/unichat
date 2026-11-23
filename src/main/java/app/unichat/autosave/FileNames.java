@@ -3,7 +3,6 @@ package app.unichat.autosave;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.MimeTypes;
-import app.unichat.support.I18n;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,7 +19,7 @@ public final class FileNames {
 
     /**
      * A message's file: the original name without any folder part, or one made from the kind and the message time
-     * ("imagen-20261026-100405.jpg"). Stickers always get the made-up name.
+     * ("image-20261026-100405.jpg": a name on disk, English in every UI language). Stickers always get the made-up name.
      */
     public static String forMessage(Message m, ZoneId zone) {
         String name = m.fileName() == null ? "" : m.fileName().replace('\\', '/');
@@ -28,11 +27,11 @@ public final class FileNames {
         String ext = MimeTypes.extension(m.mimeType());
         if (name.isEmpty() || name.equals(".") || name.equals("..") || m.type() == MessageType.STICKER) {
             String kind = switch (m.type()) {
-                case IMAGE -> I18n.t("saver.kind.image");
-                case VIDEO -> I18n.t("saver.kind.video");
-                case AUDIO -> I18n.t("saver.kind.audio");
-                case STICKER -> I18n.t("saver.kind.sticker");
-                default -> I18n.t("saver.kind.file");
+                case IMAGE -> "image";
+                case VIDEO -> "video";
+                case AUDIO -> "audio";
+                case STICKER -> "sticker";
+                default -> "file";
             };
             return kind + "-" + STAMP.format(m.timestamp().atZone(zone)) + ext;
         }

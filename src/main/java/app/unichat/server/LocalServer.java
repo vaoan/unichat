@@ -148,7 +148,7 @@ public final class LocalServer {
 
     /**
      * Installs what's missing, starts the server and the bridges in use that have an account, and creates the account the first
-     * time. Blocking (call off the FX thread); {@code progress} gets short Spanish status lines.
+     * time. Blocking (call off the FX thread); {@code progress} gets short status lines for the person (I18n).
      */
     public synchronized void ensureRunning(Consumer<String> progress) throws IOException, InterruptedException {
         Properties secrets = secretsFile.load();
@@ -159,7 +159,7 @@ public final class LocalServer {
         installLibolm();
         HomeserverConfig.writeDoublePuppet(dir, secrets.getProperty("double_puppet_token"), DOMAIN);
         if (activeBridges().contains("telegram") && !TelegramKeys.saved()) {
-            System.err.println("Telegram not started: no valid API keys (Ajustes → Redes)");
+            System.err.println("Telegram not started: no valid API keys (Settings → Networks)");
         }
         bridges.prepareAtLaunch(progress);
         HomeserverConfig.write(dir, PORT, DOMAIN, secrets.getProperty("registration_token"));

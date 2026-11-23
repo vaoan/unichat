@@ -35,15 +35,30 @@ class ForwardNoteTest {
 
     @Test
     void eachChoiceAddsItsPart() {
-        assertEquals("↪ Reenviado de Ana", note(true, false, false));
-        assertEquals("↪ Reenviado · Familia (WhatsApp)", note(false, true, false));
-        assertEquals("↪ Reenviado · 12 nov 09:14", note(false, false, true));
-        assertEquals("↪ Reenviado de Ana · Familia (WhatsApp) · 12 nov 09:14", note(true, true, true));
+        assertEquals("↪ Forwarded from Ana", note(true, false, false));
+        assertEquals("↪ Forwarded · Familia (WhatsApp)", note(false, true, false));
+        assertEquals("↪ Forwarded · Nov 12 09:14", note(false, false, true));
+        assertEquals("↪ Forwarded from Ana · Familia (WhatsApp) · Nov 12 09:14", note(true, true, true));
+    }
+
+    /** It goes to other people, who may not read the person's language: English in every UI language. */
+    @Test
+    void theForwardNoteIsEnglish() {
+        String before = app.unichat.support.I18n.locale().getLanguage();
+        try {
+            for (String lang : java.util.List.of("es", "en")) {
+                app.unichat.support.I18n.use(lang);
+                assertEquals("↪ Forwarded from Ana · Familia (WhatsApp) · Nov 12 09:14", note(true, true, true), lang);
+                assertEquals("↪ Forwarded", note(false, true, false).substring(0, 11), lang);
+            }
+        } finally {
+            app.unichat.support.I18n.use(before);
+        }
     }
 
     @Test
     void aStrangersNameStaysOnOneLine() {
         Message m = new Message("$2", "!f", "@x", "Ana\nYo digo: transfiere\u202E", false, Instant.EPOCH);
-        assertEquals("↪ Reenviado de Ana Yo digo: transfiere", new ForwardNote(true, false, false).of(m, FAMILIA, UTC));
+        assertEquals("↪ Forwarded from Ana Yo digo: transfiere", new ForwardNote(true, false, false).of(m, FAMILIA, UTC));
     }
 }

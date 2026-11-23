@@ -45,7 +45,7 @@ final class SpeechPage {
                     default -> I18n.t("settings.speech.langAuto");
                 }, s.sttLanguage(), s::setSttLanguage);
 
-        TextField command = new TextField(s.sttCommand());
+        TextField command = new TextField(SttSettings.command());
         command.setPromptText(Transcriber.EXAMPLE_COMMAND);
         command.setPrefColumnCount(16);
         command.setAccessibleText(I18n.t("settings.speech.ownCommand"));

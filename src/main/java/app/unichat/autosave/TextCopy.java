@@ -1,7 +1,6 @@
 package app.unichat.autosave;
 
 import app.unichat.model.Chat;
-import app.unichat.support.I18n;
 import app.unichat.support.Lines;
 import app.unichat.support.SafeFile;
 
@@ -17,9 +16,12 @@ import java.util.List;
  * A chat's texts as a person reads them, in its folder beside what auto-save keeps: made again from every computer's
  * ({@link TextLog#merged}), never the source, so it can be read, searched or copied from without Unichat. Each entry is
  * "when · who · {message}" with its text set in two spaces: no line of a text, nor a name, can pass for another entry.
+ * A file kept on disk, not UI: English in every UI language.
  */
 final class TextCopy {
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    private static final String HEADER = "What was said in this chat, copied by Unichat: each message, and each version if it was edited.";
 
     private TextCopy() {}
 
@@ -43,21 +45,30 @@ final class TextCopy {
     static String render(Chat chat, List<SavedText> said, ZoneId zone) {
         StringBuilder out = new StringBuilder();
         out.append("# Unichat · ").append(oneLine(chat.title())).append(" · ").append(chat.network().displayName()).append(" · ")
-                .append(chat.id()).append('\n').append("# ").append(I18n.t("autosave.texts.copyHeader")).append('\n');
+                .append(chat.id()).append('\n').append("# ").append(HEADER).append('\n');
         List<SavedText.Mark> marks = SavedText.marks(said);
         for (int i = 0; i < said.size(); i++) {
             SavedText t = said.get(i);
             SavedText.Mark mark = marks.get(i);
             boolean asSent = mark == SavedText.Mark.SENT || mark == SavedText.Mark.WRITTEN;
             out.append('\n').append(WHEN.format((asSent ? t.at() : t.seen()).atZone(zone))).append(" · ").append(oneLine(t.from()))
-                    .append(mark == SavedText.Mark.SENT ? "" : " · " + I18n.t("autosave.texts." + mark.name()))
+                    .append(mark == SavedText.Mark.SENT ? "" : " · " + said(mark))
                     .append(" · {").append(t.id()).append("}\n");
             for (String line : t.text().split("\\R", -1)) out.append("  ").append(shown(line)).append('\n');
         }
         return out.toString();
     }
 
-    /** A name on one line ({@link Lines#one}), the separator a dash: "Ana · editado" would read as an edit. */
+    private static String said(SavedText.Mark mark) {
+        return switch (mark) {
+            case EDITED -> "edited";
+            case WRITTEN -> "written before AI correction";
+            case CORRECTED -> "corrected with AI";
+            case SENT -> "";
+        };
+    }
+
+    /** A name on one line ({@link Lines#one}), the separator a dash: "Ana · edited" would read as an edit. */
     private static String oneLine(String s) {
         return Lines.one(s).replace('·', '-');
     }
