@@ -6,7 +6,7 @@ Docker (`server/`). The native server does the same with ordinary system program
 | Piece | What it is | Where it comes from |
 |---|---|---|
 | **tuwunel** | Matrix server (a single executable, in Rust) | Built in GitHub Actions and **ships inside the Unichat installer** |
-| **mautrix bridges** | One executable per network | **Downloaded** from mautrix's official releases, verified with the SHA-256 pinned in the app |
+| **mautrix bridges** | One executable per network | **Downloaded** from mautrix's official releases (X and Discord, patched or at a commit: from Unichat's own build), verified with the SHA-256 pinned in the app |
 | **SQLite** | Database (one file per component) | Built into the executables; nothing to install |
 | **libolm** (Mac only) | Library the official Mac bridges need in order to start | Built with `native/build-libolm.sh` and **ships inside Unichat**; copied next to the bridges |
 | **gif2webp** (libwebp 1.6.0, BSD license) | Converts animated GIF stickers to animated WebP for chats that only accept WebP (WhatsApp) | `package.sh` builds it with `native/build-gif2webp.sh` from the pinned source (with GIFLib; Google's binary requires macOS 15) and `package.ps1` downloads Google's official Windows binary, with its SHA-256 pinned, and it **ships inside Unichat**; without it, the sticker is sent still (PNG) |
@@ -117,7 +117,8 @@ registration only with a secret token, and reads the bridges' registrations from
 | | Mac Apple Silicon | Windows x64 | Mac Intel |
 |---|---|---|---|
 | tuwunel server | ✅ built by `natives.yml` (no changes, ~26 min) | ✅ built by `natives.yml`, without the Linux features (`--no-default-features` without `jemalloc`/`io_uring`/`systemd`; ~82 min, a 123 MB `tuwunel.exe`) | ❌ out of scope |
-| Go bridges (WhatsApp, Telegram, Meta, Slack, Google Messages, X, LinkedIn, Discord) | ✅ official binaries | ✅ built by `natives.yml` from Linux (`go build -tags goolm`, cgo with MinGW; there are no official binaries) | ❌ |
+| Go bridges (WhatsApp, Telegram, Meta, Slack, Google Messages, LinkedIn) | ✅ official binaries | ✅ built by `natives.yml` from Linux (`go build -tags goolm`, cgo with MinGW; there are no official binaries) | ❌ |
+| X, Discord (`NATIVES_ALL`) | ✅ built by `natives.yml` on `macos-15` (`-tags goolm`, cgo; Discord `goolm,nocrypto`), with their patches | ✅ built by `natives.yml` from Linux, with their patches | ❌ |
 | Signal | ✅ official binary | ❌ the Rust part builds; linking with Go fails (pending; `NATIVES_UNBUILT`, Unichat doesn't offer it) | ❌ |
 
 - **Mac Intel is left out**: GitHub retired its `macos-13` machines (Dec-2025) and will remove the remaining Intel ones in
@@ -133,6 +134,14 @@ of each file, which the bridges' AGPL asks for):
   (`native/fetch-natives.sh`; `TUWUNEL_BIN` wins).
 - `mautrix-<bridge>-windows-amd64`: Unichat downloads them on Windows when each network is connected (`Manifest.releaseUrl`),
   verified with their pinned SHA-256 like the official ones.
+- `mautrix-<bridge>-darwin-arm64` for the bridges in `NATIVES_ALL`: those Unichat builds on every platform because the
+  fix it needs isn't released. Their line in `versions.env` names a tag or a full 40-character commit SHA, and
+  `native/patches/<bridge>/*.patch` are applied on top (`git apply --check`, then `git apply`; one that doesn't apply
+  fails the build). The release notes link each file's exact commit and each patch. Unichat records them as
+  `<tag>+<natives tag>` (`Manifest.version`), so a new build of the same tag replaces the old one, and mautrix's own.
+  Today: X at the head of mautrix/twitter PR #257 (XChat per-message keys), and Discord v0.7.7 with
+  `resume-subscribe-pace.patch` (on each resume it subscribed to every guild at once and Discord rate-limited it in a
+  loop). Back to the official build: drop it from `NATIVES_ALL` (and its patches) once a release has the fix.
 
 To update a bridge or tuwunel: change its version in `versions.env`, bump `NATIVES` (`natives-2`…) and push to
 `main`; the workflow only runs if that release doesn't exist. Once it has published, run `native/pin-hashes.sh`

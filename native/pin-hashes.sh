@@ -11,7 +11,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 RES="$HERE/../src/main/resources/app/unichat/server"
 VERSIONS="$RES/versions.env"
 OUT="$RES/sha256sums.txt"
-# The platforms in server/Platform.java: mautrix publishes official builds for the first, Unichat builds the second.
+# The platforms in server/Platform.java: mautrix publishes official builds for the first, Unichat builds the second
+# (and the first too for the bridges in NATIVES_ALL: Manifest.official).
 OFFICIAL="darwin-arm64"
 NATIVE="windows-amd64"
 TUWUNEL_PLATFORMS="darwin-arm64 windows-amd64"
@@ -19,6 +20,7 @@ TUWUNEL_PLATFORMS="darwin-arm64 windows-amd64"
 setting() { grep "^$1=" "$VERSIONS" | cut -d= -f2- || true; }
 NATIVES="$(setting NATIVES)"
 UNBUILT=" $(setting NATIVES_UNBUILT | tr ',' ' ') "
+ALL=" $(setting NATIVES_ALL | tr ',' ' ') "
 [ -n "$NATIVES" ] || { echo "versions.env has no NATIVES" >&2; exit 1; }
 
 WORK="$(mktemp -d)"
@@ -40,7 +42,8 @@ pin() {
 {
   grep -E '^[a-z][a-z0-9_]*=' "$VERSIONS" | while IFS='=' read -r name spec; do
     release="${spec%:*}" prefix="${spec##*:}"
-    for p in $OFFICIAL; do pin "$release" "$prefix-$p"; done
+    case "$ALL" in *" $name "*) mac="$NATIVES" ;; *) mac="$release" ;; esac
+    for p in $OFFICIAL; do pin "$mac" "$prefix-$p"; done
     case "$UNBUILT" in *" $name "*) ;; *) for p in $NATIVE; do pin "$NATIVES" "$prefix-$p"; done ;; esac
   done
   for p in $TUWUNEL_PLATFORMS; do pin "$NATIVES" "tuwunel-$p"; done

@@ -13,11 +13,12 @@ import java.util.Set;
 
 /**
  * Pinned versions of the native server stack ({@code versions.env}, bundled with the app so updating Unichat
- * brings new bridge versions). Bridge lines: {@code <name>=<owner/repo>@<tag>:<asset prefix>}. Where a platform has
- * no official builds (Windows), the bridges come from Unichat's own release ({@code NATIVES=<owner/repo>@<tag>},
- * made by .github/workflows/natives.yml), all but those in {@code NATIVES_UNBUILT}. The SHA-256 of every file it may
- * download is pinned beside it ({@code sha256sums.txt}, written by native/pin-hashes.sh): one {@code <sha256>  <key>}
- * line per {@link #pinKey}.
+ * brings new bridge versions). Bridge lines: {@code <name>=<owner/repo>@<tag or commit>:<asset prefix>}. Where a
+ * platform has no official builds (Windows), the bridges come from Unichat's own release
+ * ({@code NATIVES=<owner/repo>@<tag>}, made by .github/workflows/natives.yml), all but those in
+ * {@code NATIVES_UNBUILT}; those in {@code NATIVES_ALL} (patched, or at a commit) come from it on every platform.
+ * The SHA-256 of every file it may download is pinned beside it ({@code sha256sums.txt}, written by
+ * native/pin-hashes.sh): one {@code <sha256>  <key>} line per {@link #pinKey}.
  */
 public final class Manifest {
     /** One bridge release; the downloaded file is {@code <assetPrefix>-<os>-<arch>}. */
@@ -101,7 +102,21 @@ public final class Manifest {
 
     /** The release {@code c}'s files for {@code p} come from, as {@code <owner/repo>@<tag>}. */
     private String release(Component c, Platform p) {
-        return p.officialBuilds() && !"tuwunel".equals(c.name()) ? c.repo() + "@" + c.tag() : settings.get("NATIVES");
+        return official(c, p) ? c.repo() + "@" + c.tag() : settings.get("NATIVES");
+    }
+
+    /** Whether {@code c}'s file for {@code p} is the bridge's own build, not one Unichat made. */
+    private boolean official(Component c, Platform p) {
+        return p.officialBuilds() && !"tuwunel".equals(c.name()) && !list("NATIVES_ALL").contains(c.name());
+    }
+
+    /**
+     * What {@code c}'s installed file for {@code p} is recorded as ({@code <name>.version}): its tag, plus the natives
+     * release for a bridge Unichat built, so a new build of the same tag (a patch changed) is installed again.
+     */
+    public String version(Component c, Platform p) {
+        String natives = settings.getOrDefault("NATIVES", "");
+        return official(c, p) || "tuwunel".equals(c.name()) ? c.tag() : c.tag() + "+" + natives.substring(natives.indexOf('@') + 1);
     }
 
     private static String url(String release) {
@@ -125,11 +140,12 @@ public final class Manifest {
 
     /** Whether {@code bridge} runs on {@code p}: Signal's doesn't build for Windows yet. */
     public boolean builds(String bridge, Platform p) {
-        return bridges.containsKey(bridge) && (p.officialBuilds() || !unbuilt().contains(bridge));
+        return bridges.containsKey(bridge) && (p.officialBuilds() || !list("NATIVES_UNBUILT").contains(bridge));
     }
 
-    private Set<String> unbuilt() {
-        return Set.copyOf(java.util.Arrays.asList(settings.getOrDefault("NATIVES_UNBUILT", "").strip().split("\\s*,\\s*")));
+    /** A setting that lists bridges, {@code a,b}. */
+    private Set<String> list(String setting) {
+        return Set.copyOf(java.util.Arrays.asList(settings.getOrDefault(setting, "").strip().split("\\s*,\\s*")));
     }
 
     /** Checksum file: {@code <sha256>  <name>} or {@code <sha256> *<name>} per line; {@code #} starts a comment. */

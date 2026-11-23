@@ -1,0 +1,22 @@
+Discord resume rate-limit loop (mautrix-discord v0.7.7).
+
+resumeHandler subscribed to every guild at once; with many guilds Discord closes the gateway with 4008
+"Rate limited", the bridge resumes and subscribes again, in a loop (about 140 times in 2 minutes with 123 guilds).
+The connect path already waits 2 s between guilds: resume now does the same, off the event handler.
+Applied by .github/workflows/natives.yml (git apply), for macOS and Windows.
+
+diff --git a/user.go b/user.go
+index 8c0d6ec..090c7dc 100644
+--- a/user.go
++++ b/user.go
+@@ -857,7 +857,9 @@ func (user *User) subscribeGuilds(delay time.Duration) {
+ 
+ func (user *User) resumeHandler(_ *discordgo.Resumed) {
+ 	user.log.Debug().Msg("Discord connection resumed")
+-	user.subscribeGuilds(0 * time.Second)
++	// Unichat: all guilds at once on every resume hit Discord's gateway limit (close 4008 "Rate limited"),
++	// the bridge resumed again and subscribed again, in a loop. Same pace as on connect, off the event handler.
++	go user.subscribeGuilds(2 * time.Second)
+ 	user.BridgeState.Send(status.BridgeState{StateEvent: status.StateConnected})
+ }
+ 

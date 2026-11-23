@@ -93,6 +93,33 @@ class BinaryStoreTest {
     }
 
     @Test
+    void aBridgeUnichatBuiltCountsAsInstalledOnlyFromThatBuild() throws Exception {
+        // The person's Mac has mautrix's own v0.7.7: the patched one from natives-2 must replace it.
+        Manifest m = Manifest.parse("""
+                discord=mautrix/discord@v0.7.7:mautrix-discord
+                NATIVES=vaoan/unichat@natives-2
+                NATIVES_ALL=discord
+                """);
+        BinaryStore store = new BinaryStore(dir, Platform.MAC_ARM64, m);
+        Files.write(store.path("discord"), BINARY);
+        assertTrue(store.path("discord").toFile().setExecutable(true, true));
+        Files.writeString(dir.resolve("discord.version"), "v0.7.7");
+        assertFalse(store.isInstalled(m.bridge("discord")), "the official v0.7.7 is not Unichat's build");
+        Files.writeString(dir.resolve("discord.version"), "v0.7.7+natives-2");
+        assertTrue(store.isInstalled(m.bridge("discord")));
+    }
+
+    @Test
+    void anInstallRecordsTheVersionItWasGiven() throws Exception {
+        String base = "http://127.0.0.1:" + server.getAddress().getPort();
+        BinaryStore store = new BinaryStore(dir, Platform.MAC_ARM64, c -> base + "/x", c -> pinnedSum, c -> c.tag() + "+natives-2");
+        store.install(WA);
+        assertEquals("v1+natives-2", Files.readString(dir.resolve("whatsapp.version")));
+        assertTrue(store.isInstalled(WA));
+        assertFalse(store().isInstalled(WA), "another build of v1");
+    }
+
+    @Test
     void aHomeserverCopiedFromThePackageCountsAsInstalled() throws Exception {
         Path shipped = Files.write(dir.resolve("shipped"), BINARY);
         BinaryStore store = new BinaryStore(dir.resolve("bin"), Platform.MAC_ARM64, c -> "http://127.0.0.1:1", c -> null);

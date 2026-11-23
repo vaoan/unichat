@@ -56,10 +56,14 @@ fi
 
 # --- Bridge binaries (official releases, checked against the pinned sha256sums.txt) ------------
 fetch_bridge() {
-  local b="$1" spec repo tag prefix asset out
+  local b="$1" spec repo tag prefix asset out version natives
   spec="$(manifest "$b")"; repo="${spec%@*}"; tag="${spec#*@}"; tag="${tag%%:*}"; prefix="${spec##*:}"
-  asset="$prefix-$OS-$ARCH"; out="$DIR/bin/$b"
-  if [ -x "$out" ] && [ "$(cat "$out.version" 2>/dev/null)" = "$tag" ]; then return; fi
+  asset="$prefix-$OS-$ARCH"; out="$DIR/bin/$b"; version="$tag"
+  # Built by Unichat (NATIVES_ALL): from its natives release, recorded as Manifest.version does.
+  case " $(manifest NATIVES_ALL | tr ',' ' ') " in *" $b "*)
+    natives="$(manifest NATIVES)"; repo="${natives%@*}"; version="$tag+${natives#*@}"; tag="${natives#*@}" ;;
+  esac
+  if [ -x "$out" ] && [ "$(cat "$out.version" 2>/dev/null)" = "$version" ]; then return; fi
   local want got
   want="$(pinned "$repo@$tag/$asset")"
   [ -n "$want" ] || { echo "$repo@$tag/$asset has no pinned SHA-256: run native/pin-hashes.sh" >&2; exit 1; }
@@ -68,7 +72,7 @@ fetch_bridge() {
   got="$(shasum -a 256 "$out.part" | awk '{print $1}')"
   [ -n "$want" ] && [ "$want" = "$got" ] || { rm -f "$out.part"; echo "Checksum mismatch for $asset" >&2; exit 1; }
   chmod 755 "$out.part"; xattr -c "$out.part" 2>/dev/null || true
-  mv "$out.part" "$out"; echo "$tag" > "$out.version"
+  mv "$out.part" "$out"; echo "$version" > "$out.version"
 }
 
 BRIDGES="${*:-whatsapp telegram signal instagram facebook discord slack gmessages twitter linkedin}"

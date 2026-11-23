@@ -50,6 +50,62 @@ class ManifestTest {
     }
 
     @Test
+    void aBridgeBuiltByUnichatComesFromNativesOnEveryPlatform() {
+        Manifest m = Manifest.parse("""
+                whatsapp=mautrix/whatsapp@v0.2610.0:mautrix-whatsapp
+                twitter=mautrix/twitter@8d47b077e0e943d94e2c2c2fcda62f864ef781c1:mautrix-twitter
+                discord=mautrix/discord@v0.7.7:mautrix-discord
+                NATIVES=vaoan/unichat@natives-3
+                NATIVES_ALL=twitter, discord
+                """);
+        String natives = "https://github.com/vaoan/unichat/releases/download/natives-3";
+        for (String b : new String[]{"twitter", "discord"}) {
+            for (Platform p : Platform.values()) {
+                assertEquals(natives, m.releaseUrl(m.bridge(b), p), b + " on " + p);
+                assertTrue(m.builds(b, p), b + " on " + p);
+            }
+        }
+        Manifest.Component wa = m.bridge("whatsapp");
+        assertEquals("https://github.com/mautrix/whatsapp/releases/download/v0.2610.0", m.releaseUrl(wa, Platform.MAC_ARM64));
+        assertEquals(natives, m.releaseUrl(wa, Platform.WINDOWS_AMD64));
+        assertEquals("vaoan/unichat@natives-3/mautrix-discord-darwin-arm64",
+                m.pinKey(m.bridge("discord"), Platform.MAC_ARM64));
+    }
+
+    @Test
+    void aBridgePinnedToACommitKeepsItsAssetNameAndVersion() {
+        String sha = "8d47b077e0e943d94e2c2c2fcda62f864ef781c1";
+        Manifest m = Manifest.parse("twitter=mautrix/twitter@" + sha + ":mautrix-twitter\nNATIVES=vaoan/unichat@natives-3\n"
+                + "NATIVES_ALL=twitter\n");
+        Manifest.Component x = m.bridge("twitter");
+        assertEquals("mautrix/twitter", x.repo());
+        assertEquals(sha, x.tag());
+        assertEquals("mautrix-twitter-darwin-arm64", x.asset(Platform.MAC_ARM64));
+        assertEquals(sha + "+natives-3", m.version(x, Platform.MAC_ARM64));
+    }
+
+    @Test
+    void aBridgeFromUnichatsBuildIsInstalledAgainWhenNativesMoves() {
+        // Discord stays v0.7.7 while its patch changes: the official v0.7.7 (or natives-1's) must not count as installed.
+        String versions = """
+                whatsapp=mautrix/whatsapp@v0.2610.0:mautrix-whatsapp
+                discord=mautrix/discord@v0.7.7:mautrix-discord
+                NATIVES=vaoan/unichat@natives-2
+                NATIVES_ALL=discord
+                """;
+        Manifest m = Manifest.parse(versions);
+        assertEquals("v0.7.7+natives-2", m.version(m.bridge("discord"), Platform.MAC_ARM64));
+        assertEquals("v0.7.7+natives-2", m.version(m.bridge("discord"), Platform.WINDOWS_AMD64));
+        assertEquals("v0.2610.0", m.version(m.bridge("whatsapp"), Platform.MAC_ARM64), "an official build keeps its tag");
+        assertEquals("v0.2610.0+natives-2", m.version(m.bridge("whatsapp"), Platform.WINDOWS_AMD64));
+        Manifest next = Manifest.parse(versions.replace("natives-2", "natives-3"));
+        assertFalse(next.version(next.bridge("discord"), Platform.MAC_ARM64).equals(m.version(m.bridge("discord"), Platform.MAC_ARM64)));
+        Manifest server = Manifest.parse("TUWUNEL_VERSION=v1.9.4\nNATIVES=vaoan/unichat@natives-2\n");
+        assertEquals("v1.9.4", server.version(server.tuwunel(), Platform.MAC_ARM64),
+                "the homeserver keeps its version, as the copy from the package writes it");
+    }
+
+    @Test
     void theBundledManifestNamesUnichatsOwnRelease() {
         assertTrue(Manifest.bundled().nativesUrl().startsWith("https://github.com/vaoan/unichat/releases/download/natives-"));
     }

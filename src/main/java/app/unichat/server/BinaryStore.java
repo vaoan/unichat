@@ -20,18 +20,27 @@ public final class BinaryStore {
     private final Platform platform;
     private final Function<Manifest.Component, String> releaseBase;
     private final Function<Manifest.Component, String> pinned;
+    private final Function<Manifest.Component, String> version;
 
     /** Downloads from {@code manifest}'s releases, checked against its pinned hashes. */
     public BinaryStore(Path bin, Platform platform, Manifest manifest) {
-        this(bin, platform, c -> manifest.releaseUrl(c, platform), c -> manifest.sha256(c, platform));
+        this(bin, platform, c -> manifest.releaseUrl(c, platform), c -> manifest.sha256(c, platform),
+                c -> manifest.version(c, platform));
     }
 
     /** {@code releaseBase}: where a component's files are; {@code pinned}: its SHA-256, null when not pinned (tests). */
     BinaryStore(Path bin, Platform platform, Function<Manifest.Component, String> releaseBase,
                 Function<Manifest.Component, String> pinned) {
+        this(bin, platform, releaseBase, pinned, Manifest.Component::tag);
+    }
+
+    /** {@code version}: what an installed component is recorded as ({@link Manifest#version}). */
+    BinaryStore(Path bin, Platform platform, Function<Manifest.Component, String> releaseBase,
+                Function<Manifest.Component, String> pinned, Function<Manifest.Component, String> version) {
         this.bin = bin;
         this.platform = platform;
         this.releaseBase = releaseBase;
+        this.version = version;
         this.pinned = pinned;
     }
 
@@ -40,7 +49,7 @@ public final class BinaryStore {
     }
 
     public boolean isInstalled(Manifest.Component c) {
-        return Files.isExecutable(path(c.name())) && c.tag().equals(installedVersion(c.name()));
+        return Files.isExecutable(path(c.name())) && version.apply(c).equals(installedVersion(c.name()));
     }
 
     /** Downloads and installs {@code c} unless that version is already there. Blocking. */
@@ -53,7 +62,7 @@ public final class BinaryStore {
 
         Downloads.fetch(releaseBase.apply(c) + "/" + asset, 0, want, target, asset, p -> { }, part -> part.toFile().setExecutable(true, true));
         clearQuarantine(target);
-        Files.writeString(bin.resolve(c.name() + ".version"), c.tag());
+        Files.writeString(bin.resolve(c.name() + ".version"), version.apply(c));
         return target;
     }
 

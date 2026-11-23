@@ -8,6 +8,9 @@ Native builds and the no-Docker stack, and the macOS menu-bar helper (the Java s
   **Bump `versions.env` → run `native/pin-hashes.sh`** and commit the `sha256sums.txt` it writes beside it: the app,
   `setup-mac.sh`, `fetch-natives.sh` and `package.ps1` install only files whose SHA-256 is pinned there (a release's
   own sha256sums.txt would vouch for a swapped binary), and `ManifestTest` fails the build while one is missing.
+  `patches/<bridge>/*.patch`: Unichat's changes to a bridge in `NATIVES_ALL` (built by `natives.yml` for both
+  platforms, from a tag or a full commit SHA). Made with `git diff` against that exact ref and checked with
+  `git apply --check` on a clean checkout; one that no longer applies fails the build, so a bump means remaking it.
   Bridges run with `direct_media` (`mxc://media-<bridge>.localhost/…`, nothing copied to the server); Unichat
   downloads those from the bridge's port (`LocalServer.directMediaBase`).
   `server/MediaPrune` deletes Discord attachments older than `discord.mediaDays` (default 30, 0 = never; Ajustes →

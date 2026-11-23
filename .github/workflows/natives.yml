@@ -1,7 +1,10 @@
 # What Unichat builds itself for its no-Docker server, published as the release named by NATIVES in versions.env:
 #   tuwunel-darwin-arm64, tuwunel-windows-amd64   the homeserver (no official macOS/Windows builds)
 #   mautrix-<bridge>-windows-amd64                the bridges for Windows (mautrix publishes Linux and macOS only)
+#   mautrix-<bridge>-darwin-arm64                 the bridges in NATIVES_ALL: patched, or at a commit with no release
 #   sha256sums.txt                                copied into the app's pins by native/pin-hashes.sh
+# Each bridge is built from the exact commit its tag (or commit) names, with native/patches/<bridge>/*.patch applied;
+# a patch that doesn't apply fails the build. The release notes name each commit and each patch.
 # Runs when versions.env changes and that release doesn't exist yet: bump NATIVES with any version there.
 name: natives
 
@@ -11,6 +14,7 @@ on:
     branches: [main]
     paths:
       - src/main/resources/app/unichat/server/versions.env
+      - native/patches/**
       - .github/workflows/natives.yml
 
 # Read-only for the jobs that build third-party code (their build scripts run with this token): only publish writes.
@@ -27,7 +31,7 @@ jobs:
     outputs:
       tag: ${{ steps.plan.outputs.tag }}
       exists: ${{ steps.plan.outputs.exists }}
-      bridges: ${{ steps.plan.outputs.bridges }}
+      builds: ${{ steps.plan.outputs.builds }}
       tuwunel: ${{ steps.plan.outputs.tuwunel }}
     steps:
       - uses: actions/checkout@v5
@@ -38,72 +42,140 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'EOF' >> "$GITHUB_OUTPUT"
-          import json, re
+          import json, os, re, subprocess, sys
           bridges, settings = [], {}
           for line in open("src/main/resources/app/unichat/server/versions.env"):
               line = line.strip()
               if not line or line.startswith("#"): continue
               key, value = line.split("=", 1)
               if key.isupper(): settings[key] = value; continue
-              m = re.fullmatch(r"([^@]+)@([^:]+):(.+)", value)
-              bridges.append({"name": key, "repo": m[1], "tag": m[2], "prefix": m[3]})
-          unbuilt = {b.strip() for b in settings.get("NATIVES_UNBUILT", "").split(",")}
+              m = re.fullmatch(r"([a-z][a-z0-9_]*)=([\w.-]+/[\w.-]+)@([\w.+-]+):([\w.-]+)", line)
+              if not m: sys.exit("Bad versions.env line: " + line)
+              bridges.append({"name": m[1], "repo": m[2], "tag": m[3], "prefix": m[4]})
+          names = lambda k: {b.strip() for b in settings.get(k, "").split(",") if b.strip()}
+          unbuilt, everywhere = names("NATIVES_UNBUILT"), names("NATIVES_ALL")
+          unknown = everywhere - {b["name"] for b in bridges}
+          if unknown: sys.exit("NATIVES_ALL names no bridge: " + ", ".join(sorted(unknown)))
+
+          def commit(repo, ref):
+              """The commit a tag names (peeled, for an annotated tag), or the commit itself."""
+              if re.fullmatch(r"[0-9a-f]{40}", ref): return ref
+              out = subprocess.run(["git", "ls-remote", "https://github.com/" + repo, "refs/tags/" + ref, "refs/tags/" + ref + "^{}"],
+                                   capture_output=True, text=True, check=True).stdout
+              refs = {r: sha for sha, r in (l.split("\t") for l in out.splitlines())}
+              sha = refs.get("refs/tags/" + ref + "^{}") or refs.get("refs/tags/" + ref)
+              if not sha: sys.exit(repo + " has no tag " + ref)
+              return sha
+
+          builds = []
+          for b in bridges:
+              b["commit"] = commit(b["repo"], b["tag"])
+              d = "native/patches/" + b["name"]
+              b["patches"] = sorted(f for f in os.listdir(d) if f.endswith(".patch")) if os.path.isdir(d) else []
+              # Windows: every bridge but the unbuilt ones, cross-compiled on Linux; macOS: only Unichat's own.
+              if b["name"] not in unbuilt: builds.append(dict(b, platform="windows-amd64", runner="ubuntu-latest"))
+              if b["name"] in everywhere: builds.append(dict(b, platform="darwin-arm64", runner="macos-15"))
           print("tag=" + settings["NATIVES"].split("@", 1)[1])
           print("tuwunel=" + settings["TUWUNEL_VERSION"])
-          print("bridges=" + json.dumps([b for b in bridges if b["name"] not in unbuilt]))
+          print("builds=" + json.dumps(builds))
           EOF
           tag=$(grep '^tag=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
           if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "exists=true"; else echo "exists=false"; fi >> "$GITHUB_OUTPUT"
 
   bridges:
-    # Cross-compiled from Linux (cgo for SQLite through MinGW; goolm, so no libolm): a minute each, and Linux minutes
-    # cost half of Windows'.
+    # Windows: cross-compiled from Linux (cgo for SQLite through MinGW; goolm, so no libolm): a minute each, and Linux
+    # minutes cost half of Windows'. macOS: on macos-15, cgo with the same tags, so no libolm either.
     needs: plan
     if: needs.plan.outputs.exists != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.build.runner }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        bridge: ${{ fromJSON(needs.plan.outputs.bridges) }}
+        build: ${{ fromJSON(needs.plan.outputs.builds) }}
+    defaults:
+      run:
+        shell: bash
     steps:
+      # Unichat's own checkout, for the patches only (never built or run here).
       - uses: actions/checkout@v5
         with:
-          repository: ${{ matrix.bridge.repo }}
-          ref: ${{ matrix.bridge.tag }}
+          persist-credentials: false
+          path: unichat
+          sparse-checkout: native/patches
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ matrix.build.repo }}
+          ref: ${{ matrix.build.commit }}
           persist-credentials: false
           path: src
+      - name: Patches
+        working-directory: src
+        env:
+          PATCHES: ${{ github.workspace }}/unichat/native/patches/${{ matrix.build.name }}
+          REPO: ${{ matrix.build.repo }}
+          TAG: ${{ matrix.build.tag }}
+        run: |
+          [ -d "$PATCHES" ] || { echo "No patches"; exit 0; }
+          for p in "$PATCHES"/*.patch; do
+            [ -e "$p" ] || continue
+            git apply --check "$p" || { echo "::error::$(basename "$p") doesn't apply to $REPO@$TAG"; exit 1; }
+            git apply "$p"
+            echo "Applied $(basename "$p")"
+          done
+          git diff --stat
       - uses: actions/setup-go@v6
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
-      - run: sudo apt-get update -q && sudo apt-get install -y -q gcc-mingw-w64-x86-64
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y -q gcc-mingw-w64-x86-64
       - name: Build
         working-directory: src
         env:
           CGO_ENABLED: "1"
-          GOOS: windows
-          GOARCH: amd64
-          CC: x86_64-w64-mingw32-gcc
           # From versions.env: through the environment, never pasted into the script.
-          PREFIX: ${{ matrix.bridge.prefix }}
-          TAG: ${{ matrix.bridge.tag }}
+          PLATFORM: ${{ matrix.build.platform }}
+          PREFIX: ${{ matrix.build.prefix }}
+          TAG: ${{ matrix.build.tag }}
+          COMMIT: ${{ matrix.build.commit }}
         run: |
+          if [ "$PLATFORM" = windows-amd64 ]; then export GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc; fi
+          if [ "$PLATFORM" = darwin-arm64 ]; then export GOOS=darwin GOARCH=arm64; fi
+          # A commit has no release tag: built as mautrix's build.sh does off a tag (main.Tag empty, "+dev.<commit>").
+          tag="$TAG"; if printf '%s' "$TAG" | grep -Eq '^[0-9a-f]{40}$'; then tag=""; fi
           # bridgev2 bridges have their main in cmd/<name>; the legacy Discord bridge at the root.
           pkg="./cmd/$PREFIX"; tags=goolm
           if [ ! -d "$pkg" ]; then
             # Legacy bridge (Discord): its mautrix-go has no goolm, only cgo libolm, so no crypto at all (Unichat turns
-            # bridge encryption off anyway); and its zeroconfig 0.1 uses log/syslog, missing on Windows. The only
-            # changes to its source, listed in the release notes.
+            # bridge encryption off anyway); and its zeroconfig 0.1 uses log/syslog, missing on Windows. Listed in the
+            # release notes.
             pkg=.; tags=goolm,nocrypto
-            if grep -q 'go.mau.fi/zeroconfig v0\.1\.' go.mod; then go mod edit -require=go.mau.fi/zeroconfig@v0.2.0 && go mod download go.mau.fi/zeroconfig; fi
+            if [ "$GOOS" = windows ] && grep -q 'go.mau.fi/zeroconfig v0\.1\.' go.mod; then
+              go mod edit -require=go.mau.fi/zeroconfig@v0.2.0 && go mod download go.mau.fi/zeroconfig
+            fi
           fi
           go build -mod=mod -tags "$tags" -trimpath \
-            -ldflags "-s -w -X main.Tag=$TAG -X main.Commit=$(git rev-parse HEAD) -X 'main.BuildTime=$(date -u '+%b %_d %Y, %H:%M:%S')'" \
-            -o "../out/$PREFIX-windows-amd64" "$pkg"
+            -ldflags "-s -w -X main.Tag=$tag -X main.Commit=$COMMIT -X 'main.BuildTime=$(date -u '+%b %e %Y, %H:%M:%S')'" \
+            -o "../out/$PREFIX-$PLATFORM" "$pkg"
+      - name: Smoke (macOS)
+        # Windows builds start in smoke-windows; a macOS one starts here: --version, and writing its example config.
+        if: runner.os == 'macOS'
+        env:
+          PLATFORM: ${{ matrix.build.platform }}
+          PREFIX: ${{ matrix.build.prefix }}
+        run: |
+          f="out/$PREFIX-$PLATFORM"
+          "./$f" --version
+          # The legacy Discord bridge has no -e (example config): only --version there.
+          help="$("./$f" -h 2>&1 || true)"
+          if case "$help" in *generate-example-config*) true ;; *) false ;; esac; then
+            "./$f" -e -c "$RUNNER_TEMP/$PREFIX.yaml"
+            test -s "$RUNNER_TEMP/$PREFIX.yaml"
+          fi
       - uses: actions/upload-artifact@v5
         with:
-          name: bridge-${{ matrix.bridge.name }}
+          name: bridge-${{ matrix.build.name }}-${{ matrix.build.platform }}
           path: out/
           retention-days: 1
 
@@ -175,7 +247,13 @@ jobs:
           for f in *-windows-amd64; do
             cp "$f" "$f.exe"
             "./$f.exe" --version
-            case "$f" in mautrix-*) "./$f.exe" -e -c "$RUNNER_TEMP/$f.yaml" && test -s "$RUNNER_TEMP/$f.yaml" ;; esac
+            # The legacy Discord bridge has no -e (example config): only --version there. Not "a && b", which the
+            # loop let fail silently.
+            help="$("./$f.exe" -h 2>&1 || true)"
+            if case "$help" in *generate-example-config*) true ;; *) false ;; esac; then
+              "./$f.exe" -e -c "$RUNNER_TEMP/$f.yaml"
+              test -s "$RUNNER_TEMP/$f.yaml"
+            fi
           done
 
   publish:
@@ -192,20 +270,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.plan.outputs.tag }}
-          BRIDGES: ${{ needs.plan.outputs.bridges }}
+          BUILDS: ${{ needs.plan.outputs.builds }}
           TUWUNEL: ${{ needs.plan.outputs.tuwunel }}
         run: |
           cd out
           sha256sum -- *-* > sha256sums.txt
           cat sha256sums.txt
-          # The bridges are AGPL-3.0 and tuwunel Apache-2.0: each file's exact, unmodified source is linked here.
+          # The bridges are AGPL-3.0 and tuwunel Apache-2.0: each file's exact source and every change to it is linked here.
           {
-            echo "Unichat's local server and the bridges for Windows, built by natives.yml from their source, unmodified. Not a version of the app."
+            echo "Unichat's local server, the bridges for Windows, and the bridges Unichat builds for every platform, built by natives.yml from their source. Not a version of the app."
             echo
             echo "Source of each file:"
-            echo "- tuwunel-*: https://github.com/matrix-construct/tuwunel/tree/$TUWUNEL (Apache-2.0)"
-            echo "$BRIDGES" | jq -r '.[] | "- \(.prefix)-windows-amd64: https://github.com/\(.repo)/tree/\(.tag) (AGPL-3.0)"'
+            echo "- tuwunel-*: https://github.com/matrix-construct/tuwunel/tree/$TUWUNEL (Apache-2.0), unmodified"
+            echo "$BUILDS" | jq -r '.[] | "- \(.prefix)-\(.platform): https://github.com/\(.repo)/tree/\(.commit) (\(if .tag == .commit then "" else .tag + ", " end)AGPL-3.0)"
+              + (if (.patches | length) == 0 then ", unmodified" else ", with " + (.patches | join(", ")) end)'
             echo
-            echo "Only change: mautrix-discord is built with \`-tags goolm,nocrypto\` and \`go mod edit -require=go.mau.fi/zeroconfig@v0.2.0\` (0.1 uses log/syslog, which Windows lacks). Everything else as is."
+            echo "Patches (applied with git apply; a patch that doesn't apply fails the build):"
+            echo "$BUILDS" | jq -r --arg base "https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/native/patches" \
+              '[.[] | .name as $n | .patches[] | "- \($n)/\(.): \($base)/\($n)/\(.)"] | unique | if length == 0 then "- none" else .[] end'
+            echo
+            echo "Build changes: every bridge is built with \`-tags goolm\` (no libolm). mautrix-discord (legacy) with \`-tags goolm,nocrypto\`, and on Windows \`go mod edit -require=go.mau.fi/zeroconfig@v0.2.0\` (0.1 uses log/syslog, which Windows lacks)."
           } > ../notes.md
           gh release create "$TAG" -R "$GITHUB_REPOSITORY" --prerelease --title "$TAG" --notes-file ../notes.md -- *
