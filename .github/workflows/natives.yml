@@ -21,6 +21,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # The oldest macOS Unichat runs on (package.sh's MACOS_MIN): a macOS bridge built for the runner's own would not start.
+  MACOS_MIN: "13.3"
+
 concurrency:
   group: natives
   cancel-in-progress: false
@@ -72,6 +76,8 @@ jobs:
               b["commit"] = commit(b["repo"], b["tag"])
               d = "native/patches/" + b["name"]
               b["patches"] = sorted(f for f in os.listdir(d) if f.endswith(".patch")) if os.path.isdir(d) else []
+              bad = [f for f in b["patches"] if not re.fullmatch(r"[\w.-]+\.patch", f)]
+              if bad: sys.exit("Bad patch name: " + ", ".join(bad))
               # Windows: every bridge but the unbuilt ones, cross-compiled on Linux; macOS: only Unichat's own.
               if b["name"] not in unbuilt: builds.append(dict(b, platform="windows-amd64", runner="ubuntu-latest"))
               if b["name"] in everywhere: builds.append(dict(b, platform="darwin-arm64", runner="macos-15"))
@@ -97,12 +103,15 @@ jobs:
       run:
         shell: bash
     steps:
-      # Unichat's own checkout, for the patches only (never built or run here).
+      # Unichat's own checkout, for the patches and the macOS minimum check only (Unichat's code is not built here).
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
           path: unichat
-          sparse-checkout: native/patches
+          sparse-checkout: |
+            native/patches
+            native/check-macos-min.sh
+          sparse-checkout-cone-mode: false
       - uses: actions/checkout@v5
         with:
           repository: ${{ matrix.build.repo }}
@@ -113,15 +122,18 @@ jobs:
         working-directory: src
         env:
           PATCHES: ${{ github.workspace }}/unichat/native/patches/${{ matrix.build.name }}
+          # What plan found (names checked there): each one must be here and apply, or the build fails.
+          PATCH_LIST: ${{ join(matrix.build.patches, ' ') }}
           REPO: ${{ matrix.build.repo }}
           TAG: ${{ matrix.build.tag }}
         run: |
-          [ -d "$PATCHES" ] || { echo "No patches"; exit 0; }
-          for p in "$PATCHES"/*.patch; do
-            [ -e "$p" ] || continue
-            git apply --check "$p" || { echo "::error::$(basename "$p") doesn't apply to $REPO@$TAG"; exit 1; }
+          [ -n "$PATCH_LIST" ] || { echo "No patches for $REPO@$TAG"; exit 0; }
+          for name in $PATCH_LIST; do
+            p="$PATCHES/$name"
+            [ -f "$p" ] || { echo "::error::$name is missing from the checkout"; exit 1; }
+            git apply --check "$p" || { echo "::error::$name doesn't apply to $REPO@$TAG"; exit 1; }
             git apply "$p"
-            echo "Applied $(basename "$p")"
+            echo "Applied $name"
           done
           git diff --stat
       - uses: actions/setup-go@v6
@@ -141,7 +153,7 @@ jobs:
           COMMIT: ${{ matrix.build.commit }}
         run: |
           if [ "$PLATFORM" = windows-amd64 ]; then export GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc; fi
-          if [ "$PLATFORM" = darwin-arm64 ]; then export GOOS=darwin GOARCH=arm64; fi
+          if [ "$PLATFORM" = darwin-arm64 ]; then export GOOS=darwin GOARCH=arm64 MACOSX_DEPLOYMENT_TARGET="$MACOS_MIN"; fi
           # A commit has no release tag: built as mautrix's build.sh does off a tag (main.Tag empty, "+dev.<commit>").
           tag="$TAG"; if printf '%s' "$TAG" | grep -Eq '^[0-9a-f]{40}$'; then tag=""; fi
           # bridgev2 bridges have their main in cmd/<name>; the legacy Discord bridge at the root.
@@ -159,20 +171,22 @@ jobs:
             -ldflags "-s -w -X main.Tag=$tag -X main.Commit=$COMMIT -X 'main.BuildTime=$(date -u '+%b %e %Y, %H:%M:%S')'" \
             -o "../out/$PREFIX-$PLATFORM" "$pkg"
       - name: Smoke (macOS)
-        # Windows builds start in smoke-windows; a macOS one starts here: --version, and writing its example config.
+        # Windows builds start in smoke-windows; a macOS one here: it runs on MACOS_MIN, --version, and writing its
+        # example config.
         if: runner.os == 'macOS'
         env:
           PLATFORM: ${{ matrix.build.platform }}
           PREFIX: ${{ matrix.build.prefix }}
         run: |
+          unichat/native/check-macos-min.sh out "$MACOS_MIN"
           f="out/$PREFIX-$PLATFORM"
           "./$f" --version
           # The legacy Discord bridge has no -e (example config): only --version there.
-          help="$("./$f" -h 2>&1 || true)"
-          if case "$help" in *generate-example-config*) true ;; *) false ;; esac; then
-            "./$f" -e -c "$RUNNER_TEMP/$PREFIX.yaml"
-            test -s "$RUNNER_TEMP/$PREFIX.yaml"
-          fi
+          case "$f" in
+            out/mautrix-discord-*) ;;
+            *) "./$f" -e -c "$RUNNER_TEMP/$PREFIX.yaml"
+               test -s "$RUNNER_TEMP/$PREFIX.yaml" ;;
+          esac
       - uses: actions/upload-artifact@v5
         with:
           name: bridge-${{ matrix.build.name }}-${{ matrix.build.platform }}
@@ -247,13 +261,13 @@ jobs:
           for f in *-windows-amd64; do
             cp "$f" "$f.exe"
             "./$f.exe" --version
-            # The legacy Discord bridge has no -e (example config): only --version there. Not "a && b", which the
-            # loop let fail silently.
-            help="$("./$f.exe" -h 2>&1 || true)"
-            if case "$help" in *generate-example-config*) true ;; *) false ;; esac; then
-              "./$f.exe" -e -c "$RUNNER_TEMP/$f.yaml"
-              test -s "$RUNNER_TEMP/$f.yaml"
-            fi
+            # Every bridge writes its example config, but the legacy Discord one, which has no -e. Not "a && b",
+            # which the loop let fail silently.
+            case "$f" in
+              mautrix-discord-*) ;;
+              mautrix-*) "./$f.exe" -e -c "$RUNNER_TEMP/$f.yaml"
+                         test -s "$RUNNER_TEMP/$f.yaml" ;;
+            esac
           done
 
   publish:

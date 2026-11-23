@@ -2,20 +2,71 @@ Discord resume rate-limit loop (mautrix-discord v0.7.7).
 
 resumeHandler subscribed to every guild at once; with many guilds Discord closes the gateway with 4008
 "Rate limited", the bridge resumes and subscribes again, in a loop (about 140 times in 2 minutes with 123 guilds).
-The connect path already waits 2 s between guilds: resume now does the same, off the event handler.
+Resume now paces it 2 s per guild, as Ready does, and only one subscribe pass runs at a time (a newer pass, from
+another Ready or resume, stops the older one), so passes never pile up. A pass also stops at logout and logs a
+panic instead of ending the bridge.
 Applied by .github/workflows/natives.yml (git apply), for macOS and Windows.
 
 diff --git a/user.go b/user.go
-index 8c0d6ec..090c7dc 100644
+index 8c0d6ec..b2e92a0 100644
 --- a/user.go
 +++ b/user.go
-@@ -857,7 +857,9 @@ func (user *User) subscribeGuilds(delay time.Duration) {
+@@ -67,6 +67,9 @@ type User struct {
+ 
+ 	nextDiscordUploadID atomic.Int32
+ 
++	// Unichat: the subscribe pass running now; an older pass stops when a newer one starts.
++	subscribeGen atomic.Uint64
++
+ 	relationships map[string]*discordgo.Relationship
+ 	// relationshipsReady should be protected by relationshipLock and is merely
+ 	// used to cover the brief moment in time where the readyHandler goroutine
+@@ -833,10 +836,27 @@ func (user *User) readyHandler(r *discordgo.Ready) {
+ }
+ 
+ func (user *User) subscribeGuilds(delay time.Duration) {
+-	if !user.Session.IsUser {
++	// Unichat: one pass at a time. Each Ready and each resume starts a pass that takes minutes with many guilds;
++	// passes left running piled up and hit Discord's gateway limit again. A pass also stops when the session it
++	// started with is gone (logout), and a panic here is logged rather than ending the bridge (callers run it with go,
++	// outside eventHandler's recover).
++	gen := user.subscribeGen.Add(1)
++	defer func() {
++		if err := recover(); err != nil {
++			user.log.Error().
++				Bytes(zerolog.ErrorStackFieldName, debug.Stack()).
++				Any(zerolog.ErrorFieldName, err).
++				Msg("Panic while subscribing to guilds")
++		}
++	}()
++	session := user.Session
++	if session == nil || !session.IsUser {
+ 		return
+ 	}
+-	for _, guildMeta := range user.Session.State.Guilds {
++	for _, guildMeta := range session.State.Guilds {
++		if user.subscribeGen.Load() != gen || user.Session != session {
++			return
++		}
+ 		guild := user.bridge.GetGuildByID(guildMeta.ID, false)
+ 		if guild != nil && guild.MXID != "" {
+ 			user.log.Debug().Str("guild_id", guild.ID).Msg("Subscribing to guild")
+@@ -846,7 +866,7 @@ func (user *User) subscribeGuilds(delay time.Duration) {
+ 				Activities: true,
+ 				Threads:    true,
+ 			}
+-			err := user.Session.SubscribeGuild(dat)
++			err := session.SubscribeGuild(dat)
+ 			if err != nil {
+ 				user.log.Warn().Err(err).Str("guild_id", guild.ID).Msg("Failed to subscribe to guild")
+ 			}
+@@ -857,7 +877,9 @@ func (user *User) subscribeGuilds(delay time.Duration) {
  
  func (user *User) resumeHandler(_ *discordgo.Resumed) {
  	user.log.Debug().Msg("Discord connection resumed")
 -	user.subscribeGuilds(0 * time.Second)
-+	// Unichat: all guilds at once on every resume hit Discord's gateway limit (close 4008 "Rate limited"),
-+	// the bridge resumed again and subscribed again, in a loop. Same pace as on connect, off the event handler.
++	// Unichat: all guilds at once on every resume hit Discord's gateway limit (close 4008 "Rate limited"), the bridge
++	// resumed again and subscribed again, in a loop. Paced as on Ready (2 s per guild), in its own goroutine as there.
 +	go user.subscribeGuilds(2 * time.Second)
  	user.BridgeState.Send(status.BridgeState{StateEvent: status.StateConnected})
  }

@@ -115,14 +115,20 @@ public final class Manifest {
      * release for a bridge Unichat built, so a new build of the same tag (a patch changed) is installed again.
      */
     public String version(Component c, Platform p) {
-        String natives = settings.getOrDefault("NATIVES", "");
-        return official(c, p) || "tuwunel".equals(c.name()) ? c.tag() : c.tag() + "+" + natives.substring(natives.indexOf('@') + 1);
+        String natives = tagOf(settings.get("NATIVES"));
+        return official(c, p) || "tuwunel".equals(c.name()) || natives == null ? c.tag() : c.tag() + "+" + natives;
     }
 
     private static String url(String release) {
-        if (release == null || release.indexOf('@') < 1) return null;
-        int at = release.indexOf('@');
-        return "https://github.com/" + release.substring(0, at) + "/releases/download/" + release.substring(at + 1);
+        String tag = tagOf(release);
+        return tag == null ? null
+                : "https://github.com/" + release.substring(0, release.indexOf('@')) + "/releases/download/" + tag;
+    }
+
+    /** The tag of a release written {@code <owner/repo>@<tag>}, or null when it isn't written so. */
+    private static String tagOf(String release) {
+        int at = release == null ? -1 : release.indexOf('@');
+        return at < 1 || at == release.length() - 1 ? null : release.substring(at + 1);
     }
 
     /**

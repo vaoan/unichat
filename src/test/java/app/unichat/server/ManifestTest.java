@@ -100,6 +100,9 @@ class ManifestTest {
         assertEquals("v0.2610.0+natives-2", m.version(m.bridge("whatsapp"), Platform.WINDOWS_AMD64));
         Manifest next = Manifest.parse(versions.replace("natives-2", "natives-3"));
         assertFalse(next.version(next.bridge("discord"), Platform.MAC_ARM64).equals(m.version(m.bridge("discord"), Platform.MAC_ARM64)));
+        Manifest none = Manifest.parse("discord=mautrix/discord@v0.7.7:mautrix-discord\nNATIVES_ALL=discord\n");
+        assertEquals("v0.7.7", none.version(none.bridge("discord"), Platform.MAC_ARM64), "no natives release: no \"v0.7.7+\"");
+        assertNull(none.releaseUrl(none.bridge("discord"), Platform.MAC_ARM64));
         Manifest server = Manifest.parse("TUWUNEL_VERSION=v1.9.4\nNATIVES=vaoan/unichat@natives-2\n");
         assertEquals("v1.9.4", server.version(server.tuwunel(), Platform.MAC_ARM64),
                 "the homeserver keeps its version, as the copy from the package writes it");

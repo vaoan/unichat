@@ -118,7 +118,7 @@ registration only with a secret token, and reads the bridges' registrations from
 |---|---|---|---|
 | tuwunel server | ✅ built by `natives.yml` (no changes, ~26 min) | ✅ built by `natives.yml`, without the Linux features (`--no-default-features` without `jemalloc`/`io_uring`/`systemd`; ~82 min, a 123 MB `tuwunel.exe`) | ❌ out of scope |
 | Go bridges (WhatsApp, Telegram, Meta, Slack, Google Messages, LinkedIn) | ✅ official binaries | ✅ built by `natives.yml` from Linux (`go build -tags goolm`, cgo with MinGW; there are no official binaries) | ❌ |
-| X, Discord (`NATIVES_ALL`) | ✅ built by `natives.yml` on `macos-15` (`-tags goolm`, cgo; Discord `goolm,nocrypto`), with their patches | ✅ built by `natives.yml` from Linux, with their patches | ❌ |
+| X, Discord (`NATIVES_ALL`) | ✅ built by `natives.yml` on `macos-15` (`-tags goolm`, cgo; Discord `goolm,nocrypto`; for macOS 13.3, `MACOSX_DEPLOYMENT_TARGET`, checked by `native/check-macos-min.sh`), with their patches | ✅ built by `natives.yml` from Linux, with their patches | ❌ |
 | Signal | ✅ official binary | ❌ the Rust part builds; linking with Go fails (pending; `NATIVES_UNBUILT`, Unichat doesn't offer it) | ❌ |
 
 - **Mac Intel is left out**: GitHub retired its `macos-13` machines (Dec-2025) and will remove the remaining Intel ones in
@@ -141,7 +141,7 @@ of each file, which the bridges' AGPL asks for):
   `<tag>+<natives tag>` (`Manifest.version`), so a new build of the same tag replaces the old one, and mautrix's own.
   Today: X at the head of mautrix/twitter PR #257 (XChat per-message keys), and Discord v0.7.7 with
   `resume-subscribe-pace.patch` (on each resume it subscribed to every guild at once and Discord rate-limited it in a
-  loop). Back to the official build: drop it from `NATIVES_ALL` (and its patches) once a release has the fix.
+  loop; now 2 s per guild, one pass at a time). Back to the official build: drop it from `NATIVES_ALL` (and its patches) once a release has the fix.
 
 To update a bridge or tuwunel: change its version in `versions.env`, bump `NATIVES` (`natives-2`…) and push to
 `main`; the workflow only runs if that release doesn't exist. Once it has published, run `native/pin-hashes.sh`
