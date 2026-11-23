@@ -10,6 +10,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 /** What the cloud is doing, in words: Ajustes → Nube says it in a line, the tray's menu in a few. Pure. */
 public final class CloudTexts {
@@ -31,7 +32,8 @@ public final class CloudTexts {
         String files = I18n.n("settings.cloud.uploaded", s.uploaded()) + (s.waiting() > 0 ? " · " + I18n.n("settings.cloud.waiting", s.waiting()) : "")
                 + retrying(s) + (s.conflicts() > 0 ? " · " + I18n.n("settings.cloud.conflicts", s.conflicts()) : "")
                 + (s.lastVerified() != null ? " · " + I18n.t("settings.cloud.verified", when(s.lastVerified(), now)) : "");
-        String vault = vaultLines(s, now).stream().map(l -> "\n" + l).collect(java.util.stream.Collectors.joining());
+        String vault = Stream.concat(paused(s).stream(), vaultLines(s, now).stream()).map(l -> "\n" + l)
+                .collect(java.util.stream.Collectors.joining());
         if (s.error() != null) return I18n.t("settings.cloud.error", s.error()) + "\n" + when + " · " + files + vault;
         return I18n.t("settings.cloud.ok") + " · " + when + " · " + files + vault;
     }
@@ -66,6 +68,11 @@ public final class CloudTexts {
         return out;
     }
 
+    /** That the last round left the photos and videos waiting because nobody could see Unichat; none otherwise. */
+    private static List<String> paused(Cloud.Status s) {
+        return s.connected() && s.mediaPaused() ? List.of(I18n.t("cloud.media.pausedUnseen")) : List.of();
+    }
+
     /**
      * A computer's name in the vault as shown anywhere: from the account, so one plain line of at most 64 characters
      * ({@link app.unichat.cloud.VaultView#label}); words for one that has none.
@@ -97,6 +104,7 @@ public final class CloudTexts {
             out.add((s.waiting() > 0 ? I18n.n("settings.cloud.waiting", s.waiting()) : "") + (s.waiting() > 0 ? retrying(s) : retrying(s).substring(3)));
         }
         if (s.conflicts() > 0) out.add(I18n.n("settings.cloud.conflicts", s.conflicts()));
+        out.addAll(paused(s));
         out.addAll(vaultLines(s, now));
         return out;
     }

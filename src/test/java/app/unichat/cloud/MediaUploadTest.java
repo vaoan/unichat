@@ -97,7 +97,7 @@ class MediaUploadTest {
     void aFileMadeFromWhatTheCloudHasAlreadyDoesntGoUp() throws Exception {
         Account acc = new Account();
         Path c = chat("a.jpg", "Chat (WhatsApp) 3f2a9c1b2d4e.txt");
-        assertEquals(1, uploader(c).run(acc, (d, t, n) -> { }));
+        assertEquals(1, uploader(c).run(acc, (d, t, n) -> { }, () -> true));
         assertEquals(java.util.Set.of(remote("a.jpg")), acc.files.keySet(), "the texts' copy stays here: it grows, and its source goes up");
     }
 
@@ -107,23 +107,55 @@ class MediaUploadTest {
         Path c = chat("a.jpg", "b.jpg", "c.jpg");
         acc.failing.add("b.jpg");
         MediaUpload up = uploader(c);
-        assertEquals(2, up.run(acc, (d, t, n) -> { }), "a and c went up though b failed");
+        assertEquals(2, up.run(acc, (d, t, n) -> { }, () -> true), "a and c went up though b failed");
         assertEquals(1, up.retrying());
         assertEquals(now.plus(Duration.ofMinutes(1)), up.nextRetry(), "first wait: a minute");
 
-        assertEquals(0, up.run(acc, (d, t, n) -> { }), "not yet its turn");
+        assertEquals(0, up.run(acc, (d, t, n) -> { }, () -> true), "not yet its turn");
         for (int i = 0; i < 10; i++) {
             now = up.nextRetry();
-            up.run(acc, (d, t, n) -> { });
+            up.run(acc, (d, t, n) -> { }, () -> true);
         }
         assertEquals(1, up.retrying(), "still trying, never given up");
         assertEquals(now.plus(MediaUpload.LONGEST_WAIT), up.nextRetry(), "the wait stops growing at an hour");
 
         acc.failing.clear();
         now = up.nextRetry();
-        assertEquals(1, up.run(acc, (d, t, n) -> { }));
+        assertEquals(1, up.run(acc, (d, t, n) -> { }, () -> true));
         assertEquals(0, up.retrying());
         assertEquals(0, up.waiting(), "all of it is there");
+    }
+
+    /** Yes {@code times} times, then no: a "may go on" that changes its mind as the files go. */
+    private static java.util.function.BooleanSupplier yes(int times) {
+        int[] left = {times};
+        return () -> left[0]-- > 0;
+    }
+
+    @Test
+    void itAsksBeforeEachFileAndTheRestWaitForTheNextRound() throws Exception {
+        Account acc = new Account();
+        Path c = chat("a.jpg", "b.jpg", "c.jpg");
+        MediaUpload up = uploader(c);
+        assertEquals(0, up.run(acc, (d, t, n) -> { }, yes(0)), "no from the start: nothing goes");
+        assertEquals(1, up.run(acc, (d, t, n) -> { }, yes(1)), "the first went, then no");
+        assertEquals(java.util.Set.of(remote("a.jpg")), acc.files.keySet());
+        assertEquals(2, up.waiting(), "the rest wait, nothing given up");
+        assertEquals(0, up.retrying(), "and none counts as failed");
+        assertEquals(2, up.run(acc, (d, t, n) -> { }, () -> true));
+    }
+
+    @Test
+    void theCheckAsksBeforeEachFileToo() throws Exception {
+        Account acc = new Account();
+        Path c = chat("a.jpg", "b.jpg");
+        MediaUpload up = uploader(c);
+        up.run(acc, (d, t, n) -> { }, () -> true);
+        acc.files.put(remote("a.jpg"), "co".getBytes(StandardCharsets.UTF_8));
+        acc.files.put(remote("b.jpg"), "co".getBytes(StandardCharsets.UTF_8));
+        assertEquals(1, up.verify(acc, (d, t, n) -> { }, yes(1)), "the first repaired, then no");
+        assertEquals("co", new String(acc.files.get(remote("b.jpg")), StandardCharsets.UTF_8), "the second waits");
+        assertEquals(1, up.verify(acc, (d, t, n) -> { }, () -> true));
     }
 
     @Test
@@ -132,11 +164,11 @@ class MediaUploadTest {
         Path c = chat("video.mp4");
         acc.damaging.add("video.mp4");
         MediaUpload up = uploader(c);
-        assertEquals(0, up.run(acc, (d, t, n) -> { }));
+        assertEquals(0, up.run(acc, (d, t, n) -> { }, () -> true));
         assertEquals(1, up.retrying(), "the copy there didn't match: not counted, tried again");
         acc.damaging.clear();
         now = up.nextRetry();
-        assertEquals(1, up.run(acc, (d, t, n) -> { }));
+        assertEquals(1, up.run(acc, (d, t, n) -> { }, () -> true));
         assertArrayEquals(Files.readAllBytes(c.resolve("video.mp4")), acc.files.get(remote("video.mp4")));
     }
 
@@ -145,7 +177,7 @@ class MediaUploadTest {
         Account acc = new Account();
         Path c = chat("cortado-aqui.jpg", "cortado-alla.jpg", "distinto.jpg", "borrado.jpg");
         MediaUpload up = uploader(c);
-        up.run(acc, (d, t, n) -> { });
+        up.run(acc, (d, t, n) -> { }, () -> true);
         byte[] whole = acc.files.get(remote("cortado-aqui.jpg")).clone();
 
         // Here cut short (damaged here): it comes back from there, which is never touched.
@@ -159,7 +191,7 @@ class MediaUploadTest {
         // Deleted here: stays there (an archive).
         Files.delete(c.resolve("borrado.jpg"));
 
-        int repaired = up.verify(acc, (d, t, n) -> { });
+        int repaired = up.verify(acc, (d, t, n) -> { }, () -> true);
         assertEquals(1, repaired, "one went back up");
         assertArrayEquals(whole, Files.readAllBytes(c.resolve("cortado-aqui.jpg")), "restored here");
         assertArrayEquals(whole, acc.files.get(remote("cortado-aqui.jpg")), "and there untouched");

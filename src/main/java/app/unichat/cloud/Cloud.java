@@ -4,6 +4,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 import app.unichat.support.SafeFile;
+import app.unichat.support.Seen;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -41,11 +42,21 @@ public final class Cloud {
      */
     public enum VaultState { NONE, LOCKED, DECLINED, OPEN, REMOVED, UNRECOGNIZED, MISSING }
 
-    /** For the settings page: connected or not, when the last round worked, why the last one didn't, what went up. */
+    /**
+     * For the settings page: connected or not, when the last round worked, why the last one didn't, what went up, and
+     * whether the last round left media waiting because nobody could see Unichat ({@link Seen}).
+     */
     public record Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
                          int retrying, Instant nextRetry, int conflicts, Instant lastVerified, VaultState vault, Moving moving,
-                         Notice vaultNotice) {
+                         Notice vaultNotice, boolean mediaPaused) {
         static final Status OFF = new Status(false, null, null, 0, 0);
+
+        public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
+                      int retrying, Instant nextRetry, int conflicts, Instant lastVerified, VaultState vault, Moving moving,
+                      Notice vaultNotice) {
+            this(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts, lastVerified, vault, moving,
+                vaultNotice, false);
+        }
 
         public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting) {
             this(connected, lastSync, error, uploaded, waiting, null, 0, null, 0, null);
@@ -58,13 +69,13 @@ public final class Cloud {
 
         Status doing(Activity a) {
             return new Status(connected, lastSync, error, uploaded, waiting, a, retrying, nextRetry, conflicts, lastVerified, vault, moving,
-                vaultNotice);
+                vaultNotice, mediaPaused);
         }
 
         /** The same, saying the vault's state is {@code v}; another state than this one's drops its notice, as a round does. */
         Status vault(VaultState v) {
             return v == vault ? this : new Status(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts,
-                lastVerified, v, moving, null);
+                lastVerified, v, moving, null, mediaPaused);
         }
     }
 
@@ -183,6 +194,11 @@ public final class Cloud {
         return t;
     });
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
+    /** A round asked by being seen again and not started yet: being seen again meanwhile joins it. */
+    private final java.util.concurrent.atomic.AtomicBoolean seenRoundQueued = new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.function.Consumer<Boolean> onSeen = seen -> {
+        if (seen) seenAgain();
+    };
     private ScheduledExecutorService timer;
     /** A round and a vault job both tell it: what changes a part of it does so in one step ({@code updateAndGet}). */
     private final java.util.concurrent.atomic.AtomicReference<Status> status = new java.util.concurrent.atomic.AtomicReference<>(Status.OFF);
@@ -279,9 +295,13 @@ public final class Cloud {
 
     public void removeListener(Runnable r) { listeners.remove(r); }
 
-    /** A round every {@code every} from now; a round also right after anything is saved ({@link #syncNow}). */
+    /**
+     * A round every {@code every} from now; a round also right after anything is saved ({@link #syncNow}), and one when
+     * Unichat is seen again, for the media that waited ({@link #seenAgain}).
+     */
     public synchronized void start(Duration every) {
         if (timer != null) return;
+        Seen.get().addListener(onSeen);
         timer = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "cloud-timer");
             t.setDaemon(true);
@@ -291,8 +311,25 @@ public final class Cloud {
     }
 
     public synchronized void stop() {
+        Seen.get().removeListener(onSeen);
         if (timer != null) timer.shutdownNow();
         timer = null;
+    }
+
+    /**
+     * Seen again: one round on the cloud's thread, for the media that waited. Called under {@code Seen}'s lock, so it takes
+     * none: a flag says one is queued and not started, and more asks meanwhile join it (at most one behind a running round).
+     */
+    private void seenAgain() {
+        if (!seenRoundQueued.compareAndSet(false, true)) return;
+        worker.execute(() -> {
+            seenRoundQueued.set(false);
+            try {
+                round();
+            } catch (RuntimeException e) {
+                System.err.println("Cloud: the round on being seen: " + Errors.message(e)); // the next round tries again
+            }
+        });
     }
 
     /** One round with the account; its result once done. */
@@ -314,22 +351,40 @@ public final class Cloud {
         try {
             pass = vaultPass(dav, now);
         } catch (IOException | RuntimeException e) {
-            return publish(finished(status().lastSync(), Errors.message(e), status().vault(), null));
+            return publish(finished(status().lastSync(), Errors.message(e), status().vault(), null, false));
         }
+        boolean waited;
         try {
-            if (CloudAccount.media()) {
-                uploaded += media.run(dav, progressOf(Step.UPLOADING));
-                if (verifyNext || verifyDue(now)) {
-                    verifyNext = false;
-                    uploaded += media.verify(dav, progressOf(Step.VERIFYING));
-                    Settings.get().set("cloud.lastVerify", now.toString());
-                }
-            }
+            waited = media(dav, now);
         } catch (IOException | RuntimeException e) {
-            return publish(finished(status().lastSync(), Errors.message(e), vaultAfter(dav, pass), null));
+            return publish(finished(status().lastSync(), Errors.message(e), vaultAfter(dav, pass), null, false));
         }
         VaultState vault = vaultAfter(dav, pass);
-        return publish(finished(now, pass.textsFailed(), vault, vault == pass.state() ? pass.notice() : null));
+        return publish(finished(now, pass.textsFailed(), vault, vault == pass.state() ? pass.notice() : null, waited));
+    }
+
+    /**
+     * Media's turn, by its switch: what's saved goes up, then the day's check when due. Each asks before each file whether
+     * anyone can see Unichat ({@link Seen}): nobody, and the rest waits for a round once seen again, and a check cut short
+     * or not begun stays due. Whether media waited so.
+     */
+    private boolean media(Storage dav, Instant now) throws IOException {
+        if (!CloudAccount.media()) return false;
+        java.util.function.BooleanSupplier seen = Seen.get()::now;
+        boolean[] waited = {false};
+        java.util.function.BooleanSupplier mayGoOn = () -> {
+            if (seen.getAsBoolean()) return true;
+            waited[0] = true;
+            return false;
+        };
+        if (!mayGoOn.getAsBoolean()) return true;
+        uploaded += media.run(dav, progressOf(Step.UPLOADING), mayGoOn);
+        if (waited[0] || !(verifyNext || verifyDue(now))) return waited[0];
+        uploaded += media.verify(dav, progressOf(Step.VERIFYING), mayGoOn);
+        if (waited[0]) return true;
+        verifyNext = false;
+        Settings.get().set("cloud.lastVerify", now.toString());
+        return false;
     }
 
     /** What a round's vault part found: the state, why the texts or the move failed (or null), and what the vault left. */
@@ -570,7 +625,7 @@ public final class Cloud {
         return last == null || Instant.parse(last).plus(VERIFY_EVERY).isBefore(now);
     }
 
-    private Status finished(Instant lastSync, String error, VaultState vault, Notice vaultNotice) {
+    private Status finished(Instant lastSync, String error, VaultState vault, Notice vaultNotice, boolean mediaPaused) {
         int waiting;
         try {
             waiting = media.waiting();
@@ -579,7 +634,7 @@ public final class Cloud {
         }
         String verified = Settings.get().getString("cloud.lastVerify", null);
         return new Status(true, lastSync, error, uploaded, waiting, null, media.retrying(), media.nextRetry(), media.conflicts(),
-                verified == null ? null : Instant.parse(verified), vault, moving, vaultNotice);
+                verified == null ? null : Instant.parse(verified), vault, moving, vaultNotice, mediaPaused);
     }
 
     /** Checks everything uploaded against the account now, repairing what differs, then the usual round. */

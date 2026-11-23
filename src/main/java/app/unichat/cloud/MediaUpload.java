@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -63,8 +64,12 @@ final class MediaUpload {
         this.clock = clock;
     }
 
-    /** Uploads what's missing and due; how many went up. A failure waits its turn; the rest go on. */
-    int run(Storage dav, Progress progress) throws IOException {
+    /**
+     * Uploads what's missing and due; how many went up. A failure waits its turn; the rest go on. {@code mayGoOn} is
+     * asked before each file: no, and the rest wait for the next round (the file going finishes: stopping mid-file would
+     * throw away what was sent).
+     */
+    int run(Storage dav, Progress progress, BooleanSupplier mayGoOn) throws IOException {
         load();
         Map<String, Path> due = new LinkedHashMap<>();
         Instant now = clock.get();
@@ -76,6 +81,7 @@ final class MediaUpload {
         }
         int sent = 0, index = 0;
         for (Map.Entry<String, Path> e : due.entrySet()) {
+            if (!mayGoOn.getAsBoolean()) break;
             progress.uploading(index++, due.size(), e.getValue().getFileName().toString());
             try {
                 if (settle(dav, e.getKey(), e.getValue(), progress)) sent++;
@@ -90,9 +96,10 @@ final class MediaUpload {
 
     /**
      * Checks everything that went up whose file is still here, and repairs what differs; how many were repaired. A
-     * file deleted here stays in the account (it's an archive).
+     * file deleted here stays in the account (it's an archive). {@code mayGoOn} is asked before each file, as in
+     * {@link #run}.
      */
-    int verify(Storage dav, Progress progress) throws IOException {
+    int verify(Storage dav, Progress progress, BooleanSupplier mayGoOn) throws IOException {
         load();
         Map<String, Path> here = new LinkedHashMap<>();
         for (Path folder : folders.get()) {
@@ -104,6 +111,7 @@ final class MediaUpload {
         }
         int repaired = 0, index = 0;
         for (Map.Entry<String, Path> e : here.entrySet()) {
+            if (!mayGoOn.getAsBoolean()) break;
             progress.uploading(index++, here.size(), e.getValue().getFileName().toString());
             try {
                 if (settle(dav, e.getKey(), e.getValue(), progress)) repaired++;

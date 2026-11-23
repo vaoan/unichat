@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** What the cloud is doing, in words for the tray's menu and the gear, and how far for their ring. */
@@ -43,6 +44,19 @@ class CloudTextsTest {
         assertTrue(lines.get(1).startsWith("3 esperando · 2 reintentando"), lines.toString());
         assertEquals(3, lines.size(), "and the one that differs: " + lines);
         assertEquals(List.of(), CloudTexts.menuLines(new Cloud.Status(false, null, null, 0, 0), NOW), "no account: nothing in the menu");
+    }
+
+    @Test
+    void mediaWaitingForBeingSeenIsSaidInTheTrayAndInNube() {
+        String line = "Las fotos y videos esperan mientras la ventana de Unichat está cerrada";
+        Cloud.Status paused = new Cloud.Status(true, NOW, null, 0, 2, null, 0, null, 0, null, Cloud.VaultState.LOCKED, null, null, true);
+        List<String> lines = CloudTexts.menuLines(paused, NOW);
+        assertTrue(lines.contains(line), "the tray: " + lines);
+        assertTrue(lines.indexOf(line) < lines.indexOf("Bóveda: no está abierta en este equipo, no sube nada personal."), "before the vault's: " + lines);
+        assertTrue(CloudTexts.status(paused, NOW).contains("\n" + line), "Ajustes → Nube");
+        Cloud.Status going = new Cloud.Status(true, NOW, null, 0, 2, null, 0, null, 0, null, Cloud.VaultState.NONE, null, null, false);
+        assertFalse(CloudTexts.menuLines(going, NOW).contains(line), "not paused: not said");
+        assertFalse(CloudTexts.status(going, NOW).contains(line));
     }
 
     private static Cloud.Status vault(Cloud.VaultState state, Cloud.Moving moving, Cloud.Notice notice) {
