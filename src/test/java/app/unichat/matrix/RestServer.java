@@ -48,6 +48,8 @@ final class RestServer implements AutoCloseable {
     final Map<String, String> tags = new ConcurrentHashMap<>();
     /** Events the first live sync answered after a catch-up brings (newer than it). */
     final Map<String, List<String>> liveAfterCatchUp = new ConcurrentHashMap<>();
+    /** The server keeps no filter for a sync: every id it's given is unknown (its database wiped over and over). */
+    volatile boolean forgetEveryFilter;
     /** Catch-up syncs fail (the server busy). */
     volatile boolean failCatchUps;
     /** The server refuses to keep filters. */
@@ -152,13 +154,14 @@ final class RestServer implements AutoCloseable {
         String filter = q.getOrDefault("filter", "");
         boolean since = q.containsKey("since");
         JsonNode posted = filter.startsWith("{") ? MatrixClient.JSON.readTree(filter) : filters.get(filter);
+        if (forgetEveryFilter && !filter.startsWith("{")) posted = null;
         if (posted == null && !filter.isEmpty()) {
             log.add("unknown filter " + filter);
             answer(ex, 404, "{\"errcode\":\"M_NOT_FOUND\",\"error\":\"No such filter\"}");
             return;
         }
         if (posted != null && posted.path("room").has("rooms")) {
-            if (isTags(posted)) tags(ex, posted.path("room").get("rooms"));
+            if (isTags(posted)) tags(ex, posted.path("room").get("rooms"), q.get("since"));
             else catchUp(ex, posted.path("room").get("rooms"));
             return;
         }
@@ -190,8 +193,8 @@ final class RestServer implements AutoCloseable {
     }
 
     /** Resting rooms' account data, as {@link #tags} has it. */
-    private void tags(HttpExchange ex, JsonNode rooms) throws IOException {
-        log.add("tags " + names(rooms));
+    private void tags(HttpExchange ex, JsonNode rooms, String since) throws IOException {
+        log.add("tags " + names(rooms) + (since == null ? "" : " since=" + since));
         ObjectNode join = MatrixClient.JSON.createObjectNode();
         for (JsonNode r : rooms) {
             String t = tags.get(r.asText());

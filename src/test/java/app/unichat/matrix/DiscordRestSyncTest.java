@@ -155,4 +155,20 @@ class DiscordRestSyncTest {
                 .anyMatch(l -> l.startsWith("sync f") && l.endsWith("timeout=30000")));
         assertEquals(List.of(), pauses, "no backoff, no \"no connection\"");
     }
+
+    @Test
+    void aFilterForgottenAgainAtOnceGoesToTheBackoff() throws Exception {
+        java.util.concurrent.CountDownLatch paused = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch never = new java.util.concurrent.CountDownLatch(1);
+        svc.pauseRetriesWith(ms -> {
+            paused.countDown();
+            never.await(); // the test ends here: what matters is how many tries came before it
+        });
+        server.forgetEveryFilter = true;
+        svc.setArchived("!s:x", true).get();
+        paused.await();
+        long unknown = server.log.stream().filter(l -> l.startsWith("unknown filter")).count();
+        assertTrue(unknown <= 2, "forgotten once and posted again, then the backoff: " + server.log);
+        never.countDown();
+    }
 }

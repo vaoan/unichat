@@ -68,6 +68,12 @@ final class ArchiveRest {
     private volatile Waking waking;
     private volatile Runnable wakeLoop = () -> { };
     private volatile Supplier<Instant> clock = Instant::now;
+    /** How long a catch-up or tags sync may take: they hold the sync thread, so not a full sync's minutes. */
+    private volatile Duration sideTimeout = Duration.ofSeconds(30);
+    /** Where the main sync is ({@code next_batch}): rooms that start resting have their tags asked from there. */
+    private final Supplier<String> mainSince;
+    /** The rooms that rest but for the chat open in the window; published for {@link #setOpenChat}. */
+    private volatile Set<String> restable = Set.of();
     /** Asks made, and those waiting for a round that has seen them; guarded by this. */
     private long asked;
     private final List<Waiter> waiters = new ArrayList<>();
@@ -88,7 +94,8 @@ final class ArchiveRest {
     private record Waiter(long ask, CompletableFuture<Void> done) {}
 
     ArchiveRest(MatrixCore core, SyncFilter filter, DiscordServers discord,
-                BiConsumer<SyncProcessor.Result, Collection<String>> caughtUp) {
+                BiConsumer<SyncProcessor.Result, Collection<String>> caughtUp, Supplier<String> mainSince) {
+        this.mainSince = mainSince;
         this.core = core;
         this.proc = core.proc;
         this.filter = filter;
@@ -102,6 +109,9 @@ final class ArchiveRest {
 
     /** Tests move time on to a retry, instead of waiting for it. */
     void useClock(Supplier<Instant> c) { clock = c; }
+
+    /** Tests give a catch-up no time at all, to see what follows a server that doesn't answer. */
+    void useTimeout(Duration d) { sideTimeout = d; }
 
     void start() { Settings.get().addListener(onSetting); }
 
@@ -124,8 +134,12 @@ final class ArchiveRest {
 
     /** The chat shown in the window: it never rests, or its new messages wouldn't come (opened from a search, a folder). */
     CompletableFuture<Void> setOpenChat(String chatId) {
+        String before = openChat;
         openChat = chatId;
-        return update();
+        // Only a chat that rests, or rested until now, changes anything: any other mustn't drop the long poll.
+        Set<String> r = restable;
+        boolean matters = chatId != null && r.contains(chatId) || before != null && r.contains(before);
+        return matters ? update() : CompletableFuture.completedFuture(null);
     }
 
     /** A chat opened in Archivados: an archived server, or a channel inside one, brings everything again until leaving. */
@@ -216,6 +230,11 @@ final class ArchiveRest {
                 excludeKnown(target);
             }
             for (String r : resting) if (!target.contains(r)) owed.add(r);
+            // Their tags from the point the main sync stops bringing them, or a change between the two is never heard.
+            if (!resting.containsAll(target)) {
+                tagsSince = mainSince.get();
+                if (tagsDue == null) tagsDue = now.plus(TAGS_EVERY);
+            }
             resting = target;
         }
         owed.removeAll(resting);
@@ -264,6 +283,10 @@ final class ArchiveRest {
                 if (owed.isEmpty()) catching = false;
                 showLocked(new Waking(owed.isEmpty() ? Step.DONE : Step.CHATS, partsDone, partsTotal));
             }
+        } catch (java.io.InterruptedIOException e) {
+            // The computer woke (MatrixChatService.wake): not a failure. The request after this takes the interrupt,
+            // and the next round goes on where this part was.
+            Thread.currentThread().interrupt();
         } catch (IOException | RuntimeException e) {
             System.err.println("Discord rest: catching up failed, tried again later: " + e);
             catchUpRetry = Retry.after(catchUpRetry, now);
@@ -338,13 +361,13 @@ final class ArchiveRest {
         }
         if (id != null) {
             try {
-                return core.client.request("GET", CLIENT + "/sync?filter=" + enc(id) + tail, null, Duration.ofSeconds(180));
+                return core.client.request("GET", CLIENT + "/sync?filter=" + enc(id) + tail, null, sideTimeout);
             } catch (MatrixException e) {
                 if (!SyncFilter.unknown(e)) throw e;
                 filter.forget(id);
             }
         }
-        return core.client.request("GET", CLIENT + "/sync?filter=" + enc(f.toString()) + tail, null, Duration.ofSeconds(180));
+        return core.client.request("GET", CLIENT + "/sync?filter=" + enc(f.toString()) + tail, null, sideTimeout);
     }
 
     /** "Reactivando <server>…" while a server comes back; once back, "Al día" unless a catch-up is still going. */
@@ -373,15 +396,20 @@ final class ArchiveRest {
      * window. None while the archive is open or archived chats notify. Caller holds the processor's lock.
      */
     private Set<String> restingRooms() {
-        if (archiveOpen || Settings.get().notifyArchived()) return Set.of();
+        if (archiveOpen || Settings.get().notifyArchived()) {
+            restable = Set.of();
+            return Set.of();
+        }
         Map<String, String> inServer = discord.serverSpaces();
         Set<String> out = new HashSet<>();
         for (MatrixRoom r : proc.rooms()) {
             if (r.chat.archived() && inServer.containsKey(r.id) && r.chat.network() == Network.DISCORD && !r.chat.bridgeBot()
-                    && !r.invite && !r.id.equals(openChat)) {
+                    && !r.invite) {
                 out.add(r.id);
             }
         }
+        restable = Set.copyOf(out);
+        out.remove(openChat);
         return out;
     }
 }

@@ -112,7 +112,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         this.discord = new DiscordServers(core, bots, this::accounts);
         this.bridges = new BridgeAccounts(core, bots, discord);
         this.syncFilter = new SyncFilter(client, userId);
-        this.rest = new ArchiveRest(core, syncFilter, discord, this::caughtUp);
+        this.rest = new ArchiveRest(core, syncFilter, discord, this::caughtUp, () -> nextBatch);
         rest.onWake(this::dropLongPoll);
         discord.onConnected(rest::archivedChanged);
         this.chatActions = new ChatActions(core, this, discord, prefs, rest::archivedChanged);
@@ -281,7 +281,11 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 } catch (MatrixException e) {
                     if (!filterParam.equals(SyncFilter.BASE) && SyncFilter.unknown(e)) {
                         rest.filterForgotten(filterParam); // the server's database was wiped: post it again
-                        continue;
+                        // Once at once; a fresh id refused too waits its turn (the backoff), never a loop of posts.
+                        if (!forgotJustNow) {
+                            forgotJustNow = true;
+                            continue;
+                        }
                     }
                     if (catchUp && sinceRejected(e)) {
                         // The cached token was rejected (expired/purged): fall back to a full sync. A busy or
@@ -298,6 +302,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                     dropped = pollEnded();
                 }
                 if (!core.running) return;
+                forgotJustNow = false;
                 // Missed messages during the catch-up don't notify, like the initial sync.
                 boolean live = core.initialSyncDone && !catchUp;
                 SyncProcessor.Result r;
@@ -346,6 +351,8 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private boolean longPolling;
     /** A long poll was dropped for a new filter, its interrupt not yet spent; guarded by {@link #pollLock}. */
     private boolean refiltered;
+    /** A filter id the server didn't know was forgotten, and no request has worked since (sync thread only). */
+    private boolean forgotJustNow;
     /** The last request ended so (sync thread only). */
     private boolean dropped;
 

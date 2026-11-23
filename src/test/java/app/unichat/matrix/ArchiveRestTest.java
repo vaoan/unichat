@@ -42,6 +42,9 @@ class ArchiveRestTest {
     private final ExecutorService loop = Executors.newSingleThreadExecutor();
     private final List<String> steps = new CopyOnWriteArrayList<>();
     private boolean discordConnected = true;
+    /** Each time the sync loop was asked to go round (its long poll dropped). */
+    private final AtomicInteger wakes = new AtomicInteger();
+    private volatile Thread loopThread;
     private volatile java.time.Instant now = java.time.Instant.parse("2026-11-23T12:00:00Z");
     private MatrixClient client;
     private RestServer server;
@@ -64,8 +67,11 @@ class ArchiveRestTest {
         DiscordServers discord = new DiscordServers(core, bots, () -> discordConnected
                 ? List.of(new Account(Network.DISCORD, "me", AccountStatus.CONNECTED, "")) : List.of());
         filter = new SyncFilter(client, ME);
-        rest = new ArchiveRest(core, filter, discord, (r, rooms) -> { });
-        rest.onWake(() -> loop.execute(this::round));
+        rest = new ArchiveRest(core, filter, discord, (r, rooms) -> { }, () -> "main-7");
+        rest.onWake(() -> {
+            wakes.incrementAndGet();
+            loop.execute(this::round);
+        });
         rest.useClock(() -> now);
         rest.addListener(() -> {
             Waking w = rest.waking();
@@ -86,9 +92,11 @@ class ArchiveRestTest {
 
     /** The sync loop's turn: what rests and a part of the catch-up, then its request; again while more is left. */
     private void round() {
+        loopThread = Thread.currentThread();
         boolean more;
         do {
             more = rest.beforeRequest();
+            Thread.interrupted(); // the request after it takes a waking's interrupt, as the real loop's does
             server.log.add("request " + filter.forRequest(false));
         } while (more);
     }
@@ -212,16 +220,15 @@ class ArchiveRestTest {
         steps.clear();
 
         rest.archivedChatOpened("!c1:x").get(); // a channel inside it
-        assertEquals(List.of("bot guilds bridging-mode " + GUILD + " create-on-message"), server.log.subList(before, server.log.size()));
+        assertEquals(List.of("bot guilds bridging-mode " + GUILD + " create-on-message"), bots(before));
         assertTrue(steps.getFirst().startsWith("SERVER 0/0 ") && steps.getLast().startsWith("DONE"), steps.toString());
         rest.archivedChatOpened("!s:x").get();
         rest.archivedChatOpened("!lone:x").get(); // its server isn't archived: it brings everything already
-        assertEquals(before + 1, server.log.size(), "one command, for the one server: " + server.log);
+        assertEquals(1, bots(before).size(), "one command, for the one server: " + server.log);
 
         rest.setArchiveOpen(false).get();
-        assertEquals(List.of("bot guilds bridging-mode " + GUILD + " nothing"),
-                server.log.subList(before + 1, server.log.size()).stream().filter(l -> l.startsWith("bot ")).toList(),
-                "leaving: the one brought back brings nothing again");
+        assertEquals(List.of("bot guilds bridging-mode " + GUILD + " create-on-message", "bot guilds bridging-mode " + GUILD + " nothing"),
+                bots(before), "leaving: the one brought back brings nothing again");
     }
 
     @Test
@@ -474,6 +481,11 @@ class ArchiveRestTest {
         assertTrue(steps.stream().noneMatch(s -> s.startsWith("SERVER")), "no server woke: " + steps);
     }
 
+    /** The bot commands from {@code from} in the log on. */
+    private List<String> bots(int from) {
+        return List.copyOf(server.log).subList(from, server.log.size()).stream().filter(l -> l.startsWith("bot ")).toList();
+    }
+
     /** The id of the {@code n}th filter posted (they're numbered as the server answers them). */
     private String idOf(int n) {
         int seen = 0;
@@ -485,4 +497,63 @@ class ArchiveRestTest {
     }
 
     private static int num(String id) { return Integer.parseInt(id.substring(1)); }
+
+    @Test
+    void roomsThatStartRestingHaveTheirTagsAskedFromTheMainSyncsPoint() throws Exception {
+        everyKind();
+        rest.update().get();
+        now = now.plus(ArchiveRest.TAGS_EVERY);
+        rest.update().get();
+        assertTrue(server.log.stream().anyMatch(l -> l.startsWith("tags ") && l.endsWith("since=main-7")), server.log.toString());
+        now = now.plus(ArchiveRest.TAGS_EVERY);
+        rest.update().get();
+        assertTrue(server.log.reversed().stream().filter(l -> l.startsWith("tags ")).findFirst().orElseThrow().matches(".*since=t\\d+"),
+                "then from where the last tags sync was: " + server.log);
+        archive(true, "!open:x"); // a tag on it may change before the next tags sync, while the main sync leaves it out
+        rest.update().get();
+        now = now.plus(ArchiveRest.TAGS_EVERY);
+        rest.update().get();
+        String last = server.log.reversed().stream().filter(l -> l.startsWith("tags ")).findFirst().orElseThrow();
+        assertTrue(last.contains("!open:x") && last.endsWith("since=main-7"), "from where the main sync left it: " + last);
+    }
+
+    @Test
+    void aSideSyncThatHangsGivesUpAfterItsTimeout() throws Exception {
+        everyKind();
+        rest.update().get();
+        rest.useTimeout(java.time.Duration.ZERO);
+        server.catchUpGate = new CountDownLatch(1); // the server never answers
+        rest.setArchiveOpen(true).get();
+        assertEquals("RETRYING 0/4", steps.getLast(), "the round goes on: " + steps);
+    }
+
+    @Test
+    void openingAChatThatNeitherRestsNorRestedLeavesTheLongPollAlone() throws Exception {
+        everyKind();
+        rest.update().get();
+        int before = wakes.get();
+        rest.setOpenChat("!open:x").get();
+        rest.setOpenChat("!dm:x").get();
+        assertEquals(before, wakes.get(), "not archived, or a DM: nothing rests or wakes");
+        rest.setOpenChat("!c1:x").get();
+        assertEquals(before + 1, wakes.get(), "a resting one wakes");
+        rest.setOpenChat("!tg:x").get();
+        assertEquals(before + 2, wakes.get(), "and the one before rests again");
+    }
+
+    @Test
+    void wakingTheComputerMidCatchUpIsNoFailure() throws Exception {
+        everyKind();
+        rest.update().get();
+        server.catchUpGate = new CountDownLatch(1);
+        CompletableFuture<Void> opening = rest.setArchiveOpen(true);
+        server.changes.until("the catch-up asked", () -> !server.catchUps().isEmpty());
+        loopThread.interrupt(); // what MatrixChatService.wake does to drop what the sync thread waits on
+        server.changes.until("asked again, the clock unmoved", () -> server.catchUps().size() == 2);
+        server.catchUpGate.countDown();
+        opening.get();
+        assertTrue(steps.stream().noneMatch(st -> st.startsWith("RETRYING")), "not a failure: " + steps);
+        assertEquals("DONE 4/4", steps.getLast(), steps.toString());
+        assertEquals(2, server.catchUps().size(), server.log.toString());
+    }
 }
