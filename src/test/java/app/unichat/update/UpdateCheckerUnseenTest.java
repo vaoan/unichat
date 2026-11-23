@@ -7,7 +7,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -20,13 +19,11 @@ class UpdateCheckerUnseenTest {
 
     private final AtomicLong clock = new AtomicLong(1_900_000_000_000L);
     private final AtomicInteger calls = new AtomicInteger();
-    private volatile CompletableFuture<Void> asked = new CompletableFuture<>();
     private Consumer<Boolean> listener;
 
     private UpdateChecker checker() {
         return new UpdateChecker(clock::get, () -> {
             calls.incrementAndGet();
-            asked.complete(null);
             return ANSWER;
         });
     }
@@ -48,6 +45,8 @@ class UpdateCheckerUnseenTest {
     void missedChecksBecomeOneWhenSeen() throws Exception {
         UpdateChecker c = checker();
         listener = c.listenToSeen();
+        // A day passes during the unseen ticks (22 hours old, then 23, 24, 25): without the gate one would ask.
+        Settings.get().set(UpdateChecker.LAST_CHECK, Long.toString(clock.get() - 22 * HOUR));
         Seen.reset(false);
         for (int i = 0; i < 3; i++) {
             clock.addAndGet(HOUR);
@@ -55,8 +54,9 @@ class UpdateCheckerUnseenTest {
         }
         assertEquals(0, calls.get(), "ticks don't ask while unseen");
         Seen.reset(true);
-        asked.get();
-        c.tick().get(); // after the worker's own look: a second check would be due only if the first hadn't been counted
+        c.idle().get(); // the look queued on seen has run, and asked without any tick of ours
+        assertEquals(1, calls.get(), "the check made on seen itself");
+        c.tick().get();
         assertEquals(1, calls.get(), "exactly one check on seen");
     }
 

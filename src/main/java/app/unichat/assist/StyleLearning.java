@@ -3,11 +3,15 @@ package app.unichat.assist;
 import app.unichat.model.Message;
 import app.unichat.support.Seen;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -19,20 +23,39 @@ import java.util.function.Supplier;
 public final class StyleLearning {
     private static final StyleLearning SHARED = new StyleLearning(WritingStyle::get);
 
+    static {
+        SHARED.listenToSeen();
+    }
+
     private final Supplier<WritingStyle> store;
     private boolean running;
     private Job next;
+    /** Released requests of other chats waiting their turn: none is folded into another. */
+    private final Deque<Job> backlog = new ArrayDeque<>();
+    private final Executor starter;
     /** Requests made while unseen, the newest per chat; its future is the one every earlier request got. */
     private final Map<String, Job> held = new LinkedHashMap<>();
 
     private record Job(String chatId, List<Message> chat, StyleLearner.Program program, CompletableFuture<Void> done) {}
 
     StyleLearning(Supplier<WritingStyle> store) {
+        this(store, r -> Thread.ofVirtual().name("learn-style").start(r));
+    }
+
+    /** {@code starter} runs each learning; tests give their own to see when one starts. */
+    StyleLearning(Supplier<WritingStyle> store, Executor starter) {
         this.store = store;
+        this.starter = starter;
+    }
+
+    /** Held requests go when seen again. Only the shared one listens; a test's own removes the result when done. */
+    Consumer<Boolean> listenToSeen() {
         // Called under Seen's lock: only hands over to a thread of its own.
-        Seen.get().addListener(seen -> {
+        Consumer<Boolean> l = seen -> {
             if (seen) Thread.ofVirtual().name("learn-style-held").start(this::releaseHeld);
-        });
+        };
+        Seen.get().addListener(l);
+        return l;
     }
 
     /** The one every composer uses. */
@@ -63,10 +86,11 @@ public final class StyleLearning {
         return job.done();
     }
 
-    /** Seen again: each held request goes in as if made now, and its future completes with the run that covers it. */
-    private void releaseHeld() {
+    /** Seen again: each held request goes in as if made now, and its future completes with its own run. */
+    void releaseHeld() {
         List<Job> jobs;
         synchronized (this) {
+            if (!Seen.get().now()) return; // seen and unseen again before this ran: they stay held
             jobs = new ArrayList<>(held.values());
             held.clear();
         }
@@ -76,13 +100,7 @@ public final class StyleLearning {
     private void submit(Job j) {
         synchronized (this) {
             if (running) {
-                if (next == null) {
-                    next = j;
-                } else {
-                    CompletableFuture<Void> shared = next.done();
-                    shared.whenComplete((v, e) -> j.done().complete(null));
-                    next = new Job(j.chatId(), j.chat(), j.program(), shared);
-                }
+                backlog.add(j);
                 return;
             }
             running = true;
@@ -91,7 +109,7 @@ public final class StyleLearning {
     }
 
     private void start(Job job) {
-        Thread.ofVirtual().name("learn-style").start(() -> {
+        starter.execute(() -> {
             try {
                 new StyleLearner(store.get(), job.program()).learn(job.chatId(), job.chat());
             } catch (RuntimeException e) {
@@ -105,7 +123,7 @@ public final class StyleLearning {
     private void finished(Job job) {
         Job then;
         synchronized (this) {
-            then = next;
+            then = next != null ? next : backlog.poll();
             next = null;
             running = then != null;
         }

@@ -72,7 +72,7 @@ public final class UpdateChecker {
         if (started) return;
         started = true;
         listenToSeen();
-        worker.scheduleWithFixedDelay(this::checkIfDue, FIRST_LOOK.toSeconds(), LOOK_EVERY.toSeconds(), TimeUnit.SECONDS);
+        worker.scheduleWithFixedDelay(this::tick, FIRST_LOOK.toSeconds(), LOOK_EVERY.toSeconds(), TimeUnit.SECONDS);
     }
 
     /** Seen again: looks at once whether a check is due (the ticks missed meanwhile count as one). */
@@ -83,8 +83,11 @@ public final class UpdateChecker {
         return l;
     }
 
-    /** One tick of the daily look, on the worker; the future completes when it's done. */
+    /** One tick of the daily look (the scheduled one too), on the worker; the future completes when it's done. */
     CompletableFuture<Void> tick() { return CompletableFuture.runAsync(this::checkIfDue, worker); }
+
+    /** Completes when everything queued on the worker so far is done (tests wait on it, never on time). */
+    CompletableFuture<Void> idle() { return CompletableFuture.runAsync(() -> { }, worker); }
 
     /** Hears the release to tell the person about, or null when there's none any more; on the worker's thread. */
     public void addListener(Consumer<Release> l) { listeners.add(l); }
