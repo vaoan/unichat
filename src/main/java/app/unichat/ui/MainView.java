@@ -427,7 +427,7 @@ public final class MainView extends StackPane {
                 && !listPane.foldersOpen()) { // a folder shows its archived chats: the filter it covers stays put
             listPane.filterProperty().set(listPane.filterProperty().get().withView(ChatFilter.View.ARCHIVE));
         }
-        resting.opened(c);
+        resting.chatOpened(c);
         listPane.setSelected(c.id());
         thread.open(c);
         if (infoVisible) panel.show(c, panel.current());

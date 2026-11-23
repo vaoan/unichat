@@ -35,6 +35,7 @@ class RestBarUiTest {
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final List<Boolean> told = new CopyOnWriteArrayList<>();
     private final List<String> opened = new CopyOnWriteArrayList<>();
+    private final List<String> shown = new CopyOnWriteArrayList<>();
     /** The bar's "a few seconds" go by when the test says. */
     private final List<Runnable> later = new CopyOnWriteArrayList<>();
     private final SimpleBooleanProperty archiveOpen = new SimpleBooleanProperty(false);
@@ -51,10 +52,15 @@ class RestBarUiTest {
     }
 
     private RestBar show(double px) throws Exception {
+        return show(px, false);
+    }
+
+    private RestBar show(double px, boolean contrast) throws Exception {
         return FxWait.fx(() -> {
-            RestBar b = new RestBar(state::get, listeners::add, listeners::remove, told::add, opened::add, archiveOpen, later::add);
+            RestBar b = new RestBar(state::get, listeners::add, listeners::remove, told::add, opened::add, shown::add, archiveOpen, later::add);
             VBox root = new VBox(b);
             root.getStyleClass().add("root");
+            if (contrast) root.getStyleClass().add("contrast");
             root.setStyle("-fx-font-size: " + px + "px;");
             Scene scene = new Scene(root, 900, 200);
             scene.getStylesheets().add(RestBarUiTest.class.getResource("/app/unichat/css/app.css").toExternalForm());
@@ -141,10 +147,12 @@ class RestBarUiTest {
         app.unichat.model.Chat archived = new app.unichat.model.Chat("!c1:x");
         archived.setArchived(true);
         app.unichat.model.Chat inbox = new app.unichat.model.Chat("!n:x");
-        FxWait.fx(() -> { bar.opened(archived); return null; });
-        assertTrue(opened.isEmpty(), "outside the archive: nothing");
-        FxWait.fx(() -> { archiveOpen.set(true); bar.opened(inbox); bar.opened(archived); return null; });
-        assertEquals(List.of("!c1:x"), opened, "only the archived one, in the archive");
+        FxWait.fx(() -> { bar.chatOpened(archived); return null; });
+        assertTrue(opened.isEmpty(), "outside the archive: no server comes back");
+        assertEquals(List.of("!c1:x"), shown, "but the chat shown never rests, however it was opened");
+        FxWait.fx(() -> { archiveOpen.set(true); bar.chatOpened(inbox); bar.chatOpened(archived); bar.serverOpened(archived); return null; });
+        assertEquals(List.of("!c1:x", "!c1:x"), opened, "only the archived one, in the archive, as a chat or a server");
+        assertEquals(List.of("!c1:x", "!n:x", "!c1:x"), shown, "a server's channels showing isn't a chat shown");
         close(bar);
     }
 
@@ -158,10 +166,14 @@ class RestBarUiTest {
     }
 
     @Test
-    void nothingIsCutAt160Percent() throws Exception {
+    void nothingIsCutAt160PercentNorInHighContrast() throws Exception {
         toolkit();
+        for (boolean contrast : List.of(false, true)) cutNothing(contrast);
+    }
+
+    private void cutNothing(boolean contrast) throws Exception {
         state.set(new Waking(Step.CHATS, 3699, 3699));
-        RestBar bar = show(21);
+        RestBar bar = show(21, contrast);
         FxWait.settled();
         for (Node n : FxWait.fx(() -> List.copyOf(bar.lookupAll(".label")))) {
             Labeled l = (Labeled) n;

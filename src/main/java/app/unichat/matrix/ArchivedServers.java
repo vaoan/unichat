@@ -43,7 +43,7 @@ final class ArchivedServers {
     CompletableFuture<Void> opened(String chatId) {
         String guild;
         synchronized (proc) {
-            String space = serverSpace(chatId, new HashSet<>());
+            String space = discord.serverSpaces().get(chatId);
             guild = space == null ? null : discord.guildOf(space);
         }
         if (guild != null) {
@@ -102,23 +102,5 @@ final class ArchivedServers {
         } finally {
             done.complete(null);
         }
-    }
-
-    /** The space of the Discord server {@code id} is (or is inside, through categories), or null. Caller holds the lock. */
-    private String serverSpace(String id, Set<String> seen) {
-        if (!seen.add(id)) return null;
-        if (discord.guildOf(id) != null) return id;
-        MatrixRoom r = proc.room(id);
-        if (r == null) return null;
-        for (String p : r.chat.spaceParents()) {
-            String s = serverSpace(p, seen);
-            if (s != null) return s;
-        }
-        for (MatrixRoom x : proc.rooms()) {
-            if (!x.space || !x.chat.spaceChildren().contains(id)) continue;
-            String s = serverSpace(x.id, seen);
-            if (s != null) return s;
-        }
-        return null;
     }
 }

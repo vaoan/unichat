@@ -79,7 +79,7 @@ class DiscordRestSyncTest {
         int before = server.log.size();
         svc.setArchiveOpen(true);
         server.changes.until("woken", () -> svc.waking() != null && svc.waking().step() == Step.DONE);
-        assertTrue(syncSince(before, "inline"), "the usual filter again, leaving nothing out: " + server.log);
+        server.changes.until("the usual filter again, leaving nothing out", () -> syncSince(before, "inline since"));
         assertTrue(svc.messages("!c1:x").stream().anyMatch(m -> m.id().equals("$while")), "shown after waking");
         assertTrue(svc.messages("!c1:x").stream().anyMatch(m -> m.id().equals("$and")));
         assertEquals(2, chat("!c1:x").unreadCount(), "its unread count is the server's");
@@ -93,5 +93,66 @@ class DiscordRestSyncTest {
         Settings.get().setNotifyArchived(true);
         server.changes.until("woken", () -> svc.waking() != null && svc.waking().step() == Step.DONE);
         assertEquals(1, server.catchUps().size());
+    }
+
+    @Test
+    void aCatchUpNeverErasesWhatCameAfterItAndNothingLiveComesBetween() throws Exception {
+        svc.setArchived("!s:x", true).get();
+        server.changes.until("resting", () -> server.notRoomsPosted().size() == 1 && syncSince(0, "f"));
+        server.missed.put("!c1:x", List.of(message("$while", "@discord_1:example.org", "mientras dormía", 5000)));
+        server.liveAfterCatchUp.put("!c1:x", List.of(message("$after", "@discord_2:example.org", "justo después", 9000)));
+        svc.setArchiveOpen(true);
+        server.changes.until("the live sync after it", () -> server.log.contains("live answered"));
+        server.changes.until("shown", () -> svc.messages("!c1:x").stream().anyMatch(m -> m.id().equals("$after")));
+        assertTrue(svc.messages("!c1:x").stream().anyMatch(m -> m.id().equals("$while")), "and what it missed");
+
+        List<String> log = List.copyOf(server.log);
+        int start = log.indexOf("catch-up [!c1:x, !c2:x, !s:x]");
+        int end = log.indexOf("caught up");
+        assertTrue(start >= 0 && log.subList(start, end).stream().noneMatch(l -> l.startsWith("sync ")), "nothing live meanwhile: " + log);
+        String before = log.subList(0, start).reversed().stream().filter(l -> l.startsWith("sync ") && l.contains("since=")).findFirst().orElseThrow();
+        String after = log.subList(end, log.size()).stream().filter(l -> l.startsWith("sync ")).findFirst().orElseThrow();
+        assertEquals(since(before), since(after), "the request after it asks again from where the sync was: " + log);
+        assertTrue(after.startsWith("sync inline"), "with the filter that woke them: " + after);
+    }
+
+    private static String since(String line) {
+        return line.replaceAll(".*since=(\\S+).*", "$1");
+    }
+
+    @Test
+    void aLiveMessageInAnotherChatDuringAWakeStillNotifies() throws Exception {
+        List<String> told = new java.util.concurrent.CopyOnWriteArrayList<>();
+        svc.addListener(new app.unichat.service.ChatService.Listener() {
+            @Override public void incomingMessage(Chat chat, app.unichat.model.Message m) { told.add(m.id()); server.changes.changed(); }
+        });
+        svc.setArchived("!s:x", true).get();
+        server.changes.until("resting", () -> server.notRoomsPosted().size() == 1);
+        server.liveAfterCatchUp.put("!n:x", List.of(message("$news", "@discord_2:example.org", "hola", System.currentTimeMillis())));
+        svc.setArchiveOpen(true);
+        server.changes.until("it notifies", () -> told.contains("$news"));
+    }
+
+    @Test
+    void aFilterTheServerForgotIsPostedAgain() throws Exception {
+        svc.setArchived("!s:x", true).get();
+        server.changes.until("resting", () -> server.notRoomsPosted().size() == 1 && syncSince(0, "f"));
+        String gone = server.filters.keySet().iterator().next();
+        server.filters.clear(); // its database wiped
+        svc.wake();
+        server.changes.until("posted again", () -> server.notRoomsPosted().size() == 2);
+        assertTrue(server.log.contains("unknown filter " + gone), server.log.toString());
+        assertTrue(Settings.get().getSet(SyncFilter.KEPT_KEY).stream().noneMatch(e -> e.endsWith("=" + gone)), "forgotten here too");
+    }
+
+    @Test
+    void droppingALongPollForANewFilterIsNoFailure() throws Exception {
+        List<Long> pauses = new java.util.concurrent.CopyOnWriteArrayList<>();
+        svc.pauseRetriesWith(pauses::add);
+        int before = server.log.size();
+        svc.setArchived("!s:x", true).get();
+        server.changes.until("the next poll has the filter", () -> server.log.subList(before, server.log.size()).stream()
+                .anyMatch(l -> l.startsWith("sync f") && l.endsWith("timeout=30000")));
+        assertEquals(List.of(), pauses, "no backoff, no \"no connection\"");
     }
 }

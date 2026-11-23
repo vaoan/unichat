@@ -44,6 +44,10 @@ final class RestServer implements AutoCloseable {
     final Map<String, Integer> unread = new ConcurrentHashMap<>();
     /** A catch-up sync waits for it (leaving the archive mid catch-up). */
     volatile CountDownLatch catchUpGate = new CountDownLatch(0);
+    /** Each room's tags ({@code m.tag}'s "tags" object), for a tags-only sync. */
+    final Map<String, String> tags = new ConcurrentHashMap<>();
+    /** Events the first live sync answered after a catch-up brings (newer than it). */
+    final Map<String, List<String>> liveAfterCatchUp = new ConcurrentHashMap<>();
     /** Catch-up syncs fail (the server busy). */
     volatile boolean failCatchUps;
     /** The server refuses to keep filters. */
@@ -127,7 +131,8 @@ final class RestServer implements AutoCloseable {
         }
         JsonNode f = MatrixClient.JSON.readTree(body);
         JsonNode room = f.path("room");
-        log.add(room.has("rooms") ? "filter rooms=" + names(room.get("rooms")) : "filter not_rooms=" + names(room.path("not_rooms")));
+        log.add(!room.has("rooms") ? "filter not_rooms=" + names(room.path("not_rooms"))
+                : (isTags(f) ? "filter tags=" : "filter rooms=") + names(room.get("rooms")));
         String id = "f" + ids.incrementAndGet();
         filters.put(id, f);
         answer(ex, 200, "{\"filter_id\":\"" + id + "\"}");
@@ -139,21 +144,32 @@ final class RestServer implements AutoCloseable {
         return out.toString();
     }
 
+    private static boolean isTags(JsonNode f) {
+        return f.path("room").path("timeline").path("limit").asInt(-1) == 0;
+    }
+
     private void sync(HttpExchange ex, Map<String, String> q) throws IOException {
         String filter = q.getOrDefault("filter", "");
         boolean since = q.containsKey("since");
         JsonNode posted = filter.startsWith("{") ? MatrixClient.JSON.readTree(filter) : filters.get(filter);
-        if (!since && posted != null && posted.path("room").has("rooms")) {
-            catchUp(ex, posted.path("room").get("rooms"));
+        if (posted == null && !filter.isEmpty()) {
+            log.add("unknown filter " + filter);
+            answer(ex, 404, "{\"errcode\":\"M_NOT_FOUND\",\"error\":\"No such filter\"}");
+            return;
+        }
+        if (posted != null && posted.path("room").has("rooms")) {
+            if (isTags(posted)) tags(ex, posted.path("room").get("rooms"));
+            else catchUp(ex, posted.path("room").get("rooms"));
             return;
         }
         log.add("sync " + (filter.startsWith("{") ? "inline" + (filter.contains("not_rooms") ? " not_rooms" : "") : filter)
-                + (since ? " since" : "") + " timeout=" + q.get("timeout"));
+                + (since ? " since=" + q.get("since") : "") + " timeout=" + q.get("timeout"));
         if (!since) {
             answer(ex, 200, initialSync);
             return;
         }
-        if (!"0".equals(q.get("timeout"))) {
+        boolean news = !liveAfterCatchUp.isEmpty() && log.contains("caught up");
+        if (!news && !"0".equals(q.get("timeout"))) {
             changes.changed();
             try {
                 hang.await(); // a long poll left open: only dropping it ends it
@@ -161,7 +177,30 @@ final class RestServer implements AutoCloseable {
                 return;
             }
         }
-        answer(ex, 200, "{\"next_batch\":\"b" + ids.incrementAndGet() + "\"}");
+        ObjectNode resp = MatrixClient.JSON.createObjectNode().put("next_batch", "b" + ids.incrementAndGet());
+        if (!liveAfterCatchUp.isEmpty() && log.contains("caught up")) {
+            ObjectNode join = resp.putObject("rooms").putObject("join");
+            for (var e : liveAfterCatchUp.entrySet()) {
+                join.set(e.getKey(), MatrixClient.JSON.readTree("{\"timeline\":{\"events\":[" + String.join(",", e.getValue()) + "]}}"));
+            }
+            liveAfterCatchUp.clear();
+            log.add("live answered");
+        }
+        answer(ex, 200, resp.toString());
+    }
+
+    /** Resting rooms' account data, as {@link #tags} has it. */
+    private void tags(HttpExchange ex, JsonNode rooms) throws IOException {
+        log.add("tags " + names(rooms));
+        ObjectNode join = MatrixClient.JSON.createObjectNode();
+        for (JsonNode r : rooms) {
+            String t = tags.get(r.asText());
+            if (t != null) join.set(r.asText(), MatrixClient.JSON.readTree("{\"timeline\":{\"limited\":true,\"events\":[]},"
+                    + "\"account_data\":{\"events\":[{\"type\":\"m.tag\",\"content\":{\"tags\":" + t + "}}]}}"));
+        }
+        ObjectNode resp = MatrixClient.JSON.createObjectNode().put("next_batch", "t" + ids.incrementAndGet());
+        resp.putObject("rooms").set("join", join);
+        answer(ex, 200, resp.toString());
     }
 
     private void catchUp(HttpExchange ex, JsonNode rooms) throws IOException {
@@ -216,6 +255,14 @@ final class RestServer implements AutoCloseable {
     static String server(String id, String guild, String... channels) {
         StringBuilder s = new StringBuilder(member(ME) + "," + state("m.room.create", "", "{\"type\":\"m.space\"}") + ","
                 + bridge("discord", guild));
+        for (String c : channels) s.append(",").append(state("m.space.child", c, "{\"via\":[\"example.org\"]}"));
+        return room(id, s.toString());
+    }
+
+    /** A category: a space inside server {@code parent}, which it names as its parent, listing its channels. */
+    static String category(String id, String channelId, String parent, String... channels) {
+        StringBuilder s = new StringBuilder(member(ME) + "," + state("m.room.create", "", "{\"type\":\"m.space\"}") + ","
+                + bridge("discord", channelId) + "," + state("m.space.parent", parent, "{\"via\":[\"example.org\"]}"));
         for (String c : channels) s.append(",").append(state("m.space.child", c, "{\"via\":[\"example.org\"]}"));
         return room(id, s.toString());
     }

@@ -24,6 +24,9 @@ public interface ArchiveWaking {
     /** A chat was opened while the archive is open: an archived server, or a channel in one, brings everything again. */
     default void archivedChatOpened(String chatId) {}
 
+    /** The chat shown in the window: it never rests, however it was opened. */
+    default void setOpenChat(String chatId) {}
+
     /** What waking is at; null when nothing has woken in this run. */
     default Waking waking() { return null; }
 

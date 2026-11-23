@@ -13,7 +13,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
-import java.util.concurrent.CompletableFuture;
 
 import static app.unichat.matrix.MatrixClient.CLIENT;
 import static app.unichat.support.Urls.enc;
@@ -21,10 +20,11 @@ import static app.unichat.support.Urls.enc;
 /**
  * The sync's filter: the usual one, less the rooms that rest ({@code room.not_rooms}). One that names rooms is posted
  * to the server ({@code /user/{id}/filter}) and the sync gives its id: inlined in the URL, a filter of the person's
- * thousands of rooms took tuwunel seconds a sync. The sync loop takes it for each request ({@link #forRequest}), and
- * whoever changed it hears when a request has gone out with it. A {@code since} token stays good across filters. Each
+ * thousands of rooms took tuwunel seconds a sync. The sync loop takes it for each request ({@link #forRequest}); a
+ * {@code since} token stays good across filters. Each
  * filter is posted once: its id is kept by its content's hash, here and in {@link #KEPT_KEY} (this computer's), so the
- * same rest set or catch-up part never posts a new one, not even after a restart.
+ * same rest set or catch-up part never posts a new one, not even after a restart. An id the server no longer knows (its
+ * database wiped) is forgotten ({@link #forget}) and posted again.
  */
 final class SyncFilter {
     /** The usual filter, inlined. */
@@ -41,42 +41,39 @@ final class SyncFilter {
     /** Hash → id, for this run; guarded by itself. */
     private final Map<String, String> ids = new LinkedHashMap<>();
     /** What the sync's {@code filter=} says from the next request on: {@link #BASE} or a posted filter's id. */
-    private String current = BASE;
-    /** Waiting for a request to go out with {@link #current}. */
-    private final List<CompletableFuture<Void>> waiting = new ArrayList<>();
-    private volatile Runnable onChange = () -> { };
+    private volatile String current = BASE;
 
     SyncFilter(MatrixClient client, String userId) {
         this.client = client;
         this.userId = userId;
     }
 
-    /** Told when the filter changed, so a long poll open with the one before can be dropped. */
-    void onChange(Runnable r) { onChange = r; }
-
     /**
      * The {@code filter=} value for the request going out now (not yet encoded). The first sync ({@code initial}) is
      * always whole: the snapshot kept on disk and its token must have every room, or a restart loses what rested.
      */
-    synchronized String forRequest(boolean initial) {
-        for (CompletableFuture<Void> f : waiting) f.complete(null);
-        waiting.clear();
+    String forRequest(boolean initial) {
         return initial ? BASE : current;
     }
 
-    /**
-     * Leaves {@code rooms} out of the sync from the next request on; the future completes once a request has gone out
-     * with it. Throws when the server didn't keep the filter: nothing changes then.
-     */
-    CompletableFuture<Void> exclude(Collection<String> rooms) throws IOException {
-        String value = rooms.isEmpty() ? BASE : id(withNotRooms(rooms));
-        CompletableFuture<Void> sent = new CompletableFuture<>();
-        synchronized (this) {
-            current = value;
-            waiting.add(sent);
+    /** Leaves {@code rooms} out of the sync from the next request on. Throws when the server didn't keep the filter: nothing changes then. */
+    void exclude(Collection<String> rooms) throws IOException {
+        current = rooms.isEmpty() ? BASE : id(withNotRooms(rooms));
+    }
+
+    /** The server doesn't know {@code id} (any more): it's forgotten here and on this computer, and the sync goes whole until posted again. */
+    void forget(String id) {
+        synchronized (ids) {
+            ids.values().removeIf(id::equals);
+            List<String> all = new ArrayList<>(Settings.get().getSet(KEPT_KEY));
+            if (all.removeIf(e -> e.endsWith("=" + id))) Settings.get().set(KEPT_KEY, all.isEmpty() ? null : String.join(",", all));
         }
-        onChange.run();
-        return sent;
+        if (id.equals(current)) current = BASE;
+    }
+
+    /** Whether the server's answer says it doesn't know the filter named. */
+    static boolean unknown(MatrixException e) {
+        return (e.status() == 400 || e.status() == 404) && ("M_NOT_FOUND".equals(e.errcode()) || "M_INVALID_PARAM".equals(e.errcode()));
     }
 
     /** The server's id for {@code filter}, posted the first time it's seen (on this server, as this user). */

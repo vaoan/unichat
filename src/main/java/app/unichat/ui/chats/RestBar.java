@@ -32,6 +32,7 @@ public final class RestBar extends TaskBar {
     private final Consumer<Runnable> later;
     private final ObservableValue<Boolean> archiveOpen;
     private final Consumer<String> tellOpened;
+    private final Consumer<String> tellShown;
     private final ChangeListener<Boolean> onOpen;
     /** Changes come from the service's thread: one redraw per frame. */
     private final FxCoalescer redraw = new FxCoalescer(this::refresh);
@@ -45,7 +46,7 @@ public final class RestBar extends TaskBar {
     /** {@code archiveOpen}: the archive showing in the window; kept here, so a binding passed in lives as long as the bar. */
     public RestBar(ArchiveWaking svc, ObservableValue<Boolean> archiveOpen) {
         this(svc::waking, svc::addWakingListener, svc::removeWakingListener, svc::setArchiveOpen, svc::archivedChatOpened,
-                archiveOpen, RestBar::afterAMoment);
+                svc::setOpenChat, archiveOpen, RestBar::afterAMoment);
     }
 
     /**
@@ -56,19 +57,20 @@ public final class RestBar extends TaskBar {
         ObservableValue<ChatFilter> filter = list.filterProperty();
         RestBar bar = new RestBar(svc, javafx.beans.binding.Bindings.createBooleanBinding(
                 () -> filter.getValue().view() == ChatFilter.View.ARCHIVE, filter));
-        list.setOnSpaceOpened(bar::opened);
+        list.setOnSpaceOpened(bar::serverOpened);
         return bar;
     }
 
     /** What it shows and tells, as functions; {@code later} runs a job once "Al día" has been seen long enough. */
     RestBar(Supplier<Waking> state, Consumer<Runnable> listen, Consumer<Runnable> unlisten, Consumer<Boolean> tellOpen,
-            Consumer<String> tellOpened, ObservableValue<Boolean> archiveOpen, Consumer<Runnable> later) {
+            Consumer<String> tellOpened, Consumer<String> tellShown, ObservableValue<Boolean> archiveOpen, Consumer<Runnable> later) {
         super("rest-bar");
         this.state = state;
         this.unlisten = unlisten;
         this.later = later;
         this.archiveOpen = archiveOpen;
         this.tellOpened = tellOpened;
+        this.tellShown = tellShown;
         lead.getChildren().setAll(Icons.icon(Icons.ARCHIVE, 20));
         stage.setWrapText(true);
         what.setWrapText(true);
@@ -83,8 +85,15 @@ public final class RestBar extends TaskBar {
         refresh();
     }
 
-    /** A chat or server opened: in the archive, an archived one may bring its server back. */
-    public void opened(app.unichat.model.Chat c) {
+    /** A chat shown in the window: it never rests; in the archive, an archived one brings its server back. */
+    public void chatOpened(app.unichat.model.Chat c) {
+        if (c == null) return;
+        tellShown.accept(c.id());
+        serverOpened(c);
+    }
+
+    /** A server or group whose channels are shown: in the archive, an archived one comes back at the bridge. */
+    void serverOpened(app.unichat.model.Chat c) {
         if (c != null && c.archived() && Boolean.TRUE.equals(archiveOpen.getValue())) tellOpened.accept(c.id());
     }
 

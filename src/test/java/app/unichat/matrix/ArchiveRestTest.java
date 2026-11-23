@@ -20,6 +20,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import static app.unichat.matrix.RestServer.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -63,12 +64,12 @@ class ArchiveRestTest {
         DiscordServers discord = new DiscordServers(core, bots, () -> discordConnected
                 ? List.of(new Account(Network.DISCORD, "me", AccountStatus.CONNECTED, "")) : List.of());
         filter = new SyncFilter(client, ME);
-        filter.onChange(() -> loop.execute(() -> server.log.add("request " + filter.forRequest(false))));
-        rest = new ArchiveRest(core, filter, discord, r -> { });
+        rest = new ArchiveRest(core, filter, discord, (r, rooms) -> { });
+        rest.onWake(() -> loop.execute(this::round));
         rest.useClock(() -> now);
         rest.addListener(() -> {
             Waking w = rest.waking();
-            steps.add(w.step() + " " + w.done() + "/" + w.total() + (w.server() == null ? "" : " " + w.server()));
+            steps.add(w == null ? "HIDDEN" : w.step() + " " + w.done() + "/" + w.total() + (w.server() == null ? "" : " " + w.server()));
             server.changes.changed();
         });
         rest.start();
@@ -81,6 +82,15 @@ class ArchiveRestTest {
         server.close();
         Settings.get().setNotifyArchived(false);
         Settings.get().set(DiscordServers.PAUSED_GUILDS_KEY, null);
+    }
+
+    /** The sync loop's turn: what rests and a part of the catch-up, then its request; again while more is left. */
+    private void round() {
+        boolean more;
+        do {
+            more = rest.beforeRequest();
+            server.log.add("request " + filter.forRequest(false));
+        } while (more);
     }
 
     private void process(String json) {
@@ -173,11 +183,16 @@ class ArchiveRestTest {
 
         rest.setArchiveOpen(true).get();
         List<String> waking = new ArrayList<>(server.log.subList(before, server.log.size()));
-        int filtered = waking.indexOf("request " + SyncFilter.BASE);
         int caught = waking.indexOf("catch-up " + set("!s:x", "!c1:x", "!c2:x", "!lone:x"));
-        assertTrue(filtered >= 0 && filtered < caught, "the filter, then the catch-up: " + waking);
+        int filtered = waking.indexOf("request " + SyncFilter.BASE);
+        assertTrue(caught >= 0 && filtered > caught && waking.subList(0, caught).stream().noneMatch(l -> l.startsWith("request")),
+                "the catch-up, then the first request with the filter that wakes them, nothing live between: " + waking);
+        JsonNode part = server.filters.values().stream().filter(f -> f.path("room").has("rooms")).findFirst().orElseThrow();
+        assertEquals(ArchiveRest.CATCH_UP_LIMIT, part.path("room").path("timeline").path("limit").asInt());
+        assertEquals("[\"*\"]", part.path("account_data").path("not_types").toString(), "no account-wide data again");
+        assertEquals("[\"*\"]", part.path("presence").path("not_types").toString());
         assertTrue(waking.stream().noneMatch(l -> l.startsWith("bot ")), "no server is woken at the bridge: " + waking);
-        assertEquals(List.of("CHATS 0/4", "CHATS 4/4", "DONE 4/4"), steps);
+        assertEquals(List.of("CHATS 0/4", "DONE 4/4"), steps);
 
         before = server.log.size();
         rest.setArchiveOpen(false).get();
@@ -282,19 +297,121 @@ class ArchiveRestTest {
         int all = ids.length + 1;
         assertEquals(3, server.catchUps().size(), server.catchUps().toString());
         assertTrue(steps.containsAll(List.of("CHATS 0/" + all, "CHATS " + ArchiveRest.CHUNK + "/" + all,
-                "CHATS " + 2 * ArchiveRest.CHUNK + "/" + all, "CHATS " + all + "/" + all, "DONE " + all + "/" + all)), steps.toString());
+                "CHATS " + 2 * ArchiveRest.CHUNK + "/" + all, "DONE " + all + "/" + all)), steps.toString());
     }
 
     @Test
-    void aFilterTheServerRefusedRestsNothing() throws Exception {
+    void aRefusedFilterKeepsWhatRestsAndIsTriedAgainLaterNotEveryRound() throws Exception {
         everyKind();
         rest.update().get();
+        String rested = filter.forRequest(false);
         server.refuseFilters = true;
         archive(true, "!open:x");
         rest.update().get();
-        requestSent();
+        assertEquals(rested, filter.forRequest(false), "resting more can wait: what rested still does");
+        assertTrue(server.catchUps().isEmpty(), server.log.toString());
+        rest.update().get();
+        assertEquals(1, server.log.stream().filter(l -> l.equals("filter refused")).count(), "not every round: " + server.log);
+
+        server.refuseFilters = false;
+        now = now.plus(Retry.FIRST);
+        rest.update().get();
+        assertEquals(set("!s:x", "!c1:x", "!c2:x", "!lone:x", "!open:x"), server.notRoomsPosted().getLast());
+    }
+
+    @Test
+    void aRefusedFilterThatWouldWakeRoomsWakesEverything() throws Exception {
+        everyKind();
+        rest.update().get();
+        server.refuseFilters = true;
+        archive(false, "!lone:x");
+        rest.update().get();
         assertEquals(SyncFilter.BASE, filter.forRequest(false), "on the safe side: everything comes");
         assertEquals(List.of(set("!s:x", "!c1:x", "!c2:x", "!lone:x")), server.catchUps(), "and what rested catches up");
+    }
+
+    @Test
+    void theChatOpenInTheWindowNeverRests() throws Exception {
+        everyKind();
+        rest.update().get();
+        rest.setOpenChat("!c1:x").get(); // opened from a search, the archive closed
+        assertEquals(set("!s:x", "!c2:x", "!lone:x"), server.notRoomsPosted().getLast());
+        assertEquals(List.of(set("!c1:x")), server.catchUps(), "and it caught up on what it missed");
+        rest.setOpenChat("!n:x").get();
+        assertEquals(idOf(0), filter.forRequest(false), "left: it rests again, with the filter it had");
+    }
+
+    @Test
+    void aChannelUnderACategoryRestsAndADmInTheBridgesFolderNever() throws Exception {
+        process(sync(server("!s3:x", "333", "!cat:x"), category("!cat:x", "cat", "!s3:x", "!deep:x"), channel("!deep:x", "deep"),
+                server("!folder:x", "__dms", "!dm2:x"), dm("!dm2:x")));
+        archive(true, "!deep:x", "!folder:x", "!dm2:x");
+        rest.update().get();
+        assertEquals(List.of(set("!deep:x")), server.notRoomsPosted());
+    }
+
+    @Test
+    void anUnarchiveTagOnARestingRoomWakesItAndTagsNeverTouchATimeline() throws Exception {
+        process(sync(server("!s:x", GUILD, "!c1:x"), channel("!c1:x", "c1"), server("!s2:x", OTHER_GUILD, "!lone:x"),
+                channel("!lone:x", "lone")));
+        archive(true, "!c1:x");
+        process(("{'rooms':{'join':{'!lone:x':{'account_data':{'events':[{'type':'m.tag','content':{'tags':{'u.archived':{}}}}]}},"
+                + "'!c1:x':{'timeline':{'events':[" + message("$old", "@discord_1:example.org", "antes", 1000).replace('"', '\'')
+                + "]}}}}}").replace('\'', '"'));
+        rest.update().get();
+        assertTrue(server.notRoomsPosted().getLast().contains("!lone:x"), "archived elsewhere: it rests " + server.log);
+
+        server.tags.put("!lone:x", "{}"); // unarchived on another device
+        server.tags.put("!c1:x", "{\"u.archived\":{}}");
+        rest.update().get();
+        assertTrue(server.log.stream().noneMatch(l -> l.startsWith("tags ")), "not before its time");
+        now = now.plus(ArchiveRest.TAGS_EVERY);
+        rest.update().get();
+        assertTrue(server.log.stream().anyMatch(l -> l.startsWith("tags ")), server.log.toString());
+        assertTrue(server.catchUps().contains(set("!lone:x")), "it woke: " + server.log);
+        synchronized (proc) {
+            assertTrue(proc.room("!c1:x").byId.containsKey("$old"), "a tags sync never resets a timeline");
+        }
+    }
+
+    @Test
+    void aRetryEndsWhenWhatFailedRestsAgainAndReopeningCatchesUpAtOnce() throws Exception {
+        everyKind();
+        rest.update().get();
+        server.failCatchUps = true;
+        rest.setArchiveOpen(true).get();
+        assertEquals("RETRYING 0/4", steps.getLast());
+        rest.setArchiveOpen(false).get();
+        assertEquals("HIDDEN", steps.getLast(), "nothing left to retry, nothing to say");
+
+        server.failCatchUps = false;
+        int before = server.catchUps().size();
+        rest.setArchiveOpen(true).get(); // the clock hasn't moved: no retry waits
+        assertEquals(before + 1, server.catchUps().size(), server.log.toString());
+        assertEquals("DONE 4/4", steps.getLast());
+    }
+
+    @Test
+    void leavingAndComingBackBeforeTheBridgeHeardKeepsTheServerBack() throws Exception {
+        everyKind();
+        rest.archivedChanged().get();
+        rest.setArchiveOpen(true).get();
+        rest.archivedChatOpened("!c1:x").get();
+        CountDownLatch held = new CountDownLatch(1);
+        loop.execute(() -> {
+            try {
+                held.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        CompletableFuture<Void> leaving = rest.setArchiveOpen(false);
+        CompletableFuture<Void> back = rest.setArchiveOpen(true);
+        held.countDown();
+        leaving.get();
+        back.get();
+        List<String> bot = server.log.stream().filter(l -> l.startsWith("bot ")).toList();
+        assertEquals("bot guilds bridging-mode " + GUILD + " create-on-message", bot.getLast(), "back in the archive: still back " + bot);
     }
 
     @Test

@@ -50,6 +50,35 @@ final class DiscordServers {
         return r.bridgeChannelId;
     }
 
+    /**
+     * Each room inside a Discord server (a channel, a category, a channel under a category, the server's own space) →
+     * that server's space, however deep, through the rooms' parents and the spaces' children. A DM, a group DM and the
+     * bridge's own folder are in none. One pass for all rooms: asked on every sync. Caller holds the processor's lock.
+     */
+    Map<String, String> serverSpaces() {
+        Map<String, Set<String>> parents = new HashMap<>();
+        for (MatrixRoom r : proc.rooms()) {
+            parents.computeIfAbsent(r.id, k -> new java.util.HashSet<>()).addAll(r.chat.spaceParents());
+            if (r.space) for (String c : r.chat.spaceChildren()) parents.computeIfAbsent(c, k -> new java.util.HashSet<>()).add(r.id);
+        }
+        Map<String, String> out = new HashMap<>();
+        for (MatrixRoom r : proc.rooms()) {
+            String s = serverSpace(r.id, parents, new java.util.HashSet<>());
+            if (s != null) out.put(r.id, s);
+        }
+        return out;
+    }
+
+    private String serverSpace(String id, Map<String, Set<String>> parents, Set<String> seen) {
+        if (!seen.add(id)) return null;
+        if (guildOf(id) != null) return id;
+        for (String p : parents.getOrDefault(id, Set.of())) {
+            String s = serverSpace(p, parents, seen);
+            if (s != null) return s;
+        }
+        return null;
+    }
+
     static Set<String> pausedGuilds() {
         return Settings.get().getSet(PAUSED_GUILDS_KEY);
     }

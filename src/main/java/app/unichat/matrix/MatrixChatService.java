@@ -112,8 +112,8 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         this.discord = new DiscordServers(core, bots, this::accounts);
         this.bridges = new BridgeAccounts(core, bots, discord);
         this.syncFilter = new SyncFilter(client, userId);
-        this.rest = new ArchiveRest(core, syncFilter, discord, r -> dispatch(r, false));
-        syncFilter.onChange(this::dropLongPoll);
+        this.rest = new ArchiveRest(core, syncFilter, discord, this::caughtUp);
+        rest.onWake(this::dropLongPoll);
         discord.onConnected(rest::archivedChanged);
         this.chatActions = new ChatActions(core, this, discord, prefs, rest::archivedChanged);
         this.contacts = new ContactActions(core);
@@ -265,17 +265,24 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
             try {
                 boolean initial = nextBatch == null;
                 if (initial) setState(ConnectionState.SYNCING);
-                // A catch-up (from the cached token, or after waking) must return at once, not long-poll for 30 s.
-                int timeout = initial || catchUp || quick ? 0 : 30000;
+                // Between two rounds: what rests changes, and a part of a catch-up comes in (ArchiveRest).
+                boolean more = !initial && !catchUp && core.initialSyncDone && rest.beforeRequest();
+                // A catch-up (from the cached token, after waking, or of woken rooms) must return at once, not long-poll for 30 s.
+                int timeout = initial || catchUp || quick || more ? 0 : 30000;
                 synchronized (pollLock) {
                     longPolling = timeout > 0; // before the filter is read: a change from here on drops this poll
                 }
-                String path = CLIENT + "/sync?filter=" + enc(syncFilter.forRequest(initial)) + "&timeout=" + timeout
+                String filterParam = syncFilter.forRequest(initial);
+                String path = CLIENT + "/sync?filter=" + enc(filterParam) + "&timeout=" + timeout
                         + (initial ? "" : "&since=" + enc(nextBatch));
                 JsonNode resp;
                 try {
                     resp = client.request("GET", path, null, Duration.ofSeconds(initial || catchUp ? 180 : 75));
                 } catch (MatrixException e) {
+                    if (!filterParam.equals(SyncFilter.BASE) && SyncFilter.unknown(e)) {
+                        rest.filterForgotten(filterParam); // the server's database was wiped: post it again
+                        continue;
+                    }
                     if (catchUp && sinceRejected(e)) {
                         // The cached token was rejected (expired/purged): fall back to a full sync. A busy or
                         // restarting server (429, 5xx) goes to the backoff instead, keeping the cache.
@@ -385,7 +392,6 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         // A channel that arrived in an archived server goes quiet like its siblings.
         chatActions.followQuiet(inArchivedServer);
         chatActions.applyMutes();
-        rest.update();
     }
 
     /**
@@ -453,6 +459,24 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         }
         profiles.fetchMissing();
         bridges.publishIfChanged();
+    }
+
+    /**
+     * A catch-up of woken rooms came in: shown, and only those rooms' messages count as seen (they're old news). Every
+     * other chat's notifications stay as the live sync decides.
+     */
+    private void caughtUp(SyncProcessor.Result r, java.util.Collection<String> rooms) {
+        r.sendStatuses.forEach(core.statuses::heard);
+        if (r.chatsChanged) core.fire(Listener::chatsChanged);
+        for (String id : r.messagesChanged) core.fire(l -> l.messagesChanged(id));
+        r.readByMe.forEach(notifyGate::seen);
+        synchronized (proc) {
+            for (String id : rooms) {
+                MatrixRoom room = proc.room(id);
+                if (room != null) notifyGate.seen(id, room.chat.lastActivity());
+            }
+        }
+        profiles.fetchMissing();
     }
 
     private void setState(ConnectionState s) {
@@ -586,6 +610,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public CompletableFuture<Void> setArchived(String chatId, boolean archived) { return chatActions.setArchived(chatId, archived); }
     @Override public void setArchiveOpen(boolean open) { rest.setArchiveOpen(open); }
     @Override public void archivedChatOpened(String chatId) { rest.archivedChatOpened(chatId); }
+    @Override public void setOpenChat(String chatId) { rest.setOpenChat(chatId); }
     @Override public Waking waking() { return rest.waking(); }
     @Override public void addWakingListener(Runnable l) { rest.addListener(l); }
     @Override public void removeWakingListener(Runnable l) { rest.removeListener(l); }

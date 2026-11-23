@@ -71,6 +71,14 @@ final class MatrixRoom {
         this.chat = new Chat(id);
     }
 
+    /** In time order: a catch-up's older events come before what's already there, not after it. */
+    void addInOrder(Message m) {
+        int at = timeline.size();
+        while (at > 0 && m.timestamp() != null && timeline.get(at - 1).timestamp() != null
+                && timeline.get(at - 1).timestamp().isAfter(m.timestamp())) at--;
+        timeline.add(at, m);
+    }
+
     boolean isActiveMember(String userId) {
         String m = membership.get(userId);
         return "join".equals(m) || "invite".equals(m);

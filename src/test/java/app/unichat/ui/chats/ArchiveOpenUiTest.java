@@ -38,9 +38,11 @@ class ArchiveOpenUiTest {
         Platform.setImplicitExit(false);
         List<Boolean> told = new CopyOnWriteArrayList<>();
         List<String> opened = new CopyOnWriteArrayList<>();
+        List<String> shown = new CopyOnWriteArrayList<>();
         MockChatService svc = new MockChatService() {
             @Override public void setArchiveOpen(boolean open) { told.add(open); }
             @Override public void archivedChatOpened(String chatId) { opened.add(chatId); }
+            @Override public void setOpenChat(String chatId) { shown.add(chatId); }
         };
         Stage stage = FxWait.fx(Stage::new);
         MainView view = FxWait.fx(() -> {
@@ -67,6 +69,7 @@ class ArchiveOpenUiTest {
         app.unichat.model.Chat archived = svc.chats().stream().filter(c -> c.archived() && !c.space()).findFirst().orElseThrow();
         FxWait.fx(() -> { view.openChat(archived); return null; });
         assertEquals(List.of(archived.id()), opened, "an archived chat opened in the archive");
+        assertEquals(archived.id(), shown.getLast(), "the chat shown never rests");
         app.unichat.model.Chat space = svc.chats().stream().filter(app.unichat.model.Chat::space).findFirst().orElseThrow();
         svc.setArchived(space.id(), true).get();
         FxWait.fx(() -> { list.open(space); return null; });

@@ -4,10 +4,10 @@ import app.unichat.model.Network;
 import app.unichat.service.ArchiveWaking.Step;
 import app.unichat.service.ArchiveWaking.Waking;
 import app.unichat.settings.Settings;
-import app.unichat.support.Threads;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -15,13 +15,12 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -30,48 +29,76 @@ import static app.unichat.support.Urls.enc;
 
 /**
  * Archived Discord servers and channels rest out of the sync: they're most of the person's thousands of rooms, and
- * each sync made the server walk them all. {@link SyncFilter} leaves them out. DMs never rest, nor anything while
- * archived chats notify ({@link Settings#NOTIFY_ARCHIVED}), nor while the archive is open. Waking: the filter takes the
- * rooms back at once, then a sync of only those rooms (no {@code since}) catches up on what they missed, their unread
- * counts too; one that fails is tried again ({@link Retry}). One thread does it, so leaving the archive mid catch-up
- * finishes it before they rest again. What servers bring at the bridge is {@link ArchivedServers}'.
+ * each sync made the server walk them all. {@link SyncFilter} leaves them out. DMs never rest, nor the chat open in the
+ * window, nor anything while archived chats notify ({@link Settings#NOTIFY_ARCHIVED}) or the archive is open.
+ *
+ * <p>All of it runs on the sync thread, before a request ({@link #beforeRequest}): the filter changes, then one part
+ * of the catch-up (a sync of only woken rooms, no {@code since}), then the request goes out with the {@code since} it
+ * had. Nothing live is processed between a catch-up and the request after it, and that request brings again whatever
+ * came after its {@code since}, so a catch-up never overwrites anything newer. A catch-up under way finishes before
+ * what rests changes (leaving the archive mid-way); one that fails is tried again ({@link Retry}). Resting rooms'
+ * own account data (tags: unarchived elsewhere) is asked for every {@link #TAGS_EVERY}, since the filter leaves it out
+ * too. What servers bring at the bridge is {@link ArchivedServers}'.
  */
 final class ArchiveRest {
     /** Rooms per catch-up sync. */
     static final int CHUNK = 100;
     /** Events per room in a catch-up: the rest are in the room's history, from its {@code prev_batch}. */
     static final int CATCH_UP_LIMIT = 20;
+    /**
+     * How often resting rooms' tags are asked for. {@code room.not_rooms} leaves their account data out of the sync
+     * as well (the spec applies it before every part of the room filter), and moving the rooms to each part's own
+     * {@code not_rooms} is untested for what the server saves; a sync of only their tags this often walks them seldom.
+     */
+    static final Duration TAGS_EVERY = Duration.ofMinutes(5);
 
     private final MatrixCore core;
     private final SyncProcessor proc;
     private final SyncFilter filter;
+    private final DiscordServers discord;
     private final ArchivedServers servers;
-    private final Consumer<SyncProcessor.Result> dispatch;
-    private final ExecutorService worker = Executors.newSingleThreadExecutor(Threads.daemon("discord-rest"));
+    /** A catch-up's answer, with the rooms it was for. */
+    private final BiConsumer<SyncProcessor.Result, Collection<String>> caughtUp;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final Consumer<String> onSetting = key -> {
         if (key == null || key.equals(Settings.NOTIFY_ARCHIVED)) update();
     };
     private volatile boolean archiveOpen;
+    private volatile String openChat;
     private volatile Waking waking;
-    /** The next run asked for, shared by everyone who asks before it starts; guarded by this. */
-    private CompletableFuture<Void> next;
-    /** Left out of the sync now. Worker thread only. */
-    private Set<String> resting = Set.of();
-    /** Awake but still to catch up on what they missed while resting (a catch-up that failed is tried again). Worker only. */
-    private final Set<String> owed = new LinkedHashSet<>();
-    /** When a catch-up that failed is tried again; null when none failed. Worker only. */
-    private Retry retry;
-    private volatile boolean catchingUp;
+    private volatile Runnable wakeLoop = () -> { };
     private volatile Supplier<Instant> clock = Instant::now;
+    /** Asks made, and those waiting for a round that has seen them; guarded by this. */
+    private long asked;
+    private final List<Waiter> waiters = new ArrayList<>();
+    /** A catch-up under way, not failed: what rests waits for it. Guarded by this (the bar decides with it). */
+    private boolean catching;
 
-    ArchiveRest(MatrixCore core, SyncFilter filter, DiscordServers discord, Consumer<SyncProcessor.Result> dispatch) {
+    // Sync thread only.
+    private Set<String> resting = Set.of();
+    /** Awake, still to catch up on what they missed while resting. */
+    private final Set<String> owed = new LinkedHashSet<>();
+    private int partsDone;
+    private int partsTotal;
+    private Retry catchUpRetry;
+    private Retry filterRetry;
+    private Instant tagsDue;
+    private String tagsSince;
+
+    private record Waiter(long ask, CompletableFuture<Void> done) {}
+
+    ArchiveRest(MatrixCore core, SyncFilter filter, DiscordServers discord,
+                BiConsumer<SyncProcessor.Result, Collection<String>> caughtUp) {
         this.core = core;
         this.proc = core.proc;
         this.filter = filter;
+        this.discord = discord;
         this.servers = new ArchivedServers(core, discord, this::resuming);
-        this.dispatch = dispatch;
+        this.caughtUp = caughtUp;
     }
+
+    /** What makes the sync loop go round at once (its long poll dropped). */
+    void onWake(Runnable r) { wakeLoop = r; }
 
     /** Tests move time on to a retry, instead of waiting for it. */
     void useClock(Supplier<Instant> c) { clock = c; }
@@ -80,15 +107,25 @@ final class ArchiveRest {
 
     void stop() {
         Settings.get().removeListener(onSetting);
-        worker.shutdownNow();
         servers.stop();
+        synchronized (this) {
+            for (Waiter w : waiters) w.done().cancel(false);
+            waiters.clear();
+        }
     }
 
     CompletableFuture<Void> setArchiveOpen(boolean open) {
         archiveOpen = open;
         CompletableFuture<Void> f = update();
         if (open) return f;
-        return CompletableFuture.allOf(f, f.thenCompose(x -> servers.archiveLeft())); // resting first, then the bridge
+        // Resting first, then the bridge; reopened meanwhile, the servers brought back stay back.
+        return f.thenCompose(x -> archiveOpen ? CompletableFuture.completedFuture(null) : servers.archiveLeft());
+    }
+
+    /** The chat shown in the window: it never rests, or its new messages wouldn't come (opened from a search, a folder). */
+    CompletableFuture<Void> setOpenChat(String chatId) {
+        openChat = chatId;
+        return update();
     }
 
     /** A chat opened in Archivados: an archived server, or a channel inside one, brings everything again until leaving. */
@@ -99,137 +136,227 @@ final class ArchiveRest {
     /** What's archived changed, or Discord connected: what rests, and what each server brings, follow. */
     CompletableFuture<Void> archivedChanged() { return CompletableFuture.allOf(update(), servers.update()); }
 
-    private void resuming(String server) {
-        if (server != null) show(new Waking(Step.SERVER, 0, 0, server));
-        else if (!catchingUp) show(new Waking(Step.DONE, 0, 0, null));
-    }
-
     Waking waking() { return waking; }
 
     void addListener(Runnable l) { listeners.add(l); }
 
     void removeListener(Runnable l) { listeners.remove(l); }
 
-    /** Brings what rests in line with the archive and the settings now; done when that run has finished. */
-    synchronized CompletableFuture<Void> update() {
-        if (next == null) {
-            next = new CompletableFuture<>();
-            worker.execute(this::run);
+    /** Asks the sync loop to bring what rests in line now; done after a round that saw it with nothing left to do. */
+    CompletableFuture<Void> update() {
+        CompletableFuture<Void> f = new CompletableFuture<>();
+        synchronized (this) {
+            waiters.add(new Waiter(++asked, f));
         }
-        return next;
+        wakeLoop.run();
+        return f;
     }
 
-    private void run() {
-        CompletableFuture<Void> done;
+    /**
+     * On the sync thread, before each request (once the first sync is in): tags if due, what rests, a part of the
+     * catch-up. True when more is left for the next round, which then shouldn't long-poll.
+     */
+    boolean beforeRequest() {
+        long seen;
         synchronized (this) {
-            done = next;
-            next = null;
+            seen = asked;
         }
+        boolean more = false;
         try {
-            apply();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (Exception e) {
+            tags();
+            if (!catchingNow()) settle();
+            catchUpPart();
+            if (!catchingNow()) settle(); // what changed while it caught up: leaving the archive rests at once after
+            more = !owed.isEmpty() && catchUpRetry == null;
+        } catch (RuntimeException e) {
             System.err.println("Discord rest: " + e);
         } finally {
-            done.complete(null);
+            if (!more) {
+                synchronized (this) {
+                    waiters.removeIf(w -> {
+                        if (w.ask() > seen) return false;
+                        w.done().complete(null);
+                        return true;
+                    });
+                }
+            }
         }
+        return more;
     }
 
-    private void apply() throws InterruptedException {
+    /** The server no longer knows the filter the sync named: everything comes again, and what rested catches up. */
+    void filterForgotten(String id) {
+        filter.forget(id);
+        owed.addAll(resting);
+        resting = Set.of();
+    }
+
+    private synchronized boolean catchingNow() { return catching; }
+
+    /** The sync leaves out what should rest now; posting a filter that fails is tried again later. */
+    private void settle() {
         Set<String> want;
         synchronized (proc) {
-            want = restingRooms(proc.rooms(), archiveOpen || Settings.get().notifyArchived());
+            want = restingRooms();
         }
-        for (String r : resting) if (!want.contains(r)) owed.add(r);
-        owed.removeAll(want);
-        if (!want.equals(resting)) refilter(want);
-        if (owed.isEmpty() || retry != null && !retry.due(clock.get())) return;
-        catchingUp = true;
-        try {
-            if (catchUp()) {
-                retry = null;
-                show(Step.DONE, waking.total(), waking.total());
-            } else {
-                retry = Retry.after(retry, clock.get());
-                show(Step.RETRYING, waking.done(), waking.total());
+        if (!want.equals(resting)) {
+            Instant now = clock.get();
+            boolean wakes = !want.containsAll(resting);
+            boolean mayPost = filterRetry == null || filterRetry.due(now);
+            // Without a post: everything wakes (the usual filter), or what rests stays as it is (its filter is known).
+            Set<String> fallback = wakes ? Set.of() : resting;
+            Set<String> target = want.isEmpty() || mayPost ? want : fallback;
+            try {
+                filter.exclude(target);
+                if (target == want) filterRetry = null;
+            } catch (IOException | MatrixException e) {
+                System.err.println("Discord rest: the server didn't keep the filter, tried again later: " + e);
+                filterRetry = Retry.after(filterRetry, now);
+                target = fallback;
+                excludeKnown(target);
             }
-        } finally {
-            catchingUp = false;
+            for (String r : resting) if (!target.contains(r)) owed.add(r);
+            resting = target;
+        }
+        owed.removeAll(resting);
+        if (owed.isEmpty() && catchUpRetry != null) {
+            // What failed to catch up rests again (the archive left): nothing to retry, nothing to say.
+            catchUpRetry = null;
+            show(null);
         }
     }
 
-    /** The sync leaves {@code want} out once a request has gone out so; a filter the server refused leaves nothing out. */
-    private void refilter(Set<String> want) throws InterruptedException {
+    /** A filter already posted (or none): never asks the server. */
+    private void excludeKnown(Set<String> rooms) {
         try {
-            await(filter.exclude(want));
-            resting = want;
-        } catch (java.io.IOException | MatrixException e) {
-            System.err.println("Discord rest: the server didn't keep the filter, nothing rests: " + e);
+            filter.exclude(rooms);
+        } catch (IOException | MatrixException e) {
             try {
-                await(filter.exclude(Set.of()));
-            } catch (java.io.IOException never) {
+                filter.exclude(Set.of());
+            } catch (IOException never) {
                 throw new IllegalStateException(never); // the usual filter is never posted
             }
-            owed.addAll(resting);
+            for (String r : resting) owed.add(r);
             resting = Set.of();
         }
     }
 
-    private static void await(CompletableFuture<Void> f) throws InterruptedException {
-        try {
-            f.get();
-        } catch (ExecutionException e) {
-            throw new IllegalStateException(e.getCause());
-        }
-    }
-
-    /**
-     * One sync for each {@link #CHUNK} of {@link #owed}, in the rooms' order, so the same rooms are the same filters and
-     * nothing is posted again; false when one failed (what's left stays owed).
-     */
-    private boolean catchUp() {
-        List<String> order = new ArrayList<>(new TreeSet<>(owed));
-        show(Step.CHATS, 0, order.size());
-        for (int from = 0; from < order.size(); from += CHUNK) {
-            List<String> part = order.subList(from, Math.min(order.size(), from + CHUNK));
-            try {
-                ObjectNode f = SyncFilter.base();
-                SyncFilter.roomList(f, "rooms", part);
-                ((ObjectNode) f.path("room").path("timeline")).put("limit", CATCH_UP_LIMIT);
-                f.putObject("account_data").putArray("not_types").add("*");
-                f.putObject("presence").putArray("not_types").add("*");
-                JsonNode resp = core.client.request("GET", CLIENT + "/sync?timeout=0&filter=" + enc(catchUpFilter(f)), null,
-                        Duration.ofSeconds(180));
-                SyncProcessor.Result r;
-                synchronized (proc) {
-                    r = proc.process(resp, false);
-                }
-                dispatch.accept(r);
-                part.forEach(owed::remove);
-                show(Step.CHATS, from + part.size(), order.size());
-            } catch (Exception e) {
-                System.err.println("Discord rest: catching up failed, tried again later: " + e);
-                return false;
+    /** One {@link #CHUNK} of what's owed, in the rooms' order (the same rooms are the same filters), if its time has come. */
+    private void catchUpPart() {
+        if (owed.isEmpty()) return;
+        Instant now = clock.get();
+        if (catchUpRetry != null && !catchUpRetry.due(now)) return;
+        synchronized (this) {
+            if (!catching) {
+                catching = true;
+                partsDone = 0;
+                partsTotal = owed.size();
+                showLocked(new Waking(Step.CHATS, 0, partsTotal));
             }
         }
-        return true;
-    }
-
-    /** Posted; inlined if the server won't keep it (a part is small enough for the URL). */
-    private String catchUpFilter(ObjectNode f) {
+        List<String> part = new ArrayList<>(new TreeSet<>(owed)).subList(0, Math.min(CHUNK, owed.size()));
         try {
-            return filter.id(f);
-        } catch (java.io.IOException | MatrixException e) {
-            return f.toString();
+            fetch(part);
+            part.forEach(owed::remove);
+            partsDone += part.size();
+            catchUpRetry = null;
+            synchronized (this) {
+                if (owed.isEmpty()) catching = false;
+                showLocked(new Waking(owed.isEmpty() ? Step.DONE : Step.CHATS, partsDone, partsTotal));
+            }
+        } catch (IOException | RuntimeException e) {
+            System.err.println("Discord rest: catching up failed, tried again later: " + e);
+            catchUpRetry = Retry.after(catchUpRetry, now);
+            synchronized (this) {
+                catching = false;
+                showLocked(new Waking(Step.RETRYING, partsDone, partsTotal));
+            }
         }
     }
 
-    private void show(Step step, int done, int total) {
-        show(new Waking(step, done, total, null));
+    private void fetch(List<String> part) throws IOException {
+        ObjectNode f = SyncFilter.base();
+        SyncFilter.roomList(f, "rooms", part);
+        ((ObjectNode) f.path("room").path("timeline")).put("limit", CATCH_UP_LIMIT);
+        f.putObject("account_data").putArray("not_types").add("*");
+        f.putObject("presence").putArray("not_types").add("*");
+        JsonNode resp = sync(f, null);
+        SyncProcessor.Result r;
+        synchronized (proc) {
+            r = proc.process(resp, false);
+        }
+        caughtUp.accept(r, part);
     }
 
-    private void show(Waking w) {
+    /** The resting rooms' own account data, if due: only that is taken, never their timelines. */
+    private void tags() {
+        Instant now = clock.get();
+        if (resting.isEmpty()) {
+            tagsDue = null;
+            return;
+        }
+        if (tagsDue == null) tagsDue = now.plus(TAGS_EVERY);
+        if (now.isBefore(tagsDue)) return;
+        tagsDue = now.plus(TAGS_EVERY);
+        ObjectNode f = MatrixClient.JSON.createObjectNode();
+        ObjectNode room = f.putObject("room");
+        SyncFilter.roomList(f, "rooms", resting);
+        room.putObject("timeline").put("limit", 0);
+        room.putObject("state").putArray("not_types").add("*");
+        room.putObject("ephemeral").putArray("not_types").add("*");
+        f.putObject("account_data").putArray("not_types").add("*");
+        f.putObject("presence").putArray("not_types").add("*");
+        try {
+            JsonNode resp = sync(f, tagsSince);
+            ObjectNode join = MatrixClient.JSON.createObjectNode();
+            for (Map.Entry<String, JsonNode> e : (Iterable<Map.Entry<String, JsonNode>>) () -> resp.path("rooms").path("join").fields()) {
+                JsonNode data = e.getValue().path("account_data");
+                if (!data.path("events").isEmpty() && resting.contains(e.getKey())) join.putObject(e.getKey()).set("account_data", data);
+            }
+            tagsSince = resp.path("next_batch").asText(null);
+            if (join.isEmpty()) return;
+            ObjectNode only = MatrixClient.JSON.createObjectNode();
+            only.putObject("rooms").set("join", join);
+            SyncProcessor.Result r;
+            synchronized (proc) {
+                r = proc.process(only, false);
+            }
+            caughtUp.accept(r, List.of());
+        } catch (IOException | RuntimeException e) {
+            System.err.println("Discord rest: resting rooms' tags failed, tried again later: " + e);
+        }
+    }
+
+    /** A sync with filter {@code f}, posted; inlined if the server won't keep it or doesn't know its id any more. */
+    private JsonNode sync(ObjectNode f, String since) throws IOException {
+        String tail = "&timeout=0" + (since == null ? "" : "&since=" + enc(since));
+        String id;
+        try {
+            id = filter.id(f);
+        } catch (IOException | MatrixException e) {
+            id = null;
+        }
+        if (id != null) {
+            try {
+                return core.client.request("GET", CLIENT + "/sync?filter=" + enc(id) + tail, null, Duration.ofSeconds(180));
+            } catch (MatrixException e) {
+                if (!SyncFilter.unknown(e)) throw e;
+                filter.forget(id);
+            }
+        }
+        return core.client.request("GET", CLIENT + "/sync?filter=" + enc(f.toString()) + tail, null, Duration.ofSeconds(180));
+    }
+
+    /** "Reactivando <server>…" while a server comes back; once back, "Al día" unless a catch-up is still going. */
+    private synchronized void resuming(String server) {
+        if (server != null) showLocked(new Waking(Step.SERVER, 0, 0, server));
+        else if (!catching) showLocked(new Waking(Step.DONE, 0, 0));
+    }
+
+    private synchronized void show(Waking w) { showLocked(w); }
+
+    /** Caller holds this: the bar's state is decided in one place at a time. */
+    private void showLocked(Waking w) {
         waking = w;
         for (Runnable l : listeners) {
             try {
@@ -241,30 +368,20 @@ final class ArchiveRest {
     }
 
     /**
-     * The rooms that rest: archived Discord servers' spaces and archived rooms inside a Discord server (a channel, a
-     * category), never a DM or group DM (in no server), a bot's chat, an invite or another network's room. None while
-     * {@code awake}. Caller holds the processor's lock.
+     * The rooms that rest: archived Discord rooms inside a server (its space, a category, a channel however deep),
+     * never a DM or group DM (in no server), a bot's chat, an invite, another network's room or the chat open in the
+     * window. None while the archive is open or archived chats notify. Caller holds the processor's lock.
      */
-    static Set<String> restingRooms(Collection<MatrixRoom> rooms, boolean awake) {
-        if (awake) return Set.of();
-        Set<String> servers = new HashSet<>();
-        for (MatrixRoom r : rooms) if (isServerSpace(r)) servers.add(r.id);
-        Set<String> inServer = new HashSet<>(servers);
-        for (MatrixRoom r : rooms) {
-            if (servers.contains(r.id)) inServer.addAll(r.chat.spaceChildren());
-            for (String p : r.chat.spaceParents()) if (servers.contains(p)) inServer.add(r.id);
-        }
+    private Set<String> restingRooms() {
+        if (archiveOpen || Settings.get().notifyArchived()) return Set.of();
+        Map<String, String> inServer = discord.serverSpaces();
         Set<String> out = new HashSet<>();
-        for (MatrixRoom r : rooms) {
-            if (r.chat.archived() && inServer.contains(r.id) && r.chat.network() == Network.DISCORD && !r.chat.bridgeBot()
-                    && !r.invite) {
+        for (MatrixRoom r : proc.rooms()) {
+            if (r.chat.archived() && inServer.containsKey(r.id) && r.chat.network() == Network.DISCORD && !r.chat.bridgeBot()
+                    && !r.invite && !r.id.equals(openChat)) {
                 out.add(r.id);
             }
         }
         return out;
-    }
-
-    private static boolean isServerSpace(MatrixRoom r) {
-        return r.space && r.chat.network() == Network.DISCORD && !r.chat.personalSpace();
     }
 }
