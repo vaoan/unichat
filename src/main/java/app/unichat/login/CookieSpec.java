@@ -55,9 +55,12 @@ public final class CookieSpec {
      * @throws IllegalArgumentException if the network does not log in with cookies
      */
     public static CookieSpec forNetwork(Network network) {
-        CookieSpec s = SPECS.get(network);
-        if (s == null) throw new IllegalArgumentException("Not a cookie network: " + network);
-        return s;
+        return find(network).orElseThrow(() -> new IllegalArgumentException("Not a cookie network: " + network));
+    }
+
+    /** The cookies {@code network} logs in with, if we know them (a bridge may ask for others in its own step). */
+    public static java.util.Optional<CookieSpec> find(Network network) {
+        return java.util.Optional.ofNullable(SPECS.get(network));
     }
 
     public Set<String> required() { return required; }

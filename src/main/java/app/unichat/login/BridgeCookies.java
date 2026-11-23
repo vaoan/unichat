@@ -118,7 +118,7 @@ public final class BridgeCookies {
 
     /** Whether these are a signed-in session: networks have guest cookies too (mautrix/linkedin#67). */
     public static boolean signedIn(Network n, Map<String, String> cookies) {
-        return CookieSpec.forNetwork(n) == null || CookieSpec.forNetwork(n).missing(cookies).isEmpty();
+        return CookieSpec.find(n).map(s -> s.missing(cookies).isEmpty()).orElse(true);
     }
 
     private static String value(BridgeLogin.CookieField f, Map<String, String> cookies, Map<String, String> headers) {

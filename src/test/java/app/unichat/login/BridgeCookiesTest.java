@@ -99,6 +99,12 @@ class BridgeCookiesTest {
     }
 
     @Test
+    void aNetworkWithNoGuestCookiesKnownIsSignedInWithWhatItsBridgeAsks() {
+        // Slack's bridge asks for its cookies in a step of its own: no rule of ours to wait for, so its window can finish.
+        assertTrue(BridgeCookies.signedIn(Network.SLACK, Map.of("d", "x")));
+    }
+
+    @Test
     void theWindowCanFinishWithTheFallbacksToo() {
         Map<String, String> fallbacks = BridgeCookies.headerFallbacks(Network.LINKEDIN, linkedin());
         String feed = "https://www.linkedin.com/feed/";
