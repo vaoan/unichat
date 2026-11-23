@@ -192,7 +192,7 @@ public final class UnichatApp extends Application {
     private static BridgeProvisioner provisioner(LocalServer local) {
         return new BridgeProvisioner() {
             @Override public void ensure(Network n) throws Exception {
-                local.ensureBridge(n.protocolId(), msg -> { });
+                local.ensureBridge(n.protocolId(), n.displayName(), msg -> { });
             }
 
             @Override public boolean provides(Network n) {
@@ -205,6 +205,10 @@ public final class UnichatApp extends Application {
 
             @Override public BridgeStates states() {
                 return local.states();
+            }
+
+            @Override public void loggedOut(Network n) {
+                local.loggedOut(n.protocolId());
             }
         };
     }

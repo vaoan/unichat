@@ -1,8 +1,5 @@
 package app.unichat.server;
 
-import app.unichat.bridge.BridgePorts;
-import app.unichat.support.I18n;
-
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Collection;
@@ -12,9 +9,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 /**
- * Which installed bridges run. One with an account starts at launch; one without doesn't (Google Messages ran with
- * "No user logins found", for nothing) until the person opens its sign-in, and from then on it runs for the session.
- * The watchdog watches only these ({@link #meant}).
+ * Which installed bridges are meant to run. One with an account is, from launch; one without isn't (Google Messages
+ * ran with "No user logins found", for nothing) until the person opens its sign-in, and then for the session, or
+ * until they log out of its last account.
  */
 final class BridgeDemand {
     /** Starts a bridge that isn't running. */
@@ -32,26 +29,26 @@ final class BridgeDemand {
     private final Predicate<String> hasAccount;
     private final Probe probe;
     private final Duration pause;
-    private final int tries;
+    private final Duration limit;
     private final Set<String> meant = ConcurrentHashMap.newKeySet();
 
-    /** @param pause between unanswered probes; @param tries probes before the sign-in gives up */
-    BridgeDemand(Predicate<String> hasAccount, Probe probe, Duration pause, int tries) {
+    /** @param pause between unanswered probes; @param limit how long a sign-in waits for its bridge in all */
+    BridgeDemand(Predicate<String> hasAccount, Probe probe, Duration pause, Duration limit) {
         this.hasAccount = hasAccount;
         this.probe = probe;
         this.pause = pause;
-        this.tries = tries;
+        this.limit = limit;
     }
 
-    /** The bridges among {@code usable} to start at launch: those with an account, and those opened this session. */
-    List<String> atLaunch(Collection<String> usable) {
-        for (String b : usable) if (!meant.contains(b) && hasAccount.test(b)) meant.add(b);
-        return meant(usable);
+    /** The bridges among {@code bridges} meant to run, asking whether they have an account those not meant yet. */
+    List<String> withAccounts(Collection<String> bridges) {
+        for (String b : bridges) if (!meant.contains(b) && hasAccount.test(b)) meant.add(b);
+        return meant(bridges);
     }
 
-    /** The bridges among {@code usable} meant to run now. */
-    List<String> meant(Collection<String> usable) {
-        return usable.stream().filter(meant::contains).toList();
+    /** The bridges among {@code bridges} meant to run now. */
+    List<String> meant(Collection<String> bridges) {
+        return bridges.stream().filter(meant::contains).toList();
     }
 
     boolean isMeant(String bridge) {
@@ -59,16 +56,22 @@ final class BridgeDemand {
     }
 
     /**
-     * Opening {@code bridge}'s sign-in: it runs from now on, {@code start} starts it when it isn't {@code running}, and
-     * this returns once it answers (the sign-in's first call needs it), or throws when it never does.
+     * Opening {@code bridge}'s sign-in: {@code start} starts it when it isn't {@code running}, it's meant to run from then
+     * on, and this returns whether it answered: false as soon as it isn't running, or after the limit.
      */
-    void open(String bridge, boolean running, Start start) throws IOException, InterruptedException {
+    boolean open(String bridge, Predicate<String> running, Start start) throws IOException, InterruptedException {
+        if (!running.test(bridge)) start.run(bridge);
         meant.add(bridge);
-        if (!running) start.run(bridge);
-        for (int i = 0; i < tries; i++) {
-            if (probe.answers(bridge)) return;
-            if (i + 1 < tries) Thread.sleep(pause);
+        long end = System.nanoTime() + limit.toNanos();
+        while (true) {
+            if (probe.answers(bridge)) return true;
+            if (!running.test(bridge) || System.nanoTime() - end >= 0) return false;
+            Thread.sleep(pause);
         }
-        throw new IOException(I18n.t("server.bridgeNoStart", BridgePorts.BRIDGE_PORTS.get(bridge)));
+    }
+
+    /** Its last account logged out: not meant to run any more. Whether it was. */
+    boolean release(String bridge) {
+        return meant.remove(bridge);
     }
 }

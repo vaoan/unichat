@@ -236,7 +236,7 @@ final class BridgeAccounts {
             if (ids.isEmpty()) bots.send(roomId, botCommand(network, "logout"));
             for (String id : ids) bots.send(roomId, botCommand(network, "logout " + id));
             Thread.sleep(1500);
-            refreshLoginsNow(network);
+            afterLogout(provisioner, network, refreshLoginsNow(network));
         });
     }
 
@@ -249,7 +249,7 @@ final class BridgeAccounts {
             if (roomId == null) return;
             bots.send(roomId, botCommand(account.network(), "logout " + loginId));
             Thread.sleep(1500);
-            refreshLoginsNow(account.network());
+            afterLogout(provisioner, account.network(), refreshLoginsNow(account.network()));
         });
     }
 
@@ -271,8 +271,11 @@ final class BridgeAccounts {
         });
     }
 
-    /** Sends {@code list-logins} to the bridge bot and caches the answer (also in Settings, to skip it next start). */
-    private void refreshLoginsNow(Network n) throws IOException, InterruptedException {
+    /**
+     * Sends {@code list-logins} to the bridge bot and caches the answer (also in Settings, to skip it next start).
+     * Returns the logins the bridge answered with, or null when it gave no answer.
+     */
+    private List<Login> refreshLoginsNow(Network n) throws IOException, InterruptedException {
         List<Login> parsed;
         BridgeLogin api = bridgeLogin(n);
         if (api != null) {
@@ -281,21 +284,26 @@ final class BridgeAccounts {
             for (BridgeLogin.Account a : api.accounts()) parsed.add(new Login(a.id(), a.name(), a.state()));
         } else {
             String reply = bots.ask(n, statusCommand(n));
-            if (reply == null) return;
+            if (reply == null) return null;
             parsed = n == Network.DISCORD ? parseDiscordPing(reply) : parseLogins(reply);
         }
         logins.put(n, parsed);
         maybeResyncChats(n, parsed);
         discord.maybePauseArchivedGuilds(n, parsed);
-        StringBuilder sb = new StringBuilder();
-        for (Login l : parsed) {
-            sb.append(l.id()).append('\t').append(l.name() == null ? "" : l.name()).append('\t')
-                    .append(l.state() == null ? "" : l.state()).append('\n');
-        }
-        Settings.get().set(LoginsCache.key(n.protocolId()), System.currentTimeMillis() + "\n" + sb);
+        Settings.get().set(LoginsCache.key(n.protocolId()), LoginsCache.format(System.currentTimeMillis(),
+                parsed.stream().map(l -> new LoginsCache.Row(l.id(), l.name(), l.state())).toList()));
         loginsCachedAt.put(n, System.currentTimeMillis());
         lastAccounts = accounts();
         core.fire(Listener::accountsChanged);
+        return parsed;
+    }
+
+    /**
+     * After the person logged out and the bridge answered with the logins left ({@code answer}, null when it didn't
+     * answer): none left, so its bridge stops. Never from a refresh alone, which can come back empty mid-sign-in.
+     */
+    static void afterLogout(BridgeProvisioner p, Network n, List<Login> answer) {
+        if (p != null && answer != null && answer.isEmpty()) p.loggedOut(n);
     }
 
     private final Map<Network, Long> loginsCachedAt = new ConcurrentHashMap<>();
@@ -304,24 +312,10 @@ final class BridgeAccounts {
     void loadCachedLogins() {
         for (Network n : Network.values()) {
             if (!n.isBridged()) continue;
-            String cached = Settings.get().getString(LoginsCache.key(n.protocolId()), null);
+            LoginsCache.Cached cached = LoginsCache.parse(Settings.get().getString(LoginsCache.key(n.protocolId()), null));
             if (cached == null) continue;
-            String[] lines = cached.split("\n");
-            long ts = 0;
-            try {
-                ts = Long.parseLong(lines[0]);
-            } catch (NumberFormatException ignored) {
-                // treated as stale
-            }
-            List<Login> list = new ArrayList<>();
-            for (int i = 1; i < lines.length; i++) {
-                String[] f = lines[i].split("\t", -1);
-                if (f.length >= 1 && !f[0].isBlank()) {
-                    list.add(new Login(f[0], f.length > 1 && !f[1].isEmpty() ? f[1] : null, f.length > 2 && !f[2].isEmpty() ? f[2] : null));
-                }
-            }
-            logins.put(n, list);
-            loginsCachedAt.put(n, ts);
+            logins.put(n, new ArrayList<>(cached.rows().stream().map(r -> new Login(r.id(), r.name(), r.state())).toList()));
+            loginsCachedAt.put(n, cached.at());
         }
     }
 

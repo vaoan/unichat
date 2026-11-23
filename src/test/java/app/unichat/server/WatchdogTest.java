@@ -53,13 +53,20 @@ class WatchdogTest {
             HttpServer closed = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             int nobody = closed.getAddress().getPort();
             closed.stop(0);
-            BridgeDemand demand = new BridgeDemand(Set.of("whatsapp")::contains, b -> true, Duration.ZERO, 1);
-            List<String> usable = List.of("whatsapp", "gmessages");
-            demand.atLaunch(usable);
+            BridgeLauncher launcher = new BridgeLauncher(new BridgeLauncher.Processes() {
+                @Override public boolean isRunning(String bridge) { return bridge.equals("whatsapp"); }
+                @Override public void prepare(String bridge, java.util.function.Consumer<String> progress) { }
+                @Override public void start(String bridge) { }
+                @Override public void stop(String bridge) { }
+                @Override public void restarting(String bridge) { }
+                @Override public java.nio.file.Path log(String bridge) { return java.nio.file.Path.of(bridge); }
+            }, new BridgeDemand(Set.of("whatsapp")::contains, b -> true, Duration.ZERO, Duration.ZERO),
+                    () -> Set.of("whatsapp", "gmessages"));
+            launcher.launch();
             List<String> restarted = new ArrayList<>();
             boolean[] online = {false};
             Watchdog dog = new Watchdog(Map.of("whatsapp", whatsapp.getAddress().getPort(), "gmessages", nobody),
-                    () -> demand.meant(usable), new BridgeStates(), (name, why) -> restarted.add(name + ": " + why), () -> online[0]);
+                    launcher::watched, new BridgeStates(), (name, why) -> restarted.add(name + ": " + why), () -> online[0]);
             for (int i = 0; i < PROBE_ROUNDS; i++) dog.check();
             online[0] = true;
             dog.check();

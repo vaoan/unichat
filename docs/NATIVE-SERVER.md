@@ -32,7 +32,8 @@ When Unichat starts, it checks what's missing and installs it without asking:
    password or a server URL.
 5. **Startup and supervision:** Unichat starts the server, waits for it to answer, starts the bridges that
    have an account and restarts them if they crash. A bridge with no account (no login kept in `matrix.logins.<network>`,
-   nor in its own database when none was kept yet) doesn't run until the person opens its sign-in, then runs for the session. When Unichat quits (tray menu → Quit Unichat) they are stopped.
+   nor in its own database when none was kept yet) doesn't run until the person opens its sign-in, then runs for the session; logging out of its last account
+   stops it again. When Unichat quits (tray menu → Quit Unichat) they are stopped.
 
 With that, **updating Unichat = getting everything**: new versions of the bridges, of the server and configuration
 changes come with the app.

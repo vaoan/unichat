@@ -16,4 +16,7 @@ public interface BridgeProvisioner {
 
     /** What the bridges report live about their accounts (the local server); null when unknown. */
     default BridgeStates states() { return null; }
+
+    /** The person logged out of {@code network}'s last account and its bridge confirmed it: it needn't run. */
+    default void loggedOut(Network network) { }
 }
