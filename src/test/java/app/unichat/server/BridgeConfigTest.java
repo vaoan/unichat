@@ -74,7 +74,7 @@ class BridgeConfigTest {
         assertEquals(500, c.at("/backfill/max_catchup_messages").asInt());
         assertEquals("stdout", c.at("/logging/writers/0/type").asText(), "logs go through Unichat's redactor");
         assertEquals(1, c.at("/logging/writers").size());
-        assertEquals("info", c.at("/logging/min_level").asText());
+        assertEquals("warn", c.at("/logging/min_level").asText());
         assertEquals(1, c.at("/network/some_network_key").asInt(), "network keys untouched");
     }
 
@@ -236,5 +236,36 @@ class BridgeConfigTest {
         assertEquals(V2, Files.readString(before));
         assertTrue(Files.readString(config).contains("127.0.0.1:8008"));
         assertFalse(Files.exists(dir.resolve("config.yaml.tmp")));
+    }
+
+    @Test
+    void bridgesLogWarningsByDefault() throws Exception {
+        assertEquals("warn", BridgeConfig.apply(BridgeConfig.read(V2), settings("signal")).at("/logging/min_level").asText());
+        assertEquals("warn", BridgeConfig.apply(BridgeConfig.read(LEGACY), settings("discord")).at("/logging/min_level").asText());
+    }
+
+    @Test
+    void theFlagBringsInfoBack() throws Throwable {
+        withFlag("info", () -> {
+            assertEquals("info", BridgeConfig.apply(BridgeConfig.read(V2), settings("signal")).at("/logging/min_level").asText());
+            assertEquals("info", BridgeConfig.apply(BridgeConfig.read(LEGACY), settings("discord")).at("/logging/min_level").asText());
+        });
+    }
+
+    @Test
+    void aFlagThatIsNoLevelFallsBackToWarn() throws Throwable {
+        withFlag("loud", () ->
+                assertEquals("warn", BridgeConfig.apply(BridgeConfig.read(V2), settings("signal")).at("/logging/min_level").asText()));
+    }
+
+    private static void withFlag(String value, org.junit.jupiter.api.function.Executable body) throws Throwable {
+        String before = System.getProperty("unichat.bridgeLogs");
+        System.setProperty("unichat.bridgeLogs", value);
+        try {
+            body.execute();
+        } finally {
+            if (before == null) System.clearProperty("unichat.bridgeLogs");
+            else System.setProperty("unichat.bridgeLogs", before);
+        }
     }
 }

@@ -1,18 +1,10 @@
 package app.unichat.server;
 
-import app.unichat.support.Redactor;
 import app.unichat.support.Storage;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +18,6 @@ import java.util.concurrent.TimeUnit;
 public final class Supervisor {
     private final Duration firstBackoff;
     private final Duration maxBackoff;
-    static final long MAX_LOG = 5L * 1024 * 1024;
     private static final long STABLE_MS = 60_000;
     private final Map<String, Service> services = new ConcurrentHashMap<>();
 
@@ -147,78 +138,14 @@ public final class Supervisor {
         }
     }
 
-    /**
-     * Copies a process's output to its log with personal data removed ({@link Redactor}); past
-     * {@link #MAX_LOG} the log is moved to {@code <log>.1} (one copy kept).
-     * <p>
-     * Whatever fails here (log not writable, disk full, out of memory), the output keeps being read: with nobody
-     * reading, the pipe fills and the process blocks on its next log line, alive but deaf (the Discord bridge sat
-     * a day in write() after an OutOfMemoryError killed this thread). A line that can't be written is lost and the
-     * next one tries again.
-     */
+    /** Copies a process's output to its log, see {@link LogPump}. */
     static void pump(Process p, Path log) {
-        pump(p, log, line -> { }, () -> { });
+        LogPump.run(p, log, line -> { }, () -> { });
     }
 
-    /**
-     * {@link #pump(Process, Path)}, handing {@code read} each line as it came (not redacted) before it's written, and
-     * running {@code afterLine} once it is.
-     */
+    /** {@link LogPump#run}: {@code read} gets each line as it came, {@code afterLine} runs once it is written. */
     static void pump(Process p, Path log, java.util.function.Consumer<String> read, Runnable afterLine) {
-        InputStream raw = p.getInputStream();
-        BufferedReader in = new BufferedReader(new InputStreamReader(raw, StandardCharsets.UTF_8));
-        OutputStream out = null;
-        boolean reported = false;
-        try {
-            String line;
-            while ((line = in.readLine()) != null) {
-                try {
-                    read.accept(line);
-                    if (out == null) out = Files.newOutputStream(log, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-                    out.write((Redactor.redact(line) + "\n").getBytes(StandardCharsets.UTF_8));
-                    out.flush();
-                    if (Files.size(log) > MAX_LOG) {
-                        out.close();
-                        out = null;
-                        Files.move(log, log.resolveSibling(log.getFileName() + ".1"), StandardCopyOption.REPLACE_EXISTING);
-                    }
-                    reported = false;
-                    afterLine.run();
-                } catch (Throwable t) {
-                    out = closeQuietly(out);
-                    if (!reported) System.err.println("Log copy failing (" + log.getFileName() + "): " + t);
-                    reported = true;
-                }
-            }
-        } catch (IOException e) {
-            // Output closed: the process is gone.
-        } catch (Throwable t) {
-            // Reading itself failed (out of memory on a huge line): from here on only drain, into a fixed buffer.
-            System.err.println("Log copy stopped (" + log.getFileName() + "): " + t);
-            byte[] buf = new byte[8192];
-            while (true) {
-                try {
-                    if (raw.read(buf) < 0) break;
-                } catch (IOException e) {
-                    break;
-                } catch (Throwable again) {
-                    // keep draining
-                }
-            }
-        } finally {
-            closeQuietly(out);
-        }
-    }
-
-    private static OutputStream closeQuietly(OutputStream out) {
-        if (out != null) {
-            try {
-                out.close();
-            } catch (Throwable ignored) {
-                // nothing to save
-            }
-        }
-        return null;
+        LogPump.run(p, log, read, afterLine);
     }
 
     /** Starts {@code name} (replacing a previous one with that name). */
