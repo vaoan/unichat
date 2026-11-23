@@ -337,7 +337,7 @@ final class SyncProcessor {
         }
         Message known = room.byId.get(id);
         if (known != null) {
-            takeServerTime(room, known, ev, r);
+            takeServerEvent(room, known, ev, r);
             return;
         }
         if (room.reactionEvents.containsKey(id)) return;
@@ -719,13 +719,16 @@ final class SyncProcessor {
     /**
      * A message confirmed from the send's answer (only an event id) still has its echo's time, from before the upload;
      * its event, when the sync brings it, has the server's. Kept, an answer saved meanwhile moved autosave's mark past
-     * what I sent, and it was never saved.
+     * what I sent, and it was never saved. A file of mine takes the event's address too, in place of the disk's.
      */
-    private void takeServerTime(MatrixRoom room, Message known, JsonNode ev, Result r) {
+    private void takeServerEvent(MatrixRoom room, Message known, JsonNode ev, Result r) {
         long ts = ev.path("origin_server_ts").asLong(0);
         Instant server = Instant.ofEpochMilli(ts);
-        if (!known.outgoing() || ts <= 0 || known.timestamp().equals(server)) return;
-        Message fixed = known.withTimestamp(server);
+        boolean time = known.outgoing() && ts > 0 && !known.timestamp().equals(server);
+        boolean media = takesServerMedia(known, ev.path("content"));
+        if (!time && !media) return;
+        Message fixed = known.withTimestamp(time ? server : known.timestamp());
+        if (media) applyMedia(fixed, ev.path("content"));
         int idx = room.timeline.indexOf(known);
         if (idx >= 0) room.timeline.set(idx, fixed);
         room.byId.put(fixed.id(), fixed);

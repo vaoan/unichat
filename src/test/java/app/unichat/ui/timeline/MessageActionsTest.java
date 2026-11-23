@@ -161,4 +161,16 @@ class MessageActionsTest {
         local.setMediaUrl("file:///Users/x/.ssh/id_rsa");
         assertFalse(MessageActions.of(local, f(WHATSAPP), SENT).contains(FORWARD), "a stranger's message chooses its address: only a media one goes on");
     }
+
+    @Test
+    void aFileISentOffersForward() throws Exception {
+        // A voice note or file of mine, once the server has it, as the sync leaves it (its server address, not the disk's).
+        for (MessageType type : new MessageType[]{MessageType.AUDIO, MessageType.FILE, MessageType.IMAGE}) {
+            Message mine = msg(true, type, "audio/ogg");
+            mine.setStatus(app.unichat.model.MessageStatus.SENT);
+            assertTrue(MessageActions.of(mine, f(TELEGRAM), SENT).contains(FORWARD), type.name());
+        }
+    }
+
+    private static final String TELEGRAM = "{\"id\":\"tg\",\"edit\":2,\"delete\":2,\"reply\":2}";
 }

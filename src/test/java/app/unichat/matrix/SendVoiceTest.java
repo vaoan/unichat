@@ -69,4 +69,15 @@ class SendVoiceTest {
         assertEquals(2500, c.path("org.matrix.msc1767.audio").path("duration").asLong());
         assertEquals(1024, c.path("org.matrix.msc1767.audio").path("waveform").get(2).asInt());
     }
+
+    @Test
+    void whatISentPlaysFromDiskAtItsServerAddressToo() throws Exception {
+        // Once its event comes, my message has the server's address: playing it mustn't download what this computer has.
+        Path f = Files.write(dir.resolve("nota.ogg"), new byte[]{1, 2, 3});
+        MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
+        svc.sendVoice("!c:example.org", new VoiceNote(f, 2500, List.of(10, 500, 1024)), null).get();
+        assertEquals(f, svc.media("mxc://s/v1", 0, 0).get());
+        Files.delete(f);
+        assertTrue(!f.equals(svc.media("mxc://s/v1", 0, 0).get()), "a file gone from disk is downloaded");
+    }
 }

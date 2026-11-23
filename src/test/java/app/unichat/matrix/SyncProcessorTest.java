@@ -389,6 +389,47 @@ class SyncProcessorTest {
     }
 
     @Test
+    void aConfirmedEchoOfMyVoiceNoteTakesItsServerAddressAndWaveform() {
+        // The echo shows the file from disk (a file: address); kept after its event came, the menu had no "Reenviar" for
+        // anything I sent, since only a media address can go on.
+        String room = "!v:example.org";
+        sync(room, "{'timeline':{'events':[]}}", false);
+        proc.addLocalEcho(room, "t4", m -> {
+            m.setType(app.unichat.model.MessageType.AUDIO);
+            m.setMediaUrl("file:///tmp/nota.ogg");
+            m.setFileName("nota.ogg");
+            m.setMimeType("audio/ogg");
+        });
+        proc.confirmLocalEcho(room, "t4", "$voz");
+        assertEquals("file:///tmp/nota.ogg", messages(room).get(0).mediaUrl(), "until its event comes, it plays from disk");
+        long server = java.time.Instant.now().plusSeconds(3600).toEpochMilli();
+        SyncProcessor.Result r = sync(room, "{'timeline':{'events':[{'type':'m.room.message','event_id':'$voz','sender':'" + ME
+                + "','origin_server_ts':" + server + ",'content':{'msgtype':'m.audio','body':'nota.ogg','filename':'nota.ogg',"
+                + "'url':'mxc://example.org/v1','info':{'mimetype':'audio/ogg','size':3,'duration':2500},"
+                + "'org.matrix.msc3245.voice':{},'org.matrix.msc1767.audio':{'duration':2500,'waveform':[10,500,1024]}}}]}}", true);
+        assertEquals(1, messages(room).size(), "still one message");
+        Message mine = messages(room).get(0);
+        assertEquals("mxc://example.org/v1", mine.mediaUrl());
+        assertEquals(List.of(10, 500, 1024), mine.voiceWaveform());
+        assertEquals(2500, mine.durationMs());
+        assertEquals(3, mine.fileSize());
+        assertEquals("nota.ogg", mine.fileName());
+        assertEquals(java.time.Instant.ofEpochMilli(server), mine.timestamp(), "the server's time as before");
+        assertEquals(mine, proc.room(room).byId.get("$voz"));
+        assertTrue(r.messagesChanged.contains(room));
+    }
+
+    @Test
+    void someoneElsesMessageKeepsItsOwnAddressWhenItsEventComesAgain() {
+        String room = "!o:example.org";
+        String ev = "{'type':'m.room.message','event_id':'$f','sender':'@bob:example.org','origin_server_ts':5,"
+                + "'content':{'msgtype':'m.file','body':'a.pdf','url':'%s'}}";
+        sync(room, "{'timeline':{'events':[" + ev.formatted("mxc://example.org/a") + "]}}", true);
+        sync(room, "{'timeline':{'events':[" + ev.formatted("mxc://example.org/b") + "]}}", true);
+        assertEquals("mxc://example.org/a", messages(room).get(0).mediaUrl(), "a known event isn't read twice");
+    }
+
+    @Test
     void liveIncomingMessagesAreReported() {
         String room = "!n:example.org";
         SyncProcessor.Result r = sync(room, "{'timeline':{'events':[%s]}}".formatted(text("$1", "@bob:example.org", 1, "a")), true);

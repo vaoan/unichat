@@ -492,6 +492,7 @@ final class MessageSender {
                 throw new CompletionException(e);
             }
         }, core.io).thenCompose(uri -> {
+            media.uploaded(uri, file);
             ObjectNode content = MatrixClient.JSON.createObjectNode();
             content.put("msgtype", switch (type) {
                 case IMAGE -> "m.image";

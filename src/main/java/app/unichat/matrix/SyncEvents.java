@@ -66,8 +66,6 @@ final class SyncEvents {
             m.setBody(I18n.t("sync.encryptedFile"));
             return;
         }
-        m.setMediaUrl(url);
-        m.setExternalUrl(text(content, "external_url"));
         String filename = text(content, "filename");
         if (filename != null && !filename.equals(b)) {
             m.setFileName(filename);
@@ -76,12 +74,28 @@ final class SyncEvents {
             m.setFileName(b.isEmpty() ? null : b);
             m.setBody("");
         }
+        applyMedia(m, content);
+    }
+
+    /** The file's own fields: its address, info, size, type and a voice note's waveform (the caption and name aside). */
+    static void applyMedia(Message m, JsonNode content) {
+        m.setMediaUrl(text(content, "url"));
+        m.setExternalUrl(text(content, "external_url"));
         JsonNode info = content.path("info");
         if (info.isObject()) m.setMediaInfo(info);
         m.setMimeType(text(info, "mimetype"));
         m.setSize(info.path("w").asInt(0), info.path("h").asInt(0));
         m.setFileSize(info.path("size").asLong(0));
-        m.setVoiceWaveform(t == MessageType.AUDIO && content.has(VOICE) ? waveform(content.path(AUDIO).path("waveform")) : null);
+        m.setVoiceWaveform(m.type() == MessageType.AUDIO && content.has(VOICE) ? waveform(content.path(AUDIO).path("waveform")) : null);
+    }
+
+    /**
+     * My echo shows the file from disk (a {@code file:} address, opened only as ours); once its event comes it takes the
+     * server's, which is what forwarding, saving and the next start use.
+     */
+    static boolean takesServerMedia(Message known, JsonNode content) {
+        return known.outgoing() && known.mediaUrl() != null && known.mediaUrl().startsWith("file:")
+                && app.unichat.model.Mxc.parse(text(content, "url")) != null;
     }
 
     static final String VOICE = "org.matrix.msc3245.voice", AUDIO = "org.matrix.msc1767.audio";
