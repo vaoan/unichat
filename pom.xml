@@ -177,7 +177,7 @@
            SystemOut: stdout and stderr are the log (AppLog writes them to unichat.log).
            Java8ApiChecker: the code targets Java 25.
            CanIgnoreReturnValueSuggester: suggests Google's annotation, which the code doesn't use.
-           RemoveUnusedImports: Checkstyle's (Task 4).
+           RemoveUnusedImports: Checkstyle's (Task 5).
            CatchingUnchecked, ThrowsUncheckedException, ConstantPatternCompile, PreferJavaTimeOverload,
              UnnecessaryBoxedVariable, MethodCanBeStatic: speed or how to say it, not defects.
            TraditionalJavadocToMarkdown, MissingBraces, UnnecessarilyFullyQualified, Varifier, Var, BooleanParameter,
