@@ -49,7 +49,11 @@ final class VaultPage {
     static Node build(Cloud cloud) {
         VaultPage page = new VaultPage(cloud);
         Runnable listener = () -> Platform.runLater(page::stateMaybeChanged);
-        app.unichat.ui.Showing.whileShowing(page.body, () -> cloud.addListener(listener), () -> cloud.removeListener(listener));
+        // Seen again (restored, unlocked): what changed while it heard nothing is drawn at once.
+        app.unichat.ui.Showing.whileShowing(page.body, () -> {
+            cloud.addListener(listener);
+            page.stateMaybeChanged();
+        }, () -> cloud.removeListener(listener));
         page.reload();
         // Only with the probe asked for (-Dunichat.passkeyProbe=true or --passkey-probe): a test for phase 3's passkey.
         return PasskeyProbeRow.ifAsked((opened, told) -> PasskeyProbe.run(uri -> {

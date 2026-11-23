@@ -25,11 +25,9 @@ public final class Showing {
     private static final Set<Watcher> SHOWN_WINDOWS = Collections.newSetFromMap(new IdentityHashMap<>());
 
     static {
-        // One listener for all, holding no node: a watch is only in SHOWN_WINDOWS while its window shows.
-        Seen.get().addListener(seen -> {
-            if (Platform.isFxApplicationThread()) seenChanged();
-            else Platform.runLater(Showing::seenChanged);
-        });
+        // One listener for all, holding no node: a watch is only in SHOWN_WINDOWS while its window shows. Always handed
+        // to the FX thread, even from there: Seen calls its listeners under its lock, and the work here can be anything.
+        Seen.get().addListener(seen -> Platform.runLater(Showing::seenChanged));
     }
 
     private Showing() {}

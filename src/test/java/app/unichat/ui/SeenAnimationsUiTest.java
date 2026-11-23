@@ -61,23 +61,44 @@ class SeenAnimationsUiTest {
         WorkingLine line = FxWait.fx(WorkingLine::new);
         Stage stage = window(FxWait.fx(() -> new StackPane(line.node())));
         FxWait.fx(() -> { line.start("Limpiando la nota"); return null; });
+        java.util.concurrent.Callable<Boolean> spinning = () -> line.node().lookupAll(".progress-indicator").stream()
+                .anyMatch(n -> ((javafx.scene.control.ProgressIndicator) n).isIndeterminate());
         assertTrue(FxWait.fx(() -> Showing.animating(line.node())), "counting while seen");
+        assertTrue(FxWait.fx(spinning), "its wheel turns while seen");
 
         Seen.reset(false); // from another thread, as the screen's source does
-        FxWait.until("resting while nobody can see it", () -> !Showing.animating(line.node()));
+        FxWait.until("resting while nobody can see it", () -> !Showing.animating(line.node()) && !spinning.call());
         Seen.reset(true);
-        FxWait.until("counting again once seen", () -> Showing.animating(line.node()));
+        FxWait.until("counting again once seen", () -> Showing.animating(line.node()) && spinning.call());
 
         FxWait.fx(() -> { stage.setIconified(true); return null; });
-        FxWait.until("resting while its window is minimised", () -> !Showing.animating(line.node()));
+        FxWait.until("resting while its window is minimised", () -> !Showing.animating(line.node()) && !spinning.call());
         FxWait.fx(() -> { stage.setIconified(false); return null; });
-        FxWait.until("counting again once restored", () -> Showing.animating(line.node()));
+        FxWait.until("counting again once restored", () -> Showing.animating(line.node()) && spinning.call());
 
         FxWait.fx(() -> { line.stop(); return null; });
         Seen.reset(false);
         Seen.reset(true);
         FxWait.fx(() -> null); // the change reached the FX thread
         assertFalse(FxWait.fx(() -> Showing.animating(line.node())), "done: seen again doesn't start it");
+    }
+
+    /** Seen's listeners run under its lock: Showing's work is handed to the FX thread, even when set from there. */
+    @Test
+    void workNeverRunsInsideSeensOwnCall() throws Exception {
+        StackPane node = FxWait.fx(StackPane::new);
+        List<Boolean> underSeensLock = new ArrayList<>();
+        window(FxWait.fx(() -> new StackPane(node)));
+        Runnable look = () -> underSeensLock.add(Thread.holdsLock(Seen.get()));
+        FxWait.fx(() -> {
+            Showing.whileShowing(node, look, look);
+            underSeensLock.clear(); // the first start, from whileShowing itself
+            Seen.reset(false);
+            return null;
+        });
+        FxWait.fx(() -> { Seen.reset(true); return null; }); // after the stop handed on by the first has run
+        FxWait.fx(() -> null); // and the start
+        assertEquals(List.of(false, false), FxWait.fx(() -> List.copyOf(underSeensLock)), "stop and start, outside Seen's call");
     }
 
     @Test

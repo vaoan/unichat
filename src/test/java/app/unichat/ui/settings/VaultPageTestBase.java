@@ -97,6 +97,7 @@ abstract class VaultPageTestBase {
 
     @AfterEach
     void stop() throws Exception {
+        app.unichat.support.Seen.reset(true);
         if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
         RecoveryCodeSheet.saveTo = saveWas;
         RecoveryCodeSheet.printer = printWas;

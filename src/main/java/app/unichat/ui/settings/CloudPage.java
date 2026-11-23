@@ -232,8 +232,12 @@ public final class CloudPage {
             verify.setDisable(act != null);
         };
         Runnable listener = () -> Platform.runLater(show);
-        // Only while its window shows: a closed window keeps its scene, and its page kept hearing every round.
-        app.unichat.ui.Showing.whileShowing(state, () -> c.addListener(listener), () -> c.removeListener(listener));
+        // Only while it can be seen: a closed window keeps its scene, and its page kept hearing every round. Seen again
+        // (restored, unlocked) it draws what it missed at once, or it kept saying "syncing" with its buttons off.
+        app.unichat.ui.Showing.whileShowing(state, () -> {
+            c.addListener(listener);
+            show.run();
+        }, () -> c.removeListener(listener));
         show.run();
         now.getStyleClass().add("secondary-button");
         now.setOnAction(e -> {

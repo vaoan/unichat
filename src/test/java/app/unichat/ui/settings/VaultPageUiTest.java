@@ -404,6 +404,52 @@ class VaultPageUiTest extends VaultPageTestBase {
             "a round after it closed changes nothing in it");
     }
 
+    /** Nobody can see Unichat: the page stops hearing the cloud. Seen again, it shows what happened meanwhile at once. */
+    @Test
+    void theCloudsStatusChangedWhileUnseenShowsOnceSeenAgain() throws Exception {
+        CloudPage.use(account.cloud());
+        Stage s = FxWait.fx(() -> {
+            Stage st = new Stage();
+            st.setOpacity(0);
+            st.setScene(new Scene(new ScrollPane(new VBox(CloudPage.build(t -> { }))), 720, 900));
+            st.show();
+            return st;
+        });
+        String before = I18n.t("settings.cloud.notYet");
+        java.util.concurrent.Callable<Boolean> saysBefore = () -> s.getScene().getRoot().lookupAll(".label").stream()
+            .anyMatch(n -> before.equals(((Labeled) n).getText()));
+        FxWait.until("the status line", saysBefore);
+        unseen();
+        account.cloud().syncNow().get();
+        FxWait.settled();
+        assertTrue(FxWait.fx(saysBefore), "unseen: nothing heard");
+        app.unichat.support.Seen.reset(true);
+        FxWait.until("seen again: the round that went meanwhile", () -> !saysBefore.call());
+        FxWait.fx(() -> { s.close(); return null; });
+    }
+
+    @Test
+    void theVaultChangedWhileUnseenShowsOnceSeenAgain() throws Exception {
+        String code = account.otherComputerMadeIt(null);
+        account.cloud().vault().openVault(app.unichat.cloud.VaultView.Way.RECOVERY, code.toCharArray()).get();
+        account.cloud().syncNow().get();
+        page();
+        waitOpen();
+        unseen();
+        account.removeHere();
+        assertEquals(Cloud.VaultState.REMOVED, round());
+        FxWait.settled();
+        assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.removed"))), "unseen: nothing heard");
+        app.unichat.support.Seen.reset(true);
+        waitFor(I18n.t("settings.vault.removed"));
+    }
+
+    /** Nobody can see Unichat, and the pages have heard it ({@code Showing} hears it on the FX thread). */
+    private static void unseen() throws Exception {
+        app.unichat.support.Seen.reset(false);
+        FxWait.fx(() -> null);
+    }
+
     @Test
     void aChangedKeyAcceptedInTheConfirmationGetsTheNewKey() throws Exception {
         String code = openedWithOthers();

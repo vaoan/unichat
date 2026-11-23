@@ -22,6 +22,7 @@ class FxWatchTest {
     @AfterEach
     void seenAgain() {
         Seen.reset(true);
+        Thread.interrupted(); // the interrupt that ended a run, even when an assert failed before it was read
     }
 
     /** The watch's time: moved by each of its sleeps, and {@code then} run after the n-th; it stops after {@code sleeps}. */
@@ -103,6 +104,5 @@ class FxWatchTest {
         assertEquals(0, frozen.get(), "the question asked before it was seen again doesn't count");
         assertEquals(2, posted.size(), "asks again from being seen");
         assertEquals(List.of(60_000L, 5_000L), clock.slept);
-        Thread.interrupted();
     }
 }
