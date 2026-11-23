@@ -41,6 +41,16 @@ class BuildRulesTest {
     }
 
     @Test
+    void noCompilerExecutionHasAConfigurationOfItsOwn() {
+        Element executions = elements(plugin("maven-compiler-plugin"), "executions").stream().findFirst().orElse(null);
+        if (executions == null) return;
+        for (Element e : elements(executions, "execution")) {
+            assertTrue(elements(e, "configuration").isEmpty(), text(e, "id") + " has its own configuration: it would replace"
+                    + " the lint and Error Prone for what it compiles (default-testCompile: the tests)");
+        }
+    }
+
+    @Test
     void aLintTurnedOffSaysWhy() {
         for (Element arg : elements(child(configuration("maven-compiler-plugin"), "compilerArgs"), "arg")) {
             if (!arg.getTextContent().trim().startsWith("-Xlint:-")) continue;

@@ -163,8 +163,28 @@
       <!-- Error Prone runs inside javac on main and test code; -Werror makes its warnings errors too (.mvn/jvm.config
            opens javac to it). Besides its defaults, checks that are off by default and catch real defects are on.
            Off, each one noise here (BuildRulesTest wants every :OFF named in this comment):
-           StringSplitter: its fix is Guava's Splitter, not a dependency; split(x, 0) would only silence it.
-           ReferenceEquality: JavaFX code compares nodes, windows and sentinels by identity on purpose (57 found, all meant). -->
+           StringSplitter: 58 sites read, none depends on trailing empty parts (each takes the first, checks the
+             length, skips blanks or reads lines); the fix needs Guava, not a dependency.
+           ReferenceEquality: JavaFX code compares nodes, windows and sentinels by identity on purpose (57 found, all meant).
+           Off by default and left so, each with what it found here:
+           InterruptedExceptionSwallowed: flags every JUnit test that "throws Exception" (345); its 19 main-code sites
+             are parked as a follow-up, because restoring the interrupt there changes behaviour.
+           AddNullMarkedToClass, FieldMissingNullable, ParameterMissingNullable, ReturnMissingNullable,
+             ReturnsNullCollection: nullness is NullAway's, Task 7 (ParameterMissingNullable also crashes 2.53.0).
+           Interruption: Thread.interrupt() is how workers are cancelled here (7, all meant).
+           NonFinalStaticField: UI-thread caches and test seams on purpose (25); making them final is a redesign.
+           SystemExitOutsideMain: Recovery's restart must exit the JVM.
+           SystemOut: stdout and stderr are the log (AppLog writes them to unichat.log).
+           Java8ApiChecker: the code targets Java 25.
+           CanIgnoreReturnValueSuggester: suggests Google's annotation, which the code doesn't use.
+           RemoveUnusedImports: Checkstyle's (Task 4).
+           CatchingUnchecked, ThrowsUncheckedException, ConstantPatternCompile, PreferJavaTimeOverload,
+             UnnecessaryBoxedVariable, MethodCanBeStatic: speed or how to say it, not defects.
+           TraditionalJavadocToMarkdown, MissingBraces, UnnecessarilyFullyQualified, Varifier, Var, BooleanParameter,
+             MultiVariableDeclaration, YodaCondition, UngroupedOverloads, InconsistentOverloads, WildcardImport,
+             IdentifierName, MissingJavadoc, ImmutableMemberCollection, TooManyParameters, PreferredInterfaceType,
+             UnnecessaryAnonymousClass, AvoidObjectArrays: a style the code doesn't use, not defects.
+           Every other off-by-default check found nothing in main code. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
