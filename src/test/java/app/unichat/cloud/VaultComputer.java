@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 final class VaultComputer {
     /** What each computer holds of the settings. */
-    static final List<String> KEYS = List.of(CloudNames.DONE, "cloud.machine", VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultParts.DECLINED,
+    static final List<String> KEYS = List.of(CloudNames.DONE, CloudNames.KEPT, VaultNames.LEFT, "cloud.machine", VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultParts.DECLINED,
         "cloud.base.settings", "cloud.base.ai", "cloud.base.secrets", "cloud.base.pinned", "cloud.media", "cloud.settings", "cloud.lastVerify",
         "server.telegram.apiId", "server.telegram.apiHash", "gif.giphy.key", "cloud.dropboxAppKey", "cloud.pcloudClientId", "stt.command",
         "ui.theme", VaultPeers.KEY, VaultActions.UNCONFIRMED, VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultOff.KEY, VaultMove.RECORD, VaultParts.SEEN, VaultMove.KNOWN);

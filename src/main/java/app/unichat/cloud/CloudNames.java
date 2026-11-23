@@ -24,6 +24,11 @@ final class CloudNames {
     static final String OLD_INFO = OLD_VAULT + "/boveda.json", OLD_SLOTS = OLD_VAULT + "/llaves";
     /** Machine-only: this computer found every plain old folder moved and deleted, so it never looks for them again. */
     static final String DONE = "cloud.names.done";
+    /**
+     * Machine-only: a media file kept under the old name (it differs from the new one), with both copies' stamps when
+     * found: while neither changes, the old folder isn't walked again.
+     */
+    static final String KEPT = "cloud.names.kept";
 
     /** Under {@code Unichat/}: each old name and its new one, a file's before its folder's. */
     private static final String[][] LOGICAL = {
@@ -108,19 +113,17 @@ final class CloudNames {
     /**
      * The plain old folders under their new names, then deleted once confirmed: run at the start of each round until it's
      * done ({@link #DONE}), then never again. With {@code texts} (TextSync's lock) held over the texts, as each computer
-     * writes its own. Cut short anywhere, the next round goes on from what's there. Whether nothing is left under media's
-     * old name (else the round's check waits: it would send again what's still there).
+     * writes its own. Cut short anywhere, the next round goes on from what's there; done without a failure, no media
+     * file is missing under the new name (what's kept under the old one differs from its new copy).
      */
-    static boolean migrate(Storage dav, Object texts) throws IOException {
+    static void migrate(Storage dav, Object texts) throws IOException {
         Settings s = Settings.get();
-        if (s.getBool(DONE, false)) return true;
+        if (s.getBool(DONE, false)) return;
         boolean gone = settings(dav);
         synchronized (texts) {
             gone &= texts(dav);
         }
-        boolean media = media(dav);
-        if (gone && media) s.setBool(DONE, true);
-        return media;
+        if (media(dav) && gone) s.setBool(DONE, true);
     }
 
     /**
@@ -151,7 +154,7 @@ final class CloudNames {
             byte[] wins = winner(target, old, now, false);
             if (wins != null) dav.put(target, wins);
         }
-        return confirmed(dav, OLD_SETTINGS, 1);
+        return confirmed(dav, OLD_SETTINGS, 1) == null;
     }
 
     /**
@@ -175,7 +178,7 @@ final class CloudNames {
                 if (name.equals(TextIndex.NAME) || TextIndex.FILE.matcher(name).matches()) text(dav, from + "/" + name, to + "/" + name);
             }
         }
-        return confirmed(dav, OLD_TEXTS, 2);
+        return confirmed(dav, OLD_TEXTS, 2) == null;
     }
 
     /** One text file or index under both names: the new name holds what wins (the old one whole is moved, not sent again). */
@@ -197,10 +200,12 @@ final class CloudNames {
 
     /**
      * Media under {@link CloudAccount#MEDIA}: the whole folder moved on the server; when both are there (a move cut
-     * short), each chat's folder, or each of its files, the new folder lacks moved in.
+     * short), each chat's folder, or each of its files, the new folder lacks moved in. A file kept because it differs
+     * ({@link #KEPT}) holds the folder without a walk each round, until one of its copies changes. Whether it's gone.
      */
     private static boolean media(Storage dav) throws IOException {
         if (!dav.exists(OLD_MEDIA)) return true;
+        if (still(dav, Settings.get().getString(KEPT, null))) return false;
         if (!dav.exists(CloudAccount.MEDIA)) {
             moveInto(dav, OLD_MEDIA, CloudAccount.MEDIA);
             return true;
@@ -216,32 +221,42 @@ final class CloudNames {
                 if (Storage.plainName(name) && dav.info(to + "/" + name) == null) dav.move(from + "/" + name, to + "/" + name);
             }
         }
-        return confirmed(dav, OLD_MEDIA, 2);
+        String kept = confirmed(dav, OLD_MEDIA, 2);
+        Settings.get().set(KEPT, kept == null ? null : kept + "\n" + dav.stamp(kept) + "\n" + dav.stamp(renamed(kept)));
+        return kept == null;
+    }
+
+    /** Whether the file {@link #KEPT} says and its new copy have the stamps they had then. */
+    private static boolean still(Storage dav, String kept) throws IOException {
+        String[] parts = kept == null ? new String[0] : kept.split("\n", 3);
+        return parts.length == 3 && parts[1].equals(String.valueOf(dav.stamp(parts[0])))
+            && parts[2].equals(String.valueOf(dav.stamp(renamed(parts[0]))));
     }
 
     /**
      * {@code dir} deleted whole once every file left in it ({@code depth} folders down) is held under its new name: media
      * the same size, and checksum where the service gives one (WebDAV gives only the size); anything else what wins
-     * there ({@link #winner}). One that isn't is kept with its folder, and said in the log. Whether it's gone.
+     * there ({@link #winner}). One that isn't is kept with its folder, and said in the log. Null once it's gone, else the
+     * first path there that isn't held.
      */
-    private static boolean confirmed(Storage dav, String dir, int depth) throws IOException {
-        if (!dav.exists(dir)) return true;
-        String why = unconfirmed(dav, dir, depth);
-        if (why != null) {
-            System.err.println("Cloud: " + dir + " kept under its old name: " + why);
-            return false;
+    private static String confirmed(Storage dav, String dir, int depth) throws IOException {
+        if (!dav.exists(dir)) return null;
+        String kept = unconfirmed(dav, dir, depth);
+        if (kept != null) {
+            System.err.println("Cloud: " + dir + " kept under its old name: something in it isn't under the new one");
+            return kept;
         }
         dav.delete(dir);
-        return true;
+        return null;
     }
 
-    /** Why some file under {@code dir} isn't held under its new name, or null when all are. */
+    /** The first path under {@code dir} that isn't held under its new name (a name not ours: its folder), or null. */
     private static String unconfirmed(Storage dav, String dir, int depth) throws IOException {
         for (String name : dav.list(dir)) {
-            if (!Storage.plainName(name)) return "a name that isn't one of ours";
+            if (!Storage.plainName(name)) return dir;
             String path = dir + "/" + name;
-            String why = depth > 1 ? unconfirmed(dav, path, depth - 1) : held(dav, path) ? null : "a file that isn't under the new name: " + name;
-            if (why != null) return why;
+            String kept = depth > 1 ? unconfirmed(dav, path, depth - 1) : held(dav, path) ? null : path;
+            if (kept != null) return kept;
         }
         return null;
     }

@@ -141,7 +141,8 @@ class VaultNamesTest {
         Map<String, byte[]> now = opened(Vault.ROOT, made.vk(), false);
         assertEquals(held.keySet(), now.keySet(), "every file, each opening under its new path");
         held.forEach((p, b) -> assertArrayEquals(b, now.get(p), p));
-        assertEquals(2, new com.fasterxml.jackson.databind.ObjectMapper().readTree(cloud.files.get(Vault.INFO)).path("names").asInt());
+        assertFalse(new com.fasterxml.jackson.databind.ObjectMapper().readTree(cloud.files.get(Vault.INFO)).has("names"),
+            "the vault's file being there is the mark: nothing in it says the names");
         assertEquals(made.info().id(), Vault.info(dav()).id());
         assertEquals(java.util.Set.of(DESK, LAPTOP), Vault.computers(dav()).keySet(), "every way in moved");
         assertEquals(2, Vault.slots(dav()).size() - 1, "and the recovery code's");
@@ -396,5 +397,18 @@ class VaultNamesTest {
         desk.as(() -> desk.cloud.vault().removeComputer(LAPTOP));
         assertFalse(Vault.computers(dav()).containsKey(LAPTOP), "removed: only the old slots needed finishing first");
         assertFalse(anyUnder(CloudNames.OLD_SLOTS), "and they were");
+    }
+
+    @Test
+    void aFileThatNeverOpensIsLookedAtOnce() throws Exception {
+        anOldVault();
+        cloud.put("Unichat/Bóveda/Ajustes/unichat-pinned.json", "dañado".getBytes(StandardCharsets.UTF_8));
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
+        assertTrue(cloud.files.containsKey("Unichat/Bóveda/Ajustes/unichat-pinned.json"), "left under its old name");
+        int asked = cloud.asked.size();
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
+        assertEquals(List.of(), cloud.asked.subList(asked, cloud.asked.size()).stream()
+            .filter(a -> a.contains(CloudNames.OLD_VAULT + "/") && !a.equals("PROPFIND Unichat/Bóveda/Ajustes/unichat-pinned.json")).toList(),
+            "the next round doesn't walk what's left again: only that file's stamp is asked");
     }
 }

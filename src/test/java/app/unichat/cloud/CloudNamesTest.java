@@ -124,14 +124,14 @@ class CloudNamesTest {
         cloud.put("Unichat/Media/Ana/c.jpg", bytes("la nueva"));
         cloud.put("Unichat/Textos/" + DESK + "/" + TEXT, bytes("{}\n"));
         cloud.put("Unichat/Texts/" + DESK + "/" + TEXT, bytes("{}\n{}\n"));
-        assertFalse(CloudNames.migrate(dav, new Object()), "something under media's old name doesn't match: its check waits");
+        CloudNames.migrate(dav, new Object());
         assertFalse(cloud.dirs.contains(CloudNames.OLD_TEXTS), "the texts' old folder confirmed and gone");
         assertArrayEquals(bytes("otra cosa"), cloud.files.get("Unichat/Multimedia/Ana/c.jpg"), "a file that differs keeps its folder");
         assertArrayEquals(bytes("la nueva"), cloud.files.get("Unichat/Media/Ana/c.jpg"));
         assertFalse(Settings.get().getBool(CloudNames.DONE, false), "not done while anything is left");
 
         cloud.put("Unichat/Media/Ana/c.jpg", bytes("otra cosa")); // the same now
-        assertTrue(CloudNames.migrate(dav, new Object()));
+        CloudNames.migrate(dav, new Object());
         assertFalse(paths().stream().anyMatch(CloudNamesTest::old), paths().toString());
         assertFalse(cloud.dirs.stream().anyMatch(CloudNamesTest::old), "every old folder deleted whole: " + cloud.dirs);
         assertTrue(Settings.get().getBool(CloudNames.DONE, false));
@@ -169,13 +169,32 @@ class CloudNamesTest {
     }
 
     @Test
+    void aMediaFileThatDiffersHoldsBackNeitherTheCheckNorTheRounds() throws Exception {
+        cloud.put("Unichat/Media/Ana/a.jpg", bytes("foto"));
+        cloud.put("Unichat/Media/Ana/c.jpg", bytes("la nueva"));
+        cloud.put("Unichat/Multimedia/Ana/c.jpg", bytes("otra cosa")); // differs: kept under the old name
+        VaultComputer desk = new VaultComputer(cloud, dir, DESK);
+        assertNull(desk.round().error());
+        assertArrayEquals(bytes("otra cosa"), cloud.files.get("Unichat/Multimedia/Ana/c.jpg"));
+        assertNotNull(desk.get(MediaTurn.LAST_VERIFY), "nothing is missing under the new name: the check runs");
+        int asked = cloud.asked.size();
+        assertNull(desk.round().error());
+        assertEquals(List.of(), cloud.asked.subList(asked, cloud.asked.size()).stream()
+            .filter(a -> a.contains(CloudNames.OLD_MEDIA + "/") && !a.equals("PROPFIND " + CloudNames.OLD_MEDIA + "/Ana/c.jpg")).toList(),
+            "and the old folder, seen once, isn't walked again each round: only the kept file's stamp is asked");
+        cloud.put("Unichat/Media/Ana/c.jpg", bytes("otra cosa")); // made the same by hand
+        assertNull(desk.round().error());
+        assertFalse(cloud.dirs.contains(CloudNames.OLD_MEDIA), "a change to it is seen, and the folder goes");
+    }
+
+    @Test
     void mediaInBothFoldersKeepsOneCopy() throws Exception {
         cloud.put("Unichat/Media/Ana/a.jpg", bytes("foto"));
         cloud.put("Unichat/Multimedia/Ana/a.jpg", bytes("foto"));
         cloud.put("Unichat/Multimedia/Ana/d.jpg", bytes("solo vieja"));
         cloud.put("Unichat/Multimedia/Beto/e.jpg", bytes("e"));
         int puts = cloud.puts.get();
-        assertTrue(CloudNames.migrate(dav(), new Object()));
+        CloudNames.migrate(dav(), new Object());
         assertArrayEquals(bytes("foto"), cloud.files.get("Unichat/Media/Ana/a.jpg"), "the same file under both: one copy");
         assertArrayEquals(bytes("solo vieja"), cloud.files.get("Unichat/Media/Ana/d.jpg"), "one only under the old name moves");
         assertArrayEquals(bytes("e"), cloud.files.get("Unichat/Media/Beto/e.jpg"), "a folder only under the old name moves whole");
@@ -229,7 +248,7 @@ class CloudNamesTest {
         cloud.put("Unichat/Texts/" + DESK + "/index.json", bytes("{}"));
         cloud.put("Unichat/Textos/no-es-una-máquina/" + TEXT, bytes("x"));
         cloud.put("Unichat/Textos/" + OLD + "/otra.txt", bytes("x"));
-        assertTrue(CloudNames.migrate(dav(), new Object()), "media's old name has nothing");
+        CloudNames.migrate(dav(), new Object());
         assertTrue(cloud.files.containsKey("Unichat/Ajustes/notas.txt"), "not ours: kept, and its folder with it");
         assertTrue(cloud.files.containsKey("Unichat/Textos/no-es-una-máquina/" + TEXT));
         assertTrue(cloud.files.containsKey("Unichat/Texts/" + OLD + "/otra.txt"), "a machine's folder moves whole, nothing in it lost");

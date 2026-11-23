@@ -53,7 +53,8 @@ public record CloudAccount(Service service, String url, String user, String secr
      */
     public static void forget() {
         Settings s = Settings.get();
-        for (String k : new String[] {"cloud.service", "cloud.url", "cloud.user", "cloud.secret", "cloud.settingsBase", CloudNames.DONE}) s.set(k, null);
+        for (String k : new String[] {"cloud.service", "cloud.url", "cloud.user", "cloud.secret", "cloud.settingsBase", CloudNames.DONE,
+            CloudNames.KEPT, VaultNames.LEFT}) s.set(k, null);
         VaultParts.gone();
     }
 

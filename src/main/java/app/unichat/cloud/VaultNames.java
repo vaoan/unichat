@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 
 import java.io.IOException;
@@ -12,7 +13,7 @@ import java.util.Set;
  * The vault moving from its old names ({@link CloudNames#OLD_VAULT}: "Bóveda", "llaves", "boveda.json", and inside it the
  * old "Ajustes", "Textos", "Registro") to the new ones, by a computer where it's open (only the vault's key can seal a
  * file again: each file's logical path is its associated data). Every step leaves a vault that opens: until
- * {@link Vault#INFO} is written ({@code names: 2}) it's read under the old names ({@link OldVault}), after it under the
+ * {@link Vault#INFO} is written (its being there is the mark) it's read under the old names ({@link OldVault}), after it under the
  * new ones, and what's left under the old ones is finished by the next round. Run in the round's vault part, under
  * {@code vaultPart}, the key's lock and TextSync's, so nothing of this computer writes the vault meanwhile.
  * <ol>
@@ -49,9 +50,25 @@ final class VaultNames {
         return new OldVault(dav);
     }
 
-    /** Whether anything of the vault is still under its old names. */
+    /**
+     * Machine-only: the files left under the old names because they don't open with the vault's key, each with its stamp
+     * then ("path<TAB>stamp" lines): while all of them are as they were, nothing else is left to move.
+     */
+    static final String LEFT = "cloud.names.vaultLeft";
+
+    /**
+     * Whether anything of the vault is still to move from its old names: what's there isn't only the files known not to
+     * open ({@link #LEFT}), unchanged (each one's stamp asked, never a walk of the folder).
+     */
     static boolean left(Storage dav) throws IOException {
-        return dav.exists(CloudNames.OLD_VAULT);
+        if (!dav.exists(CloudNames.OLD_VAULT)) return false;
+        String known = Settings.get().getString(LEFT, null);
+        if (known == null) return true;
+        for (String line : known.split("\n")) {
+            String[] f = line.split("\t", 2);
+            if (f.length < 2 || !f[1].equals(String.valueOf(dav.stamp(f[0])))) return true;
+        }
+        return false;
     }
 
     /**
@@ -64,7 +81,7 @@ final class VaultNames {
     static Storage migrate(Storage dav, Storage at, Vault.Info info, byte[] vk) throws IOException {
         Map<String, String> slotsCopied = new HashMap<>();
         if (at instanceof OldVault) {
-            copy(dav, vk, true);
+            copy(dav, vk, true, new HashMap<>());
             slots(dav, false, slotsCopied);
             hook(true);
             if (!Vault.at(at, info)) throw changed(); // its key changed meanwhile
@@ -76,8 +93,19 @@ final class VaultNames {
         }
         if (!left(dav)) return dav;
         slots(dav, true, slotsCopied); // first: a way in never waits behind a file that won't go
-        copy(dav, vk, false);
-        deleteEmpty(dav, CloudNames.OLD_VAULT);
+        Map<String, String> unopened = new java.util.TreeMap<>();
+        boolean all = copy(dav, vk, false, unopened);
+        boolean gone = deleteEmpty(dav, CloudNames.OLD_VAULT);
+        if (gone || !all || unopened.isEmpty()) {
+            Settings.get().set(LEFT, null);
+            return dav;
+        }
+        StringBuilder known = new StringBuilder();
+        unopened.forEach((path, stamp) -> known.append(known.isEmpty() ? "" : "\n").append(path).append('\t').append(stamp));
+        if (!known.toString().equals(Settings.get().getString(LEFT, null))) {
+            System.err.println("Cloud: " + unopened.size() + " file(s) of the vault don't open with its key: left under the old names");
+            Settings.get().set(LEFT, known.toString());
+        }
         return dav;
     }
 
@@ -88,20 +116,25 @@ final class VaultNames {
     /**
      * Every sealed file under the old names into its new place. {@code before} (the old names still the vault's): each
      * copied; after: each old one deleted once its new place holds it, read again now (another computer may have written
-     * it since, older or newer), and only if the old one wasn't written again meanwhile.
+     * it since, older or newer), and only if the old one wasn't written again meanwhile. Each that doesn't open goes in
+     * {@code unopened} with its stamp; whether every other one went.
      */
-    private static void copy(Storage dav, byte[] vk, boolean before) throws IOException {
+    private static boolean copy(Storage dav, byte[] vk, boolean before, Map<String, String> unopened) throws IOException {
         IOException[] failed = {null};
+        boolean[] all = {true};
         Set<String> made = new HashSet<>();
         VaultReseal.walk(dav, CloudNames.OLD_VAULT, Set.of(CloudNames.OLD_SLOTS, CloudNames.OLD_INFO), stored -> {
             String stamp = dav.stamp(stored);
             if (stamp == null) return; // gone meanwhile
             boolean held = file(dav, vk, stored, before, made); // false: it doesn't open, and stays where it is
-            if (!before && held && stamp.equals(dav.stamp(stored))) dav.delete(stored);
+            if (!held) unopened.put(stored, stamp);
+            else if (!before && stamp.equals(dav.stamp(stored))) dav.delete(stored);
+            else if (!before) all[0] = false; // written again meanwhile: the next round takes it
         }, stored -> {
             if (failed[0] == null) failed[0] = new IOException(I18n.t("cloud.error.vaultRename"));
         });
         if (failed[0] != null) throw failed[0];
+        return all[0];
     }
 
     /**
@@ -118,8 +151,7 @@ final class VaultNames {
             if (sealed == null) return false;
             plain = VaultCrypto.open(vk, old, sealed);
         } catch (VaultCrypto.Broken e) {
-            System.err.println("Cloud: a file of the vault doesn't open with its key: left under its old name");
-            return false;
+            return false; // told once, with the others left (migrate)
         }
         byte[] now = null;
         byte[] there = dav.get(target);

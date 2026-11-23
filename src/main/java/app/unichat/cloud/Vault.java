@@ -467,10 +467,10 @@ final class Vault {
         return SLOTS + "/" + id + JSON_FILE;
     }
 
-    /** The vault's file: {@code names: 2} says it's under the English names ({@link VaultNames}), the old ones gone. */
+    /** The vault's file (its being under the English names is what says the vault moved there: {@link VaultNames}). */
     static byte[] json(Info info) {
         ObjectNode n = JSON.createObjectNode();
-        n.put("id", info.id()).put("created", info.created().toString()).put("generation", info.generation()).put("names", 2);
+        n.put("id", info.id()).put("created", info.created().toString()).put("generation", info.generation());
         if (info.vouch() != null) n.put(VOUCH, java.util.Base64.getEncoder().encodeToString(info.vouch()));
         try {
             return JSON.writeValueAsBytes(n);

@@ -31,14 +31,14 @@ class CloudAccountTest {
     void disconnectingForgetsThatTheOldNamesWereMovedHere() {
         Map<String, String> were = new HashMap<>();
         for (String k : ACCOUNT) were.put(k, Settings.get().getString(k, null));
-        String done = Settings.get().getString(CloudNames.DONE, null);
+        List<String> keys = List.of(CloudNames.DONE, CloudNames.KEPT, VaultNames.LEFT);
+        for (String k : keys) were.put(k, Settings.get().getString(k, null));
         try {
-            Settings.get().setBool(CloudNames.DONE, true);
+            for (String k : keys) Settings.get().set(k, "x");
             CloudAccount.forget();
-            assertNull(Settings.get().getString(CloudNames.DONE, null), "another account may still have the old names");
+            for (String k : keys) assertNull(Settings.get().getString(k, null), "another account may still have the old names: " + k);
         } finally {
             were.forEach(Settings.get()::set);
-            Settings.get().set(CloudNames.DONE, done);
         }
     }
 }

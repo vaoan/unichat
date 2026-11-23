@@ -26,7 +26,7 @@ final class CloudRenames {
     private final ReentrantLock keyLock;
     private final Unseen unseen;
     private final Opener opener;
-    /** Whether the last round left nothing under media's old name: its check may run. */
+    /** Whether the last round's move went through, so no media file is missing under the new name: its check may run. */
     private volatile boolean mayCheck = true;
     /** Whether the last round's plain move failed with a settings part still under its old name: the plain parts wait. */
     private volatile boolean settingsWait;
@@ -38,7 +38,7 @@ final class CloudRenames {
         this.opener = opener;
     }
 
-    /** Whether the round's media check may run: nothing left under media's old name that it would send again. */
+    /** Whether the round's media check may run: no media file missing under the new name, which it would send again. */
     boolean mayCheck() {
         return mayCheck;
     }
@@ -49,7 +49,8 @@ final class CloudRenames {
      */
     String plain(Storage dav) {
         try {
-            mayCheck = CloudNames.migrate(dav, texts);
+            CloudNames.migrate(dav, texts);
+            mayCheck = true; // nothing missing under media's new name: what's kept under the old one differs
             settingsWait = false;
             return null;
         } catch (IOException | RuntimeException e) {

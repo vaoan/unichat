@@ -50,7 +50,7 @@ Everything Unichat stores, sends, logs, names or tells a program is in English. 
 
 ## Anti-goals
 - **Losing or duplicating data in the cloud while folders move,** or a vault that no longer opens.
-- **A computer still on an old Unichat breaking the account.** While it still writes the old folders, the new version keeps reading them and moves what it finds into the new ones, the same way plain copies are moved into the vault today.
+- **A computer still on an old Unichat breaking the account.** While it still writes the old folders, the new version keeps reading them and moves what it finds into the new ones, the same way plain copies are moved into the vault today. *Superseded 2026-11-23: the person ruled no computer runs an older Unichat; old-computer support was removed (see the plan's ledger).*
 - **The AI answering in English to a Spanish chat** because its instructions are now English. Tests cover it.
 
 ## Approaches
@@ -76,7 +76,7 @@ Everything Unichat stores, sends, logs, names or tells a program is in English. 
     - **Settings and AI:** the newest copy wins, as parts already merge.
     - The old folder is deleted once it's empty.
   - **Vault:** under `vaultPart`, `Bóveda` is moved to `Vault` and `llaves` to `keys`, then everything is re-sealed under the new paths. The migration is marked done in `vault.json` (`names: 2`).
-- **Old computers:** a computer on an old version keeps writing the old names. Each round, the new version moves new files from the old folders into the new ones, and the UI says which computer still needs updating, as the plain-senders list does now.
+- **Old computers:** a computer on an old version keeps writing the old names. Each round, the new version moves new files from the old folders into the new ones, and the UI says which computer still needs updating, as the plain-senders list does now. *Superseded 2026-11-23: the person ruled no computer runs an older Unichat; old-computer support was removed (see the plan's ledger).*
 - **AI prompts:** they become English text. `ReplyPromptTest`, `StylePromptTest` and `FixPromptTest` check two things:
   - the reply-language instruction is present;
   - the person's own instructions and examples are kept verbatim.
