@@ -424,9 +424,10 @@ class SyncProcessorTest {
         String room = "!o:example.org";
         String ev = "{'type':'m.room.message','event_id':'$f','sender':'@bob:example.org','origin_server_ts':5,"
                 + "'content':{'msgtype':'m.file','body':'a.pdf','url':'%s'}}";
-        sync(room, "{'timeline':{'events':[" + ev.formatted("mxc://example.org/a") + "]}}", true);
+        sync(room, "{'timeline':{'events':[" + ev.formatted("file:///Users/x/.ssh/id_rsa") + "]}}", true);
         sync(room, "{'timeline':{'events':[" + ev.formatted("mxc://example.org/b") + "]}}", true);
-        assertEquals("mxc://example.org/a", messages(room).get(0).mediaUrl(), "a known event isn't read twice");
+        assertEquals("file:///Users/x/.ssh/id_rsa", messages(room).get(0).mediaUrl(),
+                "only my own echo takes the server's address: a stranger's known event isn't read twice");
     }
 
     @Test

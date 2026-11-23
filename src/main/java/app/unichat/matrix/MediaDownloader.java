@@ -56,12 +56,32 @@ final class MediaDownloader {
         ownFiles.add(file.toUri().toString());
     }
 
-    /** What I uploaded this session, by its server address: played from disk, not downloaded back. */
-    private final Map<String, Path> uploaded = new ConcurrentHashMap<>();
+    /** What I uploaded this session, by its server address: played from disk, not downloaded back, while it's unchanged. */
+    private final Map<String, Sent> uploaded = new ConcurrentHashMap<>();
+
+    /** A file as it was sent: edited since (another size or time), it's no longer what the message holds. */
+    private record Sent(Path file, long size, java.nio.file.attribute.FileTime modified) {
+        static Sent of(Path file) throws IOException {
+            return new Sent(file, Files.size(file), Files.getLastModifiedTime(file));
+        }
+
+        boolean unchanged() {
+            try {
+                return equals(of(file));
+            } catch (IOException e) {
+                return false;
+            }
+        }
+    }
 
     /** {@code file} is on the server at {@code mxc} now: its message will have that address once its event comes. */
     void uploaded(String mxc, Path file) {
-        if (mxc != null) uploaded.put(mxc, file);
+        if (mxc == null) return;
+        try {
+            uploaded.put(mxc, Sent.of(file));
+        } catch (IOException e) {
+            // Gone already: it downloads like any other.
+        }
     }
 
     /** Who wants to know how far each download in flight got, by its cache key. */
@@ -107,8 +127,8 @@ final class MediaDownloader {
             return ownFiles.contains(url) ? CompletableFuture.completedFuture(Path.of(URI.create(url)))
                     : CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
         }
-        Path sent = uploaded.get(url);
-        if (sent != null && Files.isRegularFile(sent)) return CompletableFuture.completedFuture(sent);
+        Sent sent = uploaded.get(url);
+        if (sent != null && sent.unchanged()) return CompletableFuture.completedFuture(sent.file());
         Path own = saved.find(url);
         if (own != null) return CompletableFuture.completedFuture(own);
         String key = key(folder, url, width, height);
