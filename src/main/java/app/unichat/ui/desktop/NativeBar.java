@@ -169,6 +169,28 @@ public final class NativeBar {
         }
     }
 
+    /** Hears whether the screen is locked or asleep ({@link MacScreen}); the helper may start before or after it. */
+    private static volatile java.util.function.Consumer<Boolean> screen = away -> { };
+
+    /**
+     * From now on {@code away} hears the helper's "screen" lines, and not away once when it ends. With no helper
+     * running there's no way to know: it hears not away at once.
+     */
+    static void onScreen(java.util.function.Consumer<Boolean> away) {
+        screen = away;
+        NativeBar b = current;
+        if (b == null || !b.alive) away.accept(false);
+    }
+
+    /** "screen 1" (locked or asleep) is true, "screen 0" false; anything else null. */
+    static Boolean screenLine(String line) {
+        return switch (line) {
+            case "screen\t1" -> true;
+            case "screen\t0" -> false;
+            default -> null;
+        };
+    }
+
     private void readClicks(Runnable onExit) {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
@@ -194,6 +216,11 @@ public final class NativeBar {
                     System.err.println("System notifications: " + (notificationsAllowed ? "allowed" : "not allowed (Unichat's own cards instead)"));
                     continue;
                 }
+                Boolean away = screenLine(line);
+                if (away != null) {
+                    screen.accept(away);
+                    continue;
+                }
                 if (!line.startsWith("click\t")) continue;
                 int index;
                 try {
@@ -209,6 +236,7 @@ public final class NativeBar {
         } catch (IOException ignored) {
         }
         alive = false;
+        screen.accept(false); // gone: nothing says the screen is away any more
         onExit.run();
     }
 

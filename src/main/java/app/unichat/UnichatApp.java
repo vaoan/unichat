@@ -12,10 +12,12 @@ import app.unichat.service.MockChatService;
 import app.unichat.service.PreferencesFile;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import app.unichat.support.Os;
 import app.unichat.support.ScreenAway;
 import app.unichat.support.Seen;
 import app.unichat.ui.Browser;
 import app.unichat.ui.desktop.DockIcon;
+import app.unichat.ui.desktop.MacScreen;
 import app.unichat.ui.desktop.NotificationTarget;
 import app.unichat.ui.desktop.TrayReopen;
 import app.unichat.ui.login.LoginView;
@@ -311,7 +313,14 @@ public final class UnichatApp extends Application {
             return;
         }
         app.unichat.ui.desktop.AppWindows.watchShown(Seen.get()::windows);
-        ScreenAway.none().start(Seen.get()::screenAway); // the macOS and Windows sources come with their own tasks
+        screenAway(Os.mac(), Os.windows()).start(Seen.get()::screenAway);
+    }
+
+    /** Who says the screen is locked or asleep: the menu-bar helper on macOS, nobody where there's no way to know. */
+    static ScreenAway screenAway(boolean mac, boolean windows) {
+        if (mac) return new MacScreen();
+        if (windows) return ScreenAway.none(); // WindowsScreen comes with its own task
+        return ScreenAway.none();
     }
 
     private boolean toTray() {

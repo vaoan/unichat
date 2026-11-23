@@ -14,7 +14,7 @@ Native builds and the no-Docker stack, and the macOS menu-bar helper (the Java s
   Redes) on each server start; avatars/emoji kept.
 - `native/UnichatBar.swift` (`native/build-bar.sh`) — macOS helper, built as `UnichatBar.app` (bundle id
   `app.unichat.helper`, shown as "Unichat"): the menu-bar item (narrower than Java's TrayIcon, real NSMenu; its icon is a template drawn there, `Bar.glyph`, so macOS colours it like its own; as in Telegram, a left click brings the window when it is put away or behind other apps (`Notifier.setWindowFocused`: no Unichat window has the focus) and opens the menu while it is open and focused, a right click or Control-click always opens it: minimize to tray or open, notifications off/on, quit) and
-  **system notifications** (UNUserNotificationCenter needs a bundle; clicks come back as `open <chat id>`). Driven by
+  **system notifications** (UNUserNotificationCenter needs a bundle; clicks come back as `open <chat id>`). It also says when the screen locks or the displays sleep (`screen 1`, and `screen 0` when both are over; `ui/desktop/MacScreen` hands it to `Seen`, and the helper's end counts as the screen back). Driven by
   `ui/desktop/NativeBar` over stdin (the unread count, `ChatFilter.inboxUnread` like the inbox badge, shows beside the icon, with a red dot on the icon's corner, a view of its own since the template icon can't keep a colour; the AWT tray draws it on the icon, `Notifier.withCount`); `Notifier` uses it when macOS allows notifications, else `DesktopToast` (own card, must
   never take keyboard focus), and the AWT TrayIcon if the helper is missing or dies. package.sh ships it as
   `Contents/app/native/UnichatBar.app`.

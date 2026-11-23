@@ -14,7 +14,8 @@
 //                         -1; empty takes it away
 // It writes to stdout: "click <tag>" when a menu item is chosen, "show" on a left click of the icon while leftmenu is 0
 // (a right click, or Control and click, always opens the menu), "open <chat id>" when a notification is clicked,
-// "hotkey" when the global shortcut is pressed,
+// "hotkey" when the global shortcut is pressed, "screen <1|0>" when the screen locks or the display sleeps (1) and when
+// it's unlocked and awake again (0), only on a change (Unichat counts nobody seeing it while it's 1),
 // "notify-auth <1|0>" when notifications become allowed or not (also later), and exits when stdin closes (the app quit or died).
 // Notifications need it to run from its bundle (UnichatBar.app, built by native/build-bar.sh): that's what macOS
 // shows ("Unichat") and asks permission for. A plain java process can't post them.
@@ -150,6 +151,34 @@ final class Hotkey {
         let id = EventHotKeyID(signature: OSType(0x554E4348), id: 1) // "UNCH"
         let status = RegisterEventHotKey(UInt32(kVK_ANSI_U), UInt32(controlKey | optionKey), id, GetApplicationEventTarget(), 0, &ref)
         emit(status == noErr ? "hotkey-ok" : "hotkey-error\t\(status)")
+    }
+}
+
+/**
+ * Whether the screen is away: locked (distributed notifications, as no public API says it) or the displays asleep.
+ * Away while either holds; tells Unichat only when that changes. Every observer runs on the main queue.
+ */
+final class Screen {
+    private var locked = false
+    private var asleep = false
+    private var reported = false
+
+    func watch() {
+        let distributed = DistributedNotificationCenter.default()
+        distributed.addObserver(forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main) { [self] _ in set(locked: true) }
+        distributed.addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [self] _ in set(locked: false) }
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspace.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [self] _ in set(asleep: true) }
+        workspace.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [self] _ in set(asleep: false) }
+    }
+
+    private func set(locked: Bool? = nil, asleep: Bool? = nil) {
+        if let locked { self.locked = locked }
+        if let asleep { self.asleep = asleep }
+        let away = self.locked || self.asleep
+        if away == reported { return }
+        reported = away
+        emit("screen\t\(away ? 1 : 0)")
     }
 }
 
@@ -382,6 +411,8 @@ let notes = Notes()
 if Bundle.main.bundleIdentifier != nil { notes.setUp() } else { emit("notify-auth\t0") }
 let hotkey = Hotkey()
 let bar = Bar()
+let screen = Screen()
+screen.watch()
 Thread {
     while let line = readLine() {
         // not DispatchQueue.main: it waits while the menu is open; these modes also run during menu tracking
