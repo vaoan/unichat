@@ -431,7 +431,7 @@ final class SyncProcessor {
             }
         }
         room.byId.put(m.id(), m);
-        if (older != null) older.add(m); else room.timeline.add(m);
+        if (older != null) older.add(m); else room.addInOrder(m);
         applyPending(room, m.id(), r);
         if (live && older == null && !m.outgoing() && m.type() != MessageType.SYSTEM) r.newMessages.add(m);
     }

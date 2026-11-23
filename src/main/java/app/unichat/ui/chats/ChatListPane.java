@@ -565,9 +565,15 @@ public final class ChatListPane extends VBox {
         return c.space() || channels.actsLikeChat(c) ? menuFor(c) : null;
     }
 
+    private Consumer<Chat> onSpaceOpened = c -> { };
+
+    /** Told each server or group opened in the list (its channels shown). */
+    public void setOnSpaceOpened(Consumer<Chat> l) { onSpaceOpened = l; }
+
     void open(Chat c) {
         if (c == null) return;
         if (c.space()) {
+            onSpaceOpened.accept(c);
             openSpace(c.id());
             return;
         }
