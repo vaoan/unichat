@@ -4,6 +4,7 @@ import app.unichat.ui.FxCoalescer;
 import app.unichat.ui.Icons;
 import app.unichat.ui.TaskBar;
 import app.unichat.ui.Nodes;
+import app.unichat.ui.Showing;
 import app.unichat.ui.media.AnimatedImage;
 import app.unichat.model.Chat;
 import app.unichat.model.MimeTypes;
@@ -41,9 +42,8 @@ public final class UploadBar extends TaskBar {
 
     private final UploadQueue queue;
     private final ChatReader chats;
-    /** Counts down the seconds to the next try. */
-    private final javafx.animation.Timeline tick = new javafx.animation.Timeline(
-            new javafx.animation.KeyFrame(Duration.seconds(1), e -> refresh()));
+    /** Counts down the seconds to the next try, only while someone can see it ({@link Showing#animate}). */
+    private final Showing.Animated tick;
     private final ImageView preview = new ImageView();
     private final Button cancel;
     private final Button close;
@@ -64,7 +64,10 @@ public final class UploadBar extends TaskBar {
         where.setOnAction(e -> {
             if (chatId != null) openChat.accept(chatId);
         });
-        tick.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        javafx.animation.Timeline ticking = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(Duration.seconds(1), e -> refresh()));
+        ticking.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        tick = Showing.animate(this, ticking);
         cancel = Icons.iconButton(Icons.CLOSE, I18n.t("uploadBar.cancel"), queue::cancel);
         close = Icons.iconButton(Icons.CLOSE, I18n.t("uploadBar.close"), queue::dismiss);
         hideLater.setOnFinished(e -> queue.dismiss());
@@ -77,7 +80,7 @@ public final class UploadBar extends TaskBar {
     public void dispose() {
         queue.removeListener(listener);
         hideLater.stop();
-        tick.stop();
+        tick.cancel();
     }
 
     private void refresh() {
@@ -105,7 +108,7 @@ public final class UploadBar extends TaskBar {
             small.setText("");
             stage.setText("");
             tidy();
-            tick.stop();
+            tick.want(false);
             shownFile = null;
             lead.getChildren().setAll(Icons.icon(s.failed() > 0 ? Icons.ERROR : Icons.CHECK, 22));
             if (s.failed() == 0 && hideLater.getStatus() != javafx.animation.Animation.Status.RUNNING) hideLater.play();
@@ -126,8 +129,7 @@ public final class UploadBar extends TaskBar {
         String network = chat == null ? "" : chat.network().displayName();
         stage.setText(stage(s, network, System.currentTimeMillis()));
         boolean counting = s.phase() == UploadQueue.Phase.RETRYING;
-        if (counting && tick.getStatus() != javafx.animation.Animation.Status.RUNNING) tick.play();
-        if (!counting) tick.stop();
+        tick.want(counting);
         small.setText(eta(s.etaMs()));
         tidy();
         bar.setAccessibleText(I18n.t("uploadBar.a11y", s.position(), s.total(), title, (int) Math.floor(s.overall() * 100))

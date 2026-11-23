@@ -1,9 +1,8 @@
 package app.unichat.ui.timeline;
 
 import app.unichat.ui.Icons;
-import app.unichat.ui.Nodes;
 import app.unichat.ui.Shortcuts;
-import app.unichat.ui.Theme;
+import app.unichat.ui.WorkingLine;
 import app.unichat.assist.AiEngine;
 import app.unichat.assist.AiSettings;
 import app.unichat.assist.ReplyPrompt;
@@ -11,18 +10,12 @@ import app.unichat.assist.ReplyWriter;
 import app.unichat.support.I18n;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Tooltip;
-import javafx.scene.layout.HBox;
-import javafx.util.Duration;
 
 /**
  * A composer button that asks the AI program for text: a draft of a reply, or what's written, corrected. It only ever lands
@@ -81,9 +74,8 @@ public final class AiReplyButton {
 
     private final Look look;
     private final Button button;
-    private final Label statusText = new Label();
-    private final HBox status;
-    private Timeline ticking;
+    /** "Writing with …" and the seconds so far, while a draft or fix is being written. */
+    private final WorkingLine status = new WorkingLine();
     private final Supplier<Request> request;
     private final java.util.function.BiConsumer<String, String> onDraft;
     private final Consumer<String> onError;
@@ -104,14 +96,6 @@ public final class AiReplyButton {
         button.getStyleClass().add(look.styleClass());
         button.visibleProperty().bind(SHOWN);
         button.managedProperty().bind(SHOWN);
-        ProgressIndicator spinner = new ProgressIndicator();
-        spinner.setMaxSize(14, 14);
-        Nodes.show(spinner, !Theme.reduceMotion());
-        statusText.getStyleClass().add("settings-help");
-        status = new HBox(6, spinner, statusText);
-        status.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        status.getStyleClass().add("ai-status");
-        Nodes.show(status, false);
         idle();
     }
 
@@ -121,23 +105,15 @@ public final class AiReplyButton {
     boolean busy() { return working != null; }
 
     /** The line that says it's working; hidden otherwise. */
-    Node status() { return status; }
+    Node status() { return status.node(); }
 
     private void showWorking(boolean on) {
         showWorking(on, false);
     }
 
     private void showWorking(boolean on, boolean web) {
-        if (ticking != null) ticking.stop();
-        Nodes.show(status, on);
-        if (!on) return;
-        String what = web ? look.searching(AiSettings.engine().label()) : look.working(AiSettings.engine().label());
-        long start = System.currentTimeMillis();
-        statusText.setText(what + "…");
-        ticking = new Timeline(new KeyFrame(Duration.seconds(1),
-                e -> statusText.setText(what + "… " + (System.currentTimeMillis() - start) / 1000 + " s")));
-        ticking.setCycleCount(Timeline.INDEFINITE);
-        ticking.play();
+        if (!on) status.stop();
+        else status.start(web ? look.searching(AiSettings.engine().label()) : look.working(AiSettings.engine().label()));
     }
 
     private void pressed() {

@@ -109,12 +109,11 @@ public final class AnimatedImage {
         return true;
     }
 
-    /** Whether {@code n} can be seen now: its window showing and not minimized, every ancestor visible, inside the window. */
+    /** Whether {@code n} can be seen now: {@link Showing#seen its window}, every ancestor visible, inside the window. */
     public static boolean onScreen(javafx.scene.Node n) {
         javafx.scene.Scene sc = n.getScene();
         if (sc == null) return false;
-        javafx.stage.Window w = sc.getWindow();
-        if (w == null || !w.isShowing() || (w instanceof javafx.stage.Stage st && st.isIconified())) return false;
+        if (!Showing.seen(sc.getWindow())) return false;
         for (javafx.scene.Node p = n; p != null; p = p.getParent()) if (!p.isVisible() || p.getOpacity() == 0) return false;
         javafx.geometry.Bounds b = n.localToScene(n.getBoundsInLocal());
         if (!(b.getMaxX() > 0 && b.getMaxY() > 0 && b.getMinX() < sc.getWidth() && b.getMinY() < sc.getHeight())) return false;

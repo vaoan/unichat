@@ -1,5 +1,6 @@
 package app.unichat.ui.media;
 
+import app.unichat.support.Seen;
 import app.unichat.ui.FxWait;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -7,6 +8,8 @@ import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
@@ -14,6 +17,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * An animation runs only while its window shows: a closed window keeps its scene, and a GIF in a closed photo viewer
@@ -21,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class AnimationShowingUiTest {
-    @Test
-    void aClosedWindowsAnimationStopsAndGivesBackItsBudget() throws Exception {
+    @BeforeAll
+    static void toolkit() throws Exception {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
@@ -31,8 +35,45 @@ class AnimationShowingUiTest {
             // another UI test started the toolkit
         }
         Platform.setImplicitExit(false);
-        AnimatedImage.Frames frames = new AnimatedImage.Frames(
+    }
+
+    @AfterEach
+    void seenAgain() {
+        Seen.reset(true);
+    }
+
+    private static AnimatedImage.Frames frames() {
+        return new AnimatedImage.Frames(
                 List.of(new WritableImage(40, 40), new WritableImage(40, 40), new WritableImage(40, 40)), List.of(40, 40, 40));
+    }
+
+    /** Nobody can see Unichat (every window in the tray or minimised, the screen locked): a GIF in a window rests too. */
+    @Test
+    void anAnimationRestsWhileNobodyCanSeeUnichat() throws Exception {
+        AnimatedImage.Frames frames = frames();
+        long before = FxWait.fx(AnimationBudget.SHARED::used);
+        ImageView view = FxWait.fx(ImageView::new);
+        Stage stage = FxWait.fx(() -> {
+            Stage s = new Stage();
+            s.setOpacity(0);
+            s.setScene(new Scene(new StackPane(view), 100, 100));
+            s.show();
+            AnimatedImage.play(view, frames);
+            return s;
+        });
+        assertTrue(FxWait.fx(() -> AnimatedImage.moving(view)), "moving while seen");
+
+        Seen.reset(false);
+        FxWait.until("still while nobody can see it", () -> !AnimatedImage.moving(view));
+        assertEquals(before, FxWait.fx(AnimationBudget.SHARED::used), "its budget given back");
+        Seen.reset(true);
+        FxWait.until("moving again once seen", () -> AnimatedImage.moving(view));
+        FxWait.fx(() -> { stage.close(); return null; });
+    }
+
+    @Test
+    void aClosedWindowsAnimationStopsAndGivesBackItsBudget() throws Exception {
+        AnimatedImage.Frames frames = frames();
         long before = FxWait.fx(AnimationBudget.SHARED::used);
         Stage[] stage = new Stage[1];
         FxWait.fx(() -> {

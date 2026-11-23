@@ -106,6 +106,31 @@ class VideoUiTest {
         fx(() -> { stage.close(); return null; });
     }
 
+    /** Nobody can see Unichat: the GIF's native player and its visibility timeline go, and come back once it's seen. */
+    @Test
+    void aGifIsLetGoWhileNobodyCanSeeUnichatAndPlaysAgainOnceSeen() throws Exception {
+        Path clip = mp4();
+        MediaSource source = (url, w, h) -> CompletableFuture.completedFuture(clip);
+        StackPane root = fx(StackPane::new);
+        Stage stage = window(root);
+        InlineVideo[] video = new InlineVideo[1];
+        fx(() -> {
+            video[0] = new InlineVideo(source, "mxc://s/1", 160, 120, () -> new StackPane());
+            root.getChildren().add(video[0]);
+            return null;
+        });
+        await(() -> video[0].player() != null && video[0].player().getStatus() == MediaPlayer.Status.PLAYING, "plays");
+        try {
+            app.unichat.support.Seen.reset(false);
+            await(() -> video[0].player() == null, "let go while unseen");
+            app.unichat.support.Seen.reset(true);
+            await(() -> video[0].player() != null && video[0].player().getStatus() == MediaPlayer.Status.PLAYING, "plays again once seen");
+        } finally {
+            app.unichat.support.Seen.reset(true);
+            fx(() -> { stage.close(); return null; });
+        }
+    }
+
     @Test
     void whatCantPlayShowsTheFallbackInstead() throws Exception {
         Path bad = Files.writeString(dir.resolve("roto.mp4"), "esto no es un video");

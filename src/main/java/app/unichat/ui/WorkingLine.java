@@ -16,7 +16,11 @@ import javafx.util.Duration;
 public final class WorkingLine {
     private final Label text = new Label();
     private final HBox node;
-    private Timeline ticking;
+    /** The seconds so far, counted only while someone can see them ({@link Showing#animate}). */
+    private final Timeline ticking = new Timeline(new KeyFrame(Duration.seconds(1), e -> say()));
+    private final Showing.Animated tick;
+    private String what = "";
+    private long since;
     private int running;
 
     public WorkingLine() {
@@ -28,28 +32,32 @@ public final class WorkingLine {
         node.setAlignment(Pos.CENTER_LEFT);
         node.getStyleClass().add("ai-status");
         Nodes.show(node, false);
+        ticking.setCycleCount(Timeline.INDEFINITE);
+        tick = Showing.animate(node, ticking);
     }
 
     public Node node() { return node; }
 
     public void start(String what) {
         running++;
-        if (ticking != null) ticking.stop();
-        long since = System.currentTimeMillis();
+        this.what = what;
+        since = System.currentTimeMillis();
         text.setText(what + "…");
         text.setAccessibleText(what);
-        ticking = new Timeline(new KeyFrame(Duration.seconds(1),
-                e -> text.setText(what + "… " + (System.currentTimeMillis() - since) / 1000 + " s")));
-        ticking.setCycleCount(Timeline.INDEFINITE);
-        ticking.play();
+        ticking.stop(); // counts again from this start
+        tick.want(true);
         Nodes.show(node, true);
     }
 
     public void stop() {
         running = Math.max(0, running - 1);
         if (running > 0) return;
-        if (ticking != null) ticking.stop();
+        tick.want(false);
         Nodes.show(node, false);
+    }
+
+    private void say() {
+        text.setText(what + "… " + (System.currentTimeMillis() - since) / 1000 + " s");
     }
 
     boolean shown() { return node.isVisible(); }
