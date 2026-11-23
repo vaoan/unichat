@@ -166,8 +166,10 @@ class BuildRulesTest {
         assertEquals("true", text(config, "failOnViolation"), "a finding fails the build");
         assertEquals("5", text(config, "failurePriority"), "every priority fails, down to 5");
         assertEquals("true", text(config, "includeTests"), "the tests are checked too");
+        assertEquals("false", text(config, "skipPmdError"), "a file PMD can't read fails the build (the plugin skips it by default)");
+        assertTrue(elements(configuration("maven-pmd-plugin"), "skipPmdError").isEmpty(), "set once, on the check");
         for (Element c : List.of(config, configuration("maven-pmd-plugin"))) {
-            for (String leftOut : List.of("excludes", "excludeRoots", "excludeFromFailureFile", "minimumPriority", "skipPmdError")) {
+            for (String leftOut : List.of("excludes", "excludeRoots", "excludeFromFailureFile", "minimumPriority")) {
                 assertTrue(elements(c, leftOut).isEmpty(), "no <" + leftOut + ">: nothing is left out of PMD's sight");
             }
         }

@@ -335,6 +335,8 @@
               <analysisCache>true</analysisCache>
               <failOnViolation>true</failOnViolation>
               <failurePriority>5</failurePriority>
+              <!-- A file PMD can't read fails the build; the plugin's default skips it silently. -->
+              <skipPmdError>false</skipPmdError>
             </configuration>
           </execution>
         </executions>
