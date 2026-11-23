@@ -75,7 +75,7 @@ Everything Unichat stores, sends, logs, names or tells a program is in English. 
     - **Media:** files missing from the new folder are moved into it.
     - **Settings and AI:** the newest copy wins, as parts already merge.
     - The old folder is deleted once it's empty.
-  - **Vault:** under `vaultPart`, `Bóveda` is moved to `Vault` and `llaves` to `keys`, then everything is re-sealed under the new paths. The migration is marked done in `vault.json` (`names: 2`).
+  - **Vault:** under `vaultPart`, `Bóveda` is moved to `Vault` and `llaves` to `keys`, then everything is re-sealed under the new paths. The migration is done once `vault.json` exists (no version field).
 - **Old computers:** a computer on an old version keeps writing the old names. Each round, the new version moves new files from the old folders into the new ones, and the UI says which computer still needs updating, as the plain-senders list does now. *Superseded 2026-11-23: the person ruled no computer runs an older Unichat; old-computer support was removed (see the plan's ledger).*
 - **AI prompts:** they become English text. `ReplyPromptTest`, `StylePromptTest` and `FixPromptTest` check two things:
   - the reply-language instruction is present;
