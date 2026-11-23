@@ -96,4 +96,40 @@ class DownloadsTest {
         assertFalse(Files.exists(target));
         assertFalse(Files.exists(dir.resolve("archivo.part")));
     }
+
+    /** A download that stalls gives up (it held the local server's lock for good: every bridge waited on it). */
+    @Test
+    void aDownloadThatStallsGivesUp() throws Exception {
+        java.util.concurrent.CountDownLatch never = new java.util.concurrent.CountDownLatch(1);
+        server.createContext("/stalls", ex -> {
+            ex.sendResponseHeaders(200, BODY.length);
+            ex.getResponseBody().write(BODY[0]); // the headers only leave with a byte of the body
+            ex.getResponseBody().flush();
+            try {
+                never.await(); // then not a byte more
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            ex.close();
+        });
+        String stalls = url.replace("/f", "/stalls");
+        try {
+            IOException e = assertThrows(IOException.class, () -> Downloads.fetch(stalls, BODY.length, Hashes.sha256("contenido"),
+                    dir.resolve("archivo"), "el archivo", p -> { }, part -> { }, java.time.Duration.ZERO));
+            assertEquals(I18n.t("download.stalled", "el archivo"), e.getMessage());
+            assertFalse(Thread.currentThread().isInterrupted(), "the caller isn't left interrupted");
+            assertFalse(Files.exists(dir.resolve("archivo")));
+            assertFalse(Files.exists(dir.resolve("archivo.part")));
+        } finally {
+            never.countDown();
+        }
+    }
+
+    @Test
+    void aDownloadThatKeepsComingIsntCutShort() throws Exception {
+        Path target = dir.resolve("archivo");
+        Downloads.fetch(url, BODY.length, Hashes.sha256("contenido"), target, "el archivo", p -> { }, part -> { },
+                java.time.Duration.ofDays(1));
+        assertEquals("contenido", Files.readString(target));
+    }
 }

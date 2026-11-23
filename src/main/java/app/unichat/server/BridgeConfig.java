@@ -19,6 +19,11 @@ import java.nio.file.Path;
  * with SQLite and 127.0.0.1 instead of Postgres and Docker host names. See docs/NATIVE-SERVER.md.
  */
 public final class BridgeConfig {
+    /** The SQLite database of bridge {@code b}, in its folder {@code bridgeDir}. */
+    static Path database(Path bridgeDir, String b) {
+        return bridgeDir.resolve(b + ".db");
+    }
+
     static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory()
             .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
             .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
@@ -74,7 +79,7 @@ public final class BridgeConfig {
         perms.put("*", "relay");
         perms.put(s.domain(), "user");
         perms.put(s.adminUserId(), "admin");
-        String db = "file:" + s.dir().resolve(b + ".db") + "?_txlock=immediate";
+        String db = "file:" + database(s.dir(), b) + "?_txlock=immediate";
         // Bridges log to stdout; Unichat's Supervisor strips personal data before it reaches the disk.
         ArrayNode writers = YAML.createArrayNode();
         writers.addObject().put("type", "stdout").put("format", "json");

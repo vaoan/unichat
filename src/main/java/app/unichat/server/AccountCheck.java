@@ -12,9 +12,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 /**
- * Whether a bridge has an account, so it's started at launch: the logins Unichat keeps ({@link LoginsCache}), or a login
- * in the bridge's own database (one Unichat hasn't kept yet, as after an upgrade). When neither tells, it has one: a
- * bridge with an account left stopped would silence it, which is worse than the battery it costs.
+ * Whether a bridge has an account, so it's started at launch: a login kept ({@link LoginsCache}), else one in its
+ * database (one Unichat hasn't kept yet, as after an upgrade); with neither kept nor readable, it starts: a bridge
+ * with an account left stopped would silence it, which is worse than the battery it costs.
  */
 final class AccountCheck {
     private AccountCheck() {}
@@ -23,8 +23,7 @@ final class AccountCheck {
     static boolean hasAccount(String cached, Path db) {
         if (LoginsCache.hasLogin(cached)) return true;
         Boolean inDb = inDatabase(db);
-        if (inDb != null) return inDb;
-        return cached == null;
+        return inDb == null || inDb;
     }
 
     /** A login in the bridge's database: a {@code user_login} row (bridgev2) or a user with a token (legacy Discord); null when it can't tell. */

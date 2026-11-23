@@ -179,7 +179,7 @@ final class MetaSessions implements Watchdog.SessionKeeper {
         return DriverManager.getConnection("jdbc:sqlite:" + database(bridge));
     }
 
-    private Path database(String bridge) { return dir.resolve(bridge).resolve(bridge + ".db"); }
+    private Path database(String bridge) { return BridgeConfig.database(dir.resolve(bridge), bridge); }
 
     private Path backupFile(String bridge) { return dir.resolve(bridge).resolve("session-backup.json"); }
 

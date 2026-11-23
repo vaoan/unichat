@@ -173,8 +173,8 @@ Every push to `main` builds the packages in GitHub Actions (artifacts `unichat-w
 To publish a version: change `<version>` in `pom.xml`, commit, and push the tag `v<version>`
 (`git tag v1.1.0 && git push origin v1.1.0`); the `build` workflow creates the release with the packages and
 `sha256sums.txt`. A tag with a suffix (`v1.1.0-beta.1`) comes out as a pre-release and the app doesn't offer it as an update.
-The server and the Windows bridges are built separately by the `natives` workflow (see
-[docs/NATIVE-SERVER.md](docs/NATIVE-SERVER.md#own-builds)).
+The server, the Windows bridges, and the X and Discord bridges for every platform are built separately by the `natives`
+workflow (see [docs/NATIVE-SERVER.md](docs/NATIVE-SERVER.md#own-builds)).
 
 ```powershell
 .\mvnw.cmd javafx:run   # Windows: run from source
@@ -248,7 +248,9 @@ give credit. That covers only this code. Third-party parts keep their own licens
 (GPLv2 with the Classpath Exception), the Java libraries (Apache 2.0 and BSD), whisper.cpp (MIT), libwebp (BSD), tuwunel
 and libolm (Apache 2.0). The mautrix bridges (AGPL-3.0) don't come in the app: they're downloaded separately when you connect each network,
 from their official releases or, on Windows, from this repository's `natives-*` release, built unchanged from
-each version's source (linked in that release).
+each version's source (linked in that release). X and Discord come from that `natives-*` release on every platform:
+Discord with the fixes in [`native/patches/discord/`](native/patches/discord/), X at a commit that has no release yet;
+both linked in that release.
 The full list, with the license texts, is in [THIRD-PARTY.md](THIRD-PARTY.md), which also goes inside the packages.
 
 ---

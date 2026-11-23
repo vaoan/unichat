@@ -32,12 +32,19 @@ class BridgeLauncherTest {
     private int unanswered;
     /** The bridge dies as soon as it's started (it stops at every start, as gmessages did). */
     private boolean diesAtStart;
+    /** Bridges whose download or config fails, and bridges that can't be launched. */
+    private final Set<String> failsToPrepare = new LinkedHashSet<>();
+    private final Set<String> failsToStart = new LinkedHashSet<>();
 
     private final BridgeLauncher.Processes processes = new BridgeLauncher.Processes() {
         @Override public boolean isRunning(String b) { return running.contains(b); }
-        @Override public void prepare(String b, Consumer<String> progress) { calls.add("prepare " + b); }
-        @Override public void start(String b) {
+        @Override public void prepare(String b, Consumer<String> progress) throws IOException {
+            calls.add("prepare " + b);
+            if (failsToPrepare.contains(b)) throw new IOException("download failed");
+        }
+        @Override public void start(String b) throws IOException {
             calls.add("start " + b);
+            if (failsToStart.contains(b)) throw new IOException("no binary");
             if (!diesAtStart) running.add(b);
         }
         @Override public void stop(String b) {
@@ -167,5 +174,31 @@ class BridgeLauncherTest {
         calls.clear();
         l.loggedOut("gmessages");
         assertEquals(List.of(), calls, "once");
+    }
+
+    @Test
+    void onlyBridgesWithAnAccountArePreparedAtLaunch() throws Exception {
+        BridgeLauncher l = launcher(NO_LIMIT);
+        l.prepareAtLaunch(msg -> { });
+        assertEquals(List.of("prepare whatsapp"), calls, "gmessages is prepared when its sign-in opens");
+    }
+
+    @Test
+    void aBridgeWhoseNewBuildFailsStillStartsWithItsInstalledOneAndTheOthersToo() throws Exception {
+        withAccount = Set.of("whatsapp", "gmessages");
+        failsToPrepare.add("whatsapp");
+        BridgeLauncher l = launcher(NO_LIMIT);
+        l.prepareAtLaunch(msg -> { });
+        l.launch();
+        assertEquals(Set.of("prepare whatsapp", "prepare gmessages", "start whatsapp", "start gmessages"), Set.copyOf(calls));
+    }
+
+    @Test
+    void aBridgeThatCantStartLeavesTheOthersStarting() throws Exception {
+        withAccount = Set.of("whatsapp", "gmessages");
+        failsToStart.add("whatsapp");
+        BridgeLauncher l = launcher(NO_LIMIT);
+        l.launch();
+        assertEquals(Set.of("start whatsapp", "start gmessages"), Set.copyOf(calls));
     }
 }

@@ -47,10 +47,29 @@ final class BridgeLauncher {
         this.usable = usable;
     }
 
-    /** At launch: starts the usable bridges that have an account. */
+    /**
+     * At launch, before the server starts: writes the config of each usable bridge with an account and installs its new
+     * build. One that fails is said and left as it is (it starts with the build it has): one failed download stopped
+     * the whole server. The others are prepared when their sign-in opens.
+     */
+    void prepareAtLaunch(Consumer<String> progress) throws IOException, InterruptedException {
+        for (String b : demand.withAccounts(usable.get())) {
+            try {
+                processes.prepare(b, progress);
+            } catch (IOException | RuntimeException e) {
+                System.err.println("Could not prepare " + b + ", it starts as it was: " + e);
+            }
+        }
+    }
+
+    /** At launch: starts the usable bridges that have an account, each on its own (one that can't never stops the rest). */
     void launch() throws IOException {
         for (String b : demand.withAccounts(usable.get())) {
-            if (!processes.isRunning(b)) processes.start(b);
+            try {
+                if (!processes.isRunning(b)) processes.start(b);
+            } catch (IOException | RuntimeException e) {
+                System.err.println("Could not start " + b + ": " + e);
+            }
         }
     }
 

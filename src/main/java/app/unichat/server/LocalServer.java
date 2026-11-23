@@ -114,7 +114,7 @@ public final class LocalServer {
     /** Whether {@code bridge} has an account, so it starts at launch ({@link AccountCheck}). */
     private boolean hasAccount(String bridge) {
         return AccountCheck.hasAccount(Settings.get().getString(LoginsCache.key(bridge), null),
-                dir.resolve(bridge).resolve(bridge + ".db"));
+                BridgeConfig.database(dir.resolve(bridge), bridge));
     }
 
     /** A bridge's as_token, from its registration (it authorizes the bridge's status reports). */
@@ -161,7 +161,7 @@ public final class LocalServer {
         if (activeBridges().contains("telegram") && !TelegramKeys.saved()) {
             System.err.println("Telegram not started: no valid API keys (Ajustes → Redes)");
         }
-        for (String b : usableBridges()) prepareBridge(b, secrets, progress);
+        bridges.prepareAtLaunch(progress);
         HomeserverConfig.write(dir, PORT, DOMAIN, secrets.getProperty("registration_token"));
 
         if (!supervisor.isRunning("tuwunel")) startHomeserver(progress);
@@ -237,7 +237,7 @@ public final class LocalServer {
         // Old Discord attachments go before the bridge starts (it must not be using its database meanwhile).
         if (!supervisor.isRunning("discord")) {
             int days = Settings.get().discordMediaDays();
-            List<String> old = MediaPrune.takeOldDiscordAttachments(dir.resolve("discord").resolve("discord.db"),
+            List<String> old = MediaPrune.takeOldDiscordAttachments(BridgeConfig.database(dir.resolve("discord"), "discord"),
                     days == 0 ? null : Duration.ofDays(days), java.time.Instant.now());
             if (!old.isEmpty()) {
                 System.err.println("Discord: deleting " + old.size() + " old attachments");

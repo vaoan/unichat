@@ -268,4 +268,10 @@ class BridgeConfigTest {
             else System.setProperty("unichat.bridgeLogs", before);
         }
     }
+
+    /** One place says where a bridge's database is: its config, the account check, the session keeper and the prunes read it. */
+    @Test
+    void aBridgesDatabaseIsItsNameInItsFolder() {
+        assertEquals(java.nio.file.Path.of("/data/signal/signal.db"), BridgeConfig.database(java.nio.file.Path.of("/data/signal"), "signal"));
+    }
 }

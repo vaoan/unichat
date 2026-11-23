@@ -49,7 +49,6 @@ class AccountCheckTest {
     void theLoginsKeptSaySo() throws Exception {
         assertTrue(AccountCheck.hasAccount(ONE_LOGIN, dir.resolve("none.db")));
         assertFalse(AccountCheck.hasAccount(NO_LOGIN, bridgev2(false)), "Google Messages: no user logins found");
-        assertFalse(AccountCheck.hasAccount(NO_LOGIN, dir.resolve("none.db")));
     }
 
     @Test
@@ -67,6 +66,12 @@ class AccountCheckTest {
     @Test
     void aLoginInTheDatabaseWinsOverNoLoginKept() throws Exception {
         assertTrue(AccountCheck.hasAccount(NO_LOGIN, bridgev2(true)), "the safe direction: it starts");
+    }
+
+    @Test
+    void noLoginKeptAndADatabaseThatCantBeReadStarts() throws Exception {
+        assertTrue(AccountCheck.hasAccount(NO_LOGIN, dir.resolve("none.db")), "no database");
+        assertTrue(AccountCheck.hasAccount(NO_LOGIN, db("CREATE TABLE other (x TEXT)")), "one it can't read");
     }
 
     @Test

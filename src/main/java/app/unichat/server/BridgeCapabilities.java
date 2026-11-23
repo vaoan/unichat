@@ -27,7 +27,7 @@ final class BridgeCapabilities {
 
     /** Before {@code bridge} starts from {@code bridgeDir}; does nothing when there's nothing to mark, and never fails. */
     static void beforeStart(String bridge, Path bridgeDir) {
-        Path db = bridgeDir.resolve(bridge + ".db");
+        Path db = BridgeConfig.database(bridgeDir, bridge);
         if (!STALE.contains(bridge) || !Files.isRegularFile(db)) return;
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath())) {
             String version = read(c);
