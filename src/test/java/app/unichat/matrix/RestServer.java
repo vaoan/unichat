@@ -44,8 +44,22 @@ final class RestServer implements AutoCloseable {
     final Map<String, Integer> unread = new ConcurrentHashMap<>();
     /** A catch-up sync waits for it (leaving the archive mid catch-up). */
     volatile CountDownLatch catchUpGate = new CountDownLatch(0);
-    /** Each room's tags ({@code m.tag}'s "tags" object), for a tags-only sync. */
+    /** Each room's tags ({@code m.tag}'s "tags" object), for a tags-only sync; set with {@link #setTag}. */
     final Map<String, String> tags = new ConcurrentHashMap<>();
+    /** When each room's tags last changed, on the server's count: a tags sync since a point brings only what's newer. */
+    private final Map<String, Long> tagVersions = new ConcurrentHashMap<>();
+    /** A tags sync, and a filter post, wait for these (a computer waking mid-way). */
+    volatile CountDownLatch tagsGate = new CountDownLatch(0);
+    volatile CountDownLatch filterGate = new CountDownLatch(0);
+
+    /** A room's tags change on the server now. */
+    void setTag(String room, String tagsJson) {
+        tags.put(room, tagsJson);
+        tagVersions.put(room, (long) ids.incrementAndGet());
+    }
+
+    /** Where the server's count is now, as a main sync's {@code next_batch} would say. */
+    String point() { return "main" + ids.incrementAndGet(); }
     /** Events the first live sync answered after a catch-up brings (newer than it). */
     final Map<String, List<String>> liveAfterCatchUp = new ConcurrentHashMap<>();
     /** The server keeps no filter for a sync: every id it's given is unknown (its database wiped over and over). */
@@ -77,6 +91,8 @@ final class RestServer implements AutoCloseable {
     public void close() {
         hang.countDown();
         catchUpGate.countDown();
+        tagsGate.countDown();
+        filterGate.countDown();
         server.stop(0);
         botThread.shutdownNow();
     }
@@ -126,6 +142,13 @@ final class RestServer implements AutoCloseable {
     }
 
     private void postFilter(HttpExchange ex, String body) throws IOException {
+        log.add("filter asked");
+        changes.changed();
+        try {
+            filterGate.await();
+        } catch (InterruptedException e) {
+            return;
+        }
         if (refuseFilters) {
             log.add("filter refused");
             answer(ex, 500, "{\"errcode\":\"M_UNKNOWN\"}");
@@ -195,10 +218,17 @@ final class RestServer implements AutoCloseable {
     /** Resting rooms' account data, as {@link #tags} has it. */
     private void tags(HttpExchange ex, JsonNode rooms, String since) throws IOException {
         log.add("tags " + names(rooms) + (since == null ? "" : " since=" + since));
+        changes.changed();
+        try {
+            tagsGate.await();
+        } catch (InterruptedException e) {
+            return;
+        }
+        long from = since == null ? -1 : Long.parseLong(since.replaceAll("\\D", ""));
         ObjectNode join = MatrixClient.JSON.createObjectNode();
         for (JsonNode r : rooms) {
             String t = tags.get(r.asText());
-            if (t != null) join.set(r.asText(), MatrixClient.JSON.readTree("{\"timeline\":{\"limited\":true,\"events\":[]},"
+            if (t != null && tagVersions.getOrDefault(r.asText(), 0L) > from) join.set(r.asText(), MatrixClient.JSON.readTree("{\"timeline\":{\"limited\":true,\"events\":[]},"
                     + "\"account_data\":{\"events\":[{\"type\":\"m.tag\",\"content\":{\"tags\":" + t + "}}]}}"));
         }
         ObjectNode resp = MatrixClient.JSON.createObjectNode().put("next_batch", "t" + ids.incrementAndGet());

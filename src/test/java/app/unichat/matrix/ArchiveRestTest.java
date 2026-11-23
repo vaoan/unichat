@@ -45,6 +45,8 @@ class ArchiveRestTest {
     /** Each time the sync loop was asked to go round (its long poll dropped). */
     private final AtomicInteger wakes = new AtomicInteger();
     private volatile Thread loopThread;
+    /** Interrupts the rounds left for the request after them (a waking not swallowed). */
+    private final AtomicInteger interruptsLeft = new AtomicInteger();
     private volatile java.time.Instant now = java.time.Instant.parse("2026-11-23T12:00:00Z");
     private MatrixClient client;
     private RestServer server;
@@ -67,7 +69,7 @@ class ArchiveRestTest {
         DiscordServers discord = new DiscordServers(core, bots, () -> discordConnected
                 ? List.of(new Account(Network.DISCORD, "me", AccountStatus.CONNECTED, "")) : List.of());
         filter = new SyncFilter(client, ME);
-        rest = new ArchiveRest(core, filter, discord, (r, rooms) -> { }, () -> "main-7");
+        rest = new ArchiveRest(core, filter, discord, (r, rooms) -> { }, () -> server.point());
         rest.onWake(() -> {
             wakes.incrementAndGet();
             loop.execute(this::round);
@@ -96,7 +98,7 @@ class ArchiveRestTest {
         boolean more;
         do {
             more = rest.beforeRequest();
-            Thread.interrupted(); // the request after it takes a waking's interrupt, as the real loop's does
+            if (Thread.interrupted()) interruptsLeft.incrementAndGet(); // the request after it takes a waking's interrupt, as the real loop's does
             server.log.add("request " + filter.forRequest(false));
         } while (more);
     }
@@ -368,8 +370,8 @@ class ArchiveRestTest {
         rest.update().get();
         assertTrue(server.notRoomsPosted().getLast().contains("!lone:x"), "archived elsewhere: it rests " + server.log);
 
-        server.tags.put("!lone:x", "{}"); // unarchived on another device
-        server.tags.put("!c1:x", "{\"u.archived\":{}}");
+        server.setTag("!lone:x", "{}"); // unarchived on another device
+        server.setTag("!c1:x", "{\"u.archived\":{}}");
         rest.update().get();
         assertTrue(server.log.stream().noneMatch(l -> l.startsWith("tags ")), "not before its time");
         now = now.plus(ArchiveRest.TAGS_EVERY);
@@ -504,17 +506,78 @@ class ArchiveRestTest {
         rest.update().get();
         now = now.plus(ArchiveRest.TAGS_EVERY);
         rest.update().get();
-        assertTrue(server.log.stream().anyMatch(l -> l.startsWith("tags ") && l.endsWith("since=main-7")), server.log.toString());
+        assertTrue(lastTags().matches(".*since=main\\d+"), "the first: from where the main sync left them " + server.log);
         now = now.plus(ArchiveRest.TAGS_EVERY);
         rest.update().get();
-        assertTrue(server.log.reversed().stream().filter(l -> l.startsWith("tags ")).findFirst().orElseThrow().matches(".*since=t\\d+"),
-                "then from where the last tags sync was: " + server.log);
+        assertTrue(lastTags().matches(".*since=t\\d+"), "then from where the last tags sync was: " + server.log);
+        int tagged = server.log.size();
+
         archive(true, "!open:x"); // a tag on it may change before the next tags sync, while the main sync leaves it out
         rest.update().get();
+        assertTrue(List.copyOf(server.log).subList(tagged, server.log.size()).stream().anyMatch(l -> l.matches(
+                "tags \\[!c1:x, !c2:x, !lone:x, !s:x\\] since=t\\d+")), "those resting already first, from their own point: " + server.log);
         now = now.plus(ArchiveRest.TAGS_EVERY);
         rest.update().get();
-        String last = server.log.reversed().stream().filter(l -> l.startsWith("tags ")).findFirst().orElseThrow();
-        assertTrue(last.contains("!open:x") && last.endsWith("since=main-7"), "from where the main sync left it: " + last);
+        String last = lastTags();
+        assertTrue(last.contains("!open:x") && last.matches(".*since=main\\d+"), "from where the main sync left it: " + last);
+    }
+
+    @Test
+    void aTagChangedOnARoomAlreadyRestingIsHeardWhenMoreStartResting() throws Exception {
+        everyKind();
+        rest.update().get();
+        now = now.plus(ArchiveRest.TAGS_EVERY);
+        rest.update().get(); // a tags sync: from here on, only what changes after it
+        server.setTag("!c1:x", "{\"u.archived\":{},\"m.favourite\":{}}"); // favourite on the phone
+        archive(true, "!open:x"); // then more rests, before the next tags sync
+        rest.update().get();
+        now = now.plus(ArchiveRest.TAGS_EVERY);
+        rest.update().get();
+        synchronized (proc) {
+            assertTrue(proc.room("!c1:x").chat.favorite(), "heard, not skipped by the jump to the main sync's point: " + server.log);
+        }
+    }
+
+    @Test
+    void wakingTheComputerMidTagsSyncIsNotLostAndAsksAgain() throws Exception {
+        everyKind();
+        rest.update().get();
+        now = now.plus(ArchiveRest.TAGS_EVERY);
+        server.tagsGate = new CountDownLatch(1);
+        CompletableFuture<Void> round = rest.update();
+        server.changes.until("the tags sync asked", () -> server.log.stream().anyMatch(l -> l.startsWith("tags ")));
+        int before = interruptsLeft.get();
+        loopThread.interrupt();
+        round.get();
+        assertEquals(before + 1, interruptsLeft.get(), "left for the request after it");
+        server.tagsGate.countDown();
+        rest.update().get(); // the clock unmoved
+        assertEquals(2, server.log.stream().filter(l -> l.startsWith("tags ")).count(), "asked again at once: " + server.log);
+    }
+
+    @Test
+    void wakingTheComputerMidFilterPostIsNoRefusal() throws Exception {
+        everyKind();
+        rest.update().get();
+        server.filterGate = new CountDownLatch(1);
+        archive(true, "!open:x");
+        CompletableFuture<Void> round = rest.update();
+        int asked = (int) server.log.stream().filter(l -> l.equals("filter asked")).count();
+        server.changes.until("the post asked", () -> server.log.stream().filter(l -> l.equals("filter asked")).count() > asked);
+        int before = interruptsLeft.get();
+        loopThread.interrupt();
+        round.get();
+        assertEquals(before + 1, interruptsLeft.get(), "left for the request after it");
+        server.filterGate.countDown();
+        rest.update().get(); // the clock unmoved: no retry waits
+        assertEquals(set("!s:x", "!c1:x", "!c2:x", "!lone:x", "!open:x"), server.notRoomsPosted().getLast(), server.log.toString());
+        String id = server.filters.entrySet().stream().filter(e -> e.getValue().path("room").path("not_rooms").size() == 5)
+                .map(java.util.Map.Entry::getKey).max(java.util.Comparator.comparingInt(ArchiveRestTest::num)).orElseThrow();
+        assertEquals(id, filter.forRequest(false), "posted again and used");
+    }
+
+    private String lastTags() {
+        return server.log.reversed().stream().filter(l -> l.startsWith("tags ")).findFirst().orElseThrow();
     }
 
     @Test

@@ -223,6 +223,10 @@ final class ArchiveRest {
             try {
                 filter.exclude(target);
                 if (target == want) filterRetry = null;
+            } catch (java.io.InterruptedIOException e) {
+                // The computer woke mid post: not a refusal. The request after this takes the interrupt; the next round posts.
+                Thread.currentThread().interrupt();
+                return;
             } catch (IOException | MatrixException e) {
                 System.err.println("Discord rest: the server didn't keep the filter, tried again later: " + e);
                 filterRetry = Retry.after(filterRetry, now);
@@ -232,7 +236,11 @@ final class ArchiveRest {
             for (String r : resting) if (!target.contains(r)) owed.add(r);
             // Their tags from the point the main sync stops bringing them, or a change between the two is never heard.
             if (!resting.containsAll(target)) {
-                tagsSince = mainSince.get();
+                // Those resting already first catch up on their tags up to now, from where their last tags sync was;
+                // if that fails, the older point stays (it covers the new ones too). Never synced yet: the first
+                // tags sync, with no point, brings everything anyway.
+                boolean before = tagsSince == null || resting.isEmpty() || tagsSync(resting);
+                if (before && (tagsSince != null || resting.isEmpty())) tagsSince = mainSince.get();
                 if (tagsDue == null) tagsDue = now.plus(TAGS_EVERY);
             }
             resting = target;
@@ -321,9 +329,14 @@ final class ArchiveRest {
         if (tagsDue == null) tagsDue = now.plus(TAGS_EVERY);
         if (now.isBefore(tagsDue)) return;
         tagsDue = now.plus(TAGS_EVERY);
+        if (!tagsSync(resting) && Thread.currentThread().isInterrupted()) tagsDue = now; // woken mid-way: next round
+    }
+
+    /** A tags-only sync of {@code rooms} from {@link #tagsSince}; false when it didn't come through. */
+    private boolean tagsSync(Set<String> rooms) {
         ObjectNode f = MatrixClient.JSON.createObjectNode();
         ObjectNode room = f.putObject("room");
-        SyncFilter.roomList(f, "rooms", resting);
+        SyncFilter.roomList(f, "rooms", rooms);
         room.putObject("timeline").put("limit", 0);
         room.putObject("state").putArray("not_types").add("*");
         room.putObject("ephemeral").putArray("not_types").add("*");
@@ -334,10 +347,10 @@ final class ArchiveRest {
             ObjectNode join = MatrixClient.JSON.createObjectNode();
             for (Map.Entry<String, JsonNode> e : (Iterable<Map.Entry<String, JsonNode>>) () -> resp.path("rooms").path("join").fields()) {
                 JsonNode data = e.getValue().path("account_data");
-                if (!data.path("events").isEmpty() && resting.contains(e.getKey())) join.putObject(e.getKey()).set("account_data", data);
+                if (!data.path("events").isEmpty() && rooms.contains(e.getKey())) join.putObject(e.getKey()).set("account_data", data);
             }
             tagsSince = resp.path("next_batch").asText(null);
-            if (join.isEmpty()) return;
+            if (join.isEmpty()) return true;
             ObjectNode only = MatrixClient.JSON.createObjectNode();
             only.putObject("rooms").set("join", join);
             SyncProcessor.Result r;
@@ -345,8 +358,13 @@ final class ArchiveRest {
                 r = proc.process(only, false);
             }
             caughtUp.accept(r, List.of());
+            return true;
+        } catch (java.io.InterruptedIOException e) {
+            Thread.currentThread().interrupt(); // the computer woke: the request after this takes it
+            return false;
         } catch (IOException | RuntimeException e) {
             System.err.println("Discord rest: resting rooms' tags failed, tried again later: " + e);
+            return false;
         }
     }
 
