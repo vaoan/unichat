@@ -243,7 +243,7 @@ class VaultNamesTest {
             }
         });
         read.await();
-        VaultNames.migrate(dav(), new OldVault(dav()), made.info(), made.vk(), LAPTOP); // another computer moves the names meanwhile
+        VaultNames.migrate(dav(), new OldVault(dav()), made.info(), made.vk()); // another computer moves the names meanwhile
         go.countDown();
         job.get();
         assertEquals(made.info().generation() + 1, Vault.info(dav()).generation(), "the key changed under the new names");
@@ -348,20 +348,44 @@ class VaultNamesTest {
         desk.as(() -> desk.cloud.vault().codeKept()); // nor does a job that changes no key or file refuse
     }
 
-    @Test
-    void thisComputersOwnSlotWrittenLateUnderTheOldNamesWinsOverAStaleCopy() throws Exception {
+    /** The vault moved by the laptop, its finish cut short right after the switch: every old slot still there. */
+    private void switchedWithTheOldSlotsLeft() throws Exception {
         anOldVault();
-        cloud.failDeleteOnce.add(CloudNames.OLD_SLOTS + "/" + DESK + ".json"); // the old slots' deletes cut short
+        cloud.failDeleteOnce.add(CloudNames.OLD_SLOTS + "/" + DESK + ".json");
         assertNotNull(laptop.round().error());
         assertTrue(cloud.files.containsKey(Vault.INFO), "switched");
-        Vault.Info info = Vault.info(dav());
-        VaultSlot own = Vault.slot(dav(), info, LAPTOP);
-        byte[] slotKey = java.util.Base64.getDecoder().decode(laptop.get(VaultParts.KEY));
-        Vault.rewrap(new OldVault(dav()), info, own, slotKey, made.vk(), VaultNext.publicKey(own, made.vk())); // written late, old names
-        byte[] latest = cloud.files.get(CloudNames.OLD_SLOTS + "/" + LAPTOP + ".json");
-        assertNull(laptop.round().error());
-        assertArrayEquals(latest, cloud.files.get(Vault.SLOTS + "/" + LAPTOP + ".json"), "its latest slot, not the stale copy");
-        assertFalse(anyUnder(CloudNames.OLD_VAULT));
+        assertTrue(cloud.files.containsKey(CloudNames.OLD_SLOTS + "/" + DESK + ".json"), "its old slots left");
+    }
+
+    @Test
+    void aKeyChangedAfterAnInterruptedFinishKeepsThisComputerIn() throws Exception {
+        switchedWithTheOldSlotsLeft();
+        desk.as(() -> desk.cloud.vault().rotateKey());
+        desk.round(); // finishes what the move left
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault(), "its old slot never went back over the new one");
         assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
+        assertEquals(made.info().generation() + 1, Vault.info(dav()).generation());
+        assertFalse(anyUnder(CloudNames.OLD_SLOTS));
+    }
+
+    @Test
+    void aWayInTakenAwayAfterAnInterruptedFinishStaysGone() throws Exception {
+        switchedWithTheOldSlotsLeft();
+        desk.as(() -> desk.cloud.vault().newRecoveryCode());
+        desk.as(() -> desk.cloud.vault().removeComputer(LAPTOP));
+        desk.round();
+        assertEquals(1, Vault.slots(dav()).stream().filter(slot -> slot.method() == VaultSlot.Method.RECOVERY).count(),
+            "the old recovery code never comes back");
+        assertFalse(Vault.computers(dav()).containsKey(LAPTOP), "nor the computer removed");
+        assertEquals(Cloud.VaultState.REMOVED, laptop.round().vault());
+    }
+
+    @Test
+    void aComputerForgottenAfterAnInterruptedFinishStaysGone() throws Exception {
+        switchedWithTheOldSlotsLeft();
+        desk.as(() -> desk.cloud.vault().forgetHere());
+        laptop.round(); // the other computer finishes the move
+        assertFalse(Vault.computers(dav()).containsKey(DESK), "its way in never comes back");
+        assertFalse(anyUnder(CloudNames.OLD_SLOTS));
     }
 }

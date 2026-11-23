@@ -17,6 +17,7 @@ import java.util.TreeSet;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -146,11 +147,25 @@ class CloudNamesTest {
         VaultComputer desk = new VaultComputer(cloud, dir, DESK);
         assertTrue(desk.round().error() != null, "told");
         assertTrue(cloud.files.containsKey(OLD_SETTINGS), "cut short before the old folder went");
-        assertEquals("DARK", desk.get("ui.theme"), "the newer copy already under the new name");
+        assertEquals("DARK", Bundle.parse(cloud.files.get(SETTINGS)).settings().get("ui.theme"), "the newer copy already under the new name");
+        assertNull(desk.get("ui.theme"), "and the settings waited: one was still under its old name");
         assertNull(desk.round().error());
+        assertEquals("DARK", desk.get("ui.theme"));
         assertFalse(paths().stream().anyMatch(CloudNamesTest::old), "finished: " + paths());
         assertArrayEquals(bytes("foto"), cloud.files.get("Unichat/Media/Ana/a.jpg"));
         assertTrue(desk.get(CloudNames.DONE) != null);
+    }
+
+    @Test
+    void aPlainMoveThatFailsSendsNoSettingsThatRound() throws Exception {
+        byte[] theirs = settings(OLD, Instant.now().minusSeconds(60), "LIGHT"); // another computer's, under the old name only
+        cloud.put(OLD_SETTINGS, theirs);
+        cloud.failListOnce.add(CloudNames.OLD_SETTINGS);
+        VaultComputer desk = new VaultComputer(cloud, dir, DESK).set("ui.theme", "DARK"); // new to the account
+        assertNotNull(desk.round().error(), "told");
+        assertFalse(cloud.files.containsKey(SETTINGS), "its own settings didn't go up over the ones still under the old name");
+        assertNull(desk.round().error());
+        assertEquals("LIGHT", desk.get("ui.theme"), "the account's settings came in once moved, as for any computer new to it");
     }
 
     @Test

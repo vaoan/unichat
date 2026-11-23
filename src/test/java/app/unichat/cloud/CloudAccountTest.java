@@ -26,4 +26,19 @@ class CloudAccountTest {
             were.forEach(Settings.get()::set);
         }
     }
+
+    @Test
+    void disconnectingForgetsThatTheOldNamesWereMovedHere() {
+        Map<String, String> were = new HashMap<>();
+        for (String k : ACCOUNT) were.put(k, Settings.get().getString(k, null));
+        String done = Settings.get().getString(CloudNames.DONE, null);
+        try {
+            Settings.get().setBool(CloudNames.DONE, true);
+            CloudAccount.forget();
+            assertNull(Settings.get().getString(CloudNames.DONE, null), "another account may still have the old names");
+        } finally {
+            were.forEach(Settings.get()::set);
+            Settings.get().set(CloudNames.DONE, done);
+        }
+    }
 }

@@ -401,7 +401,7 @@ public final class Cloud {
                 }
                 if (vault.open()) seePeers(at, vault);
                 Storage personal = vault.personal(at);
-                if (personal != null && (vault.open() || CloudAccount.settings())) {
+                if (personal != null && (vault.open() || CloudAccount.settings() && !renames.settingsWait())) {
                     doing(new Activity(Step.SETTINGS, 0, 0, null));
                     parts.get(0).sync(personal, now);
                     doing(new Activity(Step.LEARNED, 0, 0, null));

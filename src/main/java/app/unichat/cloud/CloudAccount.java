@@ -47,12 +47,13 @@ public record CloudAccount(Service service, String url, String user, String secr
     }
 
     /**
-     * Disconnected: the login goes, and this computer's hold on a vault there (and that it saw one), since the next
-     * account connected has another vault or none; what's in the account and the rest on this computer stays.
+     * Disconnected: the login goes, and this computer's hold on a vault there (and that it saw one), and that its old
+     * folder names were moved, since the next account connected has another vault or none, and maybe the old names;
+     * what's in the account and the rest on this computer stays.
      */
     public static void forget() {
         Settings s = Settings.get();
-        for (String k : new String[] {"cloud.service", "cloud.url", "cloud.user", "cloud.secret", "cloud.settingsBase"}) s.set(k, null);
+        for (String k : new String[] {"cloud.service", "cloud.url", "cloud.user", "cloud.secret", "cloud.settingsBase", CloudNames.DONE}) s.set(k, null);
         VaultParts.gone();
     }
 

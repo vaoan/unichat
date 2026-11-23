@@ -27,6 +27,8 @@ final class FakeDav implements AutoCloseable {
     volatile boolean filesAreNoFolders;
     /** Paths whose next GET fails (the network dropped), once each. */
     final Set<String> failReadOnce = ConcurrentHashMap.newKeySet();
+    /** Paths whose next listing (PROPFIND, depth 1) fails, once each. */
+    final Set<String> failListOnce = ConcurrentHashMap.newKeySet();
     /** Paths whose next MOVE fails, once each. */
     final Set<String> failMoveOnce = ConcurrentHashMap.newKeySet();
     /** Paths whose next DELETE fails, once each. */
@@ -123,6 +125,10 @@ final class FakeDav implements AutoCloseable {
             asked.add(x.getRequestMethod() + " " + path);
             switch (x.getRequestMethod()) {
                 case "PROPFIND" -> {
+                    if ("1".equals(x.getRequestHeaders().getFirst("Depth")) && failListOnce.remove(path)) {
+                        x.sendResponseHeaders(503, -1);
+                        return;
+                    }
                     if (!path.isEmpty() && !files.containsKey(path) && !dirs.contains(path)) {
                         x.sendResponseHeaders(404, -1);
                         return;

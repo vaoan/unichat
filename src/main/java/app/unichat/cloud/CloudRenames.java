@@ -28,6 +28,8 @@ final class CloudRenames {
     private final Opener opener;
     /** Whether the last round left nothing under media's old name: its check may run. */
     private volatile boolean mayCheck = true;
+    /** Whether the last round's plain move failed with a settings part still under its old name: the plain parts wait. */
+    private volatile boolean settingsWait;
 
     CloudRenames(TextSync texts, ReentrantLock keyLock, Unseen unseen, Opener opener) {
         this.texts = texts;
@@ -48,11 +50,21 @@ final class CloudRenames {
     String plain(Storage dav) {
         try {
             mayCheck = CloudNames.migrate(dav, texts);
+            settingsWait = false;
             return null;
         } catch (IOException | RuntimeException e) {
             mayCheck = false;
+            settingsWait = CloudNames.settingsLeft(dav);
             return Errors.message(e);
         }
+    }
+
+    /**
+     * Whether the plain settings and the AI's part wait this round: the move failed with one still under its old name,
+     * where its own copy would go up over it and win (newer).
+     */
+    boolean settingsWait() {
+        return settingsWait;
     }
 
     /**
@@ -80,7 +92,7 @@ final class CloudRenames {
         keyLock.lock();
         try {
             synchronized (texts) {
-                Storage now = VaultNames.migrate(dav, at, vault.info(), vk, Cloud.machine());
+                Storage now = VaultNames.migrate(dav, at, vault.info(), vk);
                 if (now != at) unseen.run(); // another file now, whatever its stamp
                 return now;
             }
@@ -91,25 +103,37 @@ final class CloudRenames {
     }
 
     /**
-     * The account as a vault job is to see it, held under the job's locks: a vault still under its old names and open here
-     * is moved first, so the job never writes the old names while another computer switches them; one that can't be moved
-     * now refuses the job (the next round tries again). Not open here (a way in about to open it), the old names'.
+     * The account as a job that writes the vault's keys or files is to see it, held under the job's locks. Anything of the
+     * vault still under its old names is moved or finished first: open here, all of it; not open, its slots (they need no
+     * key). So the job never writes the old names while another computer switches them, and no old slot comes back
+     * later over a way in it changes or takes away. One that can't be finished now refuses the job (the next round tries
+     * again). Still under the old names and not open here (a way in about to open it), the old names'.
      */
     Storage forJob(Storage dav) throws IOException {
         Storage at = VaultNames.at(dav);
-        if (!(at instanceof OldVault)) return at;
+        boolean old = at instanceof OldVault;
+        if (!old && !VaultNames.left(dav)) return at;
         boolean open;
         try (VaultParts.Round vault = opener.open(at)) {
             open = vault.open();
             if (open) {
-                Storage now = vault(dav, at, vault, why -> { });
-                if (now != null && !(now instanceof OldVault)) return now;
+                try {
+                    Storage now = move(dav, at, vault);
+                    if (!(now instanceof OldVault)) return now;
+                } catch (IOException | RuntimeException e) {
+                    throw new IOException(I18n.t("cloud.error.vaultRenameFirst"), e);
+                }
             }
         }
-        Storage again = VaultNames.at(dav); // another computer may have switched it meanwhile
-        if (!(again instanceof OldVault)) return again;
         if (open) throw new IOException(I18n.t("cloud.error.vaultRenameFirst"));
-        return at;
+        Storage again = VaultNames.at(dav); // another computer may have switched it meanwhile
+        if (again instanceof OldVault) return at;
+        try {
+            VaultNames.slotsLeft(dav);
+        } catch (IOException | RuntimeException e) {
+            throw new IOException(I18n.t("cloud.error.vaultRenameFirst"), e);
+        }
+        return again;
     }
 
     /**
@@ -119,7 +143,7 @@ final class CloudRenames {
     void afterJob(Storage dav, Storage at) {
         if (!(at instanceof OldVault)) return;
         try {
-            VaultNames.slotsLeft(dav, Cloud.machine());
+            VaultNames.slotsLeft(dav);
             Storage now = VaultNames.at(dav);
             try (VaultParts.Round vault = opener.open(now)) {
                 if (vault.open() && (now != dav || VaultNames.left(dav))) vault(dav, now, vault, why -> { });

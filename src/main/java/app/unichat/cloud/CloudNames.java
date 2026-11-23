@@ -123,6 +123,19 @@ final class CloudNames {
         return media;
     }
 
+    /**
+     * Whether a settings part may still be under its old name ({@link #DONE} not written, and the old folder holds one,
+     * or can't be listed).
+     */
+    static boolean settingsLeft(Storage dav) {
+        if (Settings.get().getBool(DONE, false)) return false;
+        try {
+            return dav.list(OLD_SETTINGS).stream().anyMatch(name -> Cloud.Part.of(name) != null);
+        } catch (IOException | RuntimeException e) {
+            return true;
+        }
+    }
+
     /** Each settings file and the turn-off mark under {@link #OLD_SETTINGS}: moved, or the newer kept where both are. */
     private static boolean settings(Storage dav) throws IOException {
         for (String name : dav.list(OLD_SETTINGS)) {

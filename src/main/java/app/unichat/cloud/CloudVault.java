@@ -114,7 +114,7 @@ public final class CloudVault {
 
     /** Another computer's way into the vault taken away, on the vault's thread; this one's own goes by {@link #forgetHere}. */
     public CompletableFuture<Void> removeComputer(String machine) {
-        return cloud.onWorker(dav -> {
+        return writing(dav -> {
             VaultActions.remove(dav, machine);
             return null;
         });
@@ -161,7 +161,7 @@ public final class CloudVault {
      * it declined is left as it is). The next round finds it locked; it can be opened again later.
      */
     public CompletableFuture<Void> forgetHere() {
-        return cloud.onWorker(dav -> {
+        return writing(dav -> {
             Vault.removeSlot(dav, Cloud.machine());
             VaultParts.forget();
             return null;
