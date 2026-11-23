@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ForwardUiTest {
-    private static final String TO = "!familia:demo";
+    private static final String TO = "!family:demo";
     private TimelineWindow w;
 
     @BeforeAll

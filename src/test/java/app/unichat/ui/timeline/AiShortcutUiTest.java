@@ -60,7 +60,7 @@ class AiShortcutUiTest {
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();
-            view.openChatId("!familia:demo");
+            view.openChatId("!family:demo");
             view.lookupAll("*").stream().filter(Composer.class::isInstance).map(Composer.class::cast).findFirst().orElseThrow()
                     .useAiWriter(() -> p -> {
                         wrote.countDown();

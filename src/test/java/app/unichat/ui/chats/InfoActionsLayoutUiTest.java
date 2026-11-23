@@ -43,7 +43,7 @@ class InfoActionsLayoutUiTest {
                     scene.getRoot().setStyle("-fx-font-size: " + px + "px;");
                     stage[0].setScene(scene);
                     stage[0].show();
-                    p.show(svc.chat("!familia:demo"));
+                    p.show(svc.chat("!family:demo"));
                     return p;
                 });
                 FxWait.until("the actions show", () -> pane.lookupAll(".info-action").size() == 6);

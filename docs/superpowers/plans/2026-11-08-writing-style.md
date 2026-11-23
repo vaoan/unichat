@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 21, JavaFX 23, Jackson (already used), JUnit 5. Build: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./mvnw verify`.
 
-**Spec:** `docs/superpowers/specs/2026-11-08-estilo-de-escritura-design.md`
+**Spec:** `docs/superpowers/specs/2026-11-08-writing-style-design.md`
 
 ## Global Constraints
 

@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** "Corregir con IA" on a message already sent: corrected apart from the message box, then edited by itself. */
 class MessageFixerTest {
-    private static final String CHAT = "!familia:demo";
+    private static final String CHAT = "!family:demo";
     private MockChatService svc;
     private final List<String> told = new CopyOnWriteArrayList<>();
     private final List<String> prompts = new CopyOnWriteArrayList<>();

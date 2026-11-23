@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Forwarding: copies of the messages, in their order, to every chat chosen, saying where they came from only if asked. */
 class ForwardingTest {
-    private static final String FROM = "!familia:demo", TO = "!mama:demo", ALSO = "!andres:demo";
+    private static final String FROM = "!family:demo", TO = "!mom:demo", ALSO = "!andres:demo";
 
     private static MockChatService svc() {
         MockChatService svc = new MockChatService();

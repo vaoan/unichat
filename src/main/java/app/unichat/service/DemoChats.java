@@ -32,12 +32,12 @@ final class DemoChats {
     /** The phone's contacts the demo's WhatsApp offers. */
     static List<Contact> contacts() {
         return List.of(
-                new Contact("c-mama", I18n.t("demo.title.mom"), List.of("tel:+573001110001"), null, "!mama:demo"),
-                new Contact("c-ana", "Ana Restrepo", List.of("tel:+573001110002"), null, null),
-                new Contact("c-anamaria", "Ana María", List.of("tel:+573001110003"), null, null),
-                new Contact("c-carlos", "Carlos Peña", List.of("tel:+573001110004"), null, null),
-                new Contact("c-dentista", I18n.t("demo.contact.dentist"), List.of("tel:+573001110005"), null, null),
-                new Contact("c-pedro", "Pedro", List.of("tel:+573001110006"), null, null));
+                new Contact("c-mom", I18n.t("demo.title.mom"), List.of("tel:+573001110001"), null, "!mom:demo"),
+                new Contact("c-ana", I18n.t("demo.name.anaRestrepo"), List.of("tel:+573001110002"), null, null),
+                new Contact("c-anamaria", I18n.t("demo.name.anaMaria"), List.of("tel:+573001110003"), null, null),
+                new Contact("c-carlos", I18n.t("demo.name.carlosPena"), List.of("tel:+573001110004"), null, null),
+                new Contact("c-dentist", I18n.t("demo.contact.dentist"), List.of("tel:+573001110005"), null, null),
+                new Contact("c-pedro", I18n.t("demo.name.pedro"), List.of("tel:+573001110006"), null, null));
     }
 
     static void adopt(PreferencesFile prefs, Chat c) {
@@ -76,7 +76,7 @@ final class DemoChats {
                 .in(-240, I18n.t("demo.andrea.3"))
                 .account(WA_WORK).unread(1).done();
 
-        ChatBuilder.dm(svc, "mama", Network.WHATSAPP, I18n.t("demo.title.mom"))
+        ChatBuilder.dm(svc, "mom", Network.WHATSAPP, I18n.t("demo.title.mom"))
                 .in(-2900, I18n.t("demo.mom.1"))
                 .out(-2850, I18n.t("demo.mom.2"))
                 .in(-2800, I18n.t("demo.mom.3"))
@@ -86,31 +86,31 @@ final class DemoChats {
                 .unread(2).favorite().done();
 
         // A shop on WhatsApp Business: its buttons only work in the phone's app (ui/timeline/BusinessButtons).
-        ChatBuilder.dm(svc, "tienda", Network.WHATSAPP, I18n.t("demo.title.shop"))
+        ChatBuilder.dm(svc, "shop", Network.WHATSAPP, I18n.t("demo.title.shop"))
                 .out(-90_000, I18n.t("demo.shop.1"))
                 .in(-89_900, I18n.t("demo.shop.2")).buttons("review_and_pay")
                 .in(-89_800, I18n.t("demo.shop.3")).buttons(I18n.t("demo.shop.button"))
                 .account(WA_WORK).done();
 
-        ChatBuilder.group(svc, "familia", Network.WHATSAPP, I18n.t("demo.title.family"), I18n.t("demo.name.dad"), "Laura", I18n.t("demo.name.uncleJorge"))
+        ChatBuilder.group(svc, "family", Network.WHATSAPP, I18n.t("demo.title.family"), I18n.t("demo.name.dad"), I18n.t("demo.name.laura"), I18n.t("demo.name.uncleJorge"))
                 .in(-7200, I18n.t("demo.name.dad"), I18n.t("demo.family.1"))
-                .in(-7100, "Laura", I18n.t("demo.family.2"))
+                .in(-7100, I18n.t("demo.name.laura"), I18n.t("demo.family.2"))
                 .photo(-7000, I18n.t("demo.name.uncleJorge"), I18n.t("demo.family.photo"))
                 .in(-6900, I18n.t("demo.name.uncleJorge"), I18n.t("demo.family.3"))
                 .out(-6800, I18n.t("demo.family.4"))
-                .react(-7000, "❤️", I18n.t("demo.name.dad"), "Laura")
+                .react(-7000, "❤️", I18n.t("demo.name.dad"), I18n.t("demo.name.laura"))
                 .voice(-6700, I18n.t("demo.name.dad"))
-                .in(-600, "Laura", I18n.t("demo.family.5"))
+                .in(-600, I18n.t("demo.name.laura"), I18n.t("demo.family.5"))
                 .unread(1).done();
     }
 
     /** A link the demo pretends to have read, so its card shows as Telegram draws one. */
-    private static final String DEMO_LINK = "https://unichat.example/torneo";
+    private static final String DEMO_LINK = "https://unichat.example/tournament";
 
     private static void otherChats(MockChatService svc) {
         svc.addLinkPreview(DEMO_LINK, new app.unichat.model.LinkPreview(DEMO_LINK, "Unichat", I18n.t("demo.link.title"),
-                I18n.t("demo.link.text"), "demo://torneo", 1200, 800, null, false));
-        ChatBuilder.dm(svc, "andres", Network.TELEGRAM, "Andrés Mejía")
+                I18n.t("demo.link.text"), "demo://" + I18n.t("demo.image.tournament"), 1200, 800, null, false));
+        ChatBuilder.dm(svc, "andres", Network.TELEGRAM, I18n.t("demo.name.andres"))
                 .out(-90000, I18n.t("demo.andres.1"))
                 .in(-89000, I18n.t("demo.andres.2"))
                 .in(-88900, I18n.t("demo.andres.3"))
@@ -119,23 +119,23 @@ final class DemoChats {
                 .reply(-3500, I18n.t("demo.andres.5"), -3600)
                 .favorite().done();
 
-        ChatBuilder.group(svc, "devs", Network.SLACK, I18n.t("demo.title.dev"), "Camila Rojas", "Santiago", I18n.t("demo.name.ciBot"))
+        ChatBuilder.group(svc, "devs", Network.SLACK, I18n.t("demo.title.dev"), I18n.t("demo.name.camila"), I18n.t("demo.name.santiago"), I18n.t("demo.name.ciBot"))
                 .in(-5400, I18n.t("demo.name.ciBot"), I18n.t("demo.dev.1"))
-                .in(-5000, "Camila Rojas", I18n.t("demo.dev.2"))
-                .in(-4900, "Santiago", I18n.t("demo.dev.3"))
+                .in(-5000, I18n.t("demo.name.camila"), I18n.t("demo.dev.2"))
+                .in(-4900, I18n.t("demo.name.santiago"), I18n.t("demo.dev.3"))
                 .out(-4800, I18n.t("demo.dev.4"))
-                .in(-300, "Camila Rojas", I18n.t("demo.dev.5"))
+                .in(-300, I18n.t("demo.name.camila"), I18n.t("demo.dev.5"))
                 .unread(3).mention().done();
 
-        ChatBuilder.dm(svc, "valen", Network.INSTAGRAM, "valentina.gomez")
+        ChatBuilder.dm(svc, "valen", Network.INSTAGRAM, I18n.t("demo.name.valentina"))
                 .in(-14000, I18n.t("demo.valen.1"))
                 .out(-13900, I18n.t("demo.valen.2"))
-                .photo(-13800, "valentina.gomez", I18n.t("demo.valen.photo"))
+                .photo(-13800, I18n.t("demo.name.valentina"), I18n.t("demo.valen.photo"))
                 .in(-13700, I18n.t("demo.valen.3"))
                 .react(-13800, "🔥", I18n.t("demo.me"))
                 .done();
 
-        ChatBuilder.dm(svc, "sofia", Network.SIGNAL, "Sofía")
+        ChatBuilder.dm(svc, "sofia", Network.SIGNAL, I18n.t("demo.name.sofia"))
                 .in(-40000, I18n.t("demo.sofia.1"))
                 .out(-39900, I18n.t("demo.sofia.2"))
                 .in(-39800, I18n.t("demo.sofia.3"))
@@ -151,23 +151,23 @@ final class DemoChats {
 
         // A Discord server (a Matrix space) with two joined channels and one not joined yet.
 
-        ChatBuilder.dm(svc, "banco", Network.GOOGLE_MESSAGES, I18n.t("demo.title.bank"))
+        ChatBuilder.dm(svc, "bank", Network.GOOGLE_MESSAGES, I18n.t("demo.title.bank"))
                 .in(-30000, I18n.t("demo.bank.1"))
                 .lowPriority().done();
 
-        ChatBuilder.dm(svc, "carlos", Network.MESSENGER, "Carlos Pérez")
+        ChatBuilder.dm(svc, "carlos", Network.MESSENGER, I18n.t("demo.name.carlosPerez"))
                 .in(-250000, I18n.t("demo.carlos.1"))
                 .out(-249000, I18n.t("demo.carlos.2"))
                 .archived().done();
 
-        ChatBuilder.dm(svc, "notas", Network.MATRIX, I18n.t("demo.title.notes"))
+        ChatBuilder.dm(svc, "notes", Network.MATRIX, I18n.t("demo.title.notes"))
                 .out(-500000, I18n.t("demo.notes.1"))
                 .out(-400000, I18n.t("demo.notes.2"))
                 .pinned().done();
     }
 
     private static void discordServer(MockChatService svc) {
-        Chat server = new Chat("!servidor:demo");
+        Chat server = new Chat("!server:demo");
         server.setNetwork(Network.DISCORD);
         server.setTitle(I18n.t("demo.title.server"));
         server.setSpace(true);
@@ -180,8 +180,8 @@ final class DemoChats {
                 .html(-3000, "Mafe", "https://fixupx.com/mafe/status/1234567890123456789012345678901234567890\n"
                         + "<blockquote class=\"discord-embed\" background-color=\"#6364FF\"><p class=\"discord-embed-author\">"
                         + "<img data-mx-emoticon height=\"24\" src=\"demo://avatar\" alt=\"\">&nbsp;<a href=\"https://x.com/mafe/status/1\">Mafe (@mafe)</a></p>"
-                        + "<p class=\"discord-embed-description\"><p>" + I18n.t("demo.srv.embed") + "<br><a href=\"https://x.com/hashtag/torneo\">#" + I18n.t("demo.srv.embedTag") + "</a></p></p>"
-                        + "<p class=\"discord-embed-image\"><img src=\"demo://torneo\" alt=\"\"></p><p class=\"discord-embed-footer\"><sub>FixupX</sub></p></blockquote>")
+                        + "<p class=\"discord-embed-description\"><p>" + I18n.t("demo.srv.embed") + "<br><a href=\"https://x.com/hashtag/" + I18n.t("demo.srv.embedTag") + "\">#" + I18n.t("demo.srv.embedTag") + "</a></p></p>"
+                        + "<p class=\"discord-embed-image\"><img src=\"demo://" + I18n.t("demo.image.tournament") + "\" alt=\"\"></p><p class=\"discord-embed-footer\"><sub>FixupX</sub></p></blockquote>")
                 .unread(2).done();
         ChatBuilder.group(svc, "srv-memes", Network.DISCORD, "#memes", "Mafe")
                 .in(-7000, "Mafe", "😂")
@@ -259,7 +259,7 @@ final class DemoChats {
             in(secs, who, "");
             Message msg = list.get(list.size() - 1);
             msg.setType(MessageType.AUDIO);
-            msg.setMediaUrl("demo://nota-de-voz.ogg");
+            msg.setMediaUrl("demo://voice-note.ogg");
             msg.setFileName(I18n.t("demo.voiceNoteFile"));
             msg.setMimeType("audio/ogg");
             msg.setFileSize(18_400);

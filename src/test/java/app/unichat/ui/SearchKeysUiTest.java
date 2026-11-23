@@ -61,11 +61,11 @@ class SearchKeysUiTest {
         MockChatService svc = new MockChatService();
         InfoPane info = fx(() -> new InfoPane(svc, () -> { }, t -> { }));
         javafx.scene.layout.VBox box = fx(() -> (javafx.scene.layout.VBox) info.getContent());
-        fx(() -> { info.show(svc.chat("!familia:demo")); return null; });
+        fx(() -> { info.show(svc.chat("!family:demo")); return null; });
         Node first = fx(() -> box.getChildren().get(0));
         fx(() -> { info.refresh(); return null; });
         assertTrue(fx(() -> box.getChildren().get(0) == first), "nothing changed: the same nodes");
-        svc.setFavorite("!familia:demo", !svc.chat("!familia:demo").favorite()).get();
+        svc.setFavorite("!family:demo", !svc.chat("!family:demo").favorite()).get();
         fx(() -> { info.refresh(); return null; });
         assertFalse(fx(() -> box.getChildren().get(0) == first), "a change: built again");
     }
@@ -87,7 +87,7 @@ class SearchKeysUiTest {
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();
-            view.openChatId("!familia:demo");
+            view.openChatId("!family:demo");
             return sc;
         });
         TextField search = fx(() -> (TextField) scene.getRoot().lookup(".search-box .search-field"));

@@ -43,7 +43,7 @@ class MediaClickUiTest {
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();
-            view.openChatId("!familia:demo");
+            view.openChatId("!family:demo");
             return sc;
         });
         FxWait.until("the photo renders", () -> scene.getRoot().lookup(".media-box") != null);

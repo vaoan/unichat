@@ -44,7 +44,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
  */
 @EnabledIfSystemProperty(named = "unichat.perfTests", matches = "true")
 class ScrollPerfUiTest {
-    private static final String CHAT = "!familia:demo";
+    private static final String CHAT = "!family:demo";
     private static final int MESSAGES = 5000;
     private static final int SENDERS = 400;
     private static final String[] WORDS = ("jajaja dale qué más parce mira ese gol increíble no puedo creerlo alguien vio el partido ayer "
@@ -340,7 +340,7 @@ class ScrollPerfUiTest {
         histogram();
         Node chats = fx(() -> scene[0].getRoot().lookupAll(".list-view").stream().filter(n -> n.lookup(".chat-cell") != null).findFirst().orElseThrow());
         run("chat list scroll", fx(() -> chats.lookup(".virtual-flow")), 60, 8, ui, null);
-        for (String id : List.of("!mama:demo", CHAT, "!mama:demo", CHAT)) {
+        for (String id : List.of("!mom:demo", CHAT, "!mom:demo", CHAT)) {
             long at = System.nanoTime();
             fx(() -> {
                 view[0].openChatId(id);

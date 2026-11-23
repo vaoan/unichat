@@ -72,7 +72,7 @@ class AutoSaveTest {
     @BeforeEach
     void start() throws Exception {
         svc = new MockChatService();
-        chat = svc.chat("!familia:demo");
+        chat = svc.chat("!family:demo");
         SaveFolders.setOwn(chat.id(), dir.resolve("out"));
         save = create(NO_RETRY);
     }
@@ -160,7 +160,7 @@ class AutoSaveTest {
     }
 
     private static Message media(MessageType type, String name, boolean mine, Instant at) {
-        Message m = new Message(name + type + at, "!familia:demo", mine ? "@me" : "@ana", "Ana", mine, at);
+        Message m = new Message(name + type + at, "!family:demo", mine ? "@me" : "@ana", "Ana", mine, at);
         m.setType(type);
         m.setMediaUrl("mxc://s/" + name);
         m.setFileName(name);
@@ -357,7 +357,7 @@ class AutoSaveTest {
     }
 
     private static Message text(String body, Instant at) {
-        Message m = new Message("$" + body.hashCode() + at, "!familia:demo", "@ana", "Ana", false, at);
+        Message m = new Message("$" + body.hashCode() + at, "!family:demo", "@ana", "Ana", false, at);
         m.setType(MessageType.TEXT);
         m.setBody(body);
         return m;

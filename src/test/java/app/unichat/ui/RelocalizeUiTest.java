@@ -50,11 +50,11 @@ class RelocalizeUiTest {
             MainView before = view(svc, stage[0]);
             stage[0].setScene(new Scene(before, 1000, 700));
             stage[0].show();
-            before.openChatId("!familia:demo");
+            before.openChatId("!family:demo");
             before.dispose();
             MainView fresh = view(svc, stage[0]);
             stage[0].getScene().setRoot(fresh);
-            fresh.openChatId("!familia:demo");
+            fresh.openChatId("!family:demo");
             return new WeakReference<>(before);
         });
         // Held by the stage's listeners, it marked its chat read each time the window got the focus.

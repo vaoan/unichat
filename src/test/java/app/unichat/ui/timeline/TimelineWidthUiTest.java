@@ -47,7 +47,7 @@ class TimelineWidthUiTest {
     }
 
     private static Message photo(MockChatService svc) {
-        return svc.messages("!familia:demo").stream().filter(m -> m.type() == MessageType.IMAGE).findFirst().orElseThrow();
+        return svc.messages("!family:demo").stream().filter(m -> m.type() == MessageType.IMAGE).findFirst().orElseThrow();
     }
 
     @Test
@@ -80,7 +80,7 @@ class TimelineWidthUiTest {
             stage[0].setOpacity(0);
             stage[0].setScene(new Scene(t, 1000, 800));
             stage[0].show();
-            t.open(svc.chat("!familia:demo"));
+            t.open(svc.chat("!family:demo"));
             return t;
         });
         String id = photo(svc).id();
@@ -107,7 +107,7 @@ class TimelineWidthUiTest {
             stage[0].setOpacity(0);
             stage[0].setScene(new Scene(t, 900, 800));
             stage[0].show();
-            t.open(svc.chat("!familia:demo"));
+            t.open(svc.chat("!family:demo"));
             return t;
         });
         Message target = photo(svc);

@@ -53,7 +53,7 @@ class NetworkSettingsUiTest {
             owner.setOpacity(0);
             owner.show();
             SettingsWindow.show(owner, new MockChatService(), () -> { }, () -> { }, id -> { }, t -> { });
-            SettingsWindow.select("Redes");
+            SettingsWindow.select("networks");
             return null;
         });
         FxWait.until("the WhatsApp options show", () -> option("Enviar stickers animados de WhatsApp como Sticker") != null);
@@ -72,7 +72,7 @@ class NetworkSettingsUiTest {
             owner.setOpacity(0);
             owner.show();
             SettingsWindow.show(owner, new MockChatService(), () -> { }, () -> { }, id -> { }, t -> { });
-            SettingsWindow.select("Redes");
+            SettingsWindow.select("networks");
             return null;
         });
         FxWait.until("the page shows", () -> !SettingsWindow.current().getScene().getRoot().lookupAll(".settings-label").isEmpty());

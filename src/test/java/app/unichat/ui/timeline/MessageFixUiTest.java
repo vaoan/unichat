@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class MessageFixUiTest {
-    private static final String CHAT = "!familia:demo";
+    private static final String CHAT = "!family:demo";
     private MockChatService svc;
     /** For each text sent, whether it was already waiting to be corrected the moment it went. */
     private final List<Boolean> expectedWhenSent = new java.util.concurrent.CopyOnWriteArrayList<>();

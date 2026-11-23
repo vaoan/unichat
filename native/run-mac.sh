@@ -15,7 +15,7 @@ launch() { # name, workdir, command...
   local name="$1" wd="$2"; shift 2
   if alive "$name"; then echo "$name is already running"; return; fi
   (cd "$wd" && nohup "$@" >>"$wd/$name.out" 2>&1 & echo $! > "$RUN/$name.pid")
-  echo "$name iniciado (pid $(cat "$RUN/$name.pid"))"
+  echo "$name started (pid $(cat "$RUN/$name.pid"))"
 }
 
 create_account() {
@@ -39,7 +39,7 @@ session = first.get("session")
 done = post({"username": user, "password": pw, "inhibit_login": True,
              "auth": {"type": "m.login.registration_token", "token": token, "session": session}})
 if "user_id" not in done:
-    sys.exit("No se pudo crear la cuenta: " + json.dumps(done))
+    sys.exit("Could not create the account: " + json.dumps(done))
 PY
   (umask 077; cat > "$DIR/CREDENCIALES.txt" <<EOF
 Unichat / Matrix (native server)
@@ -55,7 +55,7 @@ case "${1:-}" in
   start)
     launch tuwunel "$DIR/tuwunel" "$DIR/bin/tuwunel" -c "$DIR/tuwunel/tuwunel.toml"
     for _ in $(seq 1 60); do curl -fsS "$HS/_matrix/client/versions" >/dev/null 2>&1 && break; sleep 1; done
-    curl -fsS "$HS/_matrix/client/versions" >/dev/null || { echo "tuwunel no responde; ver $DIR/tuwunel/tuwunel.out" >&2; exit 1; }
+    curl -fsS "$HS/_matrix/client/versions" >/dev/null || { echo "tuwunel is not answering; see $DIR/tuwunel/tuwunel.out" >&2; exit 1; }
     create_account
     for b in $(cat "$DIR/bridges.active"); do launch "$b" "$DIR/$b" "$DIR/bin/$b" -c config.yaml; done
     ;;
@@ -63,7 +63,7 @@ case "${1:-}" in
     for f in "$RUN"/*.pid; do
       [ -f "$f" ] || continue
       n="$(basename "$f" .pid)"
-      if alive "$n"; then kill "$(cat "$f")"; echo "$n detenido"; fi
+      if alive "$n"; then kill "$(cat "$f")"; echo "$n stopped"; fi
       rm -f "$f"
     done
     ;;
@@ -72,5 +72,5 @@ case "${1:-}" in
       if alive "$n"; then echo "✓ $n"; else echo "✗ $n"; fi
     done
     ;;
-  *) echo "Uso: $0 start|stop|status" >&2; exit 2 ;;
+  *) echo "Usage: $0 start|stop|status" >&2; exit 2 ;;
 esac

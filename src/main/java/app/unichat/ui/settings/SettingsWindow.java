@@ -49,28 +49,28 @@ public final class SettingsWindow {
     /** The open settings window, if any (used by the snapshot diagnostics). */
     public static Stage current() { return open; }
 
-    /** The "Cuentas" page while it is showing, else null. */
+    /** The accounts page while it is showing, else null. */
     public static AccountsPane accountsPage() { return accounts; }
 
-    /** The pages, in order: an id, the old Spanish title (still accepted by {@link #select}) and the key of its title. */
-    private record Page(String id, String spanish, String key) {
+    /** The pages, in order: an id and the key of its title. */
+    private record Page(String id, String key) {
         String title() { return I18n.t(key); }
     }
 
     private static final List<Page> PAGES = List.of(
-            new Page("accounts", "Cuentas", "settings.nav.accounts"),
-            new Page("profile", "Perfil", "settings.nav.profile"),
-            new Page("appearance", "Apariencia", "settings.nav.appearance"),
-            new Page("accessibility", "Accesibilidad", "settings.nav.accessibility"),
-            new Page("notifications", "Notificaciones", "settings.nav.notifications"),
-            new Page("privacy", "Privacidad", "settings.nav.privacy"),
-            new Page("networks", "Redes", "settings.nav.networks"),
-            new Page("cloud", "Nube", "settings.nav.cloud"),
-            new Page("speech", "Voz a texto", "settings.nav.speech"),
-            new Page("ai", "Escribir con IA", "settings.nav.ai"),
-            new Page("gifs", "GIFs", "settings.nav.gifs"),
-            new Page("shortcuts", "Atajos de teclado", "settings.nav.shortcuts"),
-            new Page("about", "Acerca de", "settings.nav.about"));
+            new Page("accounts", "settings.nav.accounts"),
+            new Page("profile", "settings.nav.profile"),
+            new Page("appearance", "settings.nav.appearance"),
+            new Page("accessibility", "settings.nav.accessibility"),
+            new Page("notifications", "settings.nav.notifications"),
+            new Page("privacy", "settings.nav.privacy"),
+            new Page("networks", "settings.nav.networks"),
+            new Page("cloud", "settings.nav.cloud"),
+            new Page("speech", "settings.nav.speech"),
+            new Page("ai", "settings.nav.ai"),
+            new Page("gifs", "settings.nav.gifs"),
+            new Page("shortcuts", "settings.nav.shortcuts"),
+            new Page("about", "settings.nav.about"));
 
     /** The id of the page showing ("appearance"), or null when the window is closed. */
     @SuppressWarnings("unchecked")
@@ -81,7 +81,7 @@ public final class SettingsWindow {
         return i < 0 ? null : PAGES.get(i).id();
     }
 
-    /** Selects the page named {@code page}: its id ("accessibility"), its Spanish title or the start of its shown title. */
+    /** Selects the page named {@code page}: its id ("accessibility") or the start of its shown title. */
     @SuppressWarnings("unchecked")
     public static void select(String page) {
         if (open == null) return;
@@ -90,7 +90,7 @@ public final class SettingsWindow {
             ListView<String> l = (ListView<String>) lv;
             for (int i = 0; i < PAGES.size(); i++) {
                 Page p = PAGES.get(i);
-                if (p.id().equalsIgnoreCase(page) || p.spanish().equalsIgnoreCase(page) || p.title().startsWith(page)) {
+                if (p.id().equalsIgnoreCase(page) || p.title().startsWith(page)) {
                     l.getSelectionModel().select(i);
                     return;
                 }

@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Messages arriving refresh the lists and replace their cells: a menu anchored to a cell closed under the person. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class RowMenuUiTest {
-    private static final String FAMILIA = "!familia:demo";
+    private static final String FAMILIA = "!family:demo";
 
     private MockChatService svc;
     private Scene scene;

@@ -368,7 +368,7 @@ class TimelineReadingUiTest {
     void leavingTheChatAndComingBack() throws Exception {
         w = TimelineWindow.open(30);
         w.scrollUp();
-        FxWait.fx(() -> { w.view.openChatId("!familia:demo"); return null; });
+        FxWait.fx(() -> { w.view.openChatId("!family:demo"); return null; });
         FxWait.settled();
         w.svc.receive(CHAT, "mientras no mirabas");
         w.openChat();
@@ -381,9 +381,9 @@ class TimelineReadingUiTest {
         w = TimelineWindow.open(30);
         w.scrollUp();
         FxWait.fx(() -> {
-            w.view.openChatId("!familia:demo");
+            w.view.openChatId("!family:demo");
             w.view.openChatId(CHAT);
-            w.view.openChatId("!familia:demo");
+            w.view.openChatId("!family:demo");
             return null;
         });
         w.openChat();

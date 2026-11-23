@@ -33,5 +33,5 @@ LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchSe
     esac
   done
 rm -rf release/Unichat.app target/pkg
-echo "Instalado en /Applications/Unichat.app"
+echo "Installed in /Applications/Unichat.app"
 echo "Log: tail -f \"\$HOME/Library/Application Support/Unichat/logs/unichat.log\""

@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class SendQueueUiTest {
-    private static final String CHAT = "!familia:demo";
+    private static final String CHAT = "!family:demo";
     private MockChatService svc;
     private Stage stage;
     private MainView view;
@@ -176,7 +176,7 @@ class SendQueueUiTest {
     @Test
     void eachChatShowsItsOwnQueueAndAnotherChatsKeepsGoing() throws Exception {
         send("uno q sí");
-        FxWait.fx(() -> { view.openChatId("!mama:demo"); return null; });
+        FxWait.fx(() -> { view.openChatId("!mom:demo"); return null; });
         assertEquals(List.of(), rows(), "not this chat's");
         release("uno q sí");
         FxWait.until("it went while another chat was open", () -> svc.messages(CHAT).getLast().body().equals("uno que sí"));

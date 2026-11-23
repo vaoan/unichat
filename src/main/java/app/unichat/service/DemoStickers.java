@@ -24,7 +24,8 @@ final class DemoStickers {
         if (!SET.equals(url)) return CompletableFuture.failedFuture(new UnsupportedOperationException("sticker sets"));
         List<MediaLibrary.Item> stickers = new ArrayList<>();
         // Each with its emoji, as Telegram's bridge gives a set's stickers: what searching stickers finds them by.
-        String[][] named = {{"hola", "👋"}, {"jaja", "😂"}, {"gracias", "🙏"}, {"ok", "👌"}, {"wow", "😮"}, {"chao", "👋"}};
+        String[][] named = {{I18n.t("demo.sticker.hello"), "👋"}, {I18n.t("demo.sticker.haha"), "😂"}, {I18n.t("demo.sticker.thanks"), "🙏"},
+            {"ok", "👌"}, {"wow", "😮"}, {I18n.t("demo.sticker.bye"), "👋"}};
         for (String[] n : named) {
             ObjectNode info = JsonNodeFactory.instance.objectNode();
             info.putObject("fi.mau.bridged_sticker").put("emoji", n[1]);

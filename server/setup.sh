@@ -16,7 +16,7 @@ ALL_BRIDGES="whatsapp telegram signal instagram facebook discord slack gmessages
 BRIDGES="${BRIDGES:-$ALL_BRIDGES}"
 
 command -v docker >/dev/null || { echo "Docker is not installed." >&2; exit 1; }
-docker compose version >/dev/null 2>&1 || { echo "Falta 'docker compose' (Docker Compose v2)." >&2; exit 1; }
+docker compose version >/dev/null 2>&1 || { echo "'docker compose' is missing (Docker Compose v2)." >&2; exit 1; }
 docker info >/dev/null 2>&1 || { echo "Docker is not running (open Docker Desktop)." >&2; exit 1; }
 
 rand() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-32}" || true; }
@@ -37,7 +37,7 @@ mkdir -p data
 if [ ! -f .env ]; then
   DOMAIN="${1:-${DOMAIN:-}}"
   if [ -z "$DOMAIN" ]; then
-    if [ -t 0 ]; then read -r -p "Nombre del servidor Matrix (dominio) [localhost]: " DOMAIN; fi
+    if [ -t 0 ]; then read -r -p "Matrix server name (domain) [localhost]: " DOMAIN; fi
     DOMAIN="${DOMAIN:-localhost}"
   fi
   {
@@ -94,7 +94,7 @@ bridge_port() {
   case "$1" in
     whatsapp) echo 29318 ;; telegram) echo 29317 ;; signal) echo 29328 ;; instagram) echo 29319 ;;
     facebook) echo 29320 ;; discord) echo 29334 ;; slack) echo 29335 ;; gmessages) echo 29336 ;;
-    twitter) echo 29327 ;; linkedin) echo 29341 ;; *) echo "Bridge desconocido: $1" >&2; exit 1 ;;
+    twitter) echo 29327 ;; linkedin) echo 29341 ;; *) echo "Unknown bridge: $1" >&2; exit 1 ;;
   esac
 }
 for b in $ACTIVE; do bridge_port "$b" >/dev/null; done
@@ -135,7 +135,7 @@ for b in $ACTIVE; do
   if [ ! -f "data/$b/config.yaml" ]; then
     docker compose run --rm --no-deps "$b" >/dev/null 2>&1 || true
   fi
-  [ -f "data/$b/config.yaml" ] || { echo "No se pudo generar data/$b/config.yaml" >&2; exit 1; }
+  [ -f "data/$b/config.yaml" ] || { echo "Could not generate data/$b/config.yaml" >&2; exit 1; }
   before="$(conf_sum "$b/config.yaml")"
 
   PORT="$(bridge_port "$b")"
@@ -196,7 +196,7 @@ for b in $ACTIVE; do
   if [ ! -f "data/$b/registration.yaml" ]; then
     docker compose run --rm --no-deps "$b" >/dev/null 2>&1 || true
   fi
-  [ -f "data/$b/registration.yaml" ] || { echo "No se pudo generar data/$b/registration.yaml" >&2; exit 1; }
+  [ -f "data/$b/registration.yaml" ] || { echo "Could not generate data/$b/registration.yaml" >&2; exit 1; }
   APPSERVICES="$APPSERVICES,/data/appservices/$b.yaml"
 done
 
@@ -230,7 +230,7 @@ fi
 RUNNING=" $(docker compose ps --services --status running 2>/dev/null | tr '\n' ' ') "
 RESTART=""
 for s in $CHANGED; do case "$RUNNING" in *" $s "*) RESTART="$RESTART $s" ;; esac; done
-echo "Arrancando contenedores (la primera vez Synapse tarda ~1 min)..."
+echo "Starting the containers (the first time Synapse takes ~1 min)..."
 # shellcheck disable=SC2086
 docker compose up -d postgres synapse $ACTIVE
 if [ -n "$RESTART" ]; then
@@ -239,7 +239,7 @@ if [ -n "$RESTART" ]; then
   docker compose restart $RESTART
 fi
 
-echo "Esperando a Synapse..."
+echo "Waiting for Synapse..."
 for _ in $(seq 1 60); do
   if curl -fsS http://localhost:8008/health >/dev/null 2>&1; then break; fi
   sleep 2

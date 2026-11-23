@@ -93,7 +93,7 @@ final class TimelineWindow {
             return new TimelineWindow(svc, stage, view, sc);
         });
         FxWait.until("the chat list shows", () -> !w.scene.getRoot().lookupAll(".chat-list .list-cell").isEmpty());
-        FxWait.fx(() -> { w.view.openChatId("!familia:demo"); return null; });
+        FxWait.fx(() -> { w.view.openChatId("!family:demo"); return null; });
         FxWait.settled();
         w.openChat();
         return w;

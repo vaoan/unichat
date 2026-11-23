@@ -14,9 +14,9 @@ class QuitSendsWhatsWaitingTest {
         MockChatService svc = new MockChatService();
         svc.noAutoReplies();
         try {
-            app.unichat.ui.timeline.SendQueueAccess.submitNeverAnswered(svc, "!familia:demo", "creo q sí");
+            app.unichat.ui.timeline.SendQueueAccess.submitNeverAnswered(svc, "!family:demo", "creo q sí");
             UnichatApp.sendWhatsWaiting(svc);
-            assertEquals("creo q sí", svc.messages("!familia:demo").stream().filter(Message::outgoing).toList().getLast().body());
+            assertEquals("creo q sí", svc.messages("!family:demo").stream().filter(Message::outgoing).toList().getLast().body());
         } finally {
             svc.stop();
             AiSettings.setFixMode(AiSettings.FixMode.OFF);

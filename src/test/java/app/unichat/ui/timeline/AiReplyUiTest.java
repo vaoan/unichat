@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class AiReplyUiTest {
-    private static final String CHAT = "!familia:demo";
+    private static final String CHAT = "!family:demo";
     private MockChatService svc;
     private Composer composer;
     private Stage stage;

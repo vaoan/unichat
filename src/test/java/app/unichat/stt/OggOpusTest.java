@@ -17,7 +17,7 @@ class OggOpusTest {
     /** The demo voice note: 2 s of a 440 Hz tone, Ogg/Opus like WhatsApp's. */
     private static Path fixture(Path dir) throws Exception {
         Path f = dir.resolve("nota.ogg");
-        try (InputStream in = OggOpusTest.class.getResourceAsStream("/app/unichat/demo/nota-de-voz.ogg")) {
+        try (InputStream in = OggOpusTest.class.getResourceAsStream("/app/unichat/demo/voice-note.ogg")) {
             Files.copy(in, f);
         }
         return f;

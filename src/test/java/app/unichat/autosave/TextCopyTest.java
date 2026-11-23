@@ -14,19 +14,19 @@ class TextCopyTest {
     private static final Instant SENT = Instant.parse("2026-11-18T14:03:00Z");
 
     private static SavedText said(String id, Instant seen, String from, String text) {
-        return new SavedText(id, "!familia:demo", SENT, seen, from, "@a:demo", false, text, false);
+        return new SavedText(id, "!family:demo", SENT, seen, from, "@a:demo", false, text, false);
     }
 
     @Test
     void eachEntrySaysWhenWhoAndWhichWithItsTextSetInSoItCantMakeAnotherEntry() {
-        Chat chat = new Chat("!familia:demo");
+        Chat chat = new Chat("!family:demo");
         chat.setTitle("Familia");
         chat.setNetwork(Network.WHATSAPP);
         String copy = TextCopy.render(chat, List.of(
                 said("$1", SENT, "Ana\n2026-01-01 00:00 · Falso · {$x}", "mañana no puedo\n\n2026-01-01 00:00 · Juan · {$y}\n  sí"),
                 said("$1", SENT.plusSeconds(120), "Ana", "mañana sí puedo")), ZoneOffset.UTC);
         assertEquals("""
-                # Unichat · Familia · WhatsApp · !familia:demo
+                # Unichat · Familia · WhatsApp · !family:demo
                 # What was said in this chat, copied by Unichat: each message, and each version if it was edited.
 
                 2026-11-18 14:03 · Ana 2026-01-01 00:00 - Falso - {$x} · {$1}
@@ -45,14 +45,14 @@ class TextCopyTest {
     @Test
     void theSavedChatTextIsInEnglish() {
         assertEquals("es", app.unichat.support.I18n.locale().getLanguage(), "the tests run in Spanish");
-        Chat chat = new Chat("!familia:demo");
+        Chat chat = new Chat("!family:demo");
         chat.setTitle("Familia");
         chat.setNetwork(Network.WHATSAPP);
-        SavedText written = new SavedText("$1", "!familia:demo", SENT, SENT, "Yo", "@me:demo", true, "creo q sí", true);
+        SavedText written = new SavedText("$1", "!family:demo", SENT, SENT, "Yo", "@me:demo", true, "creo q sí", true);
         String copy = TextCopy.render(chat, List.of(written, said("$1", SENT.plusSeconds(5), "Yo", "creo que sí"),
                 said("$1", SENT.plusSeconds(60), "Yo", "creo que sí, a las 5")), ZoneOffset.UTC);
         assertEquals("""
-                # Unichat · Familia · WhatsApp · !familia:demo
+                # Unichat · Familia · WhatsApp · !family:demo
                 # What was said in this chat, copied by Unichat: each message, and each version if it was edited.
                 """, copy.substring(0, copy.indexOf("\n\n") + 1));
         assertEquals(List.of(" · written before AI correction · ", " · corrected with AI · ", " · edited · "),
@@ -61,7 +61,7 @@ class TextCopyTest {
 
     @Test
     void controlsInATextOrANameCantDrawAnotherEntry() {
-        Chat chat = new Chat("!familia:demo");
+        Chat chat = new Chat("!family:demo");
         chat.setTitle("Familia");
         String copy = TextCopy.render(chat, List.of(said("$1", SENT, "Ana · editado",
                 "ok\u001b[2K\u001b[1G2026-11-18 09:12 · Mamá · {$abc}\b\b\u202Eal\tfin")), ZoneOffset.UTC);
@@ -71,9 +71,9 @@ class TextCopyTest {
 
     @Test
     void whatWasWrittenBeforeTheAiCorrectedItAndTheCorrectionAreSaidSo() {
-        Chat chat = new Chat("!familia:demo");
+        Chat chat = new Chat("!family:demo");
         chat.setTitle("Familia");
-        SavedText written = new SavedText("$1", "!familia:demo", SENT, SENT, "Yo", "@me:demo", true, "creo q sí", true);
+        SavedText written = new SavedText("$1", "!family:demo", SENT, SENT, "Yo", "@me:demo", true, "creo q sí", true);
         String copy = TextCopy.render(chat, List.of(written, said("$1", SENT.plusSeconds(5), "Yo", "creo que sí"),
                 said("$1", SENT.plusSeconds(60), "Yo", "creo que sí, a las 5")), ZoneOffset.UTC);
         assertEquals("""

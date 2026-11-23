@@ -126,7 +126,7 @@ class GroupsUiTest {
         var list = fx(() -> chatList(scene));
         assertTrue(fx(list::getItems).stream().noneMatch(c -> c.id().equals("!srv-general:demo")),
                 "its channels live inside it, like a Telegram group");
-        enter(scene, list, "!servidor:demo");
+        enter(scene, list, "!server:demo");
         assertTrue(fx(() -> spaceOpen(scene)));
         assertFalse(fx(list::isVisible), "the channels cover the list");
         // The names of channels you aren't in come from the server's hierarchy, asked on opening it.
@@ -149,10 +149,10 @@ class GroupsUiTest {
     @Test
     void openingADiscordServerBringsAllItsChannels() throws Exception {
         Scene scene = open(null);
-        enter(scene, fx(() -> chatList(scene)), "!servidor:demo");
-        assertEquals(List.of("!servidor:demo"), svc.channelLoads(), "asked the bridge for every channel");
+        enter(scene, fx(() -> chatList(scene)), "!server:demo");
+        assertEquals(List.of("!server:demo"), svc.channelLoads(), "asked the bridge for every channel");
         key(fx(() -> spaceList(scene)), KeyCode.ESCAPE);
-        enter(scene, fx(() -> chatList(scene)), "!servidor:demo");
+        enter(scene, fx(() -> chatList(scene)), "!server:demo");
         assertEquals(1, svc.channelLoads().size(), "once");
         svc.stop();
     }
@@ -160,7 +160,7 @@ class GroupsUiTest {
     @Test
     void joiningAChannelOpensItWhenItArrives() throws Exception {
         Scene scene = open(Network.DISCORD);
-        enter(scene, fx(() -> chatList(scene)), "!servidor:demo");
+        enter(scene, fx(() -> chatList(scene)), "!server:demo");
         enter(scene, fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
         FxWait.until("the joined channel opens", () -> MockChatService.UNJOINED_CHANNEL_ID.equals(thread(scene).chat().id()));
         assertTrue(svc.chat(MockChatService.UNJOINED_CHANNEL_ID) != null, "Enter joined the channel");
@@ -179,7 +179,7 @@ class GroupsUiTest {
     void aFailedJoinSaysSo() throws Exception {
         Scene scene = open(Network.DISCORD);
         svc.failJoins(true);
-        enter(scene, fx(() -> chatList(scene)), "!servidor:demo");
+        enter(scene, fx(() -> chatList(scene)), "!server:demo");
         enter(scene, fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
         FxWait.until("a toast about the failed join", () -> toastText(scene).startsWith("No se pudo unir"));
         assertTrue(toastText(scene).startsWith("No se pudo unir"), toastText(scene));
@@ -193,15 +193,15 @@ class GroupsUiTest {
         Spaces.joinWaitMs = 0;
         try {
             Runnable letTheRoomIn = svc.holdBridge();
-            fx(() -> { view.openChatId("!familia:demo"); return null; });
-            enter(scene, fx(() -> chatList(scene)), "!servidor:demo");
+            fx(() -> { view.openChatId("!family:demo"); return null; });
+            enter(scene, fx(() -> chatList(scene)), "!server:demo");
             CompletableFuture<Void> arrived = arrival(svc, MockChatService.UNJOINED_CHANNEL_ID);
             enter(scene, fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
             FxWait.until("the toast that it will show up later", () -> toastText(scene).contains("aparecerá"));
             letTheRoomIn.run();
             arrived.get(); // the room came in after all, and every listener heard of it
             FxWait.settled(); // and what they asked the window to do has run
-            assertEquals("!familia:demo", fx(() -> thread(scene).chat().id()), "no surprise jump minutes later");
+            assertEquals("!family:demo", fx(() -> thread(scene).chat().id()), "no surprise jump minutes later");
             assertTrue(toastText(scene).contains("aparecerá"), toastText(scene));
         } finally {
             Spaces.joinWaitMs = 30_000;
@@ -212,7 +212,7 @@ class GroupsUiTest {
     @Test
     void aFavouriteServerOpensItsChannels() throws Exception {
         Scene scene = open(null);
-        svc.setFavorite("!servidor:demo", true).get();
+        svc.setFavorite("!server:demo", true).get();
         FxWait.until("the server's favourite tile", () -> favouriteTile(scene) != null);
         javafx.scene.Node tile = fx(() -> favouriteTile(scene));
         key(tile, KeyCode.ENTER);
@@ -299,13 +299,13 @@ class GroupsUiTest {
     void theRailAlwaysTakesYouOutOfAServer() throws Exception {
         Scene scene = open(null);
         var list = fx(() -> chatList(scene));
-        enter(scene, list, "!servidor:demo");
+        enter(scene, list, "!server:demo");
         assertTrue(fx(() -> spaceOpen(scene)));
         clickRail(scene, "Bandeja unificada");
         assertFalse(fx(() -> spaceOpen(scene)), "Bandeja from inside a server, already on Bandeja: back to the inbox");
         assertTrue(fx(list::isVisible));
 
-        enter(scene, list, "!servidor:demo");
+        enter(scene, list, "!server:demo");
         clickRail(scene, "WhatsApp");
         assertFalse(fx(() -> spaceOpen(scene)), "another network: its chats, not the server");
         assertTrue(fx(list::getItems).stream().allMatch(c -> c.network() == Network.WHATSAPP || c.id().startsWith("offer")),

@@ -1,131 +1,128 @@
-# Grupos, servidores y contactos — diseño
+# Groups, servers and contacts — design
 
-Fecha: 2026-10-26 · Estado: propuesto
+Date: 2026-10-26 · Status: proposed
 
-## Por qué
+## Why
 
-En Unichat los grupos de Telegram con temas y los servidores de Discord no se pueden usar. Además, faltan muchos
-contactos: no aparecen en la bandeja, así que no se les puede escribir. El usuario quiere dos formas de ver cada
-red:
+In Unichat, Telegram groups with topics and Discord servers can't be used. Also, many contacts are missing: they don't
+show in the inbox, so they can't be written to. The user wants two ways to see each network:
 
-- **Bandeja** (lo de hoy): quién te escribe, ordenado por actividad y con avisos.
-- **Grupos**: tus servidores y grupos con sus canales o temas.
+- **Inbox** (what there is today): who writes to you, sorted by activity and with notifications.
+- **Groups**: your servers and groups with their channels or topics.
 
-Además quiere poder hablarle a cualquier contacto de la red.
+They also want to be able to talk to any contact on the network.
 
-## Lo que encontramos (datos reales, 26-oct)
+## What we found (real data, Oct 26)
 
-- Los puentes representan contenedores como **espacios de Matrix** (`m.room.create` con `type: m.space`, hijos en
-  `m.space.child`). Hay tres casos:
-  - la carpeta personal de cada red (Telegram: 15 hijos);
-  - los grupos de Telegram con temas (foros), cuyos hijos son los temas;
-  - en Discord (puente legado), un espacio por servidor con los canales como hijos, una vez que el servidor se
-    activa con el botón "Servidores".
-- Unichat no distingue espacios: los muestra como chats ("Chat vacío", sin poder escribir). Es el fallo que se ve
-  en "los grupos de Telegram no funcionan".
-- Límites de creación al iniciar sesión, en las configuraciones que genera `BridgeConfig`:
+- The bridges represent containers as **Matrix spaces** (`m.room.create` with `type: m.space`, children in
+  `m.space.child`). There are three cases:
+  - each network's personal folder (Telegram: 15 children);
+  - Telegram groups with topics (forums), whose children are the topics;
+  - on Discord (legacy bridge), one space per server with the channels as children, once the server is turned on with
+    the "Servers" button.
+- Unichat doesn't tell spaces apart: it shows them as chats ("Empty chat", with no way to write). That's the failure
+  seen in "Telegram groups don't work".
+- Creation limits at sign-in, in the configs `BridgeConfig` generates:
   - Telegram: `sync.create_limit: 15`, `login_sync_limit: 15`;
   - Discord: `startup_private_channel_create_limit: 5`;
   - WhatsApp: `history_sync.max_initial_conversations: 50`.
-- API de provisioning de bridgev2 (`/_matrix/provision/v3/…`):
-  - `GET contacts` (lista `{id, name, identifiers[], mxid, dm_room_mxid?}`);
+- bridgev2's provisioning API (`/_matrix/provision/v3/…`):
+  - `GET contacts` (lists `{id, name, identifiers[], mxid, dm_room_mxid?}`);
   - `POST search_users {query}`;
   - `GET resolve_identifier/{id}`;
   - `POST create_dm/{id}`.
-  - Probado en vivo: WhatsApp (158 contactos, búsqueda), Telegram (129 contactos de los que solo 4 tienen chat,
-    búsqueda), Facebook e Instagram (solo búsqueda). X y Discord no tienen ninguna de las dos (404).
+  - Tried live: WhatsApp (158 contacts, search), Telegram (129 contacts of which only 4 have a chat, search), Facebook
+    and Instagram (search only). X and Discord have neither (404).
 
-## Objetivos
+## Goals
 
-1. **Espacios fuera de la bandeja.** Un espacio nunca aparece como chat. Sus hijos sí, como chats normales.
-2. **Selector Bandeja | Grupos** en la cabecera de la lista de chats, recordado por red (`list.view.<red>`). Solo
-   se muestra cuando la red tiene espacios con hijos.
-3. **Vista Grupos.** Árbol en la lista:
-   - Cada espacio es una fila desplegable (avatar, nombre, contador de no leídos que suma sus hijos).
-   - Debajo van sus hijos: canales en Discord, temas en Telegram.
-   - Un hijo que también es espacio se anida un nivel más.
-   - Los chats sueltos que no cuelgan de ningún espacio que no sea la carpeta personal se agrupan al final en
-     "Chats directos y otros". La carpeta personal no es un grupo: es el conjunto de todos.
-   - Abrir un hijo funciona igual que desde la Bandeja.
-   - Teclado: flechas para moverse, derecha/izquierda o Enter para desplegar, Enter en un chat para abrirlo.
-   - Lector de pantalla: "Servidor X, 3 canales, 5 sin leer, contraído".
-4. **Más sincronización.** Subir los límites en las configuraciones de los puentes:
-   - Telegram `create_limit` y `login_sync_limit`: 100;
+1. **Spaces out of the inbox.** A space never shows as a chat. Its children do, as normal chats.
+2. **An Inbox | Groups switch** in the chat list's header, remembered per network (`list.view.<network>`). Only shown
+   when the network has spaces with children.
+3. **The Groups view.** A tree in the list:
+   - Each space is a row that expands (avatar, name, an unread count that adds up its children).
+   - Under it go its children: channels on Discord, topics on Telegram.
+   - A child that is also a space nests one level deeper.
+   - The loose chats that hang from no space other than the personal folder are grouped at the end under "Direct
+     chats and others". The personal folder is not a group: it's the set of all of them.
+   - Opening a child works the same as from the Inbox.
+   - Keyboard: arrows to move, right/left or Enter to expand, Enter on a chat to open it.
+   - Screen reader: "Server X, 3 channels, 5 unread, collapsed".
+4. **More syncing.** Raise the limits in the bridges' configs:
+   - Telegram `create_limit` and `login_sync_limit`: 100;
    - Discord `startup_private_channel_create_limit`: 50;
    - WhatsApp `max_initial_conversations`: 200.
 
-   Los puentes ya respetan las esperas que pide cada red. Se aplica al regenerar la configuración, sin volver a
-   iniciar sesión.
-5. **Nuevo chat.** Un botón y un atajo (⌘N / Ctrl+N) abren un buscador de contactos:
-   - Eliges la red; si hay varias cuentas, también la cuenta.
-   - Aparece la lista de contactos (`contacts`) y, al escribir, los resultados de `search_users` (con 300 ms de
-     espera entre teclas).
-   - Al escribir un número de teléfono o un @usuario se ofrece "Escribir a <identificador>", que usa
-     `resolve_identifier`.
-   - Al elegir: si el contacto ya tiene chat (`dm_room_mxid`), se abre; si no, `create_dm` lo crea y se abre al
-     llegar por sync.
-   - Las redes que no tienen ni lista ni búsqueda (X, Discord) dicen por qué y cómo llegar a la persona (en
-     Discord, por sus servidores).
+   The bridges already respect the waits each network asks for. It applies when the config is generated again, without
+   signing in again.
+5. **New chat.** A button and a shortcut (⌘N / Ctrl+N) open a contact finder:
+   - You choose the network; if there are several accounts, the account too.
+   - The contact list (`contacts`) shows and, as you type, the results of `search_users` (with a 300 ms wait between
+     keys).
+   - Typing a phone number or an @user offers "Write to <identifier>", which uses `resolve_identifier`.
+   - On choosing: if the contact already has a chat (`dm_room_mxid`), it opens; if not, `create_dm` creates it and it
+     opens when it arrives through sync.
+   - Networks with neither a list nor a search (X, Discord) say why and how to reach the person (on Discord, through
+     their servers).
 
-## No objetivos
+## Non-goals
 
-- Crear grupos nuevos (`create_group`) y gestionar miembros.
-- Unirse a servidores de Discord o grupos de Telegram nuevos desde Unichat.
-- Cambiar la sincronización de historial (backfill) más allá de los límites de creación.
-- Discord sin servidores activados: sigue el selector de servidores que ya existe.
+- Creating new groups (`create_group`) and managing members.
+- Joining new Discord servers or Telegram groups from Unichat.
+- Changing the history sync (backfill) beyond the creation limits.
+- Discord without servers turned on: the server picker that already exists stays.
 
-## Anti-objetivos
+## Anti-goals
 
-- Que la Bandeja cambie de comportamiento: filtros, archivados, avisos y orden se quedan como están.
-- Mandar a la red algo más que la búsqueda que el usuario escribe.
-- Que un puente sin estas funciones rompa la pantalla: se degrada con un mensaje claro.
+- The Inbox changing its behaviour: filters, archived chats, notifications and order stay as they are.
+- Sending the network anything more than the search the user types.
+- A bridge without these features breaking the screen: it degrades with a clear message.
 
-## Enfoques considerados
+## Approaches considered
 
-- **A. Árbol en la lista (elegido por el usuario, siguiendo la recomendación).** Sirve igual para Discord y para
-  Telegram, y la barra izquierda sigue siendo de redes. Coste: una lista con dos modos.
-- B. Servidores en la barra izquierda. Es el estilo Discord, pero con muchos servidores la barra se vuelve
-  inmanejable y no encaja con los temas de Telegram.
-- Sincronización: **opción 2 (elegida)**, límites altos más "Nuevo chat" bajo demanda. Se descartó crear todo al
-  iniciar sesión porque llena la bandeja lentamente y Telegram frena a quien pide mucho de golpe.
+- **A. A tree in the list (chosen by the user, following the recommendation).** It works the same for Discord and for
+  Telegram, and the left bar stays a bar of networks. Cost: a list with two modes.
+- B. Servers in the left bar. It's the Discord style, but with many servers the bar becomes unmanageable, and it doesn't
+  fit Telegram's topics.
+- Syncing: **option 2 (chosen)**, high limits plus an on-demand "New chat". Creating everything at sign-in was rejected
+  because it fills the inbox slowly and Telegram slows down whoever asks for a lot at once.
 
-## Restricciones
+## Constraints
 
-- Java 21 + JavaFX; también Windows. El texto visible va en español.
-- Accesibilidad (CLAUDE.md): texto accesible, alcanzable con teclado, funciona al 160 % y con alto contraste.
-- Sin datos personales en los logs (Redactor).
-- Pruebas: la lógica pura (árbol a partir de espacios, filtrado de espacios, análisis de contactos) con pruebas
-  unitarias, y la interfaz con `-Dunichat.uiTests=true`.
+- Java 21 + JavaFX; Windows too. Visible text is in Spanish (the app's only language then).
+- Accessibility (CLAUDE.md): accessible text, reachable by keyboard, works at 160 % and with high contrast.
+- No personal data in the logs (Redactor).
+- Tests: the pure logic (the tree from spaces, filtering out spaces, parsing contacts) with unit tests, and the UI with
+  `-Dunichat.uiTests=true`.
 
-## Respuestas a la revisión del diseño (decisiones mías, marcadas como tales)
+## Answers to the design review (my decisions, marked as such)
 
-1. **Cuenta en multicuenta:** el id de `Account` ya lleva el login del puente (`<protocolo>:<loginId>`, ver
-   `MatrixChatService.accountId`). Las llamadas de contactos van con `?user_id=<yo>&login_id=<loginId>` y con el
-   mismo token de Matrix que ya usa el inicio de sesión dinámico (`BridgeLogin`).
-2. **Árbol:** un hijo cuenta si aparece en el `m.space.child` del espacio con contenido no vacío, o si declara
-   `m.space.parent` hacia ese espacio. El filtro de sync de Unichat no limita los tipos de estado, así que esos
-   eventos ya llegan. El plan empieza con una prueba que lo confirma con un sync grabado. Discord (puente legado)
-   sigue el mismo modelo una vez activado un servidor; su "Nuevo chat" solo explica cómo llegar a la gente.
-3. **Rutas YAML (verificadas en las configuraciones generadas hoy):**
-   - Telegram: `network.sync.create_limit` y `network.sync.login_sync_limit`;
+1. **The account with several accounts:** `Account`'s id already carries the bridge's login (`<protocol>:<loginId>`,
+   see `MatrixChatService.accountId`). The contact calls go with `?user_id=<me>&login_id=<loginId>` and with the same
+   Matrix token the dynamic sign-in already uses (`BridgeLogin`).
+2. **The tree:** a child counts if it's in the space's `m.space.child` with non-empty content, or if it declares an
+   `m.space.parent` to that space. Unichat's sync filter doesn't limit the state types, so those events already arrive.
+   The plan starts with a test that confirms it with a recorded sync. Discord (legacy bridge) follows the same model
+   once a server is turned on; its "New chat" only explains how to reach people.
+3. **YAML paths (checked in the configs generated today):**
+   - Telegram: `network.sync.create_limit` and `network.sync.login_sync_limit`;
    - Discord: `bridge.startup_private_channel_create_limit`;
    - WhatsApp: `network.history_sync.max_initial_conversations`.
 
-   La prueba de `BridgeConfig` comprueba que cada clave ya existía en la plantilla del puente, para que una ruta
-   mal escrita falle en vez de crear una clave nueva que el puente ignora.
-4. **Hijos a los que aún no te has unido:** se muestran atenuados con "Unirse". Al pulsarlo, Unichat entra al
-   chat y lo abre. Los hijos que el sync no conoce (solo están en `m.space.child`) toman el nombre de
-   `/hierarchy` del espacio.
-5. **Carpeta personal:** es el espacio cuyo `m.bridge` tiene `channel.id` que empieza por `__` (bridgev2 la llama
-   `__personal…`; en tus datos aparece como `__pe…`). No se muestra como grupo.
-6. **No leídos de un espacio:** suma los hijos unidos, no archivados y no silenciados. El texto para el lector de
-   pantalla dice esa misma cifra.
-7. **⌘N / Ctrl+N:** no está usado en `MainView`.
+   `BridgeConfig`'s test checks that each key already existed in the bridge's template, so that a misspelt path fails
+   instead of creating a new key the bridge ignores.
+4. **Children you haven't joined yet:** shown dimmed with "Join". Pressing it, Unichat joins the chat and opens it.
+   Children the sync doesn't know (only in `m.space.child`) take their name from the space's `/hierarchy`.
+5. **The personal folder:** the space whose `m.bridge` has a `channel.id` starting with `__` (bridgev2 calls it
+   `__personal…`; in your data it shows as `__pe…`). Not shown as a group.
+6. **A space's unread count:** adds up the joined children that are neither archived nor muted. The screen reader's text
+   says that same number.
+7. **⌘N / Ctrl+N:** not used in `MainView`.
 
-## Decisiones dejadas al constructor
+## Decisions left to the builder
 
-- Cómo se representa internamente el árbol (modelo `SpaceTree` o similar), siempre que salga de los eventos
-  `m.space.child` / `m.space.parent` del sync.
-- El diseño exacto de la fila de espacio y del diálogo Nuevo chat, siguiendo el estilo de `AddAccountPane` y
+- How the tree is represented inside (a `SpaceTree` model or similar), as long as it comes from the sync's
+  `m.space.child` / `m.space.parent` events.
+- The exact design of the space row and of the New chat dialog, following the style of `AddAccountPane` and
   `BridgeLoginPane`.
-- El orden dentro de un espacio: el `order` de `m.space.child` si existe; si no, el nombre.
+- The order inside a space: `m.space.child`'s `order` if there is one; if not, the name.

@@ -18,7 +18,7 @@ class PlayableAudioTest {
 
     private Path voiceNote() throws Exception {
         Path f = dir.resolve("nota.ogg");
-        try (InputStream in = PlayableAudioTest.class.getResourceAsStream("/app/unichat/demo/nota-de-voz.ogg")) {
+        try (InputStream in = PlayableAudioTest.class.getResourceAsStream("/app/unichat/demo/voice-note.ogg")) {
             Files.copy(in, f);
         }
         return f;
@@ -39,7 +39,7 @@ class PlayableAudioTest {
 
         long written = Files.getLastModifiedTime(wav).toMillis();
         Files.delete(ogg);
-        Files.copy(PlayableAudioTest.class.getResourceAsStream("/app/unichat/demo/nota-de-voz.ogg"), ogg);
+        Files.copy(PlayableAudioTest.class.getResourceAsStream("/app/unichat/demo/voice-note.ogg"), ogg);
         assertEquals(wav, PlayableAudio.of(ogg));
         assertTrue(Files.getLastModifiedTime(wav).toMillis() >= written);
         assertTrue(Files.list(dir).noneMatch(f -> f.getFileName().toString().endsWith(".part")));

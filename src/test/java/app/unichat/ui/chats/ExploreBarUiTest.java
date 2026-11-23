@@ -54,7 +54,7 @@ class ExploreBarUiTest {
         assertFalse(FxWait.fx(bar::isVisible), "nothing explored: no bar");
 
         Instant nov3 = Instant.parse("2026-11-03T15:00:00Z");
-        states.put("!familia:demo", new AutoSave.Exploring(true, nov3, false, 8, 2, 120,
+        states.put("!family:demo", new AutoSave.Exploring(true, nov3, false, 8, 2, 120,
                 new AutoSave.Now(AutoSave.Doing.DOWNLOADING, nov3, "IMG_3944.MOV", 0.45)));
         changed.run();
         FxWait.until("the bar shows", bar::isVisible);
@@ -66,9 +66,9 @@ class ExploreBarUiTest {
         Button stop = FxWait.fx(() -> bar.lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> b.getText().equals("Detener")).findFirst().orElseThrow());
         FxWait.fx(() -> { stop.fire(); return null; });
-        assertEquals(List.of("!familia:demo"), stopped);
+        assertEquals(List.of("!family:demo"), stopped);
 
-        states.put("!familia:demo", new AutoSave.Exploring(false, nov3, true, 8, 2, 120, null));
+        states.put("!family:demo", new AutoSave.Exploring(false, nov3, true, 8, 2, 120, null));
         changed.run();
         FxWait.until("over: the bar goes", () -> !bar.isVisible());
         FxWait.fx(() -> { bar.dispose(); stage[0].close(); return null; });

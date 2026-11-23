@@ -118,7 +118,7 @@ class FavoritesRowUiTest {
         FxWait.until("the folder open", () -> scene.getRoot().lookupAll(".folder-title").stream()
                 .anyMatch(n -> n.isVisible() && "Trabajo".equals(((Label) n).getText())));
         FxWait.fx(() -> { scene.getRoot().lookupAll("*").stream().filter(MainView.class::isInstance).map(MainView.class::cast)
-                .findFirst().orElseThrow().openChatId("!familia:demo"); return null; }); // back to the inbox
+                .findFirst().orElseThrow().openChatId("!family:demo"); return null; }); // back to the inbox
         svc.setFolderFavorite(id, false);
         FxWait.until("no longer among the favorites", () -> scene.getRoot().lookup(".favorite-tile.favorite-folder") == null);
     }
@@ -163,7 +163,7 @@ class FavoritesRowUiTest {
     @Test
     void moreThanFitLeaveATileForTheRestThatOpensTheFavorites() throws Exception {
         Scene scene = open(1.6);
-        for (String id : List.of("!devs:demo", "!familia:demo", "!sofia:demo", "!valen:demo", "!notas:demo", "!carlos:demo")) {
+        for (String id : List.of("!devs:demo", "!family:demo", "!sofia:demo", "!valen:demo", "!notes:demo", "!carlos:demo")) {
             svc.setFavorite(id, true).get();
         }
         FxWait.fx(() -> { Theme.applyAll(); stage.setWidth(900); return null; });

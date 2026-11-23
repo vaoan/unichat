@@ -673,10 +673,10 @@ public final class MainView extends StackPane {
         listPane.goTo(listPane.filterProperty().get().withView(v).withUnreadOnly(unread).withQuery(""));
     }
 
-    /** Opens Ajustes → Cuentas (list of accounts, add account, login wizard). */
+    /** Opens Settings → Accounts (list of accounts, add account, login wizard). */
     public AccountsPane showAccounts() {
         showSettings();
-        SettingsWindow.select("Cuentas");
+        SettingsWindow.select("accounts");
         return SettingsWindow.accountsPage();
     }
 

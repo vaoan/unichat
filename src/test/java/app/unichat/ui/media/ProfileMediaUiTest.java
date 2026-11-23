@@ -31,7 +31,7 @@ class ProfileMediaUiTest {
         }
         Platform.setImplicitExit(false);
         MockChatService svc = new MockChatService();
-        String id = "!familia:demo";
+        String id = "!family:demo";
         svc.setMediaHidden(id, false).get(); // the test data folder is the whole run's: start from a known state
         InfoPane pane = FxWait.fx(() -> {
             InfoPane p = new InfoPane(svc, () -> { }, t -> { });
@@ -97,7 +97,7 @@ class ProfileMediaUiTest {
         }
         Platform.setImplicitExit(false);
         MockChatService svc = new MockChatService();
-        String id = "!familia:demo";
+        String id = "!family:demo";
         svc.setMediaHidden(id, false).get();
         java.nio.file.Path clip = java.nio.file.Files.writeString(dir.resolve("clip.mp4"), "not really a video");
         svc.sendFile(id, clip, null, app.unichat.service.SendAs.AS_IS, p -> { });

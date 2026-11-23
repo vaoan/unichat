@@ -31,7 +31,7 @@ class InfoActionsUiTest {
         }
         Platform.setImplicitExit(false);
         MockChatService svc = new MockChatService();
-        String id = "!familia:demo";
+        String id = "!family:demo";
         svc.setLowPriority(id, false).get(); // the test data folder is the whole run's
         AtomicReference<Chat> opened = new AtomicReference<>();
         InfoPane pane = FxWait.fx(() -> {

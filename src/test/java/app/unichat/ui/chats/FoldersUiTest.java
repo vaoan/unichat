@@ -50,8 +50,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class FoldersUiTest {
-    private static final String FAMILIA = "!familia:demo";
-    private static final String SERVER = "!servidor:demo";
+    private static final String FAMILIA = "!family:demo";
+    private static final String SERVER = "!server:demo";
 
     private MockChatService svc;
     private Scene scene;

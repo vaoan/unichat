@@ -75,7 +75,7 @@ class InfoAvatarUiTest {
     @Test
     void thePhotoOpensLargeInThePhotoViewer() throws Exception {
         MockChatService svc = new MockChatService();
-        Chat mama = svc.chat("!mama:demo");
+        Chat mama = svc.chat("!mom:demo");
         mama.setAvatarUrl("mxc://demo/mama.png");
         InfoPane info = panel(svc, mama);
         Node avatar = FxWait.fx(() -> info.lookup(".avatar-enlargeable"));
@@ -106,7 +106,7 @@ class InfoAvatarUiTest {
     @Test
     void initialsAloneOpenNothing() throws Exception {
         MockChatService svc = new MockChatService();
-        Chat mama = svc.chat("!mama:demo");
+        Chat mama = svc.chat("!mom:demo");
         mama.setAvatarUrl(null);
         InfoPane info = panel(svc, mama);
         assertNull(FxWait.fx(() -> info.lookup(".avatar-enlargeable")), "no photo: nothing to enlarge");

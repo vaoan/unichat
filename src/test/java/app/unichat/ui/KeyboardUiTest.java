@@ -54,7 +54,7 @@ class KeyboardUiTest {
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();
-            view.openChatId("!familia:demo");
+            view.openChatId("!family:demo");
             return sc;
         });
         untilOpen(scene);
@@ -82,7 +82,7 @@ class KeyboardUiTest {
         assertTrue(msgText.startsWith("Laura, ") && msgText.contains("¿Quién trae qué el domingo?"), msgText);
 
         // The last message is selected when the timeline gets focus; a digit never reacts (only the menu does).
-        List<Message> msgs = svc.messages("!familia:demo");
+        List<Message> msgs = svc.messages("!family:demo");
         Message last = msgs.get(msgs.size() - 1);
         press(scene, KeyCode.DIGIT1, false, false);
         assertFalse(last.reactions().containsKey(EmojiPicker.QUICK[0]), "1 doesn't react to the selected message");
@@ -119,7 +119,7 @@ class KeyboardUiTest {
             // another UI test started the toolkit
         }
         MockChatService svc = new MockChatService();
-        svc.chat("!familia:demo").setFeatures(app.unichat.model.RoomFeatures.parse(
+        svc.chat("!family:demo").setFeatures(app.unichat.model.RoomFeatures.parse(
                 new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"reply\":0,\"edit\":0,\"reaction\":0}")));
         Scene scene = fx(() -> {
             Stage stage = new Stage();
@@ -128,7 +128,7 @@ class KeyboardUiTest {
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();
-            view.openChatId("!familia:demo");
+            view.openChatId("!family:demo");
             return sc;
         });
         untilOpen(scene);

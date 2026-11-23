@@ -58,7 +58,7 @@ class ComposerHeightUiTest {
         Composer[] composer = new Composer[1];
         TextArea box = FxWait.fx(() -> {
             Composer c = new Composer(new MockChatService(), x -> { });
-            c.setChat("!familia:demo");
+            c.setChat("!family:demo");
             stage[0] = new Stage();
             composer[0] = c;
             c.setMaxWidth(420);

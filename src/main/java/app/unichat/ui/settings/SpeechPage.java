@@ -46,7 +46,7 @@ final class SpeechPage {
                 }, s.sttLanguage(), s::setSttLanguage);
 
         TextField command = new TextField(SttSettings.command());
-        command.setPromptText(Transcriber.EXAMPLE_COMMAND);
+        command.setPromptText(I18n.t("settings.speech.commandExample"));
         command.setPrefColumnCount(16);
         command.setAccessibleText(I18n.t("settings.speech.ownCommand"));
         command.textProperty().addListener((o, a, b) -> s.setSttCommand(b.strip()));

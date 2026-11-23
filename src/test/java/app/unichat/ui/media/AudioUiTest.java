@@ -57,7 +57,7 @@ class AudioUiTest {
     @BeforeEach
     void player() throws Exception {
         Path note = dir.resolve("nota.ogg");
-        try (InputStream in = AudioUiTest.class.getResourceAsStream("/app/unichat/demo/nota-de-voz.ogg")) {
+        try (InputStream in = AudioUiTest.class.getResourceAsStream("/app/unichat/demo/voice-note.ogg")) {
             Files.copy(in, note);
         }
         MediaSource source = (url, w, h) -> url.equals("mxc://s/roto")
@@ -183,7 +183,7 @@ class AudioUiTest {
             Theme.register(sc);
             stage[0].setScene(sc);
             stage[0].show();
-            v.openChatId("!familia:demo");
+            v.openChatId("!family:demo");
             return v;
         });
         AudioPlayback audio = view.audio();
@@ -191,7 +191,7 @@ class AudioUiTest {
         FxWait.settled(); // the timeline done drawing, so the button pressed is the one that stays
         fx(() -> { ((Button) view.lookup(".timeline .audio-toggle")).fire(); return null; });
         await(() -> audio.state() == AudioPlayback.State.PLAYING, "plays");
-        assertEquals("!familia:demo", fx(() -> audio.chat().id()));
+        assertEquals("!family:demo", fx(() -> audio.chat().id()));
         fx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(view.getScene().snapshot(null), null), "png",
                     Path.of(System.getProperty("java.io.tmpdir"), "unichat-audio-window.png").toFile());
@@ -205,7 +205,7 @@ class AudioUiTest {
         fx(() -> { view.openChatId("!andres:demo"); return null; });
         FxWait.settled(); // the other chat fully shown
         assertEquals(AudioPlayback.State.PAUSED, fx(audio::state), "changing chats doesn't stop it");
-        assertEquals("!familia:demo", fx(() -> audio.chat().id()));
+        assertEquals("!family:demo", fx(() -> audio.chat().id()));
         Node bar = fx(() -> view.lookup(".audio-bar"));
         assertTrue(fx(bar::isVisible));
         fx(() -> { ((Button) bar.lookup(".audio-toggle")).fire(); return null; });

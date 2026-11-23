@@ -30,7 +30,7 @@ class DraftUndoUiTest {
         Composer[] composer = new Composer[1];
         TextArea box = FxWait.fx(() -> {
             Composer c = new Composer(new MockChatService(), x -> { });
-            c.setChat("!familia:demo");
+            c.setChat("!family:demo");
             composer[0] = c;
             Stage stage = new Stage();
             stage.setScene(new Scene(new StackPane(c), 600, 300));
@@ -40,7 +40,7 @@ class DraftUndoUiTest {
             return t;
         });
         FxWait.fx(() -> {
-            composer[0].aiDraft("!familia:demo", "¡Claro que sí! Nos vemos mañana.");
+            composer[0].aiDraft("!family:demo", "¡Claro que sí! Nos vemos mañana.");
             return null;
         });
         assertEquals("¡Claro que sí! Nos vemos mañana.", FxWait.fx(box::getText));

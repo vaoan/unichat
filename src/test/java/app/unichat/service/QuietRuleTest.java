@@ -15,14 +15,14 @@ class QuietRuleTest {
     @Test
     void mutingAChatArchivesItAndUnarchivingUnmutesIt() throws Exception {
         MockChatService svc = new MockChatService();
-        svc.setMuted("!mama:demo", true).get();
-        assertTrue(svc.chat("!mama:demo").archived());
-        svc.setArchived("!mama:demo", false).get();
-        assertFalse(svc.chat("!mama:demo").muted(), "back in the inbox, it notifies again");
-        svc.setArchived("!mama:demo", true).get();
-        assertTrue(svc.chat("!mama:demo").muted(), "archived = silenced for good");
-        svc.setMuted("!mama:demo", false).get();
-        assertFalse(svc.chat("!mama:demo").archived());
+        svc.setMuted("!mom:demo", true).get();
+        assertTrue(svc.chat("!mom:demo").archived());
+        svc.setArchived("!mom:demo", false).get();
+        assertFalse(svc.chat("!mom:demo").muted(), "back in the inbox, it notifies again");
+        svc.setArchived("!mom:demo", true).get();
+        assertTrue(svc.chat("!mom:demo").muted(), "archived = silenced for good");
+        svc.setMuted("!mom:demo", false).get();
+        assertFalse(svc.chat("!mom:demo").archived());
     }
 
     @Test
@@ -30,13 +30,13 @@ class QuietRuleTest {
         MockChatService svc = new MockChatService();
         svc.setMuted("!srv-memes:demo", true).get();
         assertTrue(svc.chat("!srv-memes:demo").archived());
-        assertFalse(svc.chat("!servidor:demo").archived(), "one quiet channel doesn't hide its server");
+        assertFalse(svc.chat("!server:demo").archived(), "one quiet channel doesn't hide its server");
 
-        svc.setArchived("!servidor:demo", true).get();
-        for (String id : List.of("!servidor:demo", "!srv-general:demo", "!srv-memes:demo")) {
+        svc.setArchived("!server:demo", true).get();
+        for (String id : List.of("!server:demo", "!srv-general:demo", "!srv-memes:demo")) {
             assertTrue(svc.chat(id).archived() && svc.chat(id).muted(), id);
         }
-        svc.setArchived("!servidor:demo", false).get();
+        svc.setArchived("!server:demo", false).get();
         assertFalse(svc.chat("!srv-general:demo").muted());
         assertFalse(svc.chat("!srv-general:demo").archived());
     }

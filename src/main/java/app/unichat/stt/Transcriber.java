@@ -24,8 +24,6 @@ import java.util.function.Consumer;
 public final class Transcriber {
     public enum Engine { WHISPER, CUSTOM }
 
-    /** Example for the person's own command; {file} is a WAV/MP3/FLAC file, {language} "es", "en"… or "auto". */
-    public static final String EXAMPLE_COMMAND = "whisper-cli -m /path/to/model.bin -f {file} -l {language} -nt -np";
 
     /** A long note takes minutes on a slow computer; one stuck that long isn't coming. */
     private static final long TIMEOUT_SECONDS = 15 * 60;

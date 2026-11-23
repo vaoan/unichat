@@ -12,10 +12,46 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MockChatServiceTest {
+    /** Every name and text the demo shows, and the voice note's file, all in the UI language through demo.* keys. */
+    @Test
+    void theDemoSpeaksTheUiLanguage() throws Exception {
+        String before = app.unichat.support.I18n.locale().getLanguage();
+        try {
+            app.unichat.support.I18n.use("en");
+            MockChatService en = new MockChatService();
+            List<String> shown = shownTexts(en);
+            assertTrue(shown.containsAll(List.of("Mom", "Andrew Miller", "Sophie", "Anna Marie", "Camille Rogers")), shown.toString());
+            assertTrue(shown.stream().noneMatch(t -> t.matches("(?s).*[áéíóúñ¿¡].*")),
+                    shown.stream().filter(t -> t.matches("(?s).*[áéíóúñ¿¡].*")).toList().toString());
+            assertTrue(en.messages("!family:demo").stream().anyMatch(m -> "demo://voice-note.ogg".equals(m.mediaUrl())));
+            assertTrue(java.nio.file.Files.size(DemoMedia.demoAudio("voice-note.ogg")) > 0, "the renamed resource is there");
+            en.stop();
+
+            app.unichat.support.I18n.use("es");
+            MockChatService es = new MockChatService();
+            assertTrue(shownTexts(es).containsAll(List.of("Mamá", "Andrés Mejía", "Sofía", "Ana María")));
+            es.stop();
+        } finally {
+            app.unichat.support.I18n.use(before);
+        }
+    }
+
+    private static List<String> shownTexts(MockChatService svc) throws Exception {
+        var out = new java.util.ArrayList<String>();
+        for (Chat c : svc.chats()) {
+            out.add(c.title());
+            c.members().forEach(m -> out.add(m.name()));
+            svc.messages(c.id()).forEach(m -> out.add(m.body() == null ? "" : m.body()));
+        }
+        var wa = svc.accounts().stream().filter(a -> a.network() == app.unichat.model.Network.WHATSAPP).findFirst().orElseThrow();
+        svc.contacts(wa).get().forEach(c -> out.add(c.name()));
+        return out;
+    }
+
     @Test
     void sendEditReactDeleteAndChatState() throws Exception {
         MockChatService svc = new MockChatService();
-        Chat mama = svc.chat("!mama:demo");
+        Chat mama = svc.chat("!mom:demo");
         assertTrue(mama.isUnread());
         svc.markRead(mama.id());
         assertFalse(mama.isUnread());
@@ -47,18 +83,18 @@ class MockChatServiceTest {
         List<app.unichat.model.Account> wa = svc.accounts().stream()
                 .filter(a -> a.network() == app.unichat.model.Network.WHATSAPP).toList();
         assertEquals(2, wa.size(), "demo starts with two WhatsApp accounts");
-        assertEquals("whatsapp:trabajo", svc.chat("!andrea:demo").accountId());
-        assertEquals("whatsapp:personal", svc.chat("!mama:demo").accountId());
+        assertEquals("whatsapp:work", svc.chat("!andrea:demo").accountId());
+        assertEquals("whatsapp:personal", svc.chat("!mom:demo").accountId());
 
         String bot = svc.addAccount(app.unichat.model.Network.WHATSAPP).get();
         assertTrue(svc.chat(bot).bridgeBot());
         assertEquals(3, svc.accounts().stream().filter(a -> a.network() == app.unichat.model.Network.WHATSAPP).count(),
                 "a pending login is listed until it finishes");
 
-        app.unichat.model.Account work = wa.stream().filter(a -> a.id().equals("whatsapp:trabajo")).findFirst().orElseThrow();
+        app.unichat.model.Account work = wa.stream().filter(a -> a.id().equals("whatsapp:work")).findFirst().orElseThrow();
         svc.disconnectAccount(work).get();
         assertEquals(null, svc.chat("!andrea:demo"), "chats of the disconnected account go away");
-        assertTrue(svc.chat("!mama:demo") != null, "the other account keeps its chats");
+        assertTrue(svc.chat("!mom:demo") != null, "the other account keeps its chats");
         svc.stop();
     }
 }

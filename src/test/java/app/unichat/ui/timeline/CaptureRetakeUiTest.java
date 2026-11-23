@@ -57,7 +57,7 @@ class CaptureRetakeUiTest {
             stage.setOpacity(0);
             stage.setScene(new javafx.scene.Scene(overlay, 600, 700));
             stage.show();
-            sheet.open(3, svc.chat("!familia:demo"), footer -> {
+            sheet.open(3, svc.chat("!family:demo"), footer -> {
                 CompletableFuture<ConversationShot.Shot> f = new CompletableFuture<>();
                 takes.add(f);
                 return f;
@@ -89,7 +89,7 @@ class CaptureRetakeUiTest {
             stage.setOpacity(0);
             stage.setScene(new javafx.scene.Scene(overlay, 600, 700));
             stage.show();
-            sheet.open(500, svc.chat("!familia:demo"), footer -> CompletableFuture.failedFuture(new ConversationShot.TooLong()));
+            sheet.open(500, svc.chat("!family:demo"), footer -> CompletableFuture.failedFuture(new ConversationShot.TooLong()));
             return null;
         });
         FxWait.until("the sheet is drawn", () -> FxWait.fx(() -> overlay.lookup(".check-box") != null));

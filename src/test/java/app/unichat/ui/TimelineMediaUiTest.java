@@ -201,7 +201,7 @@ class TimelineMediaUiTest {
     @Test
     void aVoiceNote() throws Exception {
         ObjectNode info = JsonNodeFactory.instance.objectNode().put("duration", 2000);
-        arrivesWithoutPicture("a voice note arriving", file(MessageType.AUDIO, "demo://nota-de-voz.ogg", "audio/ogg", "nota.ogg", 9000, info));
+        arrivesWithoutPicture("a voice note arriving", file(MessageType.AUDIO, "demo://voice-note.ogg", "audio/ogg", "nota.ogg", 9000, info));
     }
 
     @Test
@@ -274,7 +274,7 @@ class TimelineMediaUiTest {
     @Test
     void openingAChatWhoseNewestPhotoIsStillDownloading() throws Exception {
         w = TimelineWindow.open(20);
-        FxWait.fx(() -> { w.view.openChatId("!familia:demo"); return null; });
+        FxWait.fx(() -> { w.view.openChatId("!family:demo"); return null; });
         FxWait.settled();
         ScriptedChatService.Gate downloads = w.svc.holdDownloads();
         w.svc.receive(CHAT, media(MessageType.IMAGE, still("png", 900, 600), "image/png", 0, 0));

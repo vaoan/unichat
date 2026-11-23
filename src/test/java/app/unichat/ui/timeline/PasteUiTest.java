@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** ⌘V in the message box: a copied picture is sent, copied text is written. Headless only: it fills the clipboard. */
 @EnabledIfSystemProperty(named = "unichat.headless", matches = "true")
 class PasteUiTest {
-    private static final String CHAT = "!familia:demo";
+    private static final String CHAT = "!family:demo";
 
     @Test
     void aCopiedPictureIsSentAndTextIsWritten() throws Exception {

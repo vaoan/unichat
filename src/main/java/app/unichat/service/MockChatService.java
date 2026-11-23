@@ -41,9 +41,9 @@ import java.util.function.Consumer;
  */
 public class MockChatService implements ChatService, FolderForwarding {
     private final Map<String, app.unichat.model.LinkPreview> demoLinks = new java.util.concurrent.ConcurrentHashMap<>();
-    static final String ME = "@yo:demo.unichat";
+    static final String ME = "@me:demo.unichat";
     static final String WA_PERSONAL = "whatsapp:personal";
-    static final String WA_WORK = "whatsapp:trabajo";
+    static final String WA_WORK = "whatsapp:work";
     private static final List<Network> AVAILABLE = List.of(Network.WHATSAPP, Network.TELEGRAM, Network.SIGNAL,
             Network.INSTAGRAM, Network.MESSENGER, Network.DISCORD, Network.SLACK, Network.GOOGLE_MESSAGES,
             Network.X, Network.LINKEDIN);
@@ -123,14 +123,14 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     // ---------------------------------------------------------------- reading
 
-    public static final String UNJOINED_CHANNEL_ID = "!srv-anuncios:demo";
+    public static final String UNJOINED_CHANNEL_ID = "!srv-announcements:demo";
 
     @Override
     public CompletableFuture<Void> joinChat(String roomId) {
         if (failJoins) return CompletableFuture.failedFuture(new IllegalStateException("join refused"));
         Runnable arrive = () -> {
             if (UNJOINED_CHANNEL_ID.equals(roomId) && !chats.containsKey(roomId)) {
-                DemoChats.ChatBuilder.group(this, "srv-anuncios", Network.DISCORD, I18n.t("demo.title.announcements"), "Mafe")
+                DemoChats.ChatBuilder.group(this, "srv-announcements", Network.DISCORD, I18n.t("demo.title.announcements"), "Mafe")
                         .in(-100, "Mafe", I18n.t("demo.announcements.1")).done();
                 fireChats();
             }
@@ -151,7 +151,7 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     /** Demo/tests: no Discord server in Unichat yet, like right after logging in. */
     public void dropDemoServer() {
-        for (String id : List.of("!servidor:demo", "!srv-general:demo", "!srv-memes:demo")) chats.remove(id);
+        for (String id : List.of("!server:demo", "!srv-general:demo", "!srv-memes:demo")) chats.remove(id);
         fireChats();
     }
 
@@ -170,14 +170,14 @@ public class MockChatService implements ChatService, FolderForwarding {
         }
         return later(() -> {
             offerAdded = true;
-            Chat space = new Chat("!juegos:demo");
+            Chat space = new Chat("!games:demo");
             space.setNetwork(Network.DISCORD);
             space.setTitle(I18n.t("demo.title.games"));
             space.setSpace(true);
-            space.setSpaceChildren(List.of("!juegos-general:demo"));
+            space.setSpaceChildren(List.of("!games-general:demo"));
             adopt(space);
             chats.put(space.id(), space);
-            DemoChats.ChatBuilder.group(this, "juegos-general", Network.DISCORD, "#general", "xNico")
+            DemoChats.ChatBuilder.group(this, "games-general", Network.DISCORD, "#general", "xNico")
                     .in(-100, "xNico", I18n.t("demo.games.1")).done();
             fireChats();
             return null;
@@ -206,7 +206,7 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     @Override
     public CompletableFuture<Map<String, String>> spaceNames(String spaceId) {
-        return CompletableFuture.completedFuture("!servidor:demo".equals(spaceId) ? Map.of(UNJOINED_CHANNEL_ID, I18n.t("demo.title.announcements")) : Map.of());
+        return CompletableFuture.completedFuture("!server:demo".equals(spaceId) ? Map.of(UNJOINED_CHANNEL_ID, I18n.t("demo.title.announcements")) : Map.of());
     }
 
     /** Open unless a test holds the bridge ({@link #holdBridge}): what the bridge does then waits for it. */
@@ -647,7 +647,7 @@ public class MockChatService implements ChatService, FolderForwarding {
             if (command.equalsIgnoreCase("login")) {
                 Message qr = new Message(UUID.randomUUID().toString(), chat.id(), bot.id(), bot.name(), false, Instant.now());
                 qr.setType(MessageType.IMAGE);
-                qr.setMediaUrl("demo://codigo-QR-" + n.protocolId());
+                qr.setMediaUrl("demo://" + I18n.t("demo.image.qr") + "-" + n.protocolId());
                 qr.setFileName("qr.png");
                 qr.setSize(640, 420);
                 append(chat, qr);

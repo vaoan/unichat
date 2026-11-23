@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** The message box's right-click menu offers the formats the chat's network shows, and ⌘B makes bold. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class FormatMenuUiTest {
-    private static final String CHAT = "!familia:demo";
+    private static final String CHAT = "!family:demo";
 
     private static Menu format(ContextMenu menu) {
         return (Menu) menu.getItems().get(menu.getItems().size() - 1);

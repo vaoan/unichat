@@ -41,7 +41,7 @@ class ToastPlacementUiTest {
             Theme.register(sc);
             stage[0].setScene(sc);
             stage[0].show();
-            view.openChatId("!familia:demo");
+            view.openChatId("!family:demo");
             return sc;
         });
         FxWait.until("the message box", () -> scene.getRoot().lookup(".composer-input") != null);

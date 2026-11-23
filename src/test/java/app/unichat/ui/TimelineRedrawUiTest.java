@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 /** A new message leaves the rows on screen alone, and what does change in one still shows. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class TimelineRedrawUiTest {
-    private static final String CHAT = "!familia:demo";
+    private static final String CHAT = "!family:demo";
 
     private static <T> T fx(Callable<T> c) throws Exception {
         return FxWait.fx(c);

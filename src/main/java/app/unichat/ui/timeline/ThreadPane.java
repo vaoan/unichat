@@ -409,10 +409,12 @@ public final class ThreadPane extends BorderPane {
             }
             return prompt;
         });
-        for (String t : List.of("creo q mañana no puedo", "pero el jueves si", "avisame q te parece",
-                "y tambien le dije a juan q viniera temprano para ayudar con todo lo de la cocina")) {
-            sendQueue.submit(chat.id(), t, null);
-        }
+        for (String t : snapshotDrafts()) sendQueue.submit(chat.id(), t, null);
+    }
+
+    /** The four texts {@link #showQueue} puts in the queue, as the person would write them, in the UI language. */
+    static List<String> snapshotDrafts() {
+        return List.of(I18n.t("demo.draft.1"), I18n.t("demo.draft.2"), I18n.t("demo.draft.3"), I18n.t("demo.draft.4"));
     }
 
     /** Snapshot diagnostics: my newest message being corrected with AI (an answer that never comes). */

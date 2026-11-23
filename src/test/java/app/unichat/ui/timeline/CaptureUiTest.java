@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class CaptureUiTest {
-    private static final String CHAT = "!familia:demo";
+    private static final String CHAT = "!family:demo";
     private MockChatService svc;
     private Stage stage;
     private MainView view;
@@ -215,18 +215,18 @@ class CaptureUiTest {
         Button send = FxWait.fx(() -> sheet().lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Enviar a un chat…".equals(b.getText())).findFirst().orElseThrow());
         FxWait.fx(() -> { send.fire(); return null; });
-        int before = svc.messages("!mama:demo").size();
+        int before = svc.messages("!mom:demo").size();
         FxWait.fx(() -> {
             ListView<?> chats = (ListView<?>) sheet().lookup(".forward-chats");
             for (int i = 0; i < chats.getItems().size(); i++) {
-                if (((app.unichat.model.Chat) chats.getItems().get(i)).id().equals("!mama:demo")) chats.getSelectionModel().select(i);
+                if (((app.unichat.model.Chat) chats.getItems().get(i)).id().equals("!mom:demo")) chats.getSelectionModel().select(i);
             }
             chats.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, " ", " ", KeyCode.SPACE, false, false, false, false));
             ((Button) sheet().lookupAll(".button").stream().filter(b -> "Enviar".equals(((Button) b).getText())).findFirst().orElseThrow()).fire();
             return null;
         });
-        FxWait.until("the picture went", () -> svc.messages("!mama:demo").size() == before + 1);
-        Message sent = svc.messages("!mama:demo").getLast();
+        FxWait.until("the picture went", () -> svc.messages("!mom:demo").size() == before + 1);
+        Message sent = svc.messages("!mom:demo").getLast();
         assertEquals(MessageType.FILE, sent.type(), "one long picture goes whole, as a document: as a photo it was shrunk to a strip");
         assertTrue(sent.outgoing());
     }

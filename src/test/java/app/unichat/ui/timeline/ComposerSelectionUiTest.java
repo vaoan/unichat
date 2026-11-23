@@ -42,7 +42,7 @@ class ComposerSelectionUiTest {
         Platform.setImplicitExit(false);
         box = FxWait.fx(() -> {
             Composer composer = new Composer(new MockChatService(), x -> { });
-            composer.setChat("!familia:demo");
+            composer.setChat("!family:demo");
             stage = new Stage();
             stage.setOpacity(0);
             stage.setScene(new Scene(composer, width, 240));

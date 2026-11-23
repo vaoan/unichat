@@ -89,10 +89,10 @@ class TypingDotsUiTest {
             Theme.register(sc);
             stage[0].setScene(sc);
             stage[0].show();
-            v.openChatId("!familia:demo");
+            v.openChatId("!family:demo");
             return v;
         });
-        Chat chat = svc.chat("!familia:demo");
+        Chat chat = svc.chat("!family:demo");
         fx(() -> { chat.setTyping(java.util.Set.of("Laura")); view.thread().refreshHeader(); view.list().refresh(); return null; });
         FxWait.until("the chat's row shows the dots", () -> view.lookup(".chat-preview.typing .typing-dots") != null);
         assertNotNull(fx(() -> view.lookup(".chat-preview.typing .typing-dots")), "the chat's row in the list too");

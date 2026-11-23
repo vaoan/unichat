@@ -100,7 +100,7 @@ class ChatClickUiTest {
         }
         for (int i = 0; i < (unreadOnly ? 2 : 4); i++) {
             int row = i;
-            String wanted = unreadOnly ? List.of("!mama:demo", "!familia:demo").get(i) : null;
+            String wanted = unreadOnly ? List.of("!mom:demo", "!family:demo").get(i) : null;
             String clicked = fx(() -> {
                 List<ListCell<?>> cells = scene.getRoot().lookupAll(".chat-list .list-cell").stream()
                         .<ListCell<?>>map(n -> (ListCell<?>) n).filter(c -> c.getItem() instanceof Chat ch && !ch.space() && plainChat(ch)).toList();

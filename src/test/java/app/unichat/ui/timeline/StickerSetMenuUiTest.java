@@ -40,7 +40,7 @@ class StickerSetMenuUiTest {
         MockChatService svc = new MockChatService();
         var info = new ObjectMapper().readTree("""
                 {"mimetype":"image/webp","fi.mau.bridged_sticker":{"network":"telegram","id":"7","pack_url":"https://t.me/addstickers/gatitos"}}""");
-        svc.sendSticker("!familia:demo", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://demo/s1", "image/webp", 64, 64, info), null).get();
+        svc.sendSticker("!family:demo", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://demo/s1", "image/webp", 64, 64, info), null).get();
         Stage[] window = new Stage[1];
         MainView view = FxWait.fx(() -> {
             window[0] = new Stage();
@@ -48,11 +48,11 @@ class StickerSetMenuUiTest {
             MainView v = new MainView(svc, window[0], new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             window[0].setScene(new Scene(v, 1000, 700));
             window[0].show();
-            v.openChatId("!familia:demo");
+            v.openChatId("!family:demo");
             return v;
         });
         try {
-            List<Message> msgs = svc.messages("!familia:demo");
+            List<Message> msgs = svc.messages("!family:demo");
             Message sticker = msgs.get(msgs.size() - 1);
             ThreadPane thread = FxWait.fx(() -> find(view, ThreadPane.class));
             MenuItem show = FxWait.fx(() -> thread.actions().messageMenu(sticker).getItems().stream()

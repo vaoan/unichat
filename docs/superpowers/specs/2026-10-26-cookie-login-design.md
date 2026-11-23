@@ -1,78 +1,76 @@
-# Inicio de sesión sin cookies a mano (Instagram, Messenger, X, LinkedIn, Google Messages)
+# Signing in without cookies by hand (Instagram, Messenger, X, LinkedIn, Google Messages)
 
-## Por qué
-Hoy, conectar una red "de cookies" obliga a abrir las herramientas de desarrollador y pegar un cURL.
-El usuario lo calificó de "horrible": quiere algo amigable, idealmente usando el navegador que ya usa,
-como el inicio de sesión de Spotify. Instagram no ofrece un login oficial que sirva para los puentes
-(OAuth solo para cuentas de empresa y con un token inútil para el bridge), y una página web no puede
-entregarle a otra app la sesión de otro sitio. Por eso la sesión se obtiene en la máquina del usuario.
+## Why
+Today, connecting a "cookie" network means opening the developer tools and pasting a cURL. The user called it
+"horrible": they want something friendly, ideally using the browser they already use, like Spotify's sign-in. Instagram
+offers no official sign-in that works for the bridges (OAuth only for business accounts, and with a token useless to
+the bridge), and a web page can't hand another app the session of another site. So the session is taken on the user's
+machine.
 
-## Objetivos
-- Conectar Instagram, Messenger, X, LinkedIn y Google Messages **sin ver nunca una cookie**.
-- Si el usuario ya tiene la sesión abierta en su navegador, usarla con un clic (A).
-- Si no se puede, una ventana de inicio de sesión dentro de Unichat (B), con usuario, contraseña y
-  verificación en dos pasos como en la web.
-- Alternativa: elegir un archivo **cookies.txt** (C) y, si trae lo necesario, conectar solo.
-- Funcionar en Windows (destino principal) y macOS. Varias cuentas por red.
+## Goals
+- Connect Instagram, Messenger, X, LinkedIn and Google Messages **without ever seeing a cookie**.
+- If the user already has the session open in their browser, use it with one click (A).
+- If that can't be done, a sign-in window inside Unichat (B), with user, password and two-step verification as on the
+  web.
+- An alternative: choose a **cookies.txt** file (C) and, if it has what's needed, connect by itself.
+- Work on Windows (the main target) and macOS. Several accounts per network.
 
-## No objetivos
-- Safari (requiere "Acceso total al disco").
-- Chrome/Edge en Windows con el cifrado nuevo (cookies "v20", app-bound encryption, Chrome 127+): se
-  detecta y se pasa directo a B, sin pedir privilegios de administrador.
-- Extensión de navegador propia (descartada por ahora).
+## Non-goals
+- Safari (it requires "Full Disk Access").
+- Chrome/Edge on Windows with the new encryption ("v20" cookies, app-bound encryption, Chrome 127+): it's detected and
+  goes straight to B, without asking for administrator rights.
+- A browser extension of our own (rejected for now).
 
-## Anti-objetivos
-- Guardar la sesión del navegador en Unichat: solo se lee en el momento y se envía al bridge del propio
-  servidor del usuario. Nada se sube a ningún otro lado.
-- Leer cookies de otros sitios: solo los dominios de la red elegida.
-- Pedir permisos sin explicar por qué (el aviso del llavero de macOS se anuncia antes).
+## Anti-goals
+- Keeping the browser's session in Unichat: it's only read at that moment and sent to the bridge on the user's own
+  server. Nothing is uploaded anywhere else.
+- Reading cookies of other sites: only the chosen network's domains.
+- Asking for permissions without explaining why (the macOS keychain prompt is announced first).
 
-## Enfoques considerados
-- **A. Sesión del navegador** (lectura local de cookies, como hace Beeper con `credential-extractor`).
-  Sin escribir nada, pero no sirve con Chrome/Edge en Windows.
-- **B. Ventana de login integrada** (WebView de JavaFX con la página real). Siempre funciona; hay que
-  escribir la contraseña una vez.
-- **Extensión de navegador propia**. La más parecida a Spotify, pero exige instalar una extensión
-  (y "modo desarrollador" hasta publicarla). Descartada.
-- **C. Archivo cookies.txt** (formato Netscape, el que exportan extensiones como "Get cookies.txt LOCALLY"
-  y que el usuario ya usa en otros proyectos). Útil cuando A no ve el navegador (p. ej. Chrome en Windows)
-  y no se quiere escribir la contraseña.
-- **Elegido por el usuario: A + B + C.** A primero; si no encuentra sesión, B, con C siempre disponible.
+## Approaches considered
+- **A. The browser's session** (reading cookies locally, as Beeper does with `credential-extractor`). Nothing to type,
+  but it doesn't work with Chrome/Edge on Windows.
+- **B. A built-in sign-in window** (a JavaFX WebView with the real page). It always works; the password has to be typed
+  once.
+- **A browser extension of our own.** The closest to Spotify, but it requires installing an extension (and "developer
+  mode" until it's published). Rejected.
+- **C. A cookies.txt file** (the Netscape format, the one extensions such as "Get cookies.txt LOCALLY" export, which the
+  user already uses in other projects). Useful when A can't see the browser (e.g. Chrome on Windows) and one doesn't
+  want to type the password.
+- **Chosen by the user: A + B + C.** A first; if it finds no session, B, with C always available.
 
-## Cómo funciona (decidido)
-1. En el asistente, al elegir una red de cookies: "Buscando tu sesión de Instagram en tus navegadores…".
-2. A — se buscan perfiles de **Firefox** (Windows/macOS/Linux; `cookies.sqlite` sin cifrar, copiado para no
-   chocar con el bloqueo) y de **Chrome, Edge y Brave** (macOS: clave del llavero "… Safe Storage",
-   AES-CBC "v10"; Windows: DPAPI "v10"; "v20" = no compatible). Se valida que estén las cookies
-   imprescindibles de esa red:
-   - Instagram `sessionid`, `csrftoken` (+ `ds_user_id`, `mid`, `ig_did` si están)
+## How it works (decided)
+1. In the wizard, on choosing a cookie network: "Looking for your Instagram session in your browsers…".
+2. A — it looks for **Firefox** profiles (Windows/macOS/Linux; `cookies.sqlite` unencrypted, copied so as not to clash
+   with the lock) and **Chrome, Edge and Brave** profiles (macOS: the "… Safe Storage" keychain key, AES-CBC "v10";
+   Windows: DPAPI "v10"; "v20" = not supported). It checks that the network's essential cookies are there:
+   - Instagram `sessionid`, `csrftoken` (+ `ds_user_id`, `mid`, `ig_did` if present)
    - Messenger/Facebook `c_user`, `xs` (+ `datr`, `fr`)
    - X `auth_token`, `ct0`
    - LinkedIn `li_at`, `JSESSIONID`
-   - Google Messages: cookies de `google.com` (`SAPISID`, `SID`, `__Secure-1PSID`…) + `messages.google.com`
-3. Si hay una o más sesiones: tarjeta "Usar tu sesión de Instagram de Firefox (perfil X)" con botones
-   **Usar esta sesión** y **Iniciar sesión con otra cuenta** (→ B).
-4. B — ventana con la web real (agente de usuario de un navegador actual, almacén de cookies vacío para
-   poder agregar otra cuenta). Cuando aparecen las cookies imprescindibles, la ventana se cierra sola.
-5. Las cookies se envían al bridge como JSON `{"nombre": "valor"}` (formato que aceptan los bridges de
-   cookies) por el mismo flujo del asistente; el asistente sigue mostrando éxito o error.
-6. Si el bridge pide un paso extra (Google Messages: confirmar emoji en el teléfono), el asistente lo
-   muestra como hoy.
-7. C — botón **Elegir archivo cookies.txt…** (en la tarjeta de A y en la pantalla de B). Se leen las líneas
-   Netscape (`dominio  flag  ruta  secure  expira  nombre  valor`, incluidas las `#HttpOnly_`), se
-   filtran los dominios de la red y, si están las imprescindibles, se conecta directamente; si faltan,
-   se dice cuáles ("Al archivo le falta `sessionid`: exporta las cookies con la sesión de Instagram
-   abierta"). Cookies vencidas se ignoran.
-8. Siempre queda un enlace discreto "Pegar cookies manualmente" para casos raros.
+   - Google Messages: the `google.com` cookies (`SAPISID`, `SID`, `__Secure-1PSID`…) + `messages.google.com`
+3. If there are one or more sessions: a card "Use your Instagram session from Firefox (profile X)" with the buttons
+   **Use this session** and **Sign in with another account** (→ B).
+4. B — a window with the real web (a current browser's user agent, an empty cookie store so another account can be
+   added). When the essential cookies appear, the window closes by itself.
+5. The cookies are sent to the bridge as JSON `{"name": "value"}` (the format the cookie bridges accept) through the
+   wizard's same flow; the wizard still shows success or error.
+6. If the bridge asks for an extra step (Google Messages: confirming an emoji on the phone), the wizard shows it as it
+   does today.
+7. C — a **Choose cookies.txt file…** button (on A's card and on B's screen). The Netscape lines are read
+   (`domain  flag  path  secure  expires  name  value`, the `#HttpOnly_` ones included), the network's domains are
+   kept and, if the essential ones are there, it connects at once; if some are missing, it says which ("The file lacks
+   `sessionid`: export the cookies with the Instagram session open"). Expired cookies are ignored.
+8. A discreet "Paste cookies by hand" link always remains for odd cases.
 
-## Pruebas
-- Descifrado de Chrome (macOS v10, Windows v10) con datos sintéticos; detección de v20.
-- Lectura de Firefox con una base `cookies.sqlite` sintética.
-- Lectura de cookies.txt: líneas `#HttpOnly_`, comentarios, cookies vencidas, dominios de otras redes, y
-  el mensaje de cookies faltantes.
-- Selección de cookies por red y armado del JSON.
-- Comprobación manual con los navegadores reales del usuario (Chrome con 3 perfiles en este Mac).
+## Tests
+- Chrome decryption (macOS v10, Windows v10) with synthetic data; detecting v20.
+- Reading Firefox with a synthetic `cookies.sqlite` database.
+- Reading cookies.txt: `#HttpOnly_` lines, comments, expired cookies, other networks' domains, and the missing-cookies
+  message.
+- Choosing cookies by network and building the JSON.
+- A check by hand with the user's real browsers (Chrome with 3 profiles on this Mac).
 
-## Para quien lo construya
-- Dependencias nuevas: `javafx-web` (WebView) y un driver SQLite para Java.
-- Detalles de UI dentro del estilo actual del asistente y de accesibilidad (textos accesibles, teclado).
+## For whoever builds it
+- New dependencies: `javafx-web` (WebView) and a SQLite driver for Java.
+- UI details within the wizard's current style and the accessibility rules (accessible texts, keyboard).

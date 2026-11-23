@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class HiddenWindowUiTest {
-    private static final String FAMILIA = "!familia:demo";
+    private static final String FAMILIA = "!family:demo";
 
     private MockChatService svc;
     private Stage stage;

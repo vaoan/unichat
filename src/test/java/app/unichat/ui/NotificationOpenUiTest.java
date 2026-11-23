@@ -57,7 +57,7 @@ class NotificationOpenUiTest {
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();
-            view.openChatId("!familia:demo");
+            view.openChatId("!family:demo");
             return sc;
         });
         FxWait.until("the message box", () -> scene.getRoot().lookup(".composer-row") != null);
@@ -108,7 +108,7 @@ class NotificationOpenUiTest {
                 String before = box();
                 FxWait.fx(() -> { stage.hide(); return null; });
                 FxWait.settled();
-                clickNotification(view.currentChatId().equals("!mama:demo") ? "!familia:demo" : "!mama:demo");
+                clickNotification(view.currentChatId().equals("!mom:demo") ? "!family:demo" : "!mom:demo");
                 String after = box();
                 if (!after.equals(before)) seen.append(w).append(": ").append(before).append(" -> ").append(after).append('\n');
             }
@@ -124,7 +124,7 @@ class NotificationOpenUiTest {
         String before = box();
         FxWait.fx(() -> { stage.hide(); return null; });
         FxWait.settled();
-        clickNotification("!mama:demo");
+        clickNotification("!mom:demo");
         assertEquals(before, box());
     }
 
@@ -134,7 +134,7 @@ class NotificationOpenUiTest {
         String before = box();
         FxWait.fx(() -> { stage.setIconified(true); return null; });
         FxWait.settled();
-        clickNotification("!mama:demo");
+        clickNotification("!mom:demo");
         assertEquals(before, box());
     }
 
@@ -148,8 +148,8 @@ class NotificationOpenUiTest {
         FxWait.fx(() -> { scene.getRoot().lookup(".list-view").requestFocus(); return null; });
         FxWait.fx(() -> { stage.hide(); return null; });
         FxWait.settled();
-        clickNotification("!mama:demo");
-        assertEquals("!mama:demo", FxWait.fx(view::currentChatId));
+        clickNotification("!mom:demo");
+        assertEquals("!mom:demo", FxWait.fx(view::currentChatId));
         Node box = FxWait.fx(() -> scene.getRoot().lookup(".composer-row").lookup(".text-area"));
         FxWait.until("the cursor in the chat's message box", () -> {
             Node owner = scene.getFocusOwner();
@@ -184,10 +184,10 @@ class NotificationOpenUiTest {
     @Test
     void aNoticeAboutAMessageGoesToThatMessage() throws Exception {
         open();
-        String older = FxWait.fx(() -> svc.messages("!mama:demo").get(0).id()); // far from the newest the chat opens at
+        String older = FxWait.fx(() -> svc.messages("!mom:demo").get(0).id()); // far from the newest the chat opens at
         FxWait.fx(() -> {
-            view.openChatId("!mama:demo");
-            view.showMessage("!mama:demo", older);
+            view.openChatId("!mom:demo");
+            view.showMessage("!mom:demo", older);
             return null;
         });
         FxWait.settled();

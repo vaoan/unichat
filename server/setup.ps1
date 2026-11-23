@@ -56,7 +56,7 @@ New-Item -ItemType Directory -Force -Path $Data | Out-Null
 
 if (-not (Test-Path ".env")) {
     if (-not $Domain) {
-        $Domain = Read-Host "Nombre del servidor Matrix (dominio) [localhost]"
+        $Domain = Read-Host "Matrix server name (domain) [localhost]"
         if (-not $Domain) { $Domain = "localhost" }
     }
     @("DOMAIN=$Domain", "POSTGRES_PASSWORD=$(New-Secret 32)", "DOUBLE_PUPPET_TOKEN=$(New-Secret 48)") |
@@ -81,7 +81,7 @@ $AdminId = "@${AdminUser}:$Domain"
 $TelegramOn = [bool]($TgId -and $TgHash)
 $Active = @()
 foreach ($b in $Bridges) {
-    if (-not $Ports.ContainsKey($b)) { throw "Bridge desconocido: $b" }
+    if (-not $Ports.ContainsKey($b)) { throw "Unknown bridge: $b" }
     if ($b -eq "telegram" -and -not $TelegramOn) {
         Write-Host "Telegram is turned off: TELEGRAM_API_ID / TELEGRAM_API_HASH are missing (see docs\BRIDGES.md)."
         continue
@@ -149,7 +149,7 @@ foreach ($b in $Active) {
     Write-Host "== $b =="
     New-Item -ItemType Directory -Force -Path "data/$b" | Out-Null
     if (-not (Test-Path "data/$b/config.yaml")) { Invoke-Quiet { docker compose run --rm --no-deps $b } }
-    if (-not (Test-Path "data/$b/config.yaml")) { throw "No se pudo generar data/$b/config.yaml" }
+    if (-not (Test-Path "data/$b/config.yaml")) { throw "Could not generate data/$b/config.yaml" }
     $before = Get-ConfSum "$b/config.yaml"
 
     $port = $Ports[$b]
@@ -206,7 +206,7 @@ foreach ($b in $Active) {
 
     # Delete registration.yaml to force regeneration after changing names.
     if (-not (Test-Path "data/$b/registration.yaml")) { Invoke-Quiet { docker compose run --rm --no-deps $b } }
-    if (-not (Test-Path "data/$b/registration.yaml")) { throw "No se pudo generar data/$b/registration.yaml" }
+    if (-not (Test-Path "data/$b/registration.yaml")) { throw "Could not generate data/$b/registration.yaml" }
     $AppServices += "/data/appservices/$b.yaml"
 }
 
@@ -236,7 +236,7 @@ if (-not $TelegramOn) { Invoke-Quiet { docker compose --profile telegram rm -sf 
 # Containers that were already running keep the old config until restarted (new ones read it fresh).
 $Running = @(& docker compose ps --services --status running)
 $Restart = @($Changed | Where-Object { $Running -contains $_ })
-Write-Host "Arrancando contenedores (la primera vez Synapse tarda ~1 min)..."
+Write-Host "Starting the containers (the first time Synapse takes ~1 min)..."
 & docker compose up -d postgres synapse @Active
 if ($LASTEXITCODE -ne 0) { throw "docker compose up failed" }
 if ($Restart.Count -gt 0) {
@@ -244,7 +244,7 @@ if ($Restart.Count -gt 0) {
     & docker compose restart @Restart
 }
 
-Write-Host "Esperando a Synapse..."
+Write-Host "Waiting for Synapse..."
 for ($i = 0; $i -lt 60; $i++) {
     try { Invoke-WebRequest -UseBasicParsing "http://localhost:8008/health" -TimeoutSec 2 | Out-Null; break } catch { Start-Sleep 2 }
 }

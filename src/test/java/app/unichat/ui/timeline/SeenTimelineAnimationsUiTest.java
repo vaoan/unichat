@@ -88,7 +88,7 @@ class SeenTimelineAnimationsUiTest {
         Composer composer = FxWait.fx(() -> {
             AiReplyButton.SHOWN.set(true);
             Composer c = new Composer(new MockChatService(), e -> { });
-            c.setChat("!familia:demo");
+            c.setChat("!family:demo");
             return c;
         });
         window(composer);
@@ -119,7 +119,7 @@ class SeenTimelineAnimationsUiTest {
         after.add(queue::cancel);
         bar = FxWait.fx(() -> new UploadBar(queue, failing, id -> { }));
         window(bar);
-        queue.addAll(List.of(new UploadQueue.Upload("!familia:demo", file, null, SendAs.DOCUMENT)));
+        queue.addAll(List.of(new UploadQueue.Upload("!family:demo", file, null, SendAs.DOCUMENT)));
         FxWait.until("waiting for the next try", () -> queue.status().phase() == UploadQueue.Phase.RETRYING);
         restsWhileUnseen("the upload bar's countdown", () -> Showing.animating(bar));
     }
@@ -130,10 +130,10 @@ class SeenTimelineAnimationsUiTest {
             @Override public String write(String prompt) { return null; }
             @Override public void cancel() { }
         }, said -> { }, never -> { }); // its correction never runs: it waits for good
-        SendQueueView view = FxWait.fx(() -> new SendQueueView(queue, () -> "!familia:demo"));
+        SendQueueView view = FxWait.fx(() -> new SendQueueView(queue, () -> "!family:demo"));
         after.add(() -> Platform.runLater(view::dispose));
         window(view);
-        FxWait.fx(() -> { queue.submit("!familia:demo", "ola", null); return null; });
+        FxWait.fx(() -> { queue.submit("!family:demo", "ola", null); return null; });
         restsWhileUnseen("the waiting text's wheel", () -> view.lookupAll(".message-fixing-wheel").stream()
                 .anyMatch(n -> ((javafx.scene.control.ProgressIndicator) n).isIndeterminate()));
     }

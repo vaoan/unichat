@@ -61,7 +61,7 @@ class NewChatUiTest {
         type(scene, "Mamá");
         FxWait.until("the search for Mamá", () -> names(scene).equals(List.of("Mamá")));
         enter(scene);
-        assertEquals("!mama:demo", fx(() -> thread(scene).chat().id()), "an existing chat just opens");
+        assertEquals("!mom:demo", fx(() -> thread(scene).chat().id()), "an existing chat just opens");
         assertNull(fx(() -> pane(scene)), "and the pane closes");
 
         shortcutN(scene);
@@ -131,7 +131,7 @@ class NewChatUiTest {
         MockChatService svc = new MockChatService();
         Scene scene = start(svc);
         fx(() -> { scene.getRoot().lookupAll("*").stream().filter(n -> n instanceof MainView).map(n -> (MainView) n)
-                .findFirst().orElseThrow().openChatId("!familia:demo"); return null; });
+                .findFirst().orElseThrow().openChatId("!family:demo"); return null; });
         shortcutN(scene);
         chooseNetwork(scene, "WhatsApp");
         type(scene, "Pedro");
@@ -153,7 +153,7 @@ class NewChatUiTest {
         FxWait.settled(); // and what they asked the window to do has run
         assertTrue(fx(() -> scene.getRoot().lookup(".command-bar") != null && scene.getRoot().lookup(".command-bar").getScene() != null),
                 "the command bar opened afterwards stays open");
-        assertEquals("!familia:demo", fx(() -> thread(scene).chat().id()), "no jump to the chat you gave up on");
+        assertEquals("!family:demo", fx(() -> thread(scene).chat().id()), "no jump to the chat you gave up on");
         svc.stop();
     }
 

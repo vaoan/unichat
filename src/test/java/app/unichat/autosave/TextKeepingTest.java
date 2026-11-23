@@ -51,7 +51,7 @@ class TextKeepingTest {
     @BeforeEach
     void start() {
         svc = new MockChatService();
-        chat = svc.chat("!familia:demo");
+        chat = svc.chat("!family:demo");
         SaveFolders.setOwn(chat.id(), dir.resolve("out"));
         keeping = new TextKeeping(svc, reader(), new TextLog(dir.resolve("texts"), Instant::now), Duration.ZERO, Duration.ZERO,
                 new AutoSave.Progress() {

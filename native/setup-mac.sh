@@ -17,7 +17,7 @@ ADMIN_USER="${ADMIN_USER:-yo}"
 OS=darwin ARCH=arm64
 
 [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ] || { echo "Apple Silicon Macs only." >&2; exit 1; }
-command -v yq >/dev/null || { echo "Falta yq (brew install yq)." >&2; exit 1; }
+command -v yq >/dev/null || { echo "yq is missing (brew install yq)." >&2; exit 1; }
 
 rand() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-32}" || true; }
 mkdir -p "$DIR/bin" "$DIR/appservices"
@@ -39,7 +39,7 @@ bridge_port() {
   case "$1" in
     whatsapp) echo 29318 ;; telegram) echo 29317 ;; signal) echo 29328 ;; instagram) echo 29319 ;;
     facebook) echo 29320 ;; discord) echo 29334 ;; slack) echo 29335 ;; gmessages) echo 29336 ;;
-    twitter) echo 29327 ;; linkedin) echo 29341 ;; *) echo "Bridge desconocido: $1" >&2; exit 1 ;;
+    twitter) echo 29327 ;; linkedin) echo 29341 ;; *) echo "Unknown bridge: $1" >&2; exit 1 ;;
   esac
 }
 manifest() { grep "^$1=" "$HERE/../src/main/resources/app/unichat/server/versions.env" | cut -d= -f2-; }
@@ -52,7 +52,7 @@ if [ -n "${TUWUNEL_BIN:-}" ]; then
   cp "$TUWUNEL_BIN" "$DIR/bin/tuwunel" && chmod 755 "$DIR/bin/tuwunel"
   echo "$TUWUNEL_VERSION" > "$DIR/bin/tuwunel.version"
 fi
-[ -x "$DIR/bin/tuwunel" ] || { echo "Falta bin/tuwunel (pasa TUWUNEL_BIN=<ruta>)." >&2; exit 1; }
+[ -x "$DIR/bin/tuwunel" ] || { echo "bin/tuwunel is missing (pass TUWUNEL_BIN=<path>)." >&2; exit 1; }
 
 # --- Bridge binaries (official releases, checked against the pinned sha256sums.txt) ------------
 fetch_bridge() {
@@ -67,7 +67,7 @@ fetch_bridge() {
   local want got
   want="$(pinned "$repo@$tag/$asset")"
   [ -n "$want" ] || { echo "$repo@$tag/$asset has no pinned SHA-256: run native/pin-hashes.sh" >&2; exit 1; }
-  echo "Descargando $asset $tag..."
+  echo "Downloading $asset $tag..."
   curl -fsSL -o "$out.part" "https://github.com/$repo/releases/download/$tag/$asset"
   got="$(shasum -a 256 "$out.part" | awk '{print $1}')"
   [ -n "$want" ] && [ "$want" = "$got" ] || { rm -f "$out.part"; echo "Checksum mismatch for $asset" >&2; exit 1; }

@@ -43,7 +43,7 @@ class SidePanelUiTest {
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();
-            view[0].openChatId("!familia:demo");
+            view[0].openChatId("!family:demo");
             return sc;
         });
         FxWait.until("the chat opens", () -> scene.getRoot().lookup(".composer-input") != null);
@@ -106,7 +106,7 @@ class SidePanelUiTest {
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();
-            view[0].openChatId("!familia:demo");
+            view[0].openChatId("!family:demo");
             // The library persists in the test data dir: make sure it's a favourite, whatever a previous run left.
             if (!view[0].library().isFavorite("mxc://demo/fav")) view[0].library().toggleFavorite(new app.unichat.model.MediaLibrary.Item(
                     app.unichat.model.MediaLibrary.Kind.STICKER, "mxc://demo/fav", "image/png", 160, 160, null));
@@ -115,7 +115,7 @@ class SidePanelUiTest {
         FxWait.until("the chat opens", () -> scene.getRoot().lookup(".composer-input") != null);
         fx(() -> { view[0].showPanel(SidePanel.Tab.STICKERS); return null; });
         FxWait.until("the stickers tab lists its tiles", () -> panel(scene).lookup(".sticker-tile") != null);
-        int before = fx(() -> svc.chat("!familia:demo").lastPreview().length());
+        int before = fx(() -> svc.chat("!family:demo").lastPreview().length());
         fx(() -> {
             Node tile = panel(scene).lookup(".sticker-tile");
             assertTrue(tile != null, "the favourite is listed");
@@ -124,8 +124,8 @@ class SidePanelUiTest {
                     javafx.scene.input.KeyCode.ENTER, false, false, false, false));
             return null;
         });
-        FxWait.until("the sticker is sent", () -> "Sticker".equals(svc.chat("!familia:demo").lastPreview()));
-        assertEquals("Sticker", fx(() -> svc.chat("!familia:demo").lastPreview()), "sent to the open chat");
+        FxWait.until("the sticker is sent", () -> "Sticker".equals(svc.chat("!family:demo").lastPreview()));
+        assertEquals("Sticker", fx(() -> svc.chat("!family:demo").lastPreview()), "sent to the open chat");
         assertTrue(before >= 0);
 
         // Right-click offers to see it big, and that opens it in its own window.
@@ -154,7 +154,7 @@ class SidePanelUiTest {
 
         // A network that rejects stickers: shown dimmed, with the reason, and nothing is sent.
         fx(() -> {
-            svc.chat("!familia:demo").setFeatures(app.unichat.model.RoomFeatures.parse(
+            svc.chat("!family:demo").setFeatures(app.unichat.model.RoomFeatures.parse(
                     new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"id\":\"gm\",\"file\":{\"m.image\":{\"mime_types\":{\"image/*\":2}}}}")));
             view[0].showPanel(SidePanel.Tab.STICKERS);
             return null;
@@ -186,7 +186,7 @@ class SidePanelUiTest {
             Theme.register(sc);
             stage.setScene(sc);
             stage.show();
-            view[0].openChatId("!familia:demo");
+            view[0].openChatId("!family:demo");
             return sc;
         });
         FxWait.until("the chat opens", () -> scene.getRoot().lookup(".composer-input") != null);

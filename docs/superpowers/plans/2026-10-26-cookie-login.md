@@ -1,37 +1,37 @@
-# Inicio de sesión sin cookies a mano — Implementation Plan
+# Signing in without cookies by hand — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Conectar las redes "de cookies" (Instagram, Messenger, X, LinkedIn, Google Messages) sin que el usuario abra las herramientas de desarrollador: usando la sesión que ya tiene en su navegador (A), una ventana de login dentro de la app (B), o un archivo cookies.txt (C).
+**Goal:** Connect the "cookie" networks (Instagram, Messenger, X, LinkedIn, Google Messages) without the user opening the developer tools: using the session they already have in their browser (A), a sign-in window inside the app (B), or a cookies.txt file (C).
 
-**Architecture:** Una capa `app.unichat.login` independiente de la UI produce un `SessionCookies` (mapa nombre→valor) por tres fuentes. `CookieSpec` define qué cookies necesita cada red y arma el JSON que el asistente ya sabe enviar al bridge. La UI (asistente de Cuentas) ofrece las fuentes y muestra el progreso. Nada se guarda: las cookies se leen en el momento y se envían al bridge del servidor del propio usuario.
+**Architecture:** An `app.unichat.login` layer, independent of the UI, produces a `SessionCookies` (a name→value map) from three sources. `CookieSpec` defines which cookies each network needs and builds the JSON the wizard already knows how to send to the bridge. The UI (the Accounts wizard) offers the sources and shows the progress. Nothing is kept: the cookies are read at that moment and sent to the bridge on the user's own server.
 
-**Consentimiento (vale para TODO el plan):** cada fuente la inicia el usuario con un clic. No hay lectura automática ni en segundo plano. La lectura de navegadores basados en Chromium en macOS pasa por el llavero del sistema, que muestra su diálogo nativo de permiso; Unichat lo anuncia antes. Solo se leen las cookies de los dominios de la red que el usuario está conectando, nunca de otros sitios, y solo de la cuenta del propio usuario en su propia máquina. El destino es siempre el bridge del servidor del usuario; nada se sube a ningún otro lugar ni se persiste en disco.
+**Consent (holds for the WHOLE plan):** the user starts each source with a click. There's no automatic or background reading. Reading Chromium-based browsers on macOS goes through the system keychain, which shows its native permission dialog; Unichat announces it first. Only the cookies of the domains of the network the user is connecting are read, never of other sites, and only of the user's own account on their own machine. The destination is always the bridge on the user's server; nothing is uploaded anywhere else nor persisted to disk.
 
-**Tech Stack:** Java 21, JavaFX (WebView para B, vía `javafx-web`), `org.xerial:sqlite-jdbc` (leer `cookies.sqlite` de Firefox), Jackson (ya presente). Reutiliza `AccountsPane`, `ChatService.sendLoginInput`, `MatrixChatService`.
+**Tech Stack:** Java 21, JavaFX (WebView for B, through `javafx-web`), `org.xerial:sqlite-jdbc` (to read Firefox's `cookies.sqlite`), Jackson (already there). Reuses `AccountsPane`, `ChatService.sendLoginInput`, `MatrixChatService`.
 
 **Spec:** `docs/superpowers/specs/2026-10-26-cookie-login-design.md`
 
 ## Global Constraints
 
-- Código y comentarios en inglés; texto visible y docs en **español**. Debe seguir funcionando en **Windows**.
-- `./mvnw test` pasa antes de cada commit; surefire fija `unichat.dataDir` (no tocar la carpeta real).
-- Dependencias nuevas con versión exacta de ≥2 semanas: `org.openjfx:javafx-web:23.0.1`, `org.xerial:sqlite-jdbc:3.46.1.3`. La config de WebP (`imageio-webp`) ya está.
-- Ninguna fuente lee cookies de dominios ajenos a la red solicitada. Nada de sesiones se escribe a disco ni se registra en logs.
-- Chrome/Edge en **Windows** y cookies Chromium "v20" (app-bound): se detectan y se reporta "no compatible" sin pedir privilegios de administrador; se cae a B o C.
-- Safari: fuera de alcance.
+- Code and comments in English; visible text and docs in **Spanish** (as the repo was then). It must keep working on **Windows**.
+- `./mvnw test` passes before each commit; surefire sets `unichat.dataDir` (don't touch the real folder).
+- New dependencies with an exact version at least 2 weeks old: `org.openjfx:javafx-web:23.0.1`, `org.xerial:sqlite-jdbc:3.46.1.3`. The WebP config (`imageio-webp`) is already there.
+- No source reads cookies of domains outside the requested network. No session is written to disk nor logged.
+- Chrome/Edge on **Windows** and Chromium "v20" cookies (app-bound): detected and reported as "not supported" without asking for administrator rights; it falls back to B or C.
+- Safari: out of scope.
 
 ## Review Focus
 
-- **Archivo cookies.txt con cookies vencidas o de otra red** (Task 2): debe ignorar lo vencido y lo de otros dominios, y decir qué cookie imprescindible falta en vez de "conectado" en falso.
-- **Perfil de Firefox con la base bloqueada** porque el navegador está abierto (Task 3): copiar el archivo antes de leer; si no se puede, reportar y seguir con otras fuentes, no romper.
-- **Chromium en Windows / cookies v20** (Task 4): detectar y devolver "no compatible" limpio, sin lanzar ni pedir administrador.
-- **2FA y checkpoint de Instagram en la ventana B** (Task 5): la ventana no se cierra hasta que existan las cookies imprescindibles, aunque la URL cambie varias veces (código, "¿fuiste tú?", etc.).
-- **Red sin ninguna sesión encontrada** (Task 6): el asistente ofrece B y C con un texto claro, nunca una pantalla vacía.
+- **A cookies.txt file with expired cookies or another network's** (Task 2): it must ignore the expired ones and other domains, and say which essential cookie is missing instead of a false "connected".
+- **A Firefox profile with the database locked** because the browser is open (Task 3): copy the file before reading; if that can't be done, report it and go on with other sources, don't break.
+- **Chromium on Windows / v20 cookies** (Task 4): detect them and return a clean "not supported", without throwing or asking for administrator.
+- **Instagram's 2FA and checkpoint in window B** (Task 5): the window doesn't close until the essential cookies exist, even if the URL changes several times (code, "was this you?", etc.).
+- **A network with no session found** (Task 6): the wizard offers B and C with a clear text, never an empty screen.
 
 ---
 
-## Task 1: `CookieSpec` — qué cookies necesita cada red y el JSON del bridge
+## Task 1: `CookieSpec` — which cookies each network needs, and the bridge's JSON
 
 **Files:**
 - Create: `src/main/java/app/unichat/login/CookieSpec.java`
@@ -40,22 +40,22 @@
 
 **Interfaces:**
 - Produces:
-  - `record SessionCookies(Network network, Map<String,String> values)` con `boolean complete()` y `String toBridgeJson()`.
+  - `record SessionCookies(Network network, Map<String,String> values)` with `boolean complete()` and `String toBridgeJson()`.
   - `CookieSpec.forNetwork(Network) -> CookieSpec`; `Set<String> required()`, `Set<String> optional()`, `Set<String> domains()`, `boolean isForNetwork(String cookieDomain)`, `SessionCookies select(Map<String,String> allCookiesByName)`, `List<String> missing(Map<String,String>)`.
 
 - [ ] **Step 1: Write the failing test** — `CookieSpecTest`:
   - `instagramRequiresSessionIdAndCsrf`: `forNetwork(INSTAGRAM).required()` = `{"sessionid","csrftoken"}`.
-  - `selectKeepsRequiredAndOptionalDropsOthers`: dado `{sessionid,csrftoken,ds_user_id,unrelated}` → `values` no contiene `unrelated`, `complete()` true.
-  - `missingNamesWhenIncomplete`: dado solo `{csrftoken}` → `missing()` = `["sessionid"]`, `complete()` false.
-  - `bridgeJsonIsNameValueObject`: `toBridgeJson()` parsea a objeto `{"sessionid":"x",...}`.
-  - `domainMatchForEachNetwork`: `forNetwork(MESSENGER).isForNetwork(".facebook.com")` true, `.instagram.com` false; `GOOGLE_MESSAGES` acepta `.google.com` y `messages.google.com`.
-  - Tabla de redes: INSTAGRAM `sessionid,csrftoken` (+`ds_user_id,mid,ig_did`); MESSENGER `c_user,xs` (+`datr,fr`); X `auth_token,ct0`; LINKEDIN `li_at,JSESSIONID`; GOOGLE_MESSAGES requeridas = cookies Google `SAPISID,SID,__Secure-1PSID` (+ `HSID,SSID,APISID,__Secure-3PSID`).
-- [ ] **Step 2: Run** `./mvnw test -Dtest=CookieSpecTest` → FAIL (clase no existe).
-- [ ] **Step 3: Implement** `CookieSpec` y `SessionCookies`. Tabla estática por `Network`. `select` filtra por nombre (required∪optional). `toBridgeJson` con Jackson. `isForNetwork` compara sufijos de dominio.
+  - `selectKeepsRequiredAndOptionalDropsOthers`: given `{sessionid,csrftoken,ds_user_id,unrelated}` → `values` doesn't contain `unrelated`, `complete()` true.
+  - `missingNamesWhenIncomplete`: given only `{csrftoken}` → `missing()` = `["sessionid"]`, `complete()` false.
+  - `bridgeJsonIsNameValueObject`: `toBridgeJson()` parses to an object `{"sessionid":"x",...}`.
+  - `domainMatchForEachNetwork`: `forNetwork(MESSENGER).isForNetwork(".facebook.com")` true, `.instagram.com` false; `GOOGLE_MESSAGES` accepts `.google.com` and `messages.google.com`.
+  - The network table: INSTAGRAM `sessionid,csrftoken` (+`ds_user_id,mid,ig_did`); MESSENGER `c_user,xs` (+`datr,fr`); X `auth_token,ct0`; LINKEDIN `li_at,JSESSIONID`; GOOGLE_MESSAGES required = the Google cookies `SAPISID,SID,__Secure-1PSID` (+ `HSID,SSID,APISID,__Secure-3PSID`).
+- [ ] **Step 2: Run** `./mvnw test -Dtest=CookieSpecTest` → FAIL (the class doesn't exist).
+- [ ] **Step 3: Implement** `CookieSpec` and `SessionCookies`. A static table per `Network`. `select` filters by name (required∪optional). `toBridgeJson` with Jackson. `isForNetwork` compares domain suffixes.
 - [ ] **Step 4: Run** → PASS.
 - [ ] **Step 5: Commit** `feat(login): cookie requirements per network and bridge JSON`.
 
-## Task 2: Importar cookies.txt (fuente C)
+## Task 2: Importing cookies.txt (source C)
 
 **Files:**
 - Create: `src/main/java/app/unichat/login/CookieTxt.java`
@@ -64,40 +64,40 @@
 
 **Interfaces:**
 - Consumes: Task 1.
-- Produces: `CookieTxt.read(Path, CookieSpec, Instant now) -> SessionCookies` (ignora vencidas y dominios ajenos a la red).
+- Produces: `CookieTxt.read(Path, CookieSpec, Instant now) -> SessionCookies` (ignores expired cookies and domains outside the network).
 
-- [ ] **Step 1: Write the failing test** — `CookieTxtTest`, con un `sample-cookies.txt` sintético (formato Netscape) que incluya: una línea `#HttpOnly_.instagram.com ... sessionid VALID`, `csrftoken`, un comentario `# comment`, una cookie vencida (`expira`=1), y una cookie de `.otra.com`.
-  - `readsRequiredInstagramCookies`: resultado `complete()` true, contiene `sessionid` y `csrftoken`.
-  - `ignoresExpiredAndOtherDomains`: no incluye la vencida ni la de `.otra.com`.
-  - `reportsMissing`: con un archivo sin `sessionid` → `missing()` = `["sessionid"]`, `complete()` false.
+- [ ] **Step 1: Write the failing test** — `CookieTxtTest`, with a synthetic `sample-cookies.txt` (Netscape format) holding: a line `#HttpOnly_.instagram.com ... sessionid VALID`, `csrftoken`, a comment `# comment`, an expired cookie (`expires`=1), and a cookie of `.other.com`.
+  - `readsRequiredInstagramCookies`: the result's `complete()` is true, it contains `sessionid` and `csrftoken`.
+  - `ignoresExpiredAndOtherDomains`: it includes neither the expired one nor the one of `.other.com`.
+  - `reportsMissing`: with a file without `sessionid` → `missing()` = `["sessionid"]`, `complete()` false.
 - [ ] **Step 2: Run** `./mvnw test -Dtest=CookieTxtTest` → FAIL.
-- [ ] **Step 3: Implement** `CookieTxt.read`: parsea líneas TSV de 7 campos (quita prefijo `#HttpOnly_`, salta comentarios y vacías), descarta `expira>0 && expira<now`, filtra con `spec.isForNetwork(domain)`, pasa el mapa nombre→valor a `spec.select`.
+- [ ] **Step 3: Implement** `CookieTxt.read`: parses TSV lines of 7 fields (strips the `#HttpOnly_` prefix, skips comments and empty lines), drops `expires>0 && expires<now`, filters with `spec.isForNetwork(domain)`, passes the name→value map to `spec.select`.
 - [ ] **Step 4: Run** → PASS.
 - [ ] **Step 5: Commit** `feat(login): import a cookies.txt file`.
 
-## Task 3: Sesión de Firefox (fuente A, parte 1)
+## Task 3: The Firefox session (source A, part 1)
 
 **Files:**
 - Create: `src/main/java/app/unichat/login/FirefoxCookies.java`
-- Create: `src/main/java/app/unichat/login/BrowserSession.java` (record común)
+- Create: `src/main/java/app/unichat/login/BrowserSession.java` (a shared record)
 - Test: `src/test/java/app/unichat/login/FirefoxCookiesTest.java`
-- Modify: `pom.xml` (añadir `sqlite-jdbc`)
+- Modify: `pom.xml` (add `sqlite-jdbc`)
 
 **Interfaces:**
 - Consumes: Task 1.
 - Produces:
   - `record BrowserSession(String browser, String profile, SessionCookies cookies)`.
-  - `FirefoxCookies.profilesRoot() -> Path` (por SO), `FirefoxCookies.read(Path cookiesSqlite, CookieSpec, Instant now) -> SessionCookies`, `FirefoxCookies.findSessions(CookieSpec) -> List<BrowserSession>` (recorre perfiles, copia la base a un temporal antes de abrirla, borra el temporal al terminar).
+  - `FirefoxCookies.profilesRoot() -> Path` (per OS), `FirefoxCookies.read(Path cookiesSqlite, CookieSpec, Instant now) -> SessionCookies`, `FirefoxCookies.findSessions(CookieSpec) -> List<BrowserSession>` (walks the profiles, copies the database to a temporary file before opening it, deletes the temporary file when done).
 
-- [ ] **Step 1: Write the failing test** — `FirefoxCookiesTest`: crea una `cookies.sqlite` sintética con la tabla `moz_cookies(name,value,host,path,expiry,isSecure)` y filas de Instagram válidas + una de `.otra.com` + una vencida.
-  - `readsSessionFromSqlite`: `read(db, INSTAGRAM, now)` → `complete()` true, sin la de otra red ni la vencida.
-  - `profilesRootIsOsSpecific`: en macOS termina en `Firefox/Profiles` (usa `System.getProperty("os.name")`; test parametrizado por propiedad de sistema, no por SO real).
+- [ ] **Step 1: Write the failing test** — `FirefoxCookiesTest`: creates a synthetic `cookies.sqlite` with the table `moz_cookies(name,value,host,path,expiry,isSecure)` and valid Instagram rows + one of `.other.com` + an expired one.
+  - `readsSessionFromSqlite`: `read(db, INSTAGRAM, now)` → `complete()` true, without the other network's nor the expired one.
+  - `profilesRootIsOsSpecific`: on macOS it ends in `Firefox/Profiles` (uses `System.getProperty("os.name")`; the test is parameterized by a system property, not by the real OS).
 - [ ] **Step 2: Run** `./mvnw test -Dtest=FirefoxCookiesTest` → FAIL.
-- [ ] **Step 3: Implement** con `sqlite-jdbc` (`SELECT name,value,host,expiry FROM moz_cookies`). `findSessions` lista subcarpetas de `profilesRoot`, copia `cookies.sqlite` a un tmp (para no chocar con el lock del navegador), lee y limpia. Rutas: macOS `~/Library/Application Support/Firefox/Profiles`, Windows `%APPDATA%\Mozilla\Firefox\Profiles`, Linux `~/.mozilla/firefox`.
+- [ ] **Step 3: Implement** with `sqlite-jdbc` (`SELECT name,value,host,expiry FROM moz_cookies`). `findSessions` lists the subfolders of `profilesRoot`, copies `cookies.sqlite` to a tmp file (so as not to clash with the browser's lock), reads and cleans up. Paths: macOS `~/Library/Application Support/Firefox/Profiles`, Windows `%APPDATA%\Mozilla\Firefox\Profiles`, Linux `~/.mozilla/firefox`.
 - [ ] **Step 4: Run** → PASS.
 - [ ] **Step 5: Commit** `feat(login): read the user's Firefox session`.
 
-## Task 4: Sesión de Chromium en macOS; Windows detectado como no compatible (fuente A, parte 2)
+## Task 4: The Chromium session on macOS; Windows detected as not supported (source A, part 2)
 
 **Files:**
 - Create: `src/main/java/app/unichat/login/ChromiumCookies.java`
@@ -105,38 +105,38 @@
 
 **Interfaces:**
 - Consumes: Task 1, Task 3 (`BrowserSession`).
-- Produces: `ChromiumCookies.findSessions(CookieSpec) -> List<BrowserSession>` para Chrome/Edge/Brave; `Support classify(String os, byte[] encryptedValuePrefix)` devolviendo `SUPPORTED` / `NEEDS_IN_APP_LOGIN` (prefijo `v20` o SO Windows). Descifrado expuesto como `decryptValue(byte[] encrypted, byte[] key) -> String` para poder testearlo con datos sintéticos.
+- Produces: `ChromiumCookies.findSessions(CookieSpec) -> List<BrowserSession>` for Chrome/Edge/Brave; `Support classify(String os, byte[] encryptedValuePrefix)` returning `SUPPORTED` / `NEEDS_IN_APP_LOGIN` (a `v20` prefix or the Windows OS). Decryption exposed as `decryptValue(byte[] encrypted, byte[] key) -> String` so it can be tested with synthetic data.
 
-**Consentimiento:** `findSessions` en macOS pide la clave al llavero del sistema, que muestra su diálogo nativo; esta clase no se llama hasta que el usuario pulsó "Usar mi sesión" (Task 6). Solo cookies de `spec.domains()`.
+**Consent:** on macOS `findSessions` asks the system keychain for the key, which shows its native dialog; this class isn't called until the user has pressed "Use my session" (Task 6). Only the cookies of `spec.domains()`.
 
-- [ ] **Step 1: Write the failing test** — `ChromiumCookiesTest` (sin llavero ni navegador real):
+- [ ] **Step 1: Write the failing test** — `ChromiumCookiesTest` (no keychain nor real browser):
   - `classifyMarksWindowsAndV20AsInApp`: `classify("Windows 11", anything)` = `NEEDS_IN_APP_LOGIN`; `classify("Mac OS X", "v20…")` = `NEEDS_IN_APP_LOGIN`; `classify("Mac OS X", "v10…")` = `SUPPORTED`.
-  - `decryptsV10WithGivenKey`: cifra un valor de prueba con el esquema v10 y una clave fija, y `decryptValue` lo recupera (prueba el descifrado con datos sintéticos, no una sesión real).
+  - `decryptsV10WithGivenKey`: encrypts a test value with the v10 scheme and a fixed key, and `decryptValue` gets it back (it tests the decryption with synthetic data, not a real session).
 - [ ] **Step 2: Run** `./mvnw test -Dtest=ChromiumCookiesTest` → FAIL.
-- [ ] **Step 3: Implement** `classify` y `decryptValue` (v10). `findSessions`: solo si `classify` da `SUPPORTED`; en macOS obtiene la clave del llavero (`security find-generic-password` para "Chrome/Chromium/Brave/Edge Safe Storage"), abre la copia de la base `Cookies`, descifra y filtra por dominio; en Windows devuelve lista vacía (la UI usará B/C). No escribir valores en logs.
+- [ ] **Step 3: Implement** `classify` and `decryptValue` (v10). `findSessions`: only if `classify` gives `SUPPORTED`; on macOS it gets the key from the keychain (`security find-generic-password` for "Chrome/Chromium/Brave/Edge Safe Storage"), opens the copy of the `Cookies` database, decrypts and filters by domain; on Windows it returns an empty list (the UI will use B/C). Don't write values to the logs.
 - [ ] **Step 4: Run** → PASS.
 - [ ] **Step 5: Commit** `feat(login): read a Chromium session on macOS, detect unsupported cases`.
 
-## Task 5: Ventana de login integrada (fuente B)
+## Task 5: The built-in sign-in window (source B)
 
 **Files:**
 - Create: `src/main/java/app/unichat/ui/LoginWebView.java`
-- Modify: `pom.xml` (añadir `javafx-web`)
-- Test: `src/test/java/app/unichat/login/LoginUrlsTest.java` (lógica pura; el WebView se prueba a mano)
+- Modify: `pom.xml` (add `javafx-web`)
+- Test: `src/test/java/app/unichat/login/LoginUrlsTest.java` (pure logic; the WebView is tested by hand)
 
 **Interfaces:**
 - Consumes: Task 1.
 - Produces:
   - `LoginWebView.open(Window owner, Network, CookieSpec, Consumer<SessionCookies> onDone, Runnable onCancel)`.
-  - `LoginUrls.startUrl(Network) -> String` y `LoginUrls.cookieStore(Network) -> ...` (helpers puros).
+  - `LoginUrls.startUrl(Network) -> String` and `LoginUrls.cookieStore(Network) -> ...` (pure helpers).
 
-- [ ] **Step 1: Write the failing test** — `LoginUrlsTest`: `startUrl(INSTAGRAM)` = `https://www.instagram.com/accounts/login/`, y las URLs de MESSENGER/X/LINKEDIN/GOOGLE_MESSAGES. `userAgent()` contiene una versión de navegador reciente (no el UA por defecto de JavaFX).
+- [ ] **Step 1: Write the failing test** — `LoginUrlsTest`: `startUrl(INSTAGRAM)` = `https://www.instagram.com/accounts/login/`, and the URLs of MESSENGER/X/LINKEDIN/GOOGLE_MESSAGES. `userAgent()` contains a recent browser version (not JavaFX's default UA).
 - [ ] **Step 2: Run** `./mvnw test -Dtest=LoginUrlsTest` → FAIL.
-- [ ] **Step 3: Implement** `LoginUrls`, luego `LoginWebView`: `WebView` con `CookieManager` propio y vacío (para permitir una cuenta distinta), UA de navegador actual; tras cada carga, lee las cookies del store, arma `spec.select`, y cuando `complete()` cierra la ventana y llama `onDone`. Botón Cancelar → `onCancel`. Título y accesibilidad en el estilo del asistente.
-- [ ] **Step 4: Run** `LoginUrlsTest` → PASS. (El flujo visual se valida a mano en Task 7.)
+- [ ] **Step 3: Implement** `LoginUrls`, then `LoginWebView`: a `WebView` with its own empty `CookieManager` (to allow a different account), a current browser's UA; after each load it reads the store's cookies, builds `spec.select`, and when `complete()` it closes the window and calls `onDone`. A Cancel button → `onCancel`. Title and accessibility in the wizard's style.
+- [ ] **Step 4: Run** `LoginUrlsTest` → PASS. (The visual flow is checked by hand in Task 7.)
 - [ ] **Step 5: Commit** `feat(login): in-app login window that captures the session`.
 
-## Task 6: Orquestador de fuentes
+## Task 6: The sources' orchestrator
 
 **Files:**
 - Create: `src/main/java/app/unichat/login/CookieLogin.java`
@@ -146,43 +146,43 @@
 - Consumes: Tasks 2–5.
 - Produces:
   - `CookieLogin.isCookieNetwork(Network) -> boolean`.
-  - `CookieLogin.findBrowserSessions(Network) -> CompletableFuture<List<BrowserSession>>` (Firefox + Chromium-macOS; nunca lanza, lista vacía si nada).
+  - `CookieLogin.findBrowserSessions(Network) -> CompletableFuture<List<BrowserSession>>` (Firefox + Chromium-macOS; never throws, an empty list if nothing).
   - `CookieLogin.fromCookieTxt(Path, Network) -> Result` (`Result` = ok(SessionCookies) | missing(List<String>) | error(msg)).
 
-- [ ] **Step 1: Write the failing test** — `CookieLoginTest`: `isCookieNetwork` true para INSTAGRAM/MESSENGER/X/LINKEDIN/GOOGLE_MESSAGES y false para WHATSAPP/TELEGRAM/SIGNAL/DISCORD. `fromCookieTxt` con el sample de Task 2 → ok; con uno incompleto → missing con los nombres. `findBrowserSessions` no lanza cuando no hay navegadores (devuelve lista vacía) — se prueba apuntando las raíces a un tmp vacío vía propiedad de sistema `unichat.browserRoots`.
+- [ ] **Step 1: Write the failing test** — `CookieLoginTest`: `isCookieNetwork` true for INSTAGRAM/MESSENGER/X/LINKEDIN/GOOGLE_MESSAGES and false for WHATSAPP/TELEGRAM/SIGNAL/DISCORD. `fromCookieTxt` with Task 2's sample → ok; with an incomplete one → missing with the names. `findBrowserSessions` doesn't throw when there are no browsers (it returns an empty list) — tested by pointing the roots at an empty tmp folder through the system property `unichat.browserRoots`.
 - [ ] **Step 2: Run** `./mvnw test -Dtest=CookieLoginTest` → FAIL.
-- [ ] **Step 3: Implement** `CookieLogin` combinando las fuentes en el executor de E/S; captura excepciones por fuente. Añadir soporte de `unichat.browserRoots` a Firefox/Chromium para los tests.
-- [ ] **Step 4: Run** → PASS; y `./mvnw test` completo → PASS.
+- [ ] **Step 3: Implement** `CookieLogin` combining the sources on the I/O executor; it catches exceptions per source. Add `unichat.browserRoots` support to Firefox/Chromium for the tests.
+- [ ] **Step 4: Run** → PASS; and the whole `./mvnw test` → PASS.
 - [ ] **Step 5: Commit** `feat(login): orchestrate browser, cookies.txt and in-app sources`.
 
-## Task 7: Integrar en el asistente de Cuentas
+## Task 7: Wiring it into the Accounts wizard
 
 **Files:**
 - Modify: `src/main/java/app/unichat/ui/AccountsPane.java`
-- Modify: `src/main/java/app/unichat/service/ChatService.java` (y `MockChatService`, `MatrixChatService` si hace falta un método para enviar cookies-JSON — reutilizar `sendLoginInput`)
-- Modify: `docs/BRIDGES.md` (describir el nuevo flujo en español)
-- Test: UI a mano con capturas (`-Dunichat.snapshot`), más que automatizado.
+- Modify: `src/main/java/app/unichat/service/ChatService.java` (and `MockChatService`, `MatrixChatService` if a method to send the cookie JSON is needed — reuse `sendLoginInput`)
+- Modify: `docs/BRIDGES.md` (describe the new flow, in Spanish as the docs were then)
+- Test: the UI by hand with snapshots (`-Dunichat.snapshot`), more than automated.
 
 **Interfaces:**
 - Consumes: Task 6.
 
-- [ ] **Step 1:** En `AccountsPane`, para una red de cookies (`CookieLogin.isCookieNetwork`), el asistente muestra primero "Buscando tu sesión…" y llama `findBrowserSessions`.
-- [ ] **Step 2:** Si hay sesiones, tarjeta(s) "Usar tu sesión de Instagram de Firefox (perfil X)" con **Usar esta sesión** (envía `cookies.toBridgeJson()` con `sendLoginInput`) y **Iniciar sesión con otra cuenta** (→ `LoginWebView`). Siempre un botón **Elegir archivo cookies.txt…** (`FileChooser` → `fromCookieTxt`; si `missing`, mostrar qué falta) y el enlace discreto "Pegar cookies manualmente".
-- [ ] **Step 3:** Antes de leer Chromium en macOS, un texto: "macOS te pedirá permiso para usar tu sesión de <navegador>." El `onDone` del WebView y el "Usar esta sesión" desembocan en el mismo flujo de éxito/error del asistente (Task del wizard ya existente).
-- [ ] **Step 4:** `./mvnw test` completo PASS. Capturas con el modo demo: tarjeta de sesión encontrada, pantalla de cookies.txt con error de cookie faltante, y la ventana B (contra una página local de prueba, no una red real).
+- [ ] **Step 1:** In `AccountsPane`, for a cookie network (`CookieLogin.isCookieNetwork`), the wizard first shows "Looking for your session…" and calls `findBrowserSessions`.
+- [ ] **Step 2:** If there are sessions, card(s) "Use your Instagram session from Firefox (profile X)" with **Use this session** (sends `cookies.toBridgeJson()` with `sendLoginInput`) and **Sign in with another account** (→ `LoginWebView`). Always a **Choose cookies.txt file…** button (`FileChooser` → `fromCookieTxt`; if `missing`, show what's missing) and the discreet "Paste cookies by hand" link.
+- [ ] **Step 3:** Before reading Chromium on macOS, a text: "macOS will ask your permission to use your <browser> session." The WebView's `onDone` and "Use this session" end in the same success/error flow of the wizard (the existing wizard task).
+- [ ] **Step 4:** The whole `./mvnw test` PASS. Snapshots in demo mode: the found-session card, the cookies.txt screen with a missing-cookie error, and window B (against a local test page, not a real network).
 - [ ] **Step 5: Commit** `feat(accounts): friendly login for cookie networks (browser, in-app, cookies.txt)`.
 
-## Task 8 (aparte): proteger la lista de chats directos `m.direct`
+## Task 8 (separate): protect the `m.direct` list of direct chats
 
 **Files:**
 - Modify: `src/main/java/app/unichat/matrix/MatrixChatService.java:addDirect`
-- Test: `src/test/java/app/unichat/matrix/MatrixServiceDirectTest.java` (o añadir a uno existente de matrix)
+- Test: `src/test/java/app/unichat/matrix/MatrixServiceDirectTest.java` (or add to an existing matrix one)
 
-**Interfaces:** sin API nueva.
+**Interfaces:** no new API.
 
-- [ ] **Step 1: Write the failing test** — construir `m.direct` con una entrada previa para otro bot y comprobar que al agregar una sala para un bot nuevo **no se pierden** las entradas anteriores (hoy `addDirect` relee el contenido cacheado y podría pisar entradas si el sync va atrasado). Afirmar que el cuerpo PUT resultante conserva todas las claves.
-- [ ] **Step 2: Run** → FAIL si procede (si ya es correcto, el test queda como regresión y se documenta).
-- [ ] **Step 3: Implement** fusionar sobre el `m.direct` más reciente del servidor (GET antes de PUT) en vez de solo el cacheado.
+- [ ] **Step 1: Write the failing test** — build `m.direct` with an earlier entry for another bot and check that adding a room for a new bot **doesn't lose** the earlier entries (today `addDirect` rereads the cached contents and could overwrite entries if the sync is behind). Assert that the resulting PUT body keeps every key.
+- [ ] **Step 2: Run** → FAIL if it applies (if it's already right, the test stays as a regression test and that is documented).
+- [ ] **Step 3: Implement** merging onto the server's most recent `m.direct` (GET before PUT) instead of only the cached one.
 - [ ] **Step 4: Run** → PASS.
 - [ ] **Step 5: Commit** `fix(matrix): merge m.direct so existing bot DMs aren't dropped`.
 
@@ -190,7 +190,7 @@
 
 **Why:** `MatrixChatService.saveSyncCache` writes the entire `/sync` response to disk (clear JSON),
 including bridge-bot DM timelines. Those now carry the cookie JSON we send (and QR data / tokens), so
-session credentials would sit on disk until logout. This contradicts the design's "nada se persiste en disco".
+session credentials would sit on disk until logout. This contradicts the design's "nothing is persisted to disk".
 
 **Files:**
 - Modify: `src/main/java/app/unichat/matrix/MatrixChatService.java` (`saveSyncCache`, maybe `SyncProcessor` to identify bridge-bot rooms)

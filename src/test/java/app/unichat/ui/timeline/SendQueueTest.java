@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * corrected in the order they were written; any can be cancelled (nothing goes) or sent as written.
  */
 class SendQueueTest {
-    private static final String CHAT = "!familia:demo";
+    private static final String CHAT = "!family:demo";
     private ScriptedChatService svc;
     private final List<String> told = new CopyOnWriteArrayList<>();
     /** The corrections asked for, run when the test says (as the AI answers, in any order). */
@@ -151,11 +151,11 @@ class SendQueueTest {
     void aReplyGoesAsAReplyAndEachChatHasItsOwnQueue() throws Exception {
         Message answered = svc.messages(CHAT).getFirst();
         queue.submit(CHAT, "creo q sí", answered.id());
-        queue.submit("!mama:demo", "listo q sí", null);
+        queue.submit("!mom:demo", "listo q sí", null);
         assertEquals(1, queue.waiting(CHAT).size());
-        assertEquals(1, queue.waiting("!mama:demo").size());
+        assertEquals(1, queue.waiting("!mom:demo").size());
         answer(1);
-        assertEquals("listo que sí", svc.messages("!mama:demo").getLast().body(), "another chat doesn't wait for this one");
+        assertEquals("listo que sí", svc.messages("!mom:demo").getLast().body(), "another chat doesn't wait for this one");
         answer(0);
         assertEquals(answered.id(), svc.messages(CHAT).getLast().replyToId());
     }
@@ -311,10 +311,10 @@ class SendQueueTest {
         int before = sent().size();
         queue.submit(CHAT, "uno q sí", null);
         queue.submit(CHAT, "dos q no", null);
-        queue.submit("!mama:demo", "tres q tal", null);
+        queue.submit("!mom:demo", "tres q tal", null);
         queue.drain();
         assertEquals(List.of("uno q sí", "dos q no"), sent().subList(before, sent().size()), "never lost on quitting");
-        assertEquals("tres q tal", svc.messages("!mama:demo").getLast().body());
+        assertEquals("tres q tal", svc.messages("!mom:demo").getLast().body());
         assertEquals(3, cancelled.get(), "the corrections stopped");
         running.values().forEach(Runnable::run); // their answers come anyway
         assertEquals(2, sent().size() - before, "and send nothing more");

@@ -47,12 +47,12 @@ class QuickReactionsUiTest {
                 MainView view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
                 stage.setScene(new Scene(view, 1100, 700));
                 stage.show();
-                view.openChatId("!familia:demo");
+                view.openChatId("!family:demo");
                 return find(view);
             });
             MessageActionsUi actions = thread.actions();
             assertEquals(List.of(EmojiPicker.QUICK), FxWait.fx(actions::quick), "no history: the usual six");
-            List<Message> msgs = svc.messages("!familia:demo");
+            List<Message> msgs = svc.messages("!family:demo");
             Message a = msgs.get(msgs.size() - 1), b = msgs.get(msgs.size() - 2);
             FxWait.fx(() -> {
                 actions.react(a, "🔥"); // added: counts

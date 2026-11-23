@@ -38,7 +38,7 @@ class ProfileMediaTabsUiTest {
         }
         Platform.setImplicitExit(false);
         MockChatService svc = new MockChatService();
-        String id = "!familia:demo"; // a photo and a voice note already
+        String id = "!family:demo"; // a photo and a voice note already
         // Counts as a real chat has them, two digits: one digit hid how a crowded bar cuts them.
         StringBuilder links = new StringBuilder("mira");
         for (int i = 0; i < 48; i++) links.append(" https://example.org/receta").append(i);

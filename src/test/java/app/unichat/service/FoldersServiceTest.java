@@ -41,9 +41,9 @@ class FoldersServiceTest {
         });
         String id = svc.createFolder("Trabajo");
         assertEquals(1, changes.get());
-        svc.setInFolder(id, svc.chat("!mama:demo"), true);
+        svc.setInFolder(id, svc.chat("!mom:demo"), true);
         assertEquals(2, changes.get());
-        assertEquals(List.of("matrix:!mama:demo"), svc.folders().get(0).chatKeys());
+        assertEquals(List.of("matrix:!mom:demo"), svc.folders().get(0).chatKeys());
         svc.renameFolder(id, "Casa");
         assertEquals("Casa", svc.folders().get(0).name());
         svc.deleteFolder(id);
@@ -54,36 +54,36 @@ class FoldersServiceTest {
     void foldersSurviveRecreatingTheService() throws Exception {
         MockChatService a = service();
         String id = a.createFolder("Trabajo");
-        a.setInFolder(id, a.chat("!mama:demo"), true);
+        a.setInFolder(id, a.chat("!mom:demo"), true);
         a.stop();
         MockChatService b = service();
         assertEquals("Trabajo", b.folders().get(0).name());
-        assertEquals(List.of("matrix:!mama:demo"), b.folders().get(0).chatKeys());
+        assertEquals(List.of("matrix:!mom:demo"), b.folders().get(0).chatKeys());
     }
 
     @Test
     void demoChoicesAreKeptAndEmptyFileKeepsDemoValues() throws Exception {
         MockChatService a = service();
-        boolean before = a.chat("!mama:demo").favorite();
-        a.setFavorite("!mama:demo", !before).get();
+        boolean before = a.chat("!mom:demo").favorite();
+        a.setFavorite("!mom:demo", !before).get();
         a.setMuted("!andrea:demo", true).get();
         a.stop();
         MockChatService b = service();
-        assertEquals(!before, b.chat("!mama:demo").favorite());
+        assertEquals(!before, b.chat("!mom:demo").favorite());
         assertTrue(b.chat("!andrea:demo").archived() && b.chat("!andrea:demo").muted(), "quiet records both flags");
         // untouched chats keep what the demo gave them
         assertEquals(new MockChatService().chat("!andres:demo").favorite(), b.chat("!andres:demo").favorite());
-        assertEquals(new MockChatService().chat("!familia:demo").favorite(), b.chat("!familia:demo").favorite());
+        assertEquals(new MockChatService().chat("!family:demo").favorite(), b.chat("!family:demo").favorite());
     }
 
     @Test
     void mutedServerSpaceSurvivesRecreatingTheService() throws Exception {
         MockChatService a = service();
-        a.setMuted("!servidor:demo", true).get();
-        assertNotNull(a.chat("!servidor:demo").prefKey());
+        a.setMuted("!server:demo", true).get();
+        assertNotNull(a.chat("!server:demo").prefKey());
         a.stop();
         MockChatService b = service();
-        assertTrue(b.chat("!servidor:demo").muted() && b.chat("!servidor:demo").archived());
+        assertTrue(b.chat("!server:demo").muted() && b.chat("!server:demo").archived());
     }
 
     @Test

@@ -64,7 +64,7 @@ class ChatOptionsUiTest {
     @Test
     void whileOnlyWhatOthersSendIsSavedANoteSaysMineIsnt() throws Exception {
         MockChatService svc = new MockChatService();
-        String id = "!familia:demo";
+        String id = "!family:demo";
         StackPane overlay = open(svc, id);
         Node note = FxWait.fx(() -> overlay.lookup(".chat-options-mine-note"));
         assertFalse(FxWait.fx(note::isVisible), "nothing saved: nothing to say");
@@ -83,7 +83,7 @@ class ChatOptionsUiTest {
     @Test
     void theTextsAreAKindOfTheirOwnOnEachSide() throws Exception {
         MockChatService svc = new MockChatService();
-        String id = "!familia:demo";
+        String id = "!family:demo";
         StackPane overlay = open(svc, id);
         CheckBox theirs = box(overlay, "Guardar lo que envíen en este chat");
         CheckBox texts = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
@@ -100,7 +100,7 @@ class ChatOptionsUiTest {
     @Test
     void savingTurnsOnWithEveryKindAndEachTurnsOffApart() throws Exception {
         MockChatService svc = new MockChatService();
-        String id = "!familia:demo";
+        String id = "!family:demo";
         StackPane overlay = open(svc, id);
         List<CheckBox> boxes = FxWait.fx(() -> overlay.lookupAll(".chat-options-kinds .check-box").stream().map(n -> (CheckBox) n).toList());
         CheckBox on = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)

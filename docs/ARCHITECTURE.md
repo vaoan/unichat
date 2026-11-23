@@ -100,6 +100,13 @@ and checks it on every build:
 
 The limit isn't the goal. A file is split by responsibility, not to get under a number.
 
+## Languages
+
+What Unichat stores, sends, logs or tells a program is English (file and folder names, cloud paths, ids, log lines,
+AI prompts). The person reads their own language only through `support/I18n` and `messages_<lang>.properties`, from
+any package. `EnglishFirstTest` fails on a Spanish string literal under `src/main/java`, except for `support/I18n`,
+comments and its explicit allow list, each entry with its reason (`.claude/rules/i18n.md`).
+
 ## Principles
 
 - **KISS:** the simplest solution that works; no layers "just in case".
@@ -120,5 +127,4 @@ Left alone because fixing it changes behaviour or needs tests that don't exist. 
 3. **`catch` blocks that ignore errors:** they have to be reviewed one by one; some are intentional.
 4. **Global state:** `Settings.get()`, `LocalServer.get()` and the static `provisioner` of `BridgeAccounts` force
    the tests to share state.
-5. **Spanish texts outside `ui`** (errors from `matrix`, `server`, etc.): this is the first step if it's ever translated.
-6. **CI:** the GitHub actions are pinned by tag, not by SHA.
+5. **CI:** the GitHub actions are pinned by tag, not by SHA.
