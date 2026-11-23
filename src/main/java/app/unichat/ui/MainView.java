@@ -200,7 +200,7 @@ public final class MainView extends StackPane {
         java.nio.file.Path pendingUploads = Settings.dataDir().resolve(svc instanceof app.unichat.service.MockChatService ? "uploads-demo.json" : "uploads.json");
         uploads = new UploadBar(app.unichat.service.UploadQueue.of(svc, pendingUploads), svc, this::openChatId);
         exploring = new ExploreBar(app.unichat.autosave.AutoSave.of(svc), svc, this::openChatId);
-        resting = app.unichat.ui.chats.RestBar.of(svc, stage, listPane.filterProperty());
+        resting = app.unichat.ui.chats.RestBar.of(svc, listPane);
         main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true)), uploads, forwards, exploring,
                 resting, new CloakBar(app.unichat.cloak.CloakJob.get())));
 
@@ -427,6 +427,7 @@ public final class MainView extends StackPane {
                 && !listPane.foldersOpen()) { // a folder shows its archived chats: the filter it covers stays put
             listPane.filterProperty().set(listPane.filterProperty().get().withView(ChatFilter.View.ARCHIVE));
         }
+        resting.opened(c);
         listPane.setSelected(c.id());
         thread.open(c);
         if (infoVisible) panel.show(c, panel.current());

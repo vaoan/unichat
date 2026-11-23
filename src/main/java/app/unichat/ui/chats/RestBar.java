@@ -18,9 +18,10 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * Tells the service when the archive is open, and on top of the window while what rested wakes (archived Discord
- * servers and channels, {@link ArchiveWaking}): that it's coming back and receiving everything again, which step, N of
- * M, then "Al día" for a few seconds. Hidden otherwise. Reachable with Tab, and a screen reader says it all.
+ * Tells the service when the archive is open and what's opened in it, and on top of the window while what rested
+ * wakes (archived Discord servers and channels, {@link ArchiveWaking}): chats catching up, N of M; a server opened in
+ * the archive receiving everything again; a catch-up that couldn't finish; then "Al día" for a few seconds. Hidden
+ * otherwise. Reachable with Tab, and a screen reader says it all.
  */
 public final class RestBar extends TaskBar {
     /** How long "Al día" stays. */
@@ -30,6 +31,7 @@ public final class RestBar extends TaskBar {
     private final Consumer<Runnable> unlisten;
     private final Consumer<Runnable> later;
     private final ObservableValue<Boolean> archiveOpen;
+    private final Consumer<String> tellOpened;
     private final ChangeListener<Boolean> onOpen;
     /** Changes come from the service's thread: one redraw per frame. */
     private final FxCoalescer redraw = new FxCoalescer(this::refresh);
@@ -42,23 +44,31 @@ public final class RestBar extends TaskBar {
 
     /** {@code archiveOpen}: the archive showing in the window; kept here, so a binding passed in lives as long as the bar. */
     public RestBar(ArchiveWaking svc, ObservableValue<Boolean> archiveOpen) {
-        this(svc::waking, svc::addWakingListener, svc::removeWakingListener, svc::setArchiveOpen, archiveOpen, RestBar::afterAMoment);
+        this(svc::waking, svc::addWakingListener, svc::removeWakingListener, svc::setArchiveOpen, svc::archivedChatOpened,
+                archiveOpen, RestBar::afterAMoment);
     }
 
-    /** For the window: the archive is open while Archivados shows in it and the window is there to see it. */
-    public static RestBar of(ArchiveWaking svc, javafx.stage.Window window, ObservableValue<ChatFilter> filter) {
-        return new RestBar(svc, javafx.beans.binding.Bindings.createBooleanBinding(
-                () -> window.isShowing() && filter.getValue().view() == ChatFilter.View.ARCHIVE, window.showingProperty(), filter));
+    /**
+     * For the window: the archive is open while Archivados shows in the list, and a server opened there is told. A hidden window doesn't leave it (unseen, the
+     * app is quiet already, and every show woke it all again).
+     */
+    public static RestBar of(ArchiveWaking svc, ChatListPane list) {
+        ObservableValue<ChatFilter> filter = list.filterProperty();
+        RestBar bar = new RestBar(svc, javafx.beans.binding.Bindings.createBooleanBinding(
+                () -> filter.getValue().view() == ChatFilter.View.ARCHIVE, filter));
+        list.setOnSpaceOpened(bar::opened);
+        return bar;
     }
 
     /** What it shows and tells, as functions; {@code later} runs a job once "Al día" has been seen long enough. */
     RestBar(Supplier<Waking> state, Consumer<Runnable> listen, Consumer<Runnable> unlisten, Consumer<Boolean> tellOpen,
-            ObservableValue<Boolean> archiveOpen, Consumer<Runnable> later) {
+            Consumer<String> tellOpened, ObservableValue<Boolean> archiveOpen, Consumer<Runnable> later) {
         super("rest-bar");
         this.state = state;
         this.unlisten = unlisten;
         this.later = later;
         this.archiveOpen = archiveOpen;
+        this.tellOpened = tellOpened;
         lead.getChildren().setAll(Icons.icon(Icons.ARCHIVE, 20));
         stage.setWrapText(true);
         what.setWrapText(true);
@@ -71,6 +81,11 @@ public final class RestBar extends TaskBar {
         Waking now = state.get();
         sawWaking = now != null && now.step() != Step.DONE;
         refresh();
+    }
+
+    /** A chat or server opened: in the archive, an archived one may bring its server back. */
+    public void opened(app.unichat.model.Chat c) {
+        if (c != null && c.archived() && Boolean.TRUE.equals(archiveOpen.getValue())) tellOpened.accept(c.id());
     }
 
     /** The service outlives this bar (the window is rebuilt on a language change). */
@@ -102,10 +117,13 @@ public final class RestBar extends TaskBar {
         boolean upToDate = w != null && w == saying;
         Nodes.show(this, waking || upToDate);
         if (!waking && !upToDate) return;
-        what.setText(I18n.t(upToDate ? "restBar.done" : "restBar.waking"));
-        stage.setText(upToDate ? "" : I18n.t(w.step() == Step.SERVERS ? "restBar.servers" : "restBar.chats"));
-        big.setText(upToDate ? "" : I18n.t("restBar.count", w.done(), w.total()));
-        bar.setProgress(upToDate ? 1 : w.fraction());
+        boolean server = !upToDate && w.step() == Step.SERVER;
+        boolean counts = !upToDate && !server;
+        what.setText(upToDate ? I18n.t("restBar.done") : server ? I18n.t("restBar.server", w.server())
+                : I18n.t(w.step() == Step.RETRYING ? "restBar.retrying" : "restBar.waking"));
+        stage.setText(counts ? I18n.t("restBar.chats") : "");
+        big.setText(counts ? I18n.t("restBar.count", w.done(), w.total()) : "");
+        bar.setProgress(upToDate ? 1 : server ? javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS : w.fraction());
         setAccessibleText(String.join(" ", what.getText(), stage.getText(), big.getText()).strip());
         tidy();
     }

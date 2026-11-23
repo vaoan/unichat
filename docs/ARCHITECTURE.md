@@ -57,7 +57,7 @@ receives `MediaSource`, not the whole service.
 | `ChatActions` | What you change about a chat |
 | `BridgeAccounts` | Bridges and accounts |
 | `BotChat`, `BridgeProtocol` | The chat with each bridge's bot; commands and replies |
-| `ArchiveRest`, `SyncFilter` | Archived Discord servers and channels left out of the sync while the archive is closed, and woken (bridge, filter, catch-up) while it's open; the sync's filter, posted to the server when it names rooms |
+| `ArchiveRest`, `ArchivedServers`, `SyncFilter` | Archived Discord servers and channels left out of the sync while the archive is closed, and woken (filter, catch-up) while it's open; what each server brings at the bridge (an archived one opened in the archive comes back until leaving); the sync's filter, posted once and named by id |
 | `DiscordServers`, `ContactActions`, `MediaDownloader` | Discord servers (a pause the bridge refused is retried with `Retry`, like mute rules), contacts, downloads |
 | `Profiles`, `Invites`, `FetchedMessages` | Names and pictures the sync left out (a few at a time); joining invites; messages fetched on their own (a reply's original) |
 | `RoomPreferences`, `Retry` | What the server says versus `PreferencesFile`, which decides; the mute rule that goes back to the server; when a failed write is tried again |

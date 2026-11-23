@@ -5,16 +5,24 @@ package app.unichat.service;
  * Matrix), and waking them while it's open. The demo has none: nothing rests, nothing wakes.
  */
 public interface ArchiveWaking {
-    /** Where waking is: Discord servers bringing everything again, then chats catching up on what they missed, then done. */
-    enum Step { SERVERS, CHATS, DONE }
+    /**
+     * Where waking is: an archived Discord server bringing everything again (opened in the archive), chats catching up
+     * on what they missed, a catch-up that couldn't finish and will try again, or done.
+     */
+    enum Step { SERVER, CHATS, RETRYING, DONE }
 
-    /** {@code done} of {@code total} in this step. */
-    record Waking(Step step, int done, int total) {
+    /** {@code done} of {@code total} chats; {@code server}: the server's name in {@link Step#SERVER}, else null. */
+    record Waking(Step step, int done, int total, String server) {
+        public Waking(Step step, int done, int total) { this(step, done, total, null); }
+
         public double fraction() { return total <= 0 ? 1 : Math.min(1, (double) done / total); }
     }
 
     /** The archive was opened ({@code true}) or left: what rests wakes, or goes back to rest. */
     default void setArchiveOpen(boolean open) {}
+
+    /** A chat was opened while the archive is open: an archived server, or a channel in one, brings everything again. */
+    default void archivedChatOpened(String chatId) {}
 
     /** What waking is at; null when nothing has woken in this run. */
     default Waking waking() { return null; }

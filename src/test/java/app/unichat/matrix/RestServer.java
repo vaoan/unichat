@@ -44,6 +44,8 @@ final class RestServer implements AutoCloseable {
     final Map<String, Integer> unread = new ConcurrentHashMap<>();
     /** A catch-up sync waits for it (leaving the archive mid catch-up). */
     volatile CountDownLatch catchUpGate = new CountDownLatch(0);
+    /** Catch-up syncs fail (the server busy). */
+    volatile boolean failCatchUps;
     /** The server refuses to keep filters. */
     volatile boolean refuseFilters;
     /** The answer to the first sync (no {@code since}, the usual filter). */
@@ -171,6 +173,10 @@ final class RestServer implements AutoCloseable {
             return;
         }
         log.add("caught up"); // the held catch-up answers from here on
+        if (failCatchUps) {
+            answer(ex, 503, "{\"errcode\":\"M_UNKNOWN\"}");
+            return;
+        }
         ObjectNode join = MatrixClient.JSON.createObjectNode();
         for (JsonNode r : rooms) {
             String id = r.asText();

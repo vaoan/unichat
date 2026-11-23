@@ -93,7 +93,7 @@ final class DiscordServers {
         }
     }
 
-    /** What follows Discord being connected: servers set the way the archive wants ({@link ArchiveRest}). */
+    /** What follows Discord being connected: servers set as the archive says ({@link ArchivedServers}). */
     private volatile Runnable whenConnected = () -> { };
 
     void onConnected(Runnable r) { whenConnected = r; }

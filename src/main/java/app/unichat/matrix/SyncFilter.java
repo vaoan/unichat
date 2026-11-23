@@ -1,5 +1,7 @@
 package app.unichat.matrix;
 
+import app.unichat.settings.Settings;
+import app.unichat.support.Hashes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -20,21 +22,24 @@ import static app.unichat.support.Urls.enc;
  * The sync's filter: the usual one, less the rooms that rest ({@code room.not_rooms}). One that names rooms is posted
  * to the server ({@code /user/{id}/filter}) and the sync gives its id: inlined in the URL, a filter of the person's
  * thousands of rooms took tuwunel seconds a sync. The sync loop takes it for each request ({@link #forRequest}), and
- * whoever changed it hears when a request has gone out with it. A {@code since} token stays good across filters.
+ * whoever changed it hears when a request has gone out with it. A {@code since} token stays good across filters. Each
+ * filter is posted once: its id is kept by its content's hash, here and in {@link #KEPT_KEY} (this computer's), so the
+ * same rest set or catch-up part never posts a new one, not even after a restart.
  */
 final class SyncFilter {
     /** The usual filter, inlined. */
     static final String BASE =
             "{\"room\":{\"state\":{\"lazy_load_members\":true},\"timeline\":{\"limit\":30,\"lazy_load_members\":true}}}";
 
-    /** Filters kept by their text: going back to rest is the filter posted before, not a new one. */
-    private static final int KEPT = 16;
+    /** Filter ids kept, by their content's hash: the newest this many. */
+    static final int KEPT = 128;
+    /** "hash=id,…", oldest first; {@code matrix.} keys stay on this computer, as filter ids belong to its server. */
+    static final String KEPT_KEY = "matrix.syncFilters";
 
     private final MatrixClient client;
     private final String userId;
-    private final Map<String, String> ids = new LinkedHashMap<>(KEPT, 0.75f, true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String, String> e) { return size() > KEPT; }
-    };
+    /** Hash → id, for this run; guarded by itself. */
+    private final Map<String, String> ids = new LinkedHashMap<>();
     /** What the sync's {@code filter=} says from the next request on: {@link #BASE} or a posted filter's id. */
     private String current = BASE;
     /** Waiting for a request to go out with {@link #current}. */
@@ -74,20 +79,35 @@ final class SyncFilter {
         return sent;
     }
 
-    /** The server's id for {@code filter}, posted the first time it's seen. */
+    /** The server's id for {@code filter}, posted the first time it's seen (on this server, as this user). */
     String id(ObjectNode filter) throws IOException {
-        String text = filter.toString();
+        String hash = Hashes.sha256(client.baseUrl() + "|" + userId + "|" + filter).substring(0, 24);
         synchronized (ids) {
-            String known = ids.get(text);
+            String known = ids.computeIfAbsent(hash, SyncFilter::kept);
             if (known != null) return known;
         }
         JsonNode answer = client.post(CLIENT + "/user/" + enc(userId) + "/filter", filter);
         String id = answer.path("filter_id").asText(null);
-        if (id == null || id.isBlank()) throw new IOException("the server gave no filter id");
+        if (id == null || !id.matches("[A-Za-z0-9._~-]{1,200}")) throw new IOException("the server gave no usable filter id");
         synchronized (ids) {
-            ids.put(text, id);
+            ids.put(hash, id);
+            keep(hash, id);
         }
         return id;
+    }
+
+    /** The id kept for {@code hash} on this computer, or null. */
+    private static String kept(String hash) {
+        for (String e : Settings.get().getSet(KEPT_KEY)) if (e.startsWith(hash + "=")) return e.substring(hash.length() + 1);
+        return null;
+    }
+
+    private static void keep(String hash, String id) {
+        List<String> all = new ArrayList<>(Settings.get().getSet(KEPT_KEY));
+        all.removeIf(e -> e.startsWith(hash + "="));
+        all.add(hash + "=" + id);
+        while (all.size() > KEPT) all.removeFirst();
+        Settings.get().set(KEPT_KEY, String.join(",", all));
     }
 
     /** The usual filter, to build on. */

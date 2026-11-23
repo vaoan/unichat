@@ -114,8 +114,8 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         this.syncFilter = new SyncFilter(client, userId);
         this.rest = new ArchiveRest(core, syncFilter, discord, r -> dispatch(r, false));
         syncFilter.onChange(this::dropLongPoll);
-        discord.onConnected(rest::update);
-        this.chatActions = new ChatActions(core, this, discord, prefs, rest::update);
+        discord.onConnected(rest::archivedChanged);
+        this.chatActions = new ChatActions(core, this, discord, prefs, rest::archivedChanged);
         this.contacts = new ContactActions(core);
         this.stickerPacks = new StickerPackActions(core, this::accounts);
         this.profiles = new Profiles(core);
@@ -585,6 +585,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public boolean mediaHidden(String chatId) { return chatActions.mediaHidden(chatId); }
     @Override public CompletableFuture<Void> setArchived(String chatId, boolean archived) { return chatActions.setArchived(chatId, archived); }
     @Override public void setArchiveOpen(boolean open) { rest.setArchiveOpen(open); }
+    @Override public void archivedChatOpened(String chatId) { rest.archivedChatOpened(chatId); }
     @Override public Waking waking() { return rest.waking(); }
     @Override public void addWakingListener(Runnable l) { rest.addListener(l); }
     @Override public void removeWakingListener(Runnable l) { rest.removeListener(l); }

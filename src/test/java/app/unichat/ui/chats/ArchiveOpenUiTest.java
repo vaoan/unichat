@@ -20,8 +20,8 @@ import java.util.concurrent.CountDownLatch;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * The window tells the service when Archivados opens and closes (what rests wakes meanwhile): from the rail, from
- * anything else that shows the archive, and when the window goes away with it open.
+ * The window tells the service when Archivados opens and closes (what rests wakes meanwhile), from the rail or anything
+ * else that shows the archive; a hidden window doesn't close it. An archived chat or server opened there is told too.
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ArchiveOpenUiTest {
@@ -37,8 +37,10 @@ class ArchiveOpenUiTest {
         }
         Platform.setImplicitExit(false);
         List<Boolean> told = new CopyOnWriteArrayList<>();
+        List<String> opened = new CopyOnWriteArrayList<>();
         MockChatService svc = new MockChatService() {
             @Override public void setArchiveOpen(boolean open) { told.add(open); }
+            @Override public void archivedChatOpened(String chatId) { opened.add(chatId); }
         };
         Stage stage = FxWait.fx(Stage::new);
         MainView view = FxWait.fx(() -> {
@@ -62,8 +64,19 @@ class ArchiveOpenUiTest {
                 .filter(n -> n instanceof ChatListPane).findFirst().orElseThrow());
         FxWait.fx(() -> { list.filterProperty().set(list.filterProperty().get().withView(ChatFilter.View.ARCHIVE)); return null; });
         assertEquals(true, told.getLast(), "any way to the archive (the command bar, an archived chat opened)");
+        app.unichat.model.Chat archived = svc.chats().stream().filter(c -> c.archived() && !c.space()).findFirst().orElseThrow();
+        FxWait.fx(() -> { view.openChat(archived); return null; });
+        assertEquals(List.of(archived.id()), opened, "an archived chat opened in the archive");
+        app.unichat.model.Chat space = svc.chats().stream().filter(app.unichat.model.Chat::space).findFirst().orElseThrow();
+        svc.setArchived(space.id(), true).get();
+        FxWait.fx(() -> { list.open(space); return null; });
+        assertEquals(space.id(), opened.getLast(), "a server opened in the archive");
+        FxWait.settled();
+        assertEquals(true, told.getLast(), "still in the archive, its server's channels showing: " + told);
+        int toldBefore = told.size();
         FxWait.fx(() -> { stage.hide(); return null; });
-        assertEquals(false, told.getLast(), "nobody can see it with the window gone");
+        FxWait.settled();
+        assertEquals(toldBefore, told.size(), "a hidden window doesn't leave the archive: " + told);
         FxWait.fx(() -> { view.dispose(); return null; });
         svc.stop();
     }

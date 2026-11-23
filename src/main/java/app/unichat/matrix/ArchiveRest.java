@@ -9,32 +9,32 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import static app.unichat.matrix.MatrixClient.CLIENT;
 import static app.unichat.support.Urls.enc;
 
 /**
  * Archived Discord servers and channels rest out of the sync: they're most of the person's thousands of rooms, and
- * each sync made the server walk them all. {@link SyncFilter} leaves them out and their servers bring nothing at the
- * bridge ({@link DiscordServers}). DMs never rest, nor anything while archived chats notify ({@link
- * Settings#NOTIFY_ARCHIVED}), nor while the archive is open. Waking goes in order: servers bring everything again, the
- * filter takes the rooms back, then a sync of only those rooms (no {@code since}) catches up on what they missed, their
- * unread counts too. One thread does it all, so leaving the archive mid catch-up finishes it before they rest again.
+ * each sync made the server walk them all. {@link SyncFilter} leaves them out. DMs never rest, nor anything while
+ * archived chats notify ({@link Settings#NOTIFY_ARCHIVED}), nor while the archive is open. Waking: the filter takes the
+ * rooms back at once, then a sync of only those rooms (no {@code since}) catches up on what they missed, their unread
+ * counts too; one that fails is tried again ({@link Retry}). One thread does it, so leaving the archive mid catch-up
+ * finishes it before they rest again. What servers bring at the bridge is {@link ArchivedServers}'.
  */
 final class ArchiveRest {
     /** Rooms per catch-up sync. */
@@ -45,7 +45,7 @@ final class ArchiveRest {
     private final MatrixCore core;
     private final SyncProcessor proc;
     private final SyncFilter filter;
-    private final DiscordServers discord;
+    private final ArchivedServers servers;
     private final Consumer<SyncProcessor.Result> dispatch;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(Threads.daemon("discord-rest"));
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
@@ -60,25 +60,48 @@ final class ArchiveRest {
     private Set<String> resting = Set.of();
     /** Awake but still to catch up on what they missed while resting (a catch-up that failed is tried again). Worker only. */
     private final Set<String> owed = new LinkedHashSet<>();
+    /** When a catch-up that failed is tried again; null when none failed. Worker only. */
+    private Retry retry;
+    private volatile boolean catchingUp;
+    private volatile Supplier<Instant> clock = Instant::now;
 
     ArchiveRest(MatrixCore core, SyncFilter filter, DiscordServers discord, Consumer<SyncProcessor.Result> dispatch) {
         this.core = core;
         this.proc = core.proc;
         this.filter = filter;
-        this.discord = discord;
+        this.servers = new ArchivedServers(core, discord, this::resuming);
         this.dispatch = dispatch;
     }
+
+    /** Tests move time on to a retry, instead of waiting for it. */
+    void useClock(Supplier<Instant> c) { clock = c; }
 
     void start() { Settings.get().addListener(onSetting); }
 
     void stop() {
         Settings.get().removeListener(onSetting);
         worker.shutdownNow();
+        servers.stop();
     }
 
     CompletableFuture<Void> setArchiveOpen(boolean open) {
         archiveOpen = open;
-        return update();
+        CompletableFuture<Void> f = update();
+        if (open) return f;
+        return CompletableFuture.allOf(f, f.thenCompose(x -> servers.archiveLeft())); // resting first, then the bridge
+    }
+
+    /** A chat opened in Archivados: an archived server, or a channel inside one, brings everything again until leaving. */
+    CompletableFuture<Void> archivedChatOpened(String chatId) {
+        return archiveOpen ? servers.opened(chatId) : CompletableFuture.completedFuture(null);
+    }
+
+    /** What's archived changed, or Discord connected: what rests, and what each server brings, follow. */
+    CompletableFuture<Void> archivedChanged() { return CompletableFuture.allOf(update(), servers.update()); }
+
+    private void resuming(String server) {
+        if (server != null) show(new Waking(Step.SERVER, 0, 0, server));
+        else if (!catchingUp) show(new Waking(Step.DONE, 0, 0, null));
     }
 
     Waking waking() { return waking; }
@@ -115,28 +138,25 @@ final class ArchiveRest {
 
     private void apply() throws InterruptedException {
         Set<String> want;
-        Map<String, Boolean> guilds;
         synchronized (proc) {
             want = restingRooms(proc.rooms(), archiveOpen || Settings.get().notifyArchived());
-            guilds = guildsResting(want);
         }
         for (String r : resting) if (!want.contains(r)) owed.add(r);
         owed.removeAll(want);
-        List<String> resume = discord.toSet(guilds, false);
-        // 1. Their servers bring everything again.
-        for (int i = 0; i < resume.size(); i++) {
-            show(Step.SERVERS, i, resume.size());
-            discord.setGuildPaused(resume.get(i), false);
-        }
-        if (!resume.isEmpty()) show(Step.SERVERS, resume.size(), resume.size());
-        // 2. The sync takes them back (or leaves the newly archived out).
         if (!want.equals(resting)) refilter(want);
-        boolean wakes = !resume.isEmpty() || !owed.isEmpty();
-        // 3. What they missed.
-        catchUp();
-        // 4. Servers that rest now bring nothing.
-        for (String g : discord.toSet(guilds, true)) discord.setGuildPaused(g, true);
-        if (wakes) show(Step.DONE, waking == null ? 0 : waking.total(), waking == null ? 0 : waking.total());
+        if (owed.isEmpty() || retry != null && !retry.due(clock.get())) return;
+        catchingUp = true;
+        try {
+            if (catchUp()) {
+                retry = null;
+                show(Step.DONE, waking.total(), waking.total());
+            } else {
+                retry = Retry.after(retry, clock.get());
+                show(Step.RETRYING, waking.done(), waking.total());
+            }
+        } finally {
+            catchingUp = false;
+        }
     }
 
     /** The sync leaves {@code want} out once a request has gone out so; a filter the server refused leaves nothing out. */
@@ -164,17 +184,12 @@ final class ArchiveRest {
         }
     }
 
-    /** One sync for each {@link #CHUNK} of {@link #owed}, the most recently active first; what fails stays owed. */
-    private void catchUp() {
-        if (owed.isEmpty()) return;
-        List<String> order;
-        synchronized (proc) {
-            order = new ArrayList<>(owed);
-            order.sort(Comparator.comparing((String id) -> {
-                MatrixRoom r = proc.room(id);
-                return r == null ? java.time.Instant.EPOCH : r.chat.lastActivity();
-            }, Comparator.nullsFirst(Comparator.naturalOrder())).reversed());
-        }
+    /**
+     * One sync for each {@link #CHUNK} of {@link #owed}, in the rooms' order, so the same rooms are the same filters and
+     * nothing is posted again; false when one failed (what's left stays owed).
+     */
+    private boolean catchUp() {
+        List<String> order = new ArrayList<>(new TreeSet<>(owed));
         show(Step.CHATS, 0, order.size());
         for (int from = 0; from < order.size(); from += CHUNK) {
             List<String> part = order.subList(from, Math.min(order.size(), from + CHUNK));
@@ -194,10 +209,11 @@ final class ArchiveRest {
                 part.forEach(owed::remove);
                 show(Step.CHATS, from + part.size(), order.size());
             } catch (Exception e) {
-                System.err.println("Discord rest: catching up failed, tried again on the next sync: " + e);
-                return;
+                System.err.println("Discord rest: catching up failed, tried again later: " + e);
+                return false;
             }
         }
+        return true;
     }
 
     /** Posted; inlined if the server won't keep it (a part is small enough for the URL). */
@@ -210,7 +226,11 @@ final class ArchiveRest {
     }
 
     private void show(Step step, int done, int total) {
-        waking = new Waking(step, done, total);
+        show(new Waking(step, done, total, null));
+    }
+
+    private void show(Waking w) {
+        waking = w;
         for (Runnable l : listeners) {
             try {
                 l.run();
@@ -246,15 +266,5 @@ final class ArchiveRest {
 
     private static boolean isServerSpace(MatrixRoom r) {
         return r.space && r.chat.network() == Network.DISCORD && !r.chat.personalSpace();
-    }
-
-    /** Each Discord server whose space is known → whether it rests. Caller holds the processor's lock. */
-    private Map<String, Boolean> guildsResting(Set<String> want) {
-        Map<String, Boolean> out = new HashMap<>();
-        for (MatrixRoom r : proc.rooms()) {
-            String g = r.space ? discord.guildOf(r.id) : null;
-            if (g != null) out.put(g, want.contains(r.id));
-        }
-        return out;
     }
 }

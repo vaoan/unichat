@@ -34,6 +34,7 @@ class RestBarUiTest {
     private final AtomicReference<Waking> state = new AtomicReference<>();
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final List<Boolean> told = new CopyOnWriteArrayList<>();
+    private final List<String> opened = new CopyOnWriteArrayList<>();
     /** The bar's "a few seconds" go by when the test says. */
     private final List<Runnable> later = new CopyOnWriteArrayList<>();
     private final SimpleBooleanProperty archiveOpen = new SimpleBooleanProperty(false);
@@ -51,7 +52,7 @@ class RestBarUiTest {
 
     private RestBar show(double px) throws Exception {
         return FxWait.fx(() -> {
-            RestBar b = new RestBar(state::get, listeners::add, listeners::remove, told::add, archiveOpen, later::add);
+            RestBar b = new RestBar(state::get, listeners::add, listeners::remove, told::add, opened::add, archiveOpen, later::add);
             VBox root = new VBox(b);
             root.getStyleClass().add("root");
             root.setStyle("-fx-font-size: " + px + "px;");
@@ -98,14 +99,10 @@ class RestBarUiTest {
         RestBar bar = show(13);
         assertFalse(FxWait.fx(bar::isVisible), "nothing woke: no bar");
 
-        set(new Waking(Step.SERVERS, 3, 123));
-        FxWait.until("the bar shows", bar::isVisible);
-        String text = FxWait.fx(() -> texts(bar).toString());
-        assertTrue(text.contains("Reactivando lo archivado de Discord: recibiendo todo de nuevo…"), text);
-        assertTrue(text.contains("Servidores de Discord") && text.contains("3 de 123"), text);
-
         set(new Waking(Step.CHATS, 200, 3699));
+        FxWait.until("the bar shows", bar::isVisible);
         FxWait.until("chats", () -> texts(bar).contains("200 de 3699"));
+        assertTrue(FxWait.fx(() -> texts(bar).contains("Reactivando lo archivado de Discord: recibiendo todo de nuevo…")));
         assertTrue(FxWait.fx(() -> texts(bar).contains("Chats poniéndose al día")));
         assertEquals(200.0 / 3699, FxWait.fx(() -> ((ProgressBar) bar.lookup(".progress-bar")).getProgress()), 1e-9);
         assertTrue(FxWait.fx(bar::isFocusTraversable), "reachable with Tab");
@@ -119,6 +116,35 @@ class RestBarUiTest {
         assertEquals(1, later.size());
         FxWait.fx(() -> { later.getFirst().run(); return null; });
         assertFalse(FxWait.fx(bar::isVisible), "then it goes");
+        close(bar);
+    }
+
+    @Test
+    void aServerOpenedInTheArchiveAndACatchUpThatFailedAreSaid() throws Exception {
+        toolkit();
+        RestBar bar = show(13);
+        set(new Waking(Step.SERVER, 0, 0, "Furry Moonfest"));
+        FxWait.until("the server", () -> texts(bar).contains("Reactivando Furry Moonfest: recibiendo todo de nuevo…"));
+        assertEquals(List.of("Reactivando Furry Moonfest: recibiendo todo de nuevo…"), FxWait.fx(() -> texts(bar)), "no count for a server");
+        assertTrue(FxWait.fx(() -> bar.getAccessibleText().contains("Furry Moonfest")));
+
+        set(new Waking(Step.RETRYING, 100, 3699));
+        FxWait.until("the failure", () -> texts(bar).contains("No se pudo terminar de ponerse al día: se intentará de nuevo en breve"));
+        assertTrue(FxWait.fx(() -> texts(bar).contains("100 de 3699")));
+        close(bar);
+    }
+
+    @Test
+    void anArchivedChatOpenedInTheArchiveIsTold() throws Exception {
+        toolkit();
+        RestBar bar = show(13);
+        app.unichat.model.Chat archived = new app.unichat.model.Chat("!c1:x");
+        archived.setArchived(true);
+        app.unichat.model.Chat inbox = new app.unichat.model.Chat("!n:x");
+        FxWait.fx(() -> { bar.opened(archived); return null; });
+        assertTrue(opened.isEmpty(), "outside the archive: nothing");
+        FxWait.fx(() -> { archiveOpen.set(true); bar.opened(inbox); bar.opened(archived); return null; });
+        assertEquals(List.of("!c1:x"), opened, "only the archived one, in the archive");
         close(bar);
     }
 
