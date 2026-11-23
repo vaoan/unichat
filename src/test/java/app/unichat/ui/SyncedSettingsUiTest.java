@@ -113,7 +113,7 @@ class SyncedSettingsUiTest {
         Pattern call = Pattern.compile("\\.(?:getString|getBool|getInt|getEnum|getDouble|getSet|set|setBool|addToSet|removeFromSet)\\(\"([a-z]\\w*\\.[\\w.]+)\"");
         Pattern constant = Pattern.compile("static final String [A-Z_]*(?:KEY|PROGRESS|DONE)[A-Z_]* = \"([a-z][\\w.]*)\"");
         Pattern concat = Pattern.compile("\"([a-z][\\w]*\\.(?:[\\w]+\\.)*)\" \\+");
-        TreeSet<String> keys = new TreeSet<>();
+        SortedSet<String> keys = new TreeSet<>();
         try (Stream<Path> files = Files.walk(Path.of("src/main/java"))) {
             for (Path f : files.filter(x -> x.toString().endsWith(".java")).toList()) {
                 String src = Files.readString(f);
@@ -135,7 +135,7 @@ class SyncedSettingsUiTest {
     private static boolean isMachineOnly(String key) {
         try {
             var m = Settings.class.getDeclaredMethod("staysOnThisMachine", String.class);
-            m.setAccessible(true);
+            m.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
             return (boolean) m.invoke(null, key);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException(e);

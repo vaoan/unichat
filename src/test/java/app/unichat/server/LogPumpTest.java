@@ -31,7 +31,7 @@ class LogPumpTest {
             @Override public InputStream getErrorStream() { return InputStream.nullInputStream(); }
             @Override public int waitFor() { return 0; }
             @Override public int exitValue() { return 0; }
-            @Override public void destroy() { }
+            @Override public void destroy() { /* the fake ignores it */ }
         };
     }
 
@@ -42,7 +42,7 @@ class LogPumpTest {
         final Thread thread;
 
         Live(Path log, AtomicLong clock, java.util.function.ToLongFunction<Path> size) throws IOException {
-            PipedInputStream in = new PipedInputStream(feed, 1 << 16);
+            PipedInputStream in = new PipedInputStream(feed, 1 << 16); // NOPMD: CloseResource, the pump reads it until the feed closes
             thread = new Thread(() -> LogPump.run(processReading(in), log, l -> { }, () -> done.add(true), clock::get, size));
             thread.setDaemon(true);
             thread.start();

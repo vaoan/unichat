@@ -82,7 +82,7 @@ class SafeFileTest {
     @SuppressWarnings("InputStreamSlowMultibyteRead") // a stream that fails after three bytes: its speed doesn't matter
     void aFailureWhileWritingLeavesTheOldFileAndNoTemp() throws Exception {
         Path f = Files.writeString(dir.resolve("video.mp4"), "old");
-        InputStream cut = new InputStream() {
+        InputStream cut = new InputStream() { // NOPMD: CloseResource, in memory, nothing to close
             private int left = 3;
 
             @Override

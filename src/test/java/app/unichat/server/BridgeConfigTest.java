@@ -55,7 +55,7 @@ class BridgeConfigTest {
         assertEquals("http://127.0.0.1:8008", c.at("/homeserver/address").asText());
         assertEquals("localhost", c.at("/homeserver/domain").asText());
         assertEquals("http://127.0.0.1:29318", c.at("/appservice/address").asText());
-        assertEquals("127.0.0.1", c.at("/appservice/hostname").asText());
+        assertEquals("127.0.0.1", c.at("/appservice/hostname").asText()); // NOPMD: AvoidUsingHardCodedIP, what the config says
         assertEquals(29318, c.at("/appservice/port").asInt());
         assertEquals("signal", c.at("/appservice/id").asText());
         assertEquals("signalbot", c.at("/appservice/bot/username").asText());
@@ -272,6 +272,6 @@ class BridgeConfigTest {
     /** One place says where a bridge's database is: its config, the account check, the session keeper and the prunes read it. */
     @Test
     void aBridgesDatabaseIsItsNameInItsFolder() {
-        assertEquals(java.nio.file.Path.of("/data/signal/signal.db"), BridgeConfig.database(java.nio.file.Path.of("/data/signal"), "signal"));
+        assertEquals(Path.of("/data/signal/signal.db"), BridgeConfig.database(Path.of("/data/signal"), "signal"));
     }
 }

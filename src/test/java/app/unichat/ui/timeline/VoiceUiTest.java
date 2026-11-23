@@ -155,7 +155,7 @@ class VoiceUiTest {
         speak(1200);
         fx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(stage.getScene().snapshot(null), null), "png",
-                    java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "unichat-voice-bar.png").toFile());
+                    Path.of(System.getProperty("java.io.tmpdir"), "unichat-voice-bar.png").toFile());
             ((Button) composer.lookup(".voice-bar .send-button")).fire();
             return null;
         });
@@ -248,6 +248,6 @@ class VoiceUiTest {
             return null;
         });
         await(() -> toasts.contains("No se encontró un micrófono disponible"), "says so");
-        assertFalse(fx(() -> ((Button) mic()).isDisabled()));
+        assertFalse(fx(() -> mic().isDisabled()));
     }
 }

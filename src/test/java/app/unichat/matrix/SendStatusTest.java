@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /** A bridge's com.beeper.message_send_status says whether a message reached the network: one it couldn't send shows as failed. */
 class SendStatusTest {
@@ -114,7 +115,7 @@ class SendStatusTest {
     void aFailedMessageOfMineRedactedLeavesTheChat() {
         sync(message("$m", ME), status("$s", "$m", "FAIL_PERMANENT"));
         sync("{'type':'m.room.redaction','event_id':'$r','sender':'" + ME + "','origin_server_ts':3,'redacts':'$m','content':{'redacts':'$m'}}");
-        assertEquals(null, byId("$m"));
+        assertNull(byId("$m"));
         assertEquals(0, proc.room(ROOM).timeline.size());
     }
 }

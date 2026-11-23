@@ -17,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -236,7 +237,7 @@ class VaultActionsTest {
         String old = create(desk);
         as(desk, desk.cloud.vault()::codeKept);
         String code = as(desk, desk.cloud.vault()::newRecoveryCode);
-        assertFalse(code.equals(old));
+        assertNotEquals(old, code);
         assertTrue(view(desk).codeUnconfirmed());
         assertThrows(ExecutionException.class, () -> as(laptop, () -> laptop.cloud.vault().openVault(VaultView.Way.RECOVERY, old.toCharArray())));
         as(laptop, () -> laptop.cloud.vault().openVault(VaultView.Way.RECOVERY, code.toCharArray()));

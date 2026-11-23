@@ -118,7 +118,7 @@ class MessageFixUiTest {
         svc.sendText(CHAT, "creo q mañana no puedo", null).get();
         Message m = svc.messages(CHAT).getLast();
         m.setStatus(app.unichat.model.MessageStatus.SENT); // the server has it: only then can it be edited
-        FxWait.until("listed", () -> FxWait.fx(() -> thread.lookupAll(".bubble").size() > 0));
+        FxWait.until("listed", () -> FxWait.fx(() -> !thread.lookupAll(".bubble").isEmpty()));
         MenuItem fix = FxWait.fx(() -> thread.actions().messageMenu(m).getItems().stream()
                 .filter(i -> "Corregir con IA".equals(i.getText())).findFirst().orElseThrow());
         FxWait.fx(() -> { fix.fire(); return null; });

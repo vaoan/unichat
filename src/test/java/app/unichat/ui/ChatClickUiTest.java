@@ -113,7 +113,7 @@ class ChatClickUiTest {
                 return id;
             });
             FxWait.until("the clicked chat " + clicked + " opens", () -> clicked.equals(view.currentChatId()));
-            assertEquals(clicked, fx(() -> view.currentChatId()), "the clicked chat opens");
+            assertEquals(clicked, fx(view::currentChatId), "the clicked chat opens");
         }
         FxWait.settled(); // whatever the clicks set off has run: an error would be in by now
         assertTrue(failures.isEmpty(), "no errors on the UI thread: " + failures);

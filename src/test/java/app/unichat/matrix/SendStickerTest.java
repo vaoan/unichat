@@ -1,7 +1,6 @@
 package app.unichat.matrix;
 
 import app.unichat.model.MediaLibrary;
-import app.unichat.model.Network;
 import app.unichat.service.StickerMode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
@@ -113,7 +112,7 @@ class SendStickerTest {
         assertEquals(StickerConverter.gif2webp() != null ? "image/webp" : "image/png", mime);
         assertEquals(mime, uploadedType);
         assertTrue(sent.path("info").path("fi.mau.bridged_sticker").isMissingNode(), "it's no longer that network's sticker");
-        assertTrue(sent.path("info").path("size").asLong() != 999, "size describes the new file");
+        assertNotEquals(999, sent.path("info").path("size").asLong(), "size describes the new file");
         assertEquals("mxc://s/gif", sent.path("info").path(MediaLibrary.ORIGINAL).path("url").asText(),
                 "the copy names what it was made from: seen back in the chat, it's that sticker, not a new recent");
     }

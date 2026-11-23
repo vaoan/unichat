@@ -145,7 +145,7 @@ class VideoUiTest {
             return null;
         });
         await(() -> video[0].getChildren().contains(fallback), "fallback shown");
-        assertNull(fx(() -> video[0].player()));
+        assertNull(fx(video[0]::player));
         fx(() -> { stage.close(); return null; });
     }
 
@@ -201,12 +201,12 @@ class VideoUiTest {
                 && p.getStatus() == MediaPlayer.Status.PLAYING);
         FxWait.settled();
         String where = fx(() -> {
-            javafx.scene.Node bar = viewer.getScene().getRoot().lookup(".video-controls");
+            Node bar = viewer.getScene().getRoot().lookup(".video-controls");
             javafx.geometry.Bounds b = bar.localToScene(bar.getBoundsInLocal());
             return b.getMinY() + ".." + b.getMaxY() + " in " + viewer.getScene().getHeight();
         });
         assertTrue(fx(() -> {
-            javafx.scene.Node bar = viewer.getScene().getRoot().lookup(".video-controls");
+            Node bar = viewer.getScene().getRoot().lookup(".video-controls");
             javafx.geometry.Bounds b = bar.localToScene(bar.getBoundsInLocal());
             return b.getHeight() > 0 && b.getMaxY() <= viewer.getScene().getHeight() + 0.5;
         }), "the controls are inside the window: " + where);
@@ -274,7 +274,7 @@ class VideoUiTest {
 
     private static void key(Stage stage,javafx.scene.input.KeyCode code, String text) throws Exception {
         fx(() -> {
-            javafx.scene.Node target = stage.getScene().getFocusOwner() != null ? stage.getScene().getFocusOwner() : stage.getScene().getRoot();
+            Node target = stage.getScene().getFocusOwner() != null ? stage.getScene().getFocusOwner() : stage.getScene().getRoot();
             javafx.event.Event.fireEvent(target, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,
                     "", text, code, false, false, false, false));
             return null;

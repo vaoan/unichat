@@ -141,7 +141,7 @@ class PreferencesFileTest {
     @Test
     void muteChosenHereIsReported() {
         var p = open();
-        assertTrue(p.reconcile(K, off()).muteChosenHere() == false);
+        assertFalse(p.reconcile(K, off()).muteChosenHere());
         p.choose(K, Flag.MUTED, true);
         assertTrue(p.current(K).muteChosenHere());
         var q = PreferencesFile.inMemory();
@@ -497,7 +497,7 @@ class PreferencesFileTest {
     }
 
     @Test
-    void savingKindsAllUnlessLeftOutAndWhatWasOnStaysAll(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp) {
+    void savingKindsAllUnlessLeftOutAndWhatWasOnStaysAll(@TempDir Path tmp) {
         PreferencesFile p = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
         assertTrue(p.saveKinds("k", false).isEmpty(), "nothing saved at first");
         p.choose("k", PreferencesFile.Flag.AUTO_SAVE, true); // turned on before there were kinds
@@ -515,7 +515,7 @@ class PreferencesFileTest {
     }
 
     @Test
-    void whatISendHasItsOwnKinds(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp) {
+    void whatISendHasItsOwnKinds(@TempDir Path tmp) {
         PreferencesFile p = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
         p.chooseSaveKinds("k", false, java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS));
         assertTrue(p.saveKinds("k", true).isEmpty(), "what I send isn't saved unless chosen");

@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
@@ -62,7 +63,7 @@ class BridgeCapabilitiesTest {
         assertFalse(Files.exists(dir.resolve("twitter").resolve("twitter.db")), "none made");
         Path none = db("twitter", null);
         BridgeCapabilities.beforeStart("twitter", none); // started once, but never said it
-        assertEquals(null, value(none, "twitter", "bridge_info_version"), "nothing invented: the bridge says them all then anyway");
+        assertNull(value(none, "twitter", "bridge_info_version"), "nothing invented: the bridge says them all then anyway");
         Files.delete(none.resolve("twitter.db"));
         Path odd = db("twitter", "uno,ocho");
         BridgeCapabilities.beforeStart("twitter", odd);

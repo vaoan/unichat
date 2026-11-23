@@ -234,8 +234,8 @@ final class FakeDav implements AutoCloseable {
     }
 
     /** The names right in {@code dir}, as a server says them: each once. */
-    private java.util.Set<String> children(String dir) {
-        java.util.Set<String> out = new java.util.TreeSet<>();
+    private Set<String> children(String dir) {
+        Set<String> out = new java.util.TreeSet<>();
         for (String p : files.keySet()) if (p.startsWith(dir + "/")) out.add(p.substring(dir.length() + 1).split("/")[0]);
         for (String p : dirs) if (p.startsWith(dir + "/")) out.add(p.substring(dir.length() + 1).split("/")[0]);
         return out;

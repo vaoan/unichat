@@ -34,6 +34,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -102,7 +103,7 @@ class CaptureUiTest {
         return svc.messages(CHAT);
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
     private ListView<ThreadRows.Row> list() throws Exception {
         return FxWait.fx(() -> (ListView<ThreadRows.Row>) thread.lookup(".timeline"));
     }
@@ -289,7 +290,7 @@ class CaptureUiTest {
             javafx.geometry.Bounds b = x.localToScene(x.getBoundsInLocal());
             for (var type : List.of(javafx.scene.input.MouseEvent.MOUSE_PRESSED, javafx.scene.input.MouseEvent.MOUSE_RELEASED,
                     javafx.scene.input.MouseEvent.MOUSE_CLICKED)) {
-                javafx.event.Event.fireEvent(x, new javafx.scene.input.MouseEvent(type, 2, 2, b.getCenterX(), b.getCenterY(),
+                Event.fireEvent(x, new javafx.scene.input.MouseEvent(type, 2, 2, b.getCenterX(), b.getCenterY(),
                         javafx.scene.input.MouseButton.PRIMARY, 1, false, false, false, false, true, false, false, true, false, false, null));
             }
             return null;
@@ -308,7 +309,7 @@ class CaptureUiTest {
         }, stage.getScene(), ConversationShot.WIDTH, false, java.time.Duration.ZERO));
         java.util.concurrent.ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(
                 java.util.concurrent.ExecutionException.class, f::get);
-        assertTrue(e.getCause() instanceof ConversationShot.TooLong);
+        assertInstanceOf(ConversationShot.TooLong.class, e.getCause());
         assertEquals(0, drawn.get(), "not one row made");
     }
 
@@ -322,7 +323,7 @@ class CaptureUiTest {
         }, stage.getScene(), ConversationShot.WIDTH, false, java.time.Duration.ZERO));
         java.util.concurrent.ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(
                 java.util.concurrent.ExecutionException.class, f::get);
-        assertTrue(e.getCause() instanceof ConversationShot.TooLong, String.valueOf(e.getCause()));
+        assertInstanceOf(ConversationShot.TooLong.class, e.getCause(), String.valueOf(e.getCause()));
     }
 
     @Test

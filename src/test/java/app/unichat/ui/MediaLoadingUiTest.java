@@ -18,7 +18,6 @@ import java.nio.file.Path;
 
 import static app.unichat.ui.TimelineWindow.CHAT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A sticker or picture shows its download as it really goes (a ring with the share that arrived), and one that couldn't
@@ -58,7 +57,7 @@ class MediaLoadingUiTest {
         String prefix = System.getProperty("unichat.loadingShot");
         if (prefix == null) return;
         var img = FxWait.fx(() -> n.snapshot(null, null));
-        javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(img, null), "png", java.nio.file.Path.of(prefix + name + ".png").toFile());
+        javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(img, null), "png", Path.of(prefix + name + ".png").toFile());
     }
 
     private boolean drawn(Node in) {

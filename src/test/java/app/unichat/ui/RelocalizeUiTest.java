@@ -59,7 +59,7 @@ class RelocalizeUiTest {
         });
         // Held by the stage's listeners, it marked its chat read each time the window got the focus.
         FxWait.until("nothing holds the old window's contents", () -> {
-            System.gc();
+            System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection
             return old.get() == null;
         });
         fx(() -> { stage[0].close(); svc.stop(); return null; });

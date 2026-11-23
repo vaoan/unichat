@@ -12,6 +12,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StyleLearnerTest {
@@ -69,7 +70,7 @@ class StyleLearnerTest {
         WritingStyle s = new WritingStyle(dir);
         s.save("- viejo");
         s.addCorrection("hahaha nos vemos", "nos vemos");
-        java.util.List<String> asked = new java.util.ArrayList<>();
+        List<String> asked = new java.util.ArrayList<>();
         String tooLong = bullets(38, 90); // what a real answer was: 38 traits, 3 676 characters
         StyleLearner l = new StyleLearner(s, p -> {
             asked.add(p);
@@ -86,7 +87,7 @@ class StyleLearnerTest {
         WritingStyle s = new WritingStyle(dir);
         s.save("- viejo");
         s.addCorrection("a", "b");
-        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        AtomicInteger calls = new AtomicInteger();
         StyleLearner l = new StyleLearner(s, p -> { calls.incrementAndGet(); return bullets(38, 90); });
         assertEquals("- viejo", l.learn("!c", CHAT));
         assertEquals(2, calls.get(), "shortened once, not again and again");
@@ -157,7 +158,7 @@ class StyleLearnerTest {
         StyleDiff d = StyleDiff.between("- secreto viejo\n- a", "- a\n- secreto nuevo\n- otro");
         String line = StyleLearner.learned(d, 3, 1);
         assertEquals("Writing style learned: 2 traits added, 1 changed/removed, from 3 corrections and 1 message", line);
-        assertTrue(!line.contains("secreto"), "never the text");
+        assertFalse(line.contains("secreto"), "never the text");
         assertEquals("Writing style learned: 1 trait added, 0 changed/removed, from 1 correction and 30 messages",
                 StyleLearner.learned(StyleDiff.between("", "- x"), 1, 30));
     }

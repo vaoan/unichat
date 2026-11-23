@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /** Telegram's animated stickers (Lottie, a .tgs is gzipped JSON): told by their bytes, checked, made an animated WebP. */
-public class LottieStickersTest {
+public class LottieStickersTest { // NOPMD: JUnitJupiterTestShouldBePackagePrivate, its fixtures serve ui.media's tests too
     @TempDir Path dir;
 
     /** The one built for development (native/build-lottie.sh), when this machine has it: CI has none and skips. */

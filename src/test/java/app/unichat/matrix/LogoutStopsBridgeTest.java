@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class LogoutStopsBridgeTest {
     private final List<Network> released = new ArrayList<>();
     private final BridgeProvisioner provisioner = new BridgeProvisioner() {
-        @Override public void ensure(Network n) { }
+        @Override public void ensure(Network n) { /* the fake ignores it */ }
         @Override public void loggedOut(Network n) { released.add(n); }
     };
 

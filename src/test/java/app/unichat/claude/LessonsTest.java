@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -64,7 +66,7 @@ class LessonsTest {
         var lessons = new Lessons(root);
         for (Lessons.Lesson l : lessons.all()) {
             String[] example = CAUGHT.get(l.id());
-            assertTrue(example != null, "Lesson " + l.id() + " needs an example in LessonsTest.CAUGHT");
+            assertNotNull(example, "Lesson " + l.id() + " needs an example in LessonsTest.CAUGHT");
             Path file = root.resolve(example[0]);
             Files.createDirectories(file.getParent());
             Files.writeString(file, "first line\n" + example[1] + "\n");
@@ -90,6 +92,6 @@ class LessonsTest {
         String json = "{\"tool_input\":{\"file_path\":\"C:\\\\repo\\\\A.java\",\"command\":\"echo \\\"hi\\\" \\u00e9\"}}";
         assertEquals("C:\\repo\\A.java", HookInput.string(json, "file_path"));
         assertEquals("echo \"hi\" é", HookInput.string(json, "command"));
-        assertEquals(null, HookInput.string(json, "missing"));
+        assertNull(HookInput.string(json, "missing"));
     }
 }

@@ -9,7 +9,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,7 +54,7 @@ final class FakeDropbox implements AutoCloseable {
      * the folder here), so taking only the first page loses names.
      */
     private void list(HttpExchange x, String dir, boolean rest) throws IOException {
-        java.util.Set<String> names = new java.util.TreeSet<>();
+        Set<String> names = new java.util.TreeSet<>();
         boolean there = folders.contains(dir);
         for (String f : files.keySet()) if (f.startsWith(dir + "/")) { names.add(f.substring(dir.length() + 1).split("/")[0]); there = true; }
         for (String d : folders) if (d.startsWith(dir + "/")) names.add(d.substring(dir.length() + 1).split("/")[0]);
@@ -112,7 +111,7 @@ final class FakeDropbox implements AutoCloseable {
             String path = x.getRequestURI().getPath();
             byte[] body = x.getRequestBody().readAllBytes();
             if (path.equals("/oauth2/token")) {
-                token(x, Loopback.query(new String(body, StandardCharsets.UTF_8)));
+                token(x, Loopback.query(new String(body, UTF_8)));
                 return;
             }
             if (!("Bearer " + access).equals(x.getRequestHeaders().getFirst("Authorization"))) {
@@ -225,7 +224,7 @@ final class FakeDropbox implements AutoCloseable {
     }
 
     private static void reply(HttpExchange x, int code, String body) throws IOException {
-        byte[] b = body.getBytes(StandardCharsets.UTF_8);
+        byte[] b = body.getBytes(UTF_8);
         x.sendResponseHeaders(code, b.length);
         x.getResponseBody().write(b);
     }

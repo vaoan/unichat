@@ -12,7 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TranscriptsTest {
     private static void await(Transcripts t, String url) throws Exception {
@@ -82,7 +81,7 @@ class TranscriptsTest {
         t.requestAhead("mxc://s/bad", () -> CompletableFuture.completedFuture(dir.resolve("bad.ogg")));
         t.requestAhead("mxc://s/ok", () -> CompletableFuture.completedFuture(dir.resolve("ok.ogg")));
         assertEquals(before, runs.get());
-        assertTrue(t.state("mxc://s/bad") instanceof Transcripts.Failed);
+        assertInstanceOf(Transcripts.Failed.class, t.state("mxc://s/bad"));
     }
 
     @Test

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -99,7 +101,7 @@ class ManifestTest {
         assertEquals("v0.2610.0", m.version(m.bridge("whatsapp"), Platform.MAC_ARM64), "an official build keeps its tag");
         assertEquals("v0.2610.0+natives-2", m.version(m.bridge("whatsapp"), Platform.WINDOWS_AMD64));
         Manifest next = Manifest.parse(versions.replace("natives-2", "natives-3"));
-        assertFalse(next.version(next.bridge("discord"), Platform.MAC_ARM64).equals(m.version(m.bridge("discord"), Platform.MAC_ARM64)));
+        assertNotEquals(m.version(m.bridge("discord"), Platform.MAC_ARM64), next.version(next.bridge("discord"), Platform.MAC_ARM64));
         Manifest none = Manifest.parse("discord=mautrix/discord@v0.7.7:mautrix-discord\nNATIVES_ALL=discord\n");
         assertEquals("v0.7.7", none.version(none.bridge("discord"), Platform.MAC_ARM64), "no natives release: no \"v0.7.7+\"");
         assertNull(none.releaseUrl(none.bridge("discord"), Platform.MAC_ARM64));
@@ -131,7 +133,7 @@ class ManifestTest {
         Manifest m = Manifest.bundled();
         for (String b : new String[]{"whatsapp", "telegram", "signal", "instagram", "facebook", "discord", "slack",
                 "gmessages", "twitter", "linkedin"}) {
-            assertTrue(m.bridge(b) != null, b);
+            assertNotNull(m.bridge(b), b);
         }
     }
 

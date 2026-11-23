@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,7 +16,7 @@ class SettingsValuesTest {
     @TempDir Path dir;
 
     /** Every Settings a test made: their writes run in the background, and must end before the folder is deleted. */
-    private final java.util.List<Settings> made = new java.util.ArrayList<>();
+    private final List<Settings> made = new java.util.ArrayList<>();
 
     private Settings made(Settings s) {
         made.add(s);
@@ -70,7 +71,7 @@ class SettingsValuesTest {
         assertEquals(List.of("b", "a"), List.copyOf(s.getSet("k")));
         s.removeFromSet("k", "b");
         s.removeFromSet("k", "a");
-        assertEquals(null, s.getString("k", null));
+        assertNull(s.getString("k", null));
     }
 
     @Test

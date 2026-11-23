@@ -40,7 +40,7 @@ class ThemeSceneUiTest {
         FxWait.fx(() -> { stage[0].close(); stage[0] = null; return null; });
         FxWait.settled();
         FxWait.until("the closed window's scene is collected", () -> {
-            System.gc();
+            System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection
             return scene.get() == null;
         });
     }

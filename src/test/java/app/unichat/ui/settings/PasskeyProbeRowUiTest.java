@@ -24,7 +24,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** "Probar llave de acceso (prueba)": there only when asked for, it opens the probe and says what it found. */
@@ -92,7 +93,7 @@ class PasskeyProbeRowUiTest {
         assertEquals(I18n.t("settings.vault.probe.title"), run.getAccessibleText(), "a screen reader names it");
         assertTrue(run.isFocusTraversable(), "reachable by keyboard");
         FxWait.fx(() -> { run.fire(); return null; });
-        assertTrue(told.get() != null, "the probe started");
+        assertNotNull(told.get(), "the probe started");
         FxWait.until("says it's open, at which address", () -> says(row, I18n.t("settings.vault.probe.opened", ADDRESS)));
         assertTrue(I18n.t("settings.vault.probe.opened", ADDRESS).contains(ADDRESS.toString()), "on screen, for no browser");
         told.get().accept(new PasskeyPage.Finding(PasskeyPage.Step.GET, null, 32, "0123456789abcdef", "id", "platform", "UA", ""));
@@ -117,7 +118,7 @@ class PasskeyProbeRowUiTest {
         FxWait.fx(() -> { button(row).fire(); return null; });
         session.completeExceptionally(new IOException(I18n.t("cloud.passkey.expired")));
         FxWait.until("says the test stopped", () -> says(row, I18n.t("cloud.passkey.expired")));
-        assertFalse(I18n.t("cloud.passkey.expired").equals(I18n.t("cloud.signIn.expired")), "a probe, not a sign-in");
+        assertNotEquals(I18n.t("cloud.signIn.expired"), I18n.t("cloud.passkey.expired"), "a probe, not a sign-in");
         FxWait.fx(() -> { stage.close(); return null; });
     }
 }

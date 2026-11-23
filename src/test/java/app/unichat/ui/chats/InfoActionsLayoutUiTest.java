@@ -2,6 +2,7 @@ package app.unichat.ui.chats;
 
 import app.unichat.ui.FxWait;
 import app.unichat.service.MockChatService;
+import java.util.SortedMap;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -49,7 +50,7 @@ class InfoActionsLayoutUiTest {
                 FxWait.until("the actions show", () -> pane.lookupAll(".info-action").size() == 6);
                 FxWait.settled();
                 List<Integer> rows = FxWait.fx(() -> {
-                    TreeMap<Long, Integer> byRow = new TreeMap<>();
+                    SortedMap<Long, Integer> byRow = new TreeMap<>();
                     for (Node n : pane.lookupAll(".info-action")) {
                         long y = Math.round(n.localToScene(n.getBoundsInLocal()).getMinY());
                         byRow.merge(y, 1, Integer::sum);

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -257,7 +258,7 @@ final class TimelineWindow {
         for (int i = 0; i < 8; i++) wheel(120);
         FxWait.until("the list stops following the newest", this::jumpDownShown);
         FxWait.settled();
-        assertTrue(FxWait.fx(this::newestGap) == null, "precondition: the newest is out of view");
+        assertNull(FxWait.fx(this::newestGap), "precondition: the newest is out of view");
     }
 
     /** A key pressed in the message box. */
@@ -349,6 +350,7 @@ final class TimelineWindow {
      * list's own, sees the frame as it will be drawn.
      */
     final class Frames {
+        @FunctionalInterface
         interface Probe {
             /** Null when the frame is right, else what's wrong with it. */
             String check() throws Exception;

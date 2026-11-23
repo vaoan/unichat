@@ -75,7 +75,7 @@ public final class VaultFixture implements AutoCloseable {
     public void raiseGenerationByHand() throws Exception {
         Vault.Info info = Vault.info(storage());
         dav.put(Vault.INFO, ("{\"id\":\"" + info.id() + "\",\"created\":\"" + info.created() + "\",\"generation\":"
-            + (info.generation() + 1) + "}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            + (info.generation() + 1) + "}").getBytes(UTF_8));
     }
 
     /** {@code vault.json} deleted by someone with only the account, the vault not turned off. */
@@ -186,7 +186,7 @@ public final class VaultFixture implements AutoCloseable {
         dav.holdOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown); // nothing waits past the test
         dav.holdReadOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown);
         held.forEach(java.util.concurrent.CountDownLatch::countDown); // a held upload let go, also once it's under way
-        try {
+        try { // NOPMD: UseTryWithResources, the fixture's own close
             cloud.stop();
             cloud.vaultJobsOver().get(); // what a step asked for runs before the account goes
             cloud.syncNow().get();

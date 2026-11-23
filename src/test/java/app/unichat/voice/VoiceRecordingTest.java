@@ -66,7 +66,7 @@ class VoiceRecordingTest {
     private static void awaitEnd(VoiceRecorder r) throws Exception {
         // VoiceRecorder offers no way to wait for its end; a future it completed on ending would spare this reflection.
         Field thread = VoiceRecorder.class.getDeclaredField("thread");
-        thread.setAccessible(true);
+        thread.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
         ((Thread) thread.get(r)).join(); // lesson-ok: test-future-join (a thread)
     }
 
@@ -143,7 +143,7 @@ class VoiceRecordingTest {
     @Test
     void cancellingLeavesNoFile() throws Exception {
         Path f = dir.resolve("c.ogg");
-        Tone tone = new Tone(48_000, 440, 60);
+        Tone tone = new Tone(48_000, 440, 60); // NOPMD: CloseResource, the recorder closes its source
         VoiceRecorder r = new VoiceRecorder(tone, f);
         r.start();
         tone.reading.await();

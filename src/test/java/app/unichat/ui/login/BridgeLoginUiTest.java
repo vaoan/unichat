@@ -28,6 +28,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * The dynamic login screen against a fake WhatsApp bridge: choose a method, see the QR, the bridge confirms,
@@ -143,7 +144,7 @@ class BridgeLoginUiTest {
         fx(() -> { field(scene).setText("300 123 4567"); buttonNow(scene, "Continuar").fire(); return null; });
         await("the country code asked for", () -> text(scene).contains("código de país"));
         shot(scene, "4-telefono-error");
-        assertTrue(submitted == null, "nothing sent while invalid");
+        assertNull(submitted, "nothing sent while invalid");
         fx(() -> { field(scene).setText("+57 300 123 4567"); buttonNow(scene, "Continuar").fire(); return null; });
         await("the pairing code", () -> text(scene).contains("ABCD-1234"));
         assertTrue(submitted.contains("\"phone_number\":\"+573001234567\""), submitted);

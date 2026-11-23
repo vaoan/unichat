@@ -26,8 +26,9 @@ class ComposerHeightUiTest {
 
     /** What decides the box's height, for a failure to say (Linux lays it out otherwise than the Mac). */
     private static String measures(TextArea box) {
-        StringBuilder out = new StringBuilder("box " + box.getHeight() + " (pref " + box.getPrefHeight() + ", min "
-                + box.getMinHeight() + ", max " + box.getMaxHeight() + ", width " + box.getWidth() + ")");
+        StringBuilder out = new StringBuilder("box ").append(box.getHeight()).append(" (pref ").append(box.getPrefHeight())
+                .append(", min ").append(box.getMinHeight()).append(", max ").append(box.getMaxHeight()).append(", width ")
+                .append(box.getWidth()).append(')');
         for (javafx.scene.Node n : box.lookupAll(".text")) {
             if (n instanceof javafx.scene.text.Text t) {
                 out.append("; text in ").append(t.getParent().getClass().getSimpleName()).append(' ')

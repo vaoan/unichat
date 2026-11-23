@@ -18,9 +18,10 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -245,8 +246,8 @@ class VaultRotateTest {
         assertNull(s.error(), "a part that doesn't open never stops the round");
         assertEquals(new Cloud.Notice(List.of(Cloud.Part.SECRETS), List.of(), Map.of()), s.vaultNotice(), "said");
         assertNull(desk.round().error());
-        assertFalse("falsa".equals(laptop.get("gif.giphy.key")), "no computer of the vault takes it in");
-        assertFalse("falsa".equals(desk.get("gif.giphy.key")));
+        assertNotEquals(laptop.get("gif.giphy.key"), "falsa", "no computer of the vault takes it in");
+        assertNotEquals(desk.get("gif.giphy.key"), "falsa");
         byte[] now = VaultCrypto.open(keyOf(laptop), VaultParts.SECRETS_FILE, cloud.files.get(Vault.ROOT + "/Settings/unichat-secrets.json"));
         assertEquals(LAPTOP, Bundle.parse(now).machine(), "this computer's own copy went up in its place, with the new key");
         assertFalse(Bundle.parse(now).settings().containsKey("gif.giphy.key"));
@@ -498,9 +499,9 @@ class VaultRotateTest {
     @Test
     void thisComputerIsntRemovedThatWayNorAnythingThatIsntAMachine() throws Exception {
         ExecutionException own = assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.vault().removeComputer(DESK)));
-        assertTrue(own.getCause() instanceof IllegalArgumentException);
+        assertInstanceOf(IllegalArgumentException.class, own.getCause());
         ExecutionException bad = assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.vault().removeComputer("../boveda")));
-        assertTrue(bad.getCause() instanceof IllegalArgumentException);
+        assertInstanceOf(IllegalArgumentException.class, bad.getCause());
         String recovery = Vault.slots(dav()).stream().filter(s -> s.method() == VaultSlot.Method.RECOVERY).findFirst().orElseThrow().id();
         desk.as(() -> desk.cloud.vault().removeComputer(recovery));
         assertNotNull(slot(recovery), "only a computer's slot goes this way");

@@ -11,7 +11,11 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.TreeSet;
 
-import static app.unichat.matrix.RestServer.*;
+import static app.unichat.matrix.RestServer.ME;
+import static app.unichat.matrix.RestServer.channel;
+import static app.unichat.matrix.RestServer.message;
+import static app.unichat.matrix.RestServer.server;
+import static app.unichat.matrix.RestServer.sync;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

@@ -15,7 +15,7 @@ import java.util.stream.Stream;
  * target/test-tmp (pom.xml); it's emptied when the run starts (what a run cut short left) and when it ends. Run
  * outside Maven (an IDE), the temp folder is the system's and is left alone.
  */
-public final class TestTemp implements BeforeAllCallback {
+public final class TestTemp implements BeforeAllCallback { // NOPMD: TestClassWithoutTestCases, a helper for tests, not one
     private static final Path FOLDER = Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath();
     private static final boolean OURS = FOLDER.endsWith(Path.of("target", "test-tmp"));
 

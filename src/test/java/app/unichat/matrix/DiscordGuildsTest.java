@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DiscordGuildsTest {
     @Test
@@ -19,8 +20,8 @@ class DiscordGuildsTest {
         assertEquals(3, g.size());
         assertEquals(new BridgeAccess.DiscordGuild("123456789012345678", "FF14 Housing", false), g.get(0));
         assertEquals("Amigos (con paréntesis)", g.get(1).name());
-        assertEquals(true, g.get(1).bridged());
-        assertEquals(true, g.get(2).bridged());
+        assertTrue(g.get(1).bridged());
+        assertTrue(g.get(2).bridged());
     }
 
     @Test

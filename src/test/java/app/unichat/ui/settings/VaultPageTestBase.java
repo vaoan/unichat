@@ -2,23 +2,16 @@ package app.unichat.ui.settings;
 
 import app.unichat.cloud.Cloud;
 import app.unichat.cloud.VaultFixture;
-import app.unichat.gif.GifProviders;
-import app.unichat.service.MockChatService;
-import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import app.unichat.ui.FxWait;
-import app.unichat.ui.Theme;
 import javafx.application.Platform;
-import javafx.event.ActionEvent;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.Labeled;
-import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -28,23 +21,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.BiPredicate;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** What the vault page's tests share: the page alone in a window over an account in memory, and how they look and click. */
-abstract class VaultPageTestBase {
+abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod, a base for the vault page's tests, never run alone
     protected static final String PASSWORD = "una contraseña larga", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
         LATE = "5f0e7d7c-4b5a-4a4c-9e95-0d6b1a5c6f88";
 

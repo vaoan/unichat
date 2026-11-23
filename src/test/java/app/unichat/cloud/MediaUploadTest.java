@@ -32,11 +32,11 @@ class MediaUploadTest {
         /** Each path whose copy was looked at ({@link #info}), in order. */
         final List<String> looked = new java.util.ArrayList<>();
 
-        @Override public void check() { }
+        @Override public void check() { /* the fake ignores it */ }
         @Override public boolean exists(String path) { return files.containsKey(path); }
         @Override public void delete(String path) { files.remove(path); }
         @Override public String stamp(String path) { return null; }
-        @Override public void mkdirs(String d) { }
+        @Override public void mkdirs(String d) { /* the fake ignores it */ }
 
         @Override public void move(String from, String to) throws IOException {
             if (files.keySet().stream().anyMatch(p -> p.equals(to) || p.startsWith(to + "/"))) throw new IOException("already there");
@@ -108,7 +108,7 @@ class MediaUploadTest {
         Account acc = new Account();
         Path c = chat("a.jpg", "Chat (WhatsApp) 3f2a9c1b2d4e.txt");
         assertEquals(1, uploader(c).run(acc, (d, t, n) -> { }, () -> true));
-        assertEquals(java.util.Set.of(remote("a.jpg")), acc.files.keySet(), "the texts' copy stays here: it grows, and its source goes up");
+        assertEquals(Set.of(remote("a.jpg")), acc.files.keySet(), "the texts' copy stays here: it grows, and its source goes up");
     }
 
     @Test
@@ -149,7 +149,7 @@ class MediaUploadTest {
         MediaUpload up = uploader(c);
         assertEquals(0, up.run(acc, (d, t, n) -> { }, yes(0)), "no from the start: nothing goes");
         assertEquals(1, up.run(acc, (d, t, n) -> { }, yes(1)), "the first went, then no");
-        assertEquals(java.util.Set.of(remote("a.jpg")), acc.files.keySet());
+        assertEquals(Set.of(remote("a.jpg")), acc.files.keySet());
         assertEquals(2, up.waiting(), "the rest wait, nothing given up");
         assertEquals(0, up.retrying(), "and none counts as failed");
         assertEquals(2, up.run(acc, (d, t, n) -> { }, () -> true));

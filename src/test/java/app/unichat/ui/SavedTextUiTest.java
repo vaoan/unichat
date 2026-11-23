@@ -90,7 +90,7 @@ class SavedTextUiTest {
         FxWait.until("shown as deleted", () -> FxWait.fx(() -> w.cellOf(m) != null
                 && w.cellOf(m).lookup(".deleted-text") != null));
         List<String> buttons = FxWait.fx(() -> w.cellOf(m).lookupAll(".hover-actions .button").stream()
-                .map(n -> ((javafx.scene.control.Button) n).getAccessibleText()).toList());
+                .map(Node::getAccessibleText).toList());
         assertEquals(List.of("Más"), buttons, "its menu (what it said), no reacting nor replying to what's gone");
     }
 }

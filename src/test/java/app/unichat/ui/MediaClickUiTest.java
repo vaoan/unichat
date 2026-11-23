@@ -17,6 +17,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -51,7 +52,7 @@ class MediaClickUiTest {
         int before = fx(MediaClickUiTest::viewers);
         fx(() -> {
             Node media = scene.getRoot().lookup(".media-box");
-            assertTrue(media != null, "the demo chat has a photo");
+            assertNotNull(media, "the demo chat has a photo");
             Event.fireEvent(media, mouse(MouseEvent.MOUSE_PRESSED, true));
             Event.fireEvent(media, mouse(MouseEvent.MOUSE_RELEASED, true));
             return null;

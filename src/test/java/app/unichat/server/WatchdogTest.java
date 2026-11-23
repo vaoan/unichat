@@ -56,10 +56,10 @@ class WatchdogTest {
             closed.stop(0);
             BridgeLauncher launcher = new BridgeLauncher(new BridgeLauncher.Processes() {
                 @Override public boolean isRunning(String bridge) { return bridge.equals("whatsapp"); }
-                @Override public void prepare(String bridge, java.util.function.Consumer<String> progress) { }
-                @Override public void start(String bridge) { }
-                @Override public void stop(String bridge) { }
-                @Override public void restarting(String bridge) { }
+                @Override public void prepare(String bridge, java.util.function.Consumer<String> progress) { /* the fake ignores it */ }
+                @Override public void start(String bridge) { /* the fake ignores it */ }
+                @Override public void stop(String bridge) { /* the fake ignores it */ }
+                @Override public void restarting(String bridge) { /* the fake ignores it */ }
                 @Override public java.nio.file.Path log(String bridge) { return java.nio.file.Path.of(bridge); }
             }, new BridgeDemand(Set.of("whatsapp")::contains, b -> true, Duration.ZERO, Duration.ZERO),
                     () -> Set.of("whatsapp", "gmessages"));

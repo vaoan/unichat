@@ -27,6 +27,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Messages arriving refresh the lists and replace their cells: a menu anchored to a cell closed under the person. */
@@ -115,7 +116,7 @@ class RowMenuUiTest {
         });
         FxWait.settled();
         fx(() -> {
-            @SuppressWarnings("unchecked")
+            @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
             javafx.scene.control.ListView<app.unichat.model.Chat> l =
                     (javafx.scene.control.ListView<app.unichat.model.Chat>) scene.getRoot().lookup(".chat-list");
             // The bottom of the list, at its last row that has a menu: a server to add has none, and in a short
@@ -148,7 +149,7 @@ class RowMenuUiTest {
             svc.setPinned(FAMILIA, i % 2 == 0).get();
             FxWait.settled(); // the lists' refresh for it has run
         }
-        assertTrue(closedBy[0] == null, "the menu closed when the list refreshed");
+        assertNull(closedBy[0], "the menu closed when the list refreshed");
     }
 
     private void assertMenuSurvivesRefresh(String list) throws Exception {

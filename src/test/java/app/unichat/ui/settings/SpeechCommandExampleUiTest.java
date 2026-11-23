@@ -3,7 +3,6 @@ package app.unichat.ui.settings;
 import app.unichat.support.I18n;
 import app.unichat.ui.FxWait;
 import javafx.application.Platform;
-import javafx.scene.Parent;
 import javafx.scene.control.TextField;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -36,7 +35,7 @@ class SpeechCommandExampleUiTest {
     }
 
     private static String example() throws Exception {
-        return FxWait.fx(() -> ((Parent) SpeechPage.build()).lookupAll(".text-field").stream()
+        return FxWait.fx(() -> SpeechPage.build().lookupAll(".text-field").stream()
                 .map(n -> (TextField) n).filter(t -> I18n.t("settings.speech.ownCommand").equals(t.getAccessibleText()))
                 .findFirst().orElseThrow().getPromptText());
     }

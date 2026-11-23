@@ -14,7 +14,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Marking a bot chat as direct rewrites the whole {@code m.direct}: written from the cache after a failed read, it
@@ -58,6 +57,6 @@ class BotChatDirectTest {
     void noMDirectYetIsWrittenFromTheCache() throws Exception {
         BotChat bots = bots(404, "{\"errcode\":\"M_NOT_FOUND\",\"error\":\"none\"}");
         bots.addDirect("@whatsappbot:example.org", "!bot:example.org");
-        assertTrue(calls.equals(List.of("GET", "PUT")), calls.toString());
+        assertEquals(List.of("GET", "PUT"), calls, calls.toString());
     }
 }

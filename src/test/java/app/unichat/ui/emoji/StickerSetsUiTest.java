@@ -33,6 +33,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -150,7 +152,7 @@ class StickerSetsUiTest {
         FxWait.fx(() -> { grid.showPack(PERROS); return null; });
         FxWait.until("that set, open, under its own name", () -> stickersOf("Perros_y_gatos").size() == 1);
         Button head = set("Perros_y_gatos");
-        assertTrue(!FxWait.fx(head::isMnemonicParsing), "its underscores are shown, not taken as a shortcut");
-        assertTrue(set("Gatitos") != null, "yours are still there");
+        assertFalse(FxWait.fx(head::isMnemonicParsing), "its underscores are shown, not taken as a shortcut");
+        assertNotNull(set("Gatitos"), "yours are still there");
     }
 }

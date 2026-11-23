@@ -6,7 +6,6 @@ import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -20,6 +19,7 @@ import java.util.concurrent.CountDownLatch;
 import javax.imageio.ImageIO;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -68,7 +68,7 @@ class EmojiPickerUiTest {
         String family = FxWait.fx(() -> ((javafx.scene.control.Labeled) menu.getSkin().getNode().lookup(".menu-item .label")).getFont().getFamily());
         FxWait.fx(() -> { menu.hide(); return null; });
         assertTrue(size < 16, "menu text at the window's size, was " + size);
-        assertTrue(!family.contains("Emoji"), "not the emoji font: " + family);
+        assertFalse(family.contains("Emoji"), "not the emoji font: " + family);
         assertTrue(FxWait.fx(() -> menu.getItems().stream().noneMatch(i -> app.unichat.support.I18n.t("library.enlarge").equals(i.getText()))),
                 "no 'see it big' for an emoji");
         FxWait.fx(() -> { b.getScene().getWindow().hide(); return null; });
@@ -84,7 +84,7 @@ class EmojiPickerUiTest {
             // another UI test started the toolkit
         }
         Platform.setImplicitExit(false);
-        FxWait.fx(() -> EmojiArt.pictures()).get(); // JUnit's own timeout catches one that never ends
+        FxWait.fx(EmojiArt::pictures).get(); // JUnit's own timeout catches one that never ends
         EmojiGrid grid = FxWait.fx(() -> {
             EmojiGrid g = new EmojiGrid(null, EmojiGrid.Mode.PLAIN, e -> { }, t -> { });
             Stage stage = new Stage();

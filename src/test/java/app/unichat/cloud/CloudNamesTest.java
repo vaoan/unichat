@@ -145,7 +145,7 @@ class CloudNamesTest {
         cloud.put("Unichat/Media/Ana/b.jpg", bytes("b"));
         cloud.failDeleteOnce.add(CloudNames.OLD_SETTINGS);
         VaultComputer desk = new VaultComputer(cloud, dir, DESK);
-        assertTrue(desk.round().error() != null, "told");
+        assertNotNull(desk.round().error(), "told");
         assertTrue(cloud.files.containsKey(OLD_SETTINGS), "cut short before the old folder went");
         assertEquals("DARK", Bundle.parse(cloud.files.get(SETTINGS)).settings().get("ui.theme"), "the newer copy already under the new name");
         assertNull(desk.get("ui.theme"), "and the settings waited: one was still under its old name");
@@ -153,7 +153,7 @@ class CloudNamesTest {
         assertEquals("DARK", desk.get("ui.theme"));
         assertFalse(paths().stream().anyMatch(CloudNamesTest::old), "finished: " + paths());
         assertArrayEquals(bytes("foto"), cloud.files.get("Unichat/Media/Ana/a.jpg"));
-        assertTrue(desk.get(CloudNames.DONE) != null);
+        assertNotNull(desk.get(CloudNames.DONE));
     }
 
     @Test
@@ -214,7 +214,7 @@ class CloudNamesTest {
         assertTrue(cloud.files.containsKey("Unichat/Multimedia/Beto/e.jpg"));
         assertNull(desk.round().error());
         assertArrayEquals(bytes("e"), cloud.files.get("Unichat/Media/Beto/e.jpg"), "the next round moves it");
-        assertTrue(desk.get(MediaTurn.LAST_VERIFY) != null, "and checks");
+        assertNotNull(desk.get(MediaTurn.LAST_VERIFY), "and checks");
     }
 
     @Test

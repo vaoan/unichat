@@ -108,9 +108,10 @@ class WakeSyncTest {
 
     @Test
     void aServerStillStartingIsConnectingNotOffline() throws Exception {
-        java.net.ServerSocket closed = new java.net.ServerSocket(0);
-        int port = closed.getLocalPort();
-        closed.close(); // nothing listens: refused, like the local server a second before it's up
+        int port;
+        try (java.net.ServerSocket closed = new java.net.ServerSocket(0)) {
+            port = closed.getLocalPort();
+        } // nothing listens: refused, like the local server a second before it's up
         svc = new MatrixChatService("http://127.0.0.1:" + port, "@starting:example.org", "t");
         // Each try says SYNCING first; what follows it is what the refusal left.
         List<ConnectionState> afterRefusals = new CopyOnWriteArrayList<>();

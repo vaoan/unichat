@@ -11,6 +11,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import static app.unichat.ui.TimelineWindow.CHAT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,7 +44,7 @@ class AutoScrollUiTest {
         });
         FxWait.until("the original is on screen", () -> w.yOf(firstId) != null);
         FxWait.settled();
-        assertTrue(FxWait.fx(w::newestGap) == null, "it stayed up");
+        assertNull(FxWait.fx(w::newestGap), "it stayed up");
         assertNotNull(FxWait.fx(() -> w.yOf(firstId)), "the original is on screen");
         assertTrue(FxWait.fx(w::jumpDownShown), "a way back down");
     }

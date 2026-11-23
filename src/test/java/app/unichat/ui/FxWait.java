@@ -40,7 +40,7 @@ public final class FxWait {
         try {
             return f.get();
         } catch (ExecutionException e) {
-            if (e.getCause() instanceof Exception x) throw x;
+            if (e.getCause() instanceof Exception x) throw x; // NOPMD: PreserveStackTrace, the future's wrapper is dropped; its cause has the trace
             throw e;
         }
     }
@@ -81,14 +81,14 @@ public final class FxWait {
         try {
             met.get();
         } catch (ExecutionException e) {
-            if (e.getCause() instanceof OnFxThread wrong) throw wrong;
+            if (e.getCause() instanceof OnFxThread wrong) throw wrong; // NOPMD: PreserveStackTrace, as above
             throw e;
         } catch (InterruptedException timedOut) {
             Platform.runLater(() -> { if (timer[0] != null) timer[0].stop(); });
             Thread.currentThread().interrupt();
             AssertionError e = new AssertionError("never happened: " + what);
             if (last.get() != null) e.initCause(last.get());
-            throw e;
+            throw e; // NOPMD: PreserveStackTrace, the wait's own end; its last failure is the cause
         }
     }
 

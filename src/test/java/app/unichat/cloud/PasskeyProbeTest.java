@@ -17,6 +17,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -84,8 +85,7 @@ class PasskeyProbeTest {
     void aProbeLeftToItsDeadlineAtLaunchSaysNothingMore() throws Exception {
         System.setProperty(PasskeyProbe.FLAG, "true");
         CompletableFuture<Void> probe = PasskeyProbe.onStart(u -> { }, 0, dir.resolve("probe.txt"), log::add, java.time.Duration.ZERO);
-        assertTrue(org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class, probe::get).getCause()
-                instanceof Loopback.Expired);
+        assertInstanceOf(Loopback.Expired.class, org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class, probe::get).getCause());
         assertEquals(1, log.size(), "only the address: " + log);
     }
 

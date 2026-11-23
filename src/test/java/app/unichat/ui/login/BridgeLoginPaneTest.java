@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,7 +30,7 @@ class BridgeLoginPaneTest {
 
     @Test
     void bridgePatternIsChecked() {
-        assertTrue(BridgeLoginPane.invalid(field("2fa_code", "^[0-9]{5}$"), "12a45") != null);
+        assertNotNull(BridgeLoginPane.invalid(field("2fa_code", "^[0-9]{5}$"), "12a45"));
         assertNull(BridgeLoginPane.invalid(field("2fa_code", "^[0-9]{5}$"), "12345"));
         assertNull(BridgeLoginPane.invalid(field("token", "(?<bad"), "x"), "a pattern Java can't read is left to the bridge");
     }

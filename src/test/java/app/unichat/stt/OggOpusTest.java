@@ -44,7 +44,7 @@ class OggOpusTest {
         short prev = 0;
         for (int i = 0; i < n; i++) {
             short v = b.getShort(44 + i * 2);
-            sum += (v / 32768.0) * (v / 32768.0);
+            sum += v / 32768.0 * (v / 32768.0);
             if ((prev < 0) != (v < 0)) crossings++;
             prev = v;
         }

@@ -36,7 +36,7 @@ class DownloadLeftoversTest {
         Thread.ofPlatform().daemon().start(() -> {
             while (!server.isClosed()) {
                 try (Socket s = server.accept()) {
-                    s.getInputStream().read(new byte[8192]);
+                    var _ = s.getInputStream().read(new byte[8192]); // the request: read, never looked at
                     OutputStream out = s.getOutputStream();
                     out.write("HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
                     out.write(new byte[10_000]);

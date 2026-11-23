@@ -17,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -184,7 +185,7 @@ class CloudUnseenTest {
         try {
             Cloud.Status s = desk.cloud.syncNow().get(); // the photo goes up, then the day's check, due, fails
             assertTrue(failed.get(), "the check began");
-            assertTrue(s.error() != null, "and its failure is told");
+            assertNotNull(s.error(), "and its failure is told");
             assertEquals(List.of("PUT " + PHOTO), mediaPuts());
             assertEquals(1, s.uploaded(), "what went up before it still counts");
         } finally {
@@ -261,7 +262,7 @@ class CloudUnseenTest {
         account.failReadOnce.add(Vault.INFO);
         Cloud.Status s = desk.cloud.syncNow().get();
         assertFalse(account.failReadOnce.contains(Vault.INFO), "the round failed reading the vault");
-        assertTrue(s.error() != null, "told");
+        assertNotNull(s.error(), "told");
         assertTrue(s.mediaPaused(), "and the photo still waits for being seen");
     }
 

@@ -55,8 +55,8 @@ class TextKeepingTest {
         SaveFolders.setOwn(chat.id(), dir.resolve("out"));
         keeping = new TextKeeping(svc, reader(), new TextLog(dir.resolve("texts"), Instant::now), Duration.ZERO, Duration.ZERO,
                 new AutoSave.Progress() {
-                    @Override public void changed(int done, int total) { }
-                    @Override public void finished(int saved, Chat c) { }
+                    @Override public void changed(int done, int total) { /* the fake ignores it */ }
+                    @Override public void finished(int saved, Chat c) { /* the fake ignores it */ }
                     @Override public void failed(String what, Chat c, String messageId, String why) { failed.add(what + ": " + why); }
                 });
     }

@@ -139,7 +139,7 @@ class SyncProcessorTest {
                 {'type':'m.room.message','event_id':'$1','sender':'@bob:example.org','origin_server_ts':1,
                  'content':{'msgtype':'m.image','body':'IMG_0001.jpg','url':'mxc://s/a'}}"""));
         assertEquals("Bob", old.senderName());
-        assertEquals(app.unichat.model.MessageType.IMAGE, old.type());
+        assertEquals(MessageType.IMAGE, old.type());
         assertEquals(1, messages(room).size(), "the chat keeps only what it loaded");
         assertNull(proc.standalone(room, json("{'type':'m.room.member','event_id':'$2','sender':'@bob:example.org','state_key':'@bob:example.org','content':{}}")));
         assertNull(proc.standalone("!unknown:example.org", json("{'type':'m.room.message','event_id':'$3','sender':'@bob:example.org','content':{'body':'x'}}")));
@@ -309,7 +309,7 @@ class SyncProcessorTest {
                  {'type':'m.room.member','state_key':'@dan:example.org','event_id':'$a','sender':'@dan:example.org','origin_server_ts':6000,
                   'content':{'membership':'join','displayname':'Dan','avatar_url':'mxc://example.org/new'}}]}}
                 """, true);
-        assertEquals(java.time.Instant.ofEpochMilli(1000), proc.room(room).chat.lastActivity(), "where its last message put it");
+        assertEquals(Instant.ofEpochMilli(1000), proc.room(room).chat.lastActivity(), "where its last message put it");
 
         String quiet = "!solo-cambios:example.org";
         sync(quiet, people.replace("!grande", "!solo") + """
@@ -317,7 +317,7 @@ class SyncProcessorTest {
                  {'type':'m.room.member','state_key':'@carl:example.org','event_id':'$k','sender':'@carl:example.org','origin_server_ts':7000,
                   'content':{'membership':'join','displayname':'Carl'}}]}}
                 """, false);
-        assertEquals(java.time.Instant.EPOCH, proc.room(quiet).chat.lastActivity(), "nothing to read: not on top");
+        assertEquals(Instant.EPOCH, proc.room(quiet).chat.lastActivity(), "nothing to read: not on top");
         assertEquals("Carl se unió", proc.room(quiet).chat.lastPreview(), "the line still shows");
     }
 
@@ -376,12 +376,12 @@ class SyncProcessorTest {
         sync(room, "{'timeline':{'events':[]}}", false);
         proc.addLocalEcho(room, "t3", m -> m.setBody("foto"));
         proc.confirmLocalEcho(room, "t3", "$mine");
-        long server = java.time.Instant.now().plusSeconds(3600).toEpochMilli();
+        long server = Instant.now().plusSeconds(3600).toEpochMilli();
         SyncProcessor.Result r = sync(room, "{'timeline':{'events':[" + text("$mine", ME, server, "foto") + "]}}", true);
         assertEquals(1, messages(room).size(), "still one message");
         Message mine = messages(room).get(0);
         assertEquals("$mine", mine.id());
-        assertEquals(java.time.Instant.ofEpochMilli(server), mine.timestamp());
+        assertEquals(Instant.ofEpochMilli(server), mine.timestamp());
         assertEquals("foto", mine.body());
         assertEquals(mine, proc.room(room).byId.get("$mine"));
         assertTrue(r.messagesChanged.contains(room), "so autosave looks again");
@@ -395,14 +395,14 @@ class SyncProcessorTest {
         String room = "!v:example.org";
         sync(room, "{'timeline':{'events':[]}}", false);
         proc.addLocalEcho(room, "t4", m -> {
-            m.setType(app.unichat.model.MessageType.AUDIO);
+            m.setType(MessageType.AUDIO);
             m.setMediaUrl("file:///tmp/nota.ogg");
             m.setFileName("nota.ogg");
             m.setMimeType("audio/ogg");
         });
         proc.confirmLocalEcho(room, "t4", "$voz");
         assertEquals("file:///tmp/nota.ogg", messages(room).get(0).mediaUrl(), "until its event comes, it plays from disk");
-        long server = java.time.Instant.now().plusSeconds(3600).toEpochMilli();
+        long server = Instant.now().plusSeconds(3600).toEpochMilli();
         SyncProcessor.Result r = sync(room, "{'timeline':{'events':[{'type':'m.room.message','event_id':'$voz','sender':'" + ME
                 + "','origin_server_ts':" + server + ",'content':{'msgtype':'m.audio','body':'nota.ogg','filename':'nota.ogg',"
                 + "'url':'mxc://example.org/v1','info':{'mimetype':'audio/ogg','size':3,'duration':2500},"
@@ -414,7 +414,7 @@ class SyncProcessorTest {
         assertEquals(2500, mine.durationMs());
         assertEquals(3, mine.fileSize());
         assertEquals("nota.ogg", mine.fileName());
-        assertEquals(java.time.Instant.ofEpochMilli(server), mine.timestamp(), "the server's time as before");
+        assertEquals(Instant.ofEpochMilli(server), mine.timestamp(), "the server's time as before");
         assertEquals(mine, proc.room(room).byId.get("$voz"));
         assertTrue(r.messagesChanged.contains(room));
     }

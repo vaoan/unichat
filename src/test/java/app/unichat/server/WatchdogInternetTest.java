@@ -52,7 +52,7 @@ class WatchdogInternetTest {
 
     @Test
     void whenInternetReturnsEveryBridgeStartsAgainAtOnceButNotTheServer() {
-        online = false;
+        online = false; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         dog.check();
         assertEquals(List.of(), restarted);
 
@@ -79,7 +79,7 @@ class WatchdogInternetTest {
                 (name, why) -> restarted.add(name + ": " + why), () -> online, new Watchdog.SessionKeeper() {
                     @Override public boolean fragile(String bridge) { return bridge.equals("facebook"); }
                     @Override public boolean safeToRestart(String bridge) { return !bridge.equals("facebook") || safe[0]; }
-                    @Override public void tick(boolean on, long now) { }
+                    @Override public void tick(boolean on, long now) { /* the fake ignores it */ }
                 });
     }
 
@@ -87,7 +87,7 @@ class WatchdogInternetTest {
     void returningInternetDoesNotRestartWhatCouldLoseItsSession() throws Exception {
         boolean[] safe = {false};
         Watchdog d = withFragileFacebook(safe);
-        online = false;
+        online = false; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         d.check();
         online = true;
         d.check();
@@ -104,11 +104,11 @@ class WatchdogInternetTest {
 
     @Test
     void returningInternetDoesNotWaitForTheCooldown() {
-        online = false;
+        online = false; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         dog.check();
-        online = true;
+        online = true; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         dog.check();
-        online = false;
+        online = false; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         dog.check();
         restarted.clear();
         online = true;

@@ -16,10 +16,11 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 /** Pictures for tests, written as real files: a still PNG or JPEG, and an animated GIF. */
-public final class TestPictures {
+public final class TestPictures { // NOPMD: TestClassWithoutTestCases, a helper for tests, not one
     private TestPictures() {}
 
     /** Draws frame {@code frame} of a picture. */
+    @FunctionalInterface
     public interface Painter {
         void paint(Graphics2D g, int frame);
     }
@@ -67,7 +68,7 @@ public final class TestPictures {
             g.setColor(Color.WHITE);
             g.fillRect(0, 0, w, h);
             g.setColor(Color.MAGENTA);
-            g.fillRect((f * 7) % Math.max(1, w - 10), (f * 5) % Math.max(1, h - 10), 10, 10);
+            g.fillRect(f * 7 % Math.max(1, w - 10), f * 5 % Math.max(1, h - 10), 10, 10);
         });
     }
 }

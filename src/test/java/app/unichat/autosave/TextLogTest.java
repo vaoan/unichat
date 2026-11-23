@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -106,6 +107,6 @@ class TextLogTest {
     void theKeyIsTheSameOnEveryComputerAndSaysNothingOfTheChat() {
         assertEquals(TextLog.key(CHAT), TextLog.key(CHAT));
         assertTrue(TextLog.key(CHAT).matches("[0-9a-f]{12}"), TextLog.key(CHAT));
-        assertFalse(TextLog.key(CHAT).equals(TextLog.key("!otro:demo")));
+        assertNotEquals(TextLog.key("!otro:demo"), TextLog.key(CHAT));
     }
 }

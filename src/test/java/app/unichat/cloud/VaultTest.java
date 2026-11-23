@@ -47,7 +47,7 @@ class VaultTest {
         new SealedStorage(storage, () -> old.vk().clone()).put(TextSync.ROOT + "/" + MAC + "/3f2a9c1b2d4e 2026-11.jsonl", new byte[] {1});
         storage.delete(Vault.INFO); // its folder couldn't go when it was turned off
         Vault.Created made = Vault.create(storage, MAC, "Escritorio");
-        assertEquals(java.util.Set.of(Vault.INFO), new java.util.TreeSet<>(cloud.files.keySet().stream()
+        assertEquals(Set.of(Vault.INFO), new java.util.TreeSet<>(cloud.files.keySet().stream()
             .filter(p -> !p.startsWith(Vault.SLOTS + "/")).toList()), "nothing of the old one left");
         assertEquals(2, cloud.files.keySet().stream().filter(p -> p.startsWith(Vault.SLOTS + "/")).count(), "the new one's slots only");
         java.util.Arrays.fill(old.vk(), (byte) 0);
@@ -364,6 +364,7 @@ class VaultTest {
     }
 
     /** What a {@link Racing} account does around a call, by path. */
+    @FunctionalInterface
     private interface Hook {
         void at(String path) throws IOException;
     }

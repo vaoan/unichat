@@ -7,7 +7,6 @@ import app.unichat.ui.desktop.Notifier;
 import app.unichat.model.Chat;
 import app.unichat.service.MockChatService;
 import javafx.application.Platform;
-import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
@@ -93,7 +92,7 @@ class TypingDotsUiTest {
             return v;
         });
         Chat chat = svc.chat("!family:demo");
-        fx(() -> { chat.setTyping(java.util.Set.of("Laura")); view.thread().refreshHeader(); view.list().refresh(); return null; });
+        fx(() -> { chat.setTyping(Set.of("Laura")); view.thread().refreshHeader(); view.list().refresh(); return null; });
         FxWait.until("the chat's row shows the dots", () -> view.lookup(".chat-preview.typing .typing-dots") != null);
         assertNotNull(fx(() -> view.lookup(".chat-preview.typing .typing-dots")), "the chat's row in the list too");
         Label line = fx(() -> (Label) view.lookup(".typing-line"));
@@ -105,7 +104,7 @@ class TypingDotsUiTest {
                     java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "unichat-typing.png").toFile());
             return null;
         });
-        fx(() -> { chat.setTyping(java.util.Set.of()); view.thread().refreshHeader(); view.list().refresh(); return null; });
+        fx(() -> { chat.setTyping(Set.of()); view.thread().refreshHeader(); view.list().refresh(); return null; });
         FxWait.until("the dots go", () -> line.getGraphic() == null && view.lookup(".chat-list .typing-dots") == null);
         assertNull(fx(line::getGraphic));
         assertNull(fx(() -> view.lookup(".chat-list .typing-dots")), "a recycled row doesn't keep them");

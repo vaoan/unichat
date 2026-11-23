@@ -192,7 +192,7 @@ class ReplyPromptTest {
 
     @Test
     void howLongAgoReadsLikeAPersonWouldSayIt() {
-        java.time.Instant t = Instant.parse("2026-01-02T03:04:05Z");
+        Instant t = Instant.parse("2026-01-02T03:04:05Z");
         assertEquals("a moment ago", ReplyPrompt.ago(t, t.plusSeconds(30)));
         assertEquals("1 minute ago", ReplyPrompt.ago(t, t.plusSeconds(90)));
         assertEquals("45 minutes ago", ReplyPrompt.ago(t, t.plusSeconds(45 * 60)));

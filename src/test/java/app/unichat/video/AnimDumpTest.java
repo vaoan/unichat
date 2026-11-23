@@ -11,6 +11,7 @@ import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -79,7 +80,7 @@ class AnimDumpTest {
     @Test
     void notAWebpIsNoFrames() throws Exception {
         assumeTrue(tool() != null, "no anim_dump here");
-        assertEquals(null, AnimDump.frames(Files.writeString(dir.resolve("roto.webp"), "esto no es una imagen")));
+        assertNull(AnimDump.frames(Files.writeString(dir.resolve("roto.webp"), "esto no es una imagen")));
     }
 
     @Test
@@ -102,7 +103,7 @@ class AnimDumpTest {
      */
     @Test
     void eachFrameIsMadeSmallAsItsRead() throws Exception {
-        org.junit.jupiter.api.Assumptions.assumeTrue(AnimDump.find() != null, "no anim_dump");
+        assumeTrue(AnimDump.find() != null, "no anim_dump");
         List<int[]> sizes = new java.util.ArrayList<>();
         List<BufferedImage> frames = AnimDump.frames(asset(), f -> {
             sizes.add(new int[] {f.getWidth(), f.getHeight()});

@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -93,8 +95,8 @@ class MockChatServiceTest {
 
         app.unichat.model.Account work = wa.stream().filter(a -> a.id().equals("whatsapp:work")).findFirst().orElseThrow();
         svc.disconnectAccount(work).get();
-        assertEquals(null, svc.chat("!andrea:demo"), "chats of the disconnected account go away");
-        assertTrue(svc.chat("!mom:demo") != null, "the other account keeps its chats");
+        assertNull(svc.chat("!andrea:demo"), "chats of the disconnected account go away");
+        assertNotNull(svc.chat("!mom:demo"), "the other account keeps its chats");
         svc.stop();
     }
 }

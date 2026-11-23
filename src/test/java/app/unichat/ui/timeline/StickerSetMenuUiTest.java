@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A Telegram sticker in the chat opens its set in the side panel's Stickers tab from its menu. */
@@ -69,7 +70,7 @@ class StickerSetMenuUiTest {
             // "Ver en grande" was only in the side panel's menus, never in the chat's: a sticker's menu has it too.
             MenuItem big = FxWait.fx(() -> thread.actions().messageMenu(sticker).getItems().stream()
                     .filter(i -> "Ver en grande".equals(i.getText())).findFirst().orElse(null));
-            assertTrue(big != null, "the chat's sticker menu offers Ver en grande");
+            assertNotNull(big, "the chat's sticker menu offers Ver en grande");
             FxWait.fx(() -> { big.fire(); return null; });
             // The viewer is a window of its own (no owner, by design): found by its title.
             FxWait.until("the viewer", () -> FxWait.fx(() -> viewer() != null));

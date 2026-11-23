@@ -19,6 +19,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -65,7 +66,7 @@ class FilterUiTest {
         click(chip(scene, "Prioridad baja"));
         click(rail(scene, "Bandeja unificada"));
         f = fx(() -> list.filterProperty().get());
-        assertEquals(null, f.network());
+        assertNull(f.network());
         assertEquals(ChatFilter.View.LOW_PRIORITY, f.view(), "Prioridad baja survives going back to the inbox");
 
         click(rail(scene, "Archivados"));

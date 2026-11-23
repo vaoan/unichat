@@ -58,17 +58,17 @@ public class ScriptedChatService extends MockChatService {
 
     /** Ends the downloads held by {@link #holdDownloads}, or says how far they got meanwhile. */
     public static final class Gate {
-        private final CompletableFuture<Void> gate;
+        private final CompletableFuture<Void> ends;
         private final List<java.util.function.DoubleConsumer> listeners;
 
         private Gate(CompletableFuture<Void> gate, List<java.util.function.DoubleConsumer> listeners) {
-            this.gate = gate;
+            this.ends = gate;
             this.listeners = listeners;
         }
 
-        public void release() { gate.complete(null); }
+        public void release() { ends.complete(null); }
 
-        public void fail() { gate.completeExceptionally(new java.io.IOException("download failed (test)")); }
+        public void fail() { ends.completeExceptionally(new java.io.IOException("download failed (test)")); }
 
         /** The held downloads have {@code fraction} of their file (0 to 1). */
         public void report(double fraction) { listeners.forEach(l -> l.accept(fraction)); }

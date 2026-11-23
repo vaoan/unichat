@@ -42,7 +42,7 @@ class PasteUiTest {
             Stage stage = new Stage();
             stage.setScene(new Scene(c, 700, 160));
             stage.show();
-            ClipboardContent picture = new ClipboardContent();
+            var picture = new ClipboardContent();
             picture.putImage(new WritableImage(64, 48)); // as Chrome's "Copy image" leaves it: a picture, no text
             Clipboard.getSystemClipboard().setContent(picture);
             c.paste();
@@ -55,7 +55,7 @@ class PasteUiTest {
 
         int after = svc.messages(CHAT).size();
         String box = FxWait.fx(() -> {
-            ClipboardContent text = new ClipboardContent();
+            var text = new ClipboardContent();
             text.putString("hola");
             Clipboard.getSystemClipboard().setContent(text);
             composer.paste();

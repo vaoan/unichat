@@ -25,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /** The Stickers tab's button beside "Favoritos" brings each favourite from its set as it is now, and says how many. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
@@ -88,7 +89,7 @@ class FavoritesRebuildUiTest {
         FxWait.settled();
 
         assertEquals(1, asked.get(), "not again at once");
-        assertEquals(false, app.unichat.settings.Settings.get().favoritesRebuilt());
+        assertFalse(app.unichat.settings.Settings.get().favoritesRebuilt());
     }
 
     @Test

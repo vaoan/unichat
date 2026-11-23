@@ -21,9 +21,7 @@ public final class FakeService {
             for (int i = 0; i < 1024; i++) System.out.println(line);
             System.out.flush();
             try (java.net.Socket test = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), Integer.parseInt(args[1]))) {
-                while (test.getInputStream().read() >= 0) {
-                    // until the test hangs up
-                }
+                test.getInputStream().transferTo(java.io.OutputStream.nullOutputStream()); // until the test hangs up
                 System.out.println("after");
                 System.out.flush();
                 if (System.out.checkError()) System.exit(5);
@@ -31,9 +29,7 @@ public final class FakeService {
                 System.exit(4);
             }
         }
-        while (System.in.read() >= 0) {
-            // nobody writes to it: this ends when the input closes
-        }
+        System.in.transferTo(java.io.OutputStream.nullOutputStream()); // nobody writes to it: this ends when the input closes
     }
 
     /** Works in its current folder, like a bridge: writes what it's asked for and leaves a line per call in calls.txt. */
@@ -44,7 +40,7 @@ public final class FakeService {
         if (args[0].equals("broken-bridge")) {
             System.out.println("first line");
             System.out.println("no database here");
-            System.exit(7);
+            System.exit(7); // NOPMD: DoNotTerminateVM, a fake service process that exits as a real one would
         }
         String flag = args[1];
         if (flag.equals("-e")) {
@@ -79,7 +75,7 @@ public final class FakeService {
                     """);
             java.nio.file.Files.createDirectories(here.resolve("logs"));
             java.nio.file.Files.writeString(here.resolve("logs/first.log"), "unfiltered");
-            System.exit(1);
+            System.exit(1); // NOPMD: DoNotTerminateVM, as above
         }
     }
 }

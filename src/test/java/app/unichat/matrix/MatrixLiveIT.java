@@ -27,9 +27,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * End-to-end test against a real homeserver with users {@code alice} and {@code bob}
@@ -68,7 +68,7 @@ class MatrixLiveIT {
             await("notification", () -> notified.stream().anyMatch(m -> m.body().equals("hola alice")));
             await("unread", chat::isUnread);
             Message incoming = body(alice, roomId, "hola alice");
-            assertTrue(!incoming.outgoing());
+            assertFalse(incoming.outgoing());
 
             alice.markRead(roomId);
             await("read", () -> !chat.isUnread());

@@ -18,6 +18,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -118,7 +119,7 @@ class SidePanelUiTest {
         int before = fx(() -> svc.chat("!family:demo").lastPreview().length());
         fx(() -> {
             Node tile = panel(scene).lookup(".sticker-tile");
-            assertTrue(tile != null, "the favourite is listed");
+            assertNotNull(tile, "the favourite is listed");
             assertEquals("Sticker favorito, enviar", tile.getAccessibleText());
             tile.fireEvent(new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "",
                     javafx.scene.input.KeyCode.ENTER, false, false, false, false));
@@ -141,7 +142,7 @@ class SidePanelUiTest {
         javafx.scene.control.MenuItem enlarge = fx(() -> javafx.stage.Window.getWindows().stream()
                 .filter(w -> w instanceof javafx.scene.control.ContextMenu).map(w -> (javafx.scene.control.ContextMenu) w)
                 .flatMap(m -> m.getItems().stream()).filter(i -> "Ver en grande".equals(i.getText())).findFirst().orElse(null));
-        assertTrue(enlarge != null, "the menu offers Ver en grande");
+        assertNotNull(enlarge, "the menu offers Ver en grande");
         long windows = fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage).count());
         fx(() -> { enlarge.fire(); enlarge.getParentPopup().hide(); return null; }); // as a real click on it does
         FxWait.until("the sticker's window opens", () -> javafx.stage.Window.getWindows().stream()

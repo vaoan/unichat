@@ -8,10 +8,8 @@ import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.Theme;
-import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.scene.Node;
-import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.Labeled;
@@ -22,26 +20,18 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.function.BiPredicate;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -150,7 +140,7 @@ class VaultPageUiTest extends VaultPageTestBase {
         assertEquals(code, clip, "still copied while it's being kept");
         typeGroups(code, true);
         waitOpen();
-        assertEquals(null, clip, "the clipboard emptied once the code is known kept");
+        assertNull(clip, "the clipboard emptied once the code is known kept");
         assertFalse(account.cloud().vault().vaultView().get().codeUnconfirmed());
         assertTrue(FxWait.fx(() -> says(I18n.t("settings.vault.way.RECOVERY"))), "the ways in");
         click(I18n.t("settings.vault.password.add"));
@@ -199,7 +189,7 @@ class VaultPageUiTest extends VaultPageTestBase {
         click(I18n.t("settings.vault.code.copy"));
         click(I18n.t("folders.dialog.cancel"));
         waitFor(I18n.t("settings.vault.code.notKept"));
-        assertEquals(null, clip, "the sheet gone: the code never left on the clipboard");
+        assertNull(clip, "the sheet gone: the code never left on the clipboard");
         click(I18n.t("settings.vault.newCode"));
         FxWait.until("a new code", () -> root().lookup(".text-area.vault-code") instanceof TextArea t && !t.getText().replace("\n", "").equals(first));
         typeGroups(codeShown(), true);
@@ -466,7 +456,7 @@ class VaultPageUiTest extends VaultPageTestBase {
         FxWait.settled();
         assertFalse(FxWait.fx(() -> says(I18n.t("settings.vault.change.refusedAfter", "Escritorio"))), "not refused");
         assertTrue(account.offeredTheKey(VaultFixture.OTHER), "offered the new key: it opens on its next round");
-        assertTrue(code != null);
+        assertNotNull(code);
     }
 
     @Test
@@ -712,7 +702,7 @@ class VaultPageUiTest extends VaultPageTestBase {
             return o;
         });
         FxWait.until("the vault drawn", () -> SettingsWindow.current().getScene().getRoot().lookup(".vault-page") instanceof VBox v
-            && !v.getChildren().isEmpty() && v.lookupAll(".button").size() > 0);
+            && !v.getChildren().isEmpty() && !v.lookupAll(".button").isEmpty());
         for (String press : presses) {
             FxWait.fx(() -> {
                 ((ButtonBase) SettingsWindow.current().getScene().getRoot().lookupAll(".button").stream()

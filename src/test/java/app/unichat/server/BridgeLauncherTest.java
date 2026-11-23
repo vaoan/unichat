@@ -56,7 +56,7 @@ class BridgeLauncherTest {
     };
 
     private BridgeLauncher launcher(Duration limit) {
-        BridgeDemand demand = new BridgeDemand(b -> withAccount.contains(b), b -> {
+        BridgeDemand demand = new BridgeDemand(b -> withAccount.contains(b), b -> { // NOPMD: LambdaCanBeMethodReference, withAccount changes below; the lambda reads it then
             calls.add("probe " + b);
             return unanswered-- <= 0;
         }, Duration.ZERO, limit);
@@ -126,8 +126,8 @@ class BridgeLauncherTest {
             @Override public boolean isRunning(String b) { return false; }
             @Override public void prepare(String b, Consumer<String> progress) throws IOException { throw new IOException("no keys"); }
             @Override public void start(String b) { calls.add("start " + b); }
-            @Override public void stop(String b) { }
-            @Override public void restarting(String b) { }
+            @Override public void stop(String b) { /* the fake ignores it */ }
+            @Override public void restarting(String b) { /* the fake ignores it */ }
             @Override public Path log(String b) { return Path.of(b); }
         };
         BridgeLauncher l = new BridgeLauncher(failing, new BridgeDemand(b -> false, b -> true, Duration.ZERO, NO_LIMIT),

@@ -207,7 +207,7 @@ class ScrollPerfUiTest {
     }
 
     private static long liveMegabytes() {
-        System.gc();
+        System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection
         return ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed() >> 20;
     }
 
@@ -288,10 +288,10 @@ class ScrollPerfUiTest {
         Platform.setImplicitExit(false);
         MockChatService svc = new MockChatService();
         Field field = MockChatService.class.getDeclaredField("messages");
-        field.setAccessible(true);
-        @SuppressWarnings("unchecked") List<Message> list = ((Map<String, List<Message>>) field.get(svc)).get(CHAT);
+        field.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
+        @SuppressWarnings("unchecked") List<Message> list = ((Map<String, List<Message>>) field.get(svc)).get(CHAT); // the field is that map
         Method fire = MockChatService.class.getDeclaredMethod("fireMessages", String.class);
-        fire.setAccessible(true);
+        fire.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
         Instant start = Instant.now().minusSeconds(MESSAGES * 30L);
         synchronized (list) {
             for (int i = 0; i < MESSAGES; i++) list.add(message(i, start.plusSeconds(i * 30L)));

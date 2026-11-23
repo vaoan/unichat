@@ -97,7 +97,7 @@ class MetaSessionsTest {
         login("1", COOKIES);
         sessions.tick(true, 0);
         wipe("1");
-        redirecting = true;
+        redirecting = true; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         sessions.tick(true, 1000);
         sessions.tick(false, 2000);
         assertEquals(List.of(), restored, "it would be wiped again");
@@ -134,7 +134,7 @@ class MetaSessionsTest {
         login("1", COOKIES);
         sessions.tick(true, 0);
         wipe("1");
-        redirecting = true;
+        redirecting = true; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         sessions.tick(true, MetaSessions.BACKUP_EVERY_MS + 1);
         redirecting = false;
         sessions.tick(true, MetaSessions.BACKUP_EVERY_MS * 2 + 2);

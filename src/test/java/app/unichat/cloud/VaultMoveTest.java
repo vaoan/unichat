@@ -38,6 +38,7 @@ class VaultMoveTest {
     /** Called before each read of a sealed file: a test's way to break one. */
     private Hook beforeSealedGet = p -> { };
 
+    @FunctionalInterface
     private interface Hook {
         void at(String path) throws IOException;
     }

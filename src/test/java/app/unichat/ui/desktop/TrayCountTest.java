@@ -27,7 +27,7 @@ class TrayCountTest {
         BufferedImage one = Notifier.withCount(icon, 3);
         BufferedImage many = Notifier.withCount(icon, 12345);
         assertTrue((one.getRGB(one.getWidth() - 3, one.getHeight() - 10) >>> 24) > 0, "a badge in the corner");
-        assertTrue((many.getRGB(0, 0) >>> 24) == 0, "the rest stays the icon");
+        assertEquals(0, many.getRGB(0, 0) >>> 24, "the rest stays the icon");
         assertEquals("99+", Formats.badge(12345));
     }
 

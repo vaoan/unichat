@@ -134,7 +134,7 @@ class AnimatedImageTest {
             Files.copy(in, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
         AnimatedImage.RawFrames raw = AnimatedImage.composeWebp(f, 96, 96);
-        List<java.awt.image.BufferedImage> libwebp = app.unichat.video.AnimDump.frames(f);
+        List<BufferedImage> libwebp = app.unichat.video.AnimDump.frames(f);
         assertEquals(libwebp.size(), raw.images().size());
         for (int i = 0; i < libwebp.size(); i++) {
             assertEquals(libwebp.get(i).getRGB(40, 32), raw.images().get(i).getRGB(40, 32), "frame " + i + " as libwebp has it");
@@ -151,8 +151,8 @@ class AnimatedImageTest {
         org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.video.AnimDump.find() != null, "no anim_dump");
         Path still = Path.of(AnimatedImageTest.class.getResource("/app/unichat/ui/still.webp").toURI());
         AnimatedImage.WebpOpener failing = file -> new AnimatedImage.WebpReader() {
-            @Override public java.awt.image.BufferedImage read(int i) throws java.io.IOException { throw new java.io.EOFException(); }
-            @Override public void close() { }
+            @Override public BufferedImage read(int i) throws java.io.IOException { throw new java.io.EOFException(); }
+            @Override public void close() { /* the fake ignores it */ }
         };
         AnimatedImage.RawFrames frames = AnimatedImage.composeWebp(still, 64, 64, failing);
         assertEquals(1, frames.images().size(), "libwebp read it");

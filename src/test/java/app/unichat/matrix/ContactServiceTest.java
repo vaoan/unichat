@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,7 +45,7 @@ class ContactServiceTest {
         try {
             String base = "http://127.0.0.1:" + server.getAddress().getPort() + "/_matrix/provision";
             MatrixChatService.setBridgeProvisioner(new BridgeProvisioner() {
-                @Override public void ensure(Network n) { }
+                @Override public void ensure(Network n) { /* the fake ignores it */ }
                 @Override public String provisioningUrl(Network n) { return base; }
             });
             MatrixChatService svc = new MatrixChatService("http://127.0.0.1:9", "@me:x", "t");
@@ -54,7 +55,7 @@ class ContactServiceTest {
             assertTrue(bodies.stream().allMatch(String::isEmpty), "no made-up search was sent");
             java.util.concurrent.ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(
                     java.util.concurrent.ExecutionException.class, () -> svc.searchContacts(a, "ana").get());
-            assertTrue(e.getCause() instanceof UnsupportedOperationException, e.toString());
+            assertInstanceOf(UnsupportedOperationException.class, e.getCause(), e.toString());
             assertEquals(new ChatService.ContactSupport(false, false), svc.contactSupport(a).get());
         } finally {
             MatrixChatService.setBridgeProvisioner(null);

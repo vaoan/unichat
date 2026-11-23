@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class WatchdogDiskTest {
     private HttpServer everyoneAnswers;
     private long free = 50L << 30;
-    private final long clock = 1_000_000;
+    private static final long CLOCK = 1_000_000;
     private final List<String> restarted = new ArrayList<>();
     private Storage storage;
     private Watchdog dog;
@@ -36,7 +36,7 @@ class WatchdogDiskTest {
         });
         everyoneAnswers.start();
         int port = everyoneAnswers.getAddress().getPort();
-        storage = new Storage(() -> free, () -> clock);
+        storage = new Storage(() -> free, () -> CLOCK);
         dog = new Watchdog(Map.of("tuwunel", port, "telegram", port), () -> List.of("tuwunel", "telegram"), new BridgeStates(),
                 (name, why) -> restarted.add(name + ": " + why), () -> true, storage);
     }
@@ -51,7 +51,7 @@ class WatchdogDiskTest {
         dog.check();
         assertEquals(List.of(), restarted);
 
-        free = 100L << 20;
+        free = 100L << 20; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         dog.check();
         assertEquals(List.of(), restarted, "with the disk full a restart can't help");
 
@@ -77,7 +77,7 @@ class WatchdogDiskTest {
 
     @Test
     void whileTheDiskIsFullAFailureWaitsForRoom() {
-        free = 10L << 20;
+        free = 10L << 20; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         storage.failed("telegram");
         dog.check();
         assertEquals(List.of(), restarted);

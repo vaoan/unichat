@@ -35,7 +35,7 @@ public final class LeftoverWindows implements BeforeEachCallback, AfterEachCallb
     }
 
     @Override
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // the store holds what beforeEach put there: a Set<Window>
     public void afterEach(ExtensionContext context) throws Exception {
         Set<Window> before = (Set<Window>) context.getStore(HERE).get("before");
         List<String> left = onFx(() -> {

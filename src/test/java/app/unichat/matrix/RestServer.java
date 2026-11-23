@@ -118,7 +118,7 @@ final class RestServer implements AutoCloseable {
     }
 
     private static SortedSet<String> rooms(String list) {
-        TreeSet<String> out = new TreeSet<>();
+        SortedSet<String> out = new TreeSet<>();
         for (String r : list.replace("[", "").replace("]", "").split(",")) if (!r.isBlank()) out.add(r.strip());
         return out;
     }
@@ -168,7 +168,7 @@ final class RestServer implements AutoCloseable {
     }
 
     private static String names(JsonNode list) {
-        TreeSet<String> out = new TreeSet<>();
+        SortedSet<String> out = new TreeSet<>();
         for (JsonNode r : list) out.add(r.asText());
         return out.toString();
     }
@@ -295,17 +295,17 @@ final class RestServer implements AutoCloseable {
 
     /** A Discord server's space ({@code guild}) listing its channels. */
     static String server(String id, String guild, String... channels) {
-        StringBuilder s = new StringBuilder(member(ME) + "," + state("m.room.create", "", "{\"type\":\"m.space\"}") + ","
-                + bridge("discord", guild));
-        for (String c : channels) s.append(",").append(state("m.space.child", c, "{\"via\":[\"example.org\"]}"));
+        StringBuilder s = new StringBuilder(member(ME)).append(',').append(state("m.room.create", "", "{\"type\":\"m.space\"}"))
+                .append(',').append(bridge("discord", guild));
+        for (String c : channels) s.append(',').append(state("m.space.child", c, "{\"via\":[\"example.org\"]}"));
         return room(id, s.toString());
     }
 
     /** A category: a space inside server {@code parent}, which it names as its parent, listing its channels. */
     static String category(String id, String channelId, String parent, String... channels) {
-        StringBuilder s = new StringBuilder(member(ME) + "," + state("m.room.create", "", "{\"type\":\"m.space\"}") + ","
-                + bridge("discord", channelId) + "," + state("m.space.parent", parent, "{\"via\":[\"example.org\"]}"));
-        for (String c : channels) s.append(",").append(state("m.space.child", c, "{\"via\":[\"example.org\"]}"));
+        StringBuilder s = new StringBuilder(member(ME)).append(',').append(state("m.room.create", "", "{\"type\":\"m.space\"}"))
+                .append(',').append(bridge("discord", channelId)).append(',').append(state("m.space.parent", parent, "{\"via\":[\"example.org\"]}"));
+        for (String c : channels) s.append(',').append(state("m.space.child", c, "{\"via\":[\"example.org\"]}"));
         return room(id, s.toString());
     }
 

@@ -10,7 +10,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
 
 class ChromiumCookiesTest {
-    private static final byte[] KEY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] KEY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII); // NOPMD: HardCodedCryptoKey, a fixture's
 
     private static byte[] encryptV10(byte[] plain) throws Exception {
         byte[] iv = new byte[16];

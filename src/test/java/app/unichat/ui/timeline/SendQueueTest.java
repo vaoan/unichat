@@ -2,7 +2,6 @@ package app.unichat.ui.timeline;
 
 import app.unichat.assist.ReplyWriter;
 import app.unichat.model.Message;
-import app.unichat.service.MockChatService;
 import app.unichat.service.ScriptedChatService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -191,7 +191,7 @@ class SendQueueTest {
         svc.receive(CHAT, "¿vienes mañana?");
         queue.submit(CHAT, "creo q sí", null);
         answer(0);
-        assertEquals(null, svc.messages(CHAT).getLast().replyToId(), "right after the question already: no quote");
+        assertNull(svc.messages(CHAT).getLast().replyToId(), "right after the question already: no quote");
     }
 
     @Test
@@ -207,7 +207,7 @@ class SendQueueTest {
         queue.submit(CHAT, "dijo q no", null);
         svc.receive(CHAT, "¿y entonces?");
         answer(1);
-        assertEquals(null, svc.messages(CHAT).getLast().replyToId(), "turned off");
+        assertNull(svc.messages(CHAT).getLast().replyToId(), "turned off");
     }
 
     @Test
@@ -218,7 +218,7 @@ class SendQueueTest {
         queue.submit(CHAT, "creo q sí", null);
         svc.receive(CHAT, "¿y a qué hora?");
         answer(0);
-        assertEquals(null, svc.messages(CHAT).getLast().replyToId());
+        assertNull(svc.messages(CHAT).getLast().replyToId());
     }
 
     @Test
@@ -280,7 +280,7 @@ class SendQueueTest {
         asked.markDeleted(); // what it answered was taken back
         svc.receive(CHAT, "olvídalo"); // and the chat went on
         answer(0);
-        assertEquals(null, svc.messages(CHAT).getLast().replyToId(), "never a quote of what's gone");
+        assertNull(svc.messages(CHAT).getLast().replyToId(), "never a quote of what's gone");
     }
 
     @Test
@@ -288,9 +288,9 @@ class SendQueueTest {
         svc.receive(CHAT, "¿vienes mañana?");
         SendQueue.Pending p = queue.submit(CHAT, "creo q sí", null);
         assertTrue(p.wouldAnswer() != null && p.wouldAnswer().contains("¿vienes mañana?"), String.valueOf(p.wouldAnswer()));
-        assertEquals(null, queue.submit(CHAT, "dijo q no", svc.messages(CHAT).getFirst().id()).wouldAnswer(), "the person chose");
+        assertNull(queue.submit(CHAT, "dijo q no", svc.messages(CHAT).getFirst().id()).wouldAnswer(), "the person chose");
         app.unichat.assist.AiSettings.setKeepThread(false);
-        assertEquals(null, queue.submit(CHAT, "ok", null).wouldAnswer(), "turned off");
+        assertNull(queue.submit(CHAT, "ok", null).wouldAnswer(), "turned off");
     }
 
     @Test
@@ -347,7 +347,7 @@ class SendQueueTest {
     void aQueueNeverKeepsItsServiceAlive() {
         java.lang.ref.WeakReference<app.unichat.service.ChatService> gone = queuedThenDropped();
         while (gone.get() != null) { // collected once nothing but the queue's registry holds it
-            System.gc();
+            System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection
             Thread.onSpinWait();
         }
     }

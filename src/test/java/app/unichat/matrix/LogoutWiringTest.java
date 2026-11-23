@@ -66,7 +66,7 @@ class LogoutWiringTest {
         server.start();
         String base = "http://127.0.0.1:" + server.getAddress().getPort();
         BridgeAccounts.provisioner = new BridgeProvisioner() {
-            @Override public void ensure(Network n) { }
+            @Override public void ensure(Network n) { /* the fake ignores it */ }
             @Override public String provisioningUrl(Network n) { return base + "/_matrix/provision"; }
             @Override public void loggedOut(Network n) { stopped.add(n); }
         };

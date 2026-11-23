@@ -128,7 +128,7 @@ class SeenTimelineAnimationsUiTest {
     void aTextWaitingToBeCorrectedHasAWheelThatRestsWhileUnseen() throws Exception {
         SendQueue queue = new SendQueue(new MockChatService(), () -> new AiReplyButton.Writer() {
             @Override public String write(String prompt) { return null; }
-            @Override public void cancel() { }
+            @Override public void cancel() { /* the fake ignores it */ }
         }, said -> { }, never -> { }); // its correction never runs: it waits for good
         SendQueueView view = FxWait.fx(() -> new SendQueueView(queue, () -> "!family:demo"));
         after.add(() -> Platform.runLater(view::dispose));

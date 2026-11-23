@@ -87,7 +87,7 @@ class SeenAnimationsUiTest {
     void aTaskBarsBarRestsWhileUnseenAndKeepsWhatItSays() throws Exception {
         TaskBar task = FxWait.fx(() -> new TaskBar("test-bar") { });
         Stage stage = window(FxWait.fx(() -> new StackPane(task)));
-        java.util.concurrent.Callable<Boolean> spinning = () -> task.bar.isIndeterminate();
+        java.util.concurrent.Callable<Boolean> spinning = task.bar::isIndeterminate;
         FxWait.fx(() -> { task.bar.setProgress(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS); return null; });
         assertTrue(FxWait.fx(spinning), "it moves while seen");
 
@@ -110,7 +110,7 @@ class SeenAnimationsUiTest {
         Seen.reset(false);
         Seen.reset(true);
         FxWait.fx(() -> null); // both changes reached the FX thread
-        assertEquals(0.4, FxWait.fx(() -> task.bar.getProgress()), "a count it showed stays as it was");
+        assertEquals(0.4, FxWait.fx(task.bar::getProgress), "a count it showed stays as it was");
     }
 
     /** Seen's listeners run under its lock: Showing's work is handed to the FX thread, even when set from there. */

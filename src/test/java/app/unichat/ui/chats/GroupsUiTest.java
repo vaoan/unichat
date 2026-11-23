@@ -25,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -80,12 +81,12 @@ class GroupsUiTest {
                 .filter(t -> t != null && !t.isEmpty()).toList();
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
     private static javafx.scene.control.ListView<app.unichat.model.Chat> chatList(Scene s) {
         return (javafx.scene.control.ListView<app.unichat.model.Chat>) s.getRoot().lookup(".chat-list");
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
     private static javafx.scene.control.ListView<app.unichat.model.Chat> spaceList(Scene s) {
         return (javafx.scene.control.ListView<app.unichat.model.Chat>) s.getRoot().lookup(".space-list");
     }
@@ -163,14 +164,14 @@ class GroupsUiTest {
         enter(fx(() -> chatList(scene)), "!server:demo");
         enter(fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
         FxWait.until("the joined channel opens", () -> MockChatService.UNJOINED_CHANNEL_ID.equals(thread(scene).chat().id()));
-        assertTrue(svc.chat(MockChatService.UNJOINED_CHANNEL_ID) != null, "Enter joined the channel");
+        assertNotNull(svc.chat(MockChatService.UNJOINED_CHANNEL_ID), "Enter joined the channel");
         assertEquals(MockChatService.UNJOINED_CHANNEL_ID, fx(() -> thread(scene).chat().id()), "and opened it");
         svc.stop();
     }
 
     private static String toastText(Scene s) throws Exception {
         return fx(() -> {
-            javafx.scene.Node t = s.getRoot().lookup(".toast");
+            Node t = s.getRoot().lookup(".toast");
             return t != null && t.isVisible() ? ((javafx.scene.control.Label) t).getText() : "";
         });
     }
@@ -214,14 +215,14 @@ class GroupsUiTest {
         Scene scene = open(null);
         svc.setFavorite("!server:demo", true).get();
         FxWait.until("the server's favourite tile", () -> favouriteTile(scene) != null);
-        javafx.scene.Node tile = fx(() -> favouriteTile(scene));
+        Node tile = fx(() -> favouriteTile(scene));
         key(tile, KeyCode.ENTER);
         FxWait.until("the server's channels", () -> spaceTexts(scene).stream().anyMatch(t -> t.startsWith("#anuncios")));
         assertTrue(fx(() -> spaceTexts(scene)).stream().anyMatch(t -> t.startsWith("#anuncios")), fx(() -> spaceTexts(scene)).toString());
         svc.stop();
     }
 
-    private static javafx.scene.Node favouriteTile(Scene scene) {
+    private static Node favouriteTile(Scene scene) {
         return scene.getRoot().lookupAll(".favorites > *").stream()
                 .filter(n -> String.valueOf(n.queryAccessibleAttribute(javafx.scene.AccessibleAttribute.TEXT)).contains("Servidor Unichat"))
                 .findFirst().orElse(null);

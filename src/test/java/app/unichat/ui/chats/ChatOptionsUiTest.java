@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -71,7 +72,7 @@ class ChatOptionsUiTest {
         CheckBox theirs = box(overlay, "Guardar lo que envíen en este chat"), mine = box(overlay, "Guardar lo que yo envíe en este chat");
         FxWait.fx(() -> { theirs.fire(); return null; });
         assertTrue(FxWait.fx(note::isVisible), "theirs saved, mine not: said");
-        assertTrue(FxWait.fx(() -> ((javafx.scene.control.Label) note).getText()).contains("tú"));
+        assertTrue(FxWait.fx(((javafx.scene.control.Label) note)::getText).contains("tú"));
         FxWait.fx(() -> { mine.fire(); return null; });
         assertFalse(FxWait.fx(note::isVisible), "mine saved too");
         FxWait.fx(() -> { mine.fire(); theirs.fire(); return null; });
@@ -126,11 +127,11 @@ class ChatOptionsUiTest {
         CheckBox mineOn = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
                 .filter(b -> b.getText().equals("Guardar lo que yo envíe en este chat")).findFirst().orElseThrow());
         FxWait.fx(() -> { mineOn.fire(); return null; });
-        assertEquals(java.util.EnumSet.allOf(app.unichat.model.SaveKind.class), svc.autoSaves(id, true), "on: every kind");
+        assertEquals(EnumSet.allOf(SaveKind.class), svc.autoSaves(id, true), "on: every kind");
         CheckBox minePhotos = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
                 .filter(b -> "Guardar lo que yo envíe en este chat: Fotos".equals(b.getAccessibleText())).findFirst().orElseThrow());
         FxWait.fx(() -> { minePhotos.fire(); return null; });
-        assertFalse(svc.autoSaves(id, true).contains(app.unichat.model.SaveKind.PHOTOS), "its own kinds");
+        assertFalse(svc.autoSaves(id, true).contains(SaveKind.PHOTOS), "its own kinds");
         FxWait.fx(() -> { mineOn.fire(); return null; });
         assertTrue(svc.autoSaves(id, true).isEmpty(), "and off");
 
@@ -148,7 +149,7 @@ class ChatOptionsUiTest {
         Button cancel = FxWait.fx(() -> overlay.lookupAll(".secondary-button").stream().map(n -> (Button) n)
                 .filter(b -> b.isVisible() && b.getText().equals("Cancelar")).findFirst().orElseThrow());
         FxWait.fx(() -> { cancel.fire(); return null; });
-        assertTrue(svc.chat(id) != null, "not left: asked, then cancelled");
+        assertNotNull(svc.chat(id), "not left: asked, then cancelled");
         FxWait.fx(() -> { ask.fire(); return null; });
         Button yes = FxWait.fx(() -> overlay.lookupAll(".danger-button").stream().map(n -> (Button) n)
                 .filter(b -> b.isVisible() && b.getText().startsWith("Sí,")).findFirst().orElseThrow());

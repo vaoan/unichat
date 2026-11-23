@@ -48,75 +48,81 @@ final class FakePCloud implements AutoCloseable {
                 json(x, "{\"result\": 2094, \"error\": \"Invalid 'access_token' provided.\"}");
                 return;
             }
-            switch (method) {
-                case "userinfo" -> json(x, "{\"result\": 0, \"email\": \"yo@correo.com\"}");
-                case "stat" -> {
-                    String p = q.get("path");
-                    if (files.containsKey(p)) json(x, "{\"result\": 0, \"metadata\": {\"hash\": " + versions.get(p)
-                            + ", \"modified\": \"x\", \"size\": " + files.get(p).length + "}}");
-                    else if (dirs.contains(p)) json(x, "{\"result\": 0, \"metadata\": {\"isfolder\": true}}");
-                    else json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
-                }
-                case "listfolder" -> {
-                    String p = q.get("path");
-                    if (!dirs.contains(p)) {
-                        json(x, "{\"result\": 2005, \"error\": \"Directory does not exist.\"}");
-                        return;
-                    }
-                    java.util.Set<String> names = new java.util.TreeSet<>();
-                    for (String f : files.keySet()) if (f.startsWith(p + "/")) names.add(f.substring(p.length() + 1).split("/")[0]);
-                    for (String d : dirs) if (d.startsWith(p + "/")) names.add(d.substring(p.length() + 1).split("/")[0]);
-                    StringBuilder contents = new StringBuilder();
-                    for (String n : names) contents.append(contents.isEmpty() ? "" : ",").append("{\"name\": \"").append(n).append("\"}");
-                    json(x, "{\"result\": 0, \"metadata\": {\"contents\": [" + contents + "]}}");
-                }
-                case "checksumfile" -> {
-                    byte[] f = files.get(q.get("path"));
-                    if (f == null) json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
-                    else json(x, "{\"result\": 0, \"sha1\": \"" + sha1(f) + "\"}");
-                }
-                case "createfolderifnotexists" -> {
-                    String p = q.get("path");
-                    if (!dirs.contains(p.substring(0, Math.max(1, p.lastIndexOf('/'))))) {
-                        json(x, "{\"result\": 2005, \"error\": \"Directory does not exist.\"}");
-                        return;
-                    }
-                    dirs.add(p);
-                    json(x, "{\"result\": 0}");
-                }
-                case "uploadfile" -> {
-                    String folder = q.get("path"), p = (folder.equals("/") ? "" : folder) + "/" + q.get("filename");
-                    if (!dirs.contains(folder)) {
-                        json(x, "{\"result\": 2005, \"error\": \"Directory does not exist.\"}");
-                        return;
-                    }
-                    put(p, body);
-                    json(x, "{\"result\": 0}");
-                }
-                case "deletefile" -> {
-                    if (files.remove(q.get("path")) == null) json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
-                    else json(x, "{\"result\": 0}");
-                }
-                case "deletefolderrecursive" -> {
-                    String p = q.get("path");
-                    if (!dirs.contains(p)) {
-                        json(x, "{\"result\": 2005, \"error\": \"Directory does not exist.\"}");
-                        return;
-                    }
-                    files.keySet().removeIf(f -> f.startsWith(p + "/"));
-                    dirs.removeIf(d -> d.equals(p) || d.startsWith(p + "/"));
-                    json(x, "{\"result\": 0, \"metadata\": {\"isfolder\": true}}");
-                }
-                case "getfilelink" -> {
-                    String p = q.get("path");
-                    if (!files.containsKey(p)) json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
-                    else json(x, "{\"result\": 0, \"hosts\": [\"127.0.0.1:" + server.getAddress().getPort() + "\"], \"path\": \"/file"
-                            + p.replace("\"", "") + "\"}");
-                }
-                case "renamefile", "renamefolder" -> rename(x, q.get("path"), q.get("topath"), method.equals("renamefolder"));
-                default -> json(x, "{\"result\": 2000, \"error\": \"Unknown method.\"}");
-            }
+            answer(x, method, q, body);
         }
+    }
+
+    /** pCloud's method {@code method}, signed in. */
+    private void answer(HttpExchange x, String method, Map<String, String> q, byte[] body) throws IOException {
+        switch (method) {
+            case "userinfo" -> json(x, "{\"result\": 0, \"email\": \"yo@correo.com\"}");
+            case "stat" -> {
+                String p = q.get("path");
+                if (files.containsKey(p)) json(x, "{\"result\": 0, \"metadata\": {\"hash\": " + versions.get(p)
+                        + ", \"modified\": \"x\", \"size\": " + files.get(p).length + "}}");
+                else if (dirs.contains(p)) json(x, "{\"result\": 0, \"metadata\": {\"isfolder\": true}}");
+                else json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
+            }
+            case "listfolder" -> listFolder(x, q.get("path"));
+            case "checksumfile" -> {
+                byte[] f = files.get(q.get("path"));
+                if (f == null) json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
+                else json(x, "{\"result\": 0, \"sha1\": \"" + sha1(f) + "\"}");
+            }
+            case "createfolderifnotexists" -> {
+                String p = q.get("path");
+                if (!dirs.contains(p.substring(0, Math.max(1, p.lastIndexOf('/'))))) {
+                    json(x, "{\"result\": 2005, \"error\": \"Directory does not exist.\"}");
+                    return;
+                }
+                dirs.add(p);
+                json(x, "{\"result\": 0}");
+            }
+            case "uploadfile" -> {
+                String folder = q.get("path"), p = (folder.equals("/") ? "" : folder) + "/" + q.get("filename");
+                if (!dirs.contains(folder)) {
+                    json(x, "{\"result\": 2005, \"error\": \"Directory does not exist.\"}");
+                    return;
+                }
+                put(p, body);
+                json(x, "{\"result\": 0}");
+            }
+            case "deletefile" -> {
+                if (files.remove(q.get("path")) == null) json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
+                else json(x, "{\"result\": 0}");
+            }
+            case "deletefolderrecursive" -> {
+                String p = q.get("path");
+                if (!dirs.contains(p)) {
+                    json(x, "{\"result\": 2005, \"error\": \"Directory does not exist.\"}");
+                    return;
+                }
+                files.keySet().removeIf(f -> f.startsWith(p + "/"));
+                dirs.removeIf(d -> d.equals(p) || d.startsWith(p + "/"));
+                json(x, "{\"result\": 0, \"metadata\": {\"isfolder\": true}}");
+            }
+            case "getfilelink" -> {
+                String p = q.get("path");
+                if (!files.containsKey(p)) json(x, "{\"result\": 2009, \"error\": \"File not found.\"}");
+                else json(x, "{\"result\": 0, \"hosts\": [\"127.0.0.1:" + server.getAddress().getPort() + "\"], \"path\": \"/file"
+                        + p.replace("\"", "") + "\"}");
+            }
+            case "renamefile", "renamefolder" -> rename(x, q.get("path"), q.get("topath"), method.equals("renamefolder"));
+            default -> json(x, "{\"result\": 2000, \"error\": \"Unknown method.\"}");
+        }
+    }
+
+    private void listFolder(HttpExchange x, String p) throws IOException {
+        if (!dirs.contains(p)) {
+            json(x, "{\"result\": 2005, \"error\": \"Directory does not exist.\"}");
+            return;
+        }
+        Set<String> names = new java.util.TreeSet<>();
+        for (String f : files.keySet()) if (f.startsWith(p + "/")) names.add(f.substring(p.length() + 1).split("/")[0]);
+        for (String d : dirs) if (d.startsWith(p + "/")) names.add(d.substring(p.length() + 1).split("/")[0]);
+        StringBuilder contents = new StringBuilder();
+        for (String n : names) contents.append(contents.isEmpty() ? "" : ",").append("{\"name\": \"").append(n).append("\"}");
+        json(x, "{\"result\": 0, \"metadata\": {\"contents\": [" + contents + "]}}");
     }
 
     /**

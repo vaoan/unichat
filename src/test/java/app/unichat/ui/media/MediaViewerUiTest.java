@@ -86,8 +86,8 @@ class MediaViewerUiTest {
         Stage v = (Stage) fx(() -> viewer().orElseThrow());
         fx(() -> {
             // F, as the person presses it; an owned window hung in setFullScreen on macOS
-            javafx.event.Event.fireEvent(v.getScene().getRoot(), new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,
-                    "", "f", javafx.scene.input.KeyCode.F, false, false, false, false));
+            Event.fireEvent(v.getScene().getRoot(), new KeyEvent(KeyEvent.KEY_PRESSED,
+                    "", "f", KeyCode.F, false, false, false, false));
             return null;
         });
         double screenWidth = fx(() -> javafx.stage.Screen.getScreensForRectangle(v.getX(), v.getY(), 1, 1).get(0).getBounds().getWidth());
@@ -109,12 +109,12 @@ class MediaViewerUiTest {
                 && photo().view().getImage().getHeight() > 1000);
         FxWait.settled();
         String where = fx(() -> {
-            javafx.scene.Node bar = viewer().orElseThrow().getScene().getRoot().lookup(".media-viewer-bar");
+            Node bar = viewer().orElseThrow().getScene().getRoot().lookup(".media-viewer-bar");
             javafx.geometry.Bounds b = bar.localToScene(bar.getBoundsInLocal());
             return b.getMinY() + ".." + b.getMaxY() + " in " + viewer().orElseThrow().getScene().getHeight();
         });
         assertTrue(fx(() -> {
-            javafx.scene.Node bar = viewer().orElseThrow().getScene().getRoot().lookup(".media-viewer-bar");
+            Node bar = viewer().orElseThrow().getScene().getRoot().lookup(".media-viewer-bar");
             javafx.geometry.Bounds b = bar.localToScene(bar.getBoundsInLocal());
             return b.getHeight() > 0 && b.getMaxY() <= viewer().orElseThrow().getScene().getHeight() + 0.5;
         }), "the controls are inside the window: " + where);
@@ -139,7 +139,7 @@ class MediaViewerUiTest {
     @Test
     void theArrowsStepThroughTheChatsPictures() throws Exception {
         fx(() -> { viewer().ifPresent(Window::hide); return null; });
-        java.util.List<MediaViewer.Item> items = new java.util.ArrayList<>();
+        List<MediaViewer.Item> items = new ArrayList<>();
         for (int i = 1; i <= 3; i++) {
             Path f = dir.resolve("foto" + i + ".png");
             ImageIO.write(new BufferedImage(1600, 1200, BufferedImage.TYPE_INT_RGB), "png", f.toFile());
@@ -179,7 +179,7 @@ class MediaViewerUiTest {
                     ScrollEvent.VerticalTextScrollUnits.NONE, 0, 0, null));
             return null;
         });
-        assertTrue((double) fx(() -> photo().view().getFitWidth()) > before);
+        assertTrue(fx(() -> photo().view().getFitWidth()) > before);
     }
 
     @Test
@@ -270,7 +270,7 @@ class MediaViewerUiTest {
                 .filter(PhotoPane.class::isInstance).findFirst().orElseThrow();
     }
 
-    private static void waitFor(java.util.concurrent.Callable<Boolean> done) throws Exception {
+    private static void waitFor(Callable<Boolean> done) throws Exception {
         try {
             FxWait.until("the photo showed", done); // a throw (the picture isn't in the window yet) counts as not yet
         } catch (AssertionError timedOut) {

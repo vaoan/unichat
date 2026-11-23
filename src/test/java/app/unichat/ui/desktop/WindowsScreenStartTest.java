@@ -27,7 +27,7 @@ class WindowsScreenStartTest {
             }
 
             @Override
-            public void close() { }
+            public void close() { /* the fake ignores it */ }
         }, log::add);
         screen.start(told::add);
         assertFalse(screen.registered().get(), "not registered");
@@ -59,7 +59,7 @@ class WindowsScreenStartTest {
             }
 
             @Override
-            public void close() { }
+            public void close() { /* the fake ignores it */ }
         }, log::add);
         screen.start(told::add);
         assertTrue(screen.registered().get());
@@ -88,7 +88,7 @@ class WindowsScreenStartTest {
             }
 
             @Override
-            public void close() { }
+            public void close() { /* the fake ignores it */ }
         }, line -> { });
         screen.start(a -> {
             told.add(a);
@@ -117,7 +117,7 @@ class WindowsScreenStartTest {
             }
 
             @Override
-            public void close() { }
+            public void close() { /* the fake ignores it */ }
         }, log::add);
         screen.start(told::add);
         screen.thread().join(); // lesson-ok: test-future-join (a Thread's join)

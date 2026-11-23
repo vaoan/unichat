@@ -41,7 +41,7 @@ class SealedStorageTest {
     }
 
     private SealedStorage over(Storage s) {
-        return new SealedStorage(s, () -> vk.clone());
+        return new SealedStorage(s, vk::clone);
     }
 
     @Test
@@ -93,7 +93,7 @@ class SealedStorageTest {
                 assertThrows(IllegalArgumentException.class, () -> sealed.stamp(path), path);
             }
             sealed.put("Unichat/VaultVieja/x", new byte[1]); // only the vault's own folder is the vault's
-            assertEquals(java.util.Set.of(Vault.ROOT + "/VaultVieja/x"), cloud.files.keySet(), "only that one landed");
+            assertEquals(Set.of(Vault.ROOT + "/VaultVieja/x"), cloud.files.keySet(), "only that one landed");
         }
     }
 

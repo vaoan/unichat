@@ -18,7 +18,7 @@ class DecodeBudgetTest {
     @Test
     void whatDoesntFitWaitsForTheOneBeforeToEnd() throws Exception {
         DecodeBudget budget = new DecodeBudget(100);
-        DecodeBudget.Lease first = budget.take(80);
+        DecodeBudget.Lease first = budget.take(80); // NOPMD: CloseResource, closed below, to let the second in
         CountDownLatch started = new CountDownLatch(1);
         CompletableFuture<DecodeBudget.Lease> second = CompletableFuture.supplyAsync(() -> {
             started.countDown();

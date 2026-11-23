@@ -77,7 +77,7 @@ class HiddenWindowUiTest {
 
     private int changedNodes() throws Exception {
         Field f = Scene.class.getDeclaredField("dirtyNodesSize");
-        f.setAccessible(true);
+        f.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
         return fx(() -> {
             try {
                 return f.getInt(scene);

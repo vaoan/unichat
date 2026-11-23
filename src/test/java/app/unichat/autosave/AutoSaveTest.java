@@ -23,6 +23,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -277,7 +278,7 @@ class AutoSaveTest {
         assertEquals(List.of("failed " + FLAKY_LINK + ": sin red", "failed " + FLAKY_LINK + ": sin red"),
                 told.stream().filter(t -> t.startsWith("failed")).toList(), "asked again, told again: the person is waiting for it");
         assertEquals(List.of("$t2", "$t2"), failedIn, "the notice goes to its message");
-        assertTrue(told.getLast().equals("progress 0/0"), "the ring ends: " + told);
+        assertEquals("progress 0/0", told.getLast(), "the ring ends: " + told);
     }
 
     @Test
@@ -398,7 +399,7 @@ class AutoSaveTest {
         assertTrue(steps.contains("ASKING_OLDER"), "asking the server for older messages: " + steps);
         AutoSave.Exploring e = save.exploring(chat.id());
         assertEquals(3, e.looked(), "ayer, contrato and the video looked at (the video not saved: not chosen)");
-        assertEquals(null, e.now(), "nothing going on once over");
+        assertNull(e.now(), "nothing going on once over");
     }
 
     @Test

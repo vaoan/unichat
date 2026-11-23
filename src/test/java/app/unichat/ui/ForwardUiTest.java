@@ -5,16 +5,11 @@ import app.unichat.ui.timeline.ThreadRows;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseButton;
-import javafx.scene.input.MouseEvent;
-import javafx.stage.Window;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -58,7 +53,7 @@ class ForwardUiTest {
         assertEquals("Reenviar 1 mensaje", FxWait.fx(() -> ((Label) sheet.lookup(".sheet-title")).getText()));
         assertEquals("Irá tal cual, sin decir de dónde viene.", FxWait.fx(() -> ((Label) sheet.lookup(".forward-preview")).getText()),
                 "by default a forward says nothing");
-        assertTrue(FxWait.fx(() -> ((Button) sheet.lookup(".primary-button")).isDisabled()), "no chat chosen yet");
+        assertTrue(FxWait.fx(() -> sheet.lookup(".primary-button").isDisabled()), "no chat chosen yet");
 
         choose(sheet, "Familia");
         FxWait.fx(() -> {
@@ -206,7 +201,7 @@ class ForwardUiTest {
             search.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
             return null;
         });
-        assertFalse(FxWait.fx(() -> ((Button) sheet.lookup(".primary-button")).isDisabled()), "a chat is chosen");
+        assertFalse(FxWait.fx(() -> sheet.lookup(".primary-button").isDisabled()), "a chat is chosen");
     }
 
     private static CheckBox checkBox(Node sheet, String text) {

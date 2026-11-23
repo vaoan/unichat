@@ -26,7 +26,7 @@ class SupervisorTest {
     /** Each exit the Supervisor handled: "name:true" when it scheduled a restart. */
     private final List<String> exits = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-    {
+    SupervisorTest() {
         sup.listen(new Supervisor.Listener() {
             @Override public void logged(String name) { changes.changed(); }
             @Override public void exited(String name, boolean restarting) {
@@ -85,9 +85,9 @@ class SupervisorTest {
         try (ServerSocket test = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             sup.start("chatty", dir, List.of(java, "-cp", System.getProperty("java.class.path"), FakeService.class.getName(),
                     "chatty", Integer.toString(test.getLocalPort())), log);
-            Socket wrote = test.accept(); // it calls once its 1 MB is out, which only a reader makes possible
-            Files.delete(log);
-            wrote.close(); // go on
+            try (Socket _ = test.accept()) { // it calls once its 1 MB is out, which only a reader makes possible
+                Files.delete(log);
+            } // closing it: go on
         }
         await(() -> contains(log, "after"));
         assertEquals(0, sup.restarts("chatty"), "the same process: its output was never closed under it");

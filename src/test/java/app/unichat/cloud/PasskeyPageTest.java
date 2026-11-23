@@ -15,6 +15,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -249,7 +250,7 @@ class PasskeyPageTest {
         CompletableFuture<Void> probe = PasskeyPage.start(u -> opened[0] = u, found::add, 0, Duration.ZERO);
         var e = assertThrows(ExecutionException.class, probe::get); // get: a JUnit timeout can interrupt it
         assertEquals(I18n.t("cloud.passkey.expired"), e.getCause().getMessage(), "a probe, not a sign-in");
-        assertTrue(e.getCause() instanceof Loopback.Expired);
+        assertInstanceOf(Loopback.Expired.class, e.getCause());
         PCloudTest.portIsFree(opened[0].toString());
     }
 

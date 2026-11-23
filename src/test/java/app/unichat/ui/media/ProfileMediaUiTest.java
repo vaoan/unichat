@@ -49,7 +49,7 @@ class ProfileMediaUiTest {
         double shownRatio = FxWait.fx(() -> v.getLayoutBounds().getWidth() / v.getLayoutBounds().getHeight());
         double ratio = FxWait.fx(() -> v.getImage().getWidth() / v.getImage().getHeight());
         assertEquals(ratio, shownRatio, 0.05, "the picture's own shape");
-        List<String> tabs = FxWait.fx(() -> pane.lookupAll(".media-tab").stream().map(n -> ((ToggleButton) n).getAccessibleText()).toList());
+        List<String> tabs = FxWait.fx(() -> pane.lookupAll(".media-tab").stream().map(javafx.scene.Node::getAccessibleText).toList());
         assertTrue(tabs.stream().anyMatch(t -> t.startsWith("Fotos (")), tabs.toString());
         // From the media to where it was shared: a file's button, a photo's menu.
         java.util.concurrent.atomic.AtomicReference<app.unichat.model.Message> jumped = new java.util.concurrent.atomic.AtomicReference<>();

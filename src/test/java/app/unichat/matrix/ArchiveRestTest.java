@@ -3,7 +3,6 @@ package app.unichat.matrix;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Network;
-import app.unichat.service.ArchiveWaking.Step;
 import app.unichat.service.ArchiveWaking.Waking;
 import app.unichat.service.PreferencesFile;
 import app.unichat.settings.Settings;
@@ -23,7 +22,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import com.fasterxml.jackson.databind.JsonNode;
 
-import static app.unichat.matrix.RestServer.*;
+import static app.unichat.matrix.RestServer.ME;
+import static app.unichat.matrix.RestServer.botNotice;
+import static app.unichat.matrix.RestServer.botRoom;
+import static app.unichat.matrix.RestServer.category;
+import static app.unichat.matrix.RestServer.channel;
+import static app.unichat.matrix.RestServer.dm;
+import static app.unichat.matrix.RestServer.message;
+import static app.unichat.matrix.RestServer.server;
+import static app.unichat.matrix.RestServer.sync;
+import static app.unichat.matrix.RestServer.telegramGroup;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,7 +78,7 @@ class ArchiveRestTest {
         DiscordServers discord = new DiscordServers(core, bots, () -> discordConnected
                 ? List.of(new Account(Network.DISCORD, "me", AccountStatus.CONNECTED, "")) : List.of());
         filter = new SyncFilter(client, ME);
-        rest = new ArchiveRest(core, filter, discord, (r, rooms) -> { }, () -> server.point());
+        rest = new ArchiveRest(core, filter, discord, (r, rooms) -> { }, server::point);
         rest.onWake(() -> {
             wakes.incrementAndGet();
             loop.execute(this::round);

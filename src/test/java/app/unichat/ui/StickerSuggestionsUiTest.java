@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.RoomFeatures;
@@ -28,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -199,7 +201,7 @@ class StickerSuggestionsUiTest {
         FxWait.settled();
         assertEquals("😂 jaja", FxWait.fx(() -> box().getText()), "what was written after the click stays");
 
-        String other = svc.chats().stream().map(c -> c.id()).filter(id -> !id.equals(chat)).findFirst().orElseThrow();
+        String other = svc.chats().stream().map(Chat::id).filter(id -> !id.equals(chat)).findFirst().orElseThrow();
         type("😂");
         FxWait.until("offered", () -> offered().size() == 1);
         going.obtrudeValue(null);
@@ -213,9 +215,9 @@ class StickerSuggestionsUiTest {
 
     @Test
     void aChatThatRefusesStickersHasItsTilesSayItThoughTheTextIsTheSame() throws Exception {
-        String refusing = svc.chats().stream().map(c -> c.id()).filter(id -> !id.equals(chat)).findFirst().orElseThrow();
+        String refusing = svc.chats().stream().map(Chat::id).filter(id -> !id.equals(chat)).findFirst().orElseThrow();
         FxWait.fx(() -> {
-            svc.chat(refusing).setFeatures(app.unichat.model.RoomFeatures.parse(new com.fasterxml.jackson.databind.ObjectMapper()
+            svc.chat(refusing).setFeatures(RoomFeatures.parse(new com.fasterxml.jackson.databind.ObjectMapper()
                     .readTree("{\"id\":\"gm\",\"file\":{\"m.image\":{\"mime_types\":{\"image/*\":2}}}}")));
             view.openChatId(refusing);
             return null;
@@ -236,7 +238,7 @@ class StickerSuggestionsUiTest {
         FxWait.until("offered", () -> offered().size() == 1);
         Node tile = offered().getFirst();
         assertTrue(FxWait.fx(tile::isFocusTraversable), "Tab reaches it");
-        assertTrue(FxWait.fx(() -> tile.getAccessibleText()).contains("😂"), "and says which: " + FxWait.fx(tile::getAccessibleText));
+        assertTrue(FxWait.fx(tile::getAccessibleText).contains("😂"), "and says which: " + FxWait.fx(tile::getAccessibleText));
         FxWait.fx(() -> { box().requestFocus(); return null; });
         List<Node> passed = new java.util.ArrayList<>();
         for (int i = 0; i < 4 && FxWait.fx(() -> view.getScene().getFocusOwner()) != tile; i++) { // the box's buttons, then it
@@ -248,7 +250,7 @@ class StickerSuggestionsUiTest {
             });
             FxWait.settled();
         }
-        assertTrue(FxWait.fx(() -> view.getScene().getFocusOwner()) == tile, "⇧Tab from the box reaches it, past " + passed);
+        assertSame(tile, FxWait.fx(() -> view.getScene().getFocusOwner()), "⇧Tab from the box reaches it, past " + passed);
     }
 
     private static void press(Node tile) throws Exception {

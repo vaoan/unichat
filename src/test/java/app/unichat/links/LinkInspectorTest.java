@@ -137,6 +137,7 @@ class LinkInspectorTest {
     }
 
     @Test
+    @SuppressWarnings("PMD.AvoidUsingHardCodedIP") // the addresses are what it classifies
     void onlyTheOpenInternetIsPublic() throws Exception {
         for (String a : List.of("127.0.0.1", "10.0.0.1", "192.168.1.1", "172.16.0.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "::1", "fe80::1", "fd00::1", "224.0.0.1",
                 "198.18.0.1", "198.19.255.254", "240.0.0.1", "255.255.255.255", "192.0.0.8",

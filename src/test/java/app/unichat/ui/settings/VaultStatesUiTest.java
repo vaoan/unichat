@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,7 +45,7 @@ class VaultStatesUiTest extends VaultPageTestBase {
         assertEquals(Cloud.VaultState.MISSING, round());
         page();
         waitFor(I18n.t("settings.vault.missing"));
-        assertTrue(Settings.get().getString("cloud.vault.key", null) != null, "its key kept meanwhile");
+        assertNotNull(Settings.get().getString("cloud.vault.key", null), "its key kept meanwhile");
         click(I18n.t("settings.vault.missingLeave"));
         waitFor(I18n.t("settings.vault.missingAsk"));
         click(I18n.t("folders.dialog.cancel"));

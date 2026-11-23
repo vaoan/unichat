@@ -59,7 +59,7 @@ class CloakBarUiTest {
             String shot = System.getProperty("unichat.barShot");
             if (shot != null) {
                 var img = FxWait.fx(() -> bar.snapshot(null, null));
-                ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", java.nio.file.Path.of(shot + (int) px + ".png").toFile());
+                ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", Path.of(shot + (int) px + ".png").toFile());
             }
             for (Node n : FxWait.fx(() -> List.copyOf(bar.lookupAll(".label")))) {
                 Labeled l = (Labeled) n;
@@ -88,7 +88,7 @@ class CloakBarUiTest {
             return null;
         });
         var c = CloakJob.class.getDeclaredConstructor(runner);
-        c.setAccessible(true);
+        c.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
         return c.newInstance(fake);
     }
 }

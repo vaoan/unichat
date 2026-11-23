@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.DoubleConsumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -164,7 +165,7 @@ class CloakJobTest {
         running.await();
         t.interrupt();
         t.join(); // lesson-ok: test-future-join (a thread)
-        assertTrue(ended.get() instanceof InterruptedException, String.valueOf(ended.get()));
+        assertInstanceOf(InterruptedException.class, ended.get(), String.valueOf(ended.get()));
     }
 
     /**

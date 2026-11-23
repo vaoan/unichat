@@ -38,7 +38,7 @@ class RecoveryCodeTest {
     @Test
     void aCodeTypedIsReadFromItsCharactersAsTyped() {
         RecoveryCode code = RecoveryCode.random();
-        char[] typed = code.shown().toLowerCase(java.util.Locale.ROOT).replace("-", " ").replace('0', 'o').toCharArray();
+        char[] typed = code.shown().toLowerCase(Locale.ROOT).replace("-", " ").replace('0', 'o').toCharArray();
         assertEquals(code, RecoveryCode.parse(typed), "never made into a text that stays in memory");
         assertNull(RecoveryCode.parse("ABCD".toCharArray()));
         assertNull(RecoveryCode.parse((char[]) null));
@@ -88,7 +88,7 @@ class RecoveryCodeTest {
         String shown = c.shown();
         for (int g = 1; g <= RecoveryCheck.GROUPS; g++) {
             String group = shown.split("-")[g - 1];
-            assertTrue(RecoveryCheck.matches(shown, g, " " + group.toLowerCase(java.util.Locale.ROOT).replace('0', 'o').replace('1', 'l') + " "), group);
+            assertTrue(RecoveryCheck.matches(shown, g, " " + group.toLowerCase(Locale.ROOT).replace('0', 'o').replace('1', 'l') + " "), group);
             assertFalse(RecoveryCheck.matches(shown, g, group.substring(1)), "not all of it");
         }
         assertFalse(RecoveryCheck.matches(shown, 0, "ABCD"));

@@ -75,7 +75,10 @@ class BridgesLiveIT {
     private static String awaitBotReply(MatrixChatService svc, app.unichat.service.Changes changes, String roomId, String command)
             throws InterruptedException {
         String[] reply = new String[1];
-        changes.until("the bot's reply to " + command, () -> (reply[0] = replyAfter(svc.messages(roomId), command)) != null);
+        changes.until("the bot's reply to " + command, () -> {
+            reply[0] = replyAfter(svc.messages(roomId), command);
+            return reply[0] != null;
+        });
         return reply[0];
     }
 

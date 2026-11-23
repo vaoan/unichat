@@ -11,6 +11,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 class StyleLearningTest {
@@ -48,7 +49,7 @@ class StyleLearningTest {
         third.get();
         assertEquals(2, prompts.size(), "the first run and one after it");
         assertEquals(1, most.get(), "one at a time");
-        assertEquals(true, prompts.get(1).contains("nos vemos!!"), "the run after it learns what came meanwhile");
+        assertTrue(prompts.get(1).contains("nos vemos!!"), "the run after it learns what came meanwhile");
         assertEquals(List.of(), style.pending());
     }
 

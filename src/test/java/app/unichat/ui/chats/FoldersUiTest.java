@@ -40,6 +40,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -291,16 +292,16 @@ class FoldersUiTest {
         Chat bot = new Chat("!bot:demo");
         bot.setBridgeBot(true);
         bot.setPrefKey("bot");
-        assertEquals(null, fx(() -> foldersMenu(chatMenu(bot))), "not for bridge bots");
+        assertNull(fx(() -> foldersMenu(chatMenu(bot))), "not for bridge bots");
         Chat personal = new Chat("!me:demo");
         personal.setSpace(true);
         personal.setPersonalSpace(true);
         personal.setPrefKey("me");
-        assertEquals(null, fx(() -> foldersMenu(pane.menuFor(personal))), "not for the personal space");
+        assertNull(fx(() -> foldersMenu(pane.menuFor(personal))), "not for the personal space");
         Chat invited = new Chat("!invited:demo");
         invited.setInvite(true);
         invited.setPrefKey("matrix:!invited:demo");
-        assertEquals(null, fx(() -> foldersMenu(chatMenu(invited))), "not for invitations");
+        assertNull(fx(() -> foldersMenu(chatMenu(invited))), "not for invitations");
     }
 
     @Test
@@ -323,7 +324,7 @@ class FoldersUiTest {
     void insideAFolderTheMenuCanTakeTheChatOut() throws Exception {
         String work = svc.createFolder("Trabajo");
         svc.setInFolder(work, svc.chat(FAMILIA), true);
-        assertEquals(null, fx(() -> itemNamed(pane.menuFor(svc.chat(FAMILIA)), "Quitar de esta carpeta")), "outside a folder");
+        assertNull(fx(() -> itemNamed(pane.menuFor(svc.chat(FAMILIA)), "Quitar de esta carpeta")), "outside a folder");
 
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
@@ -451,7 +452,7 @@ class FoldersUiTest {
             pane.move(1, false);
             return null;
         });
-        assertEquals(null, fx(() -> thread().chat()), "on the names there's nothing to move through");
+        assertNull(fx(() -> thread().chat()), "on the names there's nothing to move through");
 
         clickCell(".folder-list", "Trabajo");
         fx(() -> {
@@ -476,7 +477,7 @@ class FoldersUiTest {
         assertTrue(inside.contains("Quitar de esta carpeta"), inside.toString());
 
         clickCell(".folder-chats", title(SERVER));
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
         ListView<Chat> channels = fx(() -> (ListView<Chat>) scene.getRoot().lookup(".space-list"));
         String channel = fx(() -> channels.getItems().stream().filter(c -> c.prefKey() != null).findFirst().orElseThrow().id());
         assertTrue(menuKeyOn(channels, channel).contains("Carpetas"), "a server's channels");
@@ -534,17 +535,17 @@ class FoldersUiTest {
     void withNoFoldersTheFocusGoesToNuevaCarpetaAndItExplains() throws Exception {
         fire(railButton("Carpetas"));
         Button create = fx(() -> buttons("Nueva carpeta").get(0));
-        assertEquals(create, fx(() -> scene.getFocusOwner()));
+        assertEquals(create, fx(scene::getFocusOwner));
         assertEquals("Aún no tienes carpetas. Crea una y añade chats con clic derecho.", fx(create::getAccessibleHelp));
 
         svc.createFolder("Trabajo");
         eventually("the name shows", () -> !folderList().getItems().isEmpty());
-        assertEquals(null, fx(create::getAccessibleHelp), "it isn't true any more");
+        assertNull(fx(create::getAccessibleHelp), "it isn't true any more");
         fx(() -> {
             pane.focusList();
             return null;
         });
-        assertEquals(fx(this::folderList), fx(() -> scene.getFocusOwner()));
+        assertEquals(fx(this::folderList), fx(scene::getFocusOwner));
     }
 
     @Test
@@ -700,17 +701,17 @@ class FoldersUiTest {
         return (ThreadPane) scene.getRoot().lookup(".thread-pane");
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
     private ListView<Chat> inboxList() {
         return (ListView<Chat>) scene.getRoot().lookup(".chat-list");
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
     private ListView<Folder> folderList() {
         return (ListView<Folder>) scene.getRoot().lookup(".folder-list");
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
     private ListView<Chat> folderChats() {
         return (ListView<Chat>) scene.getRoot().lookup(".folder-chats");
     }
