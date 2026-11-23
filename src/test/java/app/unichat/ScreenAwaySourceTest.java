@@ -1,6 +1,7 @@
 package app.unichat;
 
 import app.unichat.ui.desktop.MacScreen;
+import app.unichat.ui.desktop.WindowsScreen;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -18,13 +19,17 @@ class ScreenAwaySourceTest {
     }
 
     @Test
+    void onWindowsTheSessionAndDisplayWatchSays() {
+        assertInstanceOf(WindowsScreen.class, UnichatApp.screenAway(false, true));
+    }
+
+    @Test
     void elsewhereNobodySaysAndTheScreenIsAlwaysHere() {
-        for (boolean windows : new boolean[] {true, false}) {
-            var source = UnichatApp.screenAway(false, windows);
-            assertFalse(source instanceof MacScreen);
-            List<Boolean> told = new ArrayList<>();
-            source.start(told::add);
-            assertEquals(List.of(), told, "nothing told: the screen stays here");
-        }
+        var source = UnichatApp.screenAway(false, false);
+        assertFalse(source instanceof MacScreen);
+        assertFalse(source instanceof WindowsScreen);
+        List<Boolean> told = new ArrayList<>();
+        source.start(told::add);
+        assertEquals(List.of(), told, "nothing told: the screen stays here");
     }
 }

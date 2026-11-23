@@ -20,6 +20,7 @@ import app.unichat.ui.desktop.DockIcon;
 import app.unichat.ui.desktop.MacScreen;
 import app.unichat.ui.desktop.NotificationTarget;
 import app.unichat.ui.desktop.TrayReopen;
+import app.unichat.ui.desktop.WindowsScreen;
 import app.unichat.ui.login.LoginView;
 import app.unichat.ui.settings.SettingsWindow;
 import app.unichat.ui.desktop.MacQuit;
@@ -316,10 +317,13 @@ public final class UnichatApp extends Application {
         screenAway(Os.mac(), Os.windows()).start(Seen.get()::screenAway);
     }
 
-    /** Who says the screen is locked or asleep: the menu-bar helper on macOS, nobody where there's no way to know. */
+    /**
+     * Who says the screen is locked or asleep: the menu-bar helper on macOS, a message-only window on Windows, nobody
+     * where there's no way to know.
+     */
     static ScreenAway screenAway(boolean mac, boolean windows) {
         if (mac) return new MacScreen();
-        if (windows) return ScreenAway.none(); // WindowsScreen comes with its own task
+        if (windows) return new WindowsScreen();
         return ScreenAway.none();
     }
 

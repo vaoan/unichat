@@ -81,6 +81,9 @@ jobs:
           distribution: temurin
           java-version: "25"
           cache: maven
+      - name: A locked session or a display off counts as nobody seeing Unichat (the real Win32 calls)
+        shell: bash
+        run: ./mvnw -B test -Dtest='WindowsScreen*Test,ScreenMessagesTest' -Dsurefire.failIfNoSpecifiedTests=false
       - name: Install WiX 3 (for the .msi)
         continue-on-error: true
         shell: pwsh
