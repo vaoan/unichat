@@ -113,23 +113,11 @@ public final class Cloud {
     }
 
     /**
-     * What came into the vault from the plain copies here (how many files, and when the last did), the computers still
-     * sending plain, each machine with its computer's name in the vault ("" for one that has none there), and the other
-     * machines still writing the account's old folder names (an older Unichat: {@link CloudNames}).
+     * What came into the vault from the plain copies here (how many files, and when the last did), and the computers still
+     * sending plain, each machine with its computer's name in the vault ("" for one that has none there).
      */
-    public record Moving(int files, Instant at, Map<String, String> strays, java.util.Set<String> older) {
+    public record Moving(int files, Instant at, Map<String, String> strays) {
         static final Moving NONE = new Moving(0, null, Map.of());
-
-        public Moving(int files, Instant at, Map<String, String> strays) {
-            this(files, at, strays, java.util.Set.of());
-        }
-
-        /** The same, saying which machines still write the account's old names ({@link CloudNames}) and aren't named as strays. */
-        Moving older(java.util.Set<String> machines) {
-            java.util.Set<String> left = new java.util.TreeSet<>(machines);
-            left.removeAll(strays.keySet());
-            return new Moving(files, at, strays, java.util.Set.copyOf(left));
-        }
 
         /** A stray's name to show: its computer's in the vault, "" when unknown. */
         public String strayName(String machine) {
@@ -378,7 +366,7 @@ public final class Cloud {
             return publish(finished(status().lastSync(), Errors.message(e), status().vault(), null, mediaTurn.waitsNow(now)));
         }
         String mediaFailed = null;
-        boolean check = renames.media(dav); // before media reads its folder: never sent again under the new name
+        boolean check = renames.mayCheck(); // nothing left under media's old name that the check would send again
         try {
             mediaTurn.run(dav, now, progressOf(Step.UPLOADING), progressOf(Step.VERIFYING), check);
         } catch (IOException | RuntimeException e) {
@@ -402,7 +390,7 @@ public final class Cloud {
     private VaultPass vaultPass(Storage dav, Instant now) throws IOException {
         vaultPart.lock();
         try {
-            String renameFailed = renames.plain(dav, now); // before anything reads a folder of the account
+            String renameFailed = renames.plain(dav); // before anything reads a folder of the account
             Storage at = VaultNames.at(dav); // the vault under its old names until it's moved
             try (VaultParts.Round vault = stateOf(at)) {
                 if (vault.open() && (at != dav || VaultNames.left(dav))) {
@@ -606,11 +594,19 @@ public final class Cloud {
         T run(Storage dav) throws IOException;
     }
 
+    /** {@code job}, which only reads the vault or changes nothing of its files and keys, as {@link #onWorker(Job, boolean)} says. */
+    <T> CompletableFuture<T> onWorker(Job<T> job) {
+        return onWorker(job, false);
+    }
+
     /**
      * {@code job} on the vault's thread, never alongside a round's vault part nor the texts alone, and never waiting for a
-     * round's media; a failure completes the future with it.
+     * round's media; a failure completes the future with it. One that {@code writes} the vault's keys or files (a change of
+     * key, a turn-off, a way in added or opened) never writes its old names while another computer switches them: the
+     * vault is moved first where it's open here, or after where the job opened it ({@link CloudRenames#forJob}); any other
+     * sees the vault where it is, and never runs the move (the page opening reads it).
      */
-    <T> CompletableFuture<T> onWorker(Job<T> job) {
+    <T> CompletableFuture<T> onWorker(Job<T> job, boolean writes) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 vaultPart.lock();
@@ -619,9 +615,9 @@ public final class Cloud {
                     if (a == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
                     keyLock.lock();
                     try {
-                        Storage dav = a.storage(), at = renames.forJob(dav); // moved first, where it's open here
+                        Storage dav = a.storage(), at = writes ? renames.forJob(dav) : VaultNames.at(dav);
                         T done = job.run(at);
-                        renames.afterJob(dav, at);
+                        if (writes) renames.afterJob(dav, at);
                         return done;
                     } finally {
                         keyLock.unlock();
@@ -661,7 +657,7 @@ public final class Cloud {
         }
         String verified = Settings.get().getString(MediaTurn.LAST_VERIFY, null);
         return new Status(true, lastSync, error, uploaded, waiting, null, media.retrying(), media.nextRetry(), media.conflicts(),
-                verified == null ? null : Instant.parse(verified), vault, moving.older(renames.older()), vaultNotice, mediaPaused);
+                verified == null ? null : Instant.parse(verified), vault, moving, vaultNotice, mediaPaused);
     }
 
     /** Checks everything uploaded against the account now, repairing what differs, then the usual round. */

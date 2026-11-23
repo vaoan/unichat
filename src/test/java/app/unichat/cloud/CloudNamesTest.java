@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -95,132 +96,77 @@ class CloudNamesTest {
         VaultComputer desk = new VaultComputer(cloud, dir, DESK).write("texts/here/" + TEXT, "{\"t\":1}\n");
 
         assertNull(desk.round().error());
-        assertEquals(Set.of(OLD_SETTINGS), paths().stream().filter(CloudNamesTest::old).collect(java.util.stream.Collectors.toSet()),
-            "nothing left under an old name but the settings, which an older computer reads back: " + paths());
+        assertFalse(paths().stream().anyMatch(CloudNamesTest::old), "nothing left under an old name: " + paths());
+        assertFalse(cloud.dirs.stream().anyMatch(CloudNamesTest::old), "nor any old folder: " + cloud.dirs);
         assertArrayEquals(photo, cloud.files.get("Unichat/Media/Ana/a.jpg"));
         assertArrayEquals(bytes("video"), cloud.files.get("Unichat/Media/Mamá d/v [1].mp4"));
         assertArrayEquals(text, cloud.files.get("Unichat/Texts/" + DESK + "/" + TEXT));
-        assertEquals("DARK", desk.get("ui.theme"), "the settings under their new name are this computer's");
+        assertEquals("DARK", desk.get("ui.theme"), "the settings under their new name");
         assertTrue(cloud.log.contains("MOVE Unichat/Multimedia Unichat/Media"), "media moved on the server, whole: " + cloud.log);
         assertTrue(cloud.log.contains("MOVE Unichat/Textos Unichat/Texts"), cloud.log.toString());
-        assertArrayEquals(mine, cloud.files.get(SETTINGS), "the settings copied in as they were");
-        assertFalse(cloud.log.stream().anyMatch(l -> l.startsWith("PUT Unichat/Media/")), "no media went up again: " + cloud.log);
+        assertTrue(cloud.log.contains("MOVE " + OLD_SETTINGS + " " + SETTINGS), cloud.log.toString());
+        assertFalse(cloud.log.stream().anyMatch(l -> l.startsWith("PUT Unichat/Media/") || l.equals("PUT " + SETTINGS)),
+            "neither media nor the settings went up again: " + cloud.log);
 
-        long moved = moves();
+        int asked = cloud.asked.size();
         assertNull(desk.round().error());
-        assertEquals(moved, moves(), "once: the next round has nothing to move");
+        assertEquals(List.of(), cloud.asked.subList(asked, cloud.asked.size()).stream().filter(CloudNamesTest::old).toList(),
+            "once: done, the old names are never looked for again");
     }
 
     @Test
-    void anOldComputerWritingTheOldFolderIsMovedInEachRound() throws Exception {
-        VaultComputer desk = new VaultComputer(cloud, dir, DESK).set("ui.theme", "DARK");
-        desk.round();
-        // An older Unichat on another computer writes the old names: its settings changed after this one's.
-        cloud.put(OLD_SETTINGS, settings(OLD, Instant.now().plusSeconds(60), "LIGHT"));
-        cloud.put("Unichat/Textos/" + OLD + "/" + TEXT, bytes("{\"de\":\"otro\"}\n"));
-        cloud.put("Unichat/Textos/" + OLD + "/index.json", TextIndex.write(Map.of(TEXT, 14L)));
-        cloud.put("Unichat/Multimedia/Ana/b.jpg", bytes("otra"));
+    void theOldFoldersAreGoneOnceTheMoveIsConfirmed() throws Exception {
+        Storage dav = dav();
+        cloud.put("Unichat/Media/Ana/a.jpg", bytes("foto")); // a move cut short: both folders there
+        cloud.put("Unichat/Multimedia/Ana/a.jpg", bytes("foto"));
+        cloud.put("Unichat/Multimedia/Ana/c.jpg", bytes("otra cosa"));
+        cloud.put("Unichat/Media/Ana/c.jpg", bytes("la nueva"));
+        cloud.put("Unichat/Textos/" + DESK + "/" + TEXT, bytes("{}\n"));
+        cloud.put("Unichat/Texts/" + DESK + "/" + TEXT, bytes("{}\n{}\n"));
+        assertFalse(CloudNames.migrate(dav, new Object()), "something under media's old name doesn't match: its check waits");
+        assertFalse(cloud.dirs.contains(CloudNames.OLD_TEXTS), "the texts' old folder confirmed and gone");
+        assertArrayEquals(bytes("otra cosa"), cloud.files.get("Unichat/Multimedia/Ana/c.jpg"), "a file that differs keeps its folder");
+        assertArrayEquals(bytes("la nueva"), cloud.files.get("Unichat/Media/Ana/c.jpg"));
+        assertFalse(Settings.get().getBool(CloudNames.DONE, false), "not done while anything is left");
 
-        assertNull(desk.round().error());
-        assertEquals("LIGHT", desk.get("ui.theme"), "the newer settings won");
-        assertEquals("{\"de\":\"otro\"}\n", desk.read("texts/" + OLD + "/" + TEXT), "its texts reached this computer");
-        assertArrayEquals(bytes("otra"), cloud.files.get("Unichat/Media/Ana/b.jpg"));
-        assertFalse(cloud.files.containsKey("Unichat/Multimedia/Ana/b.jpg"));
-        assertFalse(cloud.files.containsKey("Unichat/Textos/" + OLD + "/" + TEXT));
-        assertTrue(cloud.files.containsKey(OLD_SETTINGS), "its settings stay where it reads them back, so it never sends them again");
-
-        desk.set("ui.theme", "SYSTEM");
-        desk.round();
-        int puts = cloud.puts.get();
-        long moved = moves();
-        assertNull(desk.round().error());
-        assertEquals("SYSTEM", desk.get("ui.theme"), "its older copy, still there, never wins over what changed since");
-        assertEquals(puts, cloud.puts.get(), "and nothing loops: no round sends anything again");
-        assertEquals(moved, moves());
-
-        cloud.put(OLD_SETTINGS, settings(OLD, Instant.now().plusSeconds(120), "DARK"));
-        desk.round();
-        assertEquals("DARK", desk.get("ui.theme"), "what it changes later comes in again");
+        cloud.put("Unichat/Media/Ana/c.jpg", bytes("otra cosa")); // the same now
+        assertTrue(CloudNames.migrate(dav, new Object()));
+        assertFalse(paths().stream().anyMatch(CloudNamesTest::old), paths().toString());
+        assertFalse(cloud.dirs.stream().anyMatch(CloudNamesTest::old), "every old folder deleted whole: " + cloud.dirs);
+        assertTrue(Settings.get().getBool(CloudNames.DONE, false));
     }
 
     @Test
-    void aComputerStillOnTheOldNamesIsNamedInTheUi() throws Exception {
+    void aMoveInterruptedBeforeTheCleanupFinishesItNextRound() throws Exception {
+        cloud.put(OLD_SETTINGS, settings(DESK, Instant.now(), "DARK"));
+        cloud.put(SETTINGS, settings(DESK, Instant.now().minusSeconds(60), "LIGHT"));
+        cloud.put("Unichat/Multimedia/Ana/a.jpg", bytes("foto"));
+        cloud.put("Unichat/Media/Ana/b.jpg", bytes("b"));
+        cloud.failDeleteOnce.add(CloudNames.OLD_SETTINGS);
         VaultComputer desk = new VaultComputer(cloud, dir, DESK);
-        assertEquals(Set.of(), desk.round().moving().older(), "none before an older Unichat writes anything");
-        cloud.put("Unichat/Textos/" + OLD + "/" + TEXT, bytes("{}\n"));
-        cloud.put("Unichat/Textos/" + OLD + "/index.json", TextIndex.write(Map.of(TEXT, 3L)));
-        Cloud.Status s = desk.round();
-        assertEquals(Set.of(OLD), s.moving().older(), "no vault: counted");
-        assertTrue(app.unichat.ui.settings.CloudTexts.vaultLines(s, Instant.now()).stream().anyMatch(l -> l.contains("Unichat anterior")),
-            app.unichat.ui.settings.CloudTexts.vaultLines(s, Instant.now()).toString());
-
-        Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
-        desk.madeHere(made);
-        desk.round(); // the move into the vault, done
-        desk.round();
-        cloud.put("Unichat/Textos/" + OLD + "/" + TEXT, bytes("{}\n{}\n"));
-        cloud.put("Unichat/Textos/" + OLD + "/index.json", TextIndex.write(Map.of(TEXT, 6L)));
-        s = desk.round();
-        assertEquals(Cloud.VaultState.OPEN, s.vault());
-        assertEquals(Set.of(OLD), s.moving().strays().keySet(), "with the vault: named as the computers still sending plain are");
-        assertEquals(Set.of(), s.moving().older(), "and only once");
-        assertTrue(app.unichat.ui.settings.CloudTexts.vaultLines(s, Instant.now()).contains("Un equipo sin nombre usa una versión sin bóveda: actualízalo."),
-            app.unichat.ui.settings.CloudTexts.vaultLines(s, Instant.now()).toString());
-        java.util.Arrays.fill(made.vk(), (byte) 0);
+        assertTrue(desk.round().error() != null, "told");
+        assertTrue(cloud.files.containsKey(OLD_SETTINGS), "cut short before the old folder went");
+        assertEquals("DARK", desk.get("ui.theme"), "the newer copy already under the new name");
+        assertNull(desk.round().error());
+        assertFalse(paths().stream().anyMatch(CloudNamesTest::old), "finished: " + paths());
+        assertArrayEquals(bytes("foto"), cloud.files.get("Unichat/Media/Ana/a.jpg"));
+        assertTrue(desk.get(CloudNames.DONE) != null);
     }
 
     @Test
     void mediaInBothFoldersKeepsOneCopy() throws Exception {
-        Storage dav = dav();
         cloud.put("Unichat/Media/Ana/a.jpg", bytes("foto"));
-        cloud.put("Unichat/Media/Ana/c.jpg", bytes("la nueva"));
         cloud.put("Unichat/Multimedia/Ana/a.jpg", bytes("foto"));
-        cloud.put("Unichat/Multimedia/Ana/c.jpg", bytes("otra cosa"));
         cloud.put("Unichat/Multimedia/Ana/d.jpg", bytes("solo vieja"));
         cloud.put("Unichat/Multimedia/Beto/e.jpg", bytes("e"));
         int puts = cloud.puts.get();
-
-        CloudNames.media(dav, true); // this computer's first move: no older computer writing there since
-        assertFalse(cloud.files.containsKey("Unichat/Multimedia/Ana/a.jpg"), "the same file under both: one copy");
-        assertArrayEquals(bytes("foto"), cloud.files.get("Unichat/Media/Ana/a.jpg"));
-        assertArrayEquals(bytes("la nueva"), cloud.files.get("Unichat/Media/Ana/c.jpg"), "two that differ: both kept");
-        assertArrayEquals(bytes("otra cosa"), cloud.files.get("Unichat/Multimedia/Ana/c.jpg"));
+        assertTrue(CloudNames.migrate(dav(), new Object()));
+        assertArrayEquals(bytes("foto"), cloud.files.get("Unichat/Media/Ana/a.jpg"), "the same file under both: one copy");
         assertArrayEquals(bytes("solo vieja"), cloud.files.get("Unichat/Media/Ana/d.jpg"), "one only under the old name moves");
         assertArrayEquals(bytes("e"), cloud.files.get("Unichat/Media/Beto/e.jpg"), "a folder only under the old name moves whole");
         assertTrue(cloud.log.contains("MOVE Unichat/Multimedia/Beto Unichat/Media/Beto"), cloud.log.toString());
+        assertFalse(paths().stream().anyMatch(CloudNamesTest::old), paths().toString());
         assertEquals(puts, cloud.puts.get(), "nothing went up again");
-
-        CloudNames.media(dav, true);
-        assertArrayEquals(bytes("otra cosa"), cloud.files.get("Unichat/Multimedia/Ana/c.jpg"), "and stays so: nothing lost");
-        assertEquals(puts, cloud.puts.get());
-    }
-
-    @Test
-    void myOwnOldSettingsStayForAnOlderComputerToReadBack() throws Exception {
-        cloud.put(OLD_SETTINGS, settings(DESK, Instant.now().minusSeconds(60), "DARK")); // sent by this computer before it was updated
-        VaultComputer desk = new VaultComputer(cloud, dir, DESK);
-        assertNull(desk.round().error());
-        assertEquals("DARK", desk.get("ui.theme"));
-        assertTrue(cloud.files.containsKey(OLD_SETTINGS), "left: an older computer reads it back as the account's");
-        desk.set("ui.theme", "SYSTEM");
-        desk.round();
-        cloud.put(OLD_SETTINGS, settings(OLD, Instant.now().plusSeconds(60), "DARK")); // the older computer sends the same again, newer
-        assertNull(desk.round().error());
-        assertEquals("SYSTEM", desk.get("ui.theme"), "a copy already taken in never wins again over what changed since");
-    }
-
-    @Test
-    void anOlderComputersMediaStaysUnderBothNames() throws Exception {
-        VaultComputer desk = new VaultComputer(cloud, dir, DESK);
-        assertNull(desk.round().error()); // this computer's first move; its photo up under the new name
-        cloud.put("Unichat/Multimedia/Ana/a.jpg", bytes("foto")); // an older computer's daily check sends it again
-        cloud.put("Unichat/Multimedia/Ana/n.jpg", bytes("nueva"));
-        assertNull(desk.round().error());
-        assertArrayEquals(bytes("nueva"), cloud.files.get("Unichat/Media/Ana/n.jpg"), "what it sends comes in");
-        assertTrue(cloud.files.containsKey("Unichat/Multimedia/Ana/a.jpg"), "a copy it holds stays: deleted, it'd only go up again");
-        int puts = cloud.puts.get();
-        desk.round();
-        assertEquals(puts, cloud.puts.get(), "and nothing goes to and fro");
     }
 
     @Test
@@ -239,30 +185,25 @@ class CloudNamesTest {
 
     @Test
     void settingsInBothKeepTheNewest() throws Exception {
-        Storage dav = dav();
         Instant now = Instant.now();
         byte[] older = settings(DESK, now.minusSeconds(60), "LIGHT"), newer = settings(DESK, now, "DARK");
         cloud.put(SETTINGS, older);
-        cloud.put(OLD_SETTINGS, newer); // this computer's, sent by it before it was updated
-        CloudNames.migrate(dav, DESK, new Object(), now);
+        cloud.put(OLD_SETTINGS, newer);
+        CloudNames.migrate(dav(), new Object());
         assertArrayEquals(newer, cloud.files.get(SETTINGS), "the old name's newer copy won");
-        assertTrue(cloud.files.containsKey(OLD_SETTINGS), "and stays where an older computer reads it back");
+        assertFalse(cloud.files.containsKey(OLD_SETTINGS), "and its folder is gone, confirmed");
 
-        cloud.put(OLD_SETTINGS, settings(DESK, now.minusSeconds(120), "LIGHT"));
-        CloudNames.migrate(dav, DESK, new Object(), now);
+        Settings.get().set(CloudNames.DONE, null);
+        cloud.put(OLD_SETTINGS, settings(DESK, now.minusSeconds(120), "SYSTEM"));
+        CloudNames.migrate(dav(), new Object());
         assertArrayEquals(newer, cloud.files.get(SETTINGS), "an older copy under the old name never wins");
-
-        byte[] theirs = settings(OLD, now.plusSeconds(60), "SYSTEM");
-        cloud.put(OLD_SETTINGS, theirs); // another computer's, newer
-        CloudNames.migrate(dav, DESK, new Object(), now);
-        assertArrayEquals(theirs, cloud.files.get(SETTINGS), "another computer's newer copy wins too");
-        assertTrue(cloud.files.containsKey(OLD_SETTINGS), "and stays where that computer reads it back");
+        assertFalse(cloud.files.containsKey(OLD_SETTINGS));
     }
 
     @Test
     void theTurnOffMarkMovesToo() throws Exception {
         cloud.put(CloudNames.OLD_OFF, bytes("{\"vault\":\"x\"}"));
-        CloudNames.migrate(dav(), DESK, new Object(), Instant.now());
+        CloudNames.migrate(dav(), new Object());
         assertArrayEquals(bytes("{\"vault\":\"x\"}"), cloud.files.get(VaultOff.FILE));
         assertFalse(cloud.files.containsKey(CloudNames.OLD_OFF));
     }
@@ -270,17 +211,14 @@ class CloudNamesTest {
     @Test
     void namesFromTheAccountThatArentOursAreLeft() throws Exception {
         cloud.put("Unichat/Ajustes/notas.txt", bytes("mías"));
-        cloud.put("Unichat/Ajustes/unichat-settings.json", bytes("no es un ajuste"));
         cloud.put("Unichat/Texts/" + DESK + "/index.json", bytes("{}"));
-        cloud.put("Unichat/Textos/../fuera/" + TEXT, bytes("x"));
         cloud.put("Unichat/Textos/no-es-una-máquina/" + TEXT, bytes("x"));
         cloud.put("Unichat/Textos/" + OLD + "/otra.txt", bytes("x"));
-        CloudNames.migrate(dav(), DESK, new Object(), Instant.now());
-        assertTrue(cloud.files.containsKey("Unichat/Ajustes/notas.txt"));
-        assertTrue(cloud.files.containsKey("Unichat/Ajustes/unichat-settings.json"), "not a part of ours: left");
+        assertTrue(CloudNames.migrate(dav(), new Object()), "media's old name has nothing");
+        assertTrue(cloud.files.containsKey("Unichat/Ajustes/notas.txt"), "not ours: kept, and its folder with it");
         assertTrue(cloud.files.containsKey("Unichat/Textos/no-es-una-máquina/" + TEXT));
         assertTrue(cloud.files.containsKey("Unichat/Texts/" + OLD + "/otra.txt"), "a machine's folder moves whole, nothing in it lost");
-        assertFalse(cloud.files.keySet().stream().anyMatch(p -> p.contains("fuera") && !p.startsWith("Unichat/Textos/")));
+        assertFalse(Settings.get().getBool(CloudNames.DONE, false), "never done while they're there");
     }
 
     @Test

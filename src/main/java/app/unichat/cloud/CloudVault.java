@@ -20,12 +20,17 @@ public final class CloudVault {
         this.cloud = cloud;
     }
 
+    /** A job that writes the vault's keys or files: never under its old names while another computer switches them. */
+    private <T> CompletableFuture<T> writing(Cloud.Job<T> job) {
+        return cloud.onWorker(job, true);
+    }
+
     /**
      * A new key for the vault ({@link Vault#rotate}), on the vault's thread: only with the vault open here. This computer
      * then takes it at once, as the others do on their next round; if that fails, its next round does it.
      */
     CompletableFuture<Cloud.KeyChanged> rotateKey() {
-        return cloud.onWorker(dav -> rotate(dav, id -> true));
+        return writing(dav -> rotate(dav, id -> true));
     }
 
     /**
@@ -34,7 +39,7 @@ public final class CloudVault {
      */
     public CompletableFuture<Cloud.KeyChanged> rotateKey(java.util.Set<String> confirmed) {
         java.util.Set<String> asked = java.util.Set.copyOf(confirmed);
-        return cloud.onWorker(dav -> rotate(dav, asked::contains));
+        return writing(dav -> rotate(dav, asked::contains));
     }
 
     /**
@@ -43,7 +48,7 @@ public final class CloudVault {
      */
     public CompletableFuture<Cloud.KeyChanged> removeAndChangeKey(String machine, java.util.Set<String> confirmed) {
         java.util.Set<String> asked = java.util.Set.copyOf(confirmed);
-        return cloud.onWorker(dav -> {
+        return writing(dav -> {
             Vault.Info before = Vault.info(dav);
             VaultActions.remove(dav, machine);
             try {
@@ -171,7 +176,7 @@ public final class CloudVault {
      * computers find it gone on their next round and go back to plain by themselves.
      */
     public CompletableFuture<Void> turnOffVault() {
-        return cloud.onWorker(dav -> withKey(dav, (vault, vk) -> {
+        return writing(dav -> withKey(dav, (vault, vk) -> {
             synchronized (cloud.texts()) { // TextSync.run's own lock: no text of this computer's goes up halfway through
                 boolean whole = VaultOut.run(dav, vault.personal(dav), vault.info(), vk);
                 VaultParts.gone();
@@ -201,7 +206,7 @@ public final class CloudVault {
      * secret that opens nothing fails with "wrong" and writes nothing. {@code secret} is cleared once used.
      */
     public CompletableFuture<Void> openVault(VaultView.Way way, char[] secret) {
-        CompletableFuture<Void> f = cloud.onWorker(dav -> {
+        CompletableFuture<Void> f = writing(dav -> {
             try (VaultParts.Round here = cloud.stateOf(dav)) {
                 VaultActions.open(dav, way, secret, here.state());
             }
@@ -221,7 +226,7 @@ public final class CloudVault {
 
     /** A password as one more way in, only with the vault open here; {@code password} is cleared once used. */
     public CompletableFuture<Void> addPassword(char[] password) {
-        CompletableFuture<Void> f = cloud.onWorker(dav -> withKey(dav, (vault, vk) -> {
+        CompletableFuture<Void> f = writing(dav -> withKey(dav, (vault, vk) -> {
             VaultActions.addPassword(dav, vk, password);
             return null;
         }));
@@ -231,7 +236,7 @@ public final class CloudVault {
 
     /** A new recovery code in place of the old one (which no longer opens it), only with the vault open here. */
     public CompletableFuture<String> newRecoveryCode() {
-        return cloud.onWorker(dav -> withKey(dav, (vault, vk) -> VaultActions.newRecovery(dav, vk, vault.info())));
+        return writing(dav -> withKey(dav, (vault, vk) -> VaultActions.newRecovery(dav, vk, vault.info())));
     }
 
     /** The person typed back the groups asked of the latest recovery code: kept. */

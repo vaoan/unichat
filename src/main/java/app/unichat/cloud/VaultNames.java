@@ -61,11 +61,11 @@ final class VaultNames {
      * switch leaves the old names the vault's, to try again next round. The vault changed meanwhile (another computer
      * switched it, or changed its key) stops it: the next round goes on from what the account says then.
      */
-    static Storage migrate(Storage dav, Storage at, Vault.Info info, byte[] vk) throws IOException {
+    static Storage migrate(Storage dav, Storage at, Vault.Info info, byte[] vk, String machine) throws IOException {
         Map<String, String> slotsCopied = new HashMap<>();
         if (at instanceof OldVault) {
             copy(dav, vk, true);
-            slots(dav, false, slotsCopied);
+            slots(dav, false, slotsCopied, machine);
             hook(true);
             if (!Vault.at(at, info)) throw changed(); // its key changed meanwhile
             if (!dav.exists(Vault.INFO)) dav.put(Vault.INFO, Vault.json(info));
@@ -75,7 +75,7 @@ final class VaultNames {
             hook(false);
         }
         if (!left(dav)) return dav;
-        slots(dav, true, slotsCopied); // first: a way in never waits behind a file that won't go
+        slots(dav, true, slotsCopied, machine); // first: a way in never waits behind a file that won't go
         copy(dav, vk, false);
         deleteEmpty(dav, CloudNames.OLD_VAULT);
         return dav;
@@ -141,16 +141,18 @@ final class VaultNames {
 
     /**
      * Each slot under the old names copied as it is (a slot is sealed with its vault, method and id, never its path),
-     * its stamp noted in {@code copied}. {@code finishing}: copied again where the new names have none, or where it was
-     * written after it was copied (before the switch: the newer), and the old one deleted after.
+     * its stamp noted in {@code copied}. {@code finishing}: copied again where the new names have none, where it was
+     * written after it was copied (before the switch: the newer), and always this computer's own ({@code machine}: only
+     * it writes its slot, so the old one is its latest, whatever a round before left under the new name); the old one
+     * deleted after.
      */
-    private static void slots(Storage dav, boolean finishing, Map<String, String> copied) throws IOException {
+    private static void slots(Storage dav, boolean finishing, Map<String, String> copied, String machine) throws IOException {
         for (String name : dav.list(CloudNames.OLD_SLOTS)) {
             if (!name.endsWith(".json") || !Ids.ours(name.substring(0, name.length() - ".json".length()))) continue;
             String from = CloudNames.OLD_SLOTS + "/" + name, to = Vault.SLOTS + "/" + name;
             String stamp = dav.stamp(from);
             if (stamp == null) continue;
-            boolean again = copied.containsKey(from) && !stamp.equals(copied.get(from));
+            boolean again = copied.containsKey(from) && !stamp.equals(copied.get(from)) || name.equals(machine + ".json");
             if (!finishing || again || !dav.exists(to)) {
                 byte[] slot = dav.get(from);
                 if (slot == null) continue;
@@ -164,8 +166,8 @@ final class VaultNames {
     }
 
     /** The slots left under the old names once the new ones are the vault's (a way in written there late), taken across. */
-    static void slotsLeft(Storage dav) throws IOException {
-        if (dav.exists(Vault.INFO) && dav.exists(CloudNames.OLD_SLOTS)) slots(dav, true, new HashMap<>());
+    static void slotsLeft(Storage dav, String machine) throws IOException {
+        if (dav.exists(Vault.INFO) && dav.exists(CloudNames.OLD_SLOTS)) slots(dav, true, new HashMap<>(), machine);
     }
 
     /** {@code dir} and every folder in it deleted when no file is left in any of them. */

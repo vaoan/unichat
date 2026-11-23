@@ -4,9 +4,7 @@ import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Arrays;
-import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -28,10 +26,8 @@ final class CloudRenames {
     private final ReentrantLock keyLock;
     private final Unseen unseen;
     private final Opener opener;
-    /** Whether the last round was this computer's first move (no older Unichat known to write the old names since). */
-    private volatile boolean firstMove;
-    /** The machines the last round found still writing the account's old names. */
-    private volatile Set<String> older = Set.of();
+    /** Whether the last round left nothing under media's old name: its check may run. */
+    private volatile boolean mayCheck = true;
 
     CloudRenames(TextSync texts, ReentrantLock keyLock, Unseen unseen, Opener opener) {
         this.texts = texts;
@@ -40,31 +36,23 @@ final class CloudRenames {
         this.opener = opener;
     }
 
-    Set<String> older() {
-        return older;
+    /** Whether the round's media check may run: nothing left under media's old name that it would send again. */
+    boolean mayCheck() {
+        return mayCheck;
     }
 
     /**
-     * The account's plain old names moved to the new ones, with the texts' lock held over the texts; why it couldn't (the
-     * round goes on: what's left is moved by the next), or null.
+     * The account's plain old folders moved to the new names and deleted once confirmed, with the texts' lock held over
+     * the texts; why it couldn't (the round goes on: the next one goes on from there), or null.
      */
-    String plain(Storage dav, Instant now) {
+    String plain(Storage dav) {
         try {
-            firstMove = CloudNames.firstMove();
-            older = CloudNames.migrate(dav, Cloud.machine(), texts, now);
+            mayCheck = CloudNames.migrate(dav, texts);
             return null;
         } catch (IOException | RuntimeException e) {
+            mayCheck = false;
             return Errors.message(e);
         }
-    }
-
-    /**
-     * Media's old folder moved before media reads it, its duplicates deleted only on this computer's first move (after it,
-     * an older Unichat's daily check would only send them again); whether the round's check may run (nothing left under
-     * the old name that it would send again).
-     */
-    boolean media(Storage dav) {
-        return CloudNames.media(dav, firstMove && older.isEmpty());
     }
 
     /**
@@ -92,7 +80,7 @@ final class CloudRenames {
         keyLock.lock();
         try {
             synchronized (texts) {
-                Storage now = VaultNames.migrate(dav, at, vault.info(), vk);
+                Storage now = VaultNames.migrate(dav, at, vault.info(), vk, Cloud.machine());
                 if (now != at) unseen.run(); // another file now, whatever its stamp
                 return now;
             }
@@ -131,7 +119,7 @@ final class CloudRenames {
     void afterJob(Storage dav, Storage at) {
         if (!(at instanceof OldVault)) return;
         try {
-            VaultNames.slotsLeft(dav);
+            VaultNames.slotsLeft(dav, Cloud.machine());
             Storage now = VaultNames.at(dav);
             try (VaultParts.Round vault = opener.open(now)) {
                 if (vault.open() && (now != dav || VaultNames.left(dav))) vault(dav, now, vault, why -> { });

@@ -243,7 +243,7 @@ class VaultNamesTest {
             }
         });
         read.await();
-        VaultNames.migrate(dav(), new OldVault(dav()), made.info(), made.vk()); // another computer moves the names meanwhile
+        VaultNames.migrate(dav(), new OldVault(dav()), made.info(), made.vk(), LAPTOP); // another computer moves the names meanwhile
         go.countDown();
         job.get();
         assertEquals(made.info().generation() + 1, Vault.info(dav()).generation(), "the key changed under the new names");
@@ -335,5 +335,33 @@ class VaultNamesTest {
         assertTrue(Vault.computers(dav()).containsKey(THIRD), "its way in under the new names");
         assertEquals(Cloud.VaultState.OPEN, third.round().vault());
         assertEquals("DARK", third.get("ui.theme"));
+    }
+
+    @Test
+    void openingTheVaultsPageNeverRunsTheMove() throws Exception {
+        anOldVault();
+        cloud.failOnce.add("Unichat/Vault/Texts/" + DESK + "/index.json"); // a move would fail now
+        VaultView view = desk.as(() -> desk.cloud.vault().vaultView());
+        assertEquals(Cloud.VaultState.OPEN, view.state(), "it reads the vault where it is");
+        assertFalse(cloud.files.containsKey(Vault.INFO), "and moves nothing");
+        assertFalse(anyUnder(Vault.ROOT), cloud.files.keySet().toString());
+        desk.as(() -> desk.cloud.vault().codeKept()); // nor does a job that changes no key or file refuse
+    }
+
+    @Test
+    void thisComputersOwnSlotWrittenLateUnderTheOldNamesWinsOverAStaleCopy() throws Exception {
+        anOldVault();
+        cloud.failDeleteOnce.add(CloudNames.OLD_SLOTS + "/" + DESK + ".json"); // the old slots' deletes cut short
+        assertNotNull(laptop.round().error());
+        assertTrue(cloud.files.containsKey(Vault.INFO), "switched");
+        Vault.Info info = Vault.info(dav());
+        VaultSlot own = Vault.slot(dav(), info, LAPTOP);
+        byte[] slotKey = java.util.Base64.getDecoder().decode(laptop.get(VaultParts.KEY));
+        Vault.rewrap(new OldVault(dav()), info, own, slotKey, made.vk(), VaultNext.publicKey(own, made.vk())); // written late, old names
+        byte[] latest = cloud.files.get(CloudNames.OLD_SLOTS + "/" + LAPTOP + ".json");
+        assertNull(laptop.round().error());
+        assertArrayEquals(latest, cloud.files.get(Vault.SLOTS + "/" + LAPTOP + ".json"), "its latest slot, not the stale copy");
+        assertFalse(anyUnder(CloudNames.OLD_VAULT));
+        assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
     }
 }

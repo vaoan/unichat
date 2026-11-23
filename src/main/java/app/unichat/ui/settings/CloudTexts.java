@@ -40,7 +40,7 @@ public final class CloudTexts {
 
     /**
      * The vault's lines: how it stands here (not open, gone on without, removed), what came into it, the computers still
-     * sending plain copies, how many still write the cloud's old folder names, and what of it didn't open. None without a vault and with nothing to say.
+     * sending plain copies, and what of it didn't open. None without a vault and with nothing to say.
      */
     public static List<String> vaultLines(Cloud.Status s, Instant now) {
         List<String> out = new ArrayList<>();
@@ -56,7 +56,6 @@ public final class CloudTexts {
         Cloud.Moving m = s.moving();
         if (m != null && m.files() > 0) out.add(I18n.n("settings.vault.line.moved", m.files(), when(m.at(), now)));
         if (m != null) m.strays().keySet().forEach(machine -> out.add(I18n.t("settings.vault.line.stray", computer(m.strayName(machine)))));
-        if (m != null && !m.older().isEmpty()) out.add(I18n.n("settings.cloud.line.older", m.older().size()));
         Cloud.Notice n = s.vaultNotice();
         if (n != null) {
             if (!n.replaced().isEmpty()) out.add(I18n.t("settings.vault.line.replaced", parts(n.replaced())));
