@@ -172,6 +172,7 @@ public final class Cloud {
     private final TextSync texts;
     private final VaultParts vaultParts;
     private final CloudVault vaultJobs = new CloudVault(this);
+    private final CloudRenames renames;
     /** The vault's state last read: when it changes, what was seen of the account is another storage's. */
     private VaultState lastVault;
     private final Object vaultLock = new Object();
@@ -184,7 +185,7 @@ public final class Cloud {
     /** How many vault jobs ran, under {@link #vaultPart}: one since a round's vault part means its state is read again. */
     private long vaultJobsDone;
     /** The texts alone never run while the vault's key changes or is forgotten here: they'd go with a key just replaced. */
-    private final Object keyLock = new Object();
+    private final java.util.concurrent.locks.ReentrantLock keyLock = new java.util.concurrent.locks.ReentrantLock();
     private final java.util.function.Consumer<java.util.Set<String>> textsArrived;
     /** Asking for the texts alone, apart from the round: a round may be busy sending a video for minutes. */
     private final ExecutorService textsWorker = Executors.newSingleThreadExecutor(r -> {
@@ -221,8 +222,6 @@ public final class Cloud {
     volatile Runnable beforeTold;
     private int uploaded;
     private Moving moving = Moving.NONE;
-    /** The machines the last round found still writing the account's old names. */
-    private java.util.Set<String> older = java.util.Set.of();
 
     /**
      * What chats say, kept on every computer ({@link TextSync}).
@@ -246,6 +245,7 @@ public final class Cloud {
           java.util.function.Consumer<java.util.Set<String>> textsArrived, VaultParts vaultParts) {
         this.texts = texts;
         this.vaultParts = vaultParts;
+        this.renames = new CloudRenames(texts, keyLock, this::unseen, this::openVault);
         this.textsArrived = textsArrived;
         this.account = account;
         this.settingsPart = settingsPart;
@@ -378,9 +378,9 @@ public final class Cloud {
             return publish(finished(status().lastSync(), Errors.message(e), status().vault(), null, mediaTurn.waitsNow(now)));
         }
         String mediaFailed = null;
+        boolean check = renames.media(dav); // before media reads its folder: never sent again under the new name
         try {
-            CloudNames.media(dav); // before media reads its folder: never sent again under the new name
-            mediaTurn.run(dav, now, progressOf(Step.UPLOADING), progressOf(Step.VERIFYING));
+            mediaTurn.run(dav, now, progressOf(Step.UPLOADING), progressOf(Step.VERIFYING), check);
         } catch (IOException | RuntimeException e) {
             mediaFailed = Errors.message(e);
         }
@@ -402,15 +402,14 @@ public final class Cloud {
     private VaultPass vaultPass(Storage dav, Instant now) throws IOException {
         vaultPart.lock();
         try {
-            String renameFailed = renamed(dav, now); // before anything reads a folder of the account
+            String renameFailed = renames.plain(dav, now); // before anything reads a folder of the account
             Storage at = VaultNames.at(dav); // the vault under its old names until it's moved
             try (VaultParts.Round vault = stateOf(at)) {
                 if (vault.open() && (at != dav || VaultNames.left(dav))) {
-                    try {
-                        at = vaultRenamed(dav, at, vault);
-                    } catch (IOException | RuntimeException e) {
-                        if (renameFailed == null) renameFailed = Errors.message(e); // it opens under the old names still
-                    }
+                    String[] why = {null};
+                    at = renames.vault(dav, at, vault, failed -> why[0] = failed);
+                    if (renameFailed == null) renameFailed = why[0];
+                    if (at == null) return new VaultPass(vault.state(), renameFailed, null, vaultJobsDone); // with another key now
                 }
                 if (vault.open()) seePeers(at, vault);
                 Storage personal = vault.personal(at);
@@ -438,35 +437,6 @@ public final class Cloud {
             }
         } finally {
             vaultPart.unlock();
-        }
-    }
-
-    /** The vault open this round moved to its new names ({@link VaultNames}), nothing of this computer writing it meanwhile. */
-    private Storage vaultRenamed(Storage dav, Storage at, VaultParts.Round vault) throws IOException {
-        byte[] vk = vault.key();
-        try {
-            synchronized (keyLock) {
-                synchronized (texts) {
-                    Storage now = VaultNames.migrate(dav, at, vault.info(), vk);
-                    if (now != at) unseen(); // another file now, whatever its stamp
-                    return now;
-                }
-            }
-        } finally {
-            Arrays.fill(vk, (byte) 0);
-        }
-    }
-
-    /**
-     * The account's old names moved to the new ones ({@link CloudNames}), with the texts' lock held over the texts; why it
-     * couldn't (the round goes on: what's left is moved by the next), or null.
-     */
-    private String renamed(Storage dav, Instant now) {
-        try {
-            older = CloudNames.migrate(dav, machine(), texts, now);
-            return null;
-        } catch (IOException | RuntimeException e) {
-            return Errors.message(e);
         }
     }
 
@@ -610,12 +580,15 @@ public final class Cloud {
             try {
                 CloudAccount a = account.get();
                 if (a != null) {
-                    Storage dav = VaultNames.at(a.storage());
-                    synchronized (keyLock) {
+                    keyLock.lock(); // the vault's names read under it: a move of them holds it from start to end
+                    try {
+                        Storage dav = VaultNames.at(a.storage());
                         try (VaultParts.Round vault = stateOf(dav)) {
                             Storage to = textsTo(vault, vault.personal(dav));
                             if (to != null) syncTexts(to, vault.textsTo());
                         }
+                    } finally {
+                        keyLock.unlock();
                     }
                 }
             } catch (IOException | RuntimeException e) {
@@ -644,8 +617,14 @@ public final class Cloud {
                 try {
                     CloudAccount a = account.get(); // once it's this job's turn: disconnected meanwhile is no account
                     if (a == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
-                    synchronized (keyLock) {
-                        return job.run(VaultNames.at(a.storage())); // the vault under its old names until a round moves it
+                    keyLock.lock();
+                    try {
+                        Storage dav = a.storage(), at = renames.forJob(dav); // moved first, where it's open here
+                        T done = job.run(at);
+                        renames.afterJob(dav, at);
+                        return done;
+                    } finally {
+                        keyLock.unlock();
                     }
                 } finally {
                     vaultJobsDone++;
@@ -656,6 +635,11 @@ public final class Cloud {
                 throw new java.util.concurrent.CompletionException(e);
             }
         }, vaultWorker);
+    }
+
+    /** Whether something waits for the key's lock (tests: the texts alone held behind a round's move of the vault). */
+    boolean keyWaiting() {
+        return keyLock.hasQueuedThreads();
     }
 
     /** Whether a vault job waits for a round's vault part to end (tests: the job is asked and held, not yet run). */
@@ -677,7 +661,7 @@ public final class Cloud {
         }
         String verified = Settings.get().getString(MediaTurn.LAST_VERIFY, null);
         return new Status(true, lastSync, error, uploaded, waiting, null, media.retrying(), media.nextRetry(), media.conflicts(),
-                verified == null ? null : Instant.parse(verified), vault, moving.older(older), vaultNotice, mediaPaused);
+                verified == null ? null : Instant.parse(verified), vault, moving.older(renames.older()), vaultNotice, mediaPaused);
     }
 
     /** Checks everything uploaded against the account now, repairing what differs, then the usual round. */

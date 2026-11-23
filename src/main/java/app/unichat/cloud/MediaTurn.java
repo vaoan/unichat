@@ -35,8 +35,11 @@ final class MediaTurn {
         asked.incrementAndGet();
     }
 
-    /** The turn; how many files went up (or back up) is {@link #sent}, also when it throws. */
-    void run(Storage dav, Instant now, MediaUpload.Progress uploading, MediaUpload.Progress verifying) throws IOException {
+    /**
+     * The turn; how many files went up (or back up) is {@link #sent}, also when it throws. Without {@code check}, a check
+     * due stays due (media's old folder isn't all under its new name yet: the check would send again what's there).
+     */
+    void run(Storage dav, Instant now, MediaUpload.Progress uploading, MediaUpload.Progress verifying, boolean check) throws IOException {
         waited = false;
         sent = 0;
         if (!CloudAccount.media()) return;
@@ -45,7 +48,7 @@ final class MediaTurn {
             return;
         }
         sent = media.run(dav, uploading, this::mayGoOn);
-        if (waited || !due(now)) return;
+        if (waited || !check || !due(now)) return;
         int pressed = asked.get();
         sent += media.verify(dav, verifying, this::mayGoOn);
         if (waited) return;

@@ -29,7 +29,7 @@ final class CloudNames {
     static final String OLD_INFO = OLD_VAULT + "/boveda.json", OLD_SLOTS = OLD_VAULT + "/llaves";
     /**
      * Machine-only: when this computer's first move was done (what turns up under an old name after it was written by an
-     * older Unichat), and, per settings file another computer keeps under the old name, its stamp when last taken in.
+     * older Unichat), and, per settings file under the old name, its content's hash and stamp when last looked at.
      */
     static final String AT = "cloud.names.at", SEEN = "cloud.names.seen.";
 
@@ -120,7 +120,7 @@ final class CloudNames {
      */
     static Set<String> migrate(Storage dav, String machine, Object texts, Instant now) throws IOException {
         Settings s = Settings.get();
-        Instant since = instant(s.getString(AT, null));
+        Instant since = first(s);
         Set<String> older = new TreeSet<>();
         settings(dav, machine, since, older);
         synchronized (texts) {
@@ -131,10 +131,11 @@ final class CloudNames {
     }
 
     /**
-     * Each settings file under {@link #OLD_SETTINGS}. This computer's own (written before it was updated) moves, or goes
-     * once the new name holds it; another computer's is taken in where the new name has none or an older one, and stays
-     * where it is: that computer, on an older Unichat, reads it back as its own, so it never sends its copy again with a
-     * new time that would win over what changed since. The turn-off mark moves.
+     * Each settings file under {@link #OLD_SETTINGS}, taken in where the new name has none or an older one, and left where
+     * it is, whoever wrote it: a computer still on an older Unichat reads it back as the account's copy, and one it found
+     * gone it would send again from its own, with a new time that wins over what changed since. What was taken in is
+     * remembered ({@link #SEEN}: its content's hash and stamp), so the same content sent again is no news. The turn-off
+     * mark moves.
      */
     private static void settings(Storage dav, String machine, Instant since, Set<String> older) throws IOException {
         List<String> names = dav.list(OLD_SETTINGS);
@@ -150,36 +151,30 @@ final class CloudNames {
                 continue;
             }
             if (Cloud.Part.of(name) == null) continue;
-            String stamp = dav.stamp(path), target = renamed(path);
-            if (stamp == null || stamp.equals(s(SEEN + name))) continue; // gone meanwhile, or taken in already
-            byte[] mine = dav.get(path);
-            Bundle b = mine == null ? null : Bundle.parse(mine);
+            String stamp = dav.stamp(path);
+            String[] seen = seen(name);
+            if (stamp == null || seen != null && stamp.equals(seen[1])) continue; // gone meanwhile, or looked at already
+            byte[] theirs = dav.get(path);
+            Bundle b = theirs == null ? null : Bundle.parse(theirs);
             if (b == null) continue; // not a part of ours: left
-            if (b.machine().equals(machine)) {
-                own(dav, path, target, mine);
-                continue;
+            if (seen == null || !b.hash().equals(seen[0])) {
+                if (since != null && b.savedAt().isAfter(since) && Ids.ours(b.machine()) && !b.machine().equals(machine)) older.add(b.machine());
+                String target = renamed(path);
+                byte[] wins = winner(target, theirs, dav.get(target), false);
+                if (wins != null) {
+                    dav.mkdirs(CloudAccount.SETTINGS_DIR);
+                    dav.put(target, wins);
+                }
             }
-            if (since != null && b.savedAt().isAfter(since) && Ids.ours(b.machine())) older.add(b.machine());
-            byte[] wins = winner(target, mine, dav.get(target), false);
-            if (wins != null) {
-                dav.mkdirs(CloudAccount.SETTINGS_DIR);
-                dav.put(target, wins);
-            }
-            Settings.get().set(SEEN + name, stamp);
+            Settings.get().set(SEEN + name, b.hash() + " " + stamp);
         }
-        deleteIfEmpty(dav, OLD_SETTINGS);
     }
 
-    /** This computer's own old settings file: moved where the new name has none, else the newer kept there and the old one gone. */
-    private static void own(Storage dav, String path, String target, byte[] mine) throws IOException {
-        byte[] there = dav.get(target);
-        if (there == null) {
-            moveInto(dav, path, target);
-            return;
-        }
-        byte[] wins = winner(target, mine, there, false);
-        if (wins != null) dav.put(target, wins);
-        dav.delete(path);
+    /** What {@link #SEEN} says of {@code name}: its hash and stamp when last looked at, or null. */
+    private static String[] seen(String name) {
+        String kept = s(SEEN + name);
+        String[] parts = kept == null ? null : kept.split(" ", 2);
+        return parts == null || parts.length < 2 ? null : parts;
     }
 
     /**
@@ -236,35 +231,46 @@ final class CloudNames {
 
     /**
      * Media under {@link CloudAccount#MEDIA}: the whole folder moved when the new one isn't there; else each chat's folder,
-     * or each of its files: one the new folder has too goes only once its size (and checksum, where the service gives
-     * one) is the same; one that differs is kept under both names, and said in the log. Run before media, every round.
+     * or each of its files. One the new folder has too goes only with {@code dedupe} (this computer's first move, no older
+     * Unichat known to write the old name) and once its size, and checksum where the service gives one, is the same:
+     * otherwise it stays (an older computer's daily check would only send it again) and one that differs is said in the
+     * log. Run before media, every round; a failure is said in the log, never stops media. Whether all of it is under the
+     * new name or kept on purpose: else the round's check waits, as it would send again what's still under the old one.
      */
-    static void media(Storage dav) throws IOException {
-        if (!dav.exists(OLD_MEDIA)) return;
-        if (!dav.exists(CloudAccount.MEDIA)) {
-            moveInto(dav, OLD_MEDIA, CloudAccount.MEDIA);
-            return;
-        }
-        for (String folder : dav.list(OLD_MEDIA)) {
-            if (!plainName(folder)) continue;
-            String from = OLD_MEDIA + "/" + folder, to = CloudAccount.MEDIA + "/" + folder;
-            try {
-                if (!dav.exists(to)) {
-                    dav.move(from, to);
-                    continue;
-                }
-                for (String name : dav.list(from)) {
-                    if (plainName(name)) mediaFile(dav, from + "/" + name, to + "/" + name);
-                }
-                deleteIfEmpty(dav, from);
-            } catch (IOException e) {
-                System.err.println("Cloud: the media folder's new name: " + Errors.message(e)); // the next round goes on from there
+    static boolean media(Storage dav, boolean dedupe) {
+        try {
+            if (!dav.exists(OLD_MEDIA)) return true;
+            if (!dav.exists(CloudAccount.MEDIA)) {
+                moveInto(dav, OLD_MEDIA, CloudAccount.MEDIA);
+                return true;
             }
+            boolean all = true;
+            for (String folder : dav.list(OLD_MEDIA)) {
+                if (!Storage.plainName(folder)) continue;
+                String from = OLD_MEDIA + "/" + folder, to = CloudAccount.MEDIA + "/" + folder;
+                try {
+                    if (!dav.exists(to)) {
+                        dav.move(from, to);
+                        continue;
+                    }
+                    for (String name : dav.list(from)) {
+                        if (Storage.plainName(name)) mediaFile(dav, from + "/" + name, to + "/" + name, dedupe);
+                    }
+                    deleteIfEmpty(dav, from);
+                } catch (IOException e) {
+                    all = false;
+                    System.err.println("Cloud: the media folder's new name: " + Errors.message(e)); // the next round goes on from there
+                }
+            }
+            deleteIfEmpty(dav, OLD_MEDIA);
+            return all;
+        } catch (IOException | RuntimeException e) {
+            System.err.println("Cloud: the media folder's new name: " + Errors.message(e));
+            return false;
         }
-        deleteIfEmpty(dav, OLD_MEDIA);
     }
 
-    private static void mediaFile(Storage dav, String from, String to) throws IOException {
+    private static void mediaFile(Storage dav, String from, String to, boolean dedupe) throws IOException {
         Storage.RemoteFile there = dav.info(to);
         if (there == null) {
             dav.move(from, to);
@@ -272,19 +278,14 @@ final class CloudNames {
         }
         Storage.RemoteFile old = dav.info(from);
         if (old == null) return;
-        if (same(old, there)) dav.delete(from);
-        else System.err.println("Cloud: a file of the media is under both folder names, and they differ: both kept");
+        if (!same(old, there)) System.err.println("Cloud: a file of the media is under both folder names, and they differ: both kept");
+        else if (dedupe) dav.delete(from);
     }
 
     /** The same file, as far as the account can say: its size, and its checksum where both have one of a kind. */
     private static boolean same(Storage.RemoteFile a, Storage.RemoteFile b) {
         if (a.size() < 0 || a.size() != b.size()) return false;
         return a.kind() == null || b.kind() == null || !a.kind().equals(b.kind()) || a.hash().equalsIgnoreCase(b.hash());
-    }
-
-    /** A name from the account that becomes a path here: one part, not "." nor "..". */
-    private static boolean plainName(String name) {
-        return !name.isEmpty() && !name.contains("/") && !name.contains("\\") && !name.equals(".") && !name.equals("..");
     }
 
     /** {@code from} moved to {@code to}, the folder above it made first. */
@@ -296,6 +297,16 @@ final class CloudNames {
     /** {@code dir} deleted when nothing's left in it. */
     static void deleteIfEmpty(Storage dav, String dir) throws IOException {
         if (dav.list(dir).isEmpty() && dav.exists(dir)) dav.delete(dir);
+    }
+
+    /** When this computer's first move was done; null before it. */
+    private static Instant first(Settings s) {
+        return instant(s.getString(AT, null));
+    }
+
+    /** Whether this computer's first move is still to come: nothing an older Unichat wrote since is known. */
+    static boolean firstMove() {
+        return first(Settings.get()) == null;
     }
 
     private static String s(String key) {

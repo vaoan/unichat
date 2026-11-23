@@ -55,7 +55,7 @@ final class VaultReseal {
             return;
         }
         for (String name : names) {
-            if (name.isEmpty() || name.contains("/") || name.contains("\\") || name.equals(".") || name.equals("..")) continue;
+            if (!Storage.plainName(name)) continue;
             String path = dir + "/" + name;
             if (skipped.contains(path)) continue;
             if (name.indexOf('.') < 0) {

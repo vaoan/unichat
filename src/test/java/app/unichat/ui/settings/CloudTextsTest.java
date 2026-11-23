@@ -95,7 +95,8 @@ class CloudTextsTest {
     void computersStillOnTheOldFolderNamesAreCounted() {
         Cloud.Moving one = new Cloud.Moving(0, null, java.util.Map.of(), java.util.Set.of("m1"));
         List<String> lines = CloudTexts.vaultLines(vault(Cloud.VaultState.NONE, one, null), NOW);
-        assertEquals(List.of("1 equipo sigue con un Unichat anterior, que escribe los nombres viejos de las carpetas de la nube: actualízalo."), lines,
+        assertEquals(List.of("1 equipo sigue con un Unichat anterior, que escribe los nombres viejos de las carpetas de la nube: actualízalo. "
+                + "Hasta entonces, sus fotos y videos quedan con los dos nombres de carpeta."), lines,
                 "said without a vault too");
         assertTrue(CloudTexts.menuLines(vault(Cloud.VaultState.NONE, one, null), NOW).containsAll(lines), "and in the tray");
         Cloud.Moving two = new Cloud.Moving(0, null, java.util.Map.of(), java.util.Set.of("m1", "m2"));

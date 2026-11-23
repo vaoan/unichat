@@ -12,6 +12,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,6 +50,8 @@ class VaultNamesTest {
 
     @AfterEach
     void stop() {
+        VaultNames.beforeSwitch = null;
+        VaultNames.afterSwitch = null;
         cloud.close();
         Settings.get().replacePortable(portableWere, k -> false);
         keysWere.forEach(Settings.get()::set);
@@ -202,5 +207,133 @@ class VaultNamesTest {
         assertTrue(cloud.files.containsKey(Vault.INFO), "the rest moved");
         assertTrue(cloud.files.containsKey("Unichat/Bóveda/Ajustes/unichat-pinned.json"), "never deleted: it may be the only copy");
         assertFalse(cloud.files.containsKey(CloudNames.OLD_INFO));
+    }
+
+    @Test
+    void aRoundCutShortAfterTheSwitchGoesOnUnderTheNewNames() throws Exception {
+        anOldVault();
+        String drops = "Unichat/Vault/Texts/" + DESK + "/index.json";
+        desk.set("ui.theme", "SYSTEM");
+        cloud.failOnce.add(drops); // its own move cut short: the change goes up under the old names
+        desk.round();
+        assertFalse(cloud.files.containsKey(Vault.INFO));
+        cloud.failDeleteOnce.add("Unichat/Bóveda/Textos/" + DESK + "/index.json"); // after the old settings went
+        Cloud.Status s = laptop.round();
+        assertNotNull(s.error());
+        assertTrue(cloud.files.containsKey(Vault.INFO), "switched");
+        assertEquals("SYSTEM", laptop.get("ui.theme"), "it took the other computer's change, never sending its own older one");
+        assertNull(desk.round().error());
+        assertNull(laptop.round().error());
+        assertEquals("SYSTEM", desk.get("ui.theme"));
+        assertEquals("SYSTEM", laptop.get("ui.theme"));
+        assertFalse(anyUnder(CloudNames.OLD_VAULT));
+    }
+
+    @Test
+    void aKeyChangeAcrossTheSwitchKeepsTheRemovedComputerOut() throws Exception {
+        anOldVault();
+        CountDownLatch read = new CountDownLatch(1), go = new CountDownLatch(1);
+        cloud.arrived.put(CloudNames.OLD_INFO, read);
+        cloud.holdReadOnce.put(CloudNames.OLD_INFO, go); // the job's first look at the vault, under the old names
+        CompletableFuture<Cloud.KeyChanged> job = CompletableFuture.supplyAsync(() -> {
+            try {
+                return desk.as(() -> desk.cloud.vault().removeAndChangeKey(LAPTOP, java.util.Set.of(DESK)));
+            } catch (Exception e) {
+                throw new java.util.concurrent.CompletionException(e);
+            }
+        });
+        read.await();
+        VaultNames.migrate(dav(), new OldVault(dav()), made.info(), made.vk()); // another computer moves the names meanwhile
+        go.countDown();
+        job.get();
+        assertEquals(made.info().generation() + 1, Vault.info(dav()).generation(), "the key changed under the new names");
+        assertFalse(Vault.computers(dav()).containsKey(LAPTOP), "and the computer removed there");
+        assertFalse(anyUnder(CloudNames.OLD_VAULT), "nothing stranded under the old names: " + cloud.files.keySet());
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
+        assertEquals(Cloud.VaultState.REMOVED, laptop.round().vault());
+    }
+
+    @Test
+    void aLateCopyBetweenTheSwitchAndTheDeletesNeverLosesTheOldOne() throws Exception {
+        Map<String, byte[]> held = anOldVault();
+        String text = "Unichat/Texts/" + DESK + "/" + TEXT, stored = Vault.ROOT + "/Texts/" + DESK + "/" + TEXT;
+        AtomicReference<Vault.Info> oldNames = new AtomicReference<>();
+        VaultNames.afterSwitch = () -> {
+            try {
+                oldNames.set(Vault.info(new OldVault(dav()))); // a computer still reading the old names
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+            cloud.put(stored, VaultCrypto.seal(made.vk(), text, "{".getBytes(StandardCharsets.UTF_8))); // a late, shorter copy
+        };
+        assertNull(laptop.round().error());
+        assertNull(oldNames.get(), "between the switch and the deletes, the old names open nothing");
+        assertArrayEquals(held.get(text), VaultCrypto.open(made.vk(), text, cloud.files.get(stored)), "the longer old copy kept");
+        assertFalse(anyUnder(CloudNames.OLD_VAULT));
+    }
+
+    @Test
+    void textsAskedAloneDuringTheSwitchGoUnderTheNewNames() throws Exception {
+        anOldVault();
+        String later = "3f2a9c1b2d4e 2026-12.jsonl";
+        laptop.write("texts/here/" + later, "{\"x\":1}\n");
+        AtomicReference<CompletableFuture<Void>> alone = new AtomicReference<>();
+        int[] switched = {-1};
+        VaultNames.beforeSwitch = () -> {
+            alone.set(laptop.cloud.textsNow());
+            while (!laptop.cloud.keyWaiting()) Thread.onSpinWait(); // asked, and held behind the move
+        };
+        VaultNames.afterSwitch = () -> switched[0] = cloud.log.size();
+        laptop.as(() -> {
+            Cloud.Status s = laptop.cloud.syncNow().get();
+            alone.get().get(); // the texts alone, done with this computer's settings still in
+            return CompletableFuture.completedFuture(s);
+        });
+        assertTrue(switched[0] >= 0);
+        assertEquals(List.of(), cloud.log.subList(switched[0], cloud.log.size()).stream().filter(("GET " + CloudNames.OLD_INFO)::equals).toList(),
+            "nothing read the old names after the switch: the texts alone looked at the vault where it is now");
+        assertTrue(cloud.files.containsKey(Vault.ROOT + "/Texts/" + LAPTOP + "/" + later));
+        assertFalse(anyUnder(CloudNames.OLD_VAULT));
+    }
+
+    @Test
+    void aSlotWrittenAfterTheSlotsWereCopiedReachesTheNewNames() throws Exception {
+        anOldVault();
+        VaultNames.beforeSwitch = () -> {
+            try {
+                Vault.addComputer(new OldVault(dav()), made.vk(), THIRD, "Tercero"); // another computer joins under the old names
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        };
+        cloud.failDeleteOnce.add("Unichat/Bóveda/Ajustes/unichat-ai.json"); // and the deletes are cut short
+        laptop.round();
+        assertTrue(Vault.computers(dav()).containsKey(THIRD), "its way in is under the new names");
+    }
+
+    @Test
+    void aJobThatCantMoveTheVaultFirstIsRefusedAndChangesNothing() throws Exception {
+        anOldVault();
+        cloud.failOnce.add("Unichat/Vault/Texts/" + DESK + "/index.json");
+        java.util.concurrent.ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class,
+            () -> desk.as(() -> desk.cloud.vault().rotateKey()));
+        assertTrue(e.getCause().getMessage().contains("próxima ronda"), e.getCause().getMessage());
+        assertEquals(made.info().generation(), Vault.info(new OldVault(dav())).generation(), "the key unchanged");
+        assertFalse(cloud.files.containsKey(Vault.INFO), "still under the old names, as it opens");
+        assertEquals(Cloud.VaultState.OPEN, desk.round().vault(), "the next round moves it");
+        assertTrue(cloud.files.containsKey(Vault.INFO));
+    }
+
+    @Test
+    void aComputerOpeningTheVaultUnderItsOldNamesMovesItAfter() throws Exception {
+        anOldVault();
+        VaultComputer third = new VaultComputer(cloud, dir, THIRD);
+        assertEquals(Cloud.VaultState.LOCKED, third.round().vault());
+        third.as(() -> third.cloud.vault().openVault(VaultView.Way.RECOVERY, made.code().shown().toCharArray()));
+        assertTrue(cloud.files.containsKey(Vault.INFO), "opened, then moved in the same job");
+        assertFalse(anyUnder(CloudNames.OLD_VAULT), cloud.files.keySet().toString());
+        assertTrue(Vault.computers(dav()).containsKey(THIRD), "its way in under the new names");
+        assertEquals(Cloud.VaultState.OPEN, third.round().vault());
+        assertEquals("DARK", third.get("ui.theme"));
     }
 }

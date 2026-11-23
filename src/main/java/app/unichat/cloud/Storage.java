@@ -49,6 +49,11 @@ public interface Storage {
      */
     void move(String from, String to) throws IOException;
 
+    /** Whether a name from the account may become one part of a path here: not empty, no separator, not "." nor "..". */
+    static boolean plainName(String name) {
+        return !name.isEmpty() && !name.contains("/") && !name.contains("\\") && !name.equals(".") && !name.equals("..");
+    }
+
     void put(String path, Path file) throws IOException;
 
     /** The same, telling {@code sent} the running total of bytes gone out (null: nobody listens). */

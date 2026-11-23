@@ -95,17 +95,16 @@ class CloudNamesTest {
         VaultComputer desk = new VaultComputer(cloud, dir, DESK).write("texts/here/" + TEXT, "{\"t\":1}\n");
 
         assertNull(desk.round().error());
-        assertFalse(paths().stream().anyMatch(CloudNamesTest::old), "nothing left under an old name: " + paths());
-        assertFalse(cloud.dirs.stream().anyMatch(CloudNamesTest::old), "nor any old folder: " + cloud.dirs);
+        assertEquals(Set.of(OLD_SETTINGS), paths().stream().filter(CloudNamesTest::old).collect(java.util.stream.Collectors.toSet()),
+            "nothing left under an old name but the settings, which an older computer reads back: " + paths());
         assertArrayEquals(photo, cloud.files.get("Unichat/Media/Ana/a.jpg"));
         assertArrayEquals(bytes("video"), cloud.files.get("Unichat/Media/Mamá d/v [1].mp4"));
         assertArrayEquals(text, cloud.files.get("Unichat/Texts/" + DESK + "/" + TEXT));
         assertEquals("DARK", desk.get("ui.theme"), "the settings under their new name are this computer's");
         assertTrue(cloud.log.contains("MOVE Unichat/Multimedia Unichat/Media"), "media moved on the server, whole: " + cloud.log);
         assertTrue(cloud.log.contains("MOVE Unichat/Textos Unichat/Texts"), cloud.log.toString());
-        assertTrue(cloud.log.contains("MOVE " + OLD_SETTINGS + " " + SETTINGS), cloud.log.toString());
-        assertFalse(cloud.log.stream().anyMatch(l -> l.startsWith("PUT Unichat/Media/") || l.equals("PUT " + SETTINGS)),
-            "neither media nor the settings went up again: " + cloud.log);
+        assertArrayEquals(mine, cloud.files.get(SETTINGS), "the settings copied in as they were");
+        assertFalse(cloud.log.stream().anyMatch(l -> l.startsWith("PUT Unichat/Media/")), "no media went up again: " + cloud.log);
 
         long moved = moves();
         assertNull(desk.round().error());
@@ -181,7 +180,7 @@ class CloudNamesTest {
         cloud.put("Unichat/Multimedia/Beto/e.jpg", bytes("e"));
         int puts = cloud.puts.get();
 
-        CloudNames.media(dav);
+        CloudNames.media(dav, true); // this computer's first move: no older computer writing there since
         assertFalse(cloud.files.containsKey("Unichat/Multimedia/Ana/a.jpg"), "the same file under both: one copy");
         assertArrayEquals(bytes("foto"), cloud.files.get("Unichat/Media/Ana/a.jpg"));
         assertArrayEquals(bytes("la nueva"), cloud.files.get("Unichat/Media/Ana/c.jpg"), "two that differ: both kept");
@@ -191,9 +190,51 @@ class CloudNamesTest {
         assertTrue(cloud.log.contains("MOVE Unichat/Multimedia/Beto Unichat/Media/Beto"), cloud.log.toString());
         assertEquals(puts, cloud.puts.get(), "nothing went up again");
 
-        CloudNames.media(dav);
+        CloudNames.media(dav, true);
         assertArrayEquals(bytes("otra cosa"), cloud.files.get("Unichat/Multimedia/Ana/c.jpg"), "and stays so: nothing lost");
         assertEquals(puts, cloud.puts.get());
+    }
+
+    @Test
+    void myOwnOldSettingsStayForAnOlderComputerToReadBack() throws Exception {
+        cloud.put(OLD_SETTINGS, settings(DESK, Instant.now().minusSeconds(60), "DARK")); // sent by this computer before it was updated
+        VaultComputer desk = new VaultComputer(cloud, dir, DESK);
+        assertNull(desk.round().error());
+        assertEquals("DARK", desk.get("ui.theme"));
+        assertTrue(cloud.files.containsKey(OLD_SETTINGS), "left: an older computer reads it back as the account's");
+        desk.set("ui.theme", "SYSTEM");
+        desk.round();
+        cloud.put(OLD_SETTINGS, settings(OLD, Instant.now().plusSeconds(60), "DARK")); // the older computer sends the same again, newer
+        assertNull(desk.round().error());
+        assertEquals("SYSTEM", desk.get("ui.theme"), "a copy already taken in never wins again over what changed since");
+    }
+
+    @Test
+    void anOlderComputersMediaStaysUnderBothNames() throws Exception {
+        VaultComputer desk = new VaultComputer(cloud, dir, DESK);
+        assertNull(desk.round().error()); // this computer's first move; its photo up under the new name
+        cloud.put("Unichat/Multimedia/Ana/a.jpg", bytes("foto")); // an older computer's daily check sends it again
+        cloud.put("Unichat/Multimedia/Ana/n.jpg", bytes("nueva"));
+        assertNull(desk.round().error());
+        assertArrayEquals(bytes("nueva"), cloud.files.get("Unichat/Media/Ana/n.jpg"), "what it sends comes in");
+        assertTrue(cloud.files.containsKey("Unichat/Multimedia/Ana/a.jpg"), "a copy it holds stays: deleted, it'd only go up again");
+        int puts = cloud.puts.get();
+        desk.round();
+        assertEquals(puts, cloud.puts.get(), "and nothing goes to and fro");
+    }
+
+    @Test
+    void aMediaFolderThatWontMoveHoldsBackOnlyTheCheck() throws Exception {
+        cloud.put("Unichat/Multimedia/Beto/e.jpg", bytes("e"));
+        cloud.failMoveOnce.add(CloudNames.OLD_MEDIA);
+        VaultComputer desk = new VaultComputer(cloud, dir, DESK);
+        desk.round();
+        assertTrue(cloud.files.containsKey("Unichat/Media/Ana/a.jpg"), "media still goes up");
+        assertNull(desk.get(MediaTurn.LAST_VERIFY), "the check waits: it would send again what's under the old name");
+        assertTrue(cloud.files.containsKey("Unichat/Multimedia/Beto/e.jpg"));
+        assertNull(desk.round().error());
+        assertArrayEquals(bytes("e"), cloud.files.get("Unichat/Media/Beto/e.jpg"), "the next round moves it");
+        assertTrue(desk.get(MediaTurn.LAST_VERIFY) != null, "and checks");
     }
 
     @Test
@@ -205,12 +246,11 @@ class CloudNamesTest {
         cloud.put(OLD_SETTINGS, newer); // this computer's, sent by it before it was updated
         CloudNames.migrate(dav, DESK, new Object(), now);
         assertArrayEquals(newer, cloud.files.get(SETTINGS), "the old name's newer copy won");
-        assertFalse(cloud.files.containsKey(OLD_SETTINGS), "and it's gone, held under the new name");
+        assertTrue(cloud.files.containsKey(OLD_SETTINGS), "and stays where an older computer reads it back");
 
-        cloud.put(OLD_SETTINGS, older);
+        cloud.put(OLD_SETTINGS, settings(DESK, now.minusSeconds(120), "LIGHT"));
         CloudNames.migrate(dav, DESK, new Object(), now);
         assertArrayEquals(newer, cloud.files.get(SETTINGS), "an older copy under the old name never wins");
-        assertFalse(cloud.files.containsKey(OLD_SETTINGS));
 
         byte[] theirs = settings(OLD, now.plusSeconds(60), "SYSTEM");
         cloud.put(OLD_SETTINGS, theirs); // another computer's, newer

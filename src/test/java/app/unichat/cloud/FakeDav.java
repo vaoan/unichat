@@ -27,6 +27,8 @@ final class FakeDav implements AutoCloseable {
     volatile boolean filesAreNoFolders;
     /** Paths whose next GET fails (the network dropped), once each. */
     final Set<String> failReadOnce = ConcurrentHashMap.newKeySet();
+    /** Paths whose next MOVE fails, once each. */
+    final Set<String> failMoveOnce = ConcurrentHashMap.newKeySet();
     /** Paths whose next DELETE fails, once each. */
     final Set<String> failDeleteOnce = ConcurrentHashMap.newKeySet();
     /** Paths whose next PUT waits until its latch is let go (a slow network), once each. */
@@ -83,6 +85,10 @@ final class FakeDav implements AutoCloseable {
     private void move(HttpExchange x, String path) throws IOException {
         String dest = URLDecoder.decode(java.net.URI.create(x.getRequestHeaders().getFirst("Destination")).getRawPath(), StandardCharsets.UTF_8)
             .replaceFirst("^/dav/?", "").replaceFirst("/$", "");
+        if (failMoveOnce.remove(path)) {
+            x.sendResponseHeaders(503, -1);
+            return;
+        }
         if (!there(path)) {
             x.sendResponseHeaders(404, -1);
             return;
