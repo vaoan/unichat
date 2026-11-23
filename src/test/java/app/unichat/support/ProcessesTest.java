@@ -1,5 +1,6 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -43,6 +44,7 @@ class ProcessesTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aBuilderCanMergeErrorsAndChooseTheFolder() throws Exception {
         Processes.Result r = Processes.capture(new ProcessBuilder(sh("echo uno; echo dos >&2; pwd -P"))
                 .directory(dir.toFile()).redirectErrorStream(true), NO_LIMIT);
@@ -91,6 +93,7 @@ class ProcessesTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void itsInputIsWrittenWhileItRuns() throws Exception {
         // More than a pipe holds, to a program that talks first: written on its own, neither waits for the other.
         Processes.Result r = Processes.capture(new ProcessBuilder(sh("head -c 300000 /dev/zero; wc -c")),
@@ -100,6 +103,7 @@ class ProcessesTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void quietPastItsLimitItsKilledWhateverItsTotalTime() throws Exception {
         // It printed once, then nothing: with no silence allowed it's stopped though it had all the time in the world.
         Processes.Result r = Processes.capture(new ProcessBuilder(sh("echo hola; " + FOREVER)), Processes.Limit.whileTalking(0), null, null);
@@ -114,6 +118,7 @@ class ProcessesTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void eachLineIsHandedOverAsItComesAndStillKept() throws Exception {
         List<String> lines = new java.util.ArrayList<>();
         Processes.Result r = Processes.capture(new ProcessBuilder(sh("printf 'uno\\n[download]  45.3%%\\rdos'")), NO_LIMIT, lines::add);

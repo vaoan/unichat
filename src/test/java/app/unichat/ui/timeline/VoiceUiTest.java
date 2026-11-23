@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.support.PathParts;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.Theme;
 import app.unichat.model.Message;
@@ -209,7 +210,7 @@ class VoiceUiTest {
         Path media = app.unichat.settings.Settings.get().cacheDir().resolve("media");
         if (!Files.isDirectory(media)) return new java.util.HashSet<>();
         try (var files = Files.list(media)) {
-            return files.filter(f -> f.getFileName().toString().matches("voice-.*\\.ogg"))
+            return files.filter(f -> PathParts.name(f).matches("voice-.*\\.ogg"))
                     .collect(java.util.stream.Collectors.toCollection(java.util.HashSet::new));
         }
     }

@@ -1,6 +1,8 @@
 package app.unichat.login;
 
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -67,6 +69,7 @@ public final class ChromiumCookies {
      * plaintext; it is stripped when those bytes are not plain printable ASCII (a real cookie value
      * is, the hash is effectively random).
      */
+    @SuppressFBWarnings(value = {"CIPHER_INTEGRITY", "PADDING_ORACLE"}, justification = "reads the person's own cookies the way Chromium stores them (v10: AES-128-CBC, fixed IV); the format is Chromium's, not a choice of ours; decrypts the person's own browser database here; nobody else can send it values and watch the answer")
     public static String decryptValue(byte[] encrypted, byte[] key) {
         if (!hasPrefix(encrypted, "v10")) throw new IllegalArgumentException("Not a v10 value");
         try {
@@ -125,7 +128,7 @@ public final class ChromiumCookies {
                     byte[] k = key;
                     SessionCookies cookies = CookieDbCopy.read(db, copy -> read(copy, spec, k));
                     if (cookies != null) {
-                        out.add(new BrowserSession(b.name(), profile.getFileName().toString(), cookies));
+                        out.add(new BrowserSession(b.name(), PathParts.name(profile), cookies));
                     }
                 }
             }
@@ -147,7 +150,7 @@ public final class ChromiumCookies {
         try (Stream<Path> s = Files.list(root)) {
             return s.filter(Files::isDirectory)
                     .filter(p -> {
-                        String n = p.getFileName().toString();
+                        String n = PathParts.name(p);
                         return n.equals("Default") || n.startsWith("Profile ");
                     })
                     .sorted().toList();

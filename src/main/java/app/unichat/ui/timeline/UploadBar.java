@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.support.PathParts;
 import app.unichat.ui.FxCoalescer;
 import app.unichat.ui.Icons;
 import app.unichat.ui.TaskBar;
@@ -111,7 +112,7 @@ public final class UploadBar extends TaskBar {
         if (s.sent() > 0) text.append(" · ").append(I18n.n("uploadBar.sentSoFar", s.sent()));
         if (s.failed() > 0) text.append(" · ").append(I18n.n("uploadBar.failed", s.failed()));
         what.setText(text.toString());
-        detail.setText(u.file().getFileName().toString());
+        detail.setText(PathParts.name(u.file()));
         Chat chat = chats.chat(u.chatId());
         String title = chat == null || chat.title() == null ? "" : chat.title();
         chatId = u.chatId();

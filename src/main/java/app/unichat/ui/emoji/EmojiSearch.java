@@ -1,5 +1,7 @@
 package app.unichat.ui.emoji;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -47,6 +49,7 @@ final class EmojiSearch {
     }
 
     /** Lower case, without accents, cut at anything that isn't a letter or digit. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "folds a search for emoji names; nothing is allowed by it")
     static List<String> split(String s) {
         String plain = Normalizer.normalize(s.toLowerCase(Locale.ROOT), Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         List<String> out = new ArrayList<>();

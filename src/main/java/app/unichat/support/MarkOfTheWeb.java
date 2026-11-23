@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -21,6 +23,7 @@ public final class MarkOfTheWeb {
      * {@code Path.of}: NIO refuses the colon in a Windows path.
      */
     @org.gaul.modernizer_maven_annotations.SuppressModernizer // java.io on purpose: NIO refuses the stream's colon
+    @SuppressFBWarnings(value = "PATH_TRAVERSAL_OUT", justification = "writes the Zone.Identifier stream of a file we saved ourselves (its name already through autosave/FileNames)")
     public static void mark(Path file) {
         if (!Os.windows()) return;
         try (OutputStream out = new FileOutputStream(stream(file))) { // NOPMD: AvoidFileStream, java.io on purpose (above)

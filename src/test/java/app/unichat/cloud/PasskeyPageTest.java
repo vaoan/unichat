@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.support.I18n;
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -161,12 +162,14 @@ class PasskeyPageTest {
     }
 
     /** What a browser sends for another name (DNS rebinding: evil.example resolved to 127.0.0.1); HttpClient won't set Host. */
+    @SuppressFBWarnings(value = "UNENCRYPTED_SOCKET", justification = "talks to the page under test on 127.0.0.1, inside the test")
     private int raw(String request) throws IOException {
         try (java.net.Socket s = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), opened[0].getPort())) {
             s.getOutputStream().write(request.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
             s.getOutputStream().flush();
             String status = new java.io.BufferedReader(new java.io.InputStreamReader(s.getInputStream(),
                     java.nio.charset.StandardCharsets.US_ASCII)).readLine();
+            if (status == null) throw new IOException("no answer");
             return Integer.parseInt(status.split(" ")[1]);
         }
     }

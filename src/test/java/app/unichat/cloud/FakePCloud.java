@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -162,6 +163,7 @@ final class FakePCloud implements AutoCloseable {
         versions.merge(path, 1, Integer::sum);
     }
 
+    @SuppressFBWarnings(value = "WEAK_MESSAGE_DIGEST_SHA1", justification = "pCloud's API gives a file's SHA-1; the fake answers as pCloud does")
     static String sha1(byte[] data) {
         try {
             return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-1").digest(data));

@@ -3,6 +3,7 @@ package app.unichat.voice;
 import app.unichat.model.VoiceNote;
 import app.unichat.stt.OggOpus;
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -108,6 +109,7 @@ class VoiceRecordingTest {
 
     /** Someone else's reader is the real proof: page checksums and headers have to be right. */
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void ffmpegAcceptsTheFileWithoutComplaint() throws Exception {
         Path ffmpeg = app.unichat.video.Ffmpeg.find();
         assumeTrue(ffmpeg != null, "no ffmpeg");

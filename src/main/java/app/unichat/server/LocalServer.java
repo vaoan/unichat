@@ -48,7 +48,8 @@ public final class LocalServer {
     private final Supervisor supervisor;
     private final MetaSessions metaSessions;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
-    private boolean running;
+    /** Set under the lock; the watchdog reads it without it (watched()). */
+    private volatile boolean running;
     /** Live connection state of every bridge account, reported by the bridges themselves. */
     private final BridgeStates states = new BridgeStates();
     private final StatusEndpoint statusEndpoint = new StatusEndpoint(states, this::asToken);

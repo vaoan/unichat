@@ -3,6 +3,7 @@ package app.unichat.ui.timeline;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.service.MockChatService;
+import app.unichat.support.PathParts;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.MainView;
 import app.unichat.ui.desktop.Notifier;
@@ -246,7 +247,7 @@ class CaptureUiTest {
         FxWait.fx(() -> { save.fire(); return null; });
         FxWait.until("saved", () -> {
             try (var s = Files.list(dir)) {
-                return s.anyMatch(p -> p.getFileName().toString().startsWith("Conversación ") && p.toString().endsWith(".png"));
+                return s.anyMatch(p -> PathParts.name(p).startsWith("Conversación ") && p.toString().endsWith(".png"));
             }
         });
     }
@@ -350,7 +351,7 @@ class CaptureUiTest {
     private static java.util.Set<String> names(Path folder) throws IOException {
         if (!Files.isDirectory(folder)) return java.util.Set.of();
         try (var s = Files.list(folder)) {
-            return s.map(p -> p.getFileName().toString()).collect(java.util.stream.Collectors.toSet());
+            return s.map(PathParts::name).collect(java.util.stream.Collectors.toSet());
         }
     }
 

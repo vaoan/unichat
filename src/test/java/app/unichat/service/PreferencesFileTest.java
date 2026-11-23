@@ -5,6 +5,7 @@ import app.unichat.service.PreferencesFile.Flag;
 import app.unichat.service.PreferencesFile.ServerValues;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -265,6 +266,7 @@ class PreferencesFileTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     void aFailedWriteKeepsTheOldFileAndMemory() throws IOException {
         var p = open();
         p.choose(K, Flag.MUTED, true);
@@ -338,6 +340,7 @@ class PreferencesFileTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     void anUnmovableDamagedFileIsNeverOverwritten() throws IOException {
         Files.writeString(prefs(), "{roto");
         assumeTrue(dir.getFileSystem().supportedFileAttributeViews().contains("posix"));

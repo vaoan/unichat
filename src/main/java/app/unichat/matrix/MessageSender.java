@@ -16,8 +16,10 @@ import app.unichat.service.ChatService.Listener;
 import app.unichat.service.SendAs;
 import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
+import app.unichat.support.BoundedMap;
 import app.unichat.support.I18n;
 import app.unichat.support.ImageHeaders;
+import app.unichat.support.PathParts;
 import app.unichat.video.SendablePhotos;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -97,7 +99,7 @@ final class MessageSender {
                 mode == StickerMode.GIF).whenComplete((v, err) -> {
             try {
                 Files.deleteIfExists(r.file());
-                Files.deleteIfExists(r.file().getParent());
+                Files.deleteIfExists(PathParts.parent(r.file()));
             } catch (IOException ignored) {
                 // left in the cache folder
             }
@@ -298,11 +300,7 @@ final class MessageSender {
     private record Sent(String chatId, String type, ObjectNode content, int tries) {}
 
     private static final int REMEMBERED = 200, MOST_TRIES = 3;
-    private final Map<String, Sent> recent = java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>(16, 0.75f, false) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String, Sent> eldest) {
-            return size() > REMEMBERED;
-        }
-    });
+    private final Map<String, Sent> recent = java.util.Collections.synchronizedMap(BoundedMap.byAge(REMEMBERED));
     /** Seconds before each try again: a bridge that restarts with Unichat connects within seconds. Tests pass zeros. */
     private long[] retrySeconds = {15, 30, 60};
 
@@ -466,7 +464,7 @@ final class MessageSender {
         String mime = kind.mime();
         long durationMs = kind.durationMs();
         String txn = core.newTxnId();
-        String name = file.getFileName().toString();
+        String name = PathParts.name(file);
         MessageType type = kind.type();
         long size;
         try {

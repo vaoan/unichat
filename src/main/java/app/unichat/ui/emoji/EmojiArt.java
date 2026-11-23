@@ -1,5 +1,6 @@
 package app.unichat.ui.emoji;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.image.Image;
@@ -44,12 +45,14 @@ final class EmojiArt {
     private EmojiArt() {}
 
     /** Whether JavaFX draws {@code e} in pieces. On the FX thread. */
+    @SuppressFBWarnings(value = "LI_LAZY_INIT_STATIC", justification = "on the FX thread only (as its NOPMD says)")
     static boolean inPieces(String e) {
         if (pieces == null) pieces = measure(); // NOPMD: NonThreadSafeSingleton, only on the FX thread
         return pieces.contains(e);
     }
 
     /** The pictures of those drawn in pieces, for the ones Java2D could join; started on first use. On the FX thread. */
+    @SuppressFBWarnings(value = "LI_LAZY_INIT_STATIC", justification = "on the FX thread only (as its NOPMD says)")
     static CompletableFuture<Map<String, Image>> pictures() {
         if (pictures == null) { // NOPMD: NonThreadSafeSingleton, only on the FX thread
             if (pieces == null) pieces = measure(); // NOPMD: NonThreadSafeSingleton, only on the FX thread

@@ -1,5 +1,7 @@
 package app.unichat.ui;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 /** The person's web browser, and the system's file manager. */
 public final class Browser {
     private static final java.util.Set<String> WEB = java.util.Set.of("http", "https");
@@ -60,6 +62,7 @@ public final class Browser {
     }
 
     /** AWT's Desktop; where it can't (it isn't supported), the system's own command: open, start, xdg-open. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the system's opener with one absolute path of ours (it starts with / or a drive, so it can't pass for an option), as a list, no shell")
     private static void systemOpen(java.nio.file.Path file) throws java.io.IOException {
         if (java.awt.Desktop.isDesktopSupported() && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)) {
             java.awt.Desktop.getDesktop().open(file.toFile());

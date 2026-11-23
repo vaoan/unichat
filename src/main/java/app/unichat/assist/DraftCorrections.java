@@ -2,6 +2,7 @@ package app.unichat.assist;
 
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.text.Normalizer;
 import java.util.ArrayList;
@@ -87,6 +88,7 @@ public final class DraftCorrections {
         return out;
     }
 
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "only measures how alike a draft and what was sent are; nothing is allowed or refused by it")
     private static String normal(String s) {
         String n = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT)
                 .replaceAll("\\s+", " ").strip();

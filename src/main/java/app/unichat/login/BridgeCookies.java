@@ -1,6 +1,7 @@
 package app.unichat.login;
 
 import app.unichat.model.Network;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.net.URI;
 import java.util.HashMap;
@@ -103,6 +104,7 @@ public final class BridgeCookies {
      * they look right, and then replaces both with its own defaults unless X-LI-Track names LinkedIn's web client
      * (pkg/linkedingo/client.go): so this doesn't pretend to be any browser, it asks for those defaults. Empty elsewhere.
      */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "header names a bridge's login step gives, matched to choose a default value; nothing is allowed by it")
     public static Map<String, String> headerFallbacks(Network n, BridgeLogin.CookieParams p) {
         if (n != Network.LINKEDIN) return Map.of();
         Map<String, String> out = new HashMap<>();
@@ -132,6 +134,7 @@ public final class BridgeCookies {
         return cookies.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()).collect(Collectors.joining("; "));
     }
 
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a header name a bridge's login step gives, matched to know where the cookies go; nothing is allowed by it")
     private static boolean isCookieHeader(BridgeLogin.Source s) { return "Cookie".equalsIgnoreCase(s.name()); }
 
     private static BridgeLogin.Source headerSource(BridgeLogin.CookieField f) {

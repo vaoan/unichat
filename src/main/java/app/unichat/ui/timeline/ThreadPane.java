@@ -23,6 +23,7 @@ import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
 import app.unichat.stt.Transcripts;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -102,6 +103,7 @@ public final class ThreadPane extends BorderPane {
     private CaptureSheet captureSheet;
     private final Consumer<String> toast;
 
+    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY", justification = "whether the bubbles' width changed at all since the last build: the same function of the same width gives the same double")
     public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast, AudioPlayback audio,
                       FolderDialogs folderDialogs, MediaLibrary library) {
         this.audio = audio;

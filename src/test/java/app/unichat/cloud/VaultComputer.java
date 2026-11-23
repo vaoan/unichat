@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -87,7 +88,7 @@ final class VaultComputer {
 
     VaultComputer write(String file, String text) throws IOException {
         Path p = data.resolve(file);
-        Files.createDirectories(p.getParent());
+        Files.createDirectories(PathParts.parent(p));
         Files.writeString(p, text);
         return this;
     }

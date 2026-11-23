@@ -2,6 +2,7 @@ package app.unichat.video;
 
 import app.unichat.support.I18n;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -41,6 +42,7 @@ public final class VideoFrames {
      * handed to {@code each} one at a time, never all held here: they were, and with the output's own buffer the peak
      * was three times the frames. How long each stays, in ms. Blocking; an IOException when ffmpeg can't read it.
      */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "ffmpeg with -protocol_whitelist file and -f before -i, our own path, as a list, no shell")
     public static int read(Path video, AnimatedWebp.Probe probe, int width, int height, int maxFrames, Frame each)
             throws IOException, InterruptedException {
         double natural = probe.fps() > 0 ? probe.fps() : 30;

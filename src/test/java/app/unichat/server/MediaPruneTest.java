@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import java.sql.SQLException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -21,6 +22,7 @@ class MediaPruneTest {
     @TempDir Path dir;
     private final Instant now = Instant.parse("2026-11-20T12:00:00Z");
 
+    @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
     private Path bridgeDb() throws SQLException {
         Path db = dir.resolve("discord.db");
         long old = now.minus(Duration.ofDays(30)).toEpochMilli(), recent = now.minus(Duration.ofDays(1)).toEpochMilli();

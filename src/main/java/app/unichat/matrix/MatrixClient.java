@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 import app.unichat.support.Urls;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -121,7 +122,7 @@ final class MatrixClient {
                 parse(resp.statusCode(), in.readAllBytes());
                 throw new MatrixException(resp.statusCode(), null, "HTTP " + resp.statusCode());
             }
-            Files.createDirectories(target.getParent());
+            Files.createDirectories(PathParts.parent(target));
             Path tmp = target.resolveSibling(target.getFileName() + ".part" + Thread.currentThread().threadId());
             long size = resp.headers().firstValueAsLong("Content-Length").orElse(-1);
             try {

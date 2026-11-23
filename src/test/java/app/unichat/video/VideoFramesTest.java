@@ -1,6 +1,7 @@
 package app.unichat.video;
 
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -14,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VideoFramesTest {
     @TempDir Path dir;
 
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     private Path webm(String filter, String size, int seconds, int rate) throws IOException, InterruptedException {
         Path ffmpeg = Ffmpeg.find();
         Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");

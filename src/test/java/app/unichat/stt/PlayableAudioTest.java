@@ -1,5 +1,7 @@
 package app.unichat.stt;
 
+import app.unichat.support.PathParts;
+
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -45,7 +47,7 @@ class PlayableAudioTest {
         assertEquals(wav, PlayableAudio.of(ogg));
         assertTrue(Files.getLastModifiedTime(wav).toMillis() >= written);
         try (Stream<Path> stream = Files.list(dir)) {
-            assertTrue(stream.noneMatch(f -> f.getFileName().toString().endsWith(".part")));
+            assertTrue(stream.noneMatch(f -> PathParts.name(f).endsWith(".part")));
         }
     }
 

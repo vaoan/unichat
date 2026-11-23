@@ -1,5 +1,7 @@
 package app.unichat.cloud;
 
+import app.unichat.support.PathParts;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,7 +26,7 @@ final class StorageDownloads {
         assertFalse(storage.get("Unichat/nada.mp4", absent), "not there");
         assertFalse(Files.exists(absent), "and nothing written");
         try (var left = Files.list(dir)) {
-            assertEquals(List.of("video.mp4"), left.map(p -> p.getFileName().toString()).toList(), "no .part left behind");
+            assertEquals(List.of("video.mp4"), left.map(PathParts::name).toList(), "no .part left behind");
         }
     }
 }

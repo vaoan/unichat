@@ -1,8 +1,10 @@
 package app.unichat.video;
 
 import app.unichat.support.Downloads;
+import app.unichat.support.PathParts;
 import com.sun.net.httpserver.HttpServer;
 import java.security.NoSuchAlgorithmException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FfmpegTest {
     @TempDir Path dir;
     private HttpServer server;
+    @SuppressFBWarnings(value = "VO_VOLATILE_REFERENCE_TO_ARRAY", justification = "the array is replaced whole, never changed: the volatile hands the new one to the fake server's thread")
     private volatile byte[] served;
 
     @BeforeEach
@@ -80,7 +83,7 @@ class FfmpegTest {
         assertEquals(target, got);
         assertTrue(Files.isExecutable(target));
         try (Stream<Path> stream = Files.list(dir.resolve("tools"))) {
-            assertEquals(List.of("ffmpeg"), stream.map(f -> f.getFileName().toString()).toList(), "the zip is gone");
+            assertEquals(List.of("ffmpeg"), stream.map(PathParts::name).toList(), "the zip is gone");
         }
     }
 

@@ -8,6 +8,7 @@ import app.unichat.support.Hashes;
 import app.unichat.model.MimeTypes;
 import app.unichat.model.Mxc;
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 import app.unichat.support.Urls;
 
 import java.io.IOException;
@@ -281,7 +282,7 @@ final class MediaDownloader {
         if (!Files.isDirectory(dir)) return null;
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, hash + "*")) {
             for (Path p : ds) {
-                String n = p.getFileName().toString();
+                String n = PathParts.name(p);
                 if (!n.endsWith(".download") && !n.contains(".part")) return p;
             }
         } catch (IOException ignored) {

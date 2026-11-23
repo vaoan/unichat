@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -273,6 +274,7 @@ final class CloudNames {
     }
 
     /** The same file, as far as the account can say: its size, and its checksum where both have one of a kind. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "compares two hex checksums the services give; hex is ASCII")
     private static boolean same(Storage.RemoteFile a, Storage.RemoteFile b) {
         if (a.size() < 0 || a.size() != b.size()) return false;
         return a.kind() == null || b.kind() == null || !a.kind().equals(b.kind()) || a.hash().equalsIgnoreCase(b.hash());

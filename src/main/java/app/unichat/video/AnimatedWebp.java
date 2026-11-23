@@ -3,8 +3,10 @@ package app.unichat.video;
 import app.unichat.support.BundledTools;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
 import app.unichat.support.SafeFile;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -51,6 +53,7 @@ public final class AnimatedWebp {
      * side ({@link #AS_IT_COMES}: as the video has them; a very long one gets fewer frames a second), lossy at
      * {@code quality}. Blocking; an IOException with what went wrong.
      */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "ffmpeg with -protocol_whitelist file and -f before -i, our own paths, as a list, no shell")
     public static void make(Path ffmpeg, Path img2webp, Path in, Source src, Path out, int fps, int side, int quality, Probe probe)
             throws IOException, InterruptedException {
         int rate = rate(fps, probe);
@@ -71,6 +74,7 @@ public final class AnimatedWebp {
      * An animated WebP at {@code out} from the PAM frames {@code writer} puts in a folder of their own, lossy at
      * {@code quality}. Blocking; an IOException with what went wrong.
      */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "img2webp with frame names we made, run in their folder, as a list, no shell")
     static void fromFrames(Path img2webp, Path out, int quality, FrameWriter writer) throws IOException, InterruptedException {
         // A hidden ".part" folder beside it: the cache trims one left by a crash.
         Path frames = Files.createDirectories(out.resolveSibling("." + out.getFileName() + ".frames.part"));
@@ -78,7 +82,7 @@ public final class AnimatedWebp {
             java.util.function.IntUnaryOperator ms = writer.write(frames);
             List<String> names;
             try (var list = Files.list(frames)) {
-                names = list.map(f -> f.getFileName().toString()).filter(n -> n.endsWith(".pam")).sorted().toList();
+                names = list.map(PathParts::name).filter(n -> n.endsWith(".pam")).sorted().toList();
             }
             if (names.isEmpty()) throw new IOException(I18n.t("video.webpFailed"));
             // Short names, run where they are: hundreds of frames as whole paths would pass Windows' command-line limit.
@@ -148,6 +152,7 @@ public final class AnimatedWebp {
     }
 
     /** {@link Probe} of {@code in}, read as {@code src} only. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "ffmpeg with -protocol_whitelist file and -f before -i, our own path, as a list, no shell")
     public static Probe probe(Path ffmpeg, Path in, Source src) throws IOException, InterruptedException {
         Processes.Result r = Processes.capture(new ProcessBuilder(ffmpeg.toString(), "-nostdin", "-hide_banner",
                 "-protocol_whitelist", "file", "-f", src.format(), "-i", in.toString()).redirectErrorStream(true), 60);
@@ -162,6 +167,7 @@ public final class AnimatedWebp {
      * {@link Probe} from ffmpeg's own lines ("  Duration:", "Stream #…: Video:"), never the file's tags, which it prints
      * first: a sender's title saying "Video: h264, 100x100, 1 fps" made a big, long video pass the caps.
      */
+    @SuppressFBWarnings(value = "REDOS", justification = "no nested repetition: digits, an optional fraction, then a literal; linear on ffmpeg's output")
     static Probe parse(String out) {
         Matcher d = DURATION.matcher(out);
         double seconds = d.find() ? Integer.parseInt(d.group(1)) * 3600 + Integer.parseInt(d.group(2)) * 60 + Double.parseDouble(d.group(3)) : 0;

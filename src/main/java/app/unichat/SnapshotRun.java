@@ -4,6 +4,7 @@ import app.unichat.model.Network;
 import app.unichat.ui.MainView;
 import app.unichat.ui.settings.SettingsWindow;
 import app.unichat.ui.chats.SidePanel;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.animation.PauseTransition;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Scene;
@@ -90,6 +91,7 @@ final class SnapshotRun {
         }
     }
 
+    @SuppressFBWarnings(value = "INFORMATION_EXPOSURE_THROUGH_AN_ERROR_MESSAGE", justification = "the snapshot skill's own run: the trace goes to its stderr, read by whoever ran it")
     private void shoot(String out) {
         try {
             var settings = SettingsWindow.current();

@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
 import app.unichat.service.PreferencesFile;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -27,6 +28,7 @@ class SaveFailureToastUiTest {
     @TempDir Path dir;
 
     @Test
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     void aFailedSaveShowsAToast() throws Exception {
         assumeTrue(dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
         try {

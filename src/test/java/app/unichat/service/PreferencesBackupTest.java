@@ -1,7 +1,9 @@
 package app.unichat.service;
 
 import app.unichat.service.PreferencesFile.Flag;
+import app.unichat.support.PathParts;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,7 +55,7 @@ class PreferencesBackupTest {
 
     private long setAsideFiles() throws IOException {
         try (Stream<Path> files = Files.list(dir)) {
-            return files.filter(f -> f.getFileName().toString().contains(".bad-")).count();
+            return files.filter(f -> PathParts.name(f).contains(".bad-")).count();
         }
     }
 
@@ -147,6 +149,7 @@ class PreferencesBackupTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     void anUnmovableDamagedFileIsKeptAndItsBackupStillLoads() throws IOException {
         twoSaves();
         Files.writeString(prefs(), "{roto");
@@ -180,7 +183,7 @@ class PreferencesBackupTest {
 
     private void unblockWrites(Path obstacle) throws IOException {
         Files.delete(obstacle);
-        Files.delete(obstacle.getParent());
+        Files.delete(PathParts.parent(obstacle));
     }
 
     @Test

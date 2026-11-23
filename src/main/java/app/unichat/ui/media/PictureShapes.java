@@ -2,13 +2,13 @@ package app.unichat.ui.media;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.BackgroundWriter;
+import app.unichat.support.BoundedMap;
 import app.unichat.support.SafeFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -21,9 +21,7 @@ public final class PictureShapes {
     private static PictureShapes shared;
 
     private final Path file;
-    private final Map<String, Double> shapes = new LinkedHashMap<>(16, 0.75f, true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String, Double> e) { return size() > KEPT; }
-    };
+    private final Map<String, Double> shapes = BoundedMap.byUse(KEPT);
     private final BackgroundWriter writer;
 
     PictureShapes(Path file) {

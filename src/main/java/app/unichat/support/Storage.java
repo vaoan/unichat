@@ -52,7 +52,7 @@ public final class Storage {
     public synchronized void watch(Path dir) {
         measure = () -> {
             try {
-                return Files.getFileStore(Files.exists(dir) ? dir : dir.getParent()).getUsableSpace();
+                return Files.getFileStore(Files.exists(dir) ? dir : PathParts.parent(dir)).getUsableSpace();
             } catch (IOException | RuntimeException e) {
                 return Long.MAX_VALUE; // can't tell: never a false alarm
             }

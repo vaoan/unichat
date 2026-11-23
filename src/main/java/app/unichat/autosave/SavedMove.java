@@ -1,6 +1,7 @@
 package app.unichat.autosave;
 
 import app.unichat.model.Chat;
+import app.unichat.support.PathParts;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -48,7 +49,7 @@ final class SavedMove {
         int moved = 0;
         try (DirectoryStream<Path> in = Files.newDirectoryStream(a)) {
             for (Path p : in) {
-                String name = p.getFileName().toString();
+                String name = PathParts.name(p);
                 if (name.startsWith(".")) continue;
                 if (Files.isDirectory(p)) moved += move(p, b.resolve(name));
                 else {
@@ -63,7 +64,7 @@ final class SavedMove {
 
     private static void removeIfOnlyHidden(Path dir) throws IOException {
         try (DirectoryStream<Path> in = Files.newDirectoryStream(dir)) {
-            for (Path p : in) if (!p.getFileName().toString().startsWith(".") || Files.isDirectory(p)) return;
+            for (Path p : in) if (!PathParts.name(p).startsWith(".") || Files.isDirectory(p)) return;
         }
         try (DirectoryStream<Path> in = Files.newDirectoryStream(dir)) {
             for (Path p : in) Files.delete(p);

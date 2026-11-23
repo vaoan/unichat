@@ -1,5 +1,6 @@
 package app.unichat;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -76,6 +77,7 @@ class RecoveryTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DM_USELESS_THREAD", justification = "a thread named as the sync's, never started: the handler only reads its name")
     void itStartsAgainEvenWhenThereIsNoMemoryToSayWhy() {
         // 2026-11-13: the heap ran out in the sync thread, and the handler's own println ran out too, before it could
         // start Unichat again; the thread was gone, nothing was said and the top bar kept "Conectando…".

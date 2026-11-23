@@ -5,6 +5,7 @@ import app.unichat.ui.Speaker;
 import app.unichat.ui.Theme;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -31,6 +32,7 @@ final class AppearancePages {
 
     private AppearancePages() {}
 
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "an accent colour in hex from our own list")
     static Node appearance(Runnable changed) {
         Settings s = Settings.get();
         Node themes = plainChips(I18n.t("settings.appearance.mode"), List.of(Settings.Theme.values()), t -> switch (t) {

@@ -1,5 +1,6 @@
 package app.unichat.assist;
 
+import app.unichat.support.PathParts;
 import app.unichat.support.SafeFile;
 
 import java.io.IOException;
@@ -103,7 +104,7 @@ final class StyleHistory {
     }
 
     private static Version parse(Path f) {
-        String name = f.getFileName().toString();
+        String name = PathParts.name(f);
         if (!name.startsWith("writing-style-") || !name.endsWith(LEARNED)) return null;
         boolean undone = name.endsWith(UNDONE);
         String stamp = name.substring("writing-style-".length(), name.length() - (undone ? UNDONE : LEARNED).length());

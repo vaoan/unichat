@@ -1,5 +1,6 @@
 package app.unichat.settings;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -122,6 +123,7 @@ class SettingsSplitTest {
         }
     }
 
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     @Test void theSessionFileIsOwnerOnlyEvenOverAWideLeftoverTemp() throws IOException {
         assumeTrue(dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
         Path leftover = Files.writeString(dir.resolve("session.properties.tmp"), "old");

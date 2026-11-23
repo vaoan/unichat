@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -57,6 +58,7 @@ final class VaultOut {
      * believe it), then the vault deleted; {@code sealed} is the vault, open with {@code vk}, over {@code plain}. False when
      * its folder couldn't be deleted but its file was: no computer finds a vault, though some of it is left in the account.
      */
+    @SuppressFBWarnings(value = "THROWS_METHOD_THROWS_RUNTIMEEXCEPTION", justification = "the failure that stopped it is thrown again once the plain files it wrote are taken back")
     static boolean run(Storage plain, Storage sealed, Vault.Info vault, byte[] vk) throws IOException {
         Written w = new Written();
         try {

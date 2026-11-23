@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,6 +19,7 @@ class MatrixClientProgressTest {
     Path dir;
 
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void eachPercentOnceUpToAll() throws Exception {
         byte[] data = new byte[1_000_000];
         new java.util.Random(1).nextBytes(data);

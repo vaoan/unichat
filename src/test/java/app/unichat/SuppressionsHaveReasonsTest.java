@@ -1,5 +1,6 @@
 package app.unichat;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -23,8 +24,13 @@ class SuppressionsHaveReasonsTest {
     // Built from parts, so this file's own text doesn't match them.
     private static final String NOPMD = "NO" + "PMD";
     private static final Pattern WARNINGS = Pattern.compile("@\\s*(?:java\\.lang\\.)?" + "SuppressWarnings\\s*\\(");
-    private static final Pattern FB_WARNINGS = Pattern.compile("@\\s*(?:[\\w.]+\\.)?" + "SuppressFBWarnings\\b");
+    private static final Pattern FB_WARNINGS = fbWarnings();
     private static final Pattern JUSTIFIED = Pattern.compile("justification\\s*=\\s*\"[^\"]*\\S[^\"]*\"");
+
+    @SuppressFBWarnings(value = "REDOS", justification = "reads the repo's own sources; the optional prefix ends at a literal dot")
+    private static Pattern fbWarnings() {
+        return Pattern.compile("@\\s*(?:[\\w.]+\\.)?" + "SuppressFBWarnings\\b");
+    }
 
     @Test
     void everySuppressionInTheSourcesSaysWhy() throws IOException {

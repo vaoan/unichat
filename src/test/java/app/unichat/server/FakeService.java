@@ -1,4 +1,7 @@
 package app.unichat.server;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.IOException;
 
 /**
@@ -8,6 +11,7 @@ import java.io.IOException;
  * up and prints "after". "bridge ..." and "broken-bridge ..." are a bridge's setup commands, for BridgeInstallerTest.
  */
 public final class FakeService {
+    @SuppressFBWarnings(value = "UNENCRYPTED_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     public static void main(String[] args) throws IOException {
         if (args.length > 0 && args[0].endsWith("bridge")) {
             bridgeSetup(args);
@@ -34,6 +38,7 @@ public final class FakeService {
     }
 
     /** Works in its current folder, like a bridge: writes what it's asked for and leaves a line per call in calls.txt. */
+    @SuppressFBWarnings(value = "DM_EXIT", justification = "a fake service process that exits as a real one would (as its NOPMD says)")
     private static void bridgeSetup(String[] args) throws IOException {
         java.nio.file.Path here = java.nio.file.Path.of("").toAbsolutePath();
         java.nio.file.Files.writeString(here.resolve("calls.txt"), String.join(" ", args).substring(args[0].length()).strip() + "\n",

@@ -1,6 +1,7 @@
 package app.unichat.model;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -106,6 +107,7 @@ public final class RoomFeatures {
     }
 
     /** Whether {@code type} messages may carry a {@code mime} file (exact, {@code image/*} or {@code *}{@code /*}). */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "only decides how a file is sent (as it is or converted); the bridge checks what it takes again")
     public boolean acceptsMime(String type, String mime) {
         if (anyFile) return true;
         if (!accepts(type)) return false;

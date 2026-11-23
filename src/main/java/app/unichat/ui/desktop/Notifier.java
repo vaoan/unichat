@@ -7,6 +7,7 @@ import app.unichat.model.Message;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import app.unichat.support.Os;
+import app.unichat.support.PathParts;
 
 import javax.imageio.ImageIO;
 import java.awt.EventQueue;
@@ -180,7 +181,7 @@ public final class Notifier {
         if (o != null) return java.nio.file.Path.of(o);
         String launcher = System.getProperty("jpackage.app-path");
         if (launcher == null) return null;
-        return java.nio.file.Path.of(launcher).getParent().resolveSibling("app").resolve("native")
+        return PathParts.parent(java.nio.file.Path.of(launcher)).resolveSibling("app").resolve("native")
                 .resolve("UnichatBar.app").resolve("Contents").resolve("MacOS").resolve("UnichatBar");
     }
 

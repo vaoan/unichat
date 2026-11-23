@@ -5,6 +5,7 @@ import app.unichat.ui.Icons;
 import app.unichat.ui.Nodes;
 import app.unichat.autosave.FileNames;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.animation.PauseTransition;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Pos;
@@ -147,6 +148,7 @@ final class VideoControls extends VBox {
         return position;
     }
 
+    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY", justification = "the speeds are the menu's own constants, and lastRate is one of them")
     private void speedMenu() {
         speed.getStyleClass().add("video-speed");
         for (double r : RATES) {

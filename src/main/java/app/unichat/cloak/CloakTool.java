@@ -6,7 +6,9 @@ import app.unichat.support.Downloads;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
 import app.unichat.support.Os;
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -90,7 +92,7 @@ public final class CloakTool {
         try {
             Downloads.fetch(uvBuild.url(), uvBuild.size(), uvBuild.sha256(), archive, I18n.t("download.what.cloak"),
                     f -> progress.at("cloak.install.tools", f));
-            if (!Archives.extractOne(archive, uv.getFileName().toString(), uv)) throw new IOException(I18n.t("cloak.error.install"));
+            if (!Archives.extractOne(archive, PathParts.name(uv), uv)) throw new IOException(I18n.t("cloak.error.install"));
         } finally {
             Files.deleteIfExists(archive);
         }
@@ -140,6 +142,7 @@ public final class CloakTool {
     }
 
     /** uv with its downloads, cache and settings inside this folder, never the person's own. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "uv inside its own folder with fixed arguments, as a list, no shell")
     private void run(List<String> command, long seconds) throws IOException, InterruptedException {
         ProcessBuilder b = new ProcessBuilder(command).redirectErrorStream(true);
         b.environment().put("UV_PYTHON_INSTALL_DIR", dir.resolve("python").toString());

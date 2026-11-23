@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.support.I18n;
 import app.unichat.support.Urls;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.net.URI;
@@ -91,6 +92,7 @@ public final class WebDav implements Storage {
 
     /** What's in {@code dir}: its PROPFIND one level deep, each answer's last part but the folder's own. */
     @Override
+    @SuppressFBWarnings(value = "REDOS", justification = "no nested repetition: each class stops at the next > or <, so the server's answer is read in linear time")
     public java.util.List<String> list(String dir) throws IOException {
         URI self = uri(dir);
         HttpResponse<String> r = Http.send(http, HttpRequest.newBuilder(URI.create(self + "/")).timeout(answer).header("Authorization", auth)

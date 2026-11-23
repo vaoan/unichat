@@ -1,6 +1,8 @@
 package app.unichat.server;
 
+import app.unichat.support.PathParts;
 import app.unichat.support.Storage;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -49,7 +51,7 @@ public final class Supervisor {
     public void reapOrphans() {
         if (runDir == null || !Files.isDirectory(runDir)) return;
         try (var files = Files.list(runDir)) {
-            for (Path f : files.filter(x -> x.getFileName().toString().endsWith(".pid")).toList()) {
+            for (Path f : files.filter(x -> PathParts.name(x).endsWith(".pid")).toList()) {
                 String[] parts = Files.readString(f).strip().split("\\s+");
                 Files.deleteIfExists(f);
                 if (parts.length != 2) continue;
@@ -126,8 +128,9 @@ public final class Supervisor {
             this.log = log;
         }
 
+        @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the server or a bridge from our install folder with fixed arguments, as a list, no shell")
         void launch() throws IOException {
-            Files.createDirectories(log.getParent());
+            Files.createDirectories(PathParts.parent(log));
             process = new ProcessBuilder(command).directory(workDir.toFile()).redirectErrorStream(true).start();
             launchedAt = System.currentTimeMillis();
             Process p = process;
@@ -207,6 +210,7 @@ public final class Supervisor {
      * Kills {@code name} at once (it's hung or broken): it's restarted like after a crash. Unlike {@link #stop},
      * it stays wanted.
      */
+    @SuppressFBWarnings(value = "RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT", justification = "Process.destroyForcibly kills the process; the Process it returns is the same one")
     public void kill(String name) {
         Service s = services.get(name);
         Process p = s == null ? null : s.process;

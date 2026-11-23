@@ -5,6 +5,7 @@ import app.unichat.model.MessageType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -115,6 +116,7 @@ class GifVideosTest {
         assertTrue(webp.containsAll(List.of("-loop", "0", "-lossy", "f00001.pam", "f00002.pam")) && webp.getLast().equals("out.webp"), webp.toString());
     }
 
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     private Path mp4(String name, String size, boolean sound) throws IOException, InterruptedException {
         Path ffmpeg = Ffmpeg.find();
         Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");

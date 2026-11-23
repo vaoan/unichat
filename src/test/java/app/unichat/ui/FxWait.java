@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
 
@@ -33,6 +34,7 @@ public final class FxWait {
     }
 
     /** Runs {@code c} on the FX thread and returns its result (or rethrows what it threw). */
+    @SuppressFBWarnings(value = {"BC_UNCONFIRMED_CAST_OF_RETURN_VALUE", "THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"}, justification = "the task's checked exception can only be the E its FxCall declares; the task's own unchecked exception, thrown again as it was")
     public static <T, E extends Exception> T fx(FxCall<T, E> c) throws E, InterruptedException {
         if (Platform.isFxApplicationThread()) return c.call();
         CompletableFuture<T> f = new CompletableFuture<>();

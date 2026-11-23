@@ -1,5 +1,8 @@
 package app.unichat.video;
 
+import app.unichat.support.PathParts;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,6 +20,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class WebmStickersTest {
     @TempDir Path dir;
 
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     private Path webmWithTransparency(Path ffmpeg) throws IOException, InterruptedException {
         Path webm = dir.resolve("hash.webm");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi",
@@ -39,7 +43,7 @@ class WebmStickersTest {
         assertTrue(text.contains("ANIM"), "animated");
         assertTrue(text.contains("ALPH") || (bytes[20] & 0x10) != 0, "with its transparency");
         try (var left = Files.list(dir)) {
-            assertTrue(left.noneMatch(f -> f.getFileName().toString().contains(".part")), "its frames gone");
+            assertTrue(left.noneMatch(f -> PathParts.name(f).contains(".part")), "its frames gone");
         }
     }
 
@@ -54,6 +58,7 @@ class WebmStickersTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void anAnimatedGifBecomesATelegramVideoSticker() throws Exception {
         Path ffmpeg = Ffmpeg.find();
         assumeTrue(ffmpeg != null, "no ffmpeg");

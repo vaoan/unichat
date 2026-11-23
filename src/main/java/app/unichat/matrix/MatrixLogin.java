@@ -5,6 +5,7 @@ import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -140,6 +141,7 @@ public final class MatrixLogin {
      * Whether an address a server suggests for itself (its {@code .well-known}, the login's {@code well_known}) may be
      * the session's: https, or plain http only on this machine or its network. Any other would send the token in clear.
      */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a java.net.URI scheme is ASCII letters only, so equalsIgnoreCase can't be fooled by a look-alike")
     static boolean safeBase(String url) {
         java.net.URI u;
         try {
@@ -151,6 +153,7 @@ public final class MatrixLogin {
         return "https".equalsIgnoreCase(u.getScheme()) || ("http".equalsIgnoreCase(u.getScheme()) && isLocalHost(u.getHost()));
     }
 
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "the host comes from java.net.URI.getHost, ASCII only (a non-ASCII host is null and refused before)")
     private static boolean isLocalHost(String hostPort) {
         String h = hostPort.split("[:/]")[0].toLowerCase(Locale.ROOT);
         return h.equals("localhost") || h.startsWith("127.") || h.startsWith("10.") || h.startsWith("192.168.")

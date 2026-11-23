@@ -24,7 +24,7 @@ public final class Archives {
      * @return false when there's none
      */
     public static boolean extractOne(Path archive, String entry, Path target) throws IOException {
-        String name = archive.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        String name = PathParts.name(archive).toLowerCase(java.util.Locale.ROOT);
         return name.endsWith(".zip") ? fromZip(archive, entry, target) : fromTarGz(archive, entry, target);
     }
 

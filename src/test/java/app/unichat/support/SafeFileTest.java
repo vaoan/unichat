@@ -1,5 +1,6 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -41,6 +42,7 @@ class SafeFileTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     void aLooseFileBecomesPrivate() throws Exception {
         assumeTrue(posix());
         Path f = dir.resolve("secrets.properties");
@@ -52,6 +54,7 @@ class SafeFileTest {
 
     /** A crash leaves a temp file behind: its loose mode, or a link in its place, must not decide anything. */
     @Test
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     void aLeftoverTempDecidesNothing() throws Exception {
         assumeTrue(posix());
         Path f = dir.resolve("s");
@@ -80,6 +83,7 @@ class SafeFileTest {
 
     @Test
     @SuppressWarnings("InputStreamSlowMultibyteRead") // a stream that fails after three bytes: its speed doesn't matter
+    @SuppressFBWarnings(value = "OS_OPEN_STREAM", justification = "in memory, nothing to close (as its NOPMD says)")
     void aFailureWhileWritingLeavesTheOldFileAndNoTemp() throws Exception {
         Path f = Files.writeString(dir.resolve("video.mp4"), "old");
         InputStream cut = new InputStream() { // NOPMD: CloseResource, in memory, nothing to close

@@ -404,11 +404,7 @@ public final class MessageMedia {
      * server's, and without this its picture vanished and came back each time (downloading the file again to make it).
      */
     private static final java.util.Map<String, Image> FILE_PREVIEWS = java.util.Collections.synchronizedMap(
-            new java.util.LinkedHashMap<>(64, 0.75f, true) {
-                @Override protected boolean removeEldestEntry(java.util.Map.Entry<String, Image> eldest) {
-                    return size() > 300; // 300 of 152 px: about 30 MB at most
-                }
-            });
+            app.unichat.support.BoundedMap.byUse(300)); // 300 of 152 px: about 30 MB at most
 
     /** The picture in place of the icon once it's here (a video keeps its play mark on top); the icon if it never comes. */
     private void showFilePreview(StackPane ic, String url, String key, boolean video) {

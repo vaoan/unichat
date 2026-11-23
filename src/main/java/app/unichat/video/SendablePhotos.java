@@ -1,5 +1,8 @@
 package app.unichat.video;
 
+import app.unichat.support.PathParts;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,12 +26,14 @@ public final class SendablePhotos {
     private SendablePhotos() {}
 
     /** Whether a picture of {@code mime} can be made a photo: GIFs stay animated, and an SVG is a drawing. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a MIME type compared to our own ASCII ones: a look-alike only means the photo is converted")
     public static boolean convertible(String mime) {
         String m = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
         return m.startsWith("image/") && !m.equals("image/gif") && !m.contains("svg");
     }
 
     /** Whether it already goes as a photo as it is: a JPEG or PNG within those limits ({@code width} 0: unknown). */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a MIME type compared to our own ASCII ones: a look-alike only means the photo is converted")
     public static boolean alreadyPhoto(String mime, int width, int height, long bytes) {
         boolean format = "image/jpeg".equalsIgnoreCase(mime) || "image/png".equalsIgnoreCase(mime);
         return format && width > 0 && height > 0 && (long) width * height <= MAX_PIXELS && width + height <= 10_000
@@ -46,7 +51,7 @@ public final class SendablePhotos {
     /** {@code ffmpeg}: asked for only when sips can't (there's none, or it failed). */
     static Path jpeg(Path picture, int width, int height, Path dir, Ffmpeg.Source ffmpeg) throws IOException, InterruptedException {
         Files.createDirectories(dir);
-        String name = picture.getFileName().toString();
+        String name = PathParts.name(picture);
         int dot = name.lastIndexOf('.');
         Path out = dir.resolve((dot > 0 ? name.substring(0, dot) : name) + ".jpg");
         boolean shrink = width <= 0 || Math.max(width, height) > SIDE;

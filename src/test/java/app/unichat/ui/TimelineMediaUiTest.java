@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.scene.image.ImageView;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +51,7 @@ class TimelineMediaUiTest {
     // ---------------------------------------------------------------- files to send
 
     /** A still picture, its own file each time (pictures are cached by address). */
+    @SuppressFBWarnings(value = "PATH_TRAVERSAL_IN", justification = "a temp file in the test's own folder, with its own prefix and suffix")
     private String still(String format, int width, int height) throws IOException {
         return TestPictures.still(Files.createTempFile(dir, "foto", "." + format), format, width, height).toUri().toString();
     }
@@ -246,6 +248,7 @@ class TimelineMediaUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aShortVideoThatPlaysInTheChat() throws Exception {
         Path ffmpeg = Ffmpeg.find();
         assumeTrue(ffmpeg != null, "no ffmpeg to make a video");

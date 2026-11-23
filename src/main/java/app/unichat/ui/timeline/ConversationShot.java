@@ -2,6 +2,7 @@ package app.unichat.ui.timeline;
 
 import app.unichat.model.Message;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -110,6 +111,7 @@ final class ConversationShot {
         CompletableFuture.delayedExecutor(LOOK_MS, TimeUnit.MILLISECONDS).execute(() -> Platform.runLater(() -> whenLoaded(root, until, then)));
     }
 
+    @SuppressFBWarnings(value = "RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN", justification = "user data set to Boolean.TRUE by our own code as a mark: identity is the check")
     private static Shot snap(VBox root, Node header, VBox rows) {
         laidOut(root);
         if (px(root.getHeight()) > MAX_HEIGHT_PX) throw new TooLong(); // measured before a pixel is made

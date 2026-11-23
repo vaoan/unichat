@@ -1,5 +1,7 @@
 package app.unichat.stt;
 
+import app.unichat.support.PathParts;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -105,7 +107,7 @@ class TranscriptsTest {
     void askedAtOnceFromSeveralThreadsItsTranscribedOnce(@TempDir Path dir) throws Exception {
         java.util.Map<String, AtomicInteger> runs = new java.util.concurrent.ConcurrentHashMap<>();
         Transcripts t = new Transcripts(dir, (audio, status) -> {
-            runs.computeIfAbsent(audio.getFileName().toString(), k -> new AtomicInteger()).incrementAndGet();
+            runs.computeIfAbsent(PathParts.name(audio), k -> new AtomicInteger()).incrementAndGet();
             return "hola";
         });
         int askers = 8;

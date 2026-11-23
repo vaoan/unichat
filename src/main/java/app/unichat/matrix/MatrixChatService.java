@@ -62,7 +62,8 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private final Map<String, CompletableFuture<Boolean>> historyInFlight = new ConcurrentHashMap<>();
     private volatile ConnectionState state = ConnectionState.CONNECTING;
     private volatile String nextBatch;
-    private Thread syncThread;
+    /** Set under the lock in start(); wake() and dropLongPoll() read it without it. */
+    private volatile Thread syncThread;
     /** The computer just woke: the open long poll is dropped and the next sync answers at once ({@link #wake}). */
     private volatile boolean woke;
     /** From starting or waking until the first answer: a refused connection then is the server still starting, not "offline". */

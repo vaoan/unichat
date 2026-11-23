@@ -3,6 +3,7 @@ package app.unichat.update;
 import app.unichat.settings.Settings;
 import app.unichat.support.AppVersion;
 import app.unichat.support.Seen;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.net.URI;
@@ -51,7 +52,8 @@ public final class UpdateChecker {
         return t;
     });
     private final List<Consumer<Release>> listeners = new CopyOnWriteArrayList<>();
-    private boolean started;
+    /** Set under the lock in start(); settingChanged() reads it on the worker. */
+    private volatile boolean started;
 
     private final LongSupplier clock;
     private final Fetcher fetcher;
@@ -62,6 +64,7 @@ public final class UpdateChecker {
 
     private UpdateChecker() { this(System::currentTimeMillis, UpdateChecker::fetch); }
 
+    @SuppressFBWarnings(value = "SING_SINGLETON_HAS_NONPRIVATE_CONSTRUCTOR", justification = "package-private for the tests, which give a clock and a fetcher")
     UpdateChecker(LongSupplier clock, Fetcher fetcher) {
         this.clock = clock;
         this.fetcher = fetcher;

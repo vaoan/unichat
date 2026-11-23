@@ -1,5 +1,7 @@
 package app.unichat.matrix;
 
+import app.unichat.support.PathParts;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -76,7 +78,7 @@ final class SavedMedia {
     }
 
     private boolean copy(String url, Path file) {
-        String name = file.getFileName().toString();
+        String name = PathParts.name(file);
         int dot = name.lastIndexOf('.');
         Path tmp = dir.resolve(names.apply(url) + ".download");
         try {

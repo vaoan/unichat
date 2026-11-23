@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ class DownloadLeftoversTest {
     private ServerSocket server;
 
     @BeforeEach
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void serverThatHangsUpHalfway() throws Exception {
         // Promises 100 kB, sends 10 and closes the connection: what a network that goes away does. A raw socket,
         // since HttpServer keeps the connection open after a short body and the client would wait for the rest.

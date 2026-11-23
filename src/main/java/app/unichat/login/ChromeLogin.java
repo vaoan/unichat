@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -163,6 +164,7 @@ public final class ChromeLogin {
     }
 
     /** Blocks until signed in: the step's values, or null if the person closed Chrome or {@link #cancel cancelled}. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "Chrome found at its install place, with our profile folder, a port and fixed flags, as a list, no shell")
     public Map<String, String> run() throws IOException, InterruptedException {
         Folders.deleteQuietly(profile);
         Files.createDirectories(profile);
@@ -260,6 +262,7 @@ public final class ChromeLogin {
         return BridgeCookies.captured(params, url, cookies, Map.of(), BridgeCookies.headerFallbacks(network, params));
     }
 
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "opened on 127.0.0.1 only to find a free port and closed at once; nothing is sent over it")
     private static int freePort() throws IOException {
         try (ServerSocket socket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             return socket.getLocalPort();
@@ -385,6 +388,7 @@ public final class ChromeLogin {
     }
 
     /** Chrome is asked first: on a Mac the process here is only {@code open}, and killing that leaves Chrome running. */
+    @SuppressFBWarnings(value = "RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT", justification = "Process.destroyForcibly kills the process; the Process it returns is the same one")
     private void stop() throws InterruptedException {
         Process p = process;
         if (p != null && p.isAlive()) {

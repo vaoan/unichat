@@ -3,6 +3,7 @@ package app.unichat.ui.timeline;
 import app.unichat.assist.ReplyWriter;
 import app.unichat.model.Message;
 import app.unichat.service.ScriptedChatService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -344,6 +345,7 @@ class SendQueueTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DM_GC", justification = "it measures what is kept after a collection (as its NOPMD says)")
     void aQueueNeverKeepsItsServiceAlive() {
         java.lang.ref.WeakReference<app.unichat.service.ChatService> gone = queuedThenDropped();
         while (gone.get() != null) { // collected once nothing but the queue's registry holds it

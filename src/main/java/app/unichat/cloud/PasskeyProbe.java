@@ -3,6 +3,7 @@ package app.unichat.cloud;
 import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 
 import java.io.IOException;
 import java.net.BindException;
@@ -106,7 +107,7 @@ public final class PasskeyProbe {
                 + "\" " + f.line();
         System.err.println("Passkey probe: " + line);
         try {
-            Files.createDirectories(file.getParent());
+            Files.createDirectories(PathParts.parent(file));
             Files.writeString(file, line + System.lineSeparator(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {

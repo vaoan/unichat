@@ -219,9 +219,11 @@ public final class UploadQueue {
         }
         var _ = sending.whenComplete((v, err) -> {
             long wait;
+            int tries;
             CantSend cant = cantSend(err);
             synchronized (this) {
                 wait = err == null || cant != null || abandoned || !Files.isReadable(u.file()) ? -1 : retryDelay(++retries);
+                tries = retries;
                 if (wait >= 0) progress = 0;
                 if (cant != null) refused = cant.getMessage();
             }
@@ -230,7 +232,7 @@ public final class UploadQueue {
                     waiting = true;
                     retryAt = System.currentTimeMillis() + wait;
                 }
-                System.err.println("Batch upload: a file didn't go up (try " + retries + "), again in " + wait / 1000 + " s: " + err);
+                System.err.println("Batch upload: a file didn't go up (try " + tries + "), again in " + wait / 1000 + " s: " + err);
                 fire();
                 later.run(wait, () -> retry(u));
             } else {

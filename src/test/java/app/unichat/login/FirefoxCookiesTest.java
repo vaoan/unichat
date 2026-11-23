@@ -1,6 +1,7 @@
 package app.unichat.login;
 
 import app.unichat.model.Network;
+import app.unichat.support.PathParts;
 import java.sql.SQLException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -88,7 +89,7 @@ class FirefoxCookiesTest {
         System.setProperty("unichat.browserRoots", root.toString());
         FirefoxCookies.findSessions(spec);
         try (var files = Files.list(Path.of(System.getProperty("java.io.tmpdir")))) {
-            List<String> left = files.map(p -> p.getFileName().toString())
+            List<String> left = files.map(PathParts::name)
                     .filter(n -> n.startsWith("unichat-cookies-")).toList();
             assertTrue(left.isEmpty(), "temp cookie copies left: " + left);
         }

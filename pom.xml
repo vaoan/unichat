@@ -117,6 +117,13 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <!-- @SuppressFBWarnings, for a SpotBugs finding kept on purpose with its justification. Compile time only. -->
+      <groupId>com.github.spotbugs</groupId>
+      <artifactId>spotbugs-annotations</artifactId>
+      <version>4.10.5</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <version>5.10.3</version>
@@ -338,6 +345,41 @@
               <!-- A file PMD can't read fails the build; the plugin's default skips it silently. -->
               <skipPmdError>false</skipPmdError>
             </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- SpotBugs reads the compiled classes, main and test, for bugs (nulls, resources left open, threads) and, with
+           FindSecBugs, security (injection, weak crypto, paths). Effort Max, every confidence (threshold Low); any finding
+           fails the build. spotbugs-exclude.xml leaves out only patterns that are noise here, each with its reason; a
+           finding kept on purpose is one member's @SuppressFBWarnings with its justification. BuildRulesTest keeps it on. -->
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <version>4.10.5.0</version>
+        <dependencies>
+          <!-- SpotBugs itself, pinned (4.10 reads Java 25's class files). -->
+          <dependency><groupId>com.github.spotbugs</groupId><artifactId>spotbugs</artifactId><version>4.10.5</version></dependency>
+        </dependencies>
+        <configuration>
+          <effort>Max</effort>
+          <threshold>Low</threshold>
+          <failOnError>true</failOnError>
+          <!-- Its own JVM: room for effort Max, and one GC thread and two compiler threads, which take a third of the
+               CPU off it (measured: 231 s user to 156 s, the same wall time; SpotBugs analyses on one thread). -->
+          <maxHeap>2048</maxHeap>
+          <jvmArgs>-XX:+UseSerialGC -XX:CICompilerCount=2</jvmArgs>
+          <!-- The tests too: they add about 5 s to the 80 s of main code. -->
+          <includeTests>true</includeTests>
+          <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
+          <plugins>
+            <plugin><groupId>com.h3xstream.findsecbugs</groupId><artifactId>findsecbugs-plugin</artifactId><version>1.14.0</version></plugin>
+          </plugins>
+        </configuration>
+        <executions>
+          <execution>
+            <id>spotbugs</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
           </execution>
         </executions>
       </plugin>

@@ -2,6 +2,7 @@ package app.unichat.matrix;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.Hashes;
+import app.unichat.support.PathParts;
 import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -36,7 +37,7 @@ final class SyncCache {
     /** Removes every session's cached sync (called on sign-in: the new session builds its own). */
     static void drop() {
         try (var files = Files.list(Settings.get().cacheDir())) {
-            for (Path f : files.filter(x -> x.getFileName().toString().matches("sync-.*\\.json")).toList()) Files.deleteIfExists(f);
+            for (Path f : files.filter(x -> PathParts.name(x).matches("sync-.*\\.json")).toList()) Files.deleteIfExists(f);
         } catch (IOException ignored) {
             // No cache dir yet.
         }
@@ -86,7 +87,7 @@ final class SyncCache {
     void save(JsonNode fullSync) {
         try {
             Path f = file();
-            Files.createDirectories(f.getParent());
+            Files.createDirectories(PathParts.parent(f));
             Set<String> botRoomIds = new java.util.HashSet<>();
             synchronized (proc) {
                 for (MatrixRoom r : proc.rooms()) if (r.chat.bridgeBot()) botRoomIds.add(r.id);

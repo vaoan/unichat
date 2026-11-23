@@ -10,13 +10,17 @@ public final class ConvertedFiles {
     private ConvertedFiles() {}
 
     public static Path beside(Path original, String extension) {
-        return original.resolveSibling("converted-" + Hashes.sha256(original.getFileName().toString()) + "." + extension);
+        return original.resolveSibling("converted-" + Hashes.sha256(PathParts.name(original)) + "." + extension);
     }
 
     /** Whether the conversion is already there; if so it counts as just seen, for the cache. */
     public static boolean reuse(Path converted) {
         if (!java.nio.file.Files.isRegularFile(converted)) return false;
-        converted.toFile().setLastModified(System.currentTimeMillis());
+        try {
+            java.nio.file.Files.setLastModifiedTime(converted, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis()));
+        } catch (java.io.IOException e) {
+            // still there: only the cache's order is off
+        }
         return true;
     }
 }

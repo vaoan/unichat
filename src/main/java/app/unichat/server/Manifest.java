@@ -1,5 +1,7 @@
 package app.unichat.server;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -61,6 +63,7 @@ public final class Manifest {
     }
 
     /** {@code pinnedSums}: the pinned hashes, in the format of {@link #parseSha256Sums}, keyed by {@link #pinKey}. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "the manifest bundled with the app: upper case keys are settings, by our own convention")
     public static Manifest parse(String text, String pinnedSums) {
         Map<String, Component> bridges = new LinkedHashMap<>();
         Map<String, String> settings = new HashMap<>();

@@ -1,5 +1,6 @@
 package app.unichat.cloak;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
@@ -69,6 +70,7 @@ class CloakToolTest {
     /** The real thing: downloads ~330 MB into a temp folder, protects a small picture. {@code -Dunichat.networkTests=true}. */
     @Test
     @EnabledIfSystemProperty(named = "unichat.networkTests", matches = "true")
+    @SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "seeded test data, the same on every run on purpose; nothing secret")
     void theRealInstallationProtectsAPicture() throws Exception {
         assumeTrue(CloakTool.canInstall());
         CloakTool tool = new CloakTool(dir.resolve("cloak"));

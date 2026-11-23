@@ -1,6 +1,7 @@
 package app.unichat.login;
 
 import app.unichat.model.Network;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -68,6 +69,7 @@ public final class CookieSpec {
     public Set<String> domains() { return domains; }
 
     /** True if a cookie domain (e.g. {@code .facebook.com}) belongs to this network. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "cookie domains come from the person's own browser, which stores them as ASCII (punycode)")
     public boolean isForNetwork(String cookieDomain) {
         if (cookieDomain == null) return false;
         String d = cookieDomain.toLowerCase(Locale.ROOT);

@@ -2,6 +2,7 @@ package app.unichat.assist;
 
 import app.unichat.model.Message;
 import app.unichat.support.Seen;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -38,6 +39,7 @@ public final class StyleLearning {
 
     private record Job(String chatId, List<Message> chat, StyleLearner.Program program, CompletableFuture<Void> done) {}
 
+    @SuppressFBWarnings(value = "SING_SINGLETON_HAS_NONPRIVATE_CONSTRUCTOR", justification = "package-private for the tests, which each make their own")
     StyleLearning(Supplier<WritingStyle> store) {
         this(store, r -> Thread.ofVirtual().name("learn-style").start(r));
     }

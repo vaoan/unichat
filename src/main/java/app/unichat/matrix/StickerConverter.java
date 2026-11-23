@@ -9,6 +9,7 @@ import app.unichat.support.I18n;
 import app.unichat.support.Processes;
 import app.unichat.video.LottieStickers;
 import app.unichat.video.WebmStickers;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -123,6 +124,7 @@ public final class StickerConverter {
     }
 
     /** {@code in} made {@code mime} into a new file of {@code dir}; null when it can't be (no tool, or it failed: logged). */
+    @SuppressFBWarnings(value = "PATH_TRAVERSAL_IN", justification = "a temp file in our own folder with a fixed prefix and a suffix of ours (.webp, .webm)")
     private static Result fromVideo(Path in, Path dir, String extension, String mime, Making making, String what) throws IOException {
         Files.createDirectories(dir);
         Path out = Files.createTempFile(dir, "sticker", extension);

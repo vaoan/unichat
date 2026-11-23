@@ -1,6 +1,7 @@
 package app.unichat.service;
 
 import app.unichat.support.BackgroundWriter;
+import app.unichat.support.PathParts;
 import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -120,7 +121,9 @@ public final class PreferencesFile {
         this.seenFile = serverSeen;
         this.recovery = new PreferencesRecovery(preferences);
         this.seen = ServerSeen.load(seenFile);
-        if (file != null) load();
+        if (file != null) {
+            synchronized (this) { load(); } // its fields are guarded by this lock everywhere else
+        }
     }
 
     public static PreferencesFile inMemory() { return new PreferencesFile(null, null); }
@@ -584,7 +587,7 @@ public final class PreferencesFile {
     /** A failure or a power cut leaves the old file whole. */
     private static boolean write(Path target, ObjectNode content, boolean keepPrevious) {
         try {
-            Files.createDirectories(target.getParent());
+            Files.createDirectories(PathParts.parent(target));
             byte[] bytes = JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(content);
             if (keepPrevious) PreferencesRecovery.keepPrevious(target);
             SafeFile.replace(target, bytes, false);

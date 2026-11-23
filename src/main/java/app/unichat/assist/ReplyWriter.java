@@ -3,6 +3,7 @@ package app.unichat.assist;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.File;
 import java.io.IOException;
@@ -60,6 +61,7 @@ public final class ReplyWriter {
     }
 
     /** Stopped (cancelled, or its thread interrupted), the program goes with its children ({@link Processes}). */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the AI program with arguments of ours as a list (AiEngine.command: its path, the folder, flags); the chat's text goes on stdin, never in an argument")
     String run(AiEngine engine, Path bin, Path folder, String prompt, boolean web) throws Failure {
         synchronized (this) {
             if (cancelled) return null;
@@ -108,7 +110,8 @@ public final class ReplyWriter {
     /** Codex is a node script: the programs next to it, and the usual places, have to be found too. */
     private static String searchPath(Path bin) {
         Set<String> folders = new LinkedHashSet<>();
-        if (bin.getParent() != null) folders.add(bin.getParent().toString());
+        Path here = bin.getParent();
+        if (here != null) folders.add(here.toString());
         for (String d : System.getenv().getOrDefault("PATH", "").split(File.pathSeparator)) {
             if (!d.isBlank()) folders.add(d);
         }

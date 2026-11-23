@@ -4,6 +4,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.Folders;
 import app.unichat.support.Hashes;
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 import app.unichat.support.Threads;
 
 import java.io.IOException;
@@ -64,7 +65,7 @@ public final class LinkVideo {
                 video = files.filter(LinkVideo::whole).max(Comparator.comparingLong(LinkVideo::size))
                         .orElseThrow(() -> new IOException(I18n.t("video.downloadFailed")));
             }
-            String file = video.getFileName().toString();
+            String file = PathParts.name(video);
             Path into = cache.resolve(name + file.substring(Math.max(0, file.lastIndexOf('.'))));
             return Files.move(video, into, StandardCopyOption.REPLACE_EXISTING);
         } finally {
@@ -76,13 +77,13 @@ public final class LinkVideo {
     private static Optional<Path> finished(Path cache, String name) throws IOException {
         if (!Files.isDirectory(cache)) return Optional.empty();
         try (Stream<Path> files = Files.list(cache)) {
-            return files.filter(f -> f.getFileName().toString().startsWith(name + ".") && Files.isRegularFile(f)).findFirst();
+            return files.filter(f -> PathParts.name(f).startsWith(name + ".") && Files.isRegularFile(f)).findFirst();
         }
     }
 
     /** A file the engine finished: not hidden, not half-written. */
     private static boolean whole(Path f) {
-        String n = f.getFileName().toString();
+        String n = PathParts.name(f);
         return Files.isRegularFile(f) && !n.startsWith(".") && !n.contains(".part");
     }
 

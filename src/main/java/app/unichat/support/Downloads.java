@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -52,6 +54,7 @@ public final class Downloads {
                 return t;
             });
 
+    @SuppressFBWarnings(value = "UNSAFE_HASH_EQUALS", justification = "the downloaded file's SHA-256 against the one pinned in the app: both public, nothing secret to find by timing")
     static void fetch(String url, long size, String sha256, Path target, String what, DoubleConsumer progress,
                       Consumer<Path> beforeMove, Duration stall) throws IOException, InterruptedException {
         // The request's timeout bounds the wait for the headers; the guard below, each wait for the body.

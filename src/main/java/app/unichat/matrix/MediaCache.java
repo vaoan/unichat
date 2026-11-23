@@ -1,5 +1,7 @@
 package app.unichat.matrix;
 
+import app.unichat.support.PathParts;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -73,7 +75,7 @@ final class MediaCache {
         long staleBefore = System.currentTimeMillis() - LEFTOVER_MILLIS;
         try (Stream<Path> files = Files.list(dir)) {
             for (Path p : (Iterable<Path>) files::iterator) {
-                String n = p.getFileName().toString();
+                String n = PathParts.name(p);
                 if (n.endsWith(".download") || n.contains(".part")) {
                     leftovers += deleteIfLeftover(p, staleBefore);
                     continue;

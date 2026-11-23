@@ -1,6 +1,7 @@
 package app.unichat.video;
 
 import app.unichat.support.Os;
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
 
 import java.io.IOException;
@@ -68,7 +69,7 @@ final class PartFile {
 
     /** Hidden and with ".part" (what the cache, autosave and the cloud leave alone), the extension kept: ffmpeg goes by it. */
     static Path part(Path out) {
-        String name = out.getFileName().toString();
+        String name = PathParts.name(out);
         int dot = name.lastIndexOf('.');
         return out.resolveSibling("." + (dot > 0 ? name.substring(0, dot) + ".part" + name.substring(dot) : name + ".part"));
     }

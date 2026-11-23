@@ -6,7 +6,9 @@ import app.unichat.model.MessageType;
 import app.unichat.model.SaveKind;
 import app.unichat.service.ChatReader;
 import app.unichat.service.MockChatService;
+import app.unichat.support.PathParts;
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -184,7 +186,7 @@ class AutoSaveTest {
         try (Stream<Path> s = Files.list(folder)) {
             // The names carry the message's id ("hoy [id].jpg"): what's compared here is the name it had.
             // The texts' readable copy (every kind includes the texts) is made on a thread of its own: not a file saved.
-            return s.filter(p -> !AutoSave.isTextCopy(p)).map(p -> p.getFileName().toString()).filter(n -> !n.startsWith("."))
+            return s.filter(p -> !AutoSave.isTextCopy(p)).map(PathParts::name).filter(n -> !n.startsWith("."))
                     .map(n -> n.replaceFirst(" \\[[^\\]]+\\](\\.[^.]+)?$", "$1")).sorted().toList();
         }
     }
@@ -427,6 +429,7 @@ class AutoSaveTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY", justification = "waits for the value to change at all: the exact comparison is what's meant")
     void exploringSaysHowMuchOfTheFileHasArrived() throws Exception {
         svc.setAutoSave(chat.id(), EnumSet.allOf(SaveKind.class)).get();
         timeline.add(media(MessageType.VIDEO, "grande.mov", false, Instant.now().minusSeconds(100)));
@@ -482,7 +485,7 @@ class AutoSaveTest {
         arrive(real);
         assertEquals(List.of("nutricion.pdf"), saved(), "once, with its real id");
         try (var s = Files.list(save.folder(chat))) {
-            assertTrue(s.anyMatch(p -> p.getFileName().toString().contains("[B3WbWcGB4mXOsHJyxwCtzO38Ao2fy]")), "the real id in the name");
+            assertTrue(s.anyMatch(p -> PathParts.name(p).contains("[B3WbWcGB4mXOsHJyxwCtzO38Ao2fy]")), "the real id in the name");
         }
     }
 

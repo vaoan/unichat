@@ -4,6 +4,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.Os;
 import app.unichat.support.Processes;
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 
@@ -133,6 +134,7 @@ public final class Theme {
     }
 
     /** Windows high-contrast theme / macOS "Aumentar contraste". */
+    @SuppressFBWarnings(value = "LI_LAZY_INIT_STATIC", justification = "on the FX thread only, like the rest of Theme")
     public static boolean systemHighContrast() {
         if (systemContrast != null) return systemContrast;
         try {
@@ -152,6 +154,7 @@ public final class Theme {
     }
 
     /** Windows "Mostrar animaciones" off / macOS "Reducir movimiento". */
+    @SuppressFBWarnings(value = "LI_LAZY_INIT_STATIC", justification = "on the FX thread only, like the rest of Theme")
     public static boolean systemReducedMotion() {
         if (systemReducedMotion != null) return systemReducedMotion;
         try {
@@ -170,6 +173,7 @@ public final class Theme {
     }
 
     /** Reads the OS appearance once per {@link #applyAll()}: Windows registry / macOS defaults / GTK theme. */
+    @SuppressFBWarnings(value = {"IMPROPER_UNICODE", "LI_LAZY_INIT_STATIC"}, justification = "macOS's own defaults output; it only picks dark or light; on the FX thread only, like the rest of Theme")
     static boolean systemDark() {
         if (systemDark != null) return systemDark;
         try {

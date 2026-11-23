@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
@@ -40,6 +41,7 @@ class RelocalizeUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DM_GC", justification = "it measures what is kept after a collection (as its NOPMD says)")
     void theWindowBuiltBeforeIsLetGo() throws Exception {
         MockChatService svc = new MockChatService();
         Stage[] stage = new Stage[1];

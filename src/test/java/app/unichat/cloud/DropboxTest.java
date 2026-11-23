@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -79,6 +80,7 @@ class DropboxTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aFileComesDownIntoAFileNeverWholeInMemoryWithATokenMadeAgainIfItExpired() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
             byte[] video = new byte[300_000];
@@ -114,6 +116,7 @@ class DropboxTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aBigFileGoesUpInPieces() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
             byte[] video = new byte[2500];

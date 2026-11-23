@@ -3,6 +3,7 @@ package app.unichat.autosave;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.MimeTypes;
+import app.unichat.support.PathParts;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -74,7 +75,7 @@ public final class FileNames {
         String mark = "[" + tag(m) + "]";
         try (var in = Files.newDirectoryStream(dir)) {
             for (Path p : in) {
-                String n = p.getFileName().toString();
+                String n = PathParts.name(p);
                 if (n.contains(mark) && !n.startsWith(".") && !n.endsWith(".part")) return true;
             }
         } catch (java.io.IOException e) {

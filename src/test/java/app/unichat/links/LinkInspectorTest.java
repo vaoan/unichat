@@ -3,6 +3,7 @@ package app.unichat.links;
 import app.unichat.model.LinkMedia;
 import com.sun.net.httpserver.HttpServer;
 import java.util.concurrent.ExecutionException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -180,6 +181,7 @@ class LinkInspectorTest {
 
     /** Each address a page names is a request from this computer: a page of thousands held a worker for hours. */
     @Test
+    @SuppressFBWarnings(value = "POTENTIAL_XML_INJECTION", justification = "a fake server's page built from the test's own names")
     void aPageThatNamesManyVideosHasOnlyItsFirstFewAsked() throws Exception {
         StringBuilder page = new StringBuilder();
         for (int i = 0; i < 50; i++) page.append("<video src=\"").append(base).append("/v").append(i).append("\"></video>");

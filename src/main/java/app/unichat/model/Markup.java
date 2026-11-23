@@ -1,5 +1,7 @@
 package app.unichat.model;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -67,6 +69,7 @@ public final class Markup {
         return out.toString();
     }
 
+    @SuppressFBWarnings(value = "POTENTIAL_XML_INJECTION", justification = "every piece of the message's text goes through escape() before it's appended; only our own tags are added as they are")
     private static String inline(String s) {
         StringBuilder out = new StringBuilder();
         Matcher m = INLINE.matcher(s);

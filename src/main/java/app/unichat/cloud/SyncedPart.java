@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -61,6 +62,7 @@ final class SyncedPart {
     }
 
     /** One round with the account; what it did. */
+    @SuppressFBWarnings(value = "UNSAFE_HASH_EQUALS", justification = "SHA-256 of the person's own settings, compared to tell whether they changed: nothing secret to find by timing")
     Action sync(Storage dav, Instant now) throws IOException {
         Bundle mine = local.apply(now);
         String mineHash = mine.hash();

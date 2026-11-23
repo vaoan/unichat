@@ -28,7 +28,7 @@ public final class BundledTools {
         String launcher = System.getProperty("jpackage.app-path");
         if (launcher == null) return null;
         Path l = Path.of(launcher);
-        Path app = Os.windows() ? l.getParent().resolve("app") : l.getParent().resolveSibling("app");
+        Path app = Os.windows() ? PathParts.parent(l).resolve("app") : PathParts.parent(l).resolveSibling("app");
         return app.resolve("server").resolve(relative);
     }
 

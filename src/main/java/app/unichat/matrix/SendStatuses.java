@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.support.BoundedMap;
 import app.unichat.support.I18n;
 
 import java.time.Duration;
@@ -18,11 +19,7 @@ final class SendStatuses {
     private static final int REMEMBERED = 2000;
 
     private final Map<String, CompletableFuture<Void>> waiting = new LinkedHashMap<>();
-    private final Map<String, String> heard = new LinkedHashMap<>(16, 0.75f, false) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-            return size() > REMEMBERED;
-        }
-    };
+    private final Map<String, String> heard = BoundedMap.byAge(REMEMBERED);
 
     /** From the sync: the bridge's {@code status} for {@code eventId} (SUCCESS, FAIL_RETRIABLE, FAIL_PERMANENT…). */
     void heard(String eventId, String status) {

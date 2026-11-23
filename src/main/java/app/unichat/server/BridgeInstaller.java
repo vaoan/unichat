@@ -6,6 +6,7 @@ import app.unichat.support.I18n;
 import app.unichat.support.Processes;
 import app.unichat.support.Redactor;
 import app.unichat.support.SafeFile;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -96,6 +97,7 @@ final class BridgeInstaller {
     }
 
     /** Runs a bridge setup command; on failure its (redacted) output goes to the log and the error message. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a bridge's setup program from our install folder with fixed arguments, as a list, no shell")
     private static void run(Path workDir, List<String> cmd) throws IOException, InterruptedException {
         Processes.Result r = Processes.capture(new ProcessBuilder(cmd).directory(workDir.toFile()).redirectErrorStream(true), 60);
         if (!r.finished()) throw new IOException(I18n.t("bridge.timeout", name(cmd)));

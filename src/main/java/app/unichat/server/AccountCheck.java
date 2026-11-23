@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.bridge.LoginsCache;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,6 +33,7 @@ final class AccountCheck {
     }
 
     /** A login in the bridge's database: a {@code user_login} row (bridgev2) or a user with a token (legacy Discord); null when it can't tell. */
+    @SuppressFBWarnings(value = "NP_BOOLEAN_RETURN_NULL", justification = "three answers on purpose: a login, none, or can't tell (null), which its caller reads as start the bridge")
     private static Boolean inDatabase(Path db) {
         if (!Files.isRegularFile(db)) return null;
         org.sqlite.SQLiteConfig ro = new org.sqlite.SQLiteConfig();
@@ -52,6 +54,7 @@ final class AccountCheck {
         }
     }
 
+    @SuppressFBWarnings(value = "SQL_INJECTION_JDBC", justification = "the queries are constants of this class; nothing from outside reaches them")
     private static boolean anyRow(Connection c, String query) throws SQLException {
         try (Statement s = c.createStatement(); ResultSet r = s.executeQuery(query)) {
             return r.next();

@@ -1,5 +1,8 @@
 package app.unichat.cloud;
 
+import app.unichat.support.PathParts;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -89,7 +92,7 @@ class MediaUploadTest {
     private Instant now = Instant.parse("2026-11-10T12:00:00Z");
 
     private MediaUpload uploader(Path chat) {
-        return new MediaUpload(dir.resolve("cloud-uploaded.txt"), () -> List.of(chat), p -> p.getFileName().toString().startsWith("Chat ("),
+        return new MediaUpload(dir.resolve("cloud-uploaded.txt"), () -> List.of(chat), p -> PathParts.name(p).startsWith("Chat ("),
                 () -> now);
     }
 
@@ -242,6 +245,7 @@ class MediaUploadTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void dropboxsContentHashIsTheHashOfEachBlocksHash(@TempDir Path tmp) throws Exception {
         byte[] data = new byte[5 * 1024 * 1024]; // two blocks: 4 MB and 1 MB
         new java.util.Random(3).nextBytes(data);

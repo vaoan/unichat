@@ -4,6 +4,7 @@ import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
 import java.util.concurrent.ExecutionException;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Region;
@@ -312,7 +313,7 @@ class TimelineFollowUiTest {
         java.nio.file.Path file = java.nio.file.Files.createTempFile(Settings.dataDir(), "scroll", ".txt");
         java.nio.file.Files.writeString(file, "hola");
         FxWait.fx(() -> { w.composer().sendFiles(java.util.List.of(file.toFile())); return null; });
-        FxWait.until("it's sent", () -> file.getFileName().toString().equals(w.newest().fileName()) && w.showsNewest());
+        FxWait.until("it's sent", () -> PathParts.name(file).equals(w.newest().fileName()) && w.showsNewest());
         frames.stop("a file sent, its bar coming and going");
     }
 

@@ -4,6 +4,7 @@ import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.net.URI;
@@ -72,6 +73,7 @@ final class MetaSessions implements Watchdog.SessionKeeper {
     }
 
     /** Whether {@code page} sends you to another host; not being able to ask counts as yes: nothing is lost by waiting. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "both hosts come from java.net.URI, ASCII only")
     static boolean redirectsElsewhere(URI page) {
         try {
             HttpResponse<Void> r = HTTP.send(HttpRequest.newBuilder(page).timeout(Duration.ofSeconds(12)).build(),

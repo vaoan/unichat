@@ -1,5 +1,7 @@
 package app.unichat.autosave;
 
+import app.unichat.support.PathParts;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,9 +19,9 @@ class SavedMoveTest {
     @Test
     void everythingGoesAlongAndNothingIsOverwritten() throws Exception {
         Path from = Files.createDirectories(dir.resolve("old/Dann Serna/links"));
-        Files.writeString(from.getParent().resolve("image.jpg"), "vieja");
+        Files.writeString(PathParts.parent(from).resolve("image.jpg"), "vieja");
         Files.writeString(from.resolve("video.mp4"), "v");
-        Files.writeString(from.getParent().resolve(".DS_Store"), "finder");
+        Files.writeString(PathParts.parent(from).resolve(".DS_Store"), "finder");
         Path to = Files.createDirectories(dir.resolve("new/Dann Serna"));
         Files.writeString(to.resolve("image.jpg"), "ya estaba");
 

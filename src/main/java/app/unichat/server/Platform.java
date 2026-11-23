@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.support.Os;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.nio.file.Path;
 import java.util.Locale;
@@ -29,6 +30,7 @@ public enum Platform {
     public boolean officialBuilds() { return officialBuilds; }
 
     /** The machine this runs on, or null when the native stack isn't supported (Intel Mac, Linux, 32-bit). */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "the JVM's os.arch, ASCII")
     public static Platform current() {
         String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
         if (Os.mac() && (arch.equals("aarch64") || arch.equals("arm64"))) return MAC_ARM64;

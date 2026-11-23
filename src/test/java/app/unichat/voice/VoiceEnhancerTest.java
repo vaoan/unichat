@@ -2,8 +2,10 @@ package app.unichat.voice;
 
 import app.unichat.model.VoiceNote;
 import app.unichat.stt.OggOpus;
+import app.unichat.support.PathParts;
 import app.unichat.video.Ffmpeg;
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +46,7 @@ class VoiceEnhancerTest {
     }
 
     /** One second of tone and one of "silence", all over a noise floor; returned as raw samples. */
+    @SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "seeded test data, the same on every run on purpose; nothing secret")
     private Path noisyRecording() throws IOException {
         Random random = new Random(7);
         ByteBuffer b = ByteBuffer.allocate(RATE * 2 * 2).order(ByteOrder.LITTLE_ENDIAN);
@@ -85,7 +88,7 @@ class VoiceEnhancerTest {
         assertSame(note, VoiceEnhancer.improve(note, noisyRecording(), RATE, p -> { }));
         assertArrayEquals(new byte[]{1, 2, 3}, Files.readAllBytes(note.file()));
         try (var files = Files.list(dir)) {
-            assertTrue(files.noneMatch(f -> f.getFileName().toString().contains(".clean")), "no leftovers");
+            assertTrue(files.noneMatch(f -> PathParts.name(f).contains(".clean")), "no leftovers");
         }
     }
 
@@ -128,6 +131,7 @@ class VoiceEnhancerTest {
                 "-filter_complex", "[0][1]amix=inputs=2:duration=first:normalize=0", "-f", "s16le", "-ar", "48000", "-ac", "1", noisy.toString());
     }
 
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     private static void run(String... command) throws IOException, InterruptedException {
         Process p = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
         assumeTrue(p.waitFor() == 0, command[0] + " can't make the sample");

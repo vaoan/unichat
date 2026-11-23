@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import app.unichat.WithLocale;
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -39,6 +40,7 @@ class HomeserverConfigTest {
 
     /** Its as_token logs in as anyone on the server. */
     @Test
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     void theDoublePuppetRegistrationIsOnlyTheOwnersAndKeepsItsTokens() throws Exception {
         assumeTrue(dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
         Files.createDirectories(dir.resolve("appservices"));

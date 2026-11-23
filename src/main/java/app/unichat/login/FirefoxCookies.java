@@ -1,5 +1,7 @@
 package app.unichat.login;
 
+import app.unichat.support.PathParts;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -91,7 +93,7 @@ public final class FirefoxCookies {
                 if (!Files.isRegularFile(db)) continue;
                 SessionCookies cookies = CookieDbCopy.read(db, copy -> read(copy, spec, Instant.now()));
                 if (cookies != null) {
-                    out.add(new BrowserSession("Firefox", profile.getFileName().toString(), cookies));
+                    out.add(new BrowserSession("Firefox", PathParts.name(profile), cookies));
                 }
             }
         }

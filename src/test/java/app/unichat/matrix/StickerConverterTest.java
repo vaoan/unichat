@@ -5,6 +5,7 @@ import app.unichat.model.RoomFeatures;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -69,6 +70,7 @@ class StickerConverterTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aWebmBecomesAnAnimatedWebpWithItsTransparency() throws Exception {
         Path ffmpeg = app.unichat.video.Ffmpeg.find();
         Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");

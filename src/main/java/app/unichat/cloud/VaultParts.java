@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -83,7 +84,7 @@ final class VaultParts {
     private static Set<String> transcriptsIn(Path dir) {
         if (!Files.isDirectory(dir)) return Set.of();
         try (Stream<Path> files = Files.list(dir)) {
-            return files.map(p -> p.getFileName().toString()).filter(n -> TRANSCRIPT.matcher(n).matches()).collect(Collectors.toSet());
+            return files.map(PathParts::name).filter(n -> TRANSCRIPT.matcher(n).matches()).collect(Collectors.toSet());
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }

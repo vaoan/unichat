@@ -4,6 +4,7 @@ import app.unichat.ui.FxWait;
 import app.unichat.service.MediaSource;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -294,6 +295,7 @@ class VideoUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aWebmStickerPlaysConverted() throws Exception {
         Path ffmpeg = app.unichat.video.Ffmpeg.find();
         org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
@@ -367,6 +369,7 @@ class VideoUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aVideoJavaFxCantReadIsConvertedAndPlays() throws Exception {
         Path ffmpeg = app.unichat.video.Ffmpeg.find();
         org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");

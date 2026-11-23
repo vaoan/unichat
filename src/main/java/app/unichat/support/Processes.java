@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,6 +48,7 @@ public final class Processes {
      *
      * @param dir where it runs; null: wherever Unichat does
      */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the one place programs start: callers pass argument lists (no shell), and untrusted values only after -- or through Ffmpeg.input")
     public static Result quiet(List<String> cmd, Path dir, long seconds) throws IOException, InterruptedException {
         ProcessBuilder b = new ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
         if (dir != null) b.directory(dir.toFile());
@@ -53,6 +56,7 @@ public final class Processes {
     }
 
     /** Runs {@code cmd} and keeps its standard output; errors are left out, so they can't pass for the answer. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the one place programs start: callers pass argument lists (no shell), and untrusted values only after -- or through Ffmpeg.input")
     public static Result capture(List<String> cmd, long seconds) throws IOException, InterruptedException {
         return capture(new ProcessBuilder(cmd).redirectError(ProcessBuilder.Redirect.DISCARD), seconds);
     }
@@ -90,6 +94,7 @@ public final class Processes {
      * filled the memory), within {@code seconds}. Stopped with its children past the limit, when the reader is done or
      * fails, or when this thread is interrupted. Whether it ended well.
      */
+    @SuppressFBWarnings(value = "RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT", justification = "Process.destroyForcibly kills the process; the Process it returns is the same one")
     public static boolean read(ProcessBuilder command, long seconds, Reader reader) throws IOException, InterruptedException {
         Process p = command.start();
         closeInput(p);
@@ -197,6 +202,7 @@ public final class Processes {
     }
 
     /** It and its children (a shell's, a node script's): one left behind keeps running and holding its files. */
+    @SuppressFBWarnings(value = "RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT", justification = "Process.destroyForcibly kills the process; the Process it returns is the same one")
     private static void stop(Process p) throws InterruptedException {
         p.descendants().forEach(ProcessHandle::destroyForcibly);
         p.destroyForcibly();

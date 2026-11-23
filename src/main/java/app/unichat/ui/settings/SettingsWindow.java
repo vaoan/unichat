@@ -14,6 +14,7 @@ import app.unichat.gif.GifProviders;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -83,6 +84,7 @@ public final class SettingsWindow {
 
     /** Selects the page named {@code page}: its id ("accessibility") or the start of its shown title. */
     @SuppressWarnings("unchecked") // as above
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a page id of ours, asked by our own code")
     public static void select(String page) {
         if (open == null) return;
         Node nav = open.getScene().getRoot().lookup(".settings-nav");
@@ -98,6 +100,7 @@ public final class SettingsWindow {
         }
     }
 
+    @SuppressFBWarnings(value = {"LI_LAZY_INIT_STATIC", "LI_LAZY_INIT_UPDATE_STATIC"}, justification = "on the FX thread only: one settings window at a time")
     public static void show(Window owner, ChatService svc, Runnable onAppearanceChanged, Runnable onLogout,
                             Consumer<String> openChatId, Consumer<String> toast) {
         if (open != null) {

@@ -6,6 +6,7 @@ import app.unichat.ui.timeline.AiReplyButton;
 import app.unichat.assist.AiSettings;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.layout.VBox;
@@ -109,6 +110,7 @@ class SyncedSettingsUiTest {
     }
 
     /** The keys the app keeps settings under, read from its source: literals given to Settings, and *_KEY constants. */
+    @SuppressFBWarnings(value = "REDOS", justification = "reads the repo's own sources; each repeated group ends at a literal dot")
     private static SortedSet<String> keysInTheApp() throws IOException {
         Pattern call = Pattern.compile("\\.(?:getString|getBool|getInt|getEnum|getDouble|getSet|set|setBool|addToSet|removeFromSet)\\(\"([a-z]\\w*\\.[\\w.]+)\"");
         Pattern constant = Pattern.compile("static final String [A-Z_]*(?:KEY|PROGRESS|DONE)[A-Z_]* = \"([a-z][\\w.]*)\"");

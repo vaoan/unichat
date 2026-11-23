@@ -1,5 +1,7 @@
 package app.unichat.ui.desktop;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 /**
  * What a Windows message says about the screen. A locked session and a display that is off are kept apart, since
  * either can end while the other holds (the display comes on to show the lock screen); the screen is away while
@@ -24,6 +26,7 @@ final class ScreenMessages {
      * Whether the screen is away after {@code msg}, or null when the message isn't about it. {@code displayState} is
      * GUID_CONSOLE_DISPLAY_STATE's data: 0 off, 1 on, 2 dimmed (Unichat still shows, so on).
      */
+    @SuppressFBWarnings(value = "NP_BOOLEAN_RETURN_NULL", justification = "three answers on purpose: away, back, or not a message about the screen (null)")
     Boolean away(int msg, long wParam, int displayState) {
         if (msg == WM_WTSSESSION_CHANGE && (wParam == WTS_SESSION_LOCK || wParam == WTS_SESSION_UNLOCK)) {
             locked = wParam == WTS_SESSION_LOCK;

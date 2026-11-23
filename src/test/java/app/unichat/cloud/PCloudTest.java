@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -69,6 +70,7 @@ class PCloudTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aFileComesDownIntoAFileNeverWholeInMemory(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
         try (FakePCloud cloud = new FakePCloud("tok")) {
             byte[] video = new byte[300_000];

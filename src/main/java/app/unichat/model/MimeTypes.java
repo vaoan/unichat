@@ -1,5 +1,7 @@
 package app.unichat.model;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +41,7 @@ public final class MimeTypes {
     private MimeTypes() {}
 
     /** The extension for a type, whatever parameters it carries ({@code audio/ogg; codecs=opus}); "" when unknown. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a message's MIME type, looked up in our table of ASCII types: a look-alike finds no extension")
     public static String extension(String mimeType) {
         if (mimeType == null) return "";
         int parameters = mimeType.indexOf(';');

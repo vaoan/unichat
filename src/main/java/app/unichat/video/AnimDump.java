@@ -2,6 +2,7 @@ package app.unichat.video;
 
 import app.unichat.support.BundledTools;
 import app.unichat.support.Folders;
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
 
 import java.awt.image.BufferedImage;
@@ -52,7 +53,7 @@ public final class AnimDump {
             if (!r.finished() || r.exit() != 0) return null;
             List<Path> files;
             try (Stream<Path> s = Files.list(dir)) {
-                files = s.filter(p -> p.getFileName().toString().endsWith(".pam")).sorted().toList();
+                files = s.filter(p -> PathParts.name(p).endsWith(".pam")).sorted().toList();
             }
             if (files.isEmpty()) return null;
             List<BufferedImage> out = new ArrayList<>();
@@ -78,7 +79,7 @@ public final class AnimDump {
 
     static void sweep(Path tmp, long now) {
         try (Stream<Path> s = Files.list(tmp)) {
-            for (Path d : s.filter(p -> p.getFileName().toString().startsWith(PREFIX) && Files.isDirectory(p)).toList()) {
+            for (Path d : s.filter(p -> PathParts.name(p).startsWith(PREFIX) && Files.isDirectory(p)).toList()) {
                 if (now - Files.getLastModifiedTime(d).toMillis() > LEFT_MS) Folders.deleteQuietly(d);
             }
         } catch (IOException e) {

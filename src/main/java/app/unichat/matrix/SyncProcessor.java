@@ -238,8 +238,6 @@ final class SyncProcessor {
             case "m.room.topic" -> room.topic = text(c, "topic");
             case "m.room.canonical_alias" -> room.canonicalAlias = text(c, "alias");
             case "m.room.create" -> {
-                long ts = ev.path("origin_server_ts").asLong(0);
-                if (ts > 0) room.created = Instant.ofEpochMilli(ts);
                 room.space = "m.space".equals(text(c, "type"));
                 room.createdByBridge = isBot(text(ev, "sender"));
             }

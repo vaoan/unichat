@@ -6,6 +6,7 @@ import app.unichat.ui.Theme;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.model.Chat;
 import app.unichat.service.MockChatService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -44,6 +45,7 @@ class TypingDotsUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY", justification = "waits for the value to change at all: the exact comparison is what's meant")
     void theDotsMoveOnlyWhileTheyreOnScreen() throws Exception {
         TypingDots dots = fx(TypingDots::new);
         assertFalse(fx(dots::isRunning), "not shown yet");

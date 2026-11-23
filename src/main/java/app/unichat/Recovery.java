@@ -1,5 +1,7 @@
 package app.unichat;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryNotificationInfo;
 import java.lang.management.MemoryPoolMXBean;
@@ -68,6 +70,7 @@ final class Recovery {
     }
 
     /** What a thread's error does: said, and a start again when it's fatal. */
+    @SuppressFBWarnings(value = "INFORMATION_EXPOSURE_THROUGH_AN_ERROR_MESSAGE", justification = "the trace goes to stderr, which is the person's own log (AppLog, through Redactor), never to anyone else")
     static void uncaught(Thread t, Throwable e, java.util.function.Consumer<String> restart) {
         try {
             System.err.println("Uncaught in " + t.getName() + ": " + e);
@@ -107,6 +110,7 @@ final class Recovery {
     }
 
     /** Logs why with every thread's stack, starts the next run when allowed, and ends this one. Once. */
+    @SuppressFBWarnings(value = {"COMMAND_INJECTION", "DM_EXIT"}, justification = "starts this same program again: its own command and arguments from ProcessHandle.info() plus two of ours, as a list, no shell; starting over means this JVM ends (as its NOPMD says)")
     static void restart(String why) {
         if (!RESTARTING.compareAndSet(false, true)) return;
         try {

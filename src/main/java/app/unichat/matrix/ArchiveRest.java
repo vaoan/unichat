@@ -286,9 +286,9 @@ final class ArchiveRest {
         try {
             fetch(part);
             part.forEach(owed::remove);
-            partsDone += part.size();
             catchUpRetry = null;
             synchronized (this) {
+                partsDone += part.size();
                 if (owed.isEmpty()) catching = false;
                 showLocked(new Waking(owed.isEmpty() ? Step.DONE : Step.CHATS, partsDone, partsTotal));
             }

@@ -3,6 +3,7 @@ package app.unichat.cloud;
 import app.unichat.support.I18n;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -69,6 +70,7 @@ final class Loopback {
         return back != null && MessageDigest.isEqual(state.getBytes(StandardCharsets.UTF_8), back.getBytes(StandardCharsets.UTF_8));
     }
 
+    @SuppressFBWarnings(value = "DMI_RANDOM_USED_ONLY_ONCE", justification = "a SecureRandom made for one state: its strength doesn't come from reuse")
     static String random(int bytes) {
         byte[] b = new byte[bytes];
         new SecureRandom().nextBytes(b);

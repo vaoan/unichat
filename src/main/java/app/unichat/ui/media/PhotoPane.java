@@ -1,5 +1,6 @@
 package app.unichat.ui.media;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.beans.property.ReadOnlyIntegerProperty;
 import javafx.beans.property.ReadOnlyIntegerWrapper;
 import javafx.geometry.Point2D;
@@ -25,6 +26,7 @@ final class PhotoPane extends Pane {
     private double lastY;
 
     /** {@code close}: a plain click beside the picture. */
+    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY", justification = "whether the picture's size changed at all: the exact values JavaFX gave, compared as they are")
     PhotoPane(String description, Runnable close) {
         view.setManaged(false);
         view.setAccessibleText(description);

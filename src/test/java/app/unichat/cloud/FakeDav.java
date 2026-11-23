@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -117,6 +118,7 @@ final class FakeDav implements AutoCloseable {
         x.sendResponseHeaders(201, -1);
     }
 
+    @SuppressFBWarnings(value = "POTENTIAL_XML_INJECTION", justification = "a fake server's page built from the test's own names")
     private void handle(HttpExchange x) throws IOException {
         try (x) {
             if (!auth.equals(x.getRequestHeaders().getFirst("Authorization"))) {

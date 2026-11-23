@@ -2,6 +2,7 @@ package app.unichat.service;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;
@@ -36,6 +37,7 @@ final class DemoMedia {
 
     /** Renders a placeholder "photo" (gradient + caption) once and caches it. */
     @SuppressWarnings("MathAbsoluteNegative") // only one hash in 2^32 stays negative, and that seed still draws a picture
+    @SuppressFBWarnings(value = "RV_ABSOLUTE_VALUE_OF_HASHCODE", justification = "as MathAbsoluteNegative above: only one hash in 2^32 stays negative, and that seed still draws a picture")
     static synchronized Path demoImage(String name) throws IOException {
         Path dir = Settings.get().cacheDir().resolve("demo");
         Files.createDirectories(dir);

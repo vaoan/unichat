@@ -256,7 +256,7 @@ class SendQueueUiTest {
         FxWait.until("both went", () -> svc.messages(CHAT).size() == before + 2);
         List<Message> last = svc.messages(CHAT).subList(before, before + 2);
         assertEquals("mira esto que chévere", last.get(0).body(), "the text first");
-        photo.delete();
+        java.nio.file.Files.deleteIfExists(photo.toPath());
     }
 
     @Test

@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
@@ -17,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ThemeSceneUiTest {
     @Test
+    @SuppressFBWarnings(value = "DM_GC", justification = "it measures what is kept after a collection (as its NOPMD says)")
     void aClosedWindowsSceneIsLetGoAndOneShownAgainIsStyledAgain() throws Exception {
         TimelineWindow.toolkit();
         int before = FxWait.fx(Theme::registered);

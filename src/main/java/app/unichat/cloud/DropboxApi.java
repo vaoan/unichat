@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.json.JsonWriteFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,7 +27,12 @@ public final class DropboxApi implements Storage {
     static final long SINGLE = 150L * 1024 * 1024;
     private static final int CHUNK = 64 * 1024 * 1024;
     /** Its header takes JSON in plain ASCII only: "Ñandú.jpg" goes as \\u escapes. */
-    private static final JsonMapper JSON = JsonMapper.builder().enable(JsonWriteFeature.ESCAPE_NON_ASCII).build();
+    private static final JsonMapper JSON = json();
+
+    @SuppressFBWarnings(value = "BC_UNCONFIRMED_CAST_OF_RETURN_VALUE", justification = "Jackson's builder is generic over the mapper it builds; JsonMapper.builder() builds a JsonMapper")
+    private static JsonMapper json() {
+        return JsonMapper.builder().enable(JsonWriteFeature.ESCAPE_NON_ASCII).build();
+    }
 
     private final String appKey;
     private final String refresh;

@@ -1,10 +1,12 @@
 package app.unichat.links;
 
 import app.unichat.support.BoundedBody;
+import app.unichat.support.BoundedMap;
 import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 import app.unichat.model.LinkMedia;
 import app.unichat.model.LinkPreview;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -22,7 +24,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -58,11 +59,7 @@ public final class LinkInspector {
     private final ExecutorService workers = Executors.newFixedThreadPool(AT_ONCE, Threads.daemon("link-inspector"));
     private final Predicate<InetAddress> allowed;
     private final Duration bodyDeadline;
-    private final Map<String, CompletableFuture<Optional<LinkPreview>>> seen = new LinkedHashMap<>(64, 0.75f, true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String, CompletableFuture<Optional<LinkPreview>>> eldest) {
-            return size() > REMEMBERED;
-        }
-    };
+    private final Map<String, CompletableFuture<Optional<LinkPreview>>> seen = BoundedMap.byUse(REMEMBERED);
 
     public LinkInspector() {
         this(LinkInspector::isPublic);
@@ -183,6 +180,7 @@ public final class LinkInspector {
     }
 
     /** By what the server says; a generic answer falls back on the file's extension. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "only guesses video or audio from an extension, to label a link; nothing is allowed by it")
     static LinkMedia.Kind kindOf(String mime, String path) {
         if (mime.startsWith("video/")) return LinkMedia.Kind.VIDEO;
         if (mime.startsWith("audio/") || mime.equals("application/ogg")) return LinkMedia.Kind.AUDIO;
@@ -211,6 +209,7 @@ public final class LinkInspector {
         throw new IOException(I18n.t("link.tooManyRedirects"));
     }
 
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a java.net.URI scheme is ASCII letters only, so lowercasing can't turn a look-alike into http; the host is then checked by its resolved addresses")
     private void check(URI uri) throws IOException {
         String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
         if (!(scheme.equals("http") || scheme.equals("https")) || uri.getHost() == null || uri.getUserInfo() != null) {

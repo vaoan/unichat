@@ -3,9 +3,11 @@ package app.unichat.gif;
 import app.unichat.model.MediaLibrary;
 import app.unichat.settings.Settings;
 import app.unichat.support.BoundedBody;
+import app.unichat.support.Folders;
 import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,12 +54,14 @@ public final class GifFiles {
      * The address comes from the provider's answer, so it's a stranger's: https only (redirects never drop to http) and at
      * most {@link #MAX_BYTES}, within {@code timeout} for the headers and again for the body.
      */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a java.net.URI scheme is ASCII letters only (URI refuses any other), so equalsIgnoreCase can't be fooled by a look-alike")
     public static Path download(String url, String ext, Duration timeout) throws IOException, InterruptedException {
         URI uri = URI.create(url);
         if (!"https".equalsIgnoreCase(uri.getScheme())) throw new IOException(I18n.t("link.notAllowed"));
         return fetch(uri, ext, timeout, MAX_BYTES);
     }
 
+    @SuppressFBWarnings(value = "PATH_TRAVERSAL_IN", justification = "a temp file in our own folder with a fixed prefix and a suffix of ours (.gif or .mp4, GifGrid); Files.createTempFile also refuses a suffix with a separator")
     static Path fetch(URI url, String ext, Duration timeout, long maxBytes) throws IOException, InterruptedException {
         HttpResponse<InputStream> r = HTTP.send(HttpRequest.newBuilder(url).timeout(timeout).build(),
                 HttpResponse.BodyHandlers.ofInputStream());
@@ -86,7 +90,7 @@ public final class GifFiles {
                 } catch (IOException e) {
                     return false;
                 }
-            }).forEach(f -> f.toFile().delete());
+            }).forEach(Folders::deleteQuietly);
         } catch (IOException ignored) {
             // Nothing to prune.
         }

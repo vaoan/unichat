@@ -3,6 +3,7 @@ package app.unichat.autosave;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
+import app.unichat.support.PathParts;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -53,7 +54,7 @@ class TextLogTest {
         assertEquals(List.of(), log.versions(CHAT, "$2"), "never kept: no copy");
         assertFalse(log().record(CHAT, List.of(seen(text("$1", "mañana sí puedo")))), "known again after a restart, from the file");
         try (var files = Files.list(dir.resolve(TextLog.HERE))) {
-            assertEquals(List.of(TextLog.key(CHAT) + " 2026-11.jsonl"), files.map(p -> p.getFileName().toString()).toList(),
+            assertEquals(List.of(TextLog.key(CHAT) + " 2026-11.jsonl"), files.map(PathParts::name).toList(),
                     "this computer's file of the chat for the month");
         }
     }

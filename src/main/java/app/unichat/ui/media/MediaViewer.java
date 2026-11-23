@@ -5,6 +5,7 @@ import app.unichat.ui.Nodes;
 import app.unichat.ui.Theme;
 import app.unichat.support.I18n;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.geometry.Pos;
@@ -212,6 +213,7 @@ public final class MediaViewer {
     }
 
     /** True if the key was one of the viewer's. By character for + and -, which move around between keyboards. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a key the person typed, matched to a shortcut")
     private static boolean key(PhotoPane photo, KeyEvent e) {
         switch (e.getCode()) {
             case LEFT -> photo.change(z -> z.pan(ARROW_STEP, 0));

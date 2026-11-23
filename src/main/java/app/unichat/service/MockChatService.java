@@ -57,7 +57,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     /** Account id -> account, in connection order. */
     final Map<String, Account> accounts = new LinkedHashMap<>();
     private final Random random = new Random(7);
-    private ScheduledExecutorService scheduler;
+    private volatile ScheduledExecutorService scheduler; // made under the lock (start), read by scheduler() from any thread
     private volatile ConnectionState state = ConnectionState.CONNECTING;
 
     private final PreferencesFile prefs;
@@ -70,7 +70,7 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     /** Demo mode whose choices and folders live in {@code prefs}, like the real service. */
     @SuppressWarnings("this-escape") // the demo seeds its own chats; subclasses (tests) only change how it answers
-    public MockChatService(PreferencesFile prefs) {
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "the demo's made-up chat (random, a field), the same on every run on purpose; nothing secret") public MockChatService(PreferencesFile prefs) {
         this.prefs = prefs;
         this.folders = new FolderActions(prefs, this::fireChats);
         DemoChats.seed(this);
@@ -339,7 +339,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) {
         return sendLocal(chatId, replyToId, m -> {
             m.setType(MessageType.AUDIO);
-            m.setFileName(note.file().getFileName().toString());
+            m.setFileName(app.unichat.support.PathParts.name(note.file()));
             m.setMimeType("audio/ogg");
             m.setMediaUrl(note.file().toUri().toString());
             m.setMediaInfo(com.fasterxml.jackson.databind.json.JsonMapper.builder().build().createObjectNode().put("duration", note.durationMs()));
@@ -356,7 +356,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, SendAs as,
                                             java.util.function.DoubleConsumer progress) {
         CompletableFuture<Void> shown = sendLocal(chatId, replyToId, m -> {
-            String name = file.getFileName().toString();
+            String name = app.unichat.support.PathParts.name(file);
             m.setFileName(name);
             m.setBody(name);
             m.setMediaUrl(file.toUri().toString());
@@ -641,7 +641,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         return new Member("@" + n.botLocalpart() + ":demo.unichat", n.displayName() + " bridge bot", null);
     }
 
-    private void answerBridgeBot(Chat chat, String command) {
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "the demo's pretend bridge bot, answering the person's own commands") private void answerBridgeBot(Chat chat, String command) {
         Network n = chat.network();
         Member bot = botMember(n);
         var _ = scheduler().schedule(() -> {

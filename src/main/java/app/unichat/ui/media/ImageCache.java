@@ -1,10 +1,10 @@
 package app.unichat.ui.media;
 
 import app.unichat.service.MediaSource;
+import app.unichat.support.BoundedMap;
 import javafx.scene.image.Image;
 
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,12 +21,7 @@ public final class ImageCache {
     static final int PX = 168;
     private static final int MAX = 500;
 
-    private static final Map<String, Image> CACHE = Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Image> e) {
-            return size() > MAX;
-        }
-    });
+    private static final Map<String, Image> CACHE = Collections.synchronizedMap(BoundedMap.byUse(MAX));
     private static final Map<String, CompletableFuture<Image>> LOADING = new ConcurrentHashMap<>();
     /** URLs that failed (e.g. bridge-bot avatars on remote servers a "localhost" Synapse can't fetch). */
     private static final Map<String, Long> FAILED = new ConcurrentHashMap<>();

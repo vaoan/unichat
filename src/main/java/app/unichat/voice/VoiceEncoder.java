@@ -1,6 +1,7 @@
 package app.unichat.voice;
 
 import app.unichat.model.VoiceNote;
+import app.unichat.support.PathParts;
 import io.github.jaredmdobson.concentus.OpusApplication;
 import io.github.jaredmdobson.concentus.OpusEncoder;
 import io.github.jaredmdobson.concentus.OpusException;
@@ -46,7 +47,7 @@ final class VoiceEncoder implements AutoCloseable {
         encoder.setBitrate(BITRATE);
         encoder.setUseVBR(true);
         encoder.setSignalType(OpusSignal.OPUS_SIGNAL_VOICE);
-        Files.createDirectories(file.getParent());
+        Files.createDirectories(PathParts.parent(file));
         out = new BufferedOutputStream(Files.newOutputStream(file));
         ogg = new OggOpusWriter(out, rate, encoder.getLookahead() * (48_000 / rate));
     }

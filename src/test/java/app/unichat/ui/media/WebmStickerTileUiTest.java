@@ -4,6 +4,7 @@ import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.ui.FxWait;
 import app.unichat.video.Ffmpeg;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.image.ImageView;
 import org.junit.jupiter.api.BeforeAll;
@@ -39,6 +40,7 @@ class WebmStickerTileUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aWebmStickerLoadsAsAMovingPicture() throws Exception {
         Path ffmpeg = Ffmpeg.find();
         assumeTrue(ffmpeg != null, "no ffmpeg");
@@ -57,6 +59,7 @@ class WebmStickerTileUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aFavouriteGifThatIsAnMp4LoadsAsAMovingPicture() throws Exception {
         // Telegram's and WhatsApp's GIFs are MP4s: saved as favourites, their tile is one too.
         Path ffmpeg = Ffmpeg.find();

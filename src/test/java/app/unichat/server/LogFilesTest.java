@@ -1,5 +1,7 @@
 package app.unichat.server;
 
+import app.unichat.support.PathParts;
+
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,7 +23,7 @@ class LogFilesTest {
 
     private Path file(String rel, int daysOld) throws IOException {
         Path f = root.resolve(rel);
-        Files.createDirectories(f.getParent());
+        Files.createDirectories(PathParts.parent(f));
         Files.writeString(f, "x".repeat(10));
         Files.setLastModifiedTime(f, FileTime.from(now.minus(Duration.ofDays(daysOld))));
         return f;

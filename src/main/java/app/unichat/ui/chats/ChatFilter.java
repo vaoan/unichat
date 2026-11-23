@@ -2,6 +2,7 @@ package app.unichat.ui.chats;
 
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.text.Normalizer;
 import java.util.Comparator;
@@ -85,6 +86,7 @@ public record ChatFilter(View view, Network network, String accountId, boolean u
     }
 
     /** Lower-case, accent-insensitive form for search. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "folds text for searching chats by name; nothing is allowed by it")
     public static String normalize(String s) {
         if (s == null) return "";
         return Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);

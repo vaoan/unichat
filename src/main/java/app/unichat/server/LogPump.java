@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.support.Redactor;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -67,6 +68,7 @@ final class LogPump {
         }
     }
 
+    @SuppressFBWarnings(value = "OS_OPEN_STREAM", justification = "the reader wraps the process's stream, which the process owns and closes (as its NOPMD says)")
     private void copy(Process p, Consumer<String> read, Runnable afterLine) {
         InputStream raw = p.getInputStream(); // NOPMD: CloseResource, the process's own; the JDK closes it when it exits
         BufferedReader in = new BufferedReader(new InputStreamReader(raw, StandardCharsets.UTF_8)); // NOPMD: CloseResource, as raw

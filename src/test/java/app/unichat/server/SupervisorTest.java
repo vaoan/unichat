@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -77,6 +78,7 @@ class SupervisorTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void aLogThatCantBeWrittenNeitherBlocksTheProcessNorEndsTheCopy() throws Exception {
         // The log path is a folder at first: every line fails, yet the output must keep being read (1 MB, far more
         // than a pipe holds) and, once the log can be written again, lines reach it.

@@ -1,10 +1,11 @@
 package app.unichat.ui.media;
 
+import app.unichat.support.BoundedMap;
+
 import javafx.scene.image.Image;
 
 import java.lang.ref.SoftReference;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -14,12 +15,7 @@ import java.util.Map;
  */
 final class Stills {
     private static final int MAX = 300;
-    private static final Map<String, SoftReference<Image>> CACHE = Collections.synchronizedMap(
-            new LinkedHashMap<>(64, 0.75f, true) {
-                @Override protected boolean removeEldestEntry(Map.Entry<String, SoftReference<Image>> eldest) {
-                    return size() > MAX;
-                }
-            });
+    private static final Map<String, SoftReference<Image>> CACHE = Collections.synchronizedMap(BoundedMap.byUse(MAX));
 
     private Stills() {}
 

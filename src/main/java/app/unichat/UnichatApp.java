@@ -28,6 +28,7 @@ import app.unichat.ui.MainView;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.ui.Theme;
 import app.unichat.update.UpdateChecker;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -404,6 +405,7 @@ public final class UnichatApp extends Application {
     }
 
     /** The window goes at once; what has to stop stops off the UI thread (it can take seconds per bridge), then the app ends. */
+    @SuppressFBWarnings(value = "DM_EXIT", justification = "quitting the app (as its NOPMD says)")
     private void quit() {
         Platform.runLater(() -> {
             if (stage.isShowing()) saveGeometry();

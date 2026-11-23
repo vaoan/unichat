@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetAddress;
@@ -44,6 +45,7 @@ class HttpProbeTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void nothingListeningIsDown() throws Exception {
         int port;
         try (ServerSocket free = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
@@ -53,6 +55,7 @@ class HttpProbeTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void aHungProcessIsDown() throws Exception {
         try (ServerSocket silent = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
             assertFalse(HttpProbe.answers(HTTP, silent.getLocalPort(), Duration.ofNanos(1), HttpProbe.Up.ALIVE));
@@ -60,6 +63,7 @@ class HttpProbeTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void anInterruptedProbeIsNeitherUpNorDown() throws Exception {
         try (ServerSocket silent = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
             Thread.currentThread().interrupt();

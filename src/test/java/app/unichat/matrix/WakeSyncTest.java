@@ -4,6 +4,7 @@ import app.unichat.model.ConnectionState;
 import app.unichat.service.Changes;
 import app.unichat.service.ChatService;
 import com.sun.net.httpserver.HttpServer;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -107,6 +108,7 @@ class WakeSyncTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void aServerStillStartingIsConnectingNotOffline() throws Exception {
         int port;
         try (java.net.ServerSocket closed = new java.net.ServerSocket(0)) {

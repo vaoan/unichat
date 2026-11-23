@@ -1,5 +1,7 @@
 package app.unichat.assist;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.util.UUID;
 
 /** Asking the AI program to correct what the person wrote, changing as little as possible. Pure. */
@@ -59,8 +61,13 @@ public final class FixPrompt {
         return out;
     }
 
-    private static final java.util.regex.Pattern MARK = java.util.regex.Pattern.compile(
-            "[\\p{L}\\p{N}-]+(?:\\.[\\p{L}\\p{N}-]+)+(?:/\\S*)?|[@#][\\p{L}\\p{N}_.]+|\\+?\\d[\\d ]{2,}\\d");
+    private static final java.util.regex.Pattern MARK = mark();
+
+    @SuppressFBWarnings(value = "REDOS", justification = "no repetition can match the same text two ways (each repeated group starts with a literal dot), so no exponential case; at worst quadratic in a long word, and it reads only the person's own message and the AI's fix of it")
+    private static java.util.regex.Pattern mark() {
+        return java.util.regex.Pattern.compile(
+                "[\\p{L}\\p{N}-]+(?:\\.[\\p{L}\\p{N}-]+)+(?:/\\S*)?|[@#][\\p{L}\\p{N}_.]+|\\+?\\d[\\d ]{2,}\\d");
+    }
 
     /** {@link ReplyPrompt#clean} takes off quotes or a code fence around the answer: those were the person's own. */
     public static String keepWrapping(String original, String fixed) {

@@ -102,7 +102,11 @@ public final class I18n {
             Properties p = new Properties();
             String name = DIR + (l.isEmpty() ? "messages.properties" : "messages_" + l + ".properties");
             try (InputStream in = I18n.class.getResourceAsStream(name)) {
-                if (in != null) p.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+                if (in != null) {
+                    try (InputStreamReader text = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+                        p.load(text);
+                    }
+                }
             } catch (IOException e) {
                 System.err.println("Can't read " + name + ": " + e.getClass().getSimpleName());
             }

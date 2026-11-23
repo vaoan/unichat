@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
 import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -214,7 +215,7 @@ class CloudVaultTest {
         assertNull(desk.round().error());
         assertEquals("bien", desk.read("transcripts/" + "c".repeat(64) + ".txt"));
         try (var all = Files.walk(dir)) {
-            assertEquals(List.of(), all.filter(p -> p.getFileName().toString().contains("fuera")).toList());
+            assertEquals(List.of(), all.filter(p -> PathParts.name(p).contains("fuera")).toList());
         }
         try (var here = Files.list(desk.data.resolve("transcripts"))) {
             assertEquals(1, here.count(), "only a name of ours became a file");

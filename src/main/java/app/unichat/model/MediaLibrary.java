@@ -1,5 +1,7 @@
 package app.unichat.model;
 
+import app.unichat.support.PathParts;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -223,7 +225,7 @@ public final class MediaLibrary {
         ObjectNode react = root.putObject("reactions");
         reactions.forEach(react::put);
         try {
-            Files.createDirectories(file.getParent());
+            Files.createDirectories(PathParts.parent(file));
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
             JSON.writeValue(tmp.toFile(), root);
             Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE); // lesson-ok: atomic-move (model may not use support)

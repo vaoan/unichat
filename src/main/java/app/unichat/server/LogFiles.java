@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -35,7 +36,7 @@ public final class LogFiles {
     private LogFiles() {}
 
     static boolean isLog(Path file) {
-        return LOG.matcher(file.getFileName().toString()).matches();
+        return LOG.matcher(PathParts.name(file)).matches();
     }
 
     /** Unichat's logs folder and the local server's folder (when it exists). */
@@ -67,7 +68,7 @@ public final class LogFiles {
     public static void clearAll(List<Path> roots) {
         for (Path f : logs(roots)) {
             try {
-                if (ACTIVE.matcher(f.getFileName().toString()).matches()) {
+                if (ACTIVE.matcher(PathParts.name(f)).matches()) {
                     try (FileChannel ch = FileChannel.open(f, StandardOpenOption.WRITE)) {
                         ch.truncate(0);
                     }
@@ -106,7 +107,7 @@ public final class LogFiles {
                 Files.walkFileTree(root, Set.of(), 3, new SimpleFileVisitor<>() {
                     @Override
                     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes a) {
-                        return DATABASE_DIRS.contains(dir.getFileName().toString())
+                        return DATABASE_DIRS.contains(PathParts.name(dir))
                                 ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
                     }
 

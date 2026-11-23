@@ -32,11 +32,12 @@ public final class EmojiPicker {
     private static Map<String, List<String>> load() {
         Map<String, List<String>> out = new LinkedHashMap<>();
         try (InputStream in = EmojiPicker.class.getResourceAsStream("/app/unichat/emoji/emoji.txt")) {
+            if (in == null) throw new IllegalStateException("emoji list missing");
             for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
                 int tab = line.indexOf('\t');
                 if (tab > 0) out.put("emoji.group." + line.substring(0, tab), List.of(line.substring(tab + 1).strip().split(" ")));
             }
-        } catch (IOException | NullPointerException e) {
+        } catch (IOException e) {
             throw new IllegalStateException("emoji list missing", e);
         }
         return out;

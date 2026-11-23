@@ -7,6 +7,7 @@ import app.unichat.model.ConnectionState;
 import app.unichat.model.Network;
 import app.unichat.service.Changes;
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
@@ -113,7 +114,7 @@ class StartupBeforeSyncTest {
                        "origin_server_ts":1700000100000,"content":{"msgtype":"m.text","body":"buenas"}}]}}
                 }}}""";
         Path f = svc.syncCacheFile();
-        Files.createDirectories(f.getParent());
+        Files.createDirectories(PathParts.parent(f));
         Files.writeString(f, sync);
     }
 

@@ -1,10 +1,10 @@
 package app.unichat.matrix;
 
 import app.unichat.model.Message;
+import app.unichat.support.BoundedMap;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.IOException;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -15,12 +15,7 @@ import static app.unichat.support.Urls.enc;
 final class FetchedMessages {
     private final MatrixCore core;
     /** The last few hundred, by id. */
-    private final Map<String, CompletableFuture<Message>> fetched = new LinkedHashMap<>(16, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, CompletableFuture<Message>> e) {
-            return size() > 500;
-        }
-    };
+    private final Map<String, CompletableFuture<Message>> fetched = BoundedMap.byUse(500);
 
     FetchedMessages(MatrixCore core) {
         this.core = core;

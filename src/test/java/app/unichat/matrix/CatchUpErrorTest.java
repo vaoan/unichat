@@ -1,5 +1,7 @@
 package app.unichat.matrix;
 
+import app.unichat.support.PathParts;
+
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
@@ -91,7 +93,7 @@ class CatchUpErrorTest {
         svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), ME, "token");
         svc.pauseRetriesWith(millis -> { }); // which sync comes next is the point, not the wait before it
         Path f = svc.syncCacheFile();
-        Files.createDirectories(f.getParent());
+        Files.createDirectories(PathParts.parent(f));
         Files.writeString(f, "{\"next_batch\":\"s1\",\"rooms\":{}}");
         svc.start();
 

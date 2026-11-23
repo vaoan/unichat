@@ -1,5 +1,6 @@
 package app.unichat.video;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,6 +19,7 @@ class MovingPicturesTest {
     @TempDir Path dir;
 
     /** A video made by ffmpeg's own test source: {@code extra} adds sound or changes the format. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     private Path video(String name, double seconds, String... extra) throws IOException, InterruptedException {
         Path ffmpeg = Ffmpeg.find();
         assumeTrue(ffmpeg != null, "no ffmpeg");

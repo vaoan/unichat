@@ -4,6 +4,7 @@ import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
 import java.security.KeyPair;
 import java.time.Instant;
@@ -128,6 +129,7 @@ final class Vault {
      * takes back all it wrote, so no half-made vault is left in the way. A vault file that isn't one is replaced only
      * while no slot is there: nothing anyone could open.
      */
+    @SuppressFBWarnings(value = "THROWS_METHOD_THROWS_RUNTIMEEXCEPTION", justification = "the failure that stopped it is thrown again once what it wrote is taken back (undo)")
     static Created create(Storage s, String machine, String machineName) throws IOException, Exists {
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
         if (s.exists(INFO) && (info(s) != null || !s.list(SLOTS).isEmpty())) throw new Exists();
@@ -259,6 +261,7 @@ final class Vault {
      * this one: any other, one that came after the list was shown included, is offered nothing and named. {@code rising}
      * runs right before the generation rises (whatever the account answers then, the new code may be the vault's).
      */
+    @SuppressFBWarnings(value = "THROWS_METHOD_THROWS_RUNTIMEEXCEPTION", justification = "the failure that stopped it is thrown again once its offers are taken back (withdrawn)")
     static Rotated rotate(Storage s, byte[] oldVk, String machine, VaultPeers peers, java.util.function.Predicate<String> confirmed,
                           Runnable rising) throws IOException {
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");

@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
 import javafx.event.Event;
@@ -51,11 +52,16 @@ class ScrollPerfUiTest {
     private static final int SENDERS = 400;
     private static final String[] WORDS = ("jajaja dale qué más parce mira ese gol increíble no puedo creerlo alguien vio el partido ayer "
             + "estaba buenísimo voy saliendo ahora nos vemos luego").split(" ");
-    private final Random random = new Random(42);
+    private final Random random = seeded();
     private final List<Path> stickers = new ArrayList<>();
     private final List<Path> gifs = new ArrayList<>();
     private final List<Path> photos = new ArrayList<>();
     private final List<Path> videos = new ArrayList<>();
+
+    @SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "seeded test data, the same on every run on purpose; nothing secret")
+    private static Random seeded() {
+        return new Random(42);
+    }
 
     private static <T> T fx(Callable<T> c) throws InterruptedException, ExecutionException {
         CompletableFuture<T> f = new CompletableFuture<>();
@@ -69,6 +75,7 @@ class ScrollPerfUiTest {
         return f.get();
     }
 
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     private static void paint(Graphics2D g, int w, int h, int frame, int seed) {
         Random r = new Random(seed);
         g.setPaint(new GradientPaint(0, 0, new Color(r.nextInt(0xffffff)), w, h, new Color(r.nextInt(0xffffff))));
@@ -94,6 +101,7 @@ class ScrollPerfUiTest {
         return p;
     }
 
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     private static Path video(Path gif) throws IOException, InterruptedException {
         Path out = Path.of(gif + ".mp4");
         new ProcessBuilder("ffmpeg", "-y", "-loglevel", "error", "-i", gif.toString(), "-pix_fmt", "yuv420p", "-c:v", "libx264",
@@ -208,6 +216,7 @@ class ScrollPerfUiTest {
         return ManagementFactory.getGarbageCollectorMXBeans().stream().mapToLong(GarbageCollectorMXBean::getCollectionTime).sum();
     }
 
+    @SuppressFBWarnings(value = "DM_GC", justification = "it measures what is kept after a collection (as its NOPMD says)")
     private static long liveMegabytes() {
         System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection
         return ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed() >> 20;

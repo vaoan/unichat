@@ -1,5 +1,7 @@
 package app.unichat.service;
 
+import app.unichat.support.PathParts;
+
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -94,7 +96,7 @@ class UploadQueueTest {
             waits.remove(waits.size() - 1).r().run();
         }
         assertEquals(7, fake.calls.size());
-        assertTrue(fake.calls.stream().allMatch(c -> c.file().getFileName().toString().equals("a.jpg")), "b waits for a");
+        assertTrue(fake.calls.stream().allMatch(c -> PathParts.name(c.file()).equals("a.jpg")), "b waits for a");
         fake.futures.get(6).complete(null);
         assertEquals(1, q.status().sent());
         assertEquals(0, q.status().retries());

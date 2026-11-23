@@ -1,5 +1,6 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -70,6 +71,7 @@ class ArchivesTest {
 
     /** An archive cut short replaces nothing and leaves no temp file behind. */
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aCutShortArchiveKeepsTheOldProgramAndLeavesNoTemp() throws IOException {
         byte[] noise = new byte[200_000];
         new java.util.Random(7).nextBytes(noise);

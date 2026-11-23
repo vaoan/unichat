@@ -8,6 +8,7 @@ import app.unichat.service.SendAs;
 import app.unichat.service.UploadQueue;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 import javafx.application.Platform;
 import javafx.scene.Group;
 import javafx.scene.Node;
@@ -119,7 +120,7 @@ public final class CloakSend {
 
     /** With the photos made for sending (deleted after a day), under the picture's own name as a PNG. */
     static Path output(Path in) {
-        String name = in.getFileName().toString();
+        String name = PathParts.name(in);
         int dot = name.lastIndexOf('.');
         String base = dot > 0 ? name.substring(0, dot) : name;
         return Settings.dataDir().resolve("cache").resolve("sending").resolve("protected-" + System.currentTimeMillis())

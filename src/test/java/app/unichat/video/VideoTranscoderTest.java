@@ -1,6 +1,8 @@
 package app.unichat.video;
 
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,6 +37,7 @@ class VideoTranscoderTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aVp9VideoBecomesH264InItsPlace() throws Exception {
         Path ffmpeg = Ffmpeg.find();
         Assumptions.assumeTrue(ffmpeg != null, "needs an ffmpeg");
@@ -50,7 +53,7 @@ class VideoTranscoderTest {
                 .redirectErrorStream(true), NO_LIMIT).out();
         assertTrue(VideoTranscoder.playsEverywhere(info), info);
         try (Stream<Path> stream = Files.list(dir)) {
-            assertEquals(List.of("Video by alguien [Dx1] [abc].mp4"), stream.map(p -> p.getFileName().toString()).toList(),
+            assertEquals(List.of("Video by alguien [Dx1] [abc].mp4"), stream.map(PathParts::name).toList(),
                     "nothing half-written left behind");
         }
 
@@ -73,6 +76,7 @@ class VideoTranscoderTest {
 
     /** gallery-dl saves a link's pictures: each stays the picture it is, never a one-frame MP4. */
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void picturesAreLeftAlone() throws Exception {
         Path ffmpeg = Ffmpeg.find();
         Assumptions.assumeTrue(ffmpeg != null, "needs an ffmpeg");
@@ -91,7 +95,7 @@ class VideoTranscoderTest {
         }
         try (Stream<Path> stream = Files.list(dir)) {
             assertEquals(List.of("animada [3].gif", "foto [1].png", "foto [2].jpg"),
-                    stream.map(p -> p.getFileName().toString()).sorted().toList(), "no .mp4 beside them");
+                    stream.map(PathParts::name).sorted().toList(), "no .mp4 beside them");
         }
     }
 }

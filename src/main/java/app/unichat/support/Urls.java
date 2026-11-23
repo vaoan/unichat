@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
@@ -19,6 +21,7 @@ public final class Urls {
     public static final String ADDRESS = "https?://(?:(?!\\]\\()[^\\s<>\"])+[^\\s<>\".,;:!?)\\]']";
 
     /** Whether {@code a} and {@code b} are the same page: host and path, whatever the query, fragment or a last slash. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "both hosts come from java.net.URI, ASCII only; it only tells whether two links are one page")
     public static boolean samePage(String a, String b) {
         try {
             java.net.URI x = java.net.URI.create(a), y = java.net.URI.create(b);

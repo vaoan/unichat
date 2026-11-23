@@ -1,7 +1,9 @@
 package app.unichat.cloak;
 
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -52,6 +54,7 @@ public final class CloakJob {
      */
     private long job;
 
+    @SuppressFBWarnings(value = "SING_SINGLETON_HAS_NONPRIVATE_CONSTRUCTOR", justification = "package-private for the tests, which each make their own")
     CloakJob(Runner runner) {
         this.runner = runner;
     }
@@ -70,7 +73,7 @@ public final class CloakJob {
      */
     public synchronized boolean start(Path in, Path out, CloakLevel level, Consumer<Path> onDone) {
         if (status.busy()) return false;
-        String name = in.getFileName().toString();
+        String name = PathParts.name(in);
         long id = ++job;
         set(new Status(Phase.INSTALLING, name, level, "cloak.install.checking", -1, System.currentTimeMillis(), null));
         worker = Thread.ofPlatform().daemon().name("cloak").start(() -> work(id, in, out, level, onDone, name));
@@ -146,8 +149,9 @@ public final class CloakJob {
     }
 
     /** Runs the script, reading its progress; killed when interrupted or silent too long. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the Python script uv installed, with our own paths (the picture's copy in our cache, absolute) as a list, no shell")
     static void run(List<String> command, Path out, DoubleConsumer progress) throws IOException, InterruptedException {
-        Files.createDirectories(out.getParent());
+        Files.createDirectories(PathParts.parent(out));
         Files.deleteIfExists(out);
         Processes.Result r = Processes.capture(new ProcessBuilder(command).redirectErrorStream(true),
                 Processes.Limit.whileTalking(SILENCE_SECONDS), null, line -> {

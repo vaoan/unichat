@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.cloud.SyncedPart.Action;
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -122,7 +123,7 @@ class SealedStorageTest {
             Path target = dir.resolve("target");
             assertThrows(IOException.class, () -> sealed.get(PATH, target));
             try (var files = Files.list(dir)) {
-                assertEquals(List.of(), files.filter(p -> p.getFileName().toString().startsWith("target") || p.getFileName().toString().startsWith(".target")).toList());
+                assertEquals(List.of(), files.filter(p -> PathParts.name(p).startsWith("target") || PathParts.name(p).startsWith(".target")).toList());
             }
             byte[] otherKey = VaultCrypto.randomKey();
             assertThrows(IOException.class, () -> new SealedStorage(new WebDav(cloud.url(), "u", "p"), () -> otherKey).get(PATH), "another key opens nothing");

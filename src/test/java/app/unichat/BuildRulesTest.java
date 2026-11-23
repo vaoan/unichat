@@ -130,7 +130,8 @@ class BuildRulesTest {
 
     @Test
     void noExecutionIsUnbound() {
-        for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin")) {
+        for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin",
+                "spotbugs-maven-plugin")) {
             Element executions = elements(plugin(plugin), "executions").stream().findFirst().orElse(null);
             if (executions == null) continue;
             for (Element e : elements(executions, "execution")) {
@@ -142,7 +143,8 @@ class BuildRulesTest {
     @Test
     void noProfileChangesTheChecks() {
         for (Element profile : elements(child(POM.getDocumentElement(), "profiles"), "profile")) {
-            for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin")) {
+            for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin",
+                    "spotbugs-maven-plugin", "findsecbugs-plugin", "spotbugs-exclude.xml")) {
                 assertFalse(profile.getTextContent().contains(plugin), text(profile, "id") + " leaves " + plugin + " as it is");
             }
         }
@@ -152,7 +154,9 @@ class BuildRulesTest {
     void noCheckIsSkipped() {
         assertEquals(0, POM.getElementsByTagName("skip").getLength(), "no <skip> anywhere in pom.xml");
         for (String property : List.of("enforcer.skip", "modernizer.skip", "maven.compiler.failOnWarning", "pmd.skip", "cpd.skip",
-                "pmd.failOnViolation", "pmd.failurePriority")) {
+                "pmd.failOnViolation", "pmd.failurePriority", "spotbugs.skip", "spotbugs.failOnError", "spotbugs.effort",
+                "spotbugs.threshold", "spotbugs.includeTests", "spotbugs.onlyAnalyze", "spotbugs.omitVisitors",
+                "spotbugs.maxAllowedViolations", "spotbugs.excludeFilterFile")) {
             assertEquals(0, POM.getElementsByTagName(property).getLength(), property + " isn't set in pom.xml");
         }
     }
@@ -191,6 +195,58 @@ class BuildRulesTest {
         for (int i = 0; i < properties.getLength(); i++) {
             String name = ((Element) properties.item(i)).getAttribute("name");
             assertFalse(name.startsWith("violationSuppress"), name + ": a suppression is one line's NOPMD, with its reason");
+        }
+    }
+
+    @Test
+    void spotBugsChecksMainAndTestCodeAtFullStrengthWithFindSecBugs() {
+        Element execution = execution("spotbugs-maven-plugin", "check");
+        assertTrue(BEFORE_INSTALL.contains(text(execution, "phase")), "SpotBugs runs in verify or before: " + text(execution, "phase"));
+        Element config = configuration("spotbugs-maven-plugin");
+        assertEquals("Max", text(config, "effort"), "every detector at its deepest");
+        assertEquals("Low", text(config, "threshold"), "every confidence is reported, the lowest included");
+        assertNotEquals("false", text(config, "failOnError"), "a finding fails the build");
+        assertEquals("true", text(config, "includeTests"), "the tests are checked too");
+        assertEquals("spotbugs-exclude.xml", text(config, "excludeFilterFile"), "only the project's filter leaves anything out");
+        Element findSecBugs = elements(child(config, "plugins"), "plugin").stream()
+                .filter(p -> "com.h3xstream.findsecbugs".equals(text(p, "groupId")) && "findsecbugs-plugin".equals(text(p, "artifactId")))
+                .findFirst().orElseThrow(() -> new AssertionError("FindSecBugs is one of SpotBugs' plugins"));
+        assertTrue(text(findSecBugs, "version").matches("\\d+\\.\\d+\\.\\d+"), "pinned: " + text(findSecBugs, "version"));
+        List<Element> configs = new ArrayList<>(List.of(config));
+        for (Element e : elements(child(plugin("spotbugs-maven-plugin"), "executions"), "execution")) configs.addAll(elements(e, "configuration"));
+        for (Element c : configs) {
+            for (String weaker : List.of("skip", "onlyAnalyze", "omitVisitors", "visitors", "includeFilterFile", "excludeBugsFile",
+                    "excludeBugsFiles", "maxRank", "failThreshold", "maxAllowedViolations", "skipEmptyReport")) {
+                assertTrue(elements(c, weaker).isEmpty(), "no <" + weaker + ">: it would leave code, detectors or findings out");
+            }
+        }
+        for (Element e : elements(child(plugin("spotbugs-maven-plugin"), "executions"), "execution")) {
+            for (Element c : elements(e, "configuration")) {
+                for (String set : List.of("effort", "threshold", "failOnError", "includeTests", "excludeFilterFile", "plugins")) {
+                    assertTrue(elements(c, set).isEmpty(), text(e, "id") + " sets <" + set + "> again: the plugin's own one is the rule");
+                }
+            }
+        }
+    }
+
+    @Test
+    void everySpotBugsPatternLeftOutSaysWhyAndIsAPatternNotAPlace() {
+        Element filter = read("spotbugs-exclude.xml").getDocumentElement();
+        List<Element> matches = elements(filter, "Match");
+        assertFalse(matches.isEmpty(), "the filter is read");
+        assertEquals(matches.size(), elements(filter, null).size(), "the filter holds only Match elements");
+        for (Element m : matches) {
+            List<Element> bugs = elements(m, "Bug");
+            String what = bugs.isEmpty() ? "a Match" : bugs.getFirst().getAttribute("pattern");
+            assertTrue(previous(m) instanceof Comment c && !c.getData().isBlank(), what + " is left out with its reason in a comment just before it");
+            assertEquals(1, bugs.size(), "each Match names its bug patterns: " + what);
+            Element bug = bugs.getFirst();
+            assertFalse(bug.getAttribute("pattern").isBlank(), "matched by pattern, never by a whole category or code");
+            assertTrue(bug.getAttribute("category").isEmpty() && bug.getAttribute("code").isEmpty(), "no category or code: " + what);
+            for (Element e : elements(m, null)) {
+                assertTrue(List.of("Bug", "Local").contains(e.getTagName()), "<" + e.getTagName() + "> in a Match: nothing is left out by"
+                        + " class, package, file, method or field, only by pattern (and a local's name)");
+            }
         }
     }
 

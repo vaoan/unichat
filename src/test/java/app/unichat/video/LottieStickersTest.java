@@ -1,5 +1,7 @@
 package app.unichat.video;
 
+import app.unichat.support.PathParts;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -158,7 +160,7 @@ public class LottieStickersTest { // NOPMD: JUnitJupiterTestShouldBePackagePriva
         assertTrue(text.contains("ANIM"), "animated");
         assertTrue(text.contains("ALPH") || (bytes[20] & 0x10) != 0, "with its transparency");
         try (var left = Files.list(dir)) {
-            assertTrue(left.noneMatch(f -> f.getFileName().toString().contains(".part")), "its frames gone");
+            assertTrue(left.noneMatch(f -> PathParts.name(f).contains(".part")), "its frames gone");
         }
     }
 

@@ -1,5 +1,6 @@
 package app.unichat.service;
 
+import app.unichat.support.PathParts;
 import app.unichat.support.SafeFile;
 
 import java.io.IOException;
@@ -90,7 +91,7 @@ final class PreferencesRecovery {
     private String copyBadFile() throws IOException {
         try (var copies = Files.newDirectoryStream(file.resolveSibling(""), file.getFileName() + ".bad-*")) {
             for (Path copy : copies) {
-                if (Files.isRegularFile(copy) && Files.mismatch(file, copy) == -1) return copy.getFileName().toString();
+                if (Files.isRegularFile(copy) && Files.mismatch(file, copy) == -1) return PathParts.name(copy);
             }
         }
         String name = freeAsideName();

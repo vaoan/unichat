@@ -9,6 +9,7 @@ import app.unichat.login.SessionCookies;
 import app.unichat.model.Network;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -236,6 +237,7 @@ public final class LoginWebView {
      * The window: shows {@code url}; every 1.5 s and after each page load asks {@code finish} whether the login
      * is done; a non-null answer closes the window and then runs it.
      */
+    @SuppressFBWarnings(value = {"LI_LAZY_INIT_STATIC", "THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"}, justification = "on the FX thread only: one sign-in window at a time; the failure is thrown again once the global cookie handler is put back")
     private static void openWindow(Window owner, Network network, String url, String userAgent,
                                    BiFunction<WebEngine, CookieManager, Runnable> finish, Runnable onCancel) {
         if (openStage != null) { // never swap the global handler twice

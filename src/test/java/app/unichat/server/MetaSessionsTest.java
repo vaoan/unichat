@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.sql.SQLException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,7 @@ class MetaSessionsTest {
 
     private Path db() { return dir.resolve("facebook/facebook.db"); }
 
+    @SuppressFBWarnings(value = "SQL_INJECTION_JDBC", justification = "builds or reads a fixture database with the test's own SQL")
     private void sql(String bridge, String statement) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve(bridge + "/" + bridge + ".db"));
              Statement s = c.createStatement()) {
@@ -65,11 +67,13 @@ class MetaSessionsTest {
         }
     }
 
+    @SuppressFBWarnings(value = "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE", justification = "builds or reads a fixture database with the test's own SQL")
     private void login(String id, String cookies) throws SQLException {
         sql("facebook", "INSERT INTO user_login (bridge_id, user_mxid, id, remote_name, metadata) VALUES ('b','@yo:localhost','" + id
                 + "','Yo','{\"platform\":\"facebook\",\"cookies\":" + cookies + ",\"wa_device_id\":7}')");
     }
 
+    @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
     private String metadata(String id) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db());
              Statement s = c.createStatement();
@@ -78,6 +82,7 @@ class MetaSessionsTest {
         }
     }
 
+    @SuppressFBWarnings(value = "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE", justification = "builds or reads a fixture database with the test's own SQL")
     private void wipe(String id) throws SQLException {
         sql("facebook", "UPDATE user_login SET metadata='{\"platform\":\"facebook\",\"cookies\":null,\"wa_device_id\":7}' WHERE id='" + id + "'");
     }

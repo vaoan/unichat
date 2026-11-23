@@ -1,9 +1,12 @@
 package app.unichat.video;
 
+import app.unichat.support.BoundedMap;
 import app.unichat.support.BundledTools;
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -119,6 +122,7 @@ public final class LottieStickers {
      * {@code lottie} as an animated WebP at {@code out}, its transparency kept. Blocking; an IOException without
      * LottieConverter or img2webp, or when it can't be made. {@code installProgress} is unused: nothing is downloaded.
      */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "lottieconverter on checked JSON under fixed names in its own folder, as a list, no shell")
     public static Path toWebp(Path lottie, Path out, DoubleConsumer installProgress) throws IOException, InterruptedException {
         Path tool = tool(), img2webp = AnimatedWebp.img2webp();
         if (tool == null) throw new IOException("lottieconverter isn't there");
@@ -133,10 +137,10 @@ public final class LottieStickers {
                     .directory(frames.toFile()), "lottieconverter", TIMEOUT_SECONDS);
             List<Path> pngs;
             try (var list = Files.list(frames)) {
-                pngs = list.filter(f -> f.getFileName().toString().endsWith(".png")).sorted().toList();
+                pngs = list.filter(f -> PathParts.name(f).endsWith(".png")).sorted().toList();
             }
             for (Path png : pngs.subList(0, Math.min(pngs.size(), AnimatedWebp.MAX_FRAMES))) {
-                writePam(ImageIO.read(png.toFile()), frames.resolve(png.getFileName().toString().replace(".png", ".pam")));
+                writePam(ImageIO.read(png.toFile()), frames.resolve(PathParts.name(png).replace(".png", ".pam")));
                 Files.delete(png);
             }
             return count -> 1000 / FPS;
@@ -151,12 +155,7 @@ public final class LottieStickers {
      */
     static final class Once {
         /** Each file's conversion, going or done (made or failed), the newest 500: a few hundred paths. */
-        private final java.util.Map<Path, java.util.concurrent.CompletableFuture<Path>> made = java.util.Collections.synchronizedMap(
-                new java.util.LinkedHashMap<>(16, 0.75f, true) {
-                    @Override protected boolean removeEldestEntry(java.util.Map.Entry<Path, java.util.concurrent.CompletableFuture<Path>> e) {
-                        return size() > 500;
-                    }
-                });
+        private final java.util.Map<Path, java.util.concurrent.CompletableFuture<Path>> made = java.util.Collections.synchronizedMap(BoundedMap.byUse(500));
 
         Path of(Path file, java.util.concurrent.Callable<Path> make) throws IOException, InterruptedException {
             java.util.concurrent.CompletableFuture<Path> mine = new java.util.concurrent.CompletableFuture<>();

@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.support.Threads;
 import app.unichat.support.Os;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +38,7 @@ public final class Speaker {
         return List.of("sh", "-c", "if command -v spd-say >/dev/null; then spd-say -e; else espeak --stdin; fi");
     }
 
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a fixed command (say, spd-say or espeak); the text goes on stdin, never in an argument")
     private static void speakNow(String text) {
         try {
             Process p = new ProcessBuilder(command()).redirectErrorStream(true)

@@ -1,6 +1,7 @@
 package app.unichat.autosave;
 
 import app.unichat.support.Hashes;
+import app.unichat.support.PathParts;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -119,12 +120,12 @@ final class TextLog {
         if (!Files.isDirectory(dir)) return out;
         List<Path> folders;
         try (Stream<Path> s = Files.list(dir)) {
-            folders = s.filter(Files::isDirectory).filter(f -> !ownOnly || f.getFileName().toString().equals(HERE)).toList();
+            folders = s.filter(Files::isDirectory).filter(f -> !ownOnly || PathParts.name(f).equals(HERE)).toList();
         }
         for (Path folder : folders) {
             List<Path> files;
             try (Stream<Path> s = Files.list(folder)) {
-                files = s.filter(f -> f.getFileName().toString().startsWith(key + " ") && f.getFileName().toString().endsWith(".jsonl")).toList();
+                files = s.filter(f -> PathParts.name(f).startsWith(key + " ") && PathParts.name(f).endsWith(".jsonl")).toList();
             }
             for (Path f : files) {
                 for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {

@@ -1,6 +1,7 @@
 package app.unichat.ui.desktop;
 
 import app.unichat.ui.Formats;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.awt.CheckboxMenuItem;
 import java.awt.EventQueue;
 import java.awt.MenuItem;
@@ -43,6 +44,7 @@ public final class NativeBar {
      * {@code onOpenChat} gets the chat id of a clicked notification, {@code onShow} runs on a left click of the icon
      * or the global shortcut (any thread).
      */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "our own menu-bar helper from the app's folder, no arguments")
     static NativeBar start(Path helper, PopupMenu menu, Runnable onExit, java.util.function.Consumer<String> onOpenChat, Runnable onShow) {
         if (helper == null || !Files.isExecutable(helper)) return null;
         try {

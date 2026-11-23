@@ -56,7 +56,6 @@ final class MatrixRoom {
     boolean directInvite;
     boolean invite;
     boolean markedUnreadStable;
-    Instant created;
     Instant invitedAt;
     String inviter;
     String prevBatch;

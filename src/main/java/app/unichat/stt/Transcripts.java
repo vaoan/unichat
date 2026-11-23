@@ -66,8 +66,8 @@ public final class Transcripts {
         if (!Files.isRegularFile(f)) return null;
         try {
             State done = new Done(Files.readString(f, StandardCharsets.UTF_8));
-            states.putIfAbsent(mediaUrl, done);
-            return done;
+            State was = states.putIfAbsent(mediaUrl, done);
+            return was == null ? done : was;
         } catch (IOException e) {
             return null;
         }

@@ -1,5 +1,7 @@
 package app.unichat.claude;
 
+import app.unichat.support.PathParts;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -38,6 +40,7 @@ class LessonsTest {
             Map.entry("fx-coalesce-by-hand", new String[] {"src/main/java/app/unichat/ui/X.java",
                     "        if (scheduled.compareAndSet(false, true)) Platform.runLater(() -> {"}),
             Map.entry("script-spanish", new String[] {"native/x.sh", "  echo \"Descargando $asset $tag...\""}),
+            Map.entry("bounded-map", new String[] {"src/main/java/X.java", "        @Override protected boolean removeEldestEntry(Map.Entry<K, V> e) {"}),
             Map.entry("atomic-move",new String[] {"src/main/java/X.java", "        Files.move(tmp, file, REPLACE_EXISTING, ATOMIC_MOVE);"}));
 
     @Test
@@ -68,7 +71,7 @@ class LessonsTest {
             String[] example = CAUGHT.get(l.id());
             assertNotNull(example, "Lesson " + l.id() + " needs an example in LessonsTest.CAUGHT");
             Path file = root.resolve(example[0]);
-            Files.createDirectories(file.getParent());
+            Files.createDirectories(PathParts.parent(file));
             Files.writeString(file, "first line\n" + example[1] + "\n");
             var found = lessons.check(file);
             assertEquals(1, found.size(), l.id() + " should catch: " + example[1]);

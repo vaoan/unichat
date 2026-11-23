@@ -3,6 +3,7 @@ package app.unichat.settings;
 import app.unichat.support.BackgroundWriter;
 import app.unichat.support.Os;
 import app.unichat.support.SafeFile;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -46,6 +47,7 @@ public final class Settings {
     /** set() runs on the UI thread, and every reader needs this lock: the files are written and synced off both. */
     private final BackgroundWriter writer = new BackgroundWriter("settings-save", this, this::writeOnce);
 
+    @SuppressFBWarnings(value = "SING_SINGLETON_HAS_NONPRIVATE_CONSTRUCTOR", justification = "package-private for the tests, which each make their own over a folder")
     Settings(Path dir) {
         this.dir = dir;
         this.file = dir.resolve("settings.properties");

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Bug patterns SpotBugs and FindSecBugs leave out: only what is noise for this codebase, each with its reason in a
+     comment just before its Match (BuildRulesTest wants it). Matched by pattern, never by class, package or file. A
+     finding kept on purpose anywhere else is one member's @SuppressFBWarnings with its justification. -->
+<FindBugsFilter xmlns="https://github.com/spotbugs/filter/3.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/4.10.5/spotbugs/etc/findbugsfilter.xsd">
+  <!-- A method that declares "throws Exception": PMD's SignatureDeclareThrowsException owns it (pmd-rules.xml), with a
+       NOPMD and its reason on each callback interface that passes on what it runs; this one also flags every JUnit test. -->
+  <Match><Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION"/></Match>
+  <!-- A store to an unnamed variable, "var _ = executor.submit(...)" (Java 22): how Error Prone's
+       FutureReturnValueIgnored is answered. It has no name in the class file ("?"); a dead store to a named local still fails. -->
+  <Match><Bug pattern="DLS_DEAD_LOCAL_STORE"/><Local name="?"/></Match>
+  <!-- An object kept or handed out by reference: a defence against hostile code inside the same JVM. A desktop app runs
+       only its own code; services, nodes, singletons and records are shared by reference by design. -->
+  <Match><Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2,MS_EXPOSE_REP,EI_EXPOSE_STATIC_REP2"/></Match>
+  <!-- A lock other code can reach (a synchronized method of a public class, a lock object handed out): the same defence
+       against hostile code in the JVM, CERT's LCK00-J. Only Unichat's own code holds its locks. -->
+  <Match><Bug pattern="USO_UNSAFE_METHOD_SYNCHRONIZATION,USO_UNSAFE_STATIC_METHOD_SYNCHRONIZATION,USO_UNSAFE_OBJECT_SYNCHRONIZATION,USO_UNSAFE_INHERITABLE_OBJECT_SYNCHRONIZATION,USO_UNSAFE_ACCESSIBLE_OBJECT_SYNCHRONIZATION"/></Match>
+  <!-- A primitive field written without a lock in a class that has any volatile field: the detector takes the volatile
+       as proof the class is shared. Here those fields belong to one thread (the FX thread, AWT's, a cloud round's, the
+       Windows message loop's), or are model objects handed to the UI through Platform.runLater, which orders them. -->
+  <Match><Bug pattern="AT_STALE_THREAD_WRITE_OF_PRIMITIVE,AT_NONATOMIC_64BIT_PRIMITIVE"/></Match>
+  <!-- catch (Exception e) where nothing checked is thrown: the catch-alls at thread, UI and process boundaries on
+       purpose, as PMD's AvoidCatchingGenericException and Error Prone's CatchingUnchecked (both left off). -->
+  <Match><Bug pattern="REC_CATCH_EXCEPTION"/></Match>
+  <!-- An exception caught and dropped: best-effort calls whose failure changes nothing (leaving a room, forgetting it,
+       a typing notice, a picture that won't decode, a browser that won't open). PMD's EmptyCatchBlock already makes
+       each empty one say why. -->
+  <Match><Bug pattern="DE_MIGHT_IGNORE"/></Match>
+  <!-- A byte[] method returning null: null means "none" (no key, no file, not found), which callers test; an empty
+       array would be a real, empty value. Nullness is NullAway's (Task 7), as PMD's ReturnEmptyCollectionRatherThanNull. -->
+  <Match><Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/></Match>
+  <!-- "\n" in a format string: what is formatted are files and protocols (TOML, YAML, HTML, JavaScript, Matrix sync
+       JSON in tests) that want "\n" on every system; %n would write "\r\n" on Windows. -->
+  <Match><Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/></Match>
+  <!-- A static field set from an instance method: the test seams tests set in @BeforeEach and put back in @AfterEach,
+       and one setting a viewer remembers for the next (VideoControls.lastRate, FX thread), as Error Prone's
+       NonFinalStaticField (left off). -->
+  <Match><Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/></Match>
+  <!-- An absolute path in the code: where programs are installed (/Applications, /opt/homebrew, /usr/local) for the app
+       to look for them, and the fixed paths tests pass in as input. -->
+  <Match><Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME"/></Match>
+  <!-- A field the constructor leaves null and a method uses: a JUnit field set in @BeforeEach, or a JavaFX window
+       built in start(). The two in main code (ProfileMedia.audio, MessageActionsUi.fixer) are optional and tested for null
+       before the lambda that uses them; the detector doesn't follow the test into the lambda. -->
+  <Match><Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"/></Match>
+</FindBugsFilter>

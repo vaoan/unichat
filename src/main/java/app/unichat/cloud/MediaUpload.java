@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -84,7 +85,7 @@ final class MediaUpload {
         int sent = 0, index = 0;
         for (Map.Entry<String, Path> e : due.entrySet()) {
             if (!mayGoOn.getAsBoolean()) break;
-            progress.uploading(index++, due.size(), e.getValue().getFileName().toString());
+            progress.uploading(index++, due.size(), PathParts.name(e.getValue()));
             try {
                 if (settle(dav, e.getKey(), e.getValue(), progress)) sent++;
                 remember(e.getKey());
@@ -115,7 +116,7 @@ final class MediaUpload {
         int repaired = 0, index = 0;
         for (Map.Entry<String, Path> e : here.entrySet()) {
             if (!mayGoOn.getAsBoolean()) return repaired;
-            progress.uploading(index++, here.size(), e.getValue().getFileName().toString());
+            progress.uploading(index++, here.size(), PathParts.name(e.getValue()));
             try {
                 if (settle(dav, e.getKey(), e.getValue(), progress)) repaired++;
             } catch (IOException ex) {
@@ -205,7 +206,7 @@ final class MediaUpload {
         List<Path> out = new java.util.ArrayList<>();
         try (DirectoryStream<Path> in = Files.newDirectoryStream(folder)) {
             for (Path p : in) {
-                String name = p.getFileName().toString();
+                String name = PathParts.name(p);
                 if (!Files.isRegularFile(p) || name.startsWith(".") || name.endsWith(".part") || name.endsWith(".ytdl") || made.test(p)) continue;
                 if (!done.contains(key(folder, p))) out.add(p);
             }
@@ -222,7 +223,7 @@ final class MediaUpload {
 
     private void remember(String entry) throws IOException {
         if (!done.add(entry)) return;
-        Files.createDirectories(record.getParent());
+        Files.createDirectories(PathParts.parent(record));
         Files.writeString(record, entry + "\n", StandardCharsets.UTF_8,
                 java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
     }

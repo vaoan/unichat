@@ -7,6 +7,7 @@ import app.unichat.support.Os;
 import app.unichat.support.Processes;
 import app.unichat.settings.Settings;
 import app.unichat.video.Ffmpeg;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -119,6 +120,7 @@ public final class Transcriber {
      * Runs {@code cmd}; stdout on success, the last error line otherwise. Out of time or its thread interrupted (the
      * note's transcript no longer wanted), it's stopped with its children.
      */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "whisper or ffmpeg with our own paths and the file through Ffmpeg.input, as a list, no shell")
     static String run(List<String> cmd, Path work) throws IOException, InterruptedException {
         Path err = work.resolve("stderr.txt");
         Processes.Result r;

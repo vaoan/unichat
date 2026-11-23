@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.support.PathParts;
 import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -95,7 +96,7 @@ final class TextSync {
         if (!Files.isDirectory(own)) return;
         Map<String, Path> files = new java.util.TreeMap<>();
         try (Stream<Path> s = Files.list(own)) {
-            s.filter(p -> FILE.matcher(p.getFileName().toString()).matches()).forEach(p -> files.put(p.getFileName().toString(), p));
+            s.filter(p -> FILE.matcher(PathParts.name(p)).matches()).forEach(p -> files.put(PathParts.name(p), p));
         }
         String folder = ROOT + "/" + machine;
         boolean made = false;

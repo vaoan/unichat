@@ -147,8 +147,9 @@ class VaultNamesTest {
         assertEquals(made.info().id(), Vault.info(dav()).id());
         assertEquals(java.util.Set.of(DESK, LAPTOP), Vault.computers(dav()).keySet(), "every way in moved");
         assertEquals(2, Vault.slots(dav()).size() - 1, "and the recovery code's");
-        for (String p : before.keySet()) {
-            if (!p.startsWith(CloudNames.OLD_VAULT)) assertArrayEquals(before.get(p), cloud.files.get(p), "outside the vault, nothing changed: " + p);
+        for (Map.Entry<String, byte[]> e : before.entrySet()) {
+            String p = e.getKey();
+            if (!p.startsWith(CloudNames.OLD_VAULT)) assertArrayEquals(e.getValue(), cloud.files.get(p), "outside the vault, nothing changed: " + p);
         }
 
         Map<String, byte[]> moved = new HashMap<>(cloud.files);

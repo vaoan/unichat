@@ -3,6 +3,7 @@ package app.unichat.matrix;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -90,6 +91,7 @@ final class ForwardedContent {
     }
 
     /** Every form a bridge reads as a person: matrix:u/…, and matrix.to (any scheme or subdomain) whose #/ is a user. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "lowercasing only widens what counts as a person (unwrapped, the safe side); the host comes from java.net.URI, ASCII only (a non-ASCII host reads as none)")
     private static boolean isPerson(String href) {
         String h = href.strip().toLowerCase(java.util.Locale.ROOT);
         if (h.startsWith("matrix:")) return h.startsWith("matrix:u/");

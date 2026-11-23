@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import java.sql.SQLException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -27,6 +28,7 @@ class AccountCheckTest {
     private int dbs;
 
     /** A new database each call. */
+    @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
     private Path db(String... sql) throws SQLException {
         Path db = dir.resolve("bridge" + dbs++ + ".db");
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db); Statement s = c.createStatement()) {

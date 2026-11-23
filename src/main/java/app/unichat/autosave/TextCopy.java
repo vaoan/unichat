@@ -2,6 +2,7 @@ package app.unichat.autosave;
 
 import app.unichat.model.Chat;
 import app.unichat.support.Lines;
+import app.unichat.support.PathParts;
 import app.unichat.support.SafeFile;
 
 import java.io.IOException;
@@ -33,7 +34,7 @@ final class TextCopy {
 
     /** Whether {@code file} is a copy this makes: the cloud has its source, so it doesn't go up as media. */
     static boolean isCopy(Path file) {
-        return file.getFileName().toString().matches("Chat \\([^()/\\\\]+\\) [0-9a-f]{12}\\.txt");
+        return PathParts.name(file).matches("Chat \\([^()/\\\\]+\\) [0-9a-f]{12}\\.txt");
     }
 
     /** Writes it whole, in place of the one before. */

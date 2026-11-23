@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import com.sun.net.httpserver.HttpServer;
 import java.security.NoSuchAlgorithmException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ class BinaryStoreTest {
     private HttpServer server;
     private final AtomicInteger downloads = new AtomicInteger();
     /** What the fake release serves as the binary, and the sum its own sha256sums.txt gives for it. */
+    @SuppressFBWarnings(value = "VO_VOLATILE_REFERENCE_TO_ARRAY", justification = "the array is replaced whole, never changed: the volatile hands the new one to the fake server's thread")
     private volatile byte[] served = BINARY;
     private volatile String publishedSum;
     /** The SHA-256 the app ships pinned for the asset (null: not pinned). */

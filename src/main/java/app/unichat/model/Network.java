@@ -1,5 +1,7 @@
 package app.unichat.model;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.util.Locale;
 
 /**
@@ -47,6 +49,7 @@ public enum Network {
     /** Initial letter shown in the small network badge. */
     public String badgeLetter() { return displayName.substring(0, 1).toUpperCase(Locale.ROOT); }
 
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a bridge's protocol id, looked up among ours (ASCII): a look-alike finds no network")
     public static Network fromProtocolId(String id) {
         if (id == null) return null;
         String p = id.toLowerCase(Locale.ROOT);

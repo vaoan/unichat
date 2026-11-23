@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Hyperlink;
@@ -38,6 +39,7 @@ public abstract class TaskBar extends HBox {
 
     /** {@code kind}: the bar's own style class. */
     @SuppressWarnings("this-escape") // a JavaFX node styles and fills itself as it's built; the bars only add to it
+    @SuppressFBWarnings(value = "MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR", justification = "how a JavaFX pane is filled (as its NOPMD says)")
     protected TaskBar(String kind) {
         super(10);
         getStyleClass().addAll("audio-bar", "task-bar", kind);
