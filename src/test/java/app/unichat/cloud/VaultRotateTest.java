@@ -533,7 +533,7 @@ class VaultRotateTest {
         new SealedStorage(dav(), () -> made.vk().clone()).put(logical, "viejo".getBytes(StandardCharsets.UTF_8));
         byte[] newVk = VaultCrypto.randomKey(), sentMeanwhile = VaultCrypto.seal(newVk, logical, "nuevo".getBytes(StandardCharsets.UTF_8));
         Storage racing = (Storage) java.lang.reflect.Proxy.newProxyInstance(
-            Storage.class.getClassLoader(), new Class<?>[] {Storage.class}, (proxy, m, args) -> {
+            Storage.class.getClassLoader(), new Class<?>[] {Storage.class}, (proxy, m, args) -> { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                 Object out = m.invoke(dav(), args);
                 // Another computer sends its copy right after this one was read.
                 if (m.getName().equals("get") && stored.equals(args[0])) cloud.put(stored, sentMeanwhile);

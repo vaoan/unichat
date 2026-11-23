@@ -68,7 +68,7 @@ class FavoritesRebuildUiTest {
         java.util.concurrent.atomic.AtomicInteger asked = new java.util.concurrent.atomic.AtomicInteger();
         MockChatService mock = new MockChatService();
         ChatService svc = (ChatService) java.lang.reflect.Proxy.newProxyInstance(
-                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) {
+                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                     case "freshStickerPack" -> {
                         asked.incrementAndGet();
                         yield CompletableFuture.failedFuture(new IllegalStateException("the bridge isn't ready"));
@@ -99,7 +99,7 @@ class FavoritesRebuildUiTest {
         MockChatService mock = new MockChatService();
         Chat chat = mock.chats().stream().filter(c -> c.features().accepts(RoomFeatures.STICKER)).findFirst().orElseThrow();
         ChatService svc = (ChatService) java.lang.reflect.Proxy.newProxyInstance(
-                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) {
+                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                     case "freshStickerPack" -> CompletableFuture.completedFuture(new StickerPack("Flux", SET, List.of(now)));
                     case "stickerPacks" -> CompletableFuture.completedFuture(List.of());
                     default -> m.invoke(mock, args);

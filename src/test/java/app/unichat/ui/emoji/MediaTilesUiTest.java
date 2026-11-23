@@ -67,7 +67,7 @@ class MediaTilesUiTest {
         library.toggleFavorite(sticker("dos"));
         MockChatService mock = new MockChatService();
         app.unichat.service.ChatService svc = (app.unichat.service.ChatService) java.lang.reflect.Proxy.newProxyInstance(
-                getClass().getClassLoader(), new Class<?>[]{app.unichat.service.ChatService.class}, (p, m, args) -> {
+                getClass().getClassLoader(), new Class<?>[]{app.unichat.service.ChatService.class}, (p, m, args) -> { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                     if (m.getName().equals("media")) asked.incrementAndGet();
                     return m.invoke(mock, args);
                 });

@@ -71,7 +71,7 @@ final class Recovery {
     static void uncaught(Thread t, Throwable e, java.util.function.Consumer<String> restart) {
         try {
             System.err.println("Uncaught in " + t.getName() + ": " + e);
-            e.printStackTrace();
+            e.printStackTrace(System.err); // the log (AppLog): what printStackTrace() wrote to as well
         } catch (Throwable unsaid) {
             // Out of memory, saying it can run out too: the restart mustn't depend on it.
         }

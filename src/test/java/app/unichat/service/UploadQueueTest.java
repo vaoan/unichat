@@ -27,7 +27,7 @@ class UploadQueueTest {
         final List<DoubleConsumer> progress = new ArrayList<>();
 
         ChatMessaging messaging() {
-            return (ChatMessaging) java.lang.reflect.Proxy.newProxyInstance(ChatMessaging.class.getClassLoader(),
+            return (ChatMessaging) java.lang.reflect.Proxy.newProxyInstance(ChatMessaging.class.getClassLoader(), // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                     new Class<?>[]{ChatMessaging.class}, (proxy, method, args) -> {
                         if (method.getDeclaringClass() == Object.class) {
                             return switch (method.getName()) {

@@ -92,7 +92,7 @@ class StickerSearchUiTest {
         MockChatService mock = new MockChatService();
         Chat chat = mock.chats().stream().filter(c -> c.features().accepts(RoomFeatures.STICKER)).findFirst().orElseThrow();
         ChatService svc = (ChatService) java.lang.reflect.Proxy.newProxyInstance(
-                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) {
+                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                     case "stickerPacks" -> CompletableFuture.completedFuture(List.of(
                             new StickerPack.Ref("Gatitos felices", GATITOS), new StickerPack.Ref("Perros", PERROS)));
                     case "stickerPack" -> {

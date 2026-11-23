@@ -68,7 +68,7 @@ public final class Seen {
             l.accept(now);
         } catch (RuntimeException e) {
             System.err.println("Seen listener failed: " + e);
-            e.printStackTrace();
+            e.printStackTrace(System.err); // the log (AppLog): what printStackTrace() wrote to as well
         }
     }
 }

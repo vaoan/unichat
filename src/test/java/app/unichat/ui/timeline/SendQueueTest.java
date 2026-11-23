@@ -336,7 +336,7 @@ class SendQueueTest {
     private static java.lang.ref.WeakReference<app.unichat.service.ChatService> queuedThenDropped() {
         // A bare service: nothing else in the run holds one (a demo service is held by its own timers).
         app.unichat.service.ChatService bare = (app.unichat.service.ChatService) java.lang.reflect.Proxy.newProxyInstance(
-                SendQueueTest.class.getClassLoader(), new Class<?>[] {app.unichat.service.ChatService.class},
+                SendQueueTest.class.getClassLoader(), new Class<?>[] {app.unichat.service.ChatService.class}, // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                 (proxy, method, args) -> method.getName().equals("hashCode") ? System.identityHashCode(proxy)
                         : method.getName().equals("equals") ? proxy == args[0] : null);
         SendQueue.of(bare).addListener(() -> { var _ = bare; }); // a window listening holds the service it shows

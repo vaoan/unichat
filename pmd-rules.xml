@@ -24,8 +24,6 @@
     <exclude name="LiteralsFirstInComparisons"/>
     <!-- stdout and stderr are the log (AppLog writes them to unichat.log), as Error Prone's SystemOut (off). -->
     <exclude name="SystemPrintln"/>
-    <!-- e.printStackTrace() writes to stderr, which is the log, as SystemPrintln. -->
-    <exclude name="AvoidPrintStackTrace"/>
     <!-- Turns byte[] and String[] parameters into varargs: only changes how a caller may write the call. -->
     <exclude name="UseVarargs"/>
   </rule>
@@ -175,8 +173,6 @@
     <exclude name="AvoidLiteralsInIfCondition"/>
     <!-- JavaFX code compares nodes, windows and sentinels by identity on purpose, as Error Prone's ReferenceEquality. -->
     <exclude name="CompareObjectsWithEquals"/>
-    <!-- A J2EE rule: a desktop app has one class loader; tests' proxies use their interface's, as they should. -->
-    <exclude name="UseProperClassLoader"/>
     <!-- Catch-alls at thread and UI boundaries are on purpose (207), as Error Prone's CatchingUnchecked (off). -->
     <exclude name="AvoidCatchingGenericException"/>
   </rule>

@@ -81,7 +81,7 @@ class CloakBarUiTest {
     /** A job whose protection reports 37 % and then waits to be cancelled; installing is instant. */
     private static CloakJob runningJob() throws ClassNotFoundException, InstantiationException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
         Class<?> runner = Class.forName("app.unichat.cloak.CloakJob$Runner");
-        Object fake = Proxy.newProxyInstance(runner.getClassLoader(), new Class<?>[] {runner}, (p, m, args) -> {
+        Object fake = Proxy.newProxyInstance(runner.getClassLoader(), new Class<?>[] {runner}, (p, m, args) -> { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
             if (m.getName().equals("protect")) {
                 ((DoubleConsumer) args[3]).accept(0.37);
                 new CountDownLatch(1).await(); // until cancelled (interrupted)
