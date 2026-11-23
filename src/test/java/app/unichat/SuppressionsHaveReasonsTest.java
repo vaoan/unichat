@@ -22,8 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SuppressionsHaveReasonsTest {
     // Built from parts, so this file's own text doesn't match them.
     private static final String NOPMD = "NO" + "PMD";
-    private static final Pattern WARNINGS = Pattern.compile("@" + "SuppressWarnings\\s*\\(");
-    private static final Pattern FB_WARNINGS = Pattern.compile("@" + "SuppressFBWarnings\\s*\\(([^)]*)\\)");
+    private static final Pattern WARNINGS = Pattern.compile("@\\s*(?:java\\.lang\\.)?" + "SuppressWarnings\\s*\\(");
+    private static final Pattern FB_WARNINGS = Pattern.compile("@\\s*(?:[\\w.]+\\.)?" + "SuppressFBWarnings\\b");
     private static final Pattern JUSTIFIED = Pattern.compile("justification\\s*=\\s*\"[^\"]*\\S[^\"]*\"");
 
     @Test
@@ -53,6 +53,19 @@ class SuppressionsHaveReasonsTest {
     }
 
     @Test
+    void theWaysAroundItAreFoundToo() {
+        assertEquals(1, unexplained("A.java", "/* a */ int a = 1; // " + NOPMD + "\n").size(), "code after a closed /* */");
+        assertEquals(1, unexplained("A.java", "@java.lang." + "SuppressWarnings(\"x\")\n").size(), "qualified");
+        assertEquals(1, unexplained("A.java", "@" + "SuppressFBWarnings\nvoid f() {}\n").size(), "SpotBugs' with no arguments");
+        assertEquals(1, unexplained("A.java", "@" + "SuppressWarnings({\"PMD.A\", // why\n    \"PMD.B\"})\n").size(),
+                "a list over lines: the reason goes on the line it closes");
+        assertEquals(1, unexplained("A.java", "@" + "SuppressWarnings(\"PMD\") // why\n").size(), "every PMD rule at once");
+        assertEquals(1, unexplained("A.java", "@" + "SuppressWarnings({\"all\"}) // why\n").size(), "every warning at once");
+        assertEquals(1, unexplained("A.java", "String s = \"\"\"\n  text\n  \"\"\"; @" + "SuppressWarnings(\"x\") int b;\n").size(),
+                "after a text block");
+    }
+
+    @Test
     void aSuppressionWithItsReasonPasses() {
         assertEquals(List.of(), unexplained("A.java", "int a = 1; // " + NOPMD + ": UnusedAssignment, read by the listener\n"));
         assertEquals(List.of(), unexplained("A.java", "@" + "SuppressWarnings(\"unchecked\") // the map holds only lists\n"));
@@ -60,46 +73,119 @@ class SuppressionsHaveReasonsTest {
         assertEquals(List.of(), unexplained("A.java", "@" + "SuppressFBWarnings(value = \"X\", justification = \"why\")\n"));
         assertTrue(unexplained("A.java", "/** Use @" + "SuppressWarnings with care. */\n").isEmpty(),
                 "a word in a comment isn't an annotation");
+        assertTrue(unexplained("A.java", "/*\n * Not here: // " + NOPMD + "\n * @" + "SuppressFBWarnings\n */\n").isEmpty(),
+                "nor inside a block comment over lines");
+        assertTrue(unexplained("A.java", "String s = \"// " + NOPMD + " @" + "SuppressWarnings(x)\";\n").isEmpty(), "nor in a string");
+        assertEquals(List.of(), unexplained("A.java", "@" + "SuppressWarnings({\"PMD.A\",\n    \"PMD.B\"}) // why, for both\n"));
     }
 
-    /** The suppressions in {@code text} (file {@code name}) that don't say why, as "name:line: the line". */
+    /**
+     * The suppressions in {@code text} (file {@code name}) that don't say why, as "name:line: the line". A NOPMD is read
+     * in a line comment only; an annotation (qualified or not) in code only, never in a comment or a string. A
+     * {@code @SuppressWarnings} that spans lines has its reason on the line it closes; one naming "PMD" or "all"
+     * (every rule at once) never passes.
+     */
     static List<String> unexplained(String name, String text) {
-        List<String> out = new ArrayList<>();
+        String kinds = kinds(text);
+        StringBuilder blanked = new StringBuilder(text);
+        for (int k = 0; k < text.length(); k++) if (kinds.charAt(k) != CODE && text.charAt(k) != '\n') blanked.setCharAt(k, ' ');
+        String code = blanked.toString();
         String[] lines = text.split("\n", -1);
+        List<String> out = new ArrayList<>();
         for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-            String t = line.stripLeading();
-            if (t.startsWith("*") || t.startsWith("/*")) continue; // a block comment: no suppression there
-            String code = code(line);
-            String comment = line.substring(code.length());
-            boolean pmd = comment.contains(NOPMD) && !comment.matches(".*" + NOPMD + ":\\s*\\S.*");
-            boolean warnings = WARNINGS.matcher(code).find() && !comment.matches("//\\s*\\S.*");
-            boolean bad = pmd || warnings;
-            if (bad) out.add(name + ":" + (i + 1) + ": " + line.strip());
+            String comment = lineComment(text, kinds, i);
+            if (comment.contains(NOPMD) && !comment.matches(".*" + NOPMD + ":\\s*\\S.*")) out.add(at(name, lines, i));
         }
-        Matcher fb = FB_WARNINGS.matcher(text);
-        while (fb.find()) {
-            if (!JUSTIFIED.matcher(fb.group(1)).find()) {
-                out.add(name + ":" + text.substring(0, fb.start()).split("\n", -1).length + ": " + fb.group());
+        Matcher w = WARNINGS.matcher(code);
+        while (w.find()) {
+            int close = closing(code, w.end() - 1);
+            String args = text.substring(w.end(), close);
+            boolean blanket = args.matches("(?s).*\"\\s*(PMD|all)\\s*\".*");
+            if (blanket || !lineComment(text, kinds, lineOf(text, close)).matches("//\\s*\\S.*")) {
+                out.add(at(name, lines, lineOf(text, w.start())));
             }
+        }
+        Matcher fb = FB_WARNINGS.matcher(code);
+        while (fb.find()) {
+            int open = skipBlanks(code, fb.end());
+            String inside = open < code.length() && code.charAt(open) == '(' ? text.substring(open, closing(code, open) + 1) : "";
+            if (!JUSTIFIED.matcher(inside).find()) out.add(at(name, lines, lineOf(text, fb.start())));
         }
         return out;
     }
 
-    /** {@code line} up to its {@code //} comment (strings and chars skipped); the whole line when it has none. */
-    private static String code(String line) {
-        char quote = 0;
-        for (int i = 0; i < line.length(); i++) {
-            char c = line.charAt(i);
-            if (quote != 0) {
-                if (c == '\\') i++;
-                else if (c == quote) quote = 0;
-            } else if (c == '"' || c == '\'') {
-                quote = c;
-            } else if (c == '/' && i + 1 < line.length() && line.charAt(i + 1) == '/') {
-                return line.substring(0, i);
+    private static final char CODE = 'c', TEXT = 's', BLOCK = 'b', LINE = 'l';
+
+    /** For each character of {@code text}: code, inside a string, char or text block, or in a block or line comment. */
+    private static String kinds(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        int i = 0;
+        while (i < text.length()) {
+            int end;
+            char kind;
+            if (text.startsWith("/*", i)) {
+                end = text.indexOf("*/", i + 2) < 0 ? text.length() : text.indexOf("*/", i + 2) + 2;
+                kind = BLOCK;
+            } else if (text.startsWith("//", i)) {
+                end = text.indexOf('\n', i) < 0 ? text.length() : text.indexOf('\n', i);
+                kind = LINE;
+            } else if (text.startsWith("\"\"\"", i)) {
+                end = text.indexOf("\"\"\"", i + 3) < 0 ? text.length() : text.indexOf("\"\"\"", i + 3) + 3;
+                kind = TEXT;
+            } else if (text.charAt(i) == '"' || text.charAt(i) == '\'') {
+                end = quoted(text, i);
+                kind = TEXT;
+            } else {
+                end = i + 1;
+                kind = CODE;
             }
+            for (int k = i; k < end; k++) out.append(kind);
+            i = end;
         }
-        return line;
+        return out.toString();
+    }
+
+    /** Where the string or char starting at {@code i} ends: just past its closing quote, or at the line's end. */
+    private static int quoted(String text, int i) {
+        char q = text.charAt(i);
+        for (int k = i + 1; k < text.length(); k++) {
+            if (text.charAt(k) == '\\') k++;
+            else if (text.charAt(k) == q) return k + 1;
+            else if (text.charAt(k) == '\n') return k;
+        }
+        return text.length();
+    }
+
+    /** Line {@code line}'s {@code //} comment, or "" when it has none. */
+    private static String lineComment(String text, String kinds, int line) {
+        int start = 0;
+        for (int n = 0; n < line; n++) start = text.indexOf('\n', start) + 1;
+        int end = text.indexOf('\n', start) < 0 ? text.length() : text.indexOf('\n', start);
+        int at = kinds.indexOf(LINE, start);
+        return at < 0 || at >= end ? "" : text.substring(at, end);
+    }
+
+    /** The parenthesis that closes the one at {@code open} in code. */
+    private static int closing(String code, int open) {
+        int depth = 0;
+        for (int k = open; k < code.length(); k++) {
+            if (code.charAt(k) == '(') depth++;
+            else if (code.charAt(k) == ')' && --depth == 0) return k;
+        }
+        return code.length() - 1;
+    }
+
+    private static int skipBlanks(String code, int from) {
+        int k = from;
+        while (k < code.length() && Character.isWhitespace(code.charAt(k))) k++;
+        return k;
+    }
+
+    private static int lineOf(String text, int index) {
+        return (int) text.substring(0, Math.min(index, text.length())).chars().filter(c -> c == '\n').count();
+    }
+
+    private static String at(String name, String[] lines, int i) {
+        return name + ":" + (i + 1) + ": " + lines[i].strip();
     }
 }
