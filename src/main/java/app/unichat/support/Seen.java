@@ -9,8 +9,10 @@ import java.util.function.Consumer;
  * away (locked, or the display asleep). Work that only matters to someone looking pauses on it; what tells the person
  * something (sync, reminders, notifications, the menu-bar count) never listens to it.
  *
- * <p>Listeners are called on the setter's thread, in order, only when {@link #now()} changes, and must not block: each
- * hands its work to its own thread.
+ * <p>Listeners are called on the setter's thread, in order, only when {@link #now()} changes. They must not block nor
+ * take a lock that a thread calling {@code Seen} might hold: each hands its work to its own thread. A listener that sets
+ * {@code Seen} again isn't heard inside its own call: once every listener has heard the value at hand, all of them hear
+ * the newest, so each ends on the final value in the order it took effect.
  */
 public final class Seen {
     private static final Seen INSTANCE = new Seen();
@@ -18,12 +20,17 @@ public final class Seen {
     private final List<Consumer<Boolean>> listeners = new CopyOnWriteArrayList<>();
     private boolean windows = true;
     private boolean away;
+    /** {@code windows && !away}, read without the lock the listeners are called under. */
+    private volatile boolean seen = true;
+    /** What the listeners last heard, and whether they're being told now (a set from inside a listener). */
+    private boolean heard = true;
+    private boolean notifying;
 
     private Seen() {}
 
     public static Seen get() { return INSTANCE; }
 
-    public synchronized boolean now() { return windows && !away; }
+    public boolean now() { return seen; }
 
     public void addListener(Consumer<Boolean> l) { listeners.add(l); }
 
@@ -40,17 +47,28 @@ public final class Seen {
 
     /** Under the lock with the listeners, so two threads setting at once are heard in the order they took effect. */
     private synchronized void set(Boolean someWindowShown, Boolean screenAway) {
-        boolean before = now();
         if (someWindowShown != null) windows = someWindowShown;
         if (screenAway != null) away = screenAway;
-        boolean after = now();
-        if (after == before) return;
-        for (Consumer<Boolean> l : listeners) {
-            try {
-                l.accept(after);
-            } catch (RuntimeException e) {
-                System.err.println("Seen listener failed: " + e);
+        seen = windows && !away;
+        if (notifying) return; // a listener set it: told below, once everyone heard the value at hand
+        notifying = true;
+        try {
+            while (seen != heard) {
+                boolean now = seen;
+                heard = now;
+                for (Consumer<Boolean> l : listeners) tell(l, now);
             }
+        } finally {
+            notifying = false;
+        }
+    }
+
+    private static void tell(Consumer<Boolean> l, boolean now) {
+        try {
+            l.accept(now);
+        } catch (RuntimeException e) {
+            System.err.println("Seen listener failed: " + e);
+            e.printStackTrace();
         }
     }
 }

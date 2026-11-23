@@ -59,7 +59,6 @@ public final class UnichatApp extends Application {
     @Override
     public void start(Stage primary) {
         stage = primary;
-        Seen.get().windows(true); // it starts with its window shown (never in the tray), before anything listens
         Recovery.watchUi(); // a window that stops answering starts Unichat again
         // A full disk stops messages with no other sign. Not for a snapshot: the screen it shows mustn't hang on this disk.
         if (System.getProperty("unichat.snapshot") == null) app.unichat.support.Storage.SHARED.watch(Settings.dataDir());
@@ -301,7 +300,11 @@ public final class UnichatApp extends Application {
         }
     }
 
-    /** From the window shown on: whether anyone can see Unichat. A snapshot is seen, whatever its windows do. */
+    /**
+     * From the window shown on: whether anyone can see Unichat. {@code Seen} starts true, as Unichat always starts with
+     * its window shown (never in the tray), so nothing that listens before this hears a change. A snapshot is seen,
+     * whatever its windows do.
+     */
     private void followSeen() {
         if (System.getProperty("unichat.snapshot") != null) {
             Seen.reset(true);

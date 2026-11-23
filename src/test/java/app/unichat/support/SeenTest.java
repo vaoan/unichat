@@ -74,6 +74,70 @@ class SeenTest {
     }
 
     @Test
+    void aListenerThatSetsItAgainLeavesEveryoneOnTheFinalValueInOrder() {
+        Seen.reset(true);
+        List<String> heard = new ArrayList<>();
+        Consumer<Boolean> first = b -> {
+            heard.add("first " + b);
+            if (!b) seen.windows(true); // a window shown again while the others hear it was hidden
+        };
+        Consumer<Boolean> second = b -> heard.add("second " + b);
+        seen.addListener(first);
+        seen.addListener(second);
+        try {
+            seen.windows(false);
+        } finally {
+            seen.removeListener(first);
+            seen.removeListener(second);
+        }
+        assertEquals(List.of("first false", "second false", "first true", "second true"), heard);
+        assertTrue(seen.now());
+    }
+
+    @Test
+    void aListenerThatFailsLeavesTheOthersHearing() {
+        Seen.reset(true);
+        List<Boolean> heard = new ArrayList<>();
+        Consumer<Boolean> failing = b -> { throw new IllegalStateException("listener failed (test)"); };
+        Consumer<Boolean> other = heard::add;
+        seen.addListener(failing);
+        seen.addListener(other);
+        try {
+            seen.windows(false);
+        } finally {
+            seen.removeListener(failing);
+            seen.removeListener(other);
+        }
+        assertEquals(List.of(false), heard);
+    }
+
+    @Test
+    void nowAnswersWhileAListenerIsBeingCalledOnAnotherThread() throws Exception {
+        Seen.reset(true);
+        java.util.concurrent.CountDownLatch inside = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        Consumer<Boolean> holding = b -> {
+            inside.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        };
+        seen.addListener(holding);
+        Thread setter = Thread.ofVirtual().start(() -> seen.windows(false));
+        try {
+            inside.await();
+            // A thread holding its own lock asks now() while the setter waits on that lock inside a listener.
+            assertFalse(java.util.concurrent.CompletableFuture.supplyAsync(seen::now).get(), "answered, not waiting on the listener");
+        } finally {
+            release.countDown();
+            setter.join(); // lesson-ok: test-future-join (a Thread, which JUnit can interrupt)
+            seen.removeListener(holding);
+        }
+    }
+
+    @Test
     void theScreenSourceOfNoneNeverSaysAway() {
         Seen.reset(true);
         ScreenAway.none().start(seen::screenAway);
