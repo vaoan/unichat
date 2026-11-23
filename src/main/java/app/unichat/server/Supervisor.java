@@ -91,7 +91,10 @@ public final class Supervisor {
 
     /** What happens to the processes, as it happens: lets tests wait for an event instead of polling. */
     interface Listener {
-        /** A line of {@code name}'s output reached its log. */
+        /**
+         * A line of {@code name}'s output was handed to its log. Only an urgent one (warn, error, fatal, or not JSON) is
+         * on disk by now; the others wait in the buffer for the next flush.
+         */
         default void logged(String name) {}
         /** {@code name}'s process ended; {@code restarting} says whether a restart was scheduled for it. */
         default void exited(String name, boolean restarting) {}

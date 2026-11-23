@@ -51,7 +51,7 @@ server/
   CREDENCIALES.txt     the account's username and password (private)
   tuwunel/             tuwunel.toml + database (db/)
   appservices/         each bridge's registration (tuwunel reads them from here at startup)
-  <network>/           each bridge's config.yaml, registration.yaml, <network>.db (SQLite) and bridge.log (filtered)
+  <network>/           each bridge's config.yaml, registration.yaml, <network>.db (SQLite) and bridge.log (filtered, `warn` and worse)
   run/                 PID of each running process
   bridges.active       active bridges
 ```
@@ -180,7 +180,7 @@ The installed app has no console; everything goes to files:
 **No personal data:** the bridges and the server write to their standard output and Unichat filters it before
 saving it (`Redactor`): it removes Matrix, room and event IDs, file links, phone numbers and long numeric
 IDs, emails, tokens and the values of fields such as name, text, title or user. Unichat's log
-goes through the same filter. The bridges log at `info` level (not `debug`).
+goes through the same filter. The bridges log at `warn` by default, which saves battery and is all the app reads; start Unichat with `-Dunichat.bridgeLogs=info` to bring `info` back when debugging (the bridge configurations are rewritten at each start).
 
 **Cleanup:** each file rotates after 5 MB (a `.1` copy is kept). When Unichat opens and then once a
 day, logs not written in the last N days are deleted (Settings → Privacy → Delete logs after: 1, 7 or
