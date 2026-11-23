@@ -55,7 +55,7 @@ public final class ImageCache {
         CompletableFuture<Image> mine = new CompletableFuture<>();
         CompletableFuture<Image> running = LOADING.putIfAbsent(url, mine);
         if (running != null) return running;
-        svc.media(url, PX, PX).thenApplyAsync(path -> {
+        var _ = svc.media(url, PX, PX).thenApplyAsync(path -> {
             // Decoded completely here, so a view never shows a half-loaded (blank) image.
             // Animated avatars (Discord) stay still: JavaFX's own GIF animation never lets the image go.
             Image img;

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -388,7 +389,7 @@ class PreferencesSyncTest {
 
     private MatrixChatService service(PreferencesFile file, String deviceId) throws IOException {
         if (server != null) return new MatrixChatService(url(), ME, "t", file, deviceId);
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String call = ex.getRequestMethod() + " " + ex.getRequestURI().getPath();
             calls.add(call);

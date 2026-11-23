@@ -87,7 +87,7 @@ public final class UnichatApp extends Application {
             hideToTray();
         }), this::openFromNotification, this::quit);
         // The tray is built on AWT's thread: what depends on it waits until it exists.
-        notifier.ready().thenAccept(tray -> Platform.runLater(() -> {
+        var _ = notifier.ready().thenAccept(tray -> Platform.runLater(() -> {
             Platform.setImplicitExit(!tray);
             DockIcon.setTrayAvailable(tray);
         }));
@@ -153,7 +153,7 @@ public final class UnichatApp extends Application {
         if (snapshot != null) new SnapshotRun(mainView, scene, this::quit).start(snapshot);
         else UpdateChecker.get().start(); // diagnostics never ask GitHub
         // The passkey probe, only when asked for (-Dunichat.passkeyProbe=true or --passkey-probe), never in a snapshot.
-        if (snapshot == null) app.unichat.cloud.PasskeyProbe.onStart(uri -> Browser.open(uri.toString()));
+        if (snapshot == null) { var _ = app.unichat.cloud.PasskeyProbe.onStart(uri -> Browser.open(uri.toString())); }
     }
 
     /** The demo keeps its choices and folders in the same files as the real service. */
@@ -224,7 +224,7 @@ public final class UnichatApp extends Application {
             @Override public void changed(int done, int total) { notifier.setDownloadProgress(done, total); }
             @Override public void finished(int saved, app.unichat.model.Chat chat) {
                 notifier.downloadsDone(saved, chat);
-                if (cloud != null) cloud.syncNow(); // what was just saved goes up now, not at the next round
+                if (cloud != null) { var _ = cloud.syncNow(); } // what was just saved goes up now, not at the next round
             }
             @Override public void failed(String what, app.unichat.model.Chat chat, String messageId, String why) {
                 notifier.downloadFailed(what, chat, messageId, why);
@@ -242,7 +242,7 @@ public final class UnichatApp extends Application {
                             app.unichat.service.PinnedMessages.get()::adopt, Settings.get().dir().resolve("transcripts")));
             app.unichat.cloud.Cloud c = cloud;
             // What a chat says goes up as soon as it's kept, and looking at a deleted message asks the other computers first.
-            app.unichat.autosave.AutoSave.of(svc).setTextSync(c::textsNow, c::textsNow);
+            app.unichat.autosave.AutoSave.of(svc).setTextSync(() -> { var _ = c.textsNow(); }, c::textsNow);
             // What it's doing: on the tray (its menu's lines and ring) and on the settings gear.
             c.addListener(new app.unichat.ui.CloudShown(c::status, notifier::setCloud, java.awt.EventQueue::invokeLater,
                     st -> { if (mainView != null) mainView.cloudChanged(st); }, Platform::runLater));
@@ -282,7 +282,7 @@ public final class UnichatApp extends Application {
         if (cloud != null) cloud.stop();
         cloud = null;
         // Off the UI thread: what's waiting goes first (seconds at most), then the session ends.
-        java.util.concurrent.CompletableFuture.runAsync(() -> sendWhatsWaiting(svc)).thenCompose(v -> svc.logout()).whenComplete((v, err) -> Platform.runLater(() -> {
+        var _ = java.util.concurrent.CompletableFuture.runAsync(() -> sendWhatsWaiting(svc)).thenCompose(v -> svc.logout()).whenComplete((v, err) -> Platform.runLater(() -> {
             svc.stop();
             Settings.get().clearSession();
             if (Settings.get().localServer()) {

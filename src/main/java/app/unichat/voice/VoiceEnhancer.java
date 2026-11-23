@@ -50,7 +50,11 @@ public final class VoiceEnhancer {
         return improve(note, raw, rate, installing, () -> { });
     }
 
-    /** @param failed told when the filter failed or ran out of time, so the note goes as recorded */
+    /**
+     * The note with its voice made clearer.
+     *
+     * @param failed told when the filter failed or ran out of time, so the note goes as recorded
+     */
     public static VoiceNote improve(VoiceNote note, Path raw, int rate, DoubleConsumer installing, Runnable failed)
             throws InterruptedException {
         if (!enabled()) return note;

@@ -52,8 +52,8 @@ class MediaClickUiTest {
         fx(() -> {
             Node media = scene.getRoot().lookup(".media-box");
             assertTrue(media != null, "the demo chat has a photo");
-            Event.fireEvent(media, mouse(MouseEvent.MOUSE_PRESSED, media, true));
-            Event.fireEvent(media, mouse(MouseEvent.MOUSE_RELEASED, media, true));
+            Event.fireEvent(media, mouse(MouseEvent.MOUSE_PRESSED, true));
+            Event.fireEvent(media, mouse(MouseEvent.MOUSE_RELEASED, true));
             return null;
         });
         FxWait.until("a viewer opens", () -> viewers() > before);
@@ -74,7 +74,7 @@ class MediaClickUiTest {
                 .filter(w -> w.getScene() != null && w.getScene().getRoot().getStyleClass().contains("media-viewer")).count();
     }
 
-    private static MouseEvent mouse(javafx.event.EventType<MouseEvent> type, Node n, boolean still) {
+    private static MouseEvent mouse(javafx.event.EventType<MouseEvent> type, boolean still) {
         return new MouseEvent(type, 10, 10, 10, 10, MouseButton.PRIMARY, 1, false, false, false, false,
                 true, false, false, true, false, still, null);
     }

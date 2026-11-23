@@ -24,6 +24,7 @@ import javafx.stage.Window;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -112,7 +113,7 @@ public final class MediaViewer {
             next.setDisable(at[0] == items.size() - 1);
             photo.setAccessibleText(item.title());
             area.getChildren().setAll(spin);
-            item.file().get().whenComplete((p, err) -> {
+            var _ = item.file().get().whenComplete((p, err) -> {
                 try {
                     if (err != null || p == null) throw new IOException("no file", err);
                     load(p, () -> {
@@ -131,7 +132,9 @@ public final class MediaViewer {
                 }
             });
             // The next one starts downloading now: stepping through a chat shouldn't wait on each.
-            if (at[0] + 1 < items.size()) items.get(at[0] + 1).file().get();
+            if (at[0] + 1 < items.size()) {
+                var _ = items.get(at[0] + 1).file().get();
+            }
         };
         stage.show();
         go[0].run();
@@ -218,7 +221,7 @@ public final class MediaViewer {
             case ADD -> photo.change(z -> z.zoomBy(PhotoPane.STEP));
             case SUBTRACT -> photo.change(z -> z.zoomBy(1 / PhotoPane.STEP));
             default -> {
-                switch (e.getText().toLowerCase()) {
+                switch (e.getText().toLowerCase(Locale.ROOT)) {
                     case "+", "=" -> photo.change(z -> z.zoomBy(PhotoPane.STEP));
                     case "-" -> photo.change(z -> z.zoomBy(1 / PhotoPane.STEP));
                     case "0" -> photo.change(PhotoZoom::fit);

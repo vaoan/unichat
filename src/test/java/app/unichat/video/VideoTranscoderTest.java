@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -48,8 +49,10 @@ class VideoTranscoderTest {
         String info = Processes.capture(new ProcessBuilder(ffmpeg.toString(), "-hide_banner", "-nostdin", "-i", result.toString())
                 .redirectErrorStream(true), NO_LIMIT).out();
         assertTrue(VideoTranscoder.playsEverywhere(info), info);
-        assertEquals(List.of("Video by alguien [Dx1] [abc].mp4"), Files.list(dir).map(p -> p.getFileName().toString()).toList(),
-                "nothing half-written left behind");
+        try (Stream<Path> stream = Files.list(dir)) {
+            assertEquals(List.of("Video by alguien [Dx1] [abc].mp4"), stream.map(p -> p.getFileName().toString()).toList(),
+                    "nothing half-written left behind");
+        }
 
         assertEquals(result, VideoTranscoder.makePlayable(ffmpeg, result), "H.264 already: left as it is");
     }
@@ -86,7 +89,9 @@ class VideoTranscoderTest {
             assertEquals(picture, VideoTranscoder.makePlayable(ffmpeg, picture), name);
             org.junit.jupiter.api.Assertions.assertArrayEquals(before, Files.readAllBytes(picture), name + " untouched");
         }
-        assertEquals(List.of("animada [3].gif", "foto [1].png", "foto [2].jpg"),
-                Files.list(dir).map(p -> p.getFileName().toString()).sorted().toList(), "no .mp4 beside them");
+        try (Stream<Path> stream = Files.list(dir)) {
+            assertEquals(List.of("animada [3].gif", "foto [1].png", "foto [2].jpg"),
+                    stream.map(p -> p.getFileName().toString()).sorted().toList(), "no .mp4 beside them");
+        }
     }
 }

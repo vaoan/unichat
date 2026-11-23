@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Supplier;
@@ -108,7 +109,7 @@ class SyncedSettingsUiTest {
     }
 
     /** The keys the app keeps settings under, read from its source: literals given to Settings, and *_KEY constants. */
-    private static TreeSet<String> keysInTheApp() throws IOException {
+    private static SortedSet<String> keysInTheApp() throws IOException {
         Pattern call = Pattern.compile("\\.(?:getString|getBool|getInt|getEnum|getDouble|getSet|set|setBool|addToSet|removeFromSet)\\(\"([a-z]\\w*\\.[\\w.]+)\"");
         Pattern constant = Pattern.compile("static final String [A-Z_]*(?:KEY|PROGRESS|DONE)[A-Z_]* = \"([a-z][\\w.]*)\"");
         Pattern concat = Pattern.compile("\"([a-z][\\w]*\\.(?:[\\w]+\\.)*)\" \\+");
@@ -143,7 +144,7 @@ class SyncedSettingsUiTest {
 
     @Test
     void everySettingHasItsProof() throws IOException {
-        TreeSet<String> missing = keysInTheApp();
+        SortedSet<String> missing = keysInTheApp();
         missing.removeAll(proofs().keySet());
         assertTrue(missing.isEmpty(), "settings that travel through the cloud with no proof they apply live: " + missing);
     }

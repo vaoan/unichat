@@ -69,7 +69,7 @@ final class VaultCrypto {
             c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(TAG_BITS, Arrays.copyOfRange(sealed, 1, 1 + NONCE)));
             c.updateAAD(aad(path));
             return c.doFinal(sealed, 1 + NONCE, sealed.length - 1 - NONCE);
-        } catch (GeneralSecurityException e) {
+        } catch (GeneralSecurityException _) {
             throw new Broken();
         }
     }
@@ -99,6 +99,7 @@ final class VaultCrypto {
     }
 
     /** 64 MiB, 3 iterations, parallelism 1: heavy for a guesser, about a second for the person. */
+    @SuppressWarnings("ByteBufferBackingArray") // the whole array is wiped, wherever the bytes start in it
     static byte[] argon2id(char[] password, byte[] salt) {
         if (salt.length != SALT) throw new IllegalArgumentException("The vault's salt must be 16 bytes");
         Argon2Parameters params = new Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)

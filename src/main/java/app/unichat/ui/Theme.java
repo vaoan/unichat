@@ -8,6 +8,7 @@ import javafx.scene.Scene;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 /** Applies the stylesheet, light/dark palette, accent color and font scale to every app scene. */
@@ -125,7 +126,7 @@ public final class Theme {
             r = (int) (r * 0.93);
             g = (int) (g * 0.93);
             b = (int) (b * 0.93);
-            cur = "#%02X%02X%02X".formatted(r, g, b);
+            cur = String.format(Locale.ROOT, "#%02X%02X%02X", r, g, b);
         }
         return cur;
     }

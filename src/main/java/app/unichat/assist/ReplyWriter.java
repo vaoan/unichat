@@ -32,6 +32,10 @@ public final class ReplyWriter {
         public Failure(String message) {
             super(message);
         }
+
+        public Failure(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     /** The thread waiting for the program, which {@link #cancel} interrupts; both guarded by this. */
@@ -79,7 +83,7 @@ public final class ReplyWriter {
             if (text.isEmpty()) throw new Failure(I18n.t("ai.failure.empty", engine.label()));
             return text;
         } catch (IOException e) {
-            throw new Failure(I18n.t("ai.failure.open", engine.label()));
+            throw new Failure(I18n.t("ai.failure.open", engine.label()), e);
         } catch (InterruptedException e) {
             if (!isCancelled()) Thread.currentThread().interrupt(); // someone else's interrupt stays theirs
             return null;

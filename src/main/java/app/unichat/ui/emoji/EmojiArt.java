@@ -13,6 +13,7 @@ import java.awt.font.TextLayout;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -107,7 +108,7 @@ final class EmojiArt {
      */
     static List<Segment> segments(String text) {
         List<Segment> out = new java.util.ArrayList<>();
-        java.text.BreakIterator chars = java.text.BreakIterator.getCharacterInstance();
+        java.text.BreakIterator chars = java.text.BreakIterator.getCharacterInstance(Locale.ROOT);
         chars.setText(text);
         int runStart = 0;
         for (int start = chars.first(), end = chars.next(); end != java.text.BreakIterator.DONE; start = end, end = chars.next()) {
@@ -140,6 +141,6 @@ final class EmojiArt {
 
     /** Runs {@code then} on the FX thread with the picture of {@code e}, or null when it can't be shown. */
     static void whenDrawn(String e, java.util.function.Consumer<Image> then) {
-        pictures().thenAccept(m -> Platform.runLater(() -> then.accept(m.get(e))));
+        var _ = pictures().thenAccept(m -> Platform.runLater(() -> then.accept(m.get(e))));
     }
 }

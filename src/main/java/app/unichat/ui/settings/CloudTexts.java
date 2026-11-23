@@ -10,11 +10,12 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 
 /** What the cloud is doing, in words: Ajustes → Nube says it in a line, the tray's menu in a few. Pure. */
 public final class CloudTexts {
-    private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT);
 
     private CloudTexts() {}
 

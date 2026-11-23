@@ -200,6 +200,7 @@ public final class Cloud {
      * round has at most one behind it.
      */
     private final java.util.concurrent.atomic.AtomicBoolean roundQueued = new java.util.concurrent.atomic.AtomicBoolean();
+    @SuppressWarnings("UnnecessaryLambda") // one instance: removeListener takes away what addListener added
     private final java.util.function.Consumer<Boolean> onSeen = seen -> {
         if (seen) queueRound("the round on being seen");
     };
@@ -243,6 +244,8 @@ public final class Cloud {
     }
 
     /**
+     * The cloud for the account this computer saved, if any.
+     *
      * @param preferences each chat's options and the folders, as {@code preferences.json} holds them
      * @param adoptPreferences takes the account's in their place, at once
      * @param settingsAdopted after the account's settings were taken: whatever shows them applies them
@@ -264,7 +267,7 @@ public final class Cloud {
                     Settings.get().replacePortable(theirs.settings(), k -> !Bundle.travels(k));
                     if (theirs.preferences() != null) {
                         try {
-                            adoptPreferences.test(Bundle.writePreferences(theirs.preferences()));
+                            var _ = adoptPreferences.test(Bundle.writePreferences(theirs.preferences())); // false: not a file of them, these stay
                         } catch (IOException e) {
                             throw new IllegalStateException(e);
                         }
@@ -313,7 +316,7 @@ public final class Cloud {
             t.setDaemon(true);
             return t;
         });
-        timer.scheduleWithFixedDelay(this::tick, 0, every.toMillis(), TimeUnit.MILLISECONDS);
+        var _ = timer.scheduleWithFixedDelay(this::tick, 0, every.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     /** The timer's round, joining one already queued (tests call it directly). */
@@ -401,7 +404,7 @@ public final class Cloud {
                 }
                 if (vault.open()) seePeers(at, vault);
                 Storage personal = vault.personal(at);
-                if (personal != null && (vault.open() || CloudAccount.settings() && !renames.settingsWait())) {
+                if (personal != null && (vault.open() || (CloudAccount.settings() && !renames.settingsWait()))) {
                     doing(new Activity(Step.SETTINGS, 0, 0, null));
                     parts.get(0).sync(personal, now);
                     doing(new Activity(Step.LEARNED, 0, 0, null));

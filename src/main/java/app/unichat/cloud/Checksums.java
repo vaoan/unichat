@@ -23,8 +23,9 @@ final class Checksums {
         try (InputStream in = Files.newInputStream(file)) {
             if (DROPBOX.equals(kind)) {
                 MessageDigest all = MessageDigest.getInstance("SHA-256");
-                byte[] block;
-                while ((block = in.readNBytes(DROPBOX_BLOCK)).length > 0) all.update(MessageDigest.getInstance("SHA-256").digest(block));
+                for (byte[] block = in.readNBytes(DROPBOX_BLOCK); block.length > 0; block = in.readNBytes(DROPBOX_BLOCK)) {
+                    all.update(MessageDigest.getInstance("SHA-256").digest(block));
+                }
                 return HexFormat.of().formatHex(all.digest());
             }
             MessageDigest d = MessageDigest.getInstance(SHA1.equals(kind) ? "SHA-1" : "SHA-256");

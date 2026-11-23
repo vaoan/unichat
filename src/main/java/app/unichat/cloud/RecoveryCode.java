@@ -8,6 +8,7 @@ import java.util.Arrays;
  * back forgives what the eye mixes up (case, spaces, dashes, O for 0, I or L for 1). It never reaches a log: its text
  * form says nothing of its content.
  */
+@SuppressWarnings("ArrayRecordComponent") // equals and hashCode below compare the bytes
 record RecoveryCode(byte[] bits) {
     private static final String ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
     private static final int BYTES = 20, CHARS = 32, GROUP = 4;
@@ -89,8 +90,8 @@ record RecoveryCode(byte[] bits) {
     /** What was typed as the code's own characters: case, spaces and dashes dropped, O read as 0, I and L as 1. */
     static String normalized(String typed) {
         StringBuilder chars = new StringBuilder();
-        for (char t : typed.toCharArray()) {
-            char c = own(t);
+        for (int i = 0; i < typed.length(); i++) {
+            char c = own(typed.charAt(i));
             if (c != 0) chars.append(c);
         }
         return chars.toString();

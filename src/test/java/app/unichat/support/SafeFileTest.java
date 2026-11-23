@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -78,6 +79,7 @@ class SafeFileTest {
     }
 
     @Test
+    @SuppressWarnings("InputStreamSlowMultibyteRead") // a stream that fails after three bytes: its speed doesn't matter
     void aFailureWhileWritingLeavesTheOldFileAndNoTemp() throws Exception {
         Path f = Files.writeString(dir.resolve("video.mp4"), "old");
         InputStream cut = new InputStream() {
@@ -102,7 +104,7 @@ class SafeFileTest {
             seen[0] = part;
             assertEquals("new", Files.readString(part), "the whole file, before it takes the name");
             throw new IOException("wrong checksum");
-        }).write("new".getBytes()));
+        }).write("new".getBytes(UTF_8)));
         assertEquals(dir.resolve("uv.part"), seen[0]);
         assertEquals("old", Files.readString(f));
         assertFalse(Files.exists(seen[0]));
@@ -129,7 +131,7 @@ class SafeFileTest {
     void contentThatClosesItsStreamIsStillWrittenWhole() throws Exception {
         Path f = dir.resolve("q.json");
         SafeFile.at(f).write(out -> {
-            out.write("[1]".getBytes());
+            out.write("[1]".getBytes(UTF_8));
             out.close();
         });
         assertEquals("[1]", Files.readString(f));

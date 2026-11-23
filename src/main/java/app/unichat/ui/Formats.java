@@ -14,8 +14,8 @@ import java.util.Locale;
 public final class Formats {
     private Formats() {}
 
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("d/M/yy");
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT);
+    private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("d/M/yy", Locale.ROOT);
 
     public static String time(Instant t, ZoneId zone) {
         return TIME.format(t.atZone(zone));

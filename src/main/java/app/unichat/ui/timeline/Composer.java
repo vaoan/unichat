@@ -95,6 +95,7 @@ public final class Composer extends VBox {
     private final Region rowGrow = new Region();
     private boolean stacked;
     /** Held here: the global properties only keep a weak reference, so a closed chat's composer can go. */
+    @SuppressWarnings("UnusedVariable") // held, never read: that's what keeps the weak listeners' target alive
     private final javafx.beans.InvalidationListener frameFit;
     /** Below this many characters' width the text goes on its own line (160 % text, a narrow window, the info panel). */
     private static final double MIN_INPUT_EM = 14;

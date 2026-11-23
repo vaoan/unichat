@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import app.unichat.WithLocale;
 import java.util.Locale;
 import org.junit.jupiter.api.Test;
 
@@ -26,8 +27,8 @@ class RecoveryCodeTest {
     void aCodeTypedLooselyStillOpens() {
         RecoveryCode code = RecoveryCode.random();
         assertEquals(code, RecoveryCode.parse(code.shown()));
-        assertEquals(code, RecoveryCode.parse(code.shown().replace("-", "").toLowerCase()));
-        assertEquals(code, RecoveryCode.parse("  " + code.shown().replace('-', ' ').toLowerCase() + " "));
+        assertEquals(code, RecoveryCode.parse(code.shown().replace("-", "").toLowerCase(Locale.ROOT)));
+        assertEquals(code, RecoveryCode.parse("  " + code.shown().replace('-', ' ').toLowerCase(Locale.ROOT) + " "));
         RecoveryCode zeros = RecoveryCode.parse("0000-0000-0000-0000-0000-0000-0000-0001");
         assertEquals(zeros, RecoveryCode.parse("oooo-oooo-oooo-oooo-oooo-oooo-oooo-oool"));
         assertEquals(zeros, RecoveryCode.parse("0000-0000-0000-0000-0000-0000-0000-000i"));
@@ -64,21 +65,15 @@ class RecoveryCodeTest {
     void unicodeDashesAndAnyWhitespaceAreForgiven() {
         RecoveryCode code = RecoveryCode.random();
         assertEquals(code, RecoveryCode.parse(code.shown().replace("-", "\u2011").replace("\u2011", "\u2013 ")));
-        assertEquals(code, RecoveryCode.parse(code.shown().replace("-", "\u2212\u00a0").toLowerCase()));
+        assertEquals(code, RecoveryCode.parse(code.shown().replace("-", "\u2212\u00a0").toLowerCase(Locale.ROOT)));
         assertEquals(code, RecoveryCode.parse("\t" + code.shown().replace("-", "\n") + "\u3000"));
         assertEquals(code, RecoveryCode.parse(code.shown().replace("-", "\u2010\u2012\u2014\u2015")));
     }
 
     @Test
     void caseFoldingIgnoresTheLocale() {
-        Locale was = Locale.getDefault();
-        try {
-            Locale.setDefault(Locale.forLanguageTag("tr"));
-            RecoveryCode zeros = RecoveryCode.parse("0000-0000-0000-0000-0000-0000-0000-0001");
-            assertEquals(zeros, RecoveryCode.parse("0000-0000-0000-0000-0000-0000-0000-000i"));
-        } finally {
-            Locale.setDefault(was);
-        }
+        RecoveryCode zeros = RecoveryCode.parse("0000-0000-0000-0000-0000-0000-0000-0001");
+        assertEquals(zeros, WithLocale.get(WithLocale.TURKISH, () -> RecoveryCode.parse("0000-0000-0000-0000-0000-0000-0000-000i")));
     }
 
     @Test

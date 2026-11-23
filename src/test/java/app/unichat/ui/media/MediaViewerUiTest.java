@@ -282,10 +282,10 @@ class MediaViewerUiTest {
     private static List<String> windows() throws Exception {
         return fx(() -> Window.getWindows().stream()
                 .map(w -> w.getClass().getSimpleName() + (w.getScene() == null ? "" : ":" + w.getScene().getRoot().getStyleClass()
-                        + (w.getScene().getRoot().lookupAll("*").stream().filter(PhotoPane.class::isInstance).findFirst()
+                        + w.getScene().getRoot().lookupAll("*").stream().filter(PhotoPane.class::isInstance).findFirst()
                                 .map(n -> " photo w=" + ((PhotoPane) n).getWidth() + " img=" + ((PhotoPane) n).view().getImage()
                                         + " area=" + n.getParent()).orElse(" no photo pane; shows " + w.getScene().getRoot().lookupAll(".label, .progress-indicator").stream()
-                                        .map(n -> n instanceof javafx.scene.control.Label l ? "label:" + l.getText() : "spinner").toList()))))
+                                        .map(n -> n instanceof javafx.scene.control.Label l ? "label:" + l.getText() : "spinner").toList())))
                 .toList());
     }
 

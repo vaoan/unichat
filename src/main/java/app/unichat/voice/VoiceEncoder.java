@@ -26,7 +26,6 @@ final class VoiceEncoder implements AutoCloseable {
     private final OutputStream out;
     private final OpusEncoder encoder;
     private final OggOpusWriter ogg;
-    private final int rate;
     private final int frameSize;
     private final short[] frame;
     private final byte[] packet = new byte[MAX_PACKET];
@@ -37,7 +36,6 @@ final class VoiceEncoder implements AutoCloseable {
 
     VoiceEncoder(Path file, int rate) throws IOException {
         this.file = file;
-        this.rate = rate;
         this.frameSize = rate / FRAMES_PER_SECOND;
         this.frame = new short[frameSize];
         try {

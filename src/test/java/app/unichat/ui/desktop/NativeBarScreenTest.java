@@ -103,8 +103,8 @@ class NativeBarScreenTest {
         assertNull(NativeBar.screenLine("screen\t2"));
         assertNull(NativeBar.screenLine("screen\t"));
         assertNull(NativeBar.screenLine("screens\t1"));
-        assertEquals(Boolean.TRUE, NativeBar.screenLine("screen\t1"));
-        assertEquals(Boolean.FALSE, NativeBar.screenLine("screen\t0"));
+        assertEquals(true, NativeBar.screenLine("screen\t1"));
+        assertEquals(false, NativeBar.screenLine("screen\t0"));
     }
 
     @Test

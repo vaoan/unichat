@@ -30,7 +30,6 @@ public final class CommandBar extends VBox {
     private record Item(String label, String hint, Chat chat, Runnable action) {}
 
     private final ChatReader chats;
-    private final MediaSource media;
     private final TextField field = new TextField();
     private final ObservableList<Item> items = FXCollections.observableArrayList();
     private final ListView<Item> list = new ListView<>(items);
@@ -40,7 +39,6 @@ public final class CommandBar extends VBox {
 
     public CommandBar(ChatReader chats, MediaSource media, List<Command> commands, Consumer<Chat> openChat, Runnable close) {
         this.chats = chats;
-        this.media = media;
         this.commands = commands;
         this.openChat = openChat;
         this.close = close;

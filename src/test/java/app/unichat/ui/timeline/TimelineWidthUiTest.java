@@ -61,7 +61,7 @@ class TimelineWidthUiTest {
         ImageView again = new ImageView();
         // Right when the call returns, on the UI thread: no blank frame while it's decoded again.
         assertSame(first.getImage(), FxWait.fx(() -> {
-            MessageMedia.loadMedia(svc, again, m, 400, 300);
+            var _ = MessageMedia.loadMedia(svc, again, m, 400, 300);
             return again.getImage();
         }));
         svc.stop();

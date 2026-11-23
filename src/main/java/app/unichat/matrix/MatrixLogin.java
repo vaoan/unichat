@@ -148,7 +148,7 @@ public final class MatrixLogin {
             return false;
         }
         if (u.getHost() == null) return false;
-        return "https".equalsIgnoreCase(u.getScheme()) || "http".equalsIgnoreCase(u.getScheme()) && isLocalHost(u.getHost());
+        return "https".equalsIgnoreCase(u.getScheme()) || ("http".equalsIgnoreCase(u.getScheme()) && isLocalHost(u.getHost()));
     }
 
     private static boolean isLocalHost(String hostPort) {

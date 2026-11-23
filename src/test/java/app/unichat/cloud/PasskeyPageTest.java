@@ -132,9 +132,9 @@ class PasskeyPageTest {
         try {
             HttpResponse<String> made = post("state=" + state() + "&step=create&prfEnabled=true");
             assertEquals(I18n.t("cloud.passkey.createdPrf"), made.body());
-            assertEquals(Boolean.TRUE, found.getFirst().prfEnabled());
+            assertEquals(true, found.getFirst().prfEnabled());
             post("state=" + state() + "&step=create&prfEnabled=false");
-            assertEquals(Boolean.FALSE, found.get(1).prfEnabled());
+            assertEquals(false, found.get(1).prfEnabled());
             assertEquals(I18n.t("cloud.passkey.createdNoPrf"), found.get(1).said());
             post("state=" + state() + "&step=create");
             assertNull(found.get(2).prfEnabled(), "the browser said nothing about it");
@@ -160,7 +160,7 @@ class PasskeyPageTest {
 
     /** What a browser sends for another name (DNS rebinding: evil.example resolved to 127.0.0.1); HttpClient won't set Host. */
     private int raw(String request) throws Exception {
-        try (java.net.Socket s = new java.net.Socket("127.0.0.1", opened[0].getPort())) {
+        try (java.net.Socket s = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), opened[0].getPort())) {
             s.getOutputStream().write(request.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
             s.getOutputStream().flush();
             String status = new java.io.BufferedReader(new java.io.InputStreamReader(s.getInputStream(),

@@ -6,7 +6,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 /**
  * The way back for {@code preferences.json}: the {@code .bak} each save keeps of the version it replaces, and a damaged
@@ -97,7 +99,7 @@ final class PreferencesRecovery {
     }
 
     private String freeAsideName() {
-        String stamp = file.getFileName() + ".bad-" + DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS").format(LocalDateTime.now());
+        String stamp = file.getFileName() + ".bad-" + DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS", Locale.ROOT).format(LocalDateTime.now(ZoneId.systemDefault()));
         String name = stamp;
         for (int n = 2; Files.exists(file.resolveSibling(name)); n++) name = stamp + "-" + n;
         return name;

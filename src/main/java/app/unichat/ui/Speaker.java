@@ -22,7 +22,7 @@ public final class Speaker {
     public static void say(String text) {
         if (text == null || text.isBlank()) return;
         String clean = text.length() > 400 ? text.substring(0, 400) : text;
-        QUEUE.submit(() -> speakNow(clean));
+        var _ = QUEUE.submit(() -> speakNow(clean));
     }
 
     static List<String> command() {

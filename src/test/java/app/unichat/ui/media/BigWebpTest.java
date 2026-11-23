@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -18,9 +19,9 @@ class BigWebpTest {
     /** RIFF + WEBP + one chunk header and {@code body} (the bytes after the chunk's size). */
     private Path webp(String chunk, int... body) throws Exception {
         byte[] d = new byte[40];
-        System.arraycopy("RIFF".getBytes(), 0, d, 0, 4);
-        System.arraycopy("WEBP".getBytes(), 0, d, 8, 4);
-        System.arraycopy(chunk.getBytes(), 0, d, 12, 4);
+        System.arraycopy("RIFF".getBytes(UTF_8), 0, d, 0, 4);
+        System.arraycopy("WEBP".getBytes(UTF_8), 0, d, 8, 4);
+        System.arraycopy(chunk.getBytes(UTF_8), 0, d, 12, 4);
         for (int i = 0; i < body.length; i++) d[20 + i] = (byte) body[i];
         return Files.write(dir.resolve(chunk.trim() + body.length + ".webp"), d);
     }
@@ -55,14 +56,14 @@ class BigWebpTest {
     /** An animated WebP of {@code frames} frames on a {@code w}x{@code h} canvas: the chunk headers, no picture data. */
     private Path animated(int w, int h, int frames) throws Exception {
         var out = new java.io.ByteArrayOutputStream();
-        out.writeBytes("RIFF".getBytes());
+        out.writeBytes("RIFF".getBytes(UTF_8));
         out.writeBytes(new byte[4]);
-        out.writeBytes("WEBPVP8X".getBytes());
+        out.writeBytes("WEBPVP8X".getBytes(UTF_8));
         out.writeBytes(new byte[] {10, 0, 0, 0, 0x02, 0, 0, 0});
         int a = w - 1, b = h - 1;
         out.writeBytes(new byte[] {(byte) a, (byte) (a >> 8), (byte) (a >> 16), (byte) b, (byte) (b >> 8), (byte) (b >> 16)});
         for (int i = 0; i < frames; i++) {
-            out.writeBytes("ANMF".getBytes());
+            out.writeBytes("ANMF".getBytes(UTF_8));
             out.writeBytes(new byte[] {16, 0, 0, 0});
             out.writeBytes(new byte[] {0, 0, 0, 0, 0, 0, (byte) a, (byte) (a >> 8), (byte) (a >> 16), (byte) b, (byte) (b >> 8),
                 (byte) (b >> 16), 100, 0, 0, 0});

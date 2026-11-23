@@ -42,13 +42,11 @@ final class HtmlView {
     /** Far deeper than any real message, far shallower than the UI thread's stack (and the scene graph's) can take. */
     private static final int MAX_DEPTH = 64;
 
-    private final double available;
     private final MessageMedia media;
     private final Consumer<String> openLink;
     private int depth;
 
-    private HtmlView(double available, MessageMedia media, Consumer<String> openLink) {
-        this.available = available;
+    private HtmlView(MessageMedia media, Consumer<String> openLink) {
         this.media = media;
         this.openLink = openLink;
     }
@@ -57,7 +55,7 @@ final class HtmlView {
         VBox root = new VBox(4);
         root.getStyleClass().add("html");
         root.setMaxWidth(width);
-        new HtmlView(width, media, openLink).contents(Jsoup.parseBodyFragment(html).body(), root, width, Look.PLAIN);
+        new HtmlView(media, openLink).contents(Jsoup.parseBodyFragment(html).body(), root, width, Look.PLAIN);
         return root;
     }
 
@@ -94,7 +92,7 @@ final class HtmlView {
     }
 
     /** Blocks stack in {@code target}; text between them runs together in a flow, opened when the first of it arrives. */
-    private final class Blocks {
+    private static final class Blocks {
         final VBox target;
         final double width;
         TextFlow run;
@@ -145,7 +143,7 @@ final class HtmlView {
 
     private void text(TextNode t, Blocks b, Look look) {
         String s = look.pre() ? t.getWholeText() : t.getWholeText().replaceAll("\\s+", " ");
-        if (s.isBlank() && (b.run == null || !look.pre() && s.isEmpty())) return;
+        if (s.isBlank() && (b.run == null || (!look.pre() && s.isEmpty()))) return;
         for (RichText.Span span : RichText.addressSpans(s)) {
             if (span.kind() == RichText.Kind.LINK) b.inline(RichText.link(span.text(), span.text(), openLink, b.width));
             else for (javafx.scene.Node n : EmojiInline.nodes(span.text(), run -> styled(run, look))) b.inline(n);

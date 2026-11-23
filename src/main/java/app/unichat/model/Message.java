@@ -18,7 +18,7 @@ public final class Message {
     private final String id;
     private final String chatId;
     private final String senderId;
-    private String senderName;
+    private final String senderName;
     private final boolean outgoing;
     private final Instant timestamp;
     private MessageType type = MessageType.TEXT;

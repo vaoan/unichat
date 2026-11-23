@@ -91,12 +91,11 @@ public final class MainView extends StackPane {
     private final app.unichat.ui.timeline.ForwardBar forwards;
     private final ExploreBar exploring;
     private final app.unichat.ui.chats.RestBar resting;
-    private final Consumer<String> openLink;
     private String pendingOpenId;
     private long pendingOpenUntil;
     private boolean infoVisible;
-    private SidePanel panel;
-    private StickerGrid stickers;
+    private final SidePanel panel;
+    private final StickerGrid stickers;
     private StickerSuggestions suggestions;
     /** Favourite and recent stickers/GIFs, shared by every chat. */
     private final MediaLibrary library =
@@ -144,7 +143,6 @@ public final class MainView extends StackPane {
             audio.stop();
             onLogout.run();
         };
-        this.openLink = openLink;
         getStyleClass().add("main-root");
 
         folderDialogs = new FolderDialogs(svc, this::showOverlay, this::hideOverlay);
@@ -268,6 +266,7 @@ public final class MainView extends StackPane {
     }
 
     /** The disk ran low or had room again, or a process of the server couldn't write: told on another thread. */
+    @SuppressWarnings("UnnecessaryLambda") // one instance: removeListener takes away what addListener added
     private final Runnable onStorage = () -> Platform.runLater(() -> showConnection(state));
 
     // ------------------------------------------------------------------ updates (coalesced)
@@ -307,7 +306,7 @@ public final class MainView extends StackPane {
                 .sorted(ChatFilter.ORDER).limit(150).toList();
         if (recent.isEmpty()) return;
         avatarsPreloaded = true;
-        for (Chat c : recent) ImageCache.load(c.avatarUrl(), svc);
+        for (Chat c : recent) { var _ = ImageCache.load(c.avatarUrl(), svc); }
     }
 
     /**

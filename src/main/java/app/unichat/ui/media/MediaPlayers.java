@@ -14,7 +14,7 @@ final class MediaPlayers {
 
     private MediaPlayers() {}
 
-    /** @return the player, or null after calling {@code onFailure} (which may also run later, on the FX thread) */
+    /** Returns the player, or null after calling {@code onFailure} (which may also run later, on the FX thread). */
     static MediaPlayer open(Path file, Runnable onFailure) {
         Media media;
         MediaPlayer player;

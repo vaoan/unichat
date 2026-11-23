@@ -122,7 +122,7 @@ public final class UploadQueue {
     /** The queue for {@code svc}, kept in {@code store} (a file in the data folder; the demo has its own). */
     public static synchronized UploadQueue of(ChatMessaging svc, Path store) {
         return QUEUES.computeIfAbsent(svc, s -> new UploadQueue(s,
-                (ms, r) -> CompletableFuture.runAsync(r, CompletableFuture.delayedExecutor(ms, TimeUnit.MILLISECONDS)), store));
+                (ms, r) -> { var _ = CompletableFuture.runAsync(r, CompletableFuture.delayedExecutor(ms, TimeUnit.MILLISECONDS)); }, store));
     }
 
     /** The queue for {@code svc} if there's one already (the composer's and the bar's are the same). */
@@ -216,7 +216,7 @@ public final class UploadQueue {
         } catch (RuntimeException e) {
             sending = CompletableFuture.failedFuture(e);
         }
-        sending.whenComplete((v, err) -> {
+        var _ = sending.whenComplete((v, err) -> {
             long wait;
             CantSend cant = cantSend(err);
             synchronized (this) {

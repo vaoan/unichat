@@ -97,7 +97,7 @@ final class VaultNext {
         PrivateKey own;
         try {
             own = KeyFactory.getInstance("X25519").generatePrivate(new PKCS8EncodedKeySpec(privateKey));
-        } catch (GeneralSecurityException | IllegalArgumentException e) {
+        } catch (GeneralSecurityException | IllegalArgumentException _) {
             throw new VaultCrypto.Broken();
         }
         return taken(slot, next, own, mine, generation, held, CHAIN);
@@ -128,7 +128,7 @@ final class VaultNext {
         byte[] key;
         try {
             key = key(own, decodePublic(ephemeral), ephemeral, mine);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new VaultCrypto.Broken();
         }
         try {
@@ -190,7 +190,7 @@ final class VaultNext {
         try {
             return KeyFactory.getInstance("X25519").generatePublic(new X509EncodedKeySpec(encoded));
         } catch (GeneralSecurityException e) {
-            throw new IllegalArgumentException("Not an X25519 public key");
+            throw new IllegalArgumentException("Not an X25519 public key", e);
         }
     }
 
@@ -209,7 +209,7 @@ final class VaultNext {
             System.arraycopy(recipient, 0, info, label.length + ephemeral.length, recipient.length);
             return VaultCrypto.hkdf(shared, info);
         } catch (GeneralSecurityException | IllegalStateException e) {
-            throw new IllegalArgumentException("The keys don't agree");
+            throw new IllegalArgumentException("The keys don't agree", e);
         } finally {
             if (shared != null) Arrays.fill(shared, (byte) 0);
         }

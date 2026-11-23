@@ -147,7 +147,7 @@ final class SealedStorage implements Storage {
         byte[] key = vk.get();
         try {
             return VaultCrypto.open(key, OldVault.aad(plain, path), sealed);
-        } catch (VaultCrypto.Broken e) {
+        } catch (VaultCrypto.Broken _) {
             throw new Damaged();
         } finally {
             Arrays.fill(key, (byte) 0);

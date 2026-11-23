@@ -4,12 +4,14 @@ import app.unichat.model.MediaLibrary;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -29,9 +31,9 @@ class GifFilesTest {
     @Test
     void aHangingDownloadGivesUp() throws Exception {
         CountDownLatch hang = new CountDownLatch(1); // the server answers only once the test is over
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
-            try { hang.await(); } catch (InterruptedException ignored) { }
+            try { hang.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
             ex.sendResponseHeaders(200, -1);
             ex.close();
         });
@@ -51,7 +53,7 @@ class GifFilesTest {
     @Test
     void onlyHttpsGifsAreFetched() throws Exception {
         java.util.concurrent.atomic.AtomicInteger hits = new java.util.concurrent.atomic.AtomicInteger();
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             hits.incrementAndGet();
             ex.sendResponseHeaders(200, -1);
@@ -70,9 +72,9 @@ class GifFilesTest {
 
     @Test
     void aGifPastTheLimitStopsAndLeavesNothingBehind() throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
-            byte[] b = "GIF89a-and-much-more".getBytes();
+            byte[] b = "GIF89a-and-much-more".getBytes(UTF_8);
             ex.sendResponseHeaders(200, 0); // no length announced: only counting what arrives can stop it
             ex.getResponseBody().write(b);
             ex.close();
@@ -100,9 +102,9 @@ class GifFilesTest {
 
     @Test
     void downloadedFileLivesInTheGifCacheFolder() throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
-            byte[] b = "GIF89a".getBytes();
+            byte[] b = "GIF89a".getBytes(UTF_8);
             ex.sendResponseHeaders(200, b.length);
             ex.getResponseBody().write(b);
             ex.close();

@@ -44,7 +44,7 @@ final class PasskeyProbeRow {
         found.setAccessibleRole(javafx.scene.AccessibleRole.TEXT);
         run.setOnAction(e -> {
             // The address on screen too: Browser.open does nothing without a browser.
-            start.start(uri -> Platform.runLater(() -> found.setText(I18n.t("settings.vault.probe.opened", uri))),
+            var _ = start.start(uri -> Platform.runLater(() -> found.setText(I18n.t("settings.vault.probe.opened", uri))),
                             f -> Platform.runLater(() -> found.setText(f.said())))
                     .whenComplete((ok, err) -> {
                         if (err != null && !(err instanceof java.util.concurrent.CancellationException)) {

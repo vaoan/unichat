@@ -135,7 +135,7 @@ public final class MessageMedia {
     }
 
     private void whenLoaded(String url, int px, java.util.function.Consumer<Image> show) {
-        svc.media(url, px, px).thenAcceptAsync(p -> {
+        var _ = svc.media(url, px, px).thenAcceptAsync(p -> {
             try {
                 Image img = AnimatedImage.still(p, px, px);
                 if (img.getHeight() > 0) Platform.runLater(() -> show.accept(img));
@@ -154,7 +154,7 @@ public final class MessageMedia {
         box.setMaxWidth(width);
         java.util.Set<String> shown = new java.util.HashSet<>();
         for (String link : links.stream().limit(MAX_LINKS_OPENED).toList()) {
-            svc.linkMedia(link).thenAcceptAsync(found -> found.ifPresent(lm -> {
+            var _ = svc.linkMedia(link).thenAcceptAsync(found -> found.ifPresent(lm -> {
                 if (shown.size() < MAX_LINK_PLAYERS && shown.add(lm.url())) box.getChildren().add(player(lm, chat));
             }), Platform::runLater);
         }
@@ -329,7 +329,7 @@ public final class MessageMedia {
         // Placeholder: a still picture shows at once; decoding a long animation takes seconds. (With direct media
         // the "thumbnail" is the original file, maybe an animated GIF: only its first frame is used.)
         CompletableFuture<Path> placeholder = sticker ? original : svc.media(m.mediaUrl(), pxW, pxH);
-        placeholder.thenAcceptAsync(p -> showStill(view, m.mediaUrl(), p, pxW, pxH, true, null), AnimatedImage.DECODER);
+        var _ = placeholder.thenAcceptAsync(p -> showStill(view, m.mediaUrl(), p, pxW, pxH, true, null), AnimatedImage.DECODER);
         original.thenAcceptAsync(p -> {
             try {
                 AnimatedImage.Frames frames = AnimatedImage.decode(p, pxW, pxH); // labelled as a sticker, maybe a plain PNG/JPEG
@@ -419,7 +419,7 @@ public final class MessageMedia {
             return;
         }
         int px = FILE_THUMB * 2;
-        svc.media(url, px, px).thenAcceptAsync(p -> {
+        var _ = svc.media(url, px, px).thenAcceptAsync(p -> {
             Image img;
             try {
                 img = AnimatedImage.still(p, px * 2, px * 2);

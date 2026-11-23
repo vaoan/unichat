@@ -203,7 +203,7 @@ class FoldersUiTest {
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
 
-        svc.leaveChat(FAMILIA);
+        var _ = svc.leaveChat(FAMILIA);
         eventually("it stops showing", () -> folderChats().getItems().isEmpty());
         assertTrue(fx(() -> showing(folderChats())), "still inside the folder");
         assertEquals(List.of(key), svc.folders().get(0).chatKeys(), "the key stays for another installation");

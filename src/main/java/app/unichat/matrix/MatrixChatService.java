@@ -114,8 +114,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         this.syncFilter = new SyncFilter(client, userId);
         this.rest = new ArchiveRest(core, syncFilter, discord, this::caughtUp, () -> nextBatch);
         rest.onWake(this::dropLongPoll);
-        discord.onConnected(rest::archivedChanged);
-        this.chatActions = new ChatActions(core, this, discord, prefs, rest::archivedChanged);
+        Runnable archivedChanged = () -> { var _ = rest.archivedChanged(); };
+        discord.onConnected(archivedChanged);
+        this.chatActions = new ChatActions(core, this, discord, prefs, archivedChanged);
         this.contacts = new ContactActions(core);
         this.stickerPacks = new StickerPackActions(core, this::accounts);
         this.profiles = new Profiles(core);
@@ -144,7 +145,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         WakeWatch.onWake(onWake);
         io.execute(profiles::loadMine);
         io.execute(bridges::checkBridges);
-        timer.scheduleWithFixedDelay(chatActions::checkReminders, 10, 10, TimeUnit.SECONDS);
+        var _ = timer.scheduleWithFixedDelay(chatActions::checkReminders, 10, 10, TimeUnit.SECONDS);
         bridges.watchLiveStates();
     }
 
@@ -210,7 +211,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 Thread.sleep(30_000);
                 if (!core.running) return;
                 String path = CLIENT + "/sync?filter=" + enc(SyncFilter.BASE) + "&timeout=0";
-                cache.save(client.request("GET", path, null, Duration.ofSeconds(300)));
+                cache.save(client.request("GET", path, null, Duration.ofMinutes(5)));
             } catch (Exception e) {
                 System.err.println("Sync cache refresh failed: " + e);
             }
@@ -435,7 +436,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
 
     private void dispatch(SyncProcessor.Result r, boolean notify) {
         r.sendStatuses.forEach(core.statuses::heard);
-        r.bridgeNotReady.keySet().forEach(sender::sendAgainWhenReady);
+        r.bridgeNotReady.keySet().forEach(id -> { var _ = sender.sendAgainWhenReady(id); });
         if (r.chatsChanged) core.fire(Listener::chatsChanged);
         for (String id : r.messagesChanged) core.fire(l -> l.messagesChanged(id));
         // Read elsewhere (the phone, another client): nothing up to there is news any more.
@@ -615,9 +616,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     }
     @Override public boolean mediaHidden(String chatId) { return chatActions.mediaHidden(chatId); }
     @Override public CompletableFuture<Void> setArchived(String chatId, boolean archived) { return chatActions.setArchived(chatId, archived); }
-    @Override public void setArchiveOpen(boolean open) { rest.setArchiveOpen(open); }
-    @Override public void archivedChatOpened(String chatId) { rest.archivedChatOpened(chatId); }
-    @Override public void setOpenChat(String chatId) { rest.setOpenChat(chatId); }
+    @Override public void setArchiveOpen(boolean open) { var _ = rest.setArchiveOpen(open); }
+    @Override public void archivedChatOpened(String chatId) { var _ = rest.archivedChatOpened(chatId); }
+    @Override public void setOpenChat(String chatId) { var _ = rest.setOpenChat(chatId); }
     @Override public Waking waking() { return rest.waking(); }
     @Override public void addWakingListener(Runnable l) { rest.addListener(l); }
     @Override public void removeWakingListener(Runnable l) { rest.removeListener(l); }

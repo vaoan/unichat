@@ -13,7 +13,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 
 import static app.unichat.matrix.SyncEvents.*;
 
@@ -21,12 +20,10 @@ import static app.unichat.matrix.SyncEvents.*;
 final class RoomFields {
     private final String me;
     private final Map<String, String> directRoomUser;
-    private final Function<String, MatrixRoom> room;
 
-    RoomFields(String me, Map<String, String> directRoomUser, Function<String, MatrixRoom> room) {
+    RoomFields(String me, Map<String, String> directRoomUser) {
         this.me = me;
         this.directRoomUser = directRoomUser;
-        this.room = room;
     }
 
     /** Recomputes title, avatar, network, group, members and preview of a room's chat. */

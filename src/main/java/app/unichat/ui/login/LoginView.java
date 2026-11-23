@@ -60,7 +60,7 @@ public final class LoginView extends StackPane {
             login.setDisable(true);
             spin.setVisible(true);
             Nodes.show(error, false);
-            MatrixLogin.login(server.getText().trim(), user.getText().trim(), pass.getText())
+            var _ = MatrixLogin.login(server.getText().trim(), user.getText().trim(), pass.getText())
                     .whenComplete((svc, err) -> Platform.runLater(() -> {
                         login.setDisable(false);
                         spin.setVisible(false);

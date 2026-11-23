@@ -330,17 +330,17 @@ public final class ChromeLogin {
             try {
                 socket = http.newWebSocketBuilder().buildAsync(URI.create(url), this).get(5, TimeUnit.SECONDS);
             } catch (ExecutionException | TimeoutException e) {
-                throw new IOException(I18n.t("login.chrome.noConnect"));
+                throw new IOException(I18n.t("login.chrome.noConnect"), e);
             }
         }
 
         String call(String message) throws IOException, InterruptedException {
             answer = new CompletableFuture<>();
-            socket.sendText(message, true);
+            var _ = socket.sendText(message, true);
             try {
                 return answer.get(10, TimeUnit.SECONDS);
             } catch (ExecutionException | TimeoutException e) {
-                throw new IOException(I18n.t("login.chrome.noAnswer"));
+                throw new IOException(I18n.t("login.chrome.noAnswer"), e);
             }
         }
 

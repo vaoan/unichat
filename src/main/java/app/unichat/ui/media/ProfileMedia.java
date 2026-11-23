@@ -29,6 +29,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -85,7 +86,7 @@ public final class ProfileMedia {
         }
     }
 
-    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy");
+    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ROOT);
     private static final int TILE = 84;
 
     private final ChatService svc;
@@ -303,7 +304,7 @@ public final class ProfileMedia {
     }
 
     private void load(ImageView v, String url) {
-        svc.media(url, TILE * 2, TILE * 2).thenAcceptAsync(p -> {
+        var _ = svc.media(url, TILE * 2, TILE * 2).thenAcceptAsync(p -> {
             try {
                 Image img = AnimatedImage.still(p, TILE * 2, TILE * 2);
                 Platform.runLater(() -> v.setImage(img));

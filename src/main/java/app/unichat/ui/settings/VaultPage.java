@@ -74,7 +74,7 @@ final class VaultPage {
         inStep = false;
         int mine = ++asked;
         if (shown == null) show(actions(Labels.help(I18n.t("settings.vault.reading"))));
-        cloud.vault().vaultView().whenComplete((v, err) -> Platform.runLater(() -> {
+        var _ = cloud.vault().vaultView().whenComplete((v, err) -> Platform.runLater(() -> {
             // Two in flight (the sheet closed, and a round saying the state changed): the later one drew over the step
             // opened after the first, "Olvidar la bóveda en este equipo" gone as soon as shown.
             if (mine != asked || inStep) return;
@@ -107,13 +107,13 @@ final class VaultPage {
         Label error = error();
         create.setOnAction(e -> {
             create.setDisable(true);
-            cloud.vault().createVault().whenComplete((code, err) -> Platform.runLater(() -> {
+            var _ = cloud.vault().createVault().whenComplete((code, err) -> Platform.runLater(() -> {
                 create.setDisable(false);
                 if (err != null) {
                     say(error, Errors.message(Errors.unwrap(err)));
                     return;
                 }
-                cloud.syncNow();
+                var _ = cloud.syncNow();
                 showCode(code, I18n.t("settings.vault.created"));
             }));
         });
@@ -123,10 +123,10 @@ final class VaultPage {
     /** A code to keep, shown once and asked back; then the vault as it is now. */
     private void showCode(String code, String before) {
         inStep = true;
-        show(line(before), new RecoveryCodeSheet(code, () -> cloud.vault().codeKept().whenComplete((ok, err) -> Platform.runLater(() -> {
+        show(line(before), new RecoveryCodeSheet(code, () -> { var _ = cloud.vault().codeKept().whenComplete((ok, err) -> Platform.runLater(() -> {
             if (err == null) reload();
             else show(actions(KeyChangeFlow.warning(I18n.t("settings.vault.code.keptFailed", Errors.message(Errors.unwrap(err))))), retry());
-        })), this::reload));
+        })); }, this::reload));
     }
 
     /** Not open here: how to open it, and (locked, not removed) going on without it, or deleting it to start again. */
@@ -138,8 +138,8 @@ final class VaultPage {
             Button decline = secondary(I18n.t("settings.vault.decline"));
             decline.setOnAction(e -> {
                 decline.setDisable(true);
-                cloud.vault().declineVault(true).whenComplete((ok, err) -> Platform.runLater(() -> {
-                    cloud.syncNow();
+                var _ = cloud.vault().declineVault(true).whenComplete((ok, err) -> Platform.runLater(() -> {
+                    var _ = cloud.syncNow();
                     reload();
                 }));
             });
@@ -176,18 +176,18 @@ final class VaultPage {
     /** A step that changes how the vault stands here: done, a round and the page drawn again; failed, why and "Intentar de nuevo". */
     private void job(java.util.concurrent.CompletableFuture<Void> step) {
         show(line(I18n.t("settings.vault.reading")));
-        step.whenComplete((ok, err) -> Platform.runLater(() -> {
+        var _ = step.whenComplete((ok, err) -> Platform.runLater(() -> {
             if (err != null) {
                 show(actions(KeyChangeFlow.warning(Errors.message(Errors.unwrap(err)))), retry());
                 return;
             }
-            cloud.syncNow();
+            var _ = cloud.syncNow();
             reload();
         }));
     }
 
     private void opened() {
-        cloud.syncNow();
+        var _ = cloud.syncNow();
         reload();
     }
 
@@ -230,7 +230,7 @@ final class VaultPage {
         Button b = secondary(I18n.t("settings.vault.newCode"));
         b.setOnAction(e -> {
             b.setDisable(true);
-            cloud.vault().newRecoveryCode().whenComplete((code, err) -> Platform.runLater(() -> {
+            var _ = cloud.vault().newRecoveryCode().whenComplete((code, err) -> Platform.runLater(() -> {
                 b.setDisable(false);
                 if (err != null) show(line(Errors.message(Errors.unwrap(err))), retry());
                 else showCode(code, I18n.t("settings.vault.newCodeMade"));
@@ -274,13 +274,13 @@ final class VaultPage {
     private void changeKey(VaultView.Computer removing) {
         inStep = true;
         show(line(I18n.t("settings.vault.reading")));
-        cloud.vault().vaultView().whenComplete((now, err) -> Platform.runLater(() -> {
+        var _ = cloud.vault().vaultView().whenComplete((now, err) -> Platform.runLater(() -> {
             if (err != null || now.state() != Cloud.VaultState.OPEN) {
                 show(line(err != null ? I18n.t("settings.vault.unreadable", Errors.message(Errors.unwrap(err))) : I18n.t("cloud.error.vaultNotOpen")), retry());
                 return;
             }
             show(KeyChangeFlow.confirm(cloud, now, removing, r -> {
-                cloud.syncNow();
+                var _ = cloud.syncNow();
                 show(KeyChangeFlow.result(cloud, r, this::addPassword, this::reload));
             }, this::reload));
         }));
@@ -297,13 +297,13 @@ final class VaultPage {
         Label error = error();
         yes.setOnAction(e -> {
             yes.setDisable(true);
-            cloud.vault().forgetHere().whenComplete((ok, err) -> Platform.runLater(() -> {
+            var _ = cloud.vault().forgetHere().whenComplete((ok, err) -> Platform.runLater(() -> {
                 yes.setDisable(false);
                 if (err != null) {
                     say(error, Errors.message(Errors.unwrap(err)));
                     return;
                 }
-                cloud.syncNow();
+                var _ = cloud.syncNow();
                 reload();
             }));
         });
@@ -337,14 +337,14 @@ final class VaultPage {
      */
     private void turningOff() {
         show(line(I18n.t("settings.vault.turnOffWorking")));
-        cloud.vault().turnOffVault().whenComplete((ok, err) -> Platform.runLater(() -> {
+        var _ = cloud.vault().turnOffVault().whenComplete((ok, err) -> Platform.runLater(() -> {
             if (err == null) {
-                cloud.syncNow();
+                var _ = cloud.syncNow();
                 reload();
                 return;
             }
             String why = Errors.message(Errors.unwrap(err));
-            cloud.vault().vaultView().whenComplete((v, unread) -> Platform.runLater(() -> {
+            var _ = cloud.vault().vaultView().whenComplete((v, unread) -> Platform.runLater(() -> {
                 if (v != null && v.state() != Cloud.VaultState.OPEN) {
                     notice = why;
                     noticeFor = v.state();
@@ -352,7 +352,7 @@ final class VaultPage {
                     inStep = false;
                     asked++; // drawn without a reload: one still on its way is older than this
                     draw(v);
-                    cloud.syncNow();
+                    var _ = cloud.syncNow();
                     return;
                 }
                 Button again = secondary(I18n.t("settings.vault.retry"));

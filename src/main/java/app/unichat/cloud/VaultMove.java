@@ -294,7 +294,7 @@ final class VaultMove {
         for (String name : names) {
             if (name.equals(TextIndex.NAME)) continue;
             Long size = theirs.get(name), have = held.get(name);
-            if (have == null || size != null && have < size) { // not sent sealed yet: nothing is read until it is
+            if (have == null || (size != null && have < size)) { // not sent sealed yet: nothing is read until it is
                 all = false;
                 continue;
             }

@@ -35,6 +35,7 @@ final class DemoMedia {
     }
 
     /** Renders a placeholder "photo" (gradient + caption) once and caches it. */
+    @SuppressWarnings("MathAbsoluteNegative") // only one hash in 2^32 stays negative, and that seed still draws a picture
     static synchronized Path demoImage(String name) throws IOException {
         Path dir = Settings.get().cacheDir().resolve("demo");
         Files.createDirectories(dir);

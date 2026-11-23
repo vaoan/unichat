@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -131,7 +132,7 @@ class ArchiveRestTest {
         }
     }
 
-    private static TreeSet<String> set(String... ids) {
+    private static SortedSet<String> set(String... ids) {
         return new TreeSet<>(List.of(ids));
     }
 

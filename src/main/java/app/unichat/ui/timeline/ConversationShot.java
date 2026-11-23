@@ -69,12 +69,12 @@ final class ConversationShot {
             HBox cell = new HBox(n);
             HBox.setHgrow(n, javafx.scene.layout.Priority.ALWAYS);
             cell.getStyleClass().add("shot-row");
-            if (r instanceof ThreadRows.MessageRow) cell.setUserData(Boolean.TRUE); // a piece may end after it, not after a day's line
+            if (r instanceof ThreadRows.MessageRow) cell.setUserData(true); // a piece may end after it, not after a day's line
             rows.getChildren().add(cell);
         }
         VBox root = new VBox(top, rows);
         if (footer) {
-            Label f = new Label(I18n.t("capture.footer", DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withLocale(I18n.locale())
+            Label f = new Label(I18n.t("capture.footer", DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", I18n.locale())
                     .format(Instant.now().atZone(ZoneId.systemDefault()))));
             f.getStyleClass().add("shot-footer");
             HBox line = new HBox(f);

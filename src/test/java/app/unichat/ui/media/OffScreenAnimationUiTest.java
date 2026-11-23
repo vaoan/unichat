@@ -54,7 +54,7 @@ class OffScreenAnimationUiTest {
         List<ImageView> views = new ArrayList<>();
         Stage stage = FxWait.fx(() -> {
             VBox column = new VBox(4);
-            for (AnimatedImage.Frames f : decoded) {
+            for (AnimatedImage.Frames _ : decoded) {
                 ImageView v = new ImageView();
                 views.add(v);
                 column.getChildren().add(v);

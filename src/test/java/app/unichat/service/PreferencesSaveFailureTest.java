@@ -96,7 +96,8 @@ class PreferencesSaveFailureTest {
         try {
             readOnly(true);
             // Even with the caller back inside the monitor and waiting: a listener on this thread or needing the lock would hang here.
-            synchronized (p) {
+            PreferencesFile held = p;
+            synchronized (held) {
                 p.choose(K, Flag.MUTED, true);
                 p.flush();
                 assertTrue(Thread.holdsLock(p));

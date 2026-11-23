@@ -16,6 +16,8 @@ public final class AccountAlerts {
     private AccountAlerts() {}
 
     /**
+     * One account that needs attention.
+     *
      * @param who     the network, and the account when it has several
      * @param text    the whole explanation (tooltip, screen readers)
      * @param relink  only a new login fixes it (button shown); otherwise Unichat is recovering it by itself
@@ -24,6 +26,8 @@ public final class AccountAlerts {
     public record Alert(Network network, String who, String text, boolean relink, boolean syncing) {}
 
     /**
+     * The accounts that need attention, one alert each.
+     *
      * @param inUse networks with chats: a closed session only matters there (a bridge installed but never signed
      *              in to also reads as "needs login", and that's not news)
      */

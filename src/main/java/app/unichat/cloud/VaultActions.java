@@ -143,15 +143,17 @@ final class VaultActions {
     private static byte[] unwrap(VaultSlot slot, VaultView.Way way, char[] secret) {
         byte[] key = null;
         try {
-            if (way == VaultView.Way.RECOVERY) {
-                RecoveryCode code = RecoveryCode.parse(secret);
-                if (code == null) return null;
-                key = VaultSlot.recoveryKey(code);
-                Arrays.fill(code.bits(), (byte) 0);
-            } else if (way == VaultView.Way.PASSWORD) {
-                key = VaultSlot.passwordKey(secret, slot.params());
-            } else {
-                return null; // Google and the passkey open in the browser
+            switch (way) {
+                case RECOVERY -> {
+                    RecoveryCode code = RecoveryCode.parse(secret);
+                    if (code == null) return null;
+                    key = VaultSlot.recoveryKey(code);
+                    Arrays.fill(code.bits(), (byte) 0);
+                }
+                case PASSWORD -> key = VaultSlot.passwordKey(secret, slot.params());
+                default -> {
+                    return null; // Google and the passkey open in the browser
+                }
             }
             return slot.unwrap(key);
         } catch (VaultCrypto.Broken e) {
@@ -177,7 +179,7 @@ final class VaultActions {
         Arrays.fill(computer.key(), (byte) 0);
     }
 
-    /** Another computer's way into the vault taken away; this one's own goes by {@link Cloud#forgetHere}. */
+    /** Another computer's way into the vault taken away; this one's own goes by {@link CloudVault#forgetHere}. */
     static void remove(Storage dav, String machine) throws IOException {
         if (Cloud.machine().equals(machine)) throw new IllegalArgumentException("This computer is forgotten with forgetHere");
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");

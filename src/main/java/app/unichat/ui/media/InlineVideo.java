@@ -60,7 +60,7 @@ final class InlineVideo extends StackPane {
 
     private void load() {
         long mine = ++generation;
-        svc.media(url, 0, 0).whenComplete((p, err) -> Platform.runLater(() -> {
+        var _ = svc.media(url, 0, 0).whenComplete((p, err) -> Platform.runLater(() -> {
             if (mine != generation || getScene() == null) return; // released meanwhile
             if (err != null || p == null) failed();
             else play(p);

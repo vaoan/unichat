@@ -14,6 +14,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 
 /**
@@ -25,7 +26,7 @@ import java.util.stream.Stream;
 final class StyleHistory {
     static final int KEEP = 20;
     static final String FOLDER = "writing-style-history";
-    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssSSS'Z'").withZone(ZoneOffset.UTC);
+    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssSSS'Z'", Locale.ROOT).withZone(ZoneOffset.UTC);
     private static final String LEARNED = ".md", UNDONE = ".undone.md";
 
     /** One kept version: {@code when} it was replaced (or undone). */

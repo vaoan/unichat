@@ -82,7 +82,7 @@ public final class Avatar extends StackPane {
             return;
         }
         image.setVisible(false);
-        ImageCache.load(url, service).thenAccept(img -> {
+        var _ = ImageCache.load(url, service).thenAccept(img -> {
             if (img == null) return; // no photo available: keep the initials
             Platform.runLater(() -> {
                 if (!url.equals(loadedUrl)) return;

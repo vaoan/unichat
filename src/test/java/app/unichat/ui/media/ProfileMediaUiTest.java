@@ -100,7 +100,7 @@ class ProfileMediaUiTest {
         String id = "!family:demo";
         svc.setMediaHidden(id, false).get();
         java.nio.file.Path clip = java.nio.file.Files.writeString(dir.resolve("clip.mp4"), "not really a video");
-        svc.sendFile(id, clip, null, app.unichat.service.SendAs.AS_IS, p -> { });
+        var _ = svc.sendFile(id, clip, null, app.unichat.service.SendAs.AS_IS, p -> { });
         app.unichat.model.Message video = svc.messages(id).getLast();
         video.setType(app.unichat.model.MessageType.VIDEO);
         app.unichat.model.Message note = svc.messages(id).stream()

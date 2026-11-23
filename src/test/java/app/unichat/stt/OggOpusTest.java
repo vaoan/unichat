@@ -9,6 +9,7 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,7 +32,7 @@ class OggOpusTest {
         assertEquals(2.0, seconds, 0.05, "pre-skip removed, nothing lost");
 
         ByteBuffer b = ByteBuffer.wrap(Files.readAllBytes(wav)).order(ByteOrder.LITTLE_ENDIAN);
-        assertEquals("RIFF", new String(Files.readAllBytes(wav), 0, 4));
+        assertEquals("RIFF", new String(Files.readAllBytes(wav), 0, 4, UTF_8));
         assertEquals(1, b.getShort(22), "mono");
         assertEquals(16_000, b.getInt(24));
         assertEquals(16, b.getShort(34), "16-bit");

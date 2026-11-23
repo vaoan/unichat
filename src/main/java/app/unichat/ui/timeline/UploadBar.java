@@ -143,7 +143,7 @@ public final class UploadBar extends TaskBar {
         String kind = kind(f);
         lead.getChildren().setAll(Icons.icon("video".equals(kind) ? Icons.PLAY : Icons.FILE, 22));
         if (!"image".equals(kind)) return;
-        CompletableFuture.supplyAsync(() -> {
+        var _ = CompletableFuture.supplyAsync(() -> {
             try {
                 Image img = AnimatedImage.still(f, THUMB * 2, THUMB * 2);
                 return img.isError() ? null : img;

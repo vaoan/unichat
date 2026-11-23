@@ -134,7 +134,7 @@ final class Watchdog {
             t.setDaemon(true);
             return t;
         });
-        timer.scheduleWithFixedDelay(this::check, PROBE_EVERY_MS, PROBE_EVERY_MS, TimeUnit.MILLISECONDS);
+        var _ = timer.scheduleWithFixedDelay(this::check, PROBE_EVERY_MS, PROBE_EVERY_MS, TimeUnit.MILLISECONDS);
     }
 
     synchronized void stop() {
@@ -174,10 +174,12 @@ final class Watchdog {
                 String why = once != null ? once : why(name, h, round);
                 Long last = lastRestart.get(name);
                 int row = inARow.getOrDefault(name, 0);
-                // A long quiet run since the last restart: the next one starts with a short wait again.
-                if (last != null && why == null && now - last > MAX_COOLDOWN_MS) inARow.put(name, row = 0);
-                if (once != null) inARow.put(name, row = 0);
-                else if (why == null || (last != null && now - last < cooldown(row))) continue;
+                // Once, or a long quiet run since the last restart: the next one starts with a short wait again.
+                if (once != null || (last != null && why == null && now - last > MAX_COOLDOWN_MS)) {
+                    row = 0;
+                    inARow.put(name, row);
+                }
+                if (once == null && (why == null || (last != null && now - last < cooldown(row)))) continue;
                 // A hung process can't lose more than it has; anything else waits until a restart can't cost its session.
                 if (h.probeFailures() < PROBE_FAILURES && !keeper.safeToRestart(name)) continue;
                 System.err.println("Watchdog: restarting " + name + " (" + why + ")");

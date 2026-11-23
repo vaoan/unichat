@@ -79,7 +79,7 @@ public record ChatFilter(View view, Network network, String accountId, boolean u
         String nq = normalize(q);
         return all.stream()
                 .filter(c -> !c.space())
-                .filter(c -> !c.bridgeBot() || bots && !nq.isEmpty())
+                .filter(c -> !c.bridgeBot() || (bots && !nq.isEmpty()))
                 .filter(c -> nq.isEmpty() || normalize(c.title()).contains(nq))
                 .sorted(ORDER).toList();
     }

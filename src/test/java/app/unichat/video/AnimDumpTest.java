@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -84,7 +85,7 @@ class AnimDumpTest {
     @Test
     void portableAnymapIsReadAsArgb() throws Exception {
         Path pam = dir.resolve("f.pam");
-        byte[] head = "P7\nWIDTH 2\nHEIGHT 1\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n".getBytes();
+        byte[] head = "P7\nWIDTH 2\nHEIGHT 1\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n".getBytes(UTF_8);
         byte[] px = {(byte) 255, 0, 0, (byte) 255, 0, 0, (byte) 255, (byte) 128};
         byte[] all = new byte[head.length + px.length];
         System.arraycopy(head, 0, all, 0, head.length);

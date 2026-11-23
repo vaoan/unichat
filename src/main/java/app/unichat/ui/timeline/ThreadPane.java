@@ -44,6 +44,7 @@ import javafx.scene.layout.VBox;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 
 /** Right side: chat header, message timeline, typing line and composer. */
@@ -94,9 +95,9 @@ public final class ThreadPane extends BorderPane {
     private ForwardSheet forwardSheet;
     private DeleteSheet deleteSheet;
     private SavedTextSheet savedTextSheet;
-    private MessageFixer messageFixer;
-    private SendQueue sendQueue;
-    private SendQueueView sendQueueView;
+    private final MessageFixer messageFixer;
+    private final SendQueue sendQueue;
+    private final SendQueueView sendQueueView;
     private final MessageSelection.Purpose forwarding, deleting, capturing;
     private CaptureSheet captureSheet;
     private final Consumer<String> toast;
@@ -115,9 +116,9 @@ public final class ThreadPane extends BorderPane {
         messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, library, this::getScene, this::member,
                 this::jumpTo);
 
-        favButton = Icons.iconButton(Icons.STAR, I18n.t("thread.favorite"), () -> svc.setFavorite(chat.id(), !chat.favorite()));
+        favButton = Icons.iconButton(Icons.STAR, I18n.t("thread.favorite"), () -> { var _ = svc.setFavorite(chat.id(), !chat.favorite()); });
         archiveButton = Icons.iconButton(Icons.ARCHIVE, I18n.t("thread.archive", Shortcuts.key("E")),
-                () -> svc.setArchived(chat.id(), !chat.archived()));
+                () -> { var _ = svc.setArchived(chat.id(), !chat.archived()); });
         configureTimeline();
         selection = new MessageSelection(list, this::showSelectionBar);
         forwarding = new MessageSelection.Purpose("select.forward", "primary-button",
@@ -375,7 +376,7 @@ public final class ThreadPane extends BorderPane {
             for (Message m : messages) {
                 failed = failed.thenCompose(n -> svc.deleteMessage(chatId, m.id()).handle((v, e) -> e == null ? n : n + 1));
             }
-            failed.thenAccept(n -> Platform.runLater(() -> toast.accept(n == 0 ? I18n.n("delete.done", messages.size())
+            var _ = failed.thenAccept(n -> Platform.runLater(() -> toast.accept(n == 0 ? I18n.n("delete.done", messages.size())
                     : I18n.n("delete.failed", n))));
         });
     }
@@ -429,7 +430,7 @@ public final class ThreadPane extends BorderPane {
             }
             return prompt;
         });
-        messageFixer.fix(mine.getLast());
+        var _ = messageFixer.fix(mine.getLast());
     }
 
     /**
@@ -441,7 +442,7 @@ public final class ThreadPane extends BorderPane {
         Message m = svc.messages(chat.id()).getLast();
         java.time.Instant at = m.timestamp() == null ? java.time.Instant.now() : m.timestamp();
         List<app.unichat.autosave.SavedText> versions = none ? List.of() : List.of(
-                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at, m.senderName(), m.senderId(), m.outgoing(), m.body().toLowerCase(), true),
+                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at, m.senderName(), m.senderId(), m.outgoing(), m.body().toLowerCase(Locale.ROOT), true),
                 new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at.plusSeconds(5), m.senderName(), m.senderId(), m.outgoing(), m.body() + "…", false),
                 new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at.plusSeconds(90), m.senderName(), m.senderId(), m.outgoing(), m.body(), false));
         savedTextSheet.show(java.util.concurrent.CompletableFuture.completedFuture(versions));
@@ -532,7 +533,7 @@ public final class ThreadPane extends BorderPane {
         List<ThreadRows.Row> next = ThreadRows.build(msgs, ZoneId.systemDefault());
         if (forceBottom) rows.setAll(next); else ThreadRows.update(rows, next);
         // Drawn from elsewhere than the messages: photos of who's in the chat, what it allows, and "Hoy" on the day separators.
-        int surroundings = java.util.Objects.hash(chat.id(), chat.members(), chat.features(), java.time.LocalDate.now());
+        int surroundings = java.util.Objects.hash(chat.id(), chat.members(), chat.features(), java.time.LocalDate.now(ZoneId.systemDefault()));
         if (surroundings != drawnWith && !forceBottom) list.refresh();
         drawnWith = surroundings;
         if (selected != null && !forceBottom) select(selected);
@@ -558,7 +559,7 @@ public final class ThreadPane extends BorderPane {
         String id = chat.id();
         // Loaded because the chat is short (not because you scrolled to the top): keep showing the newest.
         boolean followBottom = scroll.pinned();
-        svc.loadOlder(id).whenComplete((more, err) -> Platform.runLater(() -> {
+        var _ = svc.loadOlder(id).whenComplete((more, err) -> Platform.runLater(() -> {
             loadingOlder = false;
             if (chat == null || !chat.id().equals(id)) return;
             if (err != null || Boolean.FALSE.equals(more)) reachedStart = true;

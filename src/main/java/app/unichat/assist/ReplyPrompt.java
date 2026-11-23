@@ -21,10 +21,10 @@ public final class ReplyPrompt {
     static final int MAX_CHAT_CHARS = 60_000;
     /** Voice notes transcribed before a draft: each takes Whisper a while, and the newest are the ones being answered. */
     static final int MAX_VOICE_NOTES = 6;
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT).withZone(ZoneId.systemDefault());
     private static final DateTimeFormatter NOW = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy, HH:mm", Locale.ENGLISH);
-    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ROOT);
+    private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT);
 
     /**
      * The instructions are English; the reply is in the person's language with this contact, and a message they already
@@ -37,6 +37,8 @@ public final class ReplyPrompt {
     private ReplyPrompt() {}
 
     /**
+     * The prompt for a reply to {@code chat}, with no voice notes heard yet.
+     *
      * @param target the message to answer, or null for the last one
      * @param idea   what the person already wrote in the box, or blank
      */
@@ -59,7 +61,7 @@ public final class ReplyPrompt {
     /** {@code examples}: how earlier drafts were corrected ({@link StylePrompt#examplesSection}). */
     public static String build(String instructions, boolean canReadFolder, List<Message> chat, Message target, String idea,
                                Map<String, String> heard, String style, List<StylePrompt.Correction> examples) {
-        return build(instructions, canReadFolder, chat, target, idea, heard, style, examples, ZonedDateTime.now());
+        return build(instructions, canReadFolder, chat, target, idea, heard, style, examples, ZonedDateTime.now(ZoneId.systemDefault()));
     }
 
     /** {@code now}: when (and in which time zone) the reply is written, so "tomorrow" or "good morning" fit. */

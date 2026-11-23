@@ -172,17 +172,19 @@ final class TextKeeping {
             if (!log.record(chatId, said)) return;
             failing.remove(chatId);
             copySoon(chatId);
-            if (sendDue.compareAndSet(false, true)) worker.schedule(() -> {
-                sendDue.set(false);
-                written.run();
-            }, settle.toMillis(), TimeUnit.MILLISECONDS);
+            if (sendDue.compareAndSet(false, true)) {
+                var _ = worker.schedule(() -> {
+                    sendDue.set(false);
+                    written.run();
+                }, settle.toMillis(), TimeUnit.MILLISECONDS);
+            }
         } catch (IOException e) {
             tellFailed(chatId, e, AutoSave.textsDir());
         }
     }
 
     private void copySoon(String chatId) {
-        if (copyDue.add(chatId)) worker.schedule(() -> copy(chatId), settle.toMillis(), TimeUnit.MILLISECONDS);
+        if (copyDue.add(chatId)) { var _ = worker.schedule(() -> copy(chatId), settle.toMillis(), TimeUnit.MILLISECONDS); }
     }
 
     private void copy(String chatId) {

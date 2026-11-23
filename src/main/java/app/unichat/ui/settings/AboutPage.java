@@ -54,7 +54,7 @@ final class AboutPage {
             say(status, I18n.t("settings.about.checking"));
             Nodes.show(result, true);
             Nodes.show(download, false);
-            UpdateChecker.get().checkNow().thenAccept(r -> Platform.runLater(() -> {
+            var _ = UpdateChecker.get().checkNow().thenAccept(r -> Platform.runLater(() -> {
                 check.setDisable(false);
                 switch (r.outcome()) {
                     case UP_TO_DATE -> say(status, I18n.t("settings.about.upToDate", AppVersion.current()));

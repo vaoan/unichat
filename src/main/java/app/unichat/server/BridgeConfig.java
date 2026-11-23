@@ -32,6 +32,8 @@ public final class BridgeConfig {
     static final String ARCHIVE_TAG = "u.archived";
 
     /**
+     * What a bridge's config is written from.
+     *
      * @param dir         the bridge's folder (database and log go there)
      * @param telegramApiId / telegramApiHash only used by the telegram bridge
      * @param statusEndpoint where the bridge reports its connection state (StatusEndpoint); null for none

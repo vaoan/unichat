@@ -1,6 +1,5 @@
 package app.unichat.server;
 
-import app.unichat.bridge.BridgeStates;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -10,6 +9,7 @@ import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.file.Files;
@@ -32,7 +32,6 @@ class MetaSessionsTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String COOKIES = "{\"xs\":\"secreto\",\"c_user\":\"1\"}";
     @TempDir Path dir;
-    private final BridgeStates states = new BridgeStates();
     private final List<String> restored = new ArrayList<>();
     private boolean redirecting;
     private MetaSessions sessions;
@@ -44,7 +43,7 @@ class MetaSessionsTest {
         Files.createDirectories(dir.resolve("instagram"));
         sql("facebook", "CREATE TABLE user_login (bridge_id TEXT NOT NULL, user_mxid TEXT NOT NULL, id TEXT NOT NULL, remote_name TEXT NOT NULL,"
                 + " remote_profile jsonb, space_room TEXT, metadata jsonb NOT NULL, PRIMARY KEY (bridge_id, id))");
-        sessions = new MetaSessions(dir, states, bridge -> redirecting, bridge -> {
+        sessions = new MetaSessions(dir, bridge -> redirecting, bridge -> {
             restored.add(bridge);
             sessions.restore(bridge);
         });
@@ -181,7 +180,7 @@ class MetaSessionsTest {
     }
 
     private URI serving(int status, String location) throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             if (location != null) ex.getResponseHeaders().add("Location", location);
             ex.sendResponseHeaders(status, -1);

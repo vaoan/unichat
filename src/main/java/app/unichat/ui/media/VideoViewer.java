@@ -54,7 +54,7 @@ final class VideoViewer {
     static Stage show(Window owner, CompletableFuture<Path> file, String title, Runnable onSave, Consumer<Path> openElsewhere) {
         VideoViewer v = new VideoViewer(openElsewhere);
         v.open(owner, title, onSave);
-        file.whenComplete((p, err) -> Platform.runLater(() -> {
+        var _ = file.whenComplete((p, err) -> Platform.runLater(() -> {
             if (!v.stage.isShowing()) return;
             if (err != null || p == null) v.fail(I18n.t("video.downloadFailed"), null);
             else v.play(p);

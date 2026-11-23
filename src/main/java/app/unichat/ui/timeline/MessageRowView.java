@@ -28,6 +28,7 @@ import javafx.scene.text.TextFlow;
 
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -105,7 +106,7 @@ final class MessageRowView {
                 quote(who, text, known);
             } else if (!asked.isDone()) {
                 text.setText(I18n.t("message.loadingOriginal"));
-                asked.thenAccept(r -> javafx.application.Platform.runLater(() -> {
+                var _ = asked.thenAccept(r -> javafx.application.Platform.runLater(() -> {
                     if (r != null) quote(who, text, r);
                     else text.setText(I18n.t("message.notLoaded"));
                 }));
@@ -286,7 +287,7 @@ final class MessageRowView {
     private Node cardWithItsVideo(LinkPreview p, boolean ownMedia, double width) {
         VBox box = new VBox(LinkPreviewCard.of(p, width, media, openLink, chat.get()));
         if (ownMedia || p.url().isEmpty()) return box;
-        svc.linkMedia(p.url()).thenAcceptAsync(found -> found.ifPresent(v ->
+        var _ = svc.linkMedia(p.url()).thenAcceptAsync(found -> found.ifPresent(v ->
                 box.getChildren().setAll(LinkPreviewCard.of(p.withVideo(v, false), width, media, openLink, chat.get()))), Platform::runLater);
         return box;
     }
@@ -294,7 +295,7 @@ final class MessageRowView {
     /** A link no bridge described: Unichat reads the page, as Telegram's server does for its apps. */
     private Node fetchedCard(String link, double width) {
         VBox box = new VBox();
-        svc.linkPreview(link).thenAcceptAsync(found -> found.ifPresent(p ->
+        var _ = svc.linkPreview(link).thenAcceptAsync(found -> found.ifPresent(p ->
                 box.getChildren().setAll(LinkPreviewCard.of(p, width, media, openLink, chat.get()))), Platform::runLater);
         return box;
     }
@@ -334,6 +335,11 @@ final class MessageRowView {
         return mediaAt.getOrDefault(mediaKey(m), 0) > (isOwnMedia(m) ? 1 : 0);
     }
 
+    /** The icon's style class, as app.css names it ("status-failed"), whatever the computer's language. */
+    static String statusClass(MessageStatus s) {
+        return "status-" + s.name().toLowerCase(Locale.ROOT);
+    }
+
     private Node statusIcon(MessageStatus s) {
         Node icon = switch (s) {
             case SENDING -> Icons.icon(Icons.CLOCK, 12);
@@ -341,7 +347,7 @@ final class MessageRowView {
             case DELIVERED, READ -> Icons.icon(Icons.CHECK_DOUBLE, 14);
             case FAILED -> Icons.icon(Icons.ERROR, 13);
         };
-        icon.getStyleClass().add("status-" + s.name().toLowerCase());
+        icon.getStyleClass().add(statusClass(s));
         return icon;
     }
 

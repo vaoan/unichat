@@ -89,8 +89,8 @@ class HiddenWindowUiTest {
 
     private void changeChatsAndMessages(int rounds) throws Exception {
         for (int i = 0; i < rounds; i++) {
-            svc.setPinned(FAMILIA, i % 2 == 0);
-            svc.setFavorite(FAMILIA, i % 2 == 0);
+            var _ = svc.setPinned(FAMILIA, i % 2 == 0);
+            var _ = svc.setFavorite(FAMILIA, i % 2 == 0);
             svc.sendText(FAMILIA, "hola " + i, null).get();
             FxWait.settled(); // every refresh asked for has run
         }
@@ -137,7 +137,7 @@ class HiddenWindowUiTest {
             return null;
         });
         FxWait.settled();
-        svc.setMarkedUnread(FAMILIA, false);
+        var _ = svc.setMarkedUnread(FAMILIA, false);
         svc.markRead(FAMILIA);
         long unread = svc.chats().stream().filter(ChatFilter::inboxUnread).count();
         String expected = unread > 0 ? "Unichat (" + unread + ")" : "Unichat";

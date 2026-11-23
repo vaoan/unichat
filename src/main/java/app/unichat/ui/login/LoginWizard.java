@@ -136,7 +136,7 @@ final class LoginWizard implements ChatService.Listener {
 
     void cancel() {
         dispose();
-        if (!finished) svc.cancelLogin(network, botChatId);
+        if (!finished) { var _ = svc.cancelLogin(network, botChatId); }
     }
 
     @Override
@@ -184,7 +184,7 @@ final class LoginWizard implements ChatService.Listener {
         if (lastImage != null && !lastImage.mediaUrl().equals(shownQr)) {
             String url = lastImage.mediaUrl();
             shownQr = url;
-            svc.media(url, 0, 0).thenAccept(p -> Platform.runLater(() -> {
+            var _ = svc.media(url, 0, 0).thenAccept(p -> Platform.runLater(() -> {
                 if (!url.equals(shownQr)) return;
                 qr.setImage(new Image(p.toUri().toString()));
                 Nodes.show(qrBox, true);

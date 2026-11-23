@@ -162,7 +162,7 @@ final class LoginChoosers {
         w.chooserActive = true;
         views.show(I18n.t("login.connectTitle", net), scroll, cancel);
 
-        CookieLogin.findBrowserSessions(n).whenComplete((sessions, err) -> Platform.runLater(() -> {
+        var _ = CookieLogin.findBrowserSessions(n).whenComplete((sessions, err) -> Platform.runLater(() -> {
             if (wizard.get() != w) return; // user left the screen meanwhile
             top.getChildren().remove(searchRow);
             showSessions(net, err != null || sessions == null ? List.of() : sessions, found, sendSession);

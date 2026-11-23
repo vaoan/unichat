@@ -213,7 +213,7 @@ public final class StickerGrid extends ScrollPane {
         if (rebuilding) return;
         rebuilding = true;
         if (!once) toast.accept(I18n.t("library.rebuilding"));
-        FavoriteRefresh.run(svc, library).whenComplete((r, err) -> Platform.runLater(() -> {
+        var _ = FavoriteRefresh.run(svc, library).whenComplete((r, err) -> Platform.runLater(() -> {
             rebuilding = false;
             if (r == null) {
                 notBefore = System.currentTimeMillis() + RETRY_MS;
@@ -263,7 +263,7 @@ public final class StickerGrid extends ScrollPane {
             return;
         }
         Runnable after = afterSent.get(); // asked now: what the box holds at the click
-        svc.sendSticker(c.id(), item, takeReply.get()).whenComplete((v, err) -> Platform.runLater(() -> {
+        var _ = svc.sendSticker(c.id(), item, takeReply.get()).whenComplete((v, err) -> Platform.runLater(() -> {
             if (err != null) {
                 toast.accept(I18n.t("sticker.sendFailed"));
                 return;

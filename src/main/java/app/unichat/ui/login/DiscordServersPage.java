@@ -42,7 +42,7 @@ final class DiscordServersPage extends StackPane {
         this.toast = toast;
         LoadingView loading = new LoadingView(I18n.t("discord.servers.loading"));
         getChildren().setAll(loading);
-        bridge.discordGuilds().whenComplete((guilds, err) -> Platform.runLater(() -> {
+        var _ = bridge.discordGuilds().whenComplete((guilds, err) -> Platform.runLater(() -> {
             if (err != null) loading.fail(I18n.t("discord.servers.readFailed", LoginTexts.rootMessage(err)));
             else show(guilds);
         }));
@@ -102,7 +102,7 @@ final class DiscordServersPage extends StackPane {
         sw.setOnAction(e -> {
             boolean want = sw.isSelected();
             sw.setDisable(true);
-            bridge.setDiscordGuildBridged(g.id(), want).whenComplete((v, ex) -> Platform.runLater(() -> {
+            var _ = bridge.setDiscordGuildBridged(g.id(), want).whenComplete((v, ex) -> Platform.runLater(() -> {
                 sw.setDisable(false);
                 if (ex != null) {
                     sw.setSelected(!want);

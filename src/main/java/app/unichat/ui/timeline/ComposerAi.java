@@ -162,7 +162,7 @@ final class ComposerAi {
     }
 
     private void learnFrom(String chatId, List<Message> chat) {
-        if (AiSettings.learnStyle()) StyleLearning.shared().request(chatId, chat, learning.get());
+        if (AiSettings.learnStyle()) { var _ = StyleLearning.shared().request(chatId, chat, learning.get()); }
     }
 
     /**

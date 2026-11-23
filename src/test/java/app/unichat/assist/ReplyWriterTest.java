@@ -196,7 +196,7 @@ class ReplyWriterTest {
             String french = corrected(engine, "je suis alle a la plage avec ma soeur");
             assertTrue(french.contains("allé") && french.contains("à la plage"), french);
             String mixed = corrected(engine, "mañana tengo el meeting, see you their");
-            assertTrue(mixed.contains("meeting") && mixed.contains("see you there") || mixed.contains("See you there"), mixed);
+            assertTrue((mixed.contains("meeting") && mixed.contains("see you there")) || mixed.contains("See you there"), mixed);
             assertTrue(mixed.contains("añana"), mixed);
         }
     }

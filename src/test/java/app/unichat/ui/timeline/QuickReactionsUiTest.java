@@ -51,7 +51,7 @@ class QuickReactionsUiTest {
                 return find(view);
             });
             MessageActionsUi actions = thread.actions();
-            assertEquals(List.of(EmojiPicker.QUICK), FxWait.fx(actions::quick), "no history: the usual six");
+            assertEquals(EmojiPicker.QUICK, FxWait.fx(actions::quick), "no history: the usual six");
             List<Message> msgs = svc.messages("!family:demo");
             Message a = msgs.get(msgs.size() - 1), b = msgs.get(msgs.size() - 2);
             FxWait.fx(() -> {
@@ -64,7 +64,7 @@ class QuickReactionsUiTest {
             });
             List<String> quick = FxWait.fx(actions::quick);
             assertEquals(List.of("🫠", "🔥"), quick.subList(0, 2), "most first; a removal isn't a use");
-            assertEquals(EmojiPicker.QUICK.length, quick.size(), "still six");
+            assertEquals(EmojiPicker.QUICK.size(), quick.size(), "still six");
             svc.stop();
             FxWait.fx(() -> { window[0].close(); return null; });
         } finally {

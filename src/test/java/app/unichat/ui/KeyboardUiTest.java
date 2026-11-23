@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
@@ -85,7 +86,7 @@ class KeyboardUiTest {
         List<Message> msgs = svc.messages("!family:demo");
         Message last = msgs.get(msgs.size() - 1);
         press(scene, KeyCode.DIGIT1, false, false);
-        assertFalse(last.reactions().containsKey(EmojiPicker.QUICK[0]), "1 doesn't react to the selected message");
+        assertFalse(last.reactions().containsKey(EmojiPicker.QUICK.getFirst()), "1 doesn't react to the selected message");
 
         press(scene, KeyCode.R, false, false);
         assertEquals("composer", fx(() -> zone(scene)), "R moves to the composer");
@@ -155,7 +156,7 @@ class KeyboardUiTest {
 
     /** As the system sends a letter: pressed, then typed, each to whatever has the focus at that moment. */
     private static void typeLetter(Scene scene, String letter) throws Exception {
-        KeyCode code = KeyCode.getKeyCode(letter.toUpperCase());
+        KeyCode code = KeyCode.getKeyCode(letter.toUpperCase(Locale.ROOT));
         for (var type : List.of(KeyEvent.KEY_PRESSED, KeyEvent.KEY_TYPED)) {
             fx(() -> {
                 Node target = scene.getFocusOwner() != null ? scene.getFocusOwner() : scene.getRoot();

@@ -7,6 +7,7 @@ import com.sun.net.httpserver.HttpServer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -14,6 +15,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /** Dropbox's API in memory, on this machine only: its token endpoint, files and upload sessions, answered as Dropbox does. */
 final class FakeDropbox implements AutoCloseable {
@@ -32,7 +35,7 @@ final class FakeDropbox implements AutoCloseable {
     FakeDropbox(String appKey, String refresh) throws IOException {
         this.appKey = appKey;
         this.refresh = refresh;
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", this::handle);
         server.start();
     }
@@ -42,6 +45,7 @@ final class FakeDropbox implements AutoCloseable {
     }
 
     /** The short-lived token stops working (as after four hours). */
+    @SuppressWarnings("NonAtomicVolatileUpdate") // only the test calls it, between requests
     void expire() {
         access = "expired-" + access;
     }
@@ -120,7 +124,7 @@ final class FakeDropbox implements AutoCloseable {
                 reply(x, 400, "{\"error_summary\": \"header not ASCII\"}");
                 return;
             }
-            JsonNode arg = argHeader != null ? JSON.readTree(argHeader) : body.length == 0 || new String(body).equals("null")
+            JsonNode arg = argHeader != null ? JSON.readTree(argHeader) : body.length == 0 || new String(body, UTF_8).equals("null")
                     ? JSON.nullNode() : JSON.readTree(body);
             switch (path) {
                 case "/2/users/get_current_account" -> reply(x, 200, "{\"email\": \"yo@correo.com\"}");

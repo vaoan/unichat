@@ -72,7 +72,7 @@ public final class UpdateChecker {
         if (started) return;
         started = true;
         listenToSeen();
-        worker.scheduleWithFixedDelay(this::tick, FIRST_LOOK.toSeconds(), LOOK_EVERY.toSeconds(), TimeUnit.SECONDS);
+        var _ = worker.scheduleWithFixedDelay(() -> { var _ = tick(); }, FIRST_LOOK.toSeconds(), LOOK_EVERY.toSeconds(), TimeUnit.SECONDS);
     }
 
     /** Seen again: looks at once whether a check is due (the ticks missed meanwhile count as one). */

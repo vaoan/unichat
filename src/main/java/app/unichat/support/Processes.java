@@ -41,7 +41,11 @@ public final class Processes {
         public static Limit whileTalking(long silentSeconds) { return new Limit(Long.MAX_VALUE, silentSeconds); }
     }
 
-    /** Runs {@code cmd} with its output discarded. @param dir where it runs; null: wherever Unichat does */
+    /**
+     * Runs {@code cmd} with its output discarded.
+     *
+     * @param dir where it runs; null: wherever Unichat does
+     */
     public static Result quiet(List<String> cmd, Path dir, long seconds) throws IOException, InterruptedException {
         ProcessBuilder b = new ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
         if (dir != null) b.directory(dir.toFile());

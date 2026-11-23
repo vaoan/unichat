@@ -108,7 +108,7 @@ public final class GifGrid extends VBox {
         FlowPane grid = new FlowPane(6, 6);
         Label loading = Labels.help(I18n.t("gif.searching"));
         content.getChildren().addAll(title, loading, grid);
-        CompletableFuture.supplyAsync(() -> q.isEmpty() ? providers.trending(LIMIT) : providers.search(q, LIMIT))
+        var _ = CompletableFuture.supplyAsync(() -> q.isEmpty() ? providers.trending(LIMIT) : providers.search(q, LIMIT))
                 .thenAccept(gifs -> Platform.runLater(() -> {
                     if (gen != generation) return; // a newer search replaced this one
                     content.getChildren().remove(loading);
@@ -201,7 +201,7 @@ public final class GifGrid extends VBox {
         if (c == null) return;
         toast.accept(I18n.t("gif.sending"));
         String reply = takeReply.get();
-        file.thenCompose(p -> svc.sendGif(c.id(), p, item.mime() == null ? "image/gif" : item.mime(), item.width(), item.height(), reply))
+        var _ = file.thenCompose(p -> svc.sendGif(c.id(), p, item.mime() == null ? "image/gif" : item.mime(), item.width(), item.height(), reply))
                 .whenComplete((v, err) -> Platform.runLater(() -> {
                     if (err != null) {
                         toast.accept(I18n.t("gif.sendFailed"));

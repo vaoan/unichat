@@ -7,6 +7,7 @@ import app.unichat.service.ChatService;
 import org.junit.jupiter.api.Test;
 
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,11 +31,11 @@ class ContactServiceTest {
 
     @Test
     void aNetworkWithoutSearchIsLearntFromTheFirstSearch() throws Exception {
-        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0);
         java.util.List<String> bodies = new java.util.concurrent.CopyOnWriteArrayList<>();
         server.createContext("/", ex -> {
-            bodies.add(new String(ex.getRequestBody().readAllBytes()));
-            byte[] b = "{\"errcode\":\"M_UNRECOGNIZED\"}".getBytes();
+            bodies.add(new String(ex.getRequestBody().readAllBytes(), UTF_8));
+            byte[] b = "{\"errcode\":\"M_UNRECOGNIZED\"}".getBytes(UTF_8);
             ex.sendResponseHeaders(404, b.length);
             ex.getResponseBody().write(b);
             ex.close();

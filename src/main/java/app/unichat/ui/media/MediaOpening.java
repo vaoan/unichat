@@ -22,7 +22,7 @@ public final class MediaOpening {
             toast.accept(I18n.t("media.downloadFailed"));
             return;
         }
-        svc.media(m.mediaUrl(), 0, 0).whenComplete((p, err) -> {
+        var _ = svc.media(m.mediaUrl(), 0, 0).whenComplete((p, err) -> {
             if (err != null) Platform.runLater(() -> toast.accept(I18n.t("media.downloadFailed")));
             else Browser.openFile(p, () -> toast.accept(I18n.t("media.openFailed")));
         });
@@ -48,7 +48,7 @@ public final class MediaOpening {
         CompletableFuture<Path> video = app.unichat.autosave.LinkVideo.of(url);
         Stage player = VideoViewer.show(owner, video, I18n.t("media.reelTitle"), null,
                 p -> Browser.openFile(p, () -> openLink.accept(url)));
-        video.whenComplete((p, failed) -> {
+        var _ = video.whenComplete((p, failed) -> {
             if (failed == null) return;
             System.err.println("Reel not playable here, opening its page: " + failed);
             Platform.runLater(() -> {

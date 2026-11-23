@@ -104,12 +104,12 @@ public final class InfoPane extends ScrollPane {
         // three (ActionGrid decides from the width it gets).
         ActionGrid actions = new ActionGrid(8);
         actions.getChildren().addAll(
-                action(Icons.BELL_OFF, c.muted() ? I18n.t("info.unmute") : I18n.t("info.mute"), c.muted(), () -> svc.setMuted(c.id(), !c.muted())),
-                action(Icons.STAR, I18n.t("info.favorite"), c.favorite(), () -> svc.setFavorite(c.id(), !c.favorite())),
-                action(Icons.PIN, I18n.t("info.pin"), c.pinned(), () -> svc.setPinned(c.id(), !c.pinned())),
-                action(Icons.ARCHIVE, c.archived() ? I18n.t("info.archived") : I18n.t("info.archive"), c.archived(), () -> svc.setArchived(c.id(), !c.archived())),
+                action(Icons.BELL_OFF, c.muted() ? I18n.t("info.unmute") : I18n.t("info.mute"), c.muted(), () -> { var _ = svc.setMuted(c.id(), !c.muted()); }),
+                action(Icons.STAR, I18n.t("info.favorite"), c.favorite(), () -> { var _ = svc.setFavorite(c.id(), !c.favorite()); }),
+                action(Icons.PIN, I18n.t("info.pin"), c.pinned(), () -> { var _ = svc.setPinned(c.id(), !c.pinned()); }),
+                action(Icons.ARCHIVE, c.archived() ? I18n.t("info.archived") : I18n.t("info.archive"), c.archived(), () -> { var _ = svc.setArchived(c.id(), !c.archived()); }),
                 action(Icons.LOW, c.lowPriority() ? I18n.t("info.toInbox") : I18n.t("info.toLowPriority"), c.lowPriority(),
-                        () -> svc.setLowPriority(c.id(), !c.lowPriority())),
+                        () -> { var _ = svc.setLowPriority(c.id(), !c.lowPriority()); }),
                 action(Icons.SETTINGS, I18n.t("thread.chatOptions"), false, () -> {
                     if (onOptions != null) onOptions.accept(c);
                 }));

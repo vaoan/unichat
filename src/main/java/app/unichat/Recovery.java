@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.NotificationEmitter;
@@ -34,6 +35,7 @@ final class Recovery {
     private Recovery() { }
 
     /** How this run was started: after which process ({@code -1}: none), the restarts in a row, and the app's arguments. */
+    @SuppressWarnings("ArrayRecordComponent") // the arguments as main gets them, never compared
     record Start(long waitFor, int restarts, String[] args) {
         static Start of(String[] args) {
             long after = -1;
@@ -166,7 +168,7 @@ final class Recovery {
         for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
             long max = pool.getUsage().getMax();
             if (pool.getType() != MemoryType.HEAP || !pool.isCollectionUsageThresholdSupported() || max <= 0) continue;
-            if (!pool.getName().toLowerCase().contains("old")) continue;
+            if (!pool.getName().toLowerCase(Locale.ROOT).contains("old")) continue;
             pool.setCollectionUsageThreshold((long) (max * NEARLY_FULL));
         }
         ((NotificationEmitter) ManagementFactory.getMemoryMXBean()).addNotificationListener((n, h) -> {
@@ -201,7 +203,7 @@ final class Recovery {
     private static MemoryPoolMXBean oldGeneration() {
         for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
             if (pool.getType() == MemoryType.HEAP && pool.isCollectionUsageThresholdSupported()
-                    && pool.getName().toLowerCase().contains("old") && pool.getCollectionUsageThreshold() > 0) {
+                    && pool.getName().toLowerCase(Locale.ROOT).contains("old") && pool.getCollectionUsageThreshold() > 0) {
                 return pool;
             }
         }

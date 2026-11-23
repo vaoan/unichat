@@ -312,7 +312,7 @@ class SendQueueTest {
         queue.submit(CHAT, "uno q sí", null);
         queue.submit(CHAT, "dos q no", null);
         queue.submit("!mom:demo", "tres q tal", null);
-        queue.drain();
+        var _ = queue.drain();
         assertEquals(List.of("uno q sí", "dos q no"), sent().subList(before, sent().size()), "never lost on quitting");
         assertEquals("tres q tal", svc.messages("!mom:demo").getLast().body());
         assertEquals(3, cancelled.get(), "the corrections stopped");
@@ -339,7 +339,7 @@ class SendQueueTest {
                 SendQueueTest.class.getClassLoader(), new Class<?>[] {app.unichat.service.ChatService.class},
                 (proxy, method, args) -> method.getName().equals("hashCode") ? System.identityHashCode(proxy)
                         : method.getName().equals("equals") ? proxy == args[0] : null);
-        SendQueue.of(bare).addListener(bare::toString); // a window listening holds the service it shows
+        SendQueue.of(bare).addListener(() -> { var _ = bare; }); // a window listening holds the service it shows
         return new java.lang.ref.WeakReference<>(bare);
     }
 

@@ -14,7 +14,8 @@ Tests run in Spanish (`unichat.language=es` in the pom), with `unichat.dataDir`,
 - Code is broken on purpose (a mutation, to see a test fail without the fix) only in a throwaway worktree: `git worktree add <session scratchpad>/<name> HEAD`, copy the change over, break it there, run, then `git worktree remove`. Never in the person's working tree: an `if (Boolean.TRUE) return at;` left there by an agent nearly got committed.
 
 ## Build rules
-- `BuildRulesTest` reads `pom.xml` and fails when a check that fails the build is turned off: javac's `-Xlint:all -Werror` (a `-Xlint:-name` needs its reason in a comment just before it), the Enforcer's rules, Modernizer at the project's Java, and any `<skip>`. A new tool that fails the build gets its case there.
+- `BuildRulesTest` reads `pom.xml` and fails when a check that fails the build is turned off: javac's `-Xlint:all -Werror` (a `-Xlint:-name` needs its reason in a comment just before it), the Enforcer's rules, Modernizer at the project's Java, Error Prone (on javac's processor path with its two policy flags; only `-Xep:Name:ERROR` or `:OFF`, each `:OFF` named with its reason in the comment before the compiler plugin; the off-by-default checks that catch defects stay on), and any `<skip>`. A new tool that fails the build gets its case there.
+- A check that depends on the computer's language runs under `app.unichat.WithLocale` (Turkish case folding, Persian digits), which puts the JVM's locale back.
 
 ## Flags
 Off by default, only the person runs them: `-Dunichat.networkTests=true` (real downloads and CLIs), `-Dunichat.chromeTests=true` (real Chrome, off screen), `-Dunichat.perfTests=true` (`ScrollPerfUiTest`, `EmojiScrollPerfUiTest`: the real display), `-Dunichat.realInputTests=true` (`MenuDismissUiTest`: the real mouse). `MatrixLiveIT` needs `UNICHAT_IT_HOMESERVER`.

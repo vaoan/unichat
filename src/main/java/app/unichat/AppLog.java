@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * Copies stdout/stderr to {@code <data dir>/logs/unichat.log}: a packaged app opened from Finder or the Start menu
@@ -32,7 +33,7 @@ final class AppLog {
                 Files.move(log, dir.resolve("unichat.log.1"), StandardCopyOption.REPLACE_EXISTING);
             }
             OutputStream file = open(log);
-            String header = "\n=== Unichat " + LocalDateTime.now() + " ===\n";
+            String header = "\n=== Unichat " + LocalDateTime.now(ZoneId.systemDefault()) + " ===\n";
             file.write(header.getBytes(StandardCharsets.UTF_8));
             OutputStream redacted = new RedactingLines(file);
             System.setOut(new PrintStream(new Tee(System.out, redacted), true, StandardCharsets.UTF_8));

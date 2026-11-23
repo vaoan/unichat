@@ -35,7 +35,7 @@ public final class MediaSaver {
         fc.setInitialFileName(suggested);
         File target = fc.showSaveDialog(owner);
         if (target == null) return;
-        svc.media(url, 0, 0).whenComplete((p, err) -> {
+        var _ = svc.media(url, 0, 0).whenComplete((p, err) -> {
             String msg;
             try {
                 if (err != null) throw err;

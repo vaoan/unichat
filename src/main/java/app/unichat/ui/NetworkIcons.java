@@ -39,7 +39,7 @@ public final class NetworkIcons {
         String p = path(n);
         if (p != null) {
             // Not grown with the text like other icons: the tile around it keeps its size.
-            Node g = Icons.fixedIcon(p, Math.round(size * 0.6));
+            Node g = Icons.fixedIcon(p, (double) Math.round(size * 0.6));
             g.setStyle("-fx-background-color: white;");
             return g;
         }

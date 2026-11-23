@@ -340,7 +340,7 @@ final class BridgeLoginPane extends StackPane {
             status.setText(text);
             Nodes.show(status, true);
         });
-        CookieLogin.findBrowserSessions(spec).whenComplete((sessions, err) -> Platform.runLater(() -> {
+        var _ = CookieLogin.findBrowserSessions(spec).whenComplete((sessions, err) -> Platform.runLater(() -> {
             if (closed) return;
             found.getChildren().clear();
             List<BrowserSession> list = err != null || sessions == null ? List.of() : sessions;

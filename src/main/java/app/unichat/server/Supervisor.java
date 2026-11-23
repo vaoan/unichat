@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Runs the server's processes (tuwunel, one per bridge) and restarts any that exits on its own, waiting a bit
@@ -113,9 +114,9 @@ public final class Supervisor {
         final Path log;
         volatile Process process;
         volatile boolean wanted = true;
-        volatile int restarts;
+        final AtomicInteger restarts = new AtomicInteger();
         /** Crashes in a row without a stable run in between; sets the wait before the next restart. */
-        volatile int streak;
+        final AtomicInteger streak = new AtomicInteger();
         volatile long launchedAt;
 
         Service(String name, Path workDir, List<String> command, Path log) {
@@ -137,7 +138,7 @@ public final class Supervisor {
             }, () -> listener.logged(name)), "log-" + name);
             pump.setDaemon(true);
             pump.start();
-            p.onExit().thenRun(() -> onExit(this, p));
+            var _ = p.onExit().thenRun(() -> onExit(this, p));
         }
     }
 
@@ -165,19 +166,19 @@ public final class Supervisor {
             return;
         }
         // A process that ran fine for a while starts over with short waits (days-old crashes don't count).
-        if (System.currentTimeMillis() - s.launchedAt > STABLE_MS) s.streak = 0;
+        if (System.currentTimeMillis() - s.launchedAt > STABLE_MS) s.streak.set(0);
         scheduleRestart(s);
         listener.exited(s.name, true);
     }
 
     private void scheduleRestart(Service s) {
-        long delay = Math.min(maxBackoff.toMillis(), firstBackoff.toMillis() << Math.min(s.streak, 10));
+        long delay = Math.min(maxBackoff.toMillis(), firstBackoff.toMillis() << Math.min(s.streak.get(), 10));
         Thread t = new Thread(() -> {
             try {
                 Thread.sleep(delay);
                 if (!s.wanted || services.get(s.name) != s) return;
-                s.restarts++;
-                s.streak++;
+                s.restarts.incrementAndGet();
+                s.streak.incrementAndGet();
                 s.launch();
                 listener.restarted(s.name);
             } catch (InterruptedException e) {
@@ -199,7 +200,7 @@ public final class Supervisor {
 
     public int restarts(String name) {
         Service s = services.get(name);
-        return s == null ? 0 : s.restarts;
+        return s == null ? 0 : s.restarts.get();
     }
 
     /**

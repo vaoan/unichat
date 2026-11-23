@@ -115,7 +115,7 @@ final class MessageFixer implements ChatService.Listener {
                 if (m.status() != app.unichat.model.MessageStatus.FAILED) ready.add(m);
             }
         }
-        for (Message m : ready) fix(m, true);
+        for (Message m : ready) { var _ = fix(m, true); }
     }
 
     /** Corrects {@code m} and edits it, every outcome told; done once edited or left as it was. */
@@ -140,7 +140,7 @@ final class MessageFixer implements ChatService.Listener {
                 tell.accept(I18n.t("messageFix.failed", r.failure()));
                 edited = CompletableFuture.completedFuture(null);
             }
-            edited.whenComplete((v, e) -> {
+            var _ = edited.whenComplete((v, e) -> {
                 working.remove(m.id());
                 changed();
                 done.complete(null);

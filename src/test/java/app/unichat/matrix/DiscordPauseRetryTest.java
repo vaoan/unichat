@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -44,7 +45,7 @@ class DiscordPauseRetryTest {
             proc.process(MatrixClient.JSON.readTree(("{'rooms':{'join':{'" + ROOM + "':{'state':{'events':["
                     + member(ME) + "," + member(BOT) + "]},'timeline':{'events':[]}}}}}").replace('\'', '"')), false);
         }
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             commands.add(MatrixClient.JSON.readTree(body).path("body").asText());

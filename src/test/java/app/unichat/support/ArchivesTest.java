@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -89,7 +90,7 @@ class ArchivesTest {
         byte[] h = new byte[512];
         byte[] n = name.getBytes(StandardCharsets.US_ASCII);
         System.arraycopy(n, 0, h, 0, n.length);
-        byte[] size = "%011o".formatted(data.length).getBytes(StandardCharsets.US_ASCII);
+        byte[] size = String.format(Locale.ROOT, "%011o", data.length).getBytes(StandardCharsets.US_ASCII);
         System.arraycopy(size, 0, h, 124, size.length);
         h[156] = (byte) type;
         System.arraycopy("ustar".getBytes(StandardCharsets.US_ASCII), 0, h, 257, 5);

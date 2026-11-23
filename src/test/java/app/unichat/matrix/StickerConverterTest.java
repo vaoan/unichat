@@ -12,6 +12,7 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -134,8 +135,8 @@ class StickerConverterTest {
         StickerConverter.Result r = StickerConverter.convert(gif(), "image/webp", dir);
         assertEquals("image/webp", r.mime());
         byte[] b = Files.readAllBytes(r.file());
-        assertEquals("RIFF", new String(b, 0, 4));
-        assertEquals("WEBP", new String(b, 8, 4));
+        assertEquals("RIFF", new String(b, 0, 4, UTF_8));
+        assertEquals("WEBP", new String(b, 8, 4, UTF_8));
     }
 
     @Test

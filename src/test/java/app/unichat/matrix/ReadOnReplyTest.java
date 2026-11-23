@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -35,7 +36,7 @@ class ReadOnReplyTest {
     @BeforeEach
     void fakeHomeserver() throws Exception {
         was = Settings.get().readReceipts();
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String p = ex.getRequestURI().getPath();
             ex.getRequestBody().readAllBytes();

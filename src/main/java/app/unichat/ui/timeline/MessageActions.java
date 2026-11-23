@@ -26,7 +26,7 @@ public final class MessageActions {
         // What it said, from the texts' copy (or that there's none): all a deleted message has left, and an edited one's past.
         if (m.deleted()) return EnumSet.of(Action.SAVED_TEXT);
         // An edited one's past; mine where kept: what I wrote before the AI corrected it.
-        if (m.edited() || myTextsKept && m.outgoing() && !m.isMedia()) out.add(Action.SAVED_TEXT);
+        if (m.edited() || (myTextsKept && m.outgoing() && !m.isMedia())) out.add(Action.SAVED_TEXT);
         out.add(Action.CAPTURE); // a picture of the chat from here to there: any message can be an end
         if (f.replies() || f.isUnknown()) out.add(Action.REPLY);
         if (!m.isMedia()) out.add(Action.COPY);

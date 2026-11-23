@@ -136,9 +136,9 @@ public final class DropboxApi implements Storage {
         try {
             rpc("/2/files/move_v2", JSON.createObjectNode().put("from_path", abs(from)).put("to_path", abs(to)).put("autorename", false));
         } catch (Conflict taken) {
-            throw new IOException(I18n.t("cloud.error.moveTaken", to));
+            throw new IOException(I18n.t("cloud.error.moveTaken", to), taken);
         } catch (Missing gone) {
-            throw new IOException(I18n.t("cloud.error.moveNothing", from));
+            throw new IOException(I18n.t("cloud.error.moveNothing", from), gone);
         }
     }
 

@@ -32,17 +32,17 @@ public final class ChatMenus {
         ContextMenu menu = new ContextMenu();
         menu.getItems().addAll(
                 item(c.isUnread() ? I18n.t("chatMenu.markRead") : I18n.t("chatMenu.markUnread"),
-                        () -> { if (c.isUnread()) svc.markRead(id); else svc.setMarkedUnread(id, true); }),
+                        () -> { if (c.isUnread()) svc.markRead(id); else { var _ = svc.setMarkedUnread(id, true); } }),
                 favoriteItem(c, svc), pinItem(c, svc), muteItem(c, svc),
                 reminderMenu(c, svc),
                 new SeparatorMenuItem(),
-                item(c.lowPriority() ? I18n.t("chatMenu.toInbox") : I18n.t("chatMenu.toLowPriority"), () -> svc.setLowPriority(id, !c.lowPriority())),
-                item(c.archived() ? I18n.t("chatMenu.unarchive") : I18n.t("chatMenu.archive"), () -> svc.setArchived(id, !c.archived())));
+                item(c.lowPriority() ? I18n.t("chatMenu.toInbox") : I18n.t("chatMenu.toLowPriority"), () -> { var _ = svc.setLowPriority(id, !c.lowPriority()); }),
+                item(c.archived() ? I18n.t("chatMenu.unarchive") : I18n.t("chatMenu.archive"), () -> { var _ = svc.setArchived(id, !c.archived()); }));
         addFoldersMenu(menu, c, folders);
         menu.getItems().addAll(
                 new SeparatorMenuItem(),
                 danger(item(c.group() ? I18n.t("chatMenu.leaveGroup") : I18n.t("chatMenu.deleteChat"), () -> {
-                    svc.leaveChat(id);
+                    var _ = svc.leaveChat(id);
                     if (afterLeave != null) afterLeave.run();
                 })));
         return menu;
@@ -55,7 +55,7 @@ public final class ChatMenus {
         menu.getItems().addAll(
                 favoriteItem(c, svc), pinItem(c, svc), muteItem(c, svc),
                 new SeparatorMenuItem(),
-                item(c.archived() ? I18n.t("chatMenu.unarchive") : I18n.t("chatMenu.archive"), () -> svc.setArchived(id, !c.archived())));
+                item(c.archived() ? I18n.t("chatMenu.unarchive") : I18n.t("chatMenu.archive"), () -> { var _ = svc.setArchived(id, !c.archived()); }));
         addFoldersMenu(menu, c, folders);
         return menu;
     }
@@ -91,15 +91,15 @@ public final class ChatMenus {
     }
 
     private static MenuItem favoriteItem(Chat c, ChatPreferences svc) {
-        return item(c.favorite() ? I18n.t("chatMenu.unfavorite") : I18n.t("chatMenu.favorite"), () -> svc.setFavorite(c.id(), !c.favorite()));
+        return item(c.favorite() ? I18n.t("chatMenu.unfavorite") : I18n.t("chatMenu.favorite"), () -> { var _ = svc.setFavorite(c.id(), !c.favorite()); });
     }
 
     private static MenuItem pinItem(Chat c, ChatPreferences svc) {
-        return item(c.pinned() ? I18n.t("chatMenu.unpin") : I18n.t("chatMenu.pin"), () -> svc.setPinned(c.id(), !c.pinned()));
+        return item(c.pinned() ? I18n.t("chatMenu.unpin") : I18n.t("chatMenu.pin"), () -> { var _ = svc.setPinned(c.id(), !c.pinned()); });
     }
 
     private static MenuItem muteItem(Chat c, ChatPreferences svc) {
-        return item(c.muted() ? I18n.t("chatMenu.unmute") : I18n.t("chatMenu.mute"), () -> svc.setMuted(c.id(), !c.muted()));
+        return item(c.muted() ? I18n.t("chatMenu.unmute") : I18n.t("chatMenu.mute"), () -> { var _ = svc.setMuted(c.id(), !c.muted()); });
     }
 
     static Menu reminderMenu(Chat c, ChatPreferences svc) {
@@ -107,16 +107,16 @@ public final class ChatMenus {
         ZoneId zone = ZoneId.systemDefault();
         Instant now = Instant.now();
         m.getItems().addAll(
-                item(I18n.t("chatMenu.in1h"), () -> svc.setReminder(c.id(), now.plus(1, ChronoUnit.HOURS))),
-                item(I18n.t("chatMenu.in3h"), () -> svc.setReminder(c.id(), now.plus(3, ChronoUnit.HOURS))),
-                item(I18n.t("chatMenu.tomorrow9"), () -> svc.setReminder(c.id(),
-                        LocalDate.now(zone).plusDays(1).atTime(LocalTime.of(9, 0)).atZone(zone).toInstant())),
-                item(I18n.t("chatMenu.nextMonday"), () -> svc.setReminder(c.id(),
-                        LocalDate.now(zone).with(TemporalAdjusters.next(DayOfWeek.MONDAY)).atTime(9, 0).atZone(zone).toInstant())));
+                item(I18n.t("chatMenu.in1h"), () -> { var _ = svc.setReminder(c.id(), now.plus(1, ChronoUnit.HOURS)); }),
+                item(I18n.t("chatMenu.in3h"), () -> { var _ = svc.setReminder(c.id(), now.plus(3, ChronoUnit.HOURS)); }),
+                item(I18n.t("chatMenu.tomorrow9"), () -> { var _ = svc.setReminder(c.id(),
+                        LocalDate.now(zone).plusDays(1).atTime(LocalTime.of(9, 0)).atZone(zone).toInstant()); }),
+                item(I18n.t("chatMenu.nextMonday"), () -> { var _ = svc.setReminder(c.id(),
+                        LocalDate.now(zone).with(TemporalAdjusters.next(DayOfWeek.MONDAY)).atTime(9, 0).atZone(zone).toInstant()); }));
         if (c.reminderAt() != null) {
             m.getItems().add(new SeparatorMenuItem());
             m.getItems().add(item(I18n.t("chatMenu.clearReminder", Formats.listStamp(c.reminderAt(), now, zone)),
-                    () -> svc.setReminder(c.id(), null)));
+                    () -> { var _ = svc.setReminder(c.id(), null); }));
         }
         return m;
     }

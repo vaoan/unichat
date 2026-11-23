@@ -71,7 +71,7 @@ public final class ChromiumCookies {
             byte[] plain = cipher.doFinal(encrypted, 3, encrypted.length - 3);
             int start = plain.length > 32 && !printableAscii(plain, 32) ? 32 : 0;
             return new String(plain, start, plain.length - start, StandardCharsets.UTF_8);
-        } catch (java.security.GeneralSecurityException e) {
+        } catch (java.security.GeneralSecurityException _) {
             // Deliberately no data in the message.
             throw new IllegalStateException("Could not decrypt cookie value");
         }
@@ -91,7 +91,7 @@ public final class ChromiumCookies {
                     "saltysalt".getBytes(StandardCharsets.US_ASCII), 1003, 16 * 8);
             return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1").generateSecret(spec).getEncoded();
         } catch (java.security.GeneralSecurityException e) {
-            throw new IllegalStateException("Key derivation unavailable");
+            throw new IllegalStateException("Key derivation unavailable", e);
         }
     }
 
@@ -197,17 +197,9 @@ public final class ChromiumCookies {
                 }
             }
         } catch (SQLException e) {
-            throw new IllegalStateException("Could not read Chromium cookies database");
+            throw new IllegalStateException("Could not read Chromium cookies database", e);
         }
         return spec.select(all);
     }
 
-    private static void deleteQuietly(Path p) {
-        if (p == null) return;
-        try {
-            Files.deleteIfExists(p);
-        } catch (IOException ignored) {
-            // best effort
-        }
-    }
 }

@@ -161,7 +161,7 @@ public final class RoomFeatures {
     public boolean isUnknown() { return unrestricted; }
 
     private static boolean withinAge(Instant sent, Instant now, long maxAgeSec) {
-        return maxAgeSec <= 0 || sent == null || Duration.between(sent, now).getSeconds() <= maxAgeSec;
+        return maxAgeSec <= 0 || sent == null || Duration.between(sent, now).toSeconds() <= maxAgeSec;
     }
 
     /** "❤️" and "❤" are the same reaction: drop the emoji variation selector. */

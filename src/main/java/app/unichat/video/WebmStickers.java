@@ -19,8 +19,7 @@ public final class WebmStickers {
     /** Conversions and the first install, one at a time: never on the FX thread. */
     public static final ExecutorService WORKER = Executors.newSingleThreadExecutor(Threads.daemon("video-convert"));
     static final long TIMEOUT_SECONDS = 60;
-    /** A sticker is seconds long and small: a file claiming more isn't one, and it shouldn't cost more than one. */
-    private static final String MAX_SECONDS = "30";
+    /** A sticker is small: a file claiming more isn't one, and it shouldn't cost more than one. */
     private static final String MAX_SIDE = "512";
     /** Telegram's video stickers: VP9 with transparency, 512 px on the long side, at most 3 s and 30 fps, no sound. */
     private static final String TELEGRAM_SIDE = "512", TELEGRAM_SECONDS = "3", TELEGRAM_FPS = "30";

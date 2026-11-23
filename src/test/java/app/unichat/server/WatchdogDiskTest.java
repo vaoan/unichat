@@ -7,6 +7,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,14 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class WatchdogDiskTest {
     private HttpServer everyoneAnswers;
     private long free = 50L << 30;
-    private long clock = 1_000_000;
+    private final long clock = 1_000_000;
     private final List<String> restarted = new ArrayList<>();
     private Storage storage;
     private Watchdog dog;
 
     @BeforeEach
     void setUp() throws Exception {
-        everyoneAnswers = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        everyoneAnswers = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         everyoneAnswers.createContext("/", ex -> {
             ex.sendResponseHeaders(200, -1);
             ex.close();

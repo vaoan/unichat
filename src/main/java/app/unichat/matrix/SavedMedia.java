@@ -61,7 +61,7 @@ final class SavedMedia {
         for (String url : urls) {
             if (find(url) == null) copies.add(fetch.apply(url).handleAsync((file, err) -> err == null && copy(url, file), io));
         }
-        CompletableFuture.allOf(copies.toArray(CompletableFuture[]::new)).thenRun(() -> {
+        var _ = CompletableFuture.allOf(copies.toArray(CompletableFuture[]::new)).thenRun(() -> {
             long failed = copies.stream().filter(c -> !c.join()).count();
             if (failed == 0) return;
             System.err.println("Favourite stickers without a saved copy yet: " + failed);

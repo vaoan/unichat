@@ -51,7 +51,7 @@ final class SavedUpTo {
             mark = marks.get(chatId);
         }
         int c = m.timestamp().compareTo(mark.at());
-        return c > 0 || c == 0 && !mark.ids().contains(m.id());
+        return c > 0 || (c == 0 && !mark.ids().contains(m.id()));
     }
 
     /** Where exploring {@code chatId}'s past got to; null: never explored. */
@@ -74,7 +74,7 @@ final class SavedUpTo {
     synchronized void exploredBack(String chatId, Instant at, boolean start) {
         Back b = backs.get(chatId);
         Instant back = b == null || at.isBefore(b.back()) ? at : b.back();
-        backs.put(chatId, new Back(back, start || b != null && b.start()));
+        backs.put(chatId, new Back(back, start || (b != null && b.start())));
         save();
     }
 

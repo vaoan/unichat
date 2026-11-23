@@ -57,7 +57,7 @@ public final class SavedTextSheet {
         card.getStyleClass().addAll("card", "folder-dialog", "saved-text-sheet");
         show.accept(Sheets.scrolling(card, WIDTH));
         Platform.runLater(close::requestFocus);
-        said.whenComplete((versions, err) -> Platform.runLater(() -> {
+        var _ = said.whenComplete((versions, err) -> Platform.runLater(() -> {
             body.getChildren().setAll(err != null ? List.of(text(I18n.t("savedText.failed", Errors.message(err))))
                     : versions.isEmpty() ? List.of(text(I18n.t("savedText.none"))) : versions(versions));
             close.setAccessibleHelp(body.getChildren().stream().map(SavedTextSheet::spoken).reduce("", (a, b) -> (a + " " + b).strip()));
@@ -108,6 +108,6 @@ public final class SavedTextSheet {
     }
 
     private static String when(Instant at) {
-        return DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withLocale(I18n.locale()).format(at.atZone(ZoneId.systemDefault()));
+        return DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", I18n.locale()).format(at.atZone(ZoneId.systemDefault()));
     }
 }

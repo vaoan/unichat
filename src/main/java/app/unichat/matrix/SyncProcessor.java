@@ -65,8 +65,8 @@ final class SyncProcessor {
 
     SyncProcessor(String myUserId) {
         this.me = myUserId;
-        this.fields = new RoomFields(me, directRoomUser, this::room);
-        this.systemMessages = new SystemMessages(fields, this::room);
+        this.fields = new RoomFields(me, directRoomUser);
+        this.systemMessages = new SystemMessages(fields);
     }
 
     void refresh(MatrixRoom room) { fields.refresh(room); }

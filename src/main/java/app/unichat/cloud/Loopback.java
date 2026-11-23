@@ -56,7 +56,7 @@ final class Loopback {
 
     /** As above, the deadline told with {@code expiredKey}'s words. */
     static void until(HttpServer server, CompletableFuture<?> result, Duration deadline, String expiredKey) {
-        result.whenComplete((a, e) -> server.stop(0));
+        var _ = result.whenComplete((a, e) -> server.stop(0));
         CompletableFuture.delayedExecutor(deadline.toNanos(), TimeUnit.NANOSECONDS).execute(() -> {
             if (result.isDone()) return;
             server.stop(0);

@@ -127,10 +127,10 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
         } else if (e.isAltDown() && (e.getCode() == KeyCode.UP || e.getCode() == KeyCode.DOWN)) {
             listPane.move(e.getCode() == KeyCode.DOWN ? 1 : -1, e.isShiftDown());
         } else if (mod && e.getCode() == KeyCode.E && c != null) {
-            svc.setArchived(c.id(), !c.archived());
+            var _ = svc.setArchived(c.id(), !c.archived());
             view.toast(c.archived() ? I18n.t("windowShortcuts.unarchived") : I18n.t("windowShortcuts.archived"));
         } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.U && c != null) {
-            if (c.isUnread()) svc.markRead(c.id()); else svc.setMarkedUnread(c.id(), true);
+            if (c.isUnread()) svc.markRead(c.id()); else { var _ = svc.setMarkedUnread(c.id(), true); }
         } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.I && c != null) {
             view.toggleInfo();
         } else if (mod && !e.isShiftDown() && c != null && thread.composer().aiKeyPressed(e.getCode())) {

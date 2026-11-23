@@ -121,10 +121,10 @@ final class SnapshotRun {
             var img = subject.snapshot(params, null);
             javax.imageio.ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", java.nio.file.Path.of(out).toFile());
         } catch (Exception ex) {
-            ex.printStackTrace();
+            ex.printStackTrace(System.err);
         }
         Thread guard = new Thread(() -> {
-            try { Thread.sleep(4000); } catch (InterruptedException ignored) { }
+            try { Thread.sleep(4000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
             Runtime.getRuntime().halt(0);
         });
         guard.setDaemon(true);

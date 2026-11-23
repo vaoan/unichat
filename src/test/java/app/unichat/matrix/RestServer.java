@@ -8,12 +8,14 @@ import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -81,7 +83,7 @@ final class RestServer implements AutoCloseable {
     private final ExecutorService botThread = Executors.newSingleThreadExecutor();
 
     RestServer() throws IOException {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.setExecutor(Executors.newCachedThreadPool());
         server.createContext("/", this::handle);
         server.start();
@@ -100,8 +102,8 @@ final class RestServer implements AutoCloseable {
     }
 
     /** The filters posted that leave rooms out, in order. */
-    List<TreeSet<String>> notRoomsPosted() {
-        List<TreeSet<String>> out = new ArrayList<>();
+    List<SortedSet<String>> notRoomsPosted() {
+        List<SortedSet<String>> out = new ArrayList<>();
         for (String line : log) {
             if (line.startsWith("filter not_rooms=")) out.add(rooms(line.substring("filter not_rooms=".length())));
         }
@@ -109,13 +111,13 @@ final class RestServer implements AutoCloseable {
     }
 
     /** The rooms each catch-up sync asked for, in order. */
-    List<TreeSet<String>> catchUps() {
-        List<TreeSet<String>> out = new ArrayList<>();
+    List<SortedSet<String>> catchUps() {
+        List<SortedSet<String>> out = new ArrayList<>();
         for (String line : log) if (line.startsWith("catch-up ")) out.add(rooms(line.substring("catch-up ".length())));
         return out;
     }
 
-    private static TreeSet<String> rooms(String list) {
+    private static SortedSet<String> rooms(String list) {
         TreeSet<String> out = new TreeSet<>();
         for (String r : list.replace("[", "").replace("]", "").split(",")) if (!r.isBlank()) out.add(r.strip());
         return out;
@@ -355,11 +357,11 @@ final class RestServer implements AutoCloseable {
 
     private static String member(String user) {
         return "{\"type\":\"m.room.member\",\"state_key\":\"" + user + "\",\"sender\":\"" + user + "\",\"event_id\":\"$m"
-                + Math.abs(user.hashCode()) + "\",\"origin_server_ts\":1,\"content\":{\"membership\":\"join\"}}";
+                + Math.abs((long) user.hashCode()) + "\",\"origin_server_ts\":1,\"content\":{\"membership\":\"join\"}}";
     }
 
     private static String state(String type, String key, String content) {
         return "{\"type\":\"" + type + "\",\"state_key\":\"" + key + "\",\"sender\":\"" + ME + "\",\"event_id\":\"$s"
-                + Math.abs((type + key).hashCode()) + "\",\"origin_server_ts\":1,\"content\":" + content + "}";
+                + Math.abs((long) (type + key).hashCode()) + "\",\"origin_server_ts\":1,\"content\":" + content + "}";
     }
 }

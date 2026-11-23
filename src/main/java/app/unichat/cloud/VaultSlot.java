@@ -17,6 +17,7 @@ import java.util.UUID;
  * another generation open nothing. A slot is
  * a small JSON file in the account; the recovery code, the password or the computer's key that opens it is never in it.
  */
+@SuppressWarnings("ArrayRecordComponent") // equals and hashCode below compare the bytes
 record VaultSlot(String id, String vault, Method method, String label, Instant created, long generation, ObjectNode params, byte[] wrapped) {
     enum Method { RECOVERY, PASSWORD, COMPUTER, GOOGLE, PASSKEY }
 

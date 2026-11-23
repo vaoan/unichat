@@ -166,7 +166,9 @@ public final class PreferencesFile {
             if (e != null && e.touched(f)) continue;
             if (said) {
                 Entry target = entry(key);
-                if (!Boolean.TRUE.equals(target.values.put(f, true)) | target.fromServer.add(f)) dirty = true;
+                boolean changed = !Boolean.TRUE.equals(target.values.put(f, true));
+                boolean fromServerNow = target.fromServer.add(f); // recorded whether or not the value changed
+                if (changed || fromServerNow) dirty = true;
             } else if (seen.saidTrueBefore(key, f)) {
                 Entry target = entry(key);
                 target.values.put(f, false);
@@ -204,7 +206,7 @@ public final class PreferencesFile {
     }
 
     private static boolean shown(Entry e, Flag f, ServerValues cached) {
-        return e != null && e.values.containsKey(f) ? is(e, f) : Boolean.TRUE.equals(cached.of(f));
+        return (e != null && e.values.containsKey(f)) ? is(e, f) : Boolean.TRUE.equals(cached.of(f));
     }
 
     /** What memory holds, as the file is written. */

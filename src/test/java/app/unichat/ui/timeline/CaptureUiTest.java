@@ -233,6 +233,10 @@ class CaptureUiTest {
 
     @Test
     void itCanBeSavedToAFolder() throws Exception {
+        savesToAFolder();
+    }
+
+    private void savesToAFolder() throws Exception {
         captureLast(3);
         FxWait.fx(() -> { thread.captureSheet().useFolderChooser(w -> dir.toFile()); return null; });
         Button save = FxWait.fx(() -> sheet().lookupAll(".button").stream().map(n -> (Button) n)
@@ -293,11 +297,6 @@ class CaptureUiTest {
         assertEquals("Capturando 1 mensaje", count(), "only its start is left");
     }
 
-    private String status() throws Exception {
-        return FxWait.fx(() -> sheet().lookupAll(".label").stream().map(n -> ((Label) n).getText())
-                .filter(t -> t != null && (t.startsWith("Lista") || t.startsWith("No se pudo") || t.startsWith("Preparando"))).findFirst().orElse(""));
-    }
-
     @Test
     void aStretchOfTooManyMessagesIsRefusedBeforeAnythingIsDrawn() throws Exception {
         List<Message> many = new java.util.ArrayList<>();
@@ -356,7 +355,7 @@ class CaptureUiTest {
     @Test
     void aChatsVeryLongNameStillMakesAFile() throws Exception {
         FxWait.fx(() -> { svc.chat(CHAT).setTitle("😀".repeat(120)); return null; });
-        itCanBeSavedToAFolder();
+        savesToAFolder();
     }
 
     @Test

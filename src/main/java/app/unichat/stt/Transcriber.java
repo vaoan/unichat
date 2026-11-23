@@ -59,7 +59,9 @@ public final class Transcriber {
                 int[] shown = {-1};
                 Path m = model.ensure(modelsDir(), p -> {
                     int pct = (int) Math.round(p * 100);
-                    if (pct != shown[0]) status.accept(I18n.t("stt.downloadingPct", shown[0] = pct));
+                    if (pct == shown[0]) return;
+                    shown[0] = pct;
+                    status.accept(I18n.t("stt.downloadingPct", pct));
                 });
                 int threads = Math.max(1, Math.min(8, Runtime.getRuntime().availableProcessors() / 2));
                 cmd = List.of(bin.toString(), "-m", m.toString(), "-f", input.toString(), "-l", lang,

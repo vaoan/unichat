@@ -15,7 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-import java.util.IdentityHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -73,7 +73,7 @@ class ListRepaintUiTest {
     /** Each row (cell) → the chat it shows and its network icon node. A cell may show another chat after a scroll. */
     private Map<Node, Object[]> badgeIcons() throws Exception {
         return FxWait.fx(() -> {
-            Map<Node, Object[]> m = new IdentityHashMap<>();
+            Map<Node, Object[]> m = new HashMap<>(); // cells: Node keeps Object's identity equals
             for (Node n : scene.getRoot().lookupAll(".chat-list .list-cell")) {
                 if (!(n instanceof ChatRowCell cell) || cell.getItem() == null) continue;
                 Node badge = cell.lookup(".network-badge");

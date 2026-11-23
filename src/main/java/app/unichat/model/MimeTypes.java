@@ -12,6 +12,7 @@ public final class MimeTypes {
     public static final String UNKNOWN = "application/octet-stream";
 
     /** A type, the extension a file of it gets, and other extensions that mean it too. */
+    @SuppressWarnings("ArrayRecordComponent") // table rows, never compared
     private record Row(String type, String extension, String... more) {}
 
     /** The one table: a type's first row gives its extension, an extension's first row gives its type. */

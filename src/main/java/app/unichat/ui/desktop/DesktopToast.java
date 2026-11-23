@@ -98,7 +98,7 @@ final class DesktopToast {
         s.setTitle(I18n.t("toast.windowTitle"));
         s.setScene(scene);
         // A card shown while the window is in the tray isn't anyone seeing Unichat: media and checks stay paused.
-        s.getProperties().put(AppWindows.NOT_LOOKED_AT, Boolean.TRUE);
+        s.getProperties().put(AppWindows.NOT_LOOKED_AT, true);
         return s;
     }
 

@@ -164,7 +164,7 @@ final class MessageSender {
         // Whether it may change (NetworkFormats decides with the file, once downloaded); a copy goes up anyway.
         String may = network == null ? NetworkFormats.byFeatures(mimeType, features) : NetworkFormats.sticker(network, mimeType, null, own, features);
         if (may == null && !copy) return sendEvent(chatId, "m.sticker", txn, content);
-        return media.media(item.url(), 0, 0).thenApplyAsync(src -> {
+        return sendWhenPrepared(chatId, txn, "m.sticker", "Sticker conversion", media.media(item.url(), 0, 0).thenApplyAsync(src -> {
             try {
                 Path dir = Settings.get().cacheDir().resolve("stickers");
                 StickerConverter.Result r = StickerConverter.forChat(src, mimeType, network, own, features, dir);
@@ -184,7 +184,13 @@ final class MessageSender {
             } catch (IOException e) {
                 throw new CompletionException(e);
             }
-        }, core.io).handle((c, err) -> sendPrepared(chatId, txn, "m.sticker", c, err, "Sticker conversion")).thenCompose(f -> f);
+        }, core.io));
+    }
+
+    /** Sends what {@code prepared} makes once it's ready, or fails the echo saying why ({@link #sendPrepared}). */
+    @SuppressWarnings("FutureReturnValueIgnored") // handle's result holds the send's future only until thenCompose unwraps it
+    private CompletableFuture<Void> sendWhenPrepared(String chatId, String txn, String type, String what, CompletableFuture<ObjectNode> prepared) {
+        return prepared.handle((c, err) -> sendPrepared(chatId, txn, type, c, err, what)).thenCompose(f -> f);
     }
 
     /** {@code content} once its file is ready, or the echo failed with why, for the log. */
@@ -225,7 +231,7 @@ final class MessageSender {
         }
         fireLocal(chatId);
         if (!copy) return sendEvent(chatId, "m.room.message", txn, content);
-        return media.media(m.mediaUrl(), 0, 0).thenApplyAsync(src -> {
+        return sendWhenPrepared(chatId, txn, "m.room.message", "Forward", media.media(m.mediaUrl(), 0, 0).thenApplyAsync(src -> {
             try {
                 // An animated WebP, as small as it takes to fit (Discord: 10 MB without Nitro), else the video, which still plays.
                 Path file = gif ? app.unichat.video.GifVideos.webpUnder(src, app.unichat.video.GifVideos.maxBytes()) : src;
@@ -239,7 +245,7 @@ final class MessageSender {
             } catch (IOException e) {
                 throw new CompletionException(e);
             }
-        }, core.io).handle((c, err) -> sendPrepared(chatId, txn, "m.room.message", c, err, "Forward")).thenCompose(f -> f);
+        }, core.io));
     }
 
     /**

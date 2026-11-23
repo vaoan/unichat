@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -69,7 +70,7 @@ public final class Manifest {
             int eq = line.indexOf('=');
             if (eq < 1) throw new IllegalArgumentException("Bad manifest line: " + line);
             String key = line.substring(0, eq), value = line.substring(eq + 1);
-            if (key.equals(key.toUpperCase())) {
+            if (key.equals(key.toUpperCase(Locale.ROOT))) {
                 settings.put(key, value);
                 continue;
             }
@@ -161,7 +162,7 @@ public final class Manifest {
             String[] parts = line.strip().split("\\s+", 2);
             if (parts.length < 2 || parts[0].startsWith("#")) continue;
             String name = parts[1].startsWith("*") ? parts[1].substring(1) : parts[1];
-            out.put(name, parts[0].toLowerCase());
+            out.put(name, parts[0].toLowerCase(Locale.ROOT));
         }
         return out;
     }

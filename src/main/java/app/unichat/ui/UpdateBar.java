@@ -25,6 +25,7 @@ import java.util.function.Consumer;
 final class UpdateBar extends VBox {
     private final UpdateChecker checker;
     private final Consumer<String> openLink;
+    @SuppressWarnings("UnnecessaryLambda") // one instance: removeListener takes away what addListener added
     private final Consumer<Release> listener = r -> Platform.runLater(() -> show(r));
     private Release shown;
 

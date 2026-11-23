@@ -71,7 +71,7 @@ final class Spaces {
     /** Asks {@code spaceId}'s hierarchy for its channels' names once. */
     void ensureNames(String spaceId) {
         if (!namesAsked.add(spaceId)) return;
-        svc.spaceNames(spaceId).thenAccept(m -> {
+        var _ = svc.spaceNames(spaceId).thenAccept(m -> {
             names.putAll(m);
             if (!m.isEmpty()) Platform.runLater(onChanged);
         });
@@ -82,7 +82,7 @@ final class Spaces {
         long now = System.currentTimeMillis();
         if (now - offersAskedAt.getOrDefault(n, 0L) >= offersRecheckMs && offersInFlight.add(n)) {
             offersAskedAt.put(n, now);
-            svc.groupOffers(n).whenComplete((l, err) -> {
+            var _ = svc.groupOffers(n).whenComplete((l, err) -> {
                 offersInFlight.remove(n);
                 if (err != null) {
                     System.err.println("Group offers for " + n + " failed: " + err.getClass().getSimpleName());
@@ -107,7 +107,7 @@ final class Spaces {
         if (!adding.add(offerId)) return;
         toast.accept(I18n.t("spaces.adding", name));
         onChanged.run();
-        svc.addGroup(n, offerId).whenComplete((v, err) -> Platform.runLater(() -> {
+        var _ = svc.addGroup(n, offerId).whenComplete((v, err) -> Platform.runLater(() -> {
             adding.remove(offerId);
             if (err != null) {
                 toast.accept(I18n.t("spaces.addFailed", name));
@@ -135,7 +135,7 @@ final class Spaces {
         if (pendingOpen != null) return;
         pendingOpen = id;
         toast.accept(I18n.t("spaces.joining", name));
-        svc.joinChat(id).whenComplete((v, err) -> Platform.runLater(() -> {
+        var _ = svc.joinChat(id).whenComplete((v, err) -> Platform.runLater(() -> {
             if (err != null) {
                 if (id.equals(pendingOpen)) pendingOpen = null;
                 toast.accept(I18n.t("spaces.joinFailed", name));
@@ -145,7 +145,7 @@ final class Spaces {
         }));
         // Don't open it by surprise minutes later: after the wait it just shows up in the list.
         if (pendingTimeout != null) pendingTimeout.stop();
-        pendingTimeout = new javafx.animation.PauseTransition(javafx.util.Duration.millis(joinWaitMs));
+        pendingTimeout = new javafx.animation.PauseTransition(javafx.util.Duration.millis((double) joinWaitMs));
         pendingTimeout.setOnFinished(e -> {
             if (!id.equals(pendingOpen)) return;
             pendingOpen = null;

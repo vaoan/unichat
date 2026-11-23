@@ -123,7 +123,7 @@ class MediaTilesUiTest {
         MockChatService svc = new MockChatService();
         ImageView shown = fx(() -> {
             ImageView v = new ImageView();
-            MessageMedia.loadMedia(svc, v, MediaItems.message(item), 100, 100);
+            var _ = MessageMedia.loadMedia(svc, v, MediaItems.message(item), 100, 100);
             assertSame(frames.images().get(0), v.getImage(), "on this very call");
             return v;
         });

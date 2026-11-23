@@ -11,7 +11,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -71,7 +70,7 @@ public final class SendQueue {
     private volatile Supplier<AiReplyButton.Writer> writers;
     private volatile Consumer<String> tell;
     private final Executor runner;
-    private final Map<String, LinkedList<Entry>> byChat = new HashMap<>();
+    private final Map<String, ArrayDeque<Entry>> byChat = new HashMap<>();
     /** What's ready and taken out of its queue, in the order it goes; sent outside the queue's lock, one at a time. */
     private final Deque<Entry> outbox = new ArrayDeque<>();
     private final Object sending = new Object();
@@ -133,7 +132,7 @@ public final class SendQueue {
 
     /** The texts waiting in {@code chatId}, in the order they'll go. Any thread. */
     synchronized List<Pending> waiting(String chatId) {
-        LinkedList<Entry> q = byChat.get(chatId);
+        ArrayDeque<Entry> q = byChat.get(chatId);
         return q == null ? List.of() : q.stream().filter(e -> e.p != null).map(e -> e.p).toList();
     }
 
@@ -145,7 +144,7 @@ public final class SendQueue {
         Pending p = new Pending(next.getAndIncrement(), chatId, text, replyToId, would);
         Entry e = new Entry(p, writers.get(), last, null);
         synchronized (this) {
-            byChat.computeIfAbsent(chatId, c -> new LinkedList<>()).add(e);
+            byChat.computeIfAbsent(chatId, c -> new ArrayDeque<>()).add(e);
         }
         changed();
         runner.execute(() -> corrected(e, correct(e)));
@@ -155,7 +154,7 @@ public final class SendQueue {
     /** Sends with {@code send} in {@code chatId}'s turn: at once with nothing waiting, else after what's waiting. */
     void inOrder(String chatId, Runnable send) {
         synchronized (this) {
-            LinkedList<Entry> q = byChat.get(chatId);
+            ArrayDeque<Entry> q = byChat.get(chatId);
             if (q != null && !q.isEmpty()) {
                 q.add(new Entry(null, null, null, send));
                 return;
@@ -197,7 +196,7 @@ public final class SendQueue {
         List<Entry> stopping = new ArrayList<>();
         synchronized (this) {
             chats = new ArrayList<>(byChat.keySet());
-            for (LinkedList<Entry> q : byChat.values()) {
+            for (ArrayDeque<Entry> q : byChat.values()) {
                 for (Entry e : q) {
                     if (e.p != null && e.ready == null) {
                         e.ready = e.p.text();
@@ -241,7 +240,7 @@ public final class SendQueue {
      */
     private List<CompletableFuture<?>> flush(String chatId) {
         synchronized (this) {
-            LinkedList<Entry> q = byChat.get(chatId);
+            ArrayDeque<Entry> q = byChat.get(chatId);
             while (q != null && !q.isEmpty() && q.getFirst().isReady()) outbox.add(q.removeFirst());
         }
         changed();
@@ -304,7 +303,7 @@ public final class SendQueue {
     }
 
     private synchronized Entry find(Pending p) {
-        LinkedList<Entry> q = byChat.get(p.chatId());
+        ArrayDeque<Entry> q = byChat.get(p.chatId());
         if (q == null) return null;
         for (Entry e : q) if (p.equals(e.p)) return e;
         return null;

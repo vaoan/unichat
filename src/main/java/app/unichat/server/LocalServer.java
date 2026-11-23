@@ -70,7 +70,7 @@ public final class LocalServer {
         this.bridges = new BridgeLauncher(new BridgeProcesses(), new BridgeDemand(this::hasAccount,
                 b -> HttpProbe.answers(http, BridgePorts.BRIDGE_PORTS.get(b), Duration.ofSeconds(3), HttpProbe.Up.ALIVE),
                 Duration.ofMillis(500), Duration.ofSeconds(60)), this::usableBridges);
-        this.metaSessions = new MetaSessions(dir, states, MetaSessions::redirecting, this::restoreSession);
+        this.metaSessions = new MetaSessions(dir, MetaSessions::redirecting, this::restoreSession);
         this.watchdog = new Watchdog(ports, this::watched, states, (name, why) -> supervisor.kill(name), Internet::reachable,
                 metaSessions);
         // Whatever way Unichat ends (Salir, ⌘Q, logout of the Mac, kill), its server and bridges end with it.

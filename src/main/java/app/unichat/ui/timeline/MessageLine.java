@@ -31,11 +31,13 @@ final class MessageLine extends HBox {
     }
 
     private boolean picking() {
-        return cell() instanceof ListCell<?> cell && cell.getListView() != null && cell.getListView().getStyleClass().contains("picking");
+        ListCell<?> cell = cell();
+        return cell != null && cell.getListView() != null && cell.getListView().getStyleClass().contains("picking");
     }
 
     private boolean inSelectedCell() {
-        return cell() instanceof ListCell<?> cell && cell.isSelected();
+        ListCell<?> cell = cell();
+        return cell != null && cell.isSelected();
     }
 
     /** The list cell it's in: its parent, or further up when a range's markers wrap it. */

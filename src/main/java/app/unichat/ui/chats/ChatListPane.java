@@ -60,7 +60,7 @@ public final class ChatListPane extends VBox {
     private final TextField search = new TextField();
     private final ToggleGroup chips = new ToggleGroup();
     private final Spaces spaces;
-    private FlowPane chipRow;
+    private final FlowPane chipRow;
     private Runnable onNewChat;
     private final Consumer<Chat> onOpen;
     private String selectedId;
@@ -285,7 +285,7 @@ public final class ChatListPane extends VBox {
         newChat.setVisible(!foldersOpen()); // beside the title Carpetas, + would read as a new folder
         title.setText(foldersOpen() ? I18n.t("chatList.title.folders") : f.network() == null ? base : f.network().displayName());
         refreshAccountRow(f);
-        refreshView(f);
+        refreshView();
         empty.setText(f.searching() ? I18n.t("chatList.empty.noResults", f.query())
                 : f.view() == ChatFilter.View.ARCHIVE ? I18n.t("chatList.empty.noArchived")
                 : f.unreadOnly() ? I18n.t("chatList.empty.allRead")
@@ -328,7 +328,7 @@ public final class ChatListPane extends VBox {
             javafx.scene.Node tile = favorites.tiles().get(favs.size() + i);
             long unread = FolderRows.unread(folders.get(i), all);
             tile.lookup(".unread-dot").setVisible(unread > 0);
-            tile.setAccessibleText(I18n.t("chatList.favoriteFolderA11y", folders.get(i).name(), unread > 0 ? ", " + I18n.n("rail.unread", (int) unread) : ""));
+            tile.setAccessibleText(I18n.t("chatList.favoriteFolderA11y", folders.get(i).name(), unread > 0 ? ", " + I18n.n("rail.unread", unread) : ""));
         }
         Nodes.show(favorites, !favs.isEmpty() || !folders.isEmpty());
     }
@@ -395,7 +395,7 @@ public final class ChatListPane extends VBox {
     }
 
     /** A server's channels cover the list while open. */
-    private void refreshView(ChatFilter f) {
+    private void refreshView() {
         boolean space = channels.isOpen();
         boolean folders = !space && foldersOpen();
         for (Node x : List.of(chipRow, list)) {

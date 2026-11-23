@@ -96,7 +96,7 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
         list.widthProperty().addListener(o -> fit());
         probe.widthProperty().addListener(o -> fit());
         if (library != null) library.addListener(() -> Platform.runLater(this::show));
-        EmojiArt.pictures().thenAccept(p -> Platform.runLater(() -> {
+        var _ = EmojiArt.pictures().thenAccept(p -> Platform.runLater(() -> {
             pictures = p;
             show();
         }));

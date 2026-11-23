@@ -125,7 +125,7 @@ final class MessageActionsUi {
             if (r.getValue().contains(svc.myUserId())) b.getStyleClass().add("mine");
             b.setTooltip(new javafx.scene.control.Tooltip((Message.isCustomReaction(r.getKey()) ? m.reactionLabel(r.getKey()) + ": " : "")
                     + String.join(", ", r.getValue().stream().map(this::nameOf).toList())));
-            b.setOnAction(e -> svc.toggleReaction(chat.get().id(), m.id(), r.getKey()));
+            b.setOnAction(e -> { var _ = svc.toggleReaction(chat.get().id(), m.id(), r.getKey()); });
             b.setFocusTraversable(false);
             boolean mine = r.getValue().contains(svc.myUserId());
             b.setAccessibleText(I18n.t(mine ? "message.reactionMine" : "message.reactionOther",
@@ -198,14 +198,14 @@ final class MessageActionsUi {
 
     /** The quick reactions: the ones the person reacts with most (the usual six until there's history), as this chat allows. */
     java.util.List<String> quick() {
-        return chat.get().features().reactionsOffered(library.mostReacted(EmojiPicker.QUICK.length, java.util.List.of(EmojiPicker.QUICK)));
+        return chat.get().features().reactionsOffered(library.mostReacted(EmojiPicker.QUICK.size(), EmojiPicker.QUICK));
     }
 
     /** Adds or takes away the person's {@code e} on {@code m}; an added one counts towards the quick ones. */
     void react(Message m, String e) {
         java.util.Set<String> who = m.reactions().get(e);
         if (who == null || !who.contains(svc.myUserId())) library.reacted(e);
-        svc.toggleReaction(chat.get().id(), m.id(), e);
+        var _ = svc.toggleReaction(chat.get().id(), m.id(), e);
     }
 
     /** Same rules as the message menu, for the shortcuts and hover buttons. */
@@ -234,7 +234,7 @@ final class MessageActionsUi {
     private void saveLink(Message m, String url) {
         AutoSave save = AutoSave.of(svc);
         toast.accept(I18n.t("message.savingLink", SaveFolders.shown(save.folder(chat.get()))));
-        save.saveLink(m, url);
+        var _ = save.saveLink(m, url);
     }
 
     /** The menu's order for what a message allows; the quick reactions and "delete for everyone" come after, set apart. */
@@ -308,7 +308,7 @@ final class MessageActionsUi {
             case CAPTURE -> List.of(ChatMenus.item(I18n.t("message.capture"), () -> onCapture.accept(m)));
             // With the AI turned on, and not twice: its row already says it's being corrected.
             case FIX -> fixer == null || !AiReplyButton.SHOWN.get() || fixer.fixing(m.id()) ? List.of()
-                    : List.of(ChatMenus.item(I18n.t("message.fix"), () -> fixer.fix(m)));
+                    : List.of(ChatMenus.item(I18n.t("message.fix"), () -> { var _ = fixer.fix(m); }));
             case SAVED_TEXT -> List.of(ChatMenus.item(I18n.t(m.deleted() ? "message.savedText" : "message.versions"), () -> onSavedText.accept(m)));
             case DELETE_FOR_EVERYONE, DELETE_FOR_ME -> List.of();
         };

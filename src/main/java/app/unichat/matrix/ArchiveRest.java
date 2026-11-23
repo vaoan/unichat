@@ -60,8 +60,9 @@ final class ArchiveRest {
     /** A catch-up's answer, with the rooms it was for. */
     private final BiConsumer<SyncProcessor.Result, Collection<String>> caughtUp;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
+    @SuppressWarnings("UnnecessaryLambda") // one instance: removeListener takes away what addListener added
     private final Consumer<String> onSetting = key -> {
-        if (key == null || key.equals(Settings.NOTIFY_ARCHIVED)) update();
+        if (key == null || key.equals(Settings.NOTIFY_ARCHIVED)) { var _ = update(); }
     };
     private volatile boolean archiveOpen;
     private volatile String openChat;
@@ -138,7 +139,7 @@ final class ArchiveRest {
         openChat = chatId;
         // Only a chat that rests, or rested until now, changes anything: any other mustn't drop the long poll.
         Set<String> r = restable;
-        boolean matters = chatId != null && r.contains(chatId) || before != null && r.contains(before);
+        boolean matters = (chatId != null && r.contains(chatId)) || (before != null && r.contains(before));
         return matters ? update() : CompletableFuture.completedFuture(null);
     }
 

@@ -74,7 +74,7 @@ public final class AudioPlayback {
         state = State.LOADING;
         long mine = ++generation;
         fire();
-        media.media(m.mediaUrl(), 0, 0)
+        var _ = media.media(m.mediaUrl(), 0, 0)
                 .thenApplyAsync(AudioPlayback::playable, DECODER)
                 .whenComplete((file, err) -> Platform.runLater(() -> {
                     if (mine != generation) return;

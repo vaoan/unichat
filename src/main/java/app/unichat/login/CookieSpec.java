@@ -44,7 +44,11 @@ public final class CookieSpec {
         return new CookieSpec(network, Set.copyOf(required), Set.copyOf(optional), Set.copyOf(domains));
     }
 
-    /** @throws IllegalArgumentException if the network does not log in with cookies */
+    /**
+     * The cookies {@code network} logs in with.
+     *
+     * @throws IllegalArgumentException if the network does not log in with cookies
+     */
     public static CookieSpec forNetwork(Network network) {
         CookieSpec s = SPECS.get(network);
         if (s == null) throw new IllegalArgumentException("Not a cookie network: " + network);

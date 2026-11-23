@@ -199,7 +199,6 @@ class StickerSuggestionsUiTest {
         FxWait.settled();
         assertEquals("😂 jaja", FxWait.fx(() -> box().getText()), "what was written after the click stays");
 
-        CompletableFuture<Void> second = new CompletableFuture<>();
         String other = svc.chats().stream().map(c -> c.id()).filter(id -> !id.equals(chat)).findFirst().orElseThrow();
         type("😂");
         FxWait.until("offered", () -> offered().size() == 1);

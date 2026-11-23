@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -165,7 +166,7 @@ public final class CaptureSheet {
             } catch (RuntimeException e) {
                 made = CompletableFuture.failedFuture(e);
             }
-            made.whenComplete((s, err) -> Platform.runLater(() -> {
+            var _ = made.whenComplete((s, err) -> Platform.runLater(() -> {
                 if (mine != takes) return; // a newer one is on its way
                 if (err != null) {
                     status.setText(I18n.t("capture.failed", Errors.message(err)));
@@ -207,7 +208,7 @@ public final class CaptureSheet {
          */
         CompletableFuture<List<Path>> files(Path dir) {
             List<Image> now = pictures;
-            String base = I18n.t("capture.fileName", app.unichat.autosave.FileNames.folder(chat.title()), LocalDate.now());
+            String base = I18n.t("capture.fileName", app.unichat.autosave.FileNames.folder(chat.title()), LocalDate.now(ZoneId.systemDefault()));
             return CompletableFuture.supplyAsync(() -> {
                 try {
                     Path into = dir != null ? dir : Files.createDirectories(sending());
@@ -226,7 +227,7 @@ public final class CaptureSheet {
 
         void copy() {
             List<Image> now = pictures;
-            files(null).whenComplete((fs, err) -> Platform.runLater(() -> {
+            var _ = files(null).whenComplete((fs, err) -> Platform.runLater(() -> {
                 if (err != null) {
                     toast.accept(I18n.t("capture.failed", Errors.message(err)));
                     return;
@@ -243,7 +244,7 @@ public final class CaptureSheet {
             File folder = chooseFolder.apply(card.getScene() == null ? null : card.getScene().getWindow());
             if (folder == null) return;
             // Straight into the folder chosen: no copy of the chat left anywhere else.
-            files(folder.toPath()).whenComplete((fs, err) -> Platform.runLater(() -> toast.accept(err != null
+            var _ = files(folder.toPath()).whenComplete((fs, err) -> Platform.runLater(() -> toast.accept(err != null
                     ? I18n.t("capture.failed", Errors.message(err)) : I18n.n("capture.saved", fs.size(), folder.getPath()))));
         }
 
@@ -280,7 +281,7 @@ public final class CaptureSheet {
          */
         void sendTo(List<String> to) {
             SendAs as = format() == Format.LONG ? SendAs.DOCUMENT : SendAs.PHOTO;
-            files(null).whenComplete((fs, err) -> Platform.runLater(() -> {
+            var _ = files(null).whenComplete((fs, err) -> Platform.runLater(() -> {
                 if (err != null) {
                     toast.accept(I18n.t("capture.failed", Errors.message(err)));
                     return;

@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * A chat's texts as a person reads them, in its folder beside what auto-save keeps: made again from every computer's
@@ -19,7 +20,7 @@ import java.util.List;
  * A file kept on disk, not UI: English in every UI language.
  */
 final class TextCopy {
-    private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT);
 
     private static final String HEADER = "What was said in this chat, copied by Unichat: each message, and each version if it was edited.";
 

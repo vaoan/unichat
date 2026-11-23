@@ -77,6 +77,7 @@ public final class Downloads {
      * Copies {@code in} to {@code out}, giving up when no byte arrives for {@code stall}: the guard interrupts the read
      * (the HTTP body's read waits interruptibly; closing it doesn't wake that wait).
      */
+    @SuppressWarnings("Finally") // a stall ends the copy with whatever the interrupt threw: the stall is what to say
     private static void copy(InputStream in, java.io.OutputStream out, Duration stall, String what,
                              java.util.function.LongConsumer done) throws IOException {
         Thread reader = Thread.currentThread();

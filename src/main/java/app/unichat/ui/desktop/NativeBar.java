@@ -250,6 +250,7 @@ public final class NativeBar {
                 });
             }
         } catch (IOException ignored) {
+            // the helper's pipe broke: it ended, as when it exits
         }
         alive = false;
         synchronized (SCREEN) {

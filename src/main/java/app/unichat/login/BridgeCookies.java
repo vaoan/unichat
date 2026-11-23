@@ -79,7 +79,11 @@ public final class BridgeCookies {
         return captured(p, location, cookies, headers, Map.of());
     }
 
-    /** @param fallbacks by field id, for what the page didn't send ({@link #headerFallbacks}) */
+    /**
+     * The step's values as above, with fallbacks for the fields the page didn't send.
+     *
+     * @param fallbacks by field id, for what the page didn't send ({@link #headerFallbacks})
+     */
     public static Map<String, String> captured(BridgeLogin.CookieParams p, String location, Map<String, String> cookies,
                                                Map<String, String> headers, Map<String, String> fallbacks) {
         if (p.waitForUrlPattern() != null && (location == null || !Pattern.compile(p.waitForUrlPattern()).matcher(location).find())) return null;

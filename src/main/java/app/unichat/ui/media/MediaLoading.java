@@ -43,7 +43,7 @@ public final class MediaLoading {
         ring.setAccessibleText(I18n.t("media.loading"));
         StackPane.setAlignment(ring, Pos.CENTER);
         box.getChildren().add(ring);
-        loading.whenComplete((v, err) -> Platform.runLater(() -> {
+        var _ = loading.whenComplete((v, err) -> Platform.runLater(() -> {
             box.getChildren().remove(ring);
             if (err != null) offerRetry(box, load);
         }));

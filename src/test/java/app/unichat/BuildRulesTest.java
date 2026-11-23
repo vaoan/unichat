@@ -35,8 +35,8 @@ class BuildRulesTest {
     @Test
     void nothingElseInTheCompilersConfigTurnsThemOff() {
         Element config = configuration("maven-compiler-plugin");
-        assertEquals(List.of("showWarnings", "compilerArgs"), childNames(config),
-                "the compiler's configuration is the lint and nothing else (no failOnWarning, compilerArgument, ...)");
+        assertEquals(List.of("showWarnings", "compilerArgs", "annotationProcessorPaths"), childNames(config),
+                "the compiler's configuration is the lint, Error Prone and nothing else (no failOnWarning, compilerArgument, ...)");
         assertEquals("true", text(config, "showWarnings"));
     }
 
@@ -45,6 +45,44 @@ class BuildRulesTest {
         for (Element arg : elements(child(configuration("maven-compiler-plugin"), "compilerArgs"), "arg")) {
             if (!arg.getTextContent().trim().startsWith("-Xlint:-")) continue;
             assertTrue(previous(arg) instanceof Comment, arg.getTextContent() + " has its reason in a comment just before it");
+        }
+    }
+
+    @Test
+    void errorProneRunsInsideJavac() {
+        List<String> args = texts(child(configuration("maven-compiler-plugin"), "compilerArgs"), "arg");
+        assertTrue(args.contains("-XDcompilePolicy=simple"), "Error Prone's compile policy: " + args);
+        assertTrue(args.contains("--should-stop=ifError=FLOW"), "Error Prone sees every class: " + args);
+        assertEquals(1, args.stream().filter(a -> a.startsWith("-Xplugin:ErrorProne")).count(), "the plugin, once: " + args);
+        Element path = elements(child(configuration("maven-compiler-plugin"), "annotationProcessorPaths"), "path").stream()
+                .filter(p -> "com.google.errorprone".equals(text(p, "groupId")) && "error_prone_core".equals(text(p, "artifactId")))
+                .findFirst().orElseThrow(() -> new AssertionError("error_prone_core is on javac's processor path"));
+        assertTrue(text(path, "version").matches("\\d+\\.\\d+\\.\\d+"), "pinned, as the Enforcer wants plugins: " + text(path, "version"));
+    }
+
+    @Test
+    void errorProneTurnsNothingOffQuietly() {
+        List<String> flags = errorProneFlags();
+        for (String flag : flags) {
+            assertTrue(flag.matches("-Xep:\\w+:(ERROR|OFF)"), flag + ": only a check made an error or turned off, nothing that"
+                    + " demotes, skips paths or patches (-XepAllErrorsAsWarnings, -XepExcludedPaths, ...)");
+        }
+        String why = comments(plugin("maven-compiler-plugin"));
+        for (String flag : flags) {
+            if (!flag.endsWith(":OFF")) continue;
+            String check = flag.split(":")[1];
+            assertTrue(why.contains(check + ":"), check + " is off with its reason in the comment before the compiler");
+        }
+    }
+
+    @Test
+    void theChecksOffByDefaultThatCatchDefectsStayOn() {
+        List<String> flags = errorProneFlags();
+        for (String check : List.of("NullableOptional", "FieldCanBeFinal", "UnnecessaryDefaultInEnumSwitch", "UnusedException",
+                "UseEnumSwitch", "DefaultLocale", "EqualsBrokenForNull", "TimeUnitMismatch", "PrimitiveArrayPassedToVarargsMethod",
+                "ComparisonContractViolated", "TransientMisuse", "VoidUsed", "AssertFalse", "TypeToString", "IterablePathParameter",
+                "FunctionalInterfaceClash", "LongLiteralLowerCaseSuffix", "DepAnn")) {
+            assertTrue(flags.contains("-Xep:" + check + ":ERROR"), check + " is on: " + flags);
         }
     }
 
@@ -100,6 +138,21 @@ class BuildRulesTest {
         for (String property : List.of("enforcer.skip", "modernizer.skip", "maven.compiler.failOnWarning")) {
             assertEquals(0, POM.getElementsByTagName(property).getLength(), property + " isn't set in pom.xml");
         }
+    }
+
+    /** Error Prone's own options: what follows {@code -Xplugin:ErrorProne} in its argument. */
+    private static List<String> errorProneFlags() {
+        String arg = texts(child(configuration("maven-compiler-plugin"), "compilerArgs"), "arg").stream()
+                .filter(a -> a.startsWith("-Xplugin:ErrorProne")).findFirst().orElseThrow();
+        List<String> words = List.of(arg.trim().split("\\s+"));
+        return words.subList(1, words.size());
+    }
+
+    /** The comments just before {@code n}, together. */
+    private static String comments(Node n) {
+        StringBuilder out = new StringBuilder();
+        for (Node p = previous(n); p instanceof Comment c; p = previous(p)) out.insert(0, c.getData()).insert(0, '\n');
+        return out.toString();
     }
 
     /** The plugin's own configuration, under build/plugins (not pluginManagement, which only pins versions). */

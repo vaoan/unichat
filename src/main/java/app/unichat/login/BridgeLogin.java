@@ -111,7 +111,7 @@ public final class BridgeLogin {
         ObjectNode body = JSON.createObjectNode();
         values.forEach(body::put);
         return step(call("POST", "/v3/login/step/" + enc(step.loginId()) + "/" + enc(step.stepId()) + "/" + enc(step.type()),
-                body, Duration.ofSeconds(120)));
+                body, Duration.ofMinutes(2)));
     }
 
     /** For display_and_wait: returns when the user did the thing (scanned the QR…) or the step changed (new QR). */

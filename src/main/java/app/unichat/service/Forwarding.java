@@ -103,7 +103,7 @@ public final class Forwarding {
                 });
             }
         }
-        chain.whenComplete((v, err) -> {
+        var _ = chain.whenComplete((v, err) -> {
             job.current = null;
             job.done.complete(null);
             job.changed();

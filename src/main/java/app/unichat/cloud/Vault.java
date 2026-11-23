@@ -34,6 +34,7 @@ final class Vault {
      * The vault's file: its id, when it was made, its generation, and, from a change of key on, what vouches for that
      * generation ({@link #vouched}: sealed with the key it replaced; null before any change, or when it isn't one).
      */
+    @SuppressWarnings("ArrayRecordComponent") // the vouch is a seal; vaults compare ids and generations, never Info
     record Info(String id, Instant created, long generation, byte[] vouch) {
         Info(String id, Instant created, long generation) {
             this(id, created, generation, null);
@@ -46,6 +47,7 @@ final class Vault {
     }
 
     /** A new vault: its key, the code to print (shown once) and this computer's way in. */
+    @SuppressWarnings("ArrayRecordComponent") // key bytes, wiped in place; never compared
     record Created(byte[] vk, RecoveryCode code, Computer computer, Info info) {
         @Override
         public String toString() {
@@ -54,6 +56,7 @@ final class Vault {
     }
 
     /** A computer's way in: the key its slot is wrapped with, and its X25519 pair (the public half is in the slot). */
+    @SuppressWarnings("ArrayRecordComponent") // key bytes, wiped in place; never compared
     record Computer(byte[] key, KeyPair pair) {
         @Override
         public String toString() {
@@ -67,6 +70,7 @@ final class Vault {
      * computers offered nothing because their key isn't the one seen here (machine → its slot's label), and whether some
      * file couldn't be sealed again (each computer seals its own again as it takes the new key).
      */
+    @SuppressWarnings("ArrayRecordComponent") // key bytes, wiped in place; never compared
     record Rotated(byte[] vk, RecoveryCode code, Set<VaultSlot.Method> dropped, List<String> left, Map<String, String> refused,
                    boolean resealFailed) {
         @Override

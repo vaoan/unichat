@@ -52,7 +52,10 @@ class ForwardingTest {
         List<String> expected = new java.util.ArrayList<>();
         String last = null;
         for (Message m : picked) {
-            if (!bySender.apply(m).equals(last)) expected.add(last = bySender.apply(m));
+            if (!bySender.apply(m).equals(last)) {
+                last = bySender.apply(m);
+                expected.add(last);
+            }
             expected.add(m.body());
         }
         assertEquals(expected, sentTo(svc, TO, to).stream().map(Message::body).toList());

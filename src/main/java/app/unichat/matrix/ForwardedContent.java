@@ -17,7 +17,7 @@ import java.util.List;
 final class ForwardedContent {
     /** What {@code ui/timeline/HtmlView} never shows, contents and all: none of it goes out as one's own. */
     private static final String UNSHOWN = "mx-reply, script, style, head, title, meta, link, iframe, object, embed, noscript, template, video, audio";
-    /** Invisible marks that turn text around ("factura‮fdp.exe" shows as "facturaexe.pdf"). */
+    /** Invisible marks that turn text around ("factura" + U+202E + "fdp.exe" shows as "facturaexe.pdf"). */
     private static final String BIDI = "[\\u202A-\\u202E\\u2066-\\u2069\\u200E\\u200F]";
 
     private ForwardedContent() {}

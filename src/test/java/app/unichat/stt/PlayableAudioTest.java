@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -42,7 +43,9 @@ class PlayableAudioTest {
         Files.copy(PlayableAudioTest.class.getResourceAsStream("/app/unichat/demo/voice-note.ogg"), ogg);
         assertEquals(wav, PlayableAudio.of(ogg));
         assertTrue(Files.getLastModifiedTime(wav).toMillis() >= written);
-        assertTrue(Files.list(dir).noneMatch(f -> f.getFileName().toString().endsWith(".part")));
+        try (Stream<Path> stream = Files.list(dir)) {
+            assertTrue(stream.noneMatch(f -> f.getFileName().toString().endsWith(".part")));
+        }
     }
 
     @Test

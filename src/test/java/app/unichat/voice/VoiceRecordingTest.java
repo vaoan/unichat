@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -85,7 +86,7 @@ class VoiceRecordingTest {
     @Test
     void whatIsRecordedDecodesBackToTheSameLengthWithSound() throws Exception {
         VoiceNote note = record(new Tone(48_000, 440, 2));
-        assertEquals(2000, note.durationMs(), 40);
+        assertEquals(2000, (float) note.durationMs(), 40);
         assertTrue(OggOpus.isOggOpus(note.file()));
         Path wav = dir.resolve("vuelta.wav");
         OggOpus.toPlayableWav(note.file(), wav);
@@ -97,7 +98,7 @@ class VoiceRecordingTest {
     @Test
     void lowerMicrophoneRatesWorkToo() throws Exception {
         VoiceNote note = record(new Tone(16_000, 440, 1));
-        assertEquals(1000, note.durationMs(), 40);
+        assertEquals(1000, (float) note.durationMs(), 40);
         Path wav = dir.resolve("vuelta.wav");
         OggOpus.toPlayableWav(note.file(), wav);
         double seconds = (Files.size(wav) - 44) / 96_000.0;
@@ -111,7 +112,7 @@ class VoiceRecordingTest {
         assumeTrue(ffmpeg != null, "no ffmpeg");
         VoiceNote note = record(new Tone(48_000, 440, 1));
         Process p = new ProcessBuilder(ffmpeg.toString(), "-v", "error", "-i", note.file().toString(), "-f", "null", "-").redirectErrorStream(true).start();
-        String complaints = new String(p.getInputStream().readAllBytes());
+        String complaints = new String(p.getInputStream().readAllBytes(), UTF_8);
         assertEquals(0, p.waitFor(), complaints);
         assertEquals("", complaints.strip());
     }
@@ -156,6 +157,6 @@ class VoiceRecordingTest {
         r.start();
         awaitEnd(r);
         assertTrue(r.ended());
-        assertEquals(1000, r.stop().durationMs(), 40);
+        assertEquals(1000, (float) r.stop().durationMs(), 40);
     }
 }

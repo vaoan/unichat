@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import app.unichat.WithLocale;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -16,6 +17,13 @@ class HomeserverConfigTest {
 
     private String mode(Path f) throws Exception {
         return PosixFilePermissions.toString(Files.getPosixFilePermissions(f));
+    }
+
+    /** On a Persian computer the port came out in Persian digits ("port = ۸۰۰۸"), and tuwunel can't read that. */
+    @Test
+    void thePortIsWrittenInDigitsTheServerReadsInAnyLanguage() {
+        String toml = WithLocale.get(WithLocale.PERSIAN, () -> HomeserverConfig.toml(dir, 8008, "localhost", "secret"));
+        assertTrue(toml.contains("port = 8008"), toml);
     }
 
     /** The registration token lets anyone create accounts on the server: only the person reads it, like secrets.properties. */

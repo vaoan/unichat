@@ -11,6 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,6 +19,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -34,7 +36,7 @@ class FfmpegTest {
 
     @BeforeEach
     void serve() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/z", ex -> {
             ex.sendResponseHeaders(200, served.length);
             try (var o = ex.getResponseBody()) {
@@ -76,7 +78,9 @@ class FfmpegTest {
         Path got = Ffmpeg.install(build(zip("carpeta/bin/ffmpeg", "#!/bin/sh\nexit 0\n"), "/bin/ffmpeg"), target, p -> { });
         assertEquals(target, got);
         assertTrue(Files.isExecutable(target));
-        assertEquals(List.of("ffmpeg"), Files.list(dir.resolve("tools")).map(f -> f.getFileName().toString()).toList(), "the zip is gone");
+        try (Stream<Path> stream = Files.list(dir.resolve("tools"))) {
+            assertEquals(List.of("ffmpeg"), stream.map(f -> f.getFileName().toString()).toList(), "the zip is gone");
+        }
     }
 
     @Test

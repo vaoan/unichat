@@ -132,10 +132,10 @@ final class MediaUpload {
         String dir = CloudAccount.MEDIA + "/" + key.substring(0, key.indexOf('/'));
         String remote = CloudAccount.MEDIA + "/" + key;
         Storage.RemoteFile there = dav.info(remote);
-        switch (Checksums.decide(Files.size(file), there == null ? null : localHash(file, there), there)) {
+        return switch (Checksums.decide(Files.size(file), there == null ? null : localHash(file, there), there)) {
             case SAME -> {
                 conflicts.remove(key);
-                return false;
+                yield false;
             }
             case UPLOAD -> {
                 dav.mkdirs(dir);
@@ -146,18 +146,18 @@ final class MediaUpload {
                     throw new IOException(I18n.t("cloud.error.mismatch"));
                 }
                 conflicts.remove(key);
-                return true;
+                yield true;
             }
             case RESTORE_LOCAL -> {
                 restore(dav, remote, file);
                 conflicts.remove(key);
-                return false;
+                yield false;
             }
             default -> {
                 conflicts.add(key);
-                return false;
+                yield false;
             }
-        }
+        };
     }
 
     private static String localHash(Path file, Storage.RemoteFile there) throws IOException {

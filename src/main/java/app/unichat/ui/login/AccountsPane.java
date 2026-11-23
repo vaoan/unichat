@@ -110,7 +110,7 @@ public final class AccountsPane extends VBox {
         VBox rows = new VBox(0);
         rows.getStyleClass().add("settings-group");
         List<Account> accounts = svc.accounts().stream().filter(a -> a.status() != AccountStatus.NEEDS_LOGIN)
-                .sorted(java.util.Comparator.comparing((Account a) -> a.network().ordinal()).thenComparing(Accounts::name))
+                .sorted(java.util.Comparator.comparing((Account a) -> a.network()).thenComparing(Accounts::name))
                 .toList();
         if (accounts.isEmpty()) {
             Label empty = Labels.help(I18n.t("accounts.empty"));
@@ -164,7 +164,7 @@ public final class AccountsPane extends VBox {
             sync.setOnAction(e -> {
                 sync.setDisable(true);
                 toast.accept(I18n.t("accounts.syncing"));
-                svc.syncChats(Network.TELEGRAM).whenComplete((r, err) -> Platform.runLater(() -> {
+                var _ = svc.syncChats(Network.TELEGRAM).whenComplete((r, err) -> Platform.runLater(() -> {
                     sync.setDisable(false);
                     toast.accept(err == null ? I18n.t("accounts.synced") : I18n.t("accounts.syncFailed"));
                 }));
@@ -206,7 +206,7 @@ public final class AccountsPane extends VBox {
         confirm.getStyleClass().add("danger-button");
         confirm.setOnAction(e -> {
             confirm.setDisable(true);
-            svc.disconnectAccount(a).whenComplete((v, err) -> Platform.runLater(() -> {
+            var _ = svc.disconnectAccount(a).whenComplete((v, err) -> Platform.runLater(() -> {
                 toast.accept(err == null ? I18n.t("accounts.disconnected", Accounts.name(a)) : I18n.t("accounts.disconnectFailed", LoginTexts.rootMessage(err)));
                 showList();
             }));
@@ -339,7 +339,7 @@ public final class AccountsPane extends VBox {
         LoadingView loading = new LoadingView(I18n.t("accounts.preparingLogin", n.displayName()));
         setView(I18n.t("login.connectTitle", n.displayName()), loading, this::showPicker);
         Instant since = Instant.now().minusSeconds(2);
-        svc.addAccount(n).whenComplete((botChatId, err) -> Platform.runLater(() -> {
+        var _ = svc.addAccount(n).whenComplete((botChatId, err) -> Platform.runLater(() -> {
             if (err != null) {
                 loading.fail(I18n.t("accounts.startFailed", LoginTexts.rootMessage(err)));
                 return;

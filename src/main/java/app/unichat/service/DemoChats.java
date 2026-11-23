@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -55,7 +56,6 @@ final class DemoChats {
 
     static void seed(MockChatService svc) {
         Map<String, Account> accounts = svc.accounts;
-        Instant now = Instant.now();
         for (Network n : List.of(Network.WHATSAPP, Network.TELEGRAM, Network.INSTAGRAM, Network.SIGNAL,
                 Network.DISCORD, Network.SLACK, Network.MESSENGER, Network.GOOGLE_MESSAGES)) {
             if (n != Network.WHATSAPP) accounts.put(n.protocolId(), new Account(n, "demo_" + n.protocolId(), AccountStatus.CONNECTED, null));
@@ -204,7 +204,7 @@ final class DemoChats {
             chat.setGroup(group);
             List<Member> members = new ArrayList<>(List.of(new Member(ME, I18n.t("demo.me"), null)));
             for (String n : names) {
-                Member m = new Member("@" + network.protocolId() + "_" + n.toLowerCase().replaceAll("[^a-z0-9]", "") + ":demo.unichat", n, null);
+                Member m = new Member("@" + network.protocolId() + "_" + n.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "") + ":demo.unichat", n, null);
                 people.put(n, m);
                 members.add(m);
             }

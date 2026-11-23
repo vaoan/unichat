@@ -50,7 +50,7 @@ final class VaultPasswordForm extends VBox {
             }
             add.setDisable(true);
             Nodes.show(error, false);
-            cloud.vault().addPassword(password).whenComplete((ok, err) -> Platform.runLater(() -> {
+            var _ = cloud.vault().addPassword(password).whenComplete((ok, err) -> Platform.runLater(() -> {
                 add.setDisable(false);
                 if (err == null) {
                     added.run();

@@ -56,7 +56,7 @@ public final class AnimatedImage {
         /** Pixel memory (4 bytes per pixel). */
         long bytes() {
             long b = 0;
-            for (Image i : images) b += (long) i.getWidth() * (long) i.getHeight() * 4;
+            for (Image i : images) b += ((long) i.getWidth()) * ((long) i.getHeight()) * 4;
             return b;
         }
     }

@@ -191,7 +191,7 @@ public final class NewChatPane extends VBox {
         search.setDisable(false);
         setStatus(I18n.t("common.loading"));
         ChatService.ContactSupport[] found = new ChatService.ContactSupport[1];
-        svc.contactSupport(a).thenCompose(s -> {
+        var _ = svc.contactSupport(a).thenCompose(s -> {
             found[0] = s;
             return s.list() ? svc.contacts(a) : java.util.concurrent.CompletableFuture.completedFuture(List.<Contact>of());
         }).whenComplete((contacts, err) -> Platform.runLater(() -> {
@@ -239,7 +239,7 @@ public final class NewChatPane extends VBox {
         }
         show(List.copyOf(rows), null);
         setStatus(I18n.t("newChat.searching"));
-        svc.searchContacts(account, q).whenComplete((found, err) -> Platform.runLater(() -> {
+        var _ = svc.searchContacts(account, q).whenComplete((found, err) -> Platform.runLater(() -> {
             if (gen != generation) return;
             if (err != null) {
                 Throwable cause = Errors.unwrap(err);
@@ -264,7 +264,7 @@ public final class NewChatPane extends VBox {
         String n = ChatFilter.normalize(q), digits = q.replaceAll("\\D", "");
         return all.stream().filter(c -> ChatFilter.normalize(c.name()).contains(n)
                 || c.identifiers().stream().anyMatch(i -> ChatFilter.normalize(i).contains(n)
-                        || digits.length() >= 3 && i.replaceAll("\\D", "").contains(digits))).toList();
+                        || (digits.length() >= 3 && i.replaceAll("\\D", "").contains(digits)))).toList();
     }
 
     /** {@code local} first, then what {@code found} adds, each contact once. */
@@ -306,7 +306,7 @@ public final class NewChatPane extends VBox {
         Nodes.show(status, true);
         java.util.concurrent.CompletableFuture<Contact> contact = r.contact() != null
                 ? java.util.concurrent.CompletableFuture.completedFuture(r.contact()) : svc.resolveContact(a, normalizeIdentifier(r.typed()));
-        contact.thenCompose(c -> {
+        var _ = contact.thenCompose(c -> {
             if (c == null) throw new java.util.concurrent.CompletionException(new IllegalArgumentException("not found"));
             return svc.openDm(a, c);
         }).whenComplete((roomId, err) -> Platform.runLater(() -> {

@@ -124,7 +124,11 @@ public final class MediaLibrary {
     /** Each one's {@code was} becomes its {@code now} where it stands, in favourites and recents; one change for all. */
     public synchronized void replace(List<Replacement> replacements) {
         boolean any = false;
-        for (Replacement r : replacements) any |= replaceIn(favorites, r) | replaceIn(recents, r);
+        for (Replacement r : replacements) {
+            boolean inFavorites = replaceIn(favorites, r); // both lists change, whatever the first did
+            boolean inRecents = replaceIn(recents, r);
+            any |= inFavorites || inRecents;
+        }
         if (!any) return;
         dropCopies(favorites);
         dropCopies(recents);
@@ -157,7 +161,9 @@ public final class MediaLibrary {
             for (JsonNode n : root.path("favorites")) if (known(n)) favorites.add(item(n));
             for (JsonNode n : root.path("recents")) if (known(n)) recents.add(item(n));
             root.path("reactions").fields().forEachRemaining(f -> reactions.put(f.getKey(), f.getValue().asInt()));
-            if (dropCopies(favorites) | dropCopies(recents)) save();
+            boolean droppedFavorites = dropCopies(favorites); // both lists lose their copies, whatever the first did
+            boolean droppedRecents = dropCopies(recents);
+            if (droppedFavorites || droppedRecents) save();
         } catch (IOException | RuntimeException e) {
             favorites.clear();
             recents.clear();

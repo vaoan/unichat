@@ -36,7 +36,12 @@ public final class Storage {
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private ScheduledExecutorService timer;
 
-    /** @param measure the free bytes now; @param clock milliseconds */
+    /**
+     * Measures with {@code measure} until {@link #watch} gives it a folder.
+     *
+     * @param measure the free bytes now
+     * @param clock milliseconds
+     */
     public Storage(LongSupplier measure, LongSupplier clock) {
         this.measure = measure;
         this.clock = clock;
@@ -58,7 +63,7 @@ public final class Storage {
             t.setDaemon(true);
             return t;
         });
-        timer.scheduleWithFixedDelay(this::check, CHECK_EVERY_MS, CHECK_EVERY_MS, TimeUnit.MILLISECONDS);
+        var _ = timer.scheduleWithFixedDelay(this::check, CHECK_EVERY_MS, CHECK_EVERY_MS, TimeUnit.MILLISECONDS);
     }
 
     /** Measures again; the listeners hear when being low changed. */

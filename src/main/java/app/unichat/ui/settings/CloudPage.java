@@ -77,14 +77,14 @@ public final class CloudPage {
         Nodes.show(status, false);
         Consumer<CloudAccount> tryIt = a -> {
             say(status, I18n.t("settings.cloud.trying"));
-            Cloud.verify(a).whenComplete((ok, err) -> Platform.runLater(() -> {
+            var _ = Cloud.verify(a).whenComplete((ok, err) -> Platform.runLater(() -> {
                 if (err != null) {
                     say(status, I18n.t("settings.cloud.failed", Errors.message(Errors.unwrap(err))));
                     return;
                 }
                 ok.save();
                 toast.accept(I18n.t("settings.cloud.connected", I18n.t("settings.cloud.service." + ok.service().name())));
-                cloud.syncNow();
+                var _ = cloud.syncNow();
                 redraw.run();
             }));
         };
@@ -145,7 +145,7 @@ public final class CloudPage {
                 connect.setDisable(true);
                 Nodes.show(cancel, true);
                 say(status, I18n.t("settings.cloud.inBrowser"));
-                login.whenComplete((a, err) -> Platform.runLater(() -> {
+                var _ = login.whenComplete((a, err) -> Platform.runLater(() -> {
                     connect.setDisable(false);
                     Nodes.show(cancel, false);
                     if (err instanceof java.util.concurrent.CancellationException) say(status, "");
@@ -245,12 +245,12 @@ public final class CloudPage {
         now.setOnAction(e -> {
             now.setDisable(true);
             state.setText(I18n.t("settings.cloud.syncing"));
-            c.syncNow();
+            var _ = c.syncNow();
         });
         verify.setOnAction(e -> {
             verify.setDisable(true);
             now.setDisable(true);
-            c.verifyNow();
+            var _ = c.verifyNow();
         });
         Button off = new Button(I18n.t("settings.cloud.disconnect"));
         off.getStyleClass().add("secondary-button");

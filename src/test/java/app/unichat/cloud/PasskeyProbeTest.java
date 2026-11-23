@@ -94,7 +94,7 @@ class PasskeyProbeTest {
         Path file = dir.resolve("logs").resolve("passkey-probe.txt");
         URI[] opened = {null};
         List<PasskeyPage.Finding> told = new CopyOnWriteArrayList<>();
-        PasskeyProbe.run(u -> opened[0] = u, told::add, 0, file);
+        var _ = PasskeyProbe.run(u -> opened[0] = u, told::add, 0, file);
         URI base = URI.create("http://127.0.0.1:" + opened[0].getPort());
         String page = HTTP.send(HttpRequest.newBuilder(base.resolve("/passkey")).build(), HttpResponse.BodyHandlers.ofString()).body();
         var m = Pattern.compile("const STATE = \"([0-9a-f]+)\"").matcher(page);
@@ -118,7 +118,7 @@ class PasskeyProbeTest {
         URI[] opened = {null};
         CompletableFuture<Void> first = PasskeyProbe.run(u -> opened[0] = u, f -> { }, 0, dir.resolve("probe.txt"));
         URI firstAddress = opened[0];
-        PasskeyProbe.run(u -> opened[0] = u, f -> { }, 0, dir.resolve("probe.txt"));
+        var _ = PasskeyProbe.run(u -> opened[0] = u, f -> { }, 0, dir.resolve("probe.txt"));
         assertTrue(first.isCancelled(), "the port 43117 is one: the one before gives it back");
         PCloudTest.portIsFree(firstAddress.toString());
     }

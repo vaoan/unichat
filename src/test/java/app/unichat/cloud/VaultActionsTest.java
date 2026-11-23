@@ -295,7 +295,7 @@ class VaultActionsTest {
         try (var r = desk.as(() -> CompletableFuture.completedFuture(VaultParts.open(dav(), (p, b) -> false, () -> { })))) {
             vk = r.key();
         }
-        Vault.addComputer(dav(), vk, OTHER, "Mal\nvado‮txt.exe" + "x".repeat(100));
+        Vault.addComputer(dav(), vk, OTHER, "Mal\nvado\u202etxt.exe" + "x".repeat(100));
         Arrays.fill(vk, (byte) 0);
         String label = view(desk).computers().stream().filter(c -> c.machine().equals(OTHER)).findFirst().orElseThrow().label();
         assertTrue(label.startsWith("Mal vado txt.exe"), label);

@@ -216,9 +216,9 @@ final class ChatActions {
      */
     void applyMutes() {
         synchronized (proc) {
-            proc.mutesToApply().forEach(this::queueMuteWrite);
+            proc.mutesToApply().forEach((id, on) -> { var _ = queueMuteWrite(id, on); });
         }
-        discord.retryGuildPauses(Instant.now());
+        var _ = discord.retryGuildPauses(Instant.now());
     }
 
     /**

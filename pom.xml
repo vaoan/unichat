@@ -160,6 +160,11 @@
     <plugins>
       <!-- Every javac lint is an error, in main and test code alike (BuildRulesTest keeps it on). A category may be
            turned off only with -Xlint:-name and the reason beside it. -->
+      <!-- Error Prone runs inside javac on main and test code; -Werror makes its warnings errors too (.mvn/jvm.config
+           opens javac to it). Besides its defaults, checks that are off by default and catch real defects are on.
+           Off, each one noise here (BuildRulesTest wants every :OFF named in this comment):
+           StringSplitter: its fix is Guava's Splitter, not a dependency; split(x, 0) would only silence it.
+           ReferenceEquality: JavaFX code compares nodes, windows and sentinels by identity on purpose (57 found, all meant). -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -169,7 +174,17 @@
           <compilerArgs>
             <arg>-Xlint:all</arg>
             <arg>-Werror</arg>
+            <arg>-XDcompilePolicy=simple</arg>
+            <arg>--should-stop=ifError=FLOW</arg>
+            <arg>-Xplugin:ErrorProne -Xep:NullableOptional:ERROR -Xep:FieldCanBeFinal:ERROR -Xep:UnnecessaryDefaultInEnumSwitch:ERROR -Xep:UnusedException:ERROR -Xep:UseEnumSwitch:ERROR -Xep:DefaultLocale:ERROR -Xep:EqualsBrokenForNull:ERROR -Xep:TimeUnitMismatch:ERROR -Xep:PrimitiveArrayPassedToVarargsMethod:ERROR -Xep:ComparisonContractViolated:ERROR -Xep:TransientMisuse:ERROR -Xep:VoidUsed:ERROR -Xep:AssertFalse:ERROR -Xep:TypeToString:ERROR -Xep:IterablePathParameter:ERROR -Xep:FunctionalInterfaceClash:ERROR -Xep:LongLiteralLowerCaseSuffix:ERROR -Xep:DepAnn:ERROR -Xep:StringSplitter:OFF -Xep:ReferenceEquality:OFF</arg>
           </compilerArgs>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>com.google.errorprone</groupId>
+              <artifactId>error_prone_core</artifactId>
+              <version>2.53.0</version>
+            </path>
+          </annotationProcessorPaths>
         </configuration>
       </plugin>
       <!-- The build's own rules: the JDK and Maven it needs, one version of each library, every plugin pinned, no

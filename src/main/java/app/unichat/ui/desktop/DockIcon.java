@@ -44,7 +44,7 @@ public final class DockIcon {
 
     /** Whether there's a Dock icon: with any window besides the main one, or with the main one if wanted. */
     static boolean regular(boolean main, boolean others, boolean setting, boolean tray) {
-        return others || main && wanted(setting, tray);
+        return others || (main && wanted(setting, tray));
     }
 
     /** Window about to be shown (or the setting changed while it is): the Dock icon if wanted, and the active app. */

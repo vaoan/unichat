@@ -117,7 +117,7 @@ public final class Rail extends VBox {
         else if (bottom > shown + view) scroll.setVvalue((bottom - view) / (content - view));
     }
 
-    private Button settingsButton;
+    private final Button settingsButton;
     /** Over the settings gear while files go up to the cloud: how far the round got. */
     private final javafx.scene.shape.Arc cloudRing = new javafx.scene.shape.Arc();
     private boolean cloudActive;

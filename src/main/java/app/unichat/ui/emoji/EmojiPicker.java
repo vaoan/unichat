@@ -21,7 +21,7 @@ import java.util.function.Consumer;
 public final class EmojiPicker {
     private EmojiPicker() {}
 
-    public static final String[] QUICK = {"❤️", "👍", "😂", "😮", "😢", "🙏"};
+    public static final List<String> QUICK = List.of("❤️", "👍", "😂", "😮", "😢", "🙏");
 
     /**
      * Unicode's emoji by group ({@code emoji.group.<key>}), from {@code emoji/emoji.txt} (made by native/emoji-list.py):

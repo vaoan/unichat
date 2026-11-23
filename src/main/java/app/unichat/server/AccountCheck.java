@@ -19,7 +19,12 @@ import java.sql.Statement;
 final class AccountCheck {
     private AccountCheck() {}
 
-    /** @param cached the logins kept, null when none were ever read; @param db the bridge's SQLite database */
+    /**
+     * Whether the bridge has an account, kept or in its database.
+     *
+     * @param cached the logins kept, null when none were ever read
+     * @param db the bridge's SQLite database
+     */
     static boolean hasAccount(String cached, Path db) {
         if (LoginsCache.hasLogin(cached)) return true;
         Boolean inDb = inDatabase(db);

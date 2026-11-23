@@ -55,9 +55,9 @@ public final class ChatOptions {
         title.getStyleClass().add("sheet-title");
         title.setWrapText(true);
         SaveChoice theirs = new SaveChoice(I18n.t("chatOptions.autoSave"), svc.autoSaves(chat.id(), false),
-                k -> svc.setAutoSave(chat.id(), false, k), () -> AutoSave.of(svc).startNow(chat.id()));
+                k -> { var _ = svc.setAutoSave(chat.id(), false, k); }, () -> AutoSave.of(svc).startNow(chat.id()));
         SaveChoice mine = new SaveChoice(I18n.t("chatOptions.autoSaveMine"), svc.autoSaves(chat.id(), true),
-                k -> svc.setAutoSave(chat.id(), true, k), () -> AutoSave.of(svc).startNow(chat.id()));
+                k -> { var _ = svc.setAutoSave(chat.id(), true, k); }, () -> AutoSave.of(svc).startNow(chat.id()));
         Label help = Labels.help(I18n.t("chatOptions.autoSaveHelp"));
         // What's sent saved and what I send not: one's own photos were left out without a word, and it looked broken.
         Label mineNote = Labels.help(I18n.t("chatOptions.autoSaveMineOff"));
@@ -78,7 +78,7 @@ public final class ChatOptions {
         CheckBox showMedia = new CheckBox(I18n.t("chatOptions.showMedia"));
         showMedia.setSelected(!svc.mediaHidden(chat.id()));
         showMedia.setWrapText(true);
-        showMedia.setOnAction(e -> svc.setMediaHidden(chat.id(), !showMedia.isSelected()));
+        showMedia.setOnAction(e -> { var _ = svc.setMediaHidden(chat.id(), !showMedia.isSelected()); });
         VBox general = new VBox(12, sectionTitle(I18n.t("chatOptions.profileTitle")), showMedia,
                 sectionTitle(I18n.t("chatOptions.autoSaveTitle")), theirs.node, mine.node, mineNote, help,
                 folderRow(chat), openFolder, sectionTitle(I18n.t("chatOptions.pastTitle")),
@@ -160,7 +160,7 @@ public final class ChatOptions {
         });
         yes.setOnAction(e -> {
             hide.run();
-            svc.leaveChat(chat.id()).thenRun(() -> Platform.runLater(() -> toast.accept(I18n.t("info.left", chat.title()))));
+            var _ = svc.leaveChat(chat.id()).thenRun(() -> Platform.runLater(() -> toast.accept(I18n.t("info.left", chat.title()))));
         });
         return new VBox(6, ask, confirm);
     }
@@ -232,7 +232,7 @@ public final class ChatOptions {
     }
 
     private static String day(java.time.Instant at) {
-        return java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy").withLocale(I18n.locale())
+        return java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", I18n.locale())
                 .format(at.atZone(java.time.ZoneId.systemDefault()));
     }
 

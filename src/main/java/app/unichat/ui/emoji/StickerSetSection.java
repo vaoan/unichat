@@ -163,7 +163,7 @@ final class StickerSetSection {
             then.run();
             return;
         }
-        svc.stickerPack(url).whenComplete((p, err) -> Platform.runLater(() -> {
+        var _ = svc.stickerPack(url).whenComplete((p, err) -> Platform.runLater(() -> {
             loading.remove(url);
             if (err != null) {
                 System.err.println("Sticker set not fetched: " + err);
@@ -178,9 +178,9 @@ final class StickerSetSection {
     }
 
     private void askForYours() {
-        if (asking || yours != null && (!yours.isEmpty() || System.currentTimeMillis() - askedAt < ASK_AGAIN_MS)) return;
+        if (asking || (yours != null && (!yours.isEmpty() || System.currentTimeMillis() - askedAt < ASK_AGAIN_MS))) return;
         asking = true;
-        svc.stickerPacks().whenComplete((l, err) -> Platform.runLater(() -> {
+        var _ = svc.stickerPacks().whenComplete((l, err) -> Platform.runLater(() -> {
             if (err != null) System.err.println("Sticker sets not listed: " + err);
             asking = false;
             askedAt = System.currentTimeMillis();

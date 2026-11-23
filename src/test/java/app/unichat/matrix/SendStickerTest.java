@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
@@ -31,7 +32,7 @@ class SendStickerTest {
 
     @BeforeEach
     void fakeHomeserver() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/_matrix/client/v1/media/download/", ex -> {
             java.io.ByteArrayOutputStream gif = new java.io.ByteArrayOutputStream();
             if (served != null) gif.write(java.nio.file.Files.readAllBytes(served));

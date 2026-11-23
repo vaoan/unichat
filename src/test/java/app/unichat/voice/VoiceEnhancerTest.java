@@ -112,7 +112,7 @@ class VoiceEnhancerTest {
         VoiceNote out = VoiceEnhancer.improve(note, noisyRecording(), RATE, p -> { });
         assertEquals(note.file(), out.file());
         assertTrue(OggOpus.isOggOpus(out.file()), "encoded again");
-        assertEquals(2000, out.durationMs(), 100);
+        assertEquals(2000, (float) out.durationMs(), 100);
         assertFalse(out.waveform().isEmpty());
     }
 

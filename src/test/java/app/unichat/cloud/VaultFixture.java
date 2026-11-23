@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * For screens' tests: this computer connected to an account in memory ({@link FakeDav}), with its {@link Cloud} as the
  * app makes it, and what another computer of the person's does there (makes the vault, adds itself). Everything it set
@@ -40,7 +42,7 @@ public final class VaultFixture implements AutoCloseable {
         photos = data.resolve("Fotos");
         cloud = Cloud.create(data, () -> null, b -> true, () -> { }, () -> Files.isDirectory(photos) ? List.of(photos) : List.of(),
             new Cloud.Texts(data.resolve("texts"), p -> false, s -> { }),
-            new Cloud.Personal(() -> "{}".getBytes(), b -> { }, data.resolve("transcripts")));
+            new Cloud.Personal(() -> "{}".getBytes(UTF_8), b -> { }, data.resolve("transcripts")));
     }
 
     public Cloud cloud() {

@@ -134,7 +134,7 @@ public final class PCloudApi implements Storage {
             call(meta.path("isfolder").asBoolean(false) ? "renamefolder" : "renamefile",
                 "path=" + Urls.enc(abs(from)) + "&topath=" + Urls.enc(abs(to)));
         } catch (Missing gone) {
-            throw new IOException(I18n.t("cloud.error.moveNothing", from));
+            throw new IOException(I18n.t("cloud.error.moveNothing", from), gone);
         }
     }
 

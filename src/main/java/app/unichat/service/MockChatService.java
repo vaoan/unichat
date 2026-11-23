@@ -93,8 +93,8 @@ public class MockChatService implements ChatService, FolderForwarding {
             return t;
         });
         after(400, () -> setState(ConnectionState.ONLINE));
-        scheduler.scheduleWithFixedDelay(this::simulateIncoming, 25, 40, TimeUnit.SECONDS);
-        scheduler.scheduleWithFixedDelay(this::checkReminders, 5, 5, TimeUnit.SECONDS);
+        var _ = scheduler.scheduleWithFixedDelay(this::simulateIncoming, 25, 40, TimeUnit.SECONDS);
+        var _ = scheduler.scheduleWithFixedDelay(this::checkReminders, 5, 5, TimeUnit.SECONDS);
     }
 
     @Override
@@ -226,7 +226,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     private void viaBridge(Runnable r) {
         CompletableFuture<Void> gate = bridgeGate;
         if (gate.isDone()) r.run();
-        else gate.thenRunAsync(r);
+        else { var _ = gate.thenRunAsync(r); }
     }
 
     private <T> CompletableFuture<T> later(java.util.function.Supplier<T> s) {
@@ -624,7 +624,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     private Chat botChat(Network network) {
-        String id = "!bot-" + network.name().toLowerCase() + ":demo";
+        String id = "!bot-" + network.name().toLowerCase(java.util.Locale.ROOT) + ":demo";
         return chats.computeIfAbsent(id, k -> {
             Chat bot = new Chat(k);
             bot.setNetwork(network);
@@ -644,7 +644,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     private void answerBridgeBot(Chat chat, String command) {
         Network n = chat.network();
         Member bot = botMember(n);
-        scheduler().schedule(() -> {
+        var _ = scheduler().schedule(() -> {
             if (command.equalsIgnoreCase("login")) {
                 Message qr = new Message(UUID.randomUUID().toString(), chat.id(), bot.id(), bot.name(), false, Instant.now());
                 qr.setType(MessageType.IMAGE);
@@ -653,7 +653,7 @@ public class MockChatService implements ChatService, FolderForwarding {
                 qr.setSize(640, 420);
                 append(chat, qr);
                 incoming(chat, bot, "Scan the QR code with the " + n.displayName() + " mobile app to log in.", false);
-                scheduler().schedule(() -> answerBridgeBot(chat, "ok"), 6, TimeUnit.SECONDS); // demo: simulated scan
+                var _ = scheduler().schedule(() -> answerBridgeBot(chat, "ok"), 6, TimeUnit.SECONDS); // demo: simulated scan
             } else if (command.equalsIgnoreCase("ok")) {
                 incoming(chat, bot, "Successfully logged in as demo_" + n.protocolId(), false);
                 synchronized (accounts) {
@@ -695,7 +695,7 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     /** {@code r} after the demo's pause of {@code ms}, or right away (queued in order) with {@link #skipDemoPauses}. */
     private void after(long ms, Runnable r) {
-        scheduler().schedule(r, noPauses ? 0 : ms, TimeUnit.MILLISECONDS);
+        var _ = scheduler().schedule(r, noPauses ? 0 : ms, TimeUnit.MILLISECONDS);
     }
 
     /** SENDING -> SENT -> DELIVERED -> READ, like a real network. */
@@ -717,8 +717,8 @@ public class MockChatService implements ChatService, FolderForwarding {
         if (others.isEmpty()) return;
         Member who = others.get(random.nextInt(others.size()));
         ScheduledExecutorService s = scheduler();
-        s.schedule(() -> setTyping(chat, who, true), 1, TimeUnit.SECONDS);
-        s.schedule(() -> {
+        var _ = s.schedule(() -> setTyping(chat, who, true), 1, TimeUnit.SECONDS);
+        var _ = s.schedule(() -> {
             setTyping(chat, who, false);
             incoming(chat, who, autoReply(random.nextInt(AUTO_REPLY_COUNT)), true);
         }, seconds, TimeUnit.SECONDS);

@@ -44,6 +44,7 @@ public final class OggOpus {
     }
 
     /** The decoded samples at 48 kHz: {@code length} of {@code samples} are in use. */
+    @SuppressWarnings("ArrayRecordComponent") // a buffer handed on once, never compared
     private record Decoded(short[] samples, int length) {}
 
     /** Decodes {@code in} to a 16-bit 16 kHz mono WAV at {@code out}; returns the duration in seconds. */

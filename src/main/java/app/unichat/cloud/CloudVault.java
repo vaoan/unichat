@@ -212,7 +212,7 @@ public final class CloudVault {
             }
             return null;
         });
-        f.whenComplete((r, e) -> Arrays.fill(secret, '\0'));
+        var _ = f.whenComplete((r, e) -> Arrays.fill(secret, '\0'));
         return f;
     }
 
@@ -230,7 +230,7 @@ public final class CloudVault {
             VaultActions.addPassword(dav, vk, password);
             return null;
         }));
-        f.whenComplete((r, e) -> Arrays.fill(password, '\0'));
+        var _ = f.whenComplete((r, e) -> Arrays.fill(password, '\0'));
         return f;
     }
 

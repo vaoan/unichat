@@ -93,7 +93,7 @@ public final class StickerConverter {
 
     /** Whether the {@code mime} sticker {@code src} moves: a video sticker always, a GIF with more than one frame. */
     static boolean animated(Path src, String mime) throws IOException {
-        return WEBM.equals(mime) || NetworkFormats.LOTTIE.equals(mime) || GIF.equals(mime) && GifFrames.count(src) > 1;
+        return WEBM.equals(mime) || NetworkFormats.LOTTIE.equals(mime) || (GIF.equals(mime) && GifFrames.count(src) > 1);
     }
 
     /** {@code src} ({@code from}) made {@code want}, each way falling back to the next best; null: it goes as it is. */

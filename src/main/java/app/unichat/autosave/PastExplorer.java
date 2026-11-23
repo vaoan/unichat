@@ -149,7 +149,7 @@ final class PastExplorer {
             return;
         }
         doing(chatId, Doing.ASKING_OLDER, exploring(chatId).back(), null);
-        chats.loadOlder(chatId).whenComplete((more, err) -> worker.execute(() -> {
+        var _ = chats.loadOlder(chatId).whenComplete((more, err) -> worker.execute(() -> {
             if (err != null || !Boolean.TRUE.equals(more)) end(chatId, chat, err == null);
             else page(chatId);
         }));

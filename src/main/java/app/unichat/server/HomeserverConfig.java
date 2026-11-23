@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 
 /** tuwunel.toml for the personal server, rewritten on every start (nothing in it is edited by hand), and the double-puppet registration. */
 final class HomeserverConfig {
@@ -40,7 +41,7 @@ final class HomeserverConfig {
     }
 
     static String toml(Path dataDir, int port, String domain, String registrationToken) {
-        return """
+        return String.format(Locale.ROOT, """
                 # Written by Unichat on every start; edits are overwritten.
                 [global]
                 server_name = %s
@@ -64,7 +65,7 @@ final class HomeserverConfig {
                 # Console commands passed at start (old Discord media cleanup) never stop the server if they fail.
                 admin_execute_errors_ignore = true
                 log = "info"
-                """.formatted(str(domain), str(dataDir.resolve("tuwunel").resolve("db").toString()), port,
+                """, str(domain), str(dataDir.resolve("tuwunel").resolve("db").toString()), port,
                 str(registrationToken), str(dataDir.resolve("appservices").toString()));
     }
 

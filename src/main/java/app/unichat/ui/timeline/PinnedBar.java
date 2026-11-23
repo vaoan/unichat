@@ -28,6 +28,7 @@ final class PinnedBar {
     private final Label preview = new Label();
     private final Button go;
     private final Button unpin;
+    @SuppressWarnings("UnnecessaryLambda") // one instance: removeListener takes away what addListener added
     private final Consumer<String> onChange = chat -> {
         if (Platform.isFxApplicationThread()) changed(chat);
         else Platform.runLater(() -> changed(chat));

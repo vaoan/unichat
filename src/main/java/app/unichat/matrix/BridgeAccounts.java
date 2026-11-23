@@ -361,15 +361,16 @@ final class BridgeAccounts {
 
     /** Right after start the server and bridges are still settling: wait a bit, and retry a failed attempt. */
     private void resyncAttempt(Network n, int attempt) {
-        CompletableFuture.delayedExecutor(attempt == 1 ? 20 : 45, java.util.concurrent.TimeUnit.SECONDS, core.io).execute(() ->
-                syncChats(n).whenComplete((r, err) -> {
-                    if (err == null) return;
-                    Throwable root = err;
-                    while (root.getCause() != null) root = root.getCause();
-                    System.err.println("Telegram chat resync attempt " + attempt + " failed: " + root.getClass().getSimpleName()
-                            + ": " + root.getMessage());
-                    if (attempt < 3) resyncAttempt(n, attempt + 1);
-                }));
+        CompletableFuture.delayedExecutor(attempt == 1 ? 20 : 45, java.util.concurrent.TimeUnit.SECONDS, core.io).execute(() -> {
+            var _ = syncChats(n).whenComplete((r, err) -> {
+                if (err == null) return;
+                Throwable root = err;
+                while (root.getCause() != null) root = root.getCause();
+                System.err.println("Telegram chat resync attempt " + attempt + " failed: " + root.getClass().getSimpleName()
+                        + ": " + root.getMessage());
+                if (attempt < 3) resyncAttempt(n, attempt + 1);
+            });
+        });
     }
 
     private final Set<Network> resyncStarted = java.util.concurrent.ConcurrentHashMap.newKeySet();
