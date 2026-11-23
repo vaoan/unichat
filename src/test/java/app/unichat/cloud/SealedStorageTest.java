@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SealedStorageTest {
-    private static final String PATH = "Unichat/Ajustes/prueba.json", STORED = Vault.ROOT + "/Ajustes/prueba.json";
+    private static final String PATH = "Unichat/Settings/prueba.json", STORED = Vault.ROOT + "/Settings/prueba.json";
     private static final Instant T = Instant.parse("2026-11-10T08:00:00Z");
     private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
     private final byte[] vk = VaultCrypto.randomKey();
@@ -50,7 +50,7 @@ class SealedStorageTest {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
             SealedStorage sealed = over(dav);
             byte[] secret = "ui.theme=DARK and more words".getBytes(StandardCharsets.UTF_8);
-            sealed.mkdirs("Unichat/Ajustes");
+            sealed.mkdirs("Unichat/Settings");
             sealed.put(PATH, secret);
 
             byte[] there = cloud.files.get(STORED);
@@ -58,23 +58,23 @@ class SealedStorageTest {
             assertFalse(cloud.files.containsKey(PATH), "kept under the vault's folder");
             assertArrayEquals(secret, sealed.get(PATH));
             assertTrue(sealed.exists(PATH));
-            assertEquals(List.of("prueba.json"), sealed.list("Unichat/Ajustes"));
+            assertEquals(List.of("prueba.json"), sealed.list("Unichat/Settings"));
             assertEquals(-1, sealed.info(PATH).size());
-            assertNull(sealed.info("Unichat/Ajustes/otra.json"));
-            assertNull(sealed.get("Unichat/Ajustes/otra.json"));
-            assertFalse(sealed.get("Unichat/Ajustes/otra.json", dir.resolve("x")));
+            assertNull(sealed.info("Unichat/Settings/otra.json"));
+            assertNull(sealed.get("Unichat/Settings/otra.json"));
+            assertFalse(sealed.get("Unichat/Settings/otra.json", dir.resolve("x")));
             assertFalse(Files.exists(dir.resolve("x")));
 
             Path file = Files.write(dir.resolve("in"), secret), out = dir.resolve("out");
             AtomicLong reported = new AtomicLong();
-            sealed.put("Unichat/Ajustes/dos.json", file, reported::set);
+            sealed.put("Unichat/Settings/dos.json", file, reported::set);
             assertEquals(there.length, reported.get(), "the sealed size, once");
-            assertTrue(sealed.get("Unichat/Ajustes/dos.json", out));
+            assertTrue(sealed.get("Unichat/Settings/dos.json", out));
             assertArrayEquals(secret, Files.readAllBytes(out));
 
             assertNotNull(sealed.stamp(PATH));
-            sealed.delete("Unichat/Ajustes/dos.json");
-            assertFalse(sealed.exists("Unichat/Ajustes/dos.json"));
+            sealed.delete("Unichat/Settings/dos.json");
+            assertFalse(sealed.exists("Unichat/Settings/dos.json"));
             sealed.check();
         }
     }
@@ -84,7 +84,7 @@ class SealedStorageTest {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             SealedStorage sealed = over(new WebDav(cloud.url(), "u", "p"));
             for (String path : new String[] {"Otro/x", "Unichat", Vault.ROOT + "/x", CloudAccount.MEDIA + "/a.mp4", CloudAccount.MEDIA, "../x",
-                "Unichat/", "Unichat//", "Unichat/../x", "Unichat/../../Unichat/Bóveda/llaves/x", "Unichat/./x", "Unichat/a//b", "Unichat/a/"}) {
+                "Unichat/", "Unichat//", "Unichat/../x", "Unichat/../../Unichat/Vault/keys/x", "Unichat/./x", "Unichat/a//b", "Unichat/a/"}) {
                 assertThrows(IllegalArgumentException.class, () -> sealed.put(path, new byte[1]), path);
                 assertThrows(IllegalArgumentException.class, () -> sealed.get(path), path);
                 assertThrows(IllegalArgumentException.class, () -> sealed.list(path), path);
@@ -92,8 +92,8 @@ class SealedStorageTest {
                 assertThrows(IllegalArgumentException.class, () -> sealed.delete(path), path);
                 assertThrows(IllegalArgumentException.class, () -> sealed.stamp(path), path);
             }
-            sealed.put("Unichat/BóvedaVieja/x", new byte[1]); // only the vault's own folder is the vault's
-            assertEquals(java.util.Set.of(Vault.ROOT + "/BóvedaVieja/x"), cloud.files.keySet(), "only that one landed");
+            sealed.put("Unichat/VaultVieja/x", new byte[1]); // only the vault's own folder is the vault's
+            assertEquals(java.util.Set.of(Vault.ROOT + "/VaultVieja/x"), cloud.files.keySet(), "only that one landed");
         }
     }
 
@@ -102,8 +102,8 @@ class SealedStorageTest {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             SealedStorage sealed = over(new WebDav(cloud.url(), "u", "p"));
             sealed.put(PATH, "x".getBytes(StandardCharsets.UTF_8));
-            cloud.files.put(Vault.ROOT + "/Ajustes/copia.json", cloud.files.get(STORED));
-            IOException e = assertThrows(IOException.class, () -> sealed.get("Unichat/Ajustes/copia.json"));
+            cloud.files.put(Vault.ROOT + "/Settings/copia.json", cloud.files.get(STORED));
+            IOException e = assertThrows(IOException.class, () -> sealed.get("Unichat/Settings/copia.json"));
             assertEquals(app.unichat.support.I18n.t("cloud.error.vaultDamaged"), e.getMessage());
         }
     }

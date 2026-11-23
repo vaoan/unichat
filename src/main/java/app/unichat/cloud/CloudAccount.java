@@ -25,9 +25,9 @@ public record CloudAccount(Service service, String url, String user, String secr
 
     /** Where in the account everything goes. */
     public static final String ROOT = "Unichat";
-    public static final String MEDIA = ROOT + "/Multimedia";
+    public static final String MEDIA = ROOT + "/Media";
     /** Where the parts of the settings go, plain or (logically) in the vault: each part's file is {@link Cloud.Part}'s. */
-    public static final String SETTINGS_DIR = ROOT + "/Ajustes";
+    public static final String SETTINGS_DIR = ROOT + "/Settings";
     public static final String SETTINGS_FILE = Cloud.Part.SETTINGS.path();
 
     /** The account saved on this computer, or null when none is connected. */

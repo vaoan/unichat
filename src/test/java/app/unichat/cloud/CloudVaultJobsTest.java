@@ -226,7 +226,7 @@ class CloudVaultJobsTest {
     void aStateChangedByAJobDropsTheNoticeOfTheOneBefore() throws Exception {
         VaultComputer desk = desk();
         desk.cloud.vault().createVault().get();
-        account.put(Vault.ROOT + "/Ajustes/unichat-transcripts.json", "dañado".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        account.put(Vault.ROOT + "/Settings/unichat-transcripts.json", "dañado".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         Cloud.Status s = desk.cloud.syncNow().get();
         assertEquals(Cloud.VaultState.OPEN, s.vault());
         assertNotNull(s.vaultNotice(), "the damaged part said");

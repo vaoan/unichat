@@ -50,7 +50,7 @@ class CloudTextsTest {
     }
 
     private Cloud cloud(java.util.function.Supplier<CloudAccount> account, Path media) {
-        SyncedPart unused = new SyncedPart("Unichat/Ajustes/x.json", "x", now -> null, b -> { });
+        SyncedPart unused = new SyncedPart("Unichat/Settings/x.json", "x", now -> null, b -> { });
         return new Cloud(account, unused, unused,
                 new MediaUpload(dir.resolve("cloud-uploaded.txt"), () -> media == null ? List.of() : List.of(media), p -> false),
                 new TextSync(dir.resolve("texts"), dir.resolve("cloud-texts.json"), Cloud.machine()), arrived::add,
@@ -63,9 +63,9 @@ class CloudTextsTest {
 
     private void laptopKept(String index) {
         cloud.dirs.add("Unichat");
-        cloud.dirs.add("Unichat/Textos");
-        cloud.put("Unichat/Textos/" + LAPTOP + "/index.json", index.getBytes(StandardCharsets.UTF_8));
-        cloud.put("Unichat/Textos/" + LAPTOP + "/" + FILE, "{}\n".getBytes(StandardCharsets.UTF_8));
+        cloud.dirs.add("Unichat/Texts");
+        cloud.put("Unichat/Texts/" + LAPTOP + "/index.json", index.getBytes(StandardCharsets.UTF_8));
+        cloud.put("Unichat/Texts/" + LAPTOP + "/" + FILE, "{}\n".getBytes(StandardCharsets.UTF_8));
     }
 
     @Test

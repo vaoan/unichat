@@ -163,7 +163,7 @@ class VaultActionsTest {
     /**
      * Eve kept the password's slot from before a change of key (she held the old key: a removed computer), and with the
      * account she puts it back in place of the new password's, its generation as {@code claims} (null: as it was), and
-     * strips {@code boveda.json}'s vouch.
+     * strips {@code vault.json}'s vouch.
      */
     private void oldPasswordSlotPutBack(Long claims) throws Exception {
         create(desk);

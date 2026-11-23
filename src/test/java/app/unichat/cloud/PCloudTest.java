@@ -42,14 +42,21 @@ class PCloudTest {
     }
 
     @Test
+    void aFileAndAFolderAreMovedOnTheServer() throws Exception {
+        try (FakePCloud cloud = new FakePCloud("tok")) {
+            StorageMoving.check(new PCloudApi(cloud.host(), "tok"));
+        }
+    }
+
+    @Test
     void foldersFilesAndWhetherTheyChanged() throws Exception {
         try (FakePCloud cloud = new FakePCloud("tok")) {
             PCloudApi api = new PCloudApi(cloud.host(), "tok");
             api.check();
             assertEquals("yo@correo.com", api.email());
-            String photo = "Unichat/Multimedia/Dann Serna/foto [abc].jpg";
+            String photo = "Unichat/Media/Dann Serna/foto [abc].jpg";
             assertFalse(api.exists(photo));
-            api.mkdirs("Unichat/Multimedia/Dann Serna");
+            api.mkdirs("Unichat/Media/Dann Serna");
             api.put(photo, "f".getBytes(StandardCharsets.UTF_8));
             assertTrue(api.exists(photo), "names with spaces and brackets");
             assertArrayEquals("f".getBytes(StandardCharsets.UTF_8), api.get(photo));
@@ -66,8 +73,8 @@ class PCloudTest {
         try (FakePCloud cloud = new FakePCloud("tok")) {
             byte[] video = new byte[300_000];
             new java.util.Random(3).nextBytes(video);
-            cloud.put("/Unichat/Multimedia/Ana/video [1].mp4", video);
-            StorageDownloads.check(new PCloudApi(cloud.host(), "tok"), "Unichat/Multimedia/Ana/video [1].mp4", video, dir);
+            cloud.put("/Unichat/Media/Ana/video [1].mp4", video);
+            StorageDownloads.check(new PCloudApi(cloud.host(), "tok"), "Unichat/Media/Ana/video [1].mp4", video, dir);
         }
     }
 

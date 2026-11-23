@@ -38,6 +38,13 @@ class MediaUploadTest {
         @Override public String stamp(String path) { return null; }
         @Override public void mkdirs(String d) { }
 
+        @Override public void move(String from, String to) throws IOException {
+            if (files.keySet().stream().anyMatch(p -> p.equals(to) || p.startsWith(to + "/"))) throw new IOException("already there");
+            for (String p : List.copyOf(files.keySet())) {
+                if (p.equals(from) || p.startsWith(from + "/")) files.put(to + p.substring(from.length()), files.remove(p));
+            }
+        }
+
         @Override public List<String> list(String d) {
             return files.keySet().stream().filter(p -> p.startsWith(d + "/")).map(p -> p.substring(d.length() + 1).split("/")[0])
                     .distinct().toList();

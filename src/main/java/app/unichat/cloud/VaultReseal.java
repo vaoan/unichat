@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.BiPredicate;
 
 /**
@@ -29,34 +30,42 @@ final class VaultReseal {
     /** Only the files {@code ours} says this computer sent (by its logical path and opened content). */
     static Result run(Storage s, byte[] oldVk, byte[] newVk, BiPredicate<String, byte[]> ours) {
         Result r = new Result(new ArrayList<>(), new ArrayList<>());
-        walk(s, Vault.ROOT, oldVk, newVk, ours, r);
+        walk(s, Vault.ROOT, Set.of(Vault.SLOTS, Vault.INFO), stored -> reseal(s, stored, oldVk, newVk, ours, r),
+            stored -> r.failed().add(logical(stored)));
         return r;
     }
 
+    /** One file of the vault, by where it's kept. */
+    interface Visit {
+        void file(String stored) throws IOException;
+    }
+
     /**
-     * Names from the account are untrusted: only a plain name goes into a path. The vault's own names are folders without
-     * a dot (Ajustes, Textos, machine ids) and files with one, so no service's way of telling them apart is needed.
+     * Each file under {@code dir} but {@code skipped} (the vault's own: its slots and its file), one that fails, or a
+     * folder that can't be listed, told to {@code failed} (where it's kept) and the rest goes on. Names from the account
+     * are untrusted: only a plain name goes into a path. The vault's own names are folders without a dot (Settings, Texts,
+     * machine ids) and files with one, so no service's way of telling them apart is needed.
      */
-    private static void walk(Storage s, String dir, byte[] oldVk, byte[] newVk, BiPredicate<String, byte[]> ours, Result r) {
+    static void walk(Storage s, String dir, Set<String> skipped, Visit visit, java.util.function.Consumer<String> failed) {
         List<String> names;
         try {
             names = s.list(dir);
         } catch (IOException e) {
-            r.failed().add(logical(dir));
+            failed.accept(dir);
             return;
         }
         for (String name : names) {
             if (name.isEmpty() || name.contains("/") || name.contains("\\") || name.equals(".") || name.equals("..")) continue;
             String path = dir + "/" + name;
-            if (path.equals(Vault.SLOTS) || path.equals(Vault.INFO)) continue;
+            if (skipped.contains(path)) continue;
             if (name.indexOf('.') < 0) {
-                walk(s, path, oldVk, newVk, ours, r);
+                walk(s, path, skipped, visit, failed);
                 continue;
             }
             try {
-                reseal(s, path, oldVk, newVk, ours, r);
+                visit.file(path);
             } catch (IOException | RuntimeException e) {
-                r.failed().add(logical(path));
+                failed.accept(path);
             }
         }
     }
@@ -67,10 +76,11 @@ final class VaultReseal {
         String logical = logical(stored);
         String stamp = s.stamp(stored);
         byte[] sealed = s.get(stored);
-        if (sealed == null || opens(newVk, logical, sealed)) return;
+        String aad = OldVault.aad(s, logical);
+        if (sealed == null || opens(newVk, aad, sealed)) return;
         byte[] plain;
         try {
-            plain = VaultCrypto.open(oldVk, logical, sealed);
+            plain = VaultCrypto.open(oldVk, aad, sealed);
         } catch (VaultCrypto.Broken e) {
             r.left().add(logical);
             return;
@@ -79,7 +89,7 @@ final class VaultReseal {
             r.left().add(logical);
             return;
         }
-        if (Objects.equals(stamp, s.stamp(stored))) s.put(stored, VaultCrypto.seal(newVk, logical, plain));
+        if (Objects.equals(stamp, s.stamp(stored))) s.put(stored, VaultCrypto.seal(newVk, aad, plain));
     }
 
     private static String logical(String stored) {

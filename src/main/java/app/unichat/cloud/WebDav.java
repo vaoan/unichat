@@ -137,6 +137,19 @@ public final class WebDav implements Storage {
         if (code != 404 && code != 200 && code != 204) throw failure(code);
     }
 
+    /** MOVE with "Overwrite: F": the server answers 412 rather than replace what's at {@code to}. */
+    @Override
+    public void move(String from, String to) throws IOException {
+        Storage.deletable(from);
+        Storage.deletable(to);
+        HttpRequest r = HttpRequest.newBuilder(uri(from)).timeout(answer).header("Authorization", auth)
+                .header("Destination", uri(to).toString()).header("Overwrite", "F").method("MOVE", HttpRequest.BodyPublishers.noBody()).build();
+        int code = Http.send(http, r, HttpResponse.BodyHandlers.discarding()).statusCode();
+        if (code == 412) throw new IOException(I18n.t("cloud.error.moveTaken", to));
+        if (code == 404) throw new IOException(I18n.t("cloud.error.moveNothing", from));
+        if (code != 201 && code != 204 && code != 200) throw failure(code);
+    }
+
     @Override
     public void put(String path, Path file) throws IOException {
         put(path, file, null);

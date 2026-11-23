@@ -46,7 +46,7 @@ class TextSyncTest {
                 assertEquals("rwx------", java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(brought)),
                         "what the others said, readable by this account alone");
             }
-            assertTrue(cloud.files.containsKey("Unichat/Textos/" + DESK + "/" + FILE));
+            assertTrue(cloud.files.containsKey("Unichat/Texts/" + DESK + "/" + FILE));
             assertFalse(cloud.files.keySet().stream().anyMatch(p -> p.contains("/here/")), "each under its own machine");
 
             int puts = cloud.puts.get(), gets = cloud.gets.get();
@@ -77,8 +77,8 @@ class TextSyncTest {
             TextSync opened = computer(DESK);
             opened.unseen();
             opened.run(dav, "vault:1");
-            assertTrue(cloud.files.containsKey("Unichat/Textos/" + DESK + "/" + FILE), "this computer is the only one to send its own: again");
-            assertTrue(new String(cloud.files.get("Unichat/Textos/" + DESK + "/index.json"), StandardCharsets.UTF_8).contains(FILE));
+            assertTrue(cloud.files.containsKey("Unichat/Texts/" + DESK + "/" + FILE), "this computer is the only one to send its own: again");
+            assertTrue(new String(cloud.files.get("Unichat/Texts/" + DESK + "/index.json"), StandardCharsets.UTF_8).contains(FILE));
             puts = cloud.puts.get();
             computer(DESK).run(dav, "vault:1");
             assertEquals(puts, cloud.puts.get(), "once");
@@ -90,7 +90,7 @@ class TextSyncTest {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
             Files.writeString(own(DESK).resolve(FILE), "{\"id\":\"$1\"}\n", StandardCharsets.UTF_8);
-            cloud.failOnce.add("Unichat/Textos/" + DESK + "/index.json");
+            cloud.failOnce.add("Unichat/Texts/" + DESK + "/index.json");
             assertThrows(java.io.IOException.class, () -> computer(DESK).run(dav), "the network dropped after the file");
             computer(DESK).run(dav); // nothing new to send, but the index is still due
             assertEquals(Set.of(CHAT), computer(LAPTOP).run(dav), "the laptop sees the desk's file");
@@ -102,12 +102,12 @@ class TextSyncTest {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
             cloud.dirs.add("Unichat");
-            cloud.dirs.add("Unichat/Textos");
-            cloud.put("Unichat/Textos/here/index.json", ("{\"files\": {\"" + FILE + "\": 3}}").getBytes(StandardCharsets.UTF_8));
-            cloud.put("Unichat/Textos/here/" + FILE, "mal".getBytes(StandardCharsets.UTF_8));
-            cloud.put("Unichat/Textos/" + LAPTOP + "/index.json",
+            cloud.dirs.add("Unichat/Texts");
+            cloud.put("Unichat/Texts/here/index.json", ("{\"files\": {\"" + FILE + "\": 3}}").getBytes(StandardCharsets.UTF_8));
+            cloud.put("Unichat/Texts/here/" + FILE, "mal".getBytes(StandardCharsets.UTF_8));
+            cloud.put("Unichat/Texts/" + LAPTOP + "/index.json",
                     "{\"files\": {\"../../x.jsonl\": 3, \"notas.txt\": 3, \"3f2a9c1b2d4e 2026-11.jsonl\": 2}}".getBytes(StandardCharsets.UTF_8));
-            cloud.put("Unichat/Textos/" + LAPTOP + "/" + FILE, "ok".getBytes(StandardCharsets.UTF_8));
+            cloud.put("Unichat/Texts/" + LAPTOP + "/" + FILE, "ok".getBytes(StandardCharsets.UTF_8));
             assertEquals(Set.of(CHAT), computer(DESK).run(dav));
             try (var all = Files.walk(dir.resolve(DESK))) {
                 assertEquals(Set.of(dir.resolve(DESK + "/texts/" + LAPTOP + "/" + FILE)),

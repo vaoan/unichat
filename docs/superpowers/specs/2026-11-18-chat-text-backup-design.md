@@ -48,8 +48,8 @@ chat didn't keep texts then). The person uses several computers; each one's copy
   entry "date · sender · {id}" with its text indented two spaces (an entry's text can't make a header). Regenerated a
   few seconds after a change (own lines or others'), whole, through a temporary file. Not uploaded as media (derived).
 - **Cloud.** `cloud/TextSync`, in each round and on demand on a thread of its own (a round may be busy uploading a
-  video): own files whose size changed go up to `Unichat/Textos/<machine id>/`, then its `index.json` (name → size);
-  other machines are found by listing `Unichat/Textos/` (new `Storage.list`, for WebDAV, pCloud and Dropbox), their
+  video): own files whose size changed go up to `Unichat/Texts/<machine id>/`, then its `index.json` (name → size);
+  other machines are found by listing `Unichat/Texts/` (new `Storage.list`, for WebDAV, pCloud and Dropbox), their
   index read when its stamp changed, and each file larger than the local copy downloaded. Names from the account are
   checked against strict patterns before becoming local paths. The chat keys that changed are told back, and their
   readable copies regenerated.

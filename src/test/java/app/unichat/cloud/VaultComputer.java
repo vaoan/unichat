@@ -19,10 +19,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 final class VaultComputer {
     /** What each computer holds of the settings. */
-    static final List<String> KEYS = List.of("cloud.machine", VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultParts.DECLINED,
+    static final List<String> KEYS = java.util.stream.Stream.concat(java.util.Arrays.stream(Cloud.Part.values())
+        .map(p -> CloudNames.SEEN + p.path().substring(p.path().lastIndexOf('/') + 1)), java.util.stream.Stream.of(CloudNames.AT, "cloud.machine", VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultParts.DECLINED,
         "cloud.base.settings", "cloud.base.ai", "cloud.base.secrets", "cloud.base.pinned", "cloud.media", "cloud.settings", "cloud.lastVerify",
         "server.telegram.apiId", "server.telegram.apiHash", "gif.giphy.key", "cloud.dropboxAppKey", "cloud.pcloudClientId", "stt.command",
-        "ui.theme", VaultPeers.KEY, VaultActions.UNCONFIRMED, VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultOff.KEY, VaultMove.RECORD, VaultParts.SEEN, VaultMove.KNOWN);
+        "ui.theme", VaultPeers.KEY, VaultActions.UNCONFIRMED, VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultOff.KEY, VaultMove.RECORD, VaultParts.SEEN, VaultMove.KNOWN)).toList();
 
     final Map<String, String> values = new HashMap<>();
     final Path data;

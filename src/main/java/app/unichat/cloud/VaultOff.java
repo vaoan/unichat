@@ -13,11 +13,11 @@ import java.util.Base64;
 /**
  * What says the vault was turned off, not just its file deleted: {@link #FILE}, outside the vault's folder, names the
  * vault and its generation, sealed with a key made from that generation's vault key. Each computer keeps that key while
- * the vault is open there ({@link #KEY}, machine-only), so one finding no {@code boveda.json} goes back to plain only
+ * the vault is open there ({@link #KEY}, machine-only), so one finding no {@code vault.json} goes back to plain only
  * when the mark opens with it; someone with only the account can delete the vault's file but never write the mark.
  */
 final class VaultOff {
-    static final String FILE = CloudAccount.SETTINGS_DIR + "/boveda-apagada.json";
+    static final String FILE = CloudAccount.SETTINGS_DIR + "/vault-off.json";
     /** The key the mark is sealed with, for the vault open here last (machine-only): "<vault>:<generation>:<key>". */
     static final String KEY = "cloud.vault.offKey";
     private static final String INFO = "unichat-vault off";

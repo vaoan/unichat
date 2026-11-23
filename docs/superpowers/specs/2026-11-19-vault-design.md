@@ -18,7 +18,7 @@ as they are, and the secrets don't travel at all (`Settings.staysOnThisMachine`)
 Telegram API keys, its Giphy key or its cloud apps' keys.
 
 ## Goals
-- One vault per person, in their cloud account (`Unichat/Bóveda/`), every file in it encrypted and authenticated.
+- One vault per person, in their cloud account (`Unichat/Vault/`), every file in it encrypted and authenticated.
 - Opened by any of several ways in, each optional except the recovery code: the **recovery code** (always, shown once
   at creation), a **password**, **Google** (a key kept in the person's Google Drive), a **passkey** (WebAuthn PRF). Any
   of them opens the same vault; adding or removing one never touches the data.
@@ -73,7 +73,7 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
 - **Vault key (VK):** 256 random bits (`SecureRandom`), made once when the vault is created.
 - **Encryption:** AES-256-GCM (the JDK's), a fresh 96-bit nonce per write; the associated data is the file's name in
   the vault and the format version, so a file can't be swapped for another or replayed under another name.
-- **Slots** (`Unichat/Bóveda/llaves/<id>.json`, one file per slot, so adding one never overwrites another's; not
+- **Slots** (`Unichat/Vault/keys/<id>.json`, one file per slot, so adding one never overwrites another's; not
   secret by themselves): one per way in, each `{method, id, created, generation, params, wrapped}`, where `wrapped` is
   VK encrypted (AES-GCM) with that way's key:
   - **recovery**: a code of 128+ random bits shown as groups of words or characters (e.g. 8 groups of 4, Crockford
@@ -90,7 +90,7 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
     computer's machine-only file (`session.properties`, owner-only, next to the Matrix token it already holds), with
     the computer's name and when it was last seen. This is how a computer reads the vault every minute without asking.
     Ajustes → Nube → Bóveda lists the computers; removing one (a lost or sold one) deletes its slot.
-- **The vault itself:** `Unichat/Bóveda/boveda.json` `{id, created, generation}`. Two computers creating a vault at the
+- **The vault itself:** `Unichat/Vault/vault.json` `{id, created, generation}`. Two computers creating a vault at the
   same moment: the one whose file is in the account first wins; the other discards its own and offers to open that one.
 - **Changing the key:** removing a way in or a computer deletes its slot, but whoever copied that slot and its secret
   before still has VK. "Cambiar la llave de la bóveda" makes a new VK, re-encrypts every file (small: no media), raises
@@ -109,7 +109,7 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
   - `pinned-messages.json` and transcripts of voice notes (`transcripts/`): personal, small. (`media-library.json`
     stays out, as `Bundle` keeps it today: it changes at every use, and "newest wins" between two computers in use at
     once would overwrite each other's recents.)
-- **Each computer's own part** (`Unichat/Bóveda/equipos/<machine>/`, written only by that computer): a backup for
+- **Each computer's own part** (`Unichat/Vault/computers/<machine>/`, written only by that computer): a backup for
   replacing it, never applied to another computer that's running:
   - its machine-only keys that are its sessions (`matrix.*`, `session.*`), its server's secrets
     (`server/secrets.properties`, registrations, `doublepuppet`), and its bridges' sessions.
@@ -123,8 +123,8 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
   (what runs here and this computer's paths); `window.*`, `app.update.*` and the other markers.
 
 ### Files in the cloud
-- `Unichat/Bóveda/boveda.json`, `Unichat/Bóveda/llaves/` (slots), `Unichat/Bóveda/<part>.enc` (shared parts), `Unichat/Bóveda/textos/<machine>/…`
-  (texts, encrypted per file, with an encrypted index), `Unichat/Bóveda/equipos/<machine>/…`. Names are ours only
+- `Unichat/Vault/vault.json`, `Unichat/Vault/keys/` (slots), `Unichat/Vault/<part>.enc` (shared parts), `Unichat/Vault/texts/<machine>/…`
+  (texts, encrypted per file, with an encrypted index), `Unichat/Vault/computers/<machine>/…`. Names are ours only
   (parts, machine UUIDs), never anything from a chat.
 - Each `.enc` is `{version, nonce, ciphertext}`; the agreed hash (`cloud.base.<part>`) is of the plaintext, so
   re-encrypting (a new nonce) is never mistaken for a change.
@@ -144,7 +144,7 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
     "Apagar la bóveda".
   - **Apagar la bóveda** (asked twice, the second time saying what happens): the shared parts go back to the plain
     sync of today, decrypted into the places they had before; once each plain copy is confirmed in the account, the
-    vault is deleted from it (`Unichat/Bóveda/` whole, each computer's part too). Every other computer finds the vault
+    vault is deleted from it (`Unichat/Vault/` whole, each computer's part too). Every other computer finds the vault
     gone and goes back to plain sync by itself, and forgets its key.
 - Google and the passkey open in the browser through `Loopback` (127.0.0.1:43117, `state`, a deadline, cancel), as
   pCloud and Dropbox do: Google with OAuth 2 + PKCE for a desktop client; the passkey on a page Unichat serves on
@@ -168,13 +168,13 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
 - Someone who can write to the cloud account can put back an older copy of a part, or delete slots (a denial, which the
   recovery code survives), but can't read or forge one. Rollback protection (a counter per part) is out of scope.
 - Someone who can only write to the cloud account can't hand a computer a new key: every offer (`next`) carries what
-  the old vault key sealed of it (`auth`: its ephemeral key and the hash of what it seals), and `boveda.json` a
+  the old vault key sealed of it (`auth`: its ephemeral key and the hash of what it seals), and `vault.json` a
   `vouch` of its generation sealed with the key it replaced. A generation raised without either leaves each computer
   `UNRECOGNIZED` (its key kept, nothing sent) rather than removed, and a way in from before still opens the vault there,
   only for the key its own slot opens. A new computer uses the current generation's ways in only, and each slot is
   sealed with its generation ("slot:<vault>:<method>:<id>:<generation>"), so an older one put back claiming the current
   generation opens nothing.
-- Deleting `boveda.json` by hand sends nobody plain: turning the vault off first writes `Unichat/Ajustes/boveda-apagada.json`
+- Deleting `vault.json` by hand sends nobody plain: turning the vault off first writes `Unichat/Settings/vault-off.json`
   (the vault and generation sealed with a key made from that generation's vault key, kept by each computer while the
   vault is open there), and a computer holding a vault goes back to plain only when that mark opens with its key;
   otherwise it is `MISSING` and the person decides ("Volver a sincronizar sin cifrar", asked twice). A computer that
@@ -186,10 +186,10 @@ Telegram API keys, its Giphy key or its cloud apps' keys.
   limit holds until that computer is opened with the recovery code or a password set after the removal, which writes it
   a slot of its own (an older password's slot, put back by the removed computer, opens its key).
   The same removed computer can write a turn-off mark such a computer believes (both hold the key the mark is made
-  from) and delete `boveda.json`: that computer then goes back to plain. Same class, same limit.
+  from) and delete `vault.json`: that computer then goes back to plain. Same class, same limit.
 - Texts come into the vault from plain folders only for the machines sending plain when the move started, and only as
   new files: a folder or a longer copy put in through the account is named, never sealed in. That list is the vault's
-  own, sealed (`Registro/remitentes.json`, never under `Ajustes`, whose plain files the move takes in), written once by
+  own, sealed (`Log/senders.json`, never under `Settings`, whose plain files the move takes in), written once by
   the computer that made the vault; the others adopt it, one finding none (deleted through the account) takes nothing
   in, and one damaged, or gone once read, is told and never written again.
 - A stranger in a chat: nothing new (names never become vault paths; nothing from the vault runs).

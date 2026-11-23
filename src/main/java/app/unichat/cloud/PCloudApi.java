@@ -119,6 +119,25 @@ public final class PCloudApi implements Storage {
         }
     }
 
+    /**
+     * {@code renamefolder} or {@code renamefile} to {@code topath}; asked first whether something is there, since a
+     * rename can replace a file.
+     */
+    @Override
+    public void move(String from, String to) throws IOException {
+        Storage.deletable(from);
+        Storage.deletable(to);
+        JsonNode meta = stat(from);
+        if (meta == null) throw new IOException(I18n.t("cloud.error.moveNothing", from));
+        if (stat(to) != null) throw new IOException(I18n.t("cloud.error.moveTaken", to));
+        try {
+            call(meta.path("isfolder").asBoolean(false) ? "renamefolder" : "renamefile",
+                "path=" + Urls.enc(abs(from)) + "&topath=" + Urls.enc(abs(to)));
+        } catch (Missing gone) {
+            throw new IOException(I18n.t("cloud.error.moveNothing", from));
+        }
+    }
+
     @Override
     public void put(String path, Path file) throws IOException {
         put(path, file, null);

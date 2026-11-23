@@ -128,6 +128,20 @@ public final class DropboxApi implements Storage {
         }
     }
 
+    /** {@code move_v2} without autorename: Dropbox refuses (to/conflict) rather than replace what's at {@code to}. */
+    @Override
+    public void move(String from, String to) throws IOException {
+        Storage.deletable(from);
+        Storage.deletable(to);
+        try {
+            rpc("/2/files/move_v2", JSON.createObjectNode().put("from_path", abs(from)).put("to_path", abs(to)).put("autorename", false));
+        } catch (Conflict taken) {
+            throw new IOException(I18n.t("cloud.error.moveTaken", to));
+        } catch (Missing gone) {
+            throw new IOException(I18n.t("cloud.error.moveNothing", from));
+        }
+    }
+
     @Override
     public void put(String path, Path file) throws IOException {
         put(path, file, null);

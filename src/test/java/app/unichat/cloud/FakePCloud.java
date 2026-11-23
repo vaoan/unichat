@@ -112,9 +112,41 @@ final class FakePCloud implements AutoCloseable {
                     else json(x, "{\"result\": 0, \"hosts\": [\"127.0.0.1:" + server.getAddress().getPort() + "\"], \"path\": \"/file"
                             + p.replace("\"", "") + "\"}");
                 }
+                case "renamefile", "renamefolder" -> rename(x, q.get("path"), q.get("topath"), method.equals("renamefolder"));
                 default -> json(x, "{\"result\": 2000, \"error\": \"Unknown method.\"}");
             }
         }
+    }
+
+    /**
+     * A file or a folder renamed to {@code to} (pCloud's renamefile/renamefolder): the folder above it must be there, and
+     * nothing at {@code to} (this fake refuses, as Unichat never asks to replace).
+     */
+    private void rename(HttpExchange x, String from, String to, boolean folder) throws IOException {
+        if (folder ? !dirs.contains(from) : !files.containsKey(from)) {
+            json(x, "{\"result\": " + (folder ? 2005 : 2009) + ", \"error\": \"File not found.\"}");
+            return;
+        }
+        if (!dirs.contains(to.substring(0, Math.max(1, to.lastIndexOf('/'))))) {
+            json(x, "{\"result\": 2002, \"error\": \"A component of parent directory does not exist.\"}");
+            return;
+        }
+        if (files.containsKey(to) || dirs.contains(to)) {
+            json(x, "{\"result\": 2004, \"error\": \"File or folder alreadyexists.\"}");
+            return;
+        }
+        for (String p : java.util.List.copyOf(files.keySet())) {
+            if (!p.equals(from) && !p.startsWith(from + "/")) continue;
+            String moved = to + p.substring(from.length());
+            files.put(moved, files.remove(p));
+            versions.put(moved, versions.getOrDefault(p, 1));
+        }
+        for (String d : java.util.List.copyOf(dirs)) {
+            if (!d.equals(from) && !d.startsWith(from + "/")) continue;
+            dirs.remove(d);
+            dirs.add(to + d.substring(from.length()));
+        }
+        json(x, "{\"result\": 0, \"metadata\": {\"isfolder\": " + folder + "}}");
     }
 
     /** Someone else (another computer) puts a file there. */

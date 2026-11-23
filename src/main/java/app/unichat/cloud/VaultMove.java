@@ -16,8 +16,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Moving in: what Unichat kept plain in the account before the vault (its files under {@code Ajustes}, every computer's
- * texts under {@code Textos}) goes into the vault, and each plain copy is deleted only once its sealed copy reads back
+ * Moving in: what Unichat kept plain in the account before the vault (its files under {@code Settings}, every computer's
+ * texts under {@code Texts}) goes into the vault, and each plain copy is deleted only once its sealed copy reads back
  * holding all of it. Run every round the vault is open here, so it's idempotent: nothing plain, nothing to do. Media never.
  * <p>
  * Each computer of the vault (one with a computer slot) is the only writer of its sealed texts ({@link TextSync} sends
@@ -43,7 +43,7 @@ final class VaultMove {
      * it): only their folders are ever taken in, by any computer of the vault. Never under {@link #SETTINGS_DIR}, where a
      * part that doesn't open reads as none and a plain file of ours is moved in.
      */
-    static final String SENDERS = CloudAccount.ROOT + "/Registro/remitentes.json";
+    static final String SENDERS = CloudAccount.ROOT + "/Log/senders.json";
     /** The vault whose list of {@link #SENDERS} this computer has read or written (machine-only): one gone since is told. */
     static final String KNOWN = "cloud.vault.sendersKnown";
     /**

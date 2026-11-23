@@ -23,7 +23,7 @@ import java.util.stream.Stream;
  * the reader's ({@code autosave.TextLog}).
  */
 final class TextSync {
-    static final String ROOT = CloudAccount.ROOT + "/Textos";
+    static final String ROOT = CloudAccount.ROOT + "/Texts";
     private static final String HERE = "here", INDEX = TextIndex.NAME;
     /** Names of ours only (machines are {@link Ids}): anything else in the account never becomes a path here. */
     private static final Pattern FILE = TextIndex.FILE;

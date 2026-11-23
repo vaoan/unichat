@@ -82,11 +82,11 @@ This builds on `2026-11-19-vault-design.md` (keys, slots, computers, rotation, `
 ### Approval from another computer
 - **New computer:**
   1. "Pedir acceso desde otro equipo" makes its computer keypair (X25519, as computer slots use today).
-  2. It writes `Unichat/Bóveda/pedidos/<random id>.json` with `{pub, label, created, expires: +15 min}`.
+  2. It writes `Unichat/Vault/requests/<random id>.json` with `{pub, label, created, expires: +15 min}`.
   3. It shows a **code of 6 digits** in groups of 3, derived from SHA-256(`"unichat-vault/approve/1"` ‖ vaultId ‖ pub),
      and waits. A round reads its request back every minute and "Revisar ahora" checks at once.
 - **Open computers:**
-  1. Each round lists `pedidos/`. A pending, unexpired request appears in Ajustes → Nube → Bóveda and as a
+  1. Each round lists `requests/`. A pending, unexpired request appears in Ajustes → Nube → Bóveda and as a
      notification: "<label> pide abrir la bóveda". The label comes from the account, shown only through `CloudTexts`
      as computers' names are today.
   2. **Approving needs the 6 digits typed** from the new computer's screen. Unichat compares them with the code it
@@ -141,7 +141,7 @@ This builds on `2026-11-19-vault-design.md` (keys, slots, computers, rotation, `
    - The person types it on the approving computer. Upper or lower case, and with or without dashes, both work.
    - Wrong tries are a slip guard only (see 4), not the defence.
    - Code length: 12 characters, approved by the person (2026-11-23).
-2. **How VK reaches the new computer.** The approver doesn't write a computer slot. It writes a **grant** next to the request (`pedidos/<id>.grant.json`): VK sealed to the request's `pub` through an ephemeral X25519 ECDH + HKDF, the same seal `VaultNext`'s offers use (reuse it).
+2. **How VK reaches the new computer.** The approver doesn't write a computer slot. It writes a **grant** next to the request (`requests/<id>.grant.json`): VK sealed to the request's `pub` through an ephemeral X25519 ECDH + HKDF, the same seal `VaultNext`'s offers use (reuse it).
    - The grant's AAD binds requestId, machineId, vaultId and generation.
    - The new computer unwraps VK, writes its own normal computer slot (symmetric key in `session.properties`, as today), and deletes the request and the grant.
 3. **Who is asking.** The request carries the machine id (`Ids.ours`).
@@ -158,7 +158,7 @@ This builds on `2026-11-19-vault-design.md` (keys, slots, computers, rotation, `
    - The approver is recorded in the new slot's label line ("aprobado por <name>, <date>").
 6. **The new computer while it waits.**
    - "Pedir acceso desde otro equipo" is offered wherever "Abrir la bóveda" is (locked, removed, unrecognized, and declined, where it ends "seguir sin la bóveda" once granted).
-   - Writing a request needs no key: it is plain JSON in `pedidos/`.
+   - Writing a request needs no key: it is plain JSON in `requests/`.
    - It checks every round, plus "Revisar ahora".
    - Open computers see requests in their small round, which keeps running while unseen (only media pauses), so no wait beyond a minute.
    - On expiry the screen also points to the recovery code.

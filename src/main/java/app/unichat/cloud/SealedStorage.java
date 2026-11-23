@@ -16,7 +16,8 @@ import java.util.function.Supplier;
 /**
  * A {@link Storage} that seals what goes in and opens what comes out, so the sync classes run over the vault unchanged.
  * A logical path {@code Unichat/<rest>} is kept at {@link Vault#ROOT}{@code /<rest>}, sealed with the logical path as its
- * associated data (a file copied to another name opens nothing). Only for what the vault keeps: media never goes through
+ * associated data (a file copied to another name opens nothing; under the vault's old names, the old logical path:
+ * {@link OldVault}). Only for what the vault keeps: media never goes through
  * it, and files are read whole. {@code vk} gives a fresh copy of the key on every call, cleared after each use and never kept.
  */
 final class SealedStorage implements Storage {
@@ -79,6 +80,12 @@ final class SealedStorage implements Storage {
         plain.delete(stored(path));
     }
 
+    /** Never: a file's logical path is sealed with it, so one moved opens nothing ({@link VaultReseal} seals it again instead). */
+    @Override
+    public void move(String from, String to) {
+        throw new IllegalArgumentException("A file of the vault is sealed with its path: it can't be moved, only sealed again");
+    }
+
     @Override
     public void put(String path, Path file) throws IOException {
         put(path, file, null);
@@ -127,7 +134,7 @@ final class SealedStorage implements Storage {
         stored(path);
         byte[] key = vk.get();
         try {
-            return VaultCrypto.seal(key, path, data);
+            return VaultCrypto.seal(key, OldVault.aad(plain, path), data);
         } finally {
             Arrays.fill(key, (byte) 0);
         }
@@ -136,7 +143,7 @@ final class SealedStorage implements Storage {
     private byte[] open(String path, byte[] sealed) throws Damaged {
         byte[] key = vk.get();
         try {
-            return VaultCrypto.open(key, path, sealed);
+            return VaultCrypto.open(key, OldVault.aad(plain, path), sealed);
         } catch (VaultCrypto.Broken e) {
             throw new Damaged();
         } finally {

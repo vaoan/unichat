@@ -31,7 +31,7 @@ class CloudVaultTest {
     private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
         OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
     private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl", TRANSCRIPT = "a".repeat(64) + ".txt";
-    private static final String SETTINGS = CloudAccount.SETTINGS_FILE, AI = "Unichat/Ajustes/unichat-ai.json",
+    private static final String SETTINGS = CloudAccount.SETTINGS_FILE, AI = "Unichat/Settings/unichat-ai.json",
         PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg";
 
     @TempDir
@@ -88,7 +88,7 @@ class CloudVaultTest {
         assertNull(s.error());
         assertEquals(Cloud.VaultState.NONE, s.vault());
         assertEquals(Cloud.VaultState.NONE, desk.cloud.vaultState());
-        assertEquals(new TreeSet<>(Set.of(SETTINGS, AI, "Unichat/Textos/" + DESK + "/" + TEXT, "Unichat/Textos/" + DESK + "/index.json", PHOTO)),
+        assertEquals(new TreeSet<>(Set.of(SETTINGS, AI, "Unichat/Texts/" + DESK + "/" + TEXT, "Unichat/Texts/" + DESK + "/index.json", PHOTO)),
             new TreeSet<>(cloud.files.keySet()), "today's paths, and no secret, pin nor transcript plain");
         assertFalse(new String(cloud.files.get(SETTINGS), StandardCharsets.UTF_8).contains("12345"));
     }
@@ -206,7 +206,7 @@ class CloudVaultTest {
     void aTranscriptsNameFromTheVaultNeverBecomesAPathOutsideItsFolder() throws Exception {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
         SealedStorage sealed = new SealedStorage(dav(), () -> made.vk().clone());
-        sealed.mkdirs("Unichat/Ajustes");
+        sealed.mkdirs("Unichat/Settings");
         sealed.put(VaultParts.TRANSCRIPTS_FILE, ("{\"entries\":{\"../../fuera.txt\":\"x\",\"" + "c".repeat(64) + ".txt\":\"bien\","
             + "\"" + "C".repeat(64) + ".txt\":\"x\",\"..\":\"x\"}}").getBytes(StandardCharsets.UTF_8));
         VaultComputer desk = computer(DESK).opened(made.info(), made.computer());
@@ -227,7 +227,7 @@ class CloudVaultTest {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
         VaultComputer laptop = computer(LAPTOP).opened(made.info(), Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil")).set("ui.theme", "LIGHT");
         laptop.round(); // the vault's settings file at its first version too: the same stamp, another file
-        assertEquals(cloud.versions.get(SETTINGS), cloud.versions.get(Vault.ROOT + "/Ajustes/unichat-settings.json"));
+        assertEquals(cloud.versions.get(SETTINGS), cloud.versions.get(Vault.ROOT + "/Settings/unichat-settings.json"));
         desk.opened(made.info(), made.computer());
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
         assertEquals("LIGHT", desk.get("ui.theme"), "the vault's settings were read, not taken for the plain ones seen");
@@ -243,7 +243,7 @@ class CloudVaultTest {
         desk.opened(made.info(), Vault.addComputer(dav(), made.vk(), DESK, "Escritorio"));
         before = files();
         desk.textsNow();
-        assertEquals(Set.of(Vault.ROOT + "/Textos/" + DESK + "/" + TEXT, Vault.ROOT + "/Textos/" + DESK + "/index.json"), written(before),
+        assertEquals(Set.of(Vault.ROOT + "/Texts/" + DESK + "/" + TEXT, Vault.ROOT + "/Texts/" + DESK + "/index.json"), written(before),
             "open: sealed, media's switch off or not");
     }
 
@@ -290,7 +290,7 @@ class CloudVaultTest {
         Vault.Created made = Vault.create(dav(), LAPTOP, "Portátil");
         laptop.opened(made.info(), made.computer()).write("texts/here/" + later, "{\"x\":1}\n");
         laptop.round(); // the vault's index of the laptop at its first version too
-        assertEquals(cloud.versions.get("Unichat/Textos/" + LAPTOP + "/index.json"), cloud.versions.get(Vault.ROOT + "/Textos/" + LAPTOP + "/index.json"));
+        assertEquals(cloud.versions.get("Unichat/Texts/" + LAPTOP + "/index.json"), cloud.versions.get(Vault.ROOT + "/Texts/" + LAPTOP + "/index.json"));
         desk.opened(made.info(), Vault.addComputer(dav(), made.vk(), DESK, "Escritorio"));
         desk.textsNow(); // before any round here with the vault open
         assertEquals("{\"x\":1}\n", desk.read("texts/" + LAPTOP + "/" + later), "the vault's index read, not taken for the plain one seen");
@@ -311,9 +311,9 @@ class CloudVaultTest {
                 Cloud.Status s = c.round();
                 assertNull(s.error(), what);
                 assertEquals(media, cloud.files.containsKey(PHOTO), what + ": media");
-                assertEquals(vault, cloud.files.containsKey(Vault.ROOT + "/Textos/" + c.get("cloud.machine") + "/" + TEXT), what + ": sealed texts");
-                assertEquals(vault, cloud.files.containsKey(Vault.ROOT + "/Ajustes/unichat-secrets.json"), what + ": sealed parts");
-                assertEquals(!vault && media, cloud.files.containsKey("Unichat/Textos/" + c.get("cloud.machine") + "/" + TEXT), what + ": plain texts");
+                assertEquals(vault, cloud.files.containsKey(Vault.ROOT + "/Texts/" + c.get("cloud.machine") + "/" + TEXT), what + ": sealed texts");
+                assertEquals(vault, cloud.files.containsKey(Vault.ROOT + "/Settings/unichat-secrets.json"), what + ": sealed parts");
+                assertEquals(!vault && media, cloud.files.containsKey("Unichat/Texts/" + c.get("cloud.machine") + "/" + TEXT), what + ": plain texts");
                 assertEquals(!vault, cloud.files.containsKey(SETTINGS), what + ": plain settings");
                 assertEquals(Boolean.toString(media), c.get("cloud.media"), what + ": the vault leaves media's switch alone");
                 assertEquals(vault ? Cloud.VaultState.OPEN : Cloud.VaultState.NONE, s.vault(), what + ": and media the vault");
@@ -347,7 +347,7 @@ class CloudVaultTest {
         VaultComputer desk = computer(DESK).opened(made.info(), made.computer()).set("ui.theme", "DARK");
         desk.round();
         Vault.addComputer(dav(), made.vk(), OTHER, "Viejo");
-        cloud.dirs.add("Unichat/Ajustes"); // the older computer's folder, as it makes it
+        cloud.dirs.add("Unichat/Settings"); // the older computer's folder, as it makes it
         cloud.put(SETTINGS, Bundle.of(OTHER, java.time.Instant.now().plusSeconds(60), Map.of("ui.theme", "LIGHT"), null).toBytes());
         Cloud.Status s = desk.round();
         assertNull(s.error());
@@ -362,13 +362,13 @@ class CloudVaultTest {
     void aFileThatFailsToMoveInIsTheRoundsErrorAndMediaStillGoes() throws Exception {
         Vault.Created made = Vault.create(dav(), DESK, "Escritorio");
         VaultComputer desk = computer(DESK).madeHere(made);
-        for (String d : new String[] {"Unichat/Textos", "Unichat/Textos/" + OTHER}) cloud.dirs.add(d);
-        cloud.put("Unichat/Textos/" + OTHER + "/" + TEXT, "{}\n".getBytes(StandardCharsets.UTF_8)); // a computer without the vault's
-        cloud.put(Vault.ROOT + "/Textos/" + OTHER + "/" + TEXT, "dañado".getBytes(StandardCharsets.UTF_8));
+        for (String d : new String[] {"Unichat/Texts", "Unichat/Texts/" + OTHER}) cloud.dirs.add(d);
+        cloud.put("Unichat/Texts/" + OTHER + "/" + TEXT, "{}\n".getBytes(StandardCharsets.UTF_8)); // a computer without the vault's
+        cloud.put(Vault.ROOT + "/Texts/" + OTHER + "/" + TEXT, "dañado".getBytes(StandardCharsets.UTF_8));
         Cloud.Status s = desk.round();
         assertTrue(s.error() != null && s.error().contains("bóveda"), "told: " + s.error());
         assertTrue(cloud.files.containsKey(PHOTO), "media went all the same");
-        assertTrue(cloud.files.containsKey("Unichat/Textos/" + OTHER + "/" + TEXT), "and the plain copy stays");
+        assertTrue(cloud.files.containsKey("Unichat/Texts/" + OTHER + "/" + TEXT), "and the plain copy stays");
     }
 
     @Test
@@ -397,7 +397,7 @@ class CloudVaultTest {
         puts = cloud.puts.get();
         assertEquals(Cloud.VaultState.LOCKED, launched.round().vault());
         assertEquals(puts, cloud.puts.get(), "a vault elsewhere, not opened here: nothing");
-        String sealedText = Vault.ROOT + "/Textos/" + DESK + "/" + TEXT;
+        String sealedText = Vault.ROOT + "/Texts/" + DESK + "/" + TEXT;
         launched.opened(made.info(), Vault.addComputer(dav(), made.vk(), DESK, "Escritorio"));
         assertNull(launched.round().error());
         assertTrue(cloud.files.containsKey(sealedText), "opened here: its texts go again, sealed");
@@ -427,7 +427,7 @@ class CloudVaultTest {
         plainTexts(OTHER, "{\"viejo\":1}\n"); // a computer of the person's, without the vault
         VaultComputer desk = computer(DESK).madeHere(made);
         assertNull(desk.round().error());
-        assertTrue(cloud.files.containsKey(Vault.ROOT + "/Textos/" + OTHER + "/" + TEXT), "its texts taken in");
+        assertTrue(cloud.files.containsKey(Vault.ROOT + "/Texts/" + OTHER + "/" + TEXT), "its texts taken in");
         assertTrue(cloud.files.containsKey(SEALED_LIST), "the list kept in the vault, sealed");
         plainTexts(PUT_IN, "{\"puesto\":1}\n");
         return desk;
@@ -444,7 +444,7 @@ class CloudVaultTest {
 
     private void neverTakenIn(VaultComputer c) throws Exception {
         c.round();
-        assertFalse(cloud.files.containsKey(Vault.ROOT + "/Textos/" + PUT_IN + "/" + TEXT), "never sealed in");
+        assertFalse(cloud.files.containsKey(Vault.ROOT + "/Texts/" + PUT_IN + "/" + TEXT), "never sealed in");
         assertTrue(cloud.files.containsKey(TextSync.ROOT + "/" + PUT_IN + "/" + TEXT), "nor deleted");
     }
 

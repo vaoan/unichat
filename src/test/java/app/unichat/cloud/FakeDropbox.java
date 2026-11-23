@@ -67,6 +67,36 @@ final class FakeDropbox implements AutoCloseable {
         reply(x, 200, JSON.writeValueAsString(out));
     }
 
+    /** Whether anything is at {@code p}: a file, or a folder (made, or holding something, as on Dropbox). */
+    private boolean there(String p) {
+        return files.containsKey(p) || folders.contains(p) || files.keySet().stream().anyMatch(f -> f.startsWith(p + "/"))
+            || folders.stream().anyMatch(d -> d.startsWith(p + "/"));
+    }
+
+    /** move_v2 without autorename: a file or a folder with all in it, never over what's there (to/conflict). */
+    private void move(HttpExchange x, String from, String to) throws IOException {
+        if (!there(from)) {
+            reply(x, 409, "{\"error_summary\": \"from_lookup/not_found/..\"}");
+            return;
+        }
+        if (there(to)) {
+            reply(x, 409, "{\"error_summary\": \"to/conflict/file/..\"}");
+            return;
+        }
+        for (String f : List.copyOf(files.keySet())) {
+            if (!f.equals(from) && !f.startsWith(from + "/")) continue;
+            String moved = to + f.substring(from.length());
+            files.put(moved, files.remove(f));
+            revs.put(moved, revs.getOrDefault(f, 1));
+        }
+        for (String d : List.copyOf(folders)) {
+            if (!d.equals(from) && !d.startsWith(from + "/")) continue;
+            folders.remove(d);
+            folders.add(to + d.substring(from.length()));
+        }
+        reply(x, 200, "{\"metadata\": {}}");
+    }
+
     /** Someone else (another computer) puts a file there. */
     void put(String path, byte[] data) {
         files.put(path, data);
@@ -141,6 +171,7 @@ final class FakeDropbox implements AutoCloseable {
                     folders.removeIf(d -> d.equals(p) || d.startsWith(p + "/"));
                     reply(x, 200, "{\"metadata\": {\".tag\": \"file\"}}");
                 }
+                case "/2/files/move_v2" -> move(x, arg.path("from_path").asText(), arg.path("to_path").asText());
                 case "/2/files/download" -> {
                     byte[] f = files.get(arg.path("path").asText());
                     if (f == null) reply(x, 409, "{\"error_summary\": \"path/not_found/..\"}");

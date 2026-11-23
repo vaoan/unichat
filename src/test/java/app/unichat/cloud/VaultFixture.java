@@ -69,14 +69,14 @@ public final class VaultFixture implements AutoCloseable {
         Vault.removeComputer(storage(), Vault.info(storage()), HERE);
     }
 
-    /** {@code boveda.json}'s generation raised by someone with only the account: nothing vouches for it. */
+    /** {@code vault.json}'s generation raised by someone with only the account: nothing vouches for it. */
     public void raiseGenerationByHand() throws Exception {
         Vault.Info info = Vault.info(storage());
         dav.put(Vault.INFO, ("{\"id\":\"" + info.id() + "\",\"created\":\"" + info.created() + "\",\"generation\":"
             + (info.generation() + 1) + "}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
-    /** {@code boveda.json} deleted by someone with only the account, the vault not turned off. */
+    /** {@code vault.json} deleted by someone with only the account, the vault not turned off. */
     public void deleteVaultFileByHand() {
         dav.files.remove(Vault.INFO);
     }
@@ -117,7 +117,7 @@ public final class VaultFixture implements AutoCloseable {
         return latch::countDown;
     }
 
-    /** The account's next read of the vault's {@code boveda.json} (each look at the vault's state) waits until the returned step runs. */
+    /** The account's next read of the vault's {@code vault.json} (each look at the vault's state) waits until the returned step runs. */
     public Runnable holdVaultReadOnce() {
         java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
         dav.holdReadOnce.put(Vault.INFO, latch);
@@ -152,7 +152,7 @@ public final class VaultFixture implements AutoCloseable {
         return h;
     }
 
-    /** How many times the account was asked for the vault's {@code boveda.json} (each look at the vault's state). */
+    /** How many times the account was asked for the vault's {@code vault.json} (each look at the vault's state). */
     public long vaultReads() {
         return dav.log.stream().filter(("GET " + Vault.INFO)::equals).count();
     }

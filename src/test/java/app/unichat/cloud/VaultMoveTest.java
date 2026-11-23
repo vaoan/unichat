@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VaultMoveTest {
     private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
         OLD = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
-    private static final String SETTINGS = CloudAccount.SETTINGS_FILE, AI = "Unichat/Ajustes/unichat-ai.json",
-        PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg", NOTES = "Unichat/Ajustes/notas.txt";
+    private static final String SETTINGS = CloudAccount.SETTINGS_FILE, AI = "Unichat/Settings/unichat-ai.json",
+        PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg", NOTES = "Unichat/Settings/notas.txt";
     private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl", NEXT = "3f2a9c1b2d4e 2026-12.jsonl", LATER = "3f2a9c1b2d4e 2027-01.jsonl";
     private static final Instant T = Instant.parse("2026-11-19T08:00:00Z");
     private static final List<String> KEYS = List.of(VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultMove.RECORD, VaultActions.UNCONFIRMED);
@@ -134,7 +134,7 @@ class VaultMoveTest {
     @Test
     void aPlainCopyGoesOnlyOnceItsSealedCopyReadsBack() throws Exception {
         plainTexts(LAPTOP, "{\"a\":1}\n");
-        String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT, sealedText = Vault.ROOT + "/Textos/" + LAPTOP + "/" + TEXT;
+        String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT, sealedText = Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT;
         boolean[] failed = {false};
         beforeSealedGet = p -> {
             // The read-back after copying it in: the first time, the network drops.
@@ -161,7 +161,7 @@ class VaultMoveTest {
         // A sealed copy that doesn't open (damaged) keeps the plain one too.
         Settings.get().set(VaultMove.MOVED_AT, null);
         plainFile(AI, "{\"version\":1}");
-        put(Vault.ROOT + "/Ajustes/unichat-ai.json", "no abre".getBytes(StandardCharsets.UTF_8));
+        put(Vault.ROOT + "/Settings/unichat-ai.json", "no abre".getBytes(StandardCharsets.UTF_8));
         run(T.plusSeconds(120));
         assertTrue(cloud.files.containsKey(AI), "its sealed copy doesn't open: the plain one stays");
     }
@@ -170,7 +170,7 @@ class VaultMoveTest {
     void everythingPlainGoesAndMediaStays() throws Exception {
         plainBundle(SETTINGS, DESK, T.minusSeconds(60), "DARK");
         plainBundle(AI, DESK, T.minusSeconds(60), "x");
-        plainFile("Unichat/Ajustes/unichat-pinned.json", "{\"version\":1}");
+        plainFile("Unichat/Settings/unichat-pinned.json", "{\"version\":1}");
         plainFile(NOTES, "not ours");
         plainFile(PHOTO, "foto");
         plainTexts(DESK, "{\"mio\":1}\n");
@@ -188,7 +188,7 @@ class VaultMoveTest {
         assertEquals(7, r.moved().size(), "each plain file of ours: " + r.moved());
         assertEquals("LIGHT", Bundle.parse(s.get(SETTINGS)).settings().get("ui.theme"), "the vault's newer settings kept");
         assertEquals("x", Bundle.parse(s.get(AI)).settings().get("ui.theme"), "a part the vault lacked came in");
-        assertEquals("{\"version\":1}", opened("Unichat/Ajustes/unichat-pinned.json"));
+        assertEquals("{\"version\":1}", opened("Unichat/Settings/unichat-pinned.json"));
         assertEquals("{\"suyo\":1}\n", opened(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT), "a computer without the vault's are brought in");
         assertTrue(opened(TextSync.ROOT + "/" + LAPTOP + "/index.json").contains(TEXT), "and its index says so, for the others");
         assertEquals(T.toString(), Settings.get().getString(VaultMove.MOVED_AT, null));
@@ -311,12 +311,12 @@ class VaultMoveTest {
         String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT, longer = "{\"suyo\":1}\n{\"suyo\":2}\n";
         plainTexts(LAPTOP, "{\"suyo\":1}\n");
         sealedTexts(LAPTOP, "{}\n"); // it hasn't sent all of it sealed yet
-        int versions = cloud.versions.get(Vault.ROOT + "/Textos/" + LAPTOP + "/" + TEXT);
+        int versions = cloud.versions.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT);
         VaultMove.Result r = run(T);
         assertNull(r.error());
         assertTrue(cloud.files.containsKey(text), "its sealed copy is shorter: the plain one stays");
         assertEquals("{}\n", opened(text), "and the move never writes its texts");
-        assertEquals(versions, cloud.versions.get(Vault.ROOT + "/Textos/" + LAPTOP + "/" + TEXT));
+        assertEquals(versions, cloud.versions.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT));
         assertNull(Settings.get().getString(VaultMove.MOVED_AT, null), "the move waits for it");
 
         boolean[] sent = {false};

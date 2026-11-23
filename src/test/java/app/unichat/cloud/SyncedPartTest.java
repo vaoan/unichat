@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** Two computers on one account: what one changes reaches the other, and nothing goes to and fro. */
 class SyncedPartTest {
-    private static final String PATH = "Unichat/Ajustes/prueba.json";
+    private static final String PATH = "Unichat/Settings/prueba.json";
     private static final Instant T = Instant.parse("2026-11-10T08:00:00Z");
 
     /** One computer's settings, in memory. */

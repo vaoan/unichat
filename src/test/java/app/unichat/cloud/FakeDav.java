@@ -71,6 +71,39 @@ final class FakeDav implements AutoCloseable {
     void put(String path, byte[] data) {
         files.put(path, data);
         versions.merge(path, 1, Integer::sum);
+        for (int at = path.lastIndexOf('/'); at > 0; at = path.lastIndexOf('/', at - 1)) dirs.add(path.substring(0, at)); // as a server has them
+    }
+
+    /** Whether anything is at {@code path}: a file, or a folder (made, or holding something). */
+    private boolean there(String path) {
+        return files.containsKey(path) || dirs.contains(path) || files.keySet().stream().anyMatch(p -> p.startsWith(path + "/"));
+    }
+
+    /** MOVE (RFC 4918): a file or a folder with all in it to its Destination; with "Overwrite: F", never over what's there. */
+    private void move(HttpExchange x, String path) throws IOException {
+        String dest = URLDecoder.decode(java.net.URI.create(x.getRequestHeaders().getFirst("Destination")).getRawPath(), StandardCharsets.UTF_8)
+            .replaceFirst("^/dav/?", "").replaceFirst("/$", "");
+        if (!there(path)) {
+            x.sendResponseHeaders(404, -1);
+            return;
+        }
+        if (there(dest) && "F".equals(x.getRequestHeaders().getFirst("Overwrite"))) {
+            x.sendResponseHeaders(412, -1);
+            return;
+        }
+        for (String p : java.util.List.copyOf(files.keySet())) {
+            if (!p.equals(path) && !p.startsWith(path + "/")) continue;
+            String to = dest + p.substring(path.length());
+            files.put(to, files.remove(p));
+            versions.put(to, versions.getOrDefault(p, 1));
+        }
+        for (String d : java.util.List.copyOf(dirs)) {
+            if (!d.equals(path) && !d.startsWith(path + "/")) continue;
+            dirs.remove(d);
+            dirs.add(dest + d.substring(path.length()));
+        }
+        log.add("MOVE " + path + " " + dest);
+        x.sendResponseHeaders(201, -1);
     }
 
     private void handle(HttpExchange x) throws IOException {
@@ -125,6 +158,7 @@ final class FakeDav implements AutoCloseable {
                     dirs.removeIf(d -> d.equals(path) || d.startsWith(path + "/"));
                     x.sendResponseHeaders(204, -1);
                 }
+                case "MOVE" -> move(x, path);
                 default -> x.sendResponseHeaders(405, -1);
             }
         }

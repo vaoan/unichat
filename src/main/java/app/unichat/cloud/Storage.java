@@ -42,6 +42,13 @@ public interface Storage {
         if (!named) throw new IOException(app.unichat.support.I18n.t("cloud.error.badPath"));
     }
 
+    /**
+     * Moves the file or folder at {@code from} (with all in it) to {@code to}, on the server: nothing comes down or goes up
+     * again. The folder above {@code to} must be there (callers make it). Never over something already at {@code to}, and
+     * nothing at {@code from}: both fail, leaving everything as it was. Both paths are checked as {@link #deletable}.
+     */
+    void move(String from, String to) throws IOException;
+
     void put(String path, Path file) throws IOException;
 
     /** The same, telling {@code sent} the running total of bytes gone out (null: nobody listens). */

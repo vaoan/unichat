@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** A part that only grows: every computer's entries end up on every computer, and none is ever lost. */
 class MergedPartTest {
-    private static final String PATH = "Unichat/Ajustes/prueba-unida.json";
+    private static final String PATH = "Unichat/Settings/prueba-unida.json";
 
     /** One computer's entries, in memory; which of them were read whole. */
     private static final class Computer {

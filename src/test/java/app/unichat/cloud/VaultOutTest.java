@@ -30,7 +30,7 @@ class VaultOutTest {
     private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
         OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
     private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl", TRANSCRIPT = "a".repeat(64) + ".txt";
-    private static final String SETTINGS = CloudAccount.SETTINGS_FILE, AI = "Unichat/Ajustes/unichat-ai.json",
+    private static final String SETTINGS = CloudAccount.SETTINGS_FILE, AI = "Unichat/Settings/unichat-ai.json",
         PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg";
 
     @TempDir
@@ -148,8 +148,8 @@ class VaultOutTest {
 
     @Test
     void aPartThatDoesntOpenIsLeft() throws Exception {
-        cloud.dirs.add(Vault.ROOT + "/Ajustes");
-        cloud.put(Vault.ROOT + "/Ajustes/unichat-ai.json", "dañado".getBytes(StandardCharsets.UTF_8));
+        cloud.dirs.add(Vault.ROOT + "/Settings");
+        cloud.put(Vault.ROOT + "/Settings/unichat-ai.json", "dañado".getBytes(StandardCharsets.UTF_8));
         SealedStorage sealed = new SealedStorage(dav(), () -> made.vk().clone());
         sealed.put(SETTINGS, Bundle.of(DESK, java.time.Instant.now(), Map.of("ui.theme", "DARK"), null).toBytes());
         assertTrue(VaultOut.run(dav(), sealed, made.info(), made.vk()));
@@ -284,7 +284,7 @@ class VaultOutTest {
     void anOffMarkerWrittenByTheAccountIsNotBelieved() throws Exception {
         VaultComputer laptop = laptopOpen();
         cloud.files.remove(Vault.INFO);
-        cloud.put("Unichat/Ajustes/boveda-apagada.json", ("{\"vault\":\"" + made.info().id() + "\",\"generation\":0,\"mac\":\"AAAA\"}")
+        cloud.put("Unichat/Settings/vault-off.json", ("{\"vault\":\"" + made.info().id() + "\",\"generation\":0,\"mac\":\"AAAA\"}")
             .getBytes(StandardCharsets.UTF_8));
         int puts = cloud.puts.get();
         assertNotEquals(Cloud.VaultState.NONE, laptop.round().vault());
@@ -296,9 +296,9 @@ class VaultOutTest {
         VaultComputer desk = desk();
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
         desk.as(desk.cloud.vault()::turnOffVault);
-        assertNotNull(cloud.files.get("Unichat/Ajustes/boveda-apagada.json"), "turned off, and said so outside the vault");
+        assertNotNull(cloud.files.get("Unichat/Settings/vault-off.json"), "turned off, and said so outside the vault");
         Vault.Created later = Vault.create(dav(), DESK, "Escritorio");
-        assertNull(cloud.files.get("Unichat/Ajustes/boveda-apagada.json"), "a new vault clears it");
+        assertNull(cloud.files.get("Unichat/Settings/vault-off.json"), "a new vault clears it");
         Arrays.fill(later.vk(), (byte) 0);
     }
 

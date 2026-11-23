@@ -23,7 +23,7 @@ import java.util.UUID;
  * the account is untrusted: what isn't a vault or a slot reads as none.
  */
 final class Vault {
-    static final String ROOT = CloudAccount.ROOT + "/Bóveda", SLOTS = ROOT + "/llaves", INFO = ROOT + "/boveda.json";
+    static final String ROOT = CloudAccount.ROOT + "/Vault", SLOTS = ROOT + "/keys", INFO = ROOT + "/vault.json";
     static final int MIN_PASSWORD = 12;
     private static final String JSON_FILE = ".json", VOUCH = "vouch";
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -467,9 +467,10 @@ final class Vault {
         return SLOTS + "/" + id + JSON_FILE;
     }
 
-    private static byte[] json(Info info) {
+    /** The vault's file: {@code names: 2} says it's under the English names ({@link VaultNames}), the old ones gone. */
+    static byte[] json(Info info) {
         ObjectNode n = JSON.createObjectNode();
-        n.put("id", info.id()).put("created", info.created().toString()).put("generation", info.generation());
+        n.put("id", info.id()).put("created", info.created().toString()).put("generation", info.generation()).put("names", 2);
         if (info.vouch() != null) n.put(VOUCH, java.util.Base64.getEncoder().encodeToString(info.vouch()));
         try {
             return JSON.writeValueAsBytes(n);

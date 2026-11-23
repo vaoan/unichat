@@ -221,16 +221,16 @@ class VaultRotateTest {
         // The laptop's round had opened the vault with the old key just before, and wrote after the change: its own text,
         // and the secrets part as it agreed on it.
         SealedStorage old = new SealedStorage(dav(), () -> made.vk().clone());
-        String text = "Unichat/Textos/" + LAPTOP + "/" + TEXT;
-        old.mkdirs("Unichat/Textos/" + LAPTOP);
+        String text = "Unichat/Texts/" + LAPTOP + "/" + TEXT;
+        old.mkdirs("Unichat/Texts/" + LAPTOP);
         old.put(text, "{}\n".getBytes(StandardCharsets.UTF_8));
         Bundle secrets = Bundle.of(LAPTOP, java.time.Instant.now(), Map.of(), null);
         assertEquals(laptop.get("cloud.base.secrets"), secrets.hash(), "what the laptop agreed on");
         old.put(VaultParts.SECRETS_FILE, secrets.toBytes());
 
         assertNull(laptop.round().error(), "never taken for damaged");
-        assertTrue(opens(keyOf(laptop), text, cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/" + TEXT)), "its text sealed again");
-        assertTrue(opens(keyOf(laptop), VaultParts.SECRETS_FILE, cloud.files.get(Vault.ROOT + "/Ajustes/unichat-secrets.json")),
+        assertTrue(opens(keyOf(laptop), text, cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT)), "its text sealed again");
+        assertTrue(opens(keyOf(laptop), VaultParts.SECRETS_FILE, cloud.files.get(Vault.ROOT + "/Settings/unichat-secrets.json")),
             "and the part it agreed on");
         assertNull(desk.round().error());
     }
@@ -247,14 +247,14 @@ class VaultRotateTest {
         assertNull(desk.round().error());
         assertFalse("falsa".equals(laptop.get("gif.giphy.key")), "no computer of the vault takes it in");
         assertFalse("falsa".equals(desk.get("gif.giphy.key")));
-        byte[] now = VaultCrypto.open(keyOf(laptop), VaultParts.SECRETS_FILE, cloud.files.get(Vault.ROOT + "/Ajustes/unichat-secrets.json"));
+        byte[] now = VaultCrypto.open(keyOf(laptop), VaultParts.SECRETS_FILE, cloud.files.get(Vault.ROOT + "/Settings/unichat-secrets.json"));
         assertEquals(LAPTOP, Bundle.parse(now).machine(), "this computer's own copy went up in its place, with the new key");
         assertFalse(Bundle.parse(now).settings().containsKey("gif.giphy.key"));
     }
 
     @Test
     void aPartSealedAtANewerGenerationIsNeverOverwrittenWithAnOlderKey() throws Exception {
-        String stored = Vault.ROOT + "/Ajustes/unichat-secrets.json";
+        String stored = Vault.ROOT + "/Settings/unichat-secrets.json";
         try (VaultParts.Round old = laptop.as(() -> java.util.concurrent.CompletableFuture.completedFuture(
             VaultParts.open(dav(), (p, b) -> false, () -> { })))) {
             rotate(desk); // meanwhile: every part sealed again at the next generation
@@ -267,7 +267,7 @@ class VaultRotateTest {
 
     @Test
     void anotherComputersTextThatDoesntOpenIsLeftAndNamedAndTheRoundGoesOn() throws Exception {
-        String folder = Vault.ROOT + "/Textos/" + OTHER;
+        String folder = Vault.ROOT + "/Texts/" + OTHER;
         cloud.dirs.add(folder);
         cloud.put(folder + "/index.json", "dañado".getBytes(StandardCharsets.UTF_8));
         int before = cloud.puts.get();
@@ -285,14 +285,14 @@ class VaultRotateTest {
         assertNull(desk.round().error());
         rotate(desk);
         SealedStorage old = new SealedStorage(dav(), () -> made.vk().clone());
-        String folder = "Unichat/Textos/" + LAPTOP;
+        String folder = "Unichat/Texts/" + LAPTOP;
         old.put(folder + "/" + TEXT, forged.getBytes(StandardCharsets.UTF_8));
         old.put(folder + "/index.json", TextIndex.write(Map.of(TEXT, (long) forged.length())));
         assertNull(laptop.round().error());
         assertEquals(mine, new String(VaultCrypto.open(keyOf(laptop), folder + "/" + TEXT,
-            cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/" + TEXT)), StandardCharsets.UTF_8),
+            cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT)), StandardCharsets.UTF_8),
             "not what this computer has: never sealed again, its own sent in its place");
-        assertTrue(opens(keyOf(laptop), folder + "/index.json", cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/index.json")),
+        assertTrue(opens(keyOf(laptop), folder + "/index.json", cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/index.json")),
             "its index sent anew");
         desk.round();
         assertEquals(mine, desk.read("texts/" + LAPTOP + "/" + TEXT), "and no other computer takes the forged one in");
@@ -404,10 +404,10 @@ class VaultRotateTest {
 
     @Test
     void aFileThatDoesntOpenWithTheOldKeyIsLeftAndSaid() throws Exception {
-        String stored = Vault.ROOT + "/Ajustes/unichat-otro.json";
+        String stored = Vault.ROOT + "/Settings/unichat-otro.json";
         cloud.put(stored, "no es nuestro".getBytes(StandardCharsets.UTF_8));
         Cloud.KeyChanged changed = rotate(desk);
-        assertEquals(List.of(CloudAccount.ROOT + "/Ajustes/unichat-otro.json"), changed.left());
+        assertEquals(List.of(CloudAccount.ROOT + "/Settings/unichat-otro.json"), changed.left());
         assertArrayEquals("no es nuestro".getBytes(StandardCharsets.UTF_8), cloud.files.get(stored), "left as it was");
     }
 
@@ -526,7 +526,7 @@ class VaultRotateTest {
 
     @Test
     void aFileSentAnewWhileItsSealedAgainIsLeftForWhoSentIt() throws Exception {
-        String logical = VaultParts.PINNED_FILE, stored = Vault.ROOT + "/Ajustes/unichat-pinned.json";
+        String logical = VaultParts.PINNED_FILE, stored = Vault.ROOT + "/Settings/unichat-pinned.json";
         new SealedStorage(dav(), () -> made.vk().clone()).put(logical, "viejo".getBytes(StandardCharsets.UTF_8));
         byte[] newVk = VaultCrypto.randomKey(), sentMeanwhile = VaultCrypto.seal(newVk, logical, "nuevo".getBytes(StandardCharsets.UTF_8));
         Storage racing = (Storage) java.lang.reflect.Proxy.newProxyInstance(
@@ -548,7 +548,7 @@ class VaultRotateTest {
         assertNull(desk.round().error());
         assertNull(laptop.write("texts/here/" + first, "{}\n" + real).write("texts/here/" + second, "{}\n{\"b\":1}\n").round().error());
         rotate(desk);
-        new SealedStorage(dav(), () -> made.vk().clone()).put("Unichat/Textos/" + LAPTOP + "/" + first,
+        new SealedStorage(dav(), () -> made.vk().clone()).put("Unichat/Texts/" + LAPTOP + "/" + first,
             ("{}\n" + forged).getBytes(StandardCharsets.UTF_8));
 
         Cloud.Status s = desk.round();
@@ -591,7 +591,7 @@ class VaultRotateTest {
 
     @Test
     void aPartThatDoesntOpenAndHasNothingOfOursToReplaceItIsSaidDamaged() throws Exception {
-        String stored = Vault.ROOT + "/Ajustes/unichat-transcripts.json";
+        String stored = Vault.ROOT + "/Settings/unichat-transcripts.json";
         cloud.put(stored, "dañado".getBytes(StandardCharsets.UTF_8));
         Cloud.Status s = desk.round(); // no transcripts here: nothing goes up in its place
         assertArrayEquals("dañado".getBytes(StandardCharsets.UTF_8), cloud.files.get(stored));
@@ -602,14 +602,14 @@ class VaultRotateTest {
     void anIndexForgedInAComputersFolderWithTheOldKeyIsSentAnewByIt() throws Exception {
         assertNull(laptop.write("texts/here/" + TEXT, "{}\n").round().error());
         rotate(desk);
-        String index = "Unichat/Textos/" + LAPTOP + "/index.json";
+        String index = "Unichat/Texts/" + LAPTOP + "/index.json";
         new SealedStorage(dav(), () -> made.vk().clone()).put(index, TextIndex.write(Map.of(TEXT, 99L)));
         assertNull(laptop.round().error());
-        assertEquals(Map.of(TEXT, 3L), TextIndex.read(VaultCrypto.open(keyOf(laptop), index, cloud.files.get(Vault.ROOT + "/Textos/" + LAPTOP + "/index.json"))),
+        assertEquals(Map.of(TEXT, 3L), TextIndex.read(VaultCrypto.open(keyOf(laptop), index, cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/index.json"))),
             "never sealed again: what it has, sent anew");
     }
 
-    /** {@code boveda.json} rewritten at {@code generation} by someone with only the account: nothing vouches for it. */
+    /** {@code vault.json} rewritten at {@code generation} by someone with only the account: nothing vouches for it. */
     private void raiseByHand(long generation) throws Exception {
         cloud.put(Vault.INFO, ("{\"id\":\"" + made.info().id() + "\",\"created\":\"" + made.info().created()
             + "\",\"generation\":" + generation + "}").getBytes(StandardCharsets.UTF_8));
