@@ -8,7 +8,8 @@ import java.util.function.Consumer;
 /**
  * Windows: a locked session or a display that is off counts as nobody seeing Unichat. A message-only window on a
  * daemon thread of its own hears both ({@link WindowsScreenWindow}), with nothing polling; if it can't be made or
- * registered, one log line says why, the screen counts as here once, and Unichat goes on with its windows alone.
+ * registered, one log line says why, the screen counts as here once, and Unichat goes on with its windows alone. The
+ * same holds when the watch ends, however it ends.
  */
 public final class WindowsScreen implements ScreenAway {
     /** One message to the window: its code, wParam, and the display state when it carries one. */
@@ -21,7 +22,7 @@ public final class WindowsScreen implements ScreenAway {
         /** Makes the window and registers it; throws with why when it can't. */
         void open(Handler onMessage) throws Exception;
 
-        /** Hands every message to the handler until {@link #close}. */
+        /** Hands every message to the handler until {@link #close}; throws with why if the loop fails first. */
         void run();
 
         /** From any thread, once open: ends {@link #run}. */
@@ -64,7 +65,13 @@ public final class WindowsScreen implements ScreenAway {
             return;
         }
         registered.complete(true);
-        window.run();
+        try {
+            window.run();
+        } catch (Throwable e) {
+            log.accept("Screen lock and display watch ended, so only Unichat's windows count: " + e);
+        } finally {
+            tell(away, false); // nobody is left to say unlocked: a lock told before must not stay for good
+        }
     }
 
     /** A listener's bug mustn't end the watch, nor reach the window procedure (JNA would only print it). */

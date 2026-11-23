@@ -5,6 +5,8 @@ import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
 import com.sun.jna.WString;
+import com.sun.jna.ptr.IntByReference;
+import com.sun.jna.ptr.PointerByReference;
 import com.sun.jna.win32.StdCallLibrary;
 
 import java.util.Arrays;
@@ -28,6 +30,16 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
     private static final int SETTING_LENGTH = 16;
     private static final int SETTING_DATA = 20;
     private static final AtomicInteger CLASSES = new AtomicInteger();
+    private static final int WTS_CURRENT_SESSION = -1;
+    private static final int WTS_SESSION_INFO_EX = 25;
+    private static final int WTSINFOEX_LEVEL = 1;
+    /** WTSINFOEXW: Level, then (8-aligned, for its LARGE_INTEGERs) WTSINFOEX_LEVEL1_W's SessionId, SessionState, SessionFlags. */
+    private static final int SESSION_FLAGS = 16;
+    /** The bytes of a WTSINFOEXW read here: up to and with SessionFlags. */
+    static final int SESSION_INFO_SIZE = SESSION_FLAGS + Integer.BYTES;
+    private static final int WTS_SESSIONSTATE_LOCK = 0;
+    /** Windows 7 and Server 2008 R2 report SessionFlags the other way round. */
+    private static final String FLAGS_INVERTED = "6.1";
 
     /** Kept in a field: a callback JNA hands to Windows must outlive every message, or it's collected under it. */
     private final WindowProc proc = new WindowProc() {
@@ -70,13 +82,48 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
             unregisterClass();
             throw e;
         }
+        askLockAtStart();
+    }
+
+    /** Windows tells only changes; the macOS helper says the state at start, and so does this. */
+    private void askLockAtStart() {
+        PointerByReference buffer = new PointerByReference();
+        IntByReference bytes = new IntByReference();
+        try {
+            if (!Wtsapi32.LIB.WTSQuerySessionInformationW(null, WTS_CURRENT_SESSION, WTS_SESSION_INFO_EX, buffer, bytes)) {
+                return; // unknown counts as not locked
+            }
+            try {
+                lockAtStart(handler, buffer.getValue(), bytes.getValue(), System.getProperty("os.version", ""));
+            } finally {
+                Wtsapi32.LIB.WTSFreeMemory(buffer.getValue());
+            }
+        } catch (RuntimeException | LinkageError e) {
+            System.err.println("Screen lock and display watch: the lock at start is unknown, so not locked: " + e);
+        }
+    }
+
+    /**
+     * Tells {@code onMessage} a WTS_SESSION_LOCK when the WTSINFOEXW at {@code info} ({@code bytes} long) says the
+     * session is locked; anything it can't read, and Windows 7's inverted flag, tells nothing.
+     */
+    static void lockAtStart(WindowsScreen.Handler onMessage, Pointer info, int bytes, String osVersion) {
+        if (info == null || bytes < SESSION_INFO_SIZE || osVersion.startsWith(FLAGS_INVERTED)) return;
+        if (info.getInt(0) != WTSINFOEX_LEVEL || info.getInt(SESSION_FLAGS) != WTS_SESSIONSTATE_LOCK) return;
+        onMessage.message(ScreenMessages.WM_WTSSESSION_CHANGE, ScreenMessages.WTS_SESSION_LOCK,
+                ScreenMessages.NO_DISPLAY_STATE);
     }
 
     @Override
     public void run() {
         Memory msg = new Memory(64); // a MSG is 48 bytes on 64-bit Windows; only Windows reads it
-        while (User32.LIB.GetMessageW(msg, null, 0, 0) > 0) User32.LIB.DispatchMessageW(msg);
-        unregisterClass();
+        int got;
+        while ((got = User32.LIB.GetMessageW(msg, null, 0, 0)) > 0) User32.LIB.DispatchMessageW(msg);
+        try {
+            check(got == 0, "GetMessageW"); // -1: the loop failed, not WM_QUIT; read its error before another call
+        } finally {
+            unregisterClass();
+        }
     }
 
     @Override
@@ -210,5 +257,10 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
         boolean WTSRegisterSessionNotification(Pointer hwnd, int flags);
 
         boolean WTSUnRegisterSessionNotification(Pointer hwnd);
+
+        boolean WTSQuerySessionInformationW(Pointer server, int session, int infoClass, PointerByReference buffer,
+                IntByReference bytes);
+
+        void WTSFreeMemory(Pointer memory);
     }
 }

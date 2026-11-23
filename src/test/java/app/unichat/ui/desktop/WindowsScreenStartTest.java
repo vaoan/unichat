@@ -64,7 +64,7 @@ class WindowsScreenStartTest {
         screen.start(told::add);
         assertTrue(screen.registered().get());
         screen.thread().join(); // lesson-ok: test-future-join (a Thread's join)
-        assertEquals(List.of(true, false), told, "locked, then unlocked; nothing else told");
+        assertEquals(List.of(true, false, false), told, "locked, then unlocked, then here as the watch ends");
         assertEquals(List.of(), log);
     }
 
@@ -95,6 +95,34 @@ class WindowsScreenStartTest {
             if (a) throw new IllegalStateException("a listener's bug");
         });
         screen.thread().join(); // lesson-ok: test-future-join (a Thread's join)
-        assertEquals(List.of(true, false), told, "the unlock still arrives");
+        assertEquals(List.of(true, false, false), told, "the unlock still arrives");
+    }
+    @Test
+    void aLoopThatEndsAfterALockLeavesTheScreenHere() throws Exception {
+        List<Boolean> told = new CopyOnWriteArrayList<>();
+        List<String> log = new CopyOnWriteArrayList<>();
+        WindowsScreen screen = new WindowsScreen(new WindowsScreen.MessageWindow() {
+            private WindowsScreen.Handler handler;
+
+            @Override
+            public void open(WindowsScreen.Handler onMessage) {
+                handler = onMessage;
+            }
+
+            @Override
+            public void run() {
+                handler.message(ScreenMessages.WM_WTSSESSION_CHANGE, ScreenMessages.WTS_SESSION_LOCK,
+                        ScreenMessages.NO_DISPLAY_STATE);
+                throw new IllegalStateException("GetMessageW failed (error 1400)");
+            }
+
+            @Override
+            public void close() { }
+        }, log::add);
+        screen.start(told::add);
+        screen.thread().join(); // lesson-ok: test-future-join (a Thread's join)
+        assertEquals(List.of(true, false), told, "no watch left to say unlocked: the screen counts as here");
+        assertEquals(1, log.size(), "one log line: " + log);
+        assertTrue(log.get(0).contains("GetMessageW failed (error 1400)"), "it says why: " + log);
     }
 }
