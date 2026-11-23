@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -77,11 +78,14 @@ class StylePromptTest {
     @Test
     void theStyleNotesAreWrittenInThePersonsLanguage() {
         String es = StylePrompt.learn("- Ríe con jajaja", List.of("jajaja sí"), List.of(), Locale.forLanguageTag("es"));
-        assertTrue(es.contains("Write the file in Spanish"), es);
-        assertTrue(es.contains("if their own messages are in another language, write it in that one"), es);
+        assertTrue(es.contains("Write the file in Spanish, this person's language, whatever language their messages are in "
+                + "(which languages they write in is one of the traits)"), es);
+        assertFalse(es.contains("write it in that one"), "their messages never switch the file's language");
         String en = StylePrompt.learn("", List.of("lol yes"), List.of(), Locale.ENGLISH);
         assertTrue(en.contains("Write the file in English"), en);
         assertTrue(es.contains("- Ríe con jajaja\n") && es.contains("- jajaja sí\n"), "their own file and messages, as they are");
-        assertTrue(StylePrompt.shorten("- Ríe con jajaja").contains("the same language"), "shortening keeps it in its language");
+        String shorter = StylePrompt.shorten("- Ríe con jajaja");
+        assertTrue(shorter.contains("in the same language it's written in (don't translate it)"), "shortening keeps its language: " + shorter);
+        assertTrue(shorter.contains("above all keep what comes from their corrections"), shorter);
     }
 }

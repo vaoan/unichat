@@ -88,7 +88,7 @@ class ReplyPromptTest {
         assertEquals(1, marked.size(), "only the chosen one is marked: " + marked);
         assertTrue(marked.get(0).endsWith("Ana: ¿Me prestas el carro el sábado?"), "marked where it is in the chat: " + marked);
         String ask = p.substring(p.lastIndexOf("</chat-"));
-        assertTrue(ask.contains("chose to reply to this message"), ask);
+        assertTrue(ask.contains("Work out what it's replying to: the person chose to reply to this message"), ask);
         assertTrue(ask.contains("not necessarily the last one"), ask);
         assertTrue(ask.contains("¿Me prestas el carro el sábado?"), "named again where the task is");
         assertFalse(p.contains("the last message in the conversation"));
@@ -155,7 +155,7 @@ class ReplyPromptTest {
     @Test
     void withNothingChosenNorWrittenItAnswersTheLastMessage() {
         String p = ReplyPrompt.build("", false, List.of(msg("Ana", false, "¿Vienes?")), null, "  ");
-        assertTrue(p.contains("the last message in the conversation"));
+        assertTrue(p.contains("Work out what it's replying to: the last message in the conversation"), p);
         assertFalse(p.contains("→ "));
         assertFalse(p.contains("Use it as the base"));
     }
@@ -289,12 +289,23 @@ class ReplyPromptTest {
         for (String written : List.of("", "sí voy", "sí voy [+]")) {
             String ask = ReplyPrompt.build("", false, chat, null, written);
             String reply = ask.substring(ask.lastIndexOf("Write the reply"));
-            assertTrue(reply.contains("in the language the conversation is in"), written + ": " + reply);
+            assertTrue(reply.contains("in the language this person (\"Me\") uses in this conversation"), written + ": " + reply);
+            assertTrue(reply.contains("if they haven't written in it yet, the language of the message it answers"), reply);
             assertFalse(ask.contains("in English"), "never told to answer in English: " + ask);
         }
         String theirs = ReplyPrompt.build("Responde siempre en inglés", false, chat, null, "");
-        assertTrue(theirs.contains("unless their instructions say which language to use"), "the person's own instructions win");
-        assertTrue(theirs.indexOf("Responde siempre en inglés") < theirs.indexOf("unless their instructions"), "named before");
+        assertTrue(theirs.contains("Their instructions win if they say which language to use"), "the person's own instructions win");
+        assertTrue(theirs.indexOf("Responde siempre en inglés") < theirs.indexOf("Their instructions win"), "named before");
+    }
+
+    /** What the person already wrote in the box, as the message itself, is never translated into the chat's language. */
+    @Test
+    void anEnglishTextInTheBoxKeepsItsLanguageInASpanishChat() {
+        String ask = ReplyPrompt.build("", false, List.of(msg("Ana", false, "¿Vienes el sábado?")), null, "Yes, see you on Saturday [+]");
+        String reply = ask.substring(ask.lastIndexOf("Write the reply"));
+        assertTrue(ask.contains("\nYes, see you on Saturday\n"), ask);
+        assertTrue(reply.contains("if what they already wrote is the message itself rather than an instruction for you, keep the "
+                + "language it's in"), reply);
     }
 
     /** What the person wrote for the AI (instructions, style, examples, the box) goes in as they wrote it, in their language. */

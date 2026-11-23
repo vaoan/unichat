@@ -26,9 +26,13 @@ public final class ReplyPrompt {
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm");
 
-    /** The instructions are English; the reply isn't, unless the chat is or the person's own instructions say so. */
-    static final String REPLY_LANGUAGE = "Write it in the language the conversation is in, unless their instructions say "
-            + "which language to use.";
+    /**
+     * The instructions are English; the reply is in the person's language with this contact, and a message they already
+     * wrote in the box is never translated. Their own instructions win.
+     */
+    static final String REPLY_LANGUAGE = "Write it in the language this person (\"Me\") uses in this conversation, or, if they "
+            + "haven't written in it yet, the language of the message it answers; if what they already wrote is the message itself "
+            + "rather than an instruction for you, keep the language it's in. Their instructions win if they say which language to use.";
 
     private ReplyPrompt() {}
 
@@ -85,9 +89,9 @@ public final class ReplyPrompt {
         if (hasGaps(idea)) steps.add(gapsStep(idea, canReadFolder));
         if (wrote) steps.add(ideaStep(idea, marks));
         steps.add(target == null
-                ? "See what it answers: the last message in the conversation; what comes before it is context."
+                ? "Work out what it's replying to: the last message in the conversation; what comes before it is context."
                 // A chosen message is often not the last one: said plainly, or the last message wins.
-                : "See what it answers: the person chose to reply to this message (marked with → in the conversation; not "
+                : "Work out what it's replying to: the person chose to reply to this message (marked with → in the conversation; not "
                         + "necessarily the last one): " + line(target, heard) + "\nYour message replies to that one, and to what it says; "
                         + "the rest of the conversation is only context.");
         StringBuilder length = new StringBuilder(); // only marks: what the reply is like

@@ -200,4 +200,15 @@ class StyleLearnerTest {
         new StyleLearner(new WritingStyle(dir.resolve("es")), p -> { asked.add(p); return "- jajaja"; }).learn("!c", CHAT);
         assertTrue(asked.getLast().contains("Write the file in Spanish"), "the tests run in Spanish");
     }
+
+    /** An English chat with Unichat in Spanish still asks for the notes in Spanish: the person reads them in Ajustes. */
+    @Test
+    void anEnglishChatWithASpanishUiStillAsksForTheNotesInSpanish() {
+        List<String> asked = new java.util.ArrayList<>();
+        List<Message> english = List.of(mine("$e1", "lol see you tomorrow"), mine("$e2", "omg yes"));
+        new StyleLearner(new WritingStyle(dir), p -> { asked.add(p); return "- lol"; }).learn("!c", english);
+        assertTrue(asked.getFirst().contains("lol see you tomorrow"), asked.toString());
+        assertTrue(asked.getFirst().contains("Write the file in Spanish, this person's language, whatever language their "
+                + "messages are in"), asked.toString());
+    }
 }
