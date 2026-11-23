@@ -31,7 +31,7 @@ final class AppLog {
             if (Files.exists(log) && Files.size(log) > MAX) {
                 Files.move(log, dir.resolve("unichat.log.1"), StandardCopyOption.REPLACE_EXISTING);
             }
-            OutputStream file = Files.newOutputStream(log, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            OutputStream file = open(log);
             String header = "\n=== Unichat " + LocalDateTime.now() + " ===\n";
             file.write(header.getBytes(StandardCharsets.UTF_8));
             OutputStream redacted = new RedactingLines(file);
@@ -40,6 +40,14 @@ final class AppLog {
         } catch (IOException e) {
             System.err.println("No log file: " + e);
         }
+    }
+
+    /**
+     * The log, appended to. Any thread writes to it, interrupted ones too: the stream must stay open after such a write
+     * (an interruptible channel would close for good, and nothing more would be logged).
+     */
+    static OutputStream open(Path log) throws IOException {
+        return Files.newOutputStream(log, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
     }
 
     /** Buffers bytes into lines and writes each one through {@link Redactor}. Shared by stdout and stderr. */

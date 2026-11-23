@@ -33,6 +33,14 @@ class BuildRulesTest {
     }
 
     @Test
+    void nothingElseInTheCompilersConfigTurnsThemOff() {
+        Element config = configuration("maven-compiler-plugin");
+        assertEquals(List.of("showWarnings", "compilerArgs"), childNames(config),
+                "the compiler's configuration is the lint and nothing else (no failOnWarning, compilerArgument, ...)");
+        assertEquals("true", text(config, "showWarnings"));
+    }
+
+    @Test
     void aLintTurnedOffSaysWhy() {
         for (Element arg : elements(child(configuration("maven-compiler-plugin"), "compilerArgs"), "arg")) {
             if (!arg.getTextContent().trim().startsWith("-Xlint:-")) continue;
@@ -44,13 +52,13 @@ class BuildRulesTest {
     void theEnforcerRulesRun() {
         Element execution = execution("maven-enforcer-plugin", "enforce");
         Element rules = child(child(execution, "configuration"), "rules");
-        List<String> names = new ArrayList<>();
-        for (Node n = rules.getFirstChild(); n != null; n = n.getNextSibling()) {
-            if (n instanceof Element e) names.add(e.getTagName());
-        }
+        List<String> names = childNames(rules);
         assertEquals(List.of("requireJavaVersion", "requireMavenVersion", "dependencyConvergence",
                 "banDuplicatePomDependencyVersions", "requirePluginVersions", "requireReleaseDeps", "banCircularDependencies"),
                 names);
+        for (Element rule : elements(rules, null)) {
+            assertTrue(elements(rule, "level").isEmpty(), rule.getTagName() + " fails the build, not a warning (<level>)");
+        }
         assertEquals("[25,)", child(child(rules, "requireJavaVersion"), "version").getTextContent().trim());
         assertNotEquals("false", text(child(execution, "configuration"), "fail"), "the enforcer fails the build");
     }
@@ -58,10 +66,32 @@ class BuildRulesTest {
     @Test
     void modernizerFailsAtTheProjectsJava() {
         Element config = configuration("modernizer-maven-plugin");
+        assertEquals(List.of("javaVersion", "failOnViolations", "includeTestClasses"), childNames(config),
+                "Modernizer's configuration has nothing that leaves code out (exclusions, ignorePackages, ...)");
         assertEquals("${maven.compiler.release}", text(config, "javaVersion"));
         assertEquals("true", text(config, "failOnViolations"));
         assertEquals("true", text(config, "includeTestClasses"));
         execution("modernizer-maven-plugin", "modernizer");
+    }
+
+    @Test
+    void noExecutionIsUnbound() {
+        for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin")) {
+            Element executions = elements(plugin(plugin), "executions").stream().findFirst().orElse(null);
+            if (executions == null) continue;
+            for (Element e : elements(executions, "execution")) {
+                assertNotEquals("none", text(e, "phase"), plugin + "'s " + text(e, "id") + " runs in the build");
+            }
+        }
+    }
+
+    @Test
+    void noProfileChangesTheChecks() {
+        for (Element profile : elements(child(POM.getDocumentElement(), "profiles"), "profile")) {
+            for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin")) {
+                assertFalse(profile.getTextContent().contains(plugin), text(profile, "id") + " leaves " + plugin + " as it is");
+            }
+        }
     }
 
     @Test
@@ -108,14 +138,18 @@ class BuildRulesTest {
         return elements(parent, tag).stream().map(e -> e.getTextContent().trim()).toList();
     }
 
-    /** The direct children named {@code tag}. */
+    /** The direct children named {@code tag} (any, when null). */
     private static List<Element> elements(Element parent, String tag) {
         List<Element> out = new ArrayList<>();
         NodeList all = parent.getChildNodes();
         for (int i = 0; i < all.getLength(); i++) {
-            if (all.item(i) instanceof Element e && e.getTagName().equals(tag)) out.add(e);
+            if (all.item(i) instanceof Element e && (tag == null || e.getTagName().equals(tag))) out.add(e);
         }
         return out;
+    }
+
+    private static List<String> childNames(Element parent) {
+        return elements(parent, null).stream().map(Element::getTagName).toList();
     }
 
     /** The node before {@code n}, past blank text. */
