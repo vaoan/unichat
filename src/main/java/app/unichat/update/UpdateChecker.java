@@ -2,6 +2,7 @@ package app.unichat.update;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.AppVersion;
+import app.unichat.support.Seen;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -15,12 +16,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 
 /**
  * Asks GitHub for Unichat's latest release (Ajustes → Privacidad, {@code app.checkUpdates}): a little after start, then
  * at most once a day, on its own daemon thread. Only GitHub's public API is contacted, with nothing about the person.
  * The answer is kept in settings, so a restart shows a known new version without asking again. Any failure (no
- * network, 404 while the repository is private, rate limit) is one line in the log and nothing on screen.
+ * network, 404 while the repository is private, rate limit) is one line in the log and nothing on screen. While nobody
+ * can see Unichat ({@link Seen}) the ticks don't ask; when it's seen again, one check runs if one is due.
  */
 public final class UpdateChecker {
     public enum Outcome { UP_TO_DATE, NEWER, FAILED }
@@ -49,7 +52,18 @@ public final class UpdateChecker {
     private final List<Consumer<Release>> listeners = new CopyOnWriteArrayList<>();
     private boolean started;
 
-    private UpdateChecker() {}
+    private final LongSupplier clock;
+    private final Fetcher fetcher;
+
+    /** What answers GitHub's call: the body, or an exception. */
+    interface Fetcher { String fetch() throws Exception; }
+
+    private UpdateChecker() { this(System::currentTimeMillis, UpdateChecker::fetch); }
+
+    UpdateChecker(LongSupplier clock, Fetcher fetcher) {
+        this.clock = clock;
+        this.fetcher = fetcher;
+    }
 
     public static UpdateChecker get() { return INSTANCE; }
 
@@ -57,8 +71,20 @@ public final class UpdateChecker {
     public synchronized void start() {
         if (started) return;
         started = true;
+        listenToSeen();
         worker.scheduleWithFixedDelay(this::checkIfDue, FIRST_LOOK.toSeconds(), LOOK_EVERY.toSeconds(), TimeUnit.SECONDS);
     }
+
+    /** Seen again: looks at once whether a check is due (the ticks missed meanwhile count as one). */
+    Consumer<Boolean> listenToSeen() {
+        // Called under Seen's lock: only hands over to the worker.
+        Consumer<Boolean> l = seen -> { if (seen) worker.execute(this::checkIfDue); };
+        Seen.get().addListener(l);
+        return l;
+    }
+
+    /** One tick of the daily look, on the worker; the future completes when it's done. */
+    CompletableFuture<Void> tick() { return CompletableFuture.runAsync(this::checkIfDue, worker); }
 
     /** Hears the release to tell the person about, or null when there's none any more; on the worker's thread. */
     public void addListener(Consumer<Release> l) { listeners.add(l); }
@@ -96,7 +122,7 @@ public final class UpdateChecker {
     }
 
     private void checkIfDue() {
-        if (Settings.get().checkUpdates() && UpdatePolicy.due(lastCheck(), System.currentTimeMillis())) check();
+        if (Seen.get().now() && Settings.get().checkUpdates() && UpdatePolicy.due(lastCheck(), clock.getAsLong())) check();
     }
 
     private static long lastCheck() {
@@ -109,10 +135,10 @@ public final class UpdateChecker {
 
     private Result check() {
         Settings s = Settings.get();
-        s.set(LAST_CHECK, Long.toString(System.currentTimeMillis()));
+        s.set(LAST_CHECK, Long.toString(clock.getAsLong()));
         Result r;
         try {
-            Release latest = UpdatePolicy.parse(fetch());
+            Release latest = UpdatePolicy.parse(fetcher.fetch());
             if (latest == null) throw new IllegalStateException("no release in the answer");
             s.set(LATEST, latest.version());
             s.set(LATEST_URL, latest.url());
