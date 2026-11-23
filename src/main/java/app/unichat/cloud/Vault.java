@@ -149,7 +149,7 @@ final class Vault {
             return new Created(vk, code, computer, mine);
         } catch (IOException e) {
             throw undo(s, written, mine, e);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e) { // NOPMD: IdenticalCatchBranches, undo gives back the type it got; one catch for both would throw Exception
             throw undo(s, written, mine, e);
         } finally {
             if (!made) Arrays.fill(vk, (byte) 0);

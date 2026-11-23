@@ -33,7 +33,7 @@ final class Spaces {
     }
 
     /** How long a joined channel may take to arrive before we stop waiting to open it (tests shorten it). */
-    static long joinWaitMs = 30_000;
+    static long joinWaitMs = 30_000; // NOPMD: MutableStaticState, a seam tests swap
 
     private final ChatService svc;
     private final Consumer<Chat> onOpen;
@@ -43,7 +43,7 @@ final class Spaces {
     private final Map<Network, Long> offersAskedAt = new ConcurrentHashMap<>();
     private final Set<Network> offersInFlight = ConcurrentHashMap.newKeySet();
     /** Servers keep arriving (Discord brings them in one by one): the list to add is re-checked this often. */
-    static long offersRecheckMs = 15_000;
+    static long offersRecheckMs = 15_000; // NOPMD: MutableStaticState, a seam tests swap
     private final Set<String> adding = new HashSet<>();
     private String pendingOpen;
     private javafx.animation.PauseTransition pendingTimeout;

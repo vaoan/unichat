@@ -32,10 +32,10 @@ final class AppLog {
             if (Files.exists(log) && Files.size(log) > MAX) {
                 Files.move(log, dir.resolve("unichat.log.1"), StandardCopyOption.REPLACE_EXISTING);
             }
-            OutputStream file = open(log);
+            OutputStream file = open(log); // NOPMD: CloseResource, the log stays open while the app runs
             String header = "\n=== Unichat " + LocalDateTime.now(ZoneId.systemDefault()) + " ===\n";
             file.write(header.getBytes(StandardCharsets.UTF_8));
-            OutputStream redacted = new RedactingLines(file);
+            OutputStream redacted = new RedactingLines(file); // NOPMD: CloseResource, System.out and err write to it from now on
             System.setOut(new PrintStream(new Tee(System.out, redacted), true, StandardCharsets.UTF_8));
             System.setErr(new PrintStream(new Tee(System.err, redacted), true, StandardCharsets.UTF_8));
         } catch (IOException e) {

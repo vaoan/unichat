@@ -30,7 +30,8 @@ public final class Archives {
 
     private static boolean fromZip(Path zip, String entry, Path target) throws IOException {
         try (ZipInputStream in = new ZipInputStream(Files.newInputStream(zip))) {
-            for (ZipEntry e; (e = in.getNextEntry()) != null; ) {
+            ZipEntry e;
+            while ((e = in.getNextEntry()) != null) {
                 if (!e.isDirectory() && matches(e.getName(), entry)) {
                     copy(in, target);
                     return true;
@@ -45,9 +46,8 @@ public final class Archives {
         try (InputStream in = new BufferedInputStream(new GZIPInputStream(Files.newInputStream(tgz)))) {
             byte[] h = new byte[TAR_BLOCK];
             while (in.readNBytes(h, 0, TAR_BLOCK) == TAR_BLOCK && h[0] != 0) {
-                String name = text(h, 0, 100);
                 String prefix = text(h, 345, 155);
-                if (!prefix.isEmpty()) name = prefix + "/" + name;
+                String name = prefix.isEmpty() ? text(h, 0, 100) : prefix + "/" + text(h, 0, 100);
                 long size = Long.parseLong(text(h, 124, 12).isEmpty() ? "0" : text(h, 124, 12), 8);
                 char type = (char) h[156];
                 if ((type == '0' || type == 0) && matches(name, entry)) {

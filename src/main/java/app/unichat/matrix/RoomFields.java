@@ -14,7 +14,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static app.unichat.matrix.SyncEvents.*;
+import static app.unichat.matrix.SyncEvents.blankToNull;
+import static app.unichat.matrix.SyncEvents.cleanName;
+import static app.unichat.matrix.SyncEvents.fallbackName;
+import static app.unichat.matrix.SyncEvents.isBot;
 
 /** What a chat shows, worked out from its room's state: title, network, group or not, members. */
 final class RoomFields {

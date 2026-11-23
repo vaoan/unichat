@@ -21,7 +21,7 @@ public final class Seen {
     private boolean windows = true;
     private boolean away;
     /** {@code windows && !away}, read without the lock the listeners are called under. */
-    private volatile boolean seen = true;
+    private volatile boolean seenNow = true;
     /** What the listeners last heard, and whether they're being told now (a set from inside a listener). */
     private boolean heard = true;
     private boolean notifying;
@@ -30,7 +30,7 @@ public final class Seen {
 
     public static Seen get() { return INSTANCE; }
 
-    public boolean now() { return seen; }
+    public boolean now() { return seenNow; }
 
     public void addListener(Consumer<Boolean> l) { listeners.add(l); }
 
@@ -49,12 +49,12 @@ public final class Seen {
     private synchronized void set(Boolean someWindowShown, Boolean screenAway) {
         if (someWindowShown != null) windows = someWindowShown;
         if (screenAway != null) away = screenAway;
-        seen = windows && !away;
+        seenNow = windows && !away;
         if (notifying) return; // a listener set it: told below, once everyone heard the value at hand
-        notifying = true;
+        notifying = true; // NOPMD: UnusedAssignment, read by the listeners the change below fires
         try {
-            while (seen != heard) {
-                boolean now = seen;
+            while (seenNow != heard) {
+                boolean now = seenNow;
                 heard = now;
                 for (Consumer<Boolean> l : listeners) tell(l, now);
             }

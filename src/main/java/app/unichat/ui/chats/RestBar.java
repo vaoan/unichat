@@ -125,7 +125,11 @@ public final class RestBar extends TaskBar {
         }
         boolean upToDate = w != null && w == saying;
         Nodes.show(this, waking || upToDate);
-        if (!waking && !upToDate) return;
+        if (waking || upToDate) show(w, upToDate);
+    }
+
+    /** What {@code w} says, or that all is up to date. */
+    private void show(Waking w, boolean upToDate) {
         boolean server = !upToDate && w.step() == Step.SERVER;
         boolean counts = !upToDate && !server;
         what.setText(upToDate ? I18n.t("restBar.done") : server ? I18n.t("restBar.server", w.server())

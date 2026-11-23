@@ -13,18 +13,9 @@ import app.unichat.service.UploadQueue;
 import app.unichat.support.I18n;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
-import javafx.geometry.Pos;
 import javafx.scene.control.Button;
-import javafx.scene.control.Hyperlink;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
 import java.nio.file.Path;
@@ -116,10 +107,10 @@ public final class UploadBar extends TaskBar {
         }
         hideLater.stop();
         UploadQueue.Upload u = s.current();
-        String text = I18n.t("uploadBar.sending", s.position(), s.total());
-        if (s.sent() > 0) text += " · " + I18n.n("uploadBar.sentSoFar", s.sent());
-        if (s.failed() > 0) text += " · " + I18n.n("uploadBar.failed", s.failed());
-        what.setText(text);
+        StringBuilder text = new StringBuilder(I18n.t("uploadBar.sending", s.position(), s.total()));
+        if (s.sent() > 0) text.append(" · ").append(I18n.n("uploadBar.sentSoFar", s.sent()));
+        if (s.failed() > 0) text.append(" · ").append(I18n.n("uploadBar.failed", s.failed()));
+        what.setText(text.toString());
         detail.setText(u.file().getFileName().toString());
         Chat chat = chats.chat(u.chatId());
         String title = chat == null || chat.title() == null ? "" : chat.title();

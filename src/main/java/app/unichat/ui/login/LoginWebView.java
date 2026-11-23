@@ -62,13 +62,13 @@ public final class LoginWebView {
         volatile CookieManager store;
 
         @Override
-        public Map<String, java.util.List<String>> get(java.net.URI uri, Map<String, java.util.List<String>> headers) throws java.io.IOException {
+        public Map<String, java.util.List<String>> get(java.net.URI uri, Map<String, java.util.List<String>> headers) throws IOException {
             CookieManager s = store;
             return s == null ? Map.of() : s.get(uri, headers);
         }
 
         @Override
-        public void put(java.net.URI uri, Map<String, java.util.List<String>> headers) throws java.io.IOException {
+        public void put(java.net.URI uri, Map<String, java.util.List<String>> headers) throws IOException {
             CookieManager s = store;
             if (s != null) s.put(uri, headers);
         }

@@ -23,7 +23,7 @@ public final class CookieTxt {
         long nowSec = now.getEpochSecond();
         Map<String, String> byName = new HashMap<>();
         for (String raw : Files.readAllLines(file, StandardCharsets.UTF_8)) {
-            String line = raw.strip().isEmpty() ? "" : raw.replaceAll("[\\r\\n]+$", "");
+            String line = raw.isBlank() ? "" : raw.replaceAll("[\\r\\n]+$", "");
             if (line.isEmpty()) continue;
             if (line.startsWith(HTTP_ONLY)) line = line.substring(HTTP_ONLY.length());
             else if (line.startsWith("#")) continue;

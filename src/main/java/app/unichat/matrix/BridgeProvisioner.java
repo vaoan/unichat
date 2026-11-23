@@ -18,5 +18,5 @@ public interface BridgeProvisioner {
     default BridgeStates states() { return null; }
 
     /** The person logged out of {@code network}'s last account and its bridge confirmed it: it needn't run. */
-    default void loggedOut(Network network) { }
+    default void loggedOut(Network network) { /* nothing by default */ }
 }

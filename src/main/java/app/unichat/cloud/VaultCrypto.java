@@ -82,8 +82,8 @@ final class VaultCrypto {
     /** The same with {@code info} as bytes (one that carries keys, not only a label). */
     static byte[] hkdf(byte[] secret, byte[] info) {
         try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(new byte[KEY], "HmacSHA256"));
+            Mac mac = Mac.getInstance("HmacSHA256"); // NOPMD: HardCodedCryptoKey, see below
+            mac.init(new SecretKeySpec(new byte[KEY], "HmacSHA256")); // NOPMD: HardCodedCryptoKey, HKDF's zero salt (RFC 5869), not a key
             byte[] prk = mac.doFinal(secret);
             try {
                 mac.init(new SecretKeySpec(prk, "HmacSHA256"));

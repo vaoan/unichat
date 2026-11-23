@@ -105,7 +105,7 @@ public final class LocalServer {
 
     /** The processes that should be up: the server and the bridges meant to run. */
     private Iterable<String> watched() {
-        java.util.List<String> out = new java.util.ArrayList<>();
+        List<String> out = new ArrayList<>();
         if (supervisor.isRunning("tuwunel") || running) out.add("tuwunel");
         out.addAll(bridges.watched());
         return out;

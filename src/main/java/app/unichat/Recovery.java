@@ -129,7 +129,7 @@ final class Recovery {
             System.err.println("Recovery: " + MAX_IN_A_ROW + " restarts in a row, not starting again.");
         }
         // Ending can hang where things are broken: a shutdown hook flushes what was chosen, then it's cut short.
-        Thread end = new Thread(() -> System.exit(3), "recovery-exit");
+        Thread end = new Thread(() -> System.exit(3), "recovery-exit"); // NOPMD: DoNotTerminateVM, starting over means this JVM ends
         end.setDaemon(true);
         end.start();
         Thread halt = new Thread(() -> {
@@ -138,7 +138,7 @@ final class Recovery {
             } catch (InterruptedException ignored) {
                 // halting anyway
             }
-            Runtime.getRuntime().halt(3);
+            Runtime.getRuntime().halt(3); // NOPMD: DoNotTerminateVM, when exit itself hangs
         }, "recovery-halt");
         halt.start();
     }
@@ -157,7 +157,7 @@ final class Recovery {
                     new javax.management.ObjectName("com.sun.management:type=DiagnosticCommand"), "gcClassHistogram",
                     new Object[] {new String[0]}, new String[] {String[].class.getName()});
             String[] lines = String.valueOf(out).split("\n");
-            return "Memory: what fills it\n" + String.join("\n", java.util.Arrays.copyOf(lines, Math.min(lines.length, count + 3)));
+            return "Memory: what fills it\n" + String.join("\n", Arrays.copyOf(lines, Math.min(lines.length, count + 3)));
         } catch (Exception e) {
             return "Memory: no class histogram (" + e + ")";
         }

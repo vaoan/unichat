@@ -155,7 +155,8 @@ public final class Processes {
         try (InputStream in = p.getInputStream()) {
             ByteArrayOutputStream line = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];
-            for (int n; (n = in.read(buf)) >= 0; ) {
+            int n;
+            while ((n = in.read(buf)) >= 0) {
                 heard.set(System.nanoTime());
                 out.write(buf, 0, n);
                 if (eachLine != null) split(buf, n, line, eachLine);

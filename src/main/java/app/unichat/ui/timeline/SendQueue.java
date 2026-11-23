@@ -70,7 +70,7 @@ public final class SendQueue {
     private volatile Supplier<AiReplyButton.Writer> writers;
     private volatile Consumer<String> tell;
     private final Executor runner;
-    private final Map<String, ArrayDeque<Entry>> byChat = new HashMap<>();
+    private final Map<String, Deque<Entry>> byChat = new HashMap<>();
     /** What's ready and taken out of its queue, in the order it goes; sent outside the queue's lock, one at a time. */
     private final Deque<Entry> outbox = new ArrayDeque<>();
     private final Object sending = new Object();
@@ -132,7 +132,7 @@ public final class SendQueue {
 
     /** The texts waiting in {@code chatId}, in the order they'll go. Any thread. */
     synchronized List<Pending> waiting(String chatId) {
-        ArrayDeque<Entry> q = byChat.get(chatId);
+        Deque<Entry> q = byChat.get(chatId);
         return q == null ? List.of() : q.stream().filter(e -> e.p != null).map(e -> e.p).toList();
     }
 
@@ -154,7 +154,7 @@ public final class SendQueue {
     /** Sends with {@code send} in {@code chatId}'s turn: at once with nothing waiting, else after what's waiting. */
     void inOrder(String chatId, Runnable send) {
         synchronized (this) {
-            ArrayDeque<Entry> q = byChat.get(chatId);
+            Deque<Entry> q = byChat.get(chatId);
             if (q != null && !q.isEmpty()) {
                 q.add(new Entry(null, null, null, send));
                 return;
@@ -196,7 +196,7 @@ public final class SendQueue {
         List<Entry> stopping = new ArrayList<>();
         synchronized (this) {
             chats = new ArrayList<>(byChat.keySet());
-            for (ArrayDeque<Entry> q : byChat.values()) {
+            for (Deque<Entry> q : byChat.values()) {
                 for (Entry e : q) {
                     if (e.p != null && e.ready == null) {
                         e.ready = e.p.text();
@@ -240,7 +240,7 @@ public final class SendQueue {
      */
     private List<CompletableFuture<?>> flush(String chatId) {
         synchronized (this) {
-            ArrayDeque<Entry> q = byChat.get(chatId);
+            Deque<Entry> q = byChat.get(chatId);
             while (q != null && !q.isEmpty() && q.getFirst().isReady()) outbox.add(q.removeFirst());
         }
         changed();
@@ -303,7 +303,7 @@ public final class SendQueue {
     }
 
     private synchronized Entry find(Pending p) {
-        ArrayDeque<Entry> q = byChat.get(p.chatId());
+        Deque<Entry> q = byChat.get(p.chatId());
         if (q == null) return null;
         for (Entry e : q) if (p.equals(e.p)) return e;
         return null;

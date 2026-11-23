@@ -19,15 +19,15 @@ public interface ChatService extends ChatSession, ChatReader, MediaSource, ChatM
 
     interface Listener {
         /** Chat list membership, order or any chat field changed. */
-        default void chatsChanged() {}
+        default void chatsChanged() { /* nothing by default */ }
         /** Messages of one chat were added, changed or removed. */
-        default void messagesChanged(String chatId) {}
-        default void accountsChanged() {}
-        default void connectionChanged(ConnectionState state) {}
+        default void messagesChanged(String chatId) { /* nothing by default */ }
+        default void accountsChanged() { /* nothing by default */ }
+        default void connectionChanged(ConnectionState state) { /* nothing by default */ }
         /** A new incoming message that should produce a desktop notification (respects mute). */
-        default void incomingMessage(Chat chat, Message message) {}
+        default void incomingMessage(Chat chat, Message message) { /* nothing by default */ }
         /** A chat reminder came due. */
-        default void reminderDue(Chat chat) {}
+        default void reminderDue(Chat chat) { /* nothing by default */ }
     }
 
     /** What "Nuevo chat" can do for an account: list its contacts, search the network. */

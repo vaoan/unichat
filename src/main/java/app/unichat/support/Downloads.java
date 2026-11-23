@@ -1,6 +1,5 @@
 package app.unichat.support;
 
-import app.unichat.support.I18n;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -95,15 +94,16 @@ public final class Downloads {
         try {
             byte[] buf = new byte[1 << 16];
             long total = 0;
-            for (int n; (n = in.read(buf)) > 0; ) {
+            int n;
+            while ((n = in.read(buf)) > 0) {
                 last.set(System.nanoTime());
                 out.write(buf, 0, n);
                 total += n;
                 done.accept(total);
             }
-        } catch (IOException e) {
+        } catch (IOException e) { // NOPMD: ExceptionAsFlowControl, one failure path for a stall and a read error
             if (!stalledAndDone(lock, state, guard)) throw e;
-        } finally {
+        } finally { // NOPMD: DoNotThrowExceptionInFinally, a stall replaces whatever the interrupt threw (as Error Prone's Finally)
             if (stalledAndDone(lock, state, guard)) throw new IOException(I18n.t("download.stalled", what));
         }
     }

@@ -43,7 +43,7 @@ public final class Browser {
         void open(java.nio.file.Path file) throws Exception;
     }
 
-    static Opener opener = Browser::systemOpen;
+    static Opener opener = Browser::systemOpen; // NOPMD: MutableStaticState, a seam tests swap
 
     /**
      * Opens {@code file} with the system's app for it, through AWT's own thread (mistakes.md): called from wherever a

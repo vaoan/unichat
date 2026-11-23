@@ -60,13 +60,14 @@ public final class AiReplyButton {
     }
 
     /** Writes a draft, or null if cancelled. Tests put their own in place of the real program. */
+    @FunctionalInterface
     interface Writer {
         String write(String prompt) throws ReplyWriter.Failure;
 
         /** The same writer, allowed to search the web; the ones that can't search stay as they are. */
         default Writer searching() { return this; }
 
-        default void cancel() { }
+        default void cancel() { /* nothing by default */ }
     }
 
     /** Ajustes turns it on or off for the open window. */

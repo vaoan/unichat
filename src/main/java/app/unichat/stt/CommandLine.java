@@ -46,8 +46,9 @@ public final class CommandLine {
     public static List<String> expand(String template, Map<String, String> vars) {
         List<String> out = new ArrayList<>();
         for (String word : split(template)) {
-            for (Map.Entry<String, String> v : vars.entrySet()) word = word.replace("{" + v.getKey() + "}", v.getValue());
-            out.add(word);
+            String expanded = word;
+            for (Map.Entry<String, String> v : vars.entrySet()) expanded = expanded.replace("{" + v.getKey() + "}", v.getValue());
+            out.add(expanded);
         }
         return out;
     }

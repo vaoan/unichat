@@ -19,19 +19,19 @@ public interface ArchiveWaking {
     }
 
     /** The archive was opened ({@code true}) or left: what rests wakes, or goes back to rest. */
-    default void setArchiveOpen(boolean open) {}
+    default void setArchiveOpen(boolean open) { /* nothing by default */ }
 
     /** A chat was opened while the archive is open: an archived server, or a channel in one, brings everything again. */
-    default void archivedChatOpened(String chatId) {}
+    default void archivedChatOpened(String chatId) { /* nothing by default */ }
 
     /** The chat shown in the window: it never rests, however it was opened. */
-    default void setOpenChat(String chatId) {}
+    default void setOpenChat(String chatId) { /* nothing by default */ }
 
     /** What waking is at; null when nothing has woken in this run. */
     default Waking waking() { return null; }
 
     /** Told on any thread each time {@link #waking} changes. */
-    default void addWakingListener(Runnable listener) {}
+    default void addWakingListener(Runnable listener) { /* nothing by default */ }
 
-    default void removeWakingListener(Runnable listener) {}
+    default void removeWakingListener(Runnable listener) { /* nothing by default */ }
 }

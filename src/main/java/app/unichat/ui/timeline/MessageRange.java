@@ -29,7 +29,8 @@ final class MessageRange {
         int at = order.indexOf(id);
         if (at < 0) return;
         if (start == null && end == null) {
-            start = end = id;
+            start = id;
+            end = id;
             return;
         }
         if (start == null || end == null) { // one taken away: put back, on whichever side it falls
@@ -41,7 +42,8 @@ final class MessageRange {
         }
         int s = order.indexOf(start), e = order.indexOf(end);
         if (s < 0 || e < 0) { // its ends were deleted meanwhile: it starts again here
-            start = end = id;
+            start = id;
+            end = id;
             return;
         }
         if (at < s) start = id;
@@ -69,7 +71,8 @@ final class MessageRange {
     }
 
     void clear() {
-        start = end = null;
+        start = null;
+        end = null;
         order = List.of();
     }
 }

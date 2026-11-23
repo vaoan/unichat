@@ -28,7 +28,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import javafx.scene.shape.Rectangle;
-import java.awt.Desktop;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -134,7 +133,7 @@ public final class MessageMedia {
         return view;
     }
 
-    private void whenLoaded(String url, int px, java.util.function.Consumer<Image> show) {
+    private void whenLoaded(String url, int px, Consumer<Image> show) {
         var _ = svc.media(url, px, px).thenAcceptAsync(p -> {
             try {
                 Image img = AnimatedImage.still(p, px, px);
@@ -231,7 +230,7 @@ public final class MessageMedia {
                 });
     }
 
-    private static AnimatedImage.Frames decoded(java.nio.file.Path picture, int px) {
+    private static AnimatedImage.Frames decoded(Path picture, int px) {
         try {
             return AnimatedImage.decode(picture, px, px);
         } catch (java.io.IOException e) {
@@ -439,7 +438,7 @@ public final class MessageMedia {
         view.setFitWidth(FILE_THUMB);
         view.setFitHeight(FILE_THUMB);
         view.setSmooth(true);
-        javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle(FILE_THUMB, FILE_THUMB);
+        Rectangle clip = new Rectangle(FILE_THUMB, FILE_THUMB);
         clip.setArcWidth(16);
         clip.setArcHeight(16);
         view.setClip(clip);

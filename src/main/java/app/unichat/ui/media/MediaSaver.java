@@ -41,7 +41,7 @@ public final class MediaSaver {
                 if (err != null) throw err;
                 Files.copy(p, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 msg = I18n.t("saver.saved", target.getName());
-            } catch (Throwable e) {
+            } catch (Throwable e) { // NOPMD: ExceptionAsFlowControl, one failure path for a failed download and a failed copy
                 msg = I18n.t("saver.failed");
             }
             String text = msg;

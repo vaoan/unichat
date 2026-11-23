@@ -9,6 +9,7 @@ import java.util.function.Consumer;
  * An implementation mixin, not a role: both services get {@link ChatFolders} by handing every call to one
  * {@link FolderActions}. Callers take {@link ChatFolders}, never this.
  */
+@FunctionalInterface
 public interface FolderForwarding extends ChatFolders {
     ChatFolders folderActions();
 

@@ -105,7 +105,8 @@ public final class AnimDump {
             byte[] px = in.readNBytes(width * height * depth);
             if (px.length < width * height * depth) throw new IOException("short PAM file");
             int[] argb = new int[width * height];
-            for (int i = 0, p = 0; i < argb.length; i++, p += depth) {
+            for (int i = 0; i < argb.length; i++) {
+                int p = i * depth;
                 int a = depth == 4 ? px[p + 3] & 0xFF : 0xFF;
                 argb[i] = a << 24 | (px[p] & 0xFF) << 16 | (px[p + 1] & 0xFF) << 8 | (px[p + 2] & 0xFF);
             }

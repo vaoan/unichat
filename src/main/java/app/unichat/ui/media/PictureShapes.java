@@ -54,7 +54,7 @@ public final class PictureShapes {
 
     /** {@code url}'s picture turned out {@code shape} wide per unit of height; saved in the background. */
     public void remember(String url, double shape) {
-        if (!(shape > 0) || Double.isInfinite(shape)) return;
+        if (!(shape > 0) || Double.isInfinite(shape)) return; // NOPMD: LogicInversion, !(x > 0) is also true for NaN
         synchronized (this) {
             Double was = shapes.put(url, shape);
             if (was != null && Math.abs(was - shape) < 1e-6) return;

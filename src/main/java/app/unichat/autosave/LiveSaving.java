@@ -126,7 +126,9 @@ final class LiveSaving {
     private void endRoundIfDone() {
         if (total == 0 || done < total) return; // nothing going on, or not over yet
         if (savedInRound > 0) progress.finished(savedInRound, lastChat);
-        total = done = savedInRound = 0;
+        total = 0;
+        done = 0;
+        savedInRound = 0;
         lastChat = null;
         progress.changed(0, 0);
     }
@@ -139,7 +141,7 @@ final class LiveSaving {
             SavedFile.copyInto(saver, m, dir, file, arrived -> { });
             return null;
         } catch (IOException | RuntimeException e) {
-            return failed(name, chat, m, new Failure(AutoSave.why(e, dir, file[0]), e instanceof AutoSave.Gone), false);
+            return failed(name, chat, m, new Failure(AutoSave.why(e, dir, file[0]), e instanceof AutoSave.Gone), false); // NOPMD: AvoidInstanceofChecksInCatchClause, the same handling; whether it is gone is a flag of it
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Failure.forNow(e.toString());

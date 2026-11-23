@@ -116,7 +116,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
 
     @Override
     public void run() {
-        Memory msg = new Memory(64); // a MSG is 48 bytes on 64-bit Windows; only Windows reads it
+        Memory msg = new Memory(64); // NOPMD: CloseResource, lives as long as the loop; JNA frees it when collected. A MSG is 48 bytes on 64-bit Windows; only Windows reads it
         int got;
         while ((got = User32.LIB.GetMessageW(msg, null, 0, 0)) > 0) User32.LIB.DispatchMessageW(msg);
         try {
@@ -196,6 +196,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
     }
 
     /** LRESULT (CALLBACK *WNDPROC)(HWND, UINT, WPARAM, LPARAM): the pointer-sized ones as pointers. */
+    @FunctionalInterface
     interface WindowProc extends StdCallLibrary.StdCallCallback {
         Pointer callback(Pointer hwnd, int msg, Pointer wParam, Pointer lParam);
     }
@@ -203,6 +204,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
     /** WNDCLASSEXW. */
     @Structure.FieldOrder({"cbSize", "style", "lpfnWndProc", "cbClsExtra", "cbWndExtra", "hInstance", "hIcon",
         "hCursor", "hbrBackground", "lpszMenuName", "lpszClassName", "hIconSm"})
+    @SuppressWarnings("PMD.PublicMemberInNonPublicType") // JNA reads a Structure's public fields, by reflection
     public static final class WndClassEx extends Structure {
         public int cbSize;
         public int style;
@@ -218,6 +220,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
         public Pointer hIconSm;
     }
 
+    @SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ExcessiveParameterList"}) // JNA binds each by its Win32 name and signature
     interface User32 extends StdCallLibrary {
         User32 LIB = Native.load("user32", User32.class);
 
@@ -245,12 +248,15 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
         boolean UnregisterPowerSettingNotification(Pointer handle);
     }
 
+    @FunctionalInterface
+    @SuppressWarnings("PMD.MethodNamingConventions") // JNA binds each by its Win32 name
     interface Kernel32 extends StdCallLibrary {
         Kernel32 LIB = Native.load("kernel32", Kernel32.class);
 
         Pointer GetModuleHandleW(WString name);
     }
 
+    @SuppressWarnings("PMD.MethodNamingConventions") // JNA binds each by its Win32 name
     interface Wtsapi32 extends StdCallLibrary {
         Wtsapi32 LIB = Native.load("wtsapi32", Wtsapi32.class);
 

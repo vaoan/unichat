@@ -68,10 +68,11 @@ final class FormatMenu {
     static boolean onKey(KeyEvent e, TextArea box, RoomFeatures features) {
         for (TextFormat t : TextFormat.values()) {
             KeyCombination k = shortcut(t);
-            if (k == null || !k.match(e)) continue;
-            e.consume();
-            if (features == null || features.formats(t)) apply(box, t);
-            return true;
+            if (k != null && k.match(e)) {
+                e.consume();
+                if (features == null || features.formats(t)) apply(box, t);
+                return true;
+            }
         }
         return false;
     }

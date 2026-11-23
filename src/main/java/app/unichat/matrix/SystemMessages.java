@@ -3,7 +3,10 @@ package app.unichat.matrix;
 import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 
-import static app.unichat.matrix.SyncEvents.*;
+import static app.unichat.matrix.SyncEvents.blankToNull;
+import static app.unichat.matrix.SyncEvents.isBot;
+import static app.unichat.matrix.SyncEvents.prevContent;
+import static app.unichat.matrix.SyncEvents.text;
 
 /** The line a room's state change shows in the timeline ("Ana joined"). */
 final class SystemMessages {

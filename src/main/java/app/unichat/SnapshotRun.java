@@ -65,22 +65,26 @@ final class SnapshotRun {
                 // -Dunichat.uploadAs=PHOTO|DOCUMENT (-Dunichat.uploadAsDocument=true, as before, is DOCUMENT)
                 Boolean.getBoolean("unichat.uploadAsDocument") ? app.unichat.service.SendAs.DOCUMENT
                         : app.unichat.service.SendAs.valueOf(System.getProperty("unichat.uploadAs", "AS_IS")));
-        String overlay = System.getProperty("unichat.overlay", "");
+        showOverlay(System.getProperty("unichat.overlay", ""));
+    }
+
+    /** -Dunichat.overlay: the one sheet, window or dialog to show over the main view. */
+    private void showOverlay(String overlay) {
         if (overlay.equals("command")) mainView.showCommandBar();
-        if (overlay.equals("newchat")) mainView.showNewChat();
-        if (overlay.equals("add")) mainView.showAccounts();
-        if (overlay.startsWith("folder")) mainView.showFolderDialog(overlay.equals("folderDelete"));
-        if (overlay.equals("picker")) mainView.showAccounts().showPicker();
-        if (overlay.equals("cloak")) mainView.showProtectPhoto();
-        if (overlay.equals("chatOptions")) mainView.showChatOptions();
-        if (overlay.equals("forward") || overlay.equals("select")) mainView.showForwarding(overlay.equals("select"));
-        if (overlay.equals("delete")) mainView.showDeleting();
-        if (overlay.startsWith("savedText")) mainView.showSavedText(overlay.equals("savedText:none"));
-        if (overlay.equals("fixing")) mainView.showFixing();
-        if (overlay.equals("queue")) mainView.showQueue();
-        if (overlay.startsWith("capture")) mainView.showCapture(overlay.equals("capture:sheet"));
-        if (overlay.startsWith("login:")) mainView.addAccount(Network.fromProtocolId(overlay.substring(6)));
-        if (overlay.startsWith("settings")) {
+        else if (overlay.equals("newchat")) mainView.showNewChat();
+        else if (overlay.equals("add")) mainView.showAccounts();
+        else if (overlay.startsWith("folder")) mainView.showFolderDialog(overlay.equals("folderDelete"));
+        else if (overlay.equals("picker")) mainView.showAccounts().showPicker();
+        else if (overlay.equals("cloak")) mainView.showProtectPhoto();
+        else if (overlay.equals("chatOptions")) mainView.showChatOptions();
+        else if (overlay.equals("forward") || overlay.equals("select")) mainView.showForwarding(overlay.equals("select"));
+        else if (overlay.equals("delete")) mainView.showDeleting();
+        else if (overlay.startsWith("savedText")) mainView.showSavedText(overlay.equals("savedText:none"));
+        else if (overlay.equals("fixing")) mainView.showFixing();
+        else if (overlay.equals("queue")) mainView.showQueue();
+        else if (overlay.startsWith("capture")) mainView.showCapture(overlay.equals("capture:sheet"));
+        else if (overlay.startsWith("login:")) mainView.addAccount(Network.fromProtocolId(overlay.substring(6)));
+        else if (overlay.startsWith("settings")) {
             mainView.showSettings();
             if (overlay.contains(":")) SettingsWindow.select(overlay.substring(overlay.indexOf(':') + 1));
         }
@@ -125,7 +129,7 @@ final class SnapshotRun {
         }
         Thread guard = new Thread(() -> {
             try { Thread.sleep(4000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-            Runtime.getRuntime().halt(0);
+            Runtime.getRuntime().halt(0); // NOPMD: DoNotTerminateVM, a snapshot run ends the JVM once the picture is out
         });
         guard.setDaemon(true);
         guard.start();

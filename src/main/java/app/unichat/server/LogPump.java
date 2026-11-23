@@ -68,10 +68,10 @@ final class LogPump {
     }
 
     private void copy(Process p, Consumer<String> read, Runnable afterLine) {
-        InputStream raw = p.getInputStream();
-        BufferedReader in = new BufferedReader(new InputStreamReader(raw, StandardCharsets.UTF_8));
+        InputStream raw = p.getInputStream(); // NOPMD: CloseResource, the process's own; the JDK closes it when it exits
+        BufferedReader in = new BufferedReader(new InputStreamReader(raw, StandardCharsets.UTF_8)); // NOPMD: CloseResource, as raw
         boolean reported = false;
-        try {
+        try { // NOPMD: UseTryWithResources, the process's stream; the JDK closes it when it exits
             String line;
             while ((line = in.readLine()) != null) {
                 try {

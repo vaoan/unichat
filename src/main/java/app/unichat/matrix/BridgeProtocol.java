@@ -38,7 +38,7 @@ final class BridgeProtocol {
     private BridgeProtocol() {}
 
     /** A bot command that answers "Successfully…" on success: any other answer is the failure's message. */
-    static void requireSuccess(String reply) throws MatrixException {
+    static void requireSuccess(String reply) {
         if (!reply.startsWith("Successfully")) throw new MatrixException(0, null, reply);
     }
 

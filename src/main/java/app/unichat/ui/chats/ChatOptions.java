@@ -8,7 +8,6 @@ import app.unichat.ui.Showing;
 import app.unichat.autosave.AutoSave;
 import app.unichat.autosave.SaveFolders;
 import app.unichat.model.Chat;
-import app.unichat.model.SaveKind;
 import app.unichat.service.ChatService;
 import app.unichat.support.I18n;
 import javafx.application.Platform;
@@ -23,11 +22,7 @@ import javafx.scene.layout.VBox;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.function.Consumer;
 
 /**

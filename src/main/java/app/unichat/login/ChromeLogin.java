@@ -165,7 +165,7 @@ public final class ChromeLogin {
     public Map<String, String> run() throws IOException, InterruptedException {
         Folders.deleteQuietly(profile);
         Files.createDirectories(profile);
-        try {
+        try { // NOPMD: UseTryWithResources, the finally stops Chrome and its tab, not one stream
             int port = freePort();
             process = new ProcessBuilder(launched(command(chrome, profile, port, headless)))
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
@@ -189,7 +189,7 @@ public final class ChromeLogin {
             });
         } finally {
             // Read, cancelled, closed, out of time or failed: Chrome and its debugging port go now.
-            DevTools tab = siteTab;
+            DevTools tab = siteTab; // NOPMD: CloseResource, closed on the next line
             if (tab != null) tab.close();
             stop();
         }
@@ -231,7 +231,7 @@ public final class ChromeLogin {
             if (socket == null) pause(Duration.ofMillis(100));
         }
         if (socket == null) throw new IOException(I18n.t("login.chrome.noStart"));
-        DevTools tab = new DevTools(socket);
+        DevTools tab = new DevTools(socket); // NOPMD: CloseResource, kept as siteTab; run() closes it
         siteTab = tab;
         String agent = params.userAgent();
         if (agent != null && !agent.isBlank()) tab.call(identity(agent));
@@ -322,7 +322,7 @@ public final class ChromeLogin {
 
     /** A debugging connection, one request at a time: no events are asked for, so all that arrives is the answer. */
     private final class DevTools implements WebSocket.Listener, AutoCloseable {
-        private final StringBuilder text = new StringBuilder();
+        private final StringBuilder text = new StringBuilder(); // NOPMD: AvoidStringBufferField, one message's parts, emptied once it is whole
         private final WebSocket socket;
         private volatile CompletableFuture<String> answer = new CompletableFuture<>();
 

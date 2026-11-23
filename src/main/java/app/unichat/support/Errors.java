@@ -9,8 +9,9 @@ public final class Errors {
 
     /** Without the wrappers futures add; any other exception stays, even if it has a cause. */
     public static Throwable unwrap(Throwable t) {
-        while ((t instanceof CompletionException || t instanceof ExecutionException) && t.getCause() != null) t = t.getCause();
-        return t;
+        Throwable out = t;
+        while ((out instanceof CompletionException || out instanceof ExecutionException) && out.getCause() != null) out = out.getCause();
+        return out;
     }
 
     /** The message of {@code t} or, for exceptions that have none, its class name: never "null". */

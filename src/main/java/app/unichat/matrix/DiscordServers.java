@@ -17,7 +17,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 
-import static app.unichat.matrix.BridgeProtocol.*;
+import static app.unichat.matrix.BridgeProtocol.Login;
+import static app.unichat.matrix.BridgeProtocol.offers;
+import static app.unichat.matrix.BridgeProtocol.parseGuilds;
+import static app.unichat.matrix.BridgeProtocol.requireSuccess;
 import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** Discord servers: which are bridged, offering the rest, and archived servers bringing nothing. */
@@ -112,8 +115,8 @@ final class DiscordServers {
             if (!reply.startsWith("Set guild bridging mode")) throw new MatrixException(0, null, reply);
             if (paused) Settings.get().addToSet(PAUSED_GUILDS_KEY, guildId);
             else Settings.get().removeFromSet(PAUSED_GUILDS_KEY, guildId);
-        } catch (Exception e) {
-            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+        } catch (Exception e) { // NOPMD: ExceptionAsFlowControl, one failure path for a refusal and an error: both retried
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt(); // NOPMD: AvoidInstanceofChecksInCatchClause, the same handling; an interrupt is kept
             System.err.println("Discord server " + (paused ? "pause" : "resume") + " failed, will retry: " + e);
             synchronized (pauseRetries) {
                 // A newer choice made meanwhile stays the one to retry.

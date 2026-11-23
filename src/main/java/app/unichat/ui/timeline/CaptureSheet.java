@@ -232,7 +232,7 @@ public final class CaptureSheet {
                     toast.accept(I18n.t("capture.failed", Errors.message(err)));
                     return;
                 }
-                ClipboardContent c = new ClipboardContent();
+                var c = new ClipboardContent();
                 if (now.size() == 1) c.putImage(now.getFirst()); // pasted as a picture where one goes
                 c.putFiles(fs.stream().map(Path::toFile).toList());
                 javafx.scene.input.Clipboard.getSystemClipboard().setContent(c);

@@ -59,7 +59,7 @@ public final class SidePanel extends VBox {
         content.put(Tab.STICKERS, placeholder(I18n.t("sidePanel.stickersEmpty")));
         content.put(Tab.GIFS, placeholder(I18n.t("sidePanel.gifsEmpty")));
         content.put(Tab.FAVORITES, placeholder(I18n.t("sidePanel.favoritesEmpty")));
-        VBox.setVgrow(body, Priority.ALWAYS);
+        setVgrow(body, Priority.ALWAYS);
         getChildren().addAll(tabs, body);
         try {
             current = Tab.valueOf(Settings.get().getString("panel.tab", Tab.PROFILE.name()));

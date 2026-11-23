@@ -31,6 +31,7 @@ public final class Transcripts {
     public record Done(String text) implements State {}
     public record Failed(String error) implements State {}
 
+    @FunctionalInterface
     public interface Engine {
         String transcribe(Path audio, java.util.function.Consumer<String> status) throws Exception;
     }

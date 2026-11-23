@@ -13,6 +13,7 @@ import java.util.function.Consumer;
  */
 public final class WindowsScreen implements ScreenAway {
     /** One message to the window: its code, wParam, and the display state when it carries one. */
+    @FunctionalInterface
     interface Handler {
         void message(int msg, long wParam, int displayState);
     }

@@ -50,7 +50,7 @@ public final class FileNames {
         String tag = " [" + tag(m) + "]";
         String ext = dot > 0 ? name.substring(dot) : "";
         String saved = dot > 0 ? name.substring(0, dot) + tag + ext : name + tag;
-        return SHELL_ACTIVE.contains(ext.toLowerCase(java.util.Locale.ROOT)) ? saved + ".txt" : saved;
+        return SHELL_ACTIVE.contains(ext.toLowerCase(Locale.ROOT)) ? saved + ".txt" : saved;
     }
 
     /**

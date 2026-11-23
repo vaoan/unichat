@@ -37,13 +37,13 @@ public final class RoomFeatures {
     private final Map<String, Long> files;
     private final boolean anyFile;
     /** msgtype → MIME types offered (may hold wildcards like image/*); a type missing here takes any. */
-    private final Map<String, java.util.Set<String>> mimes;
+    private final Map<String, Set<String>> mimes;
     /** The text formats the network shows (the {@code formatting} map). */
-    private final java.util.Set<TextFormat> formats;
+    private final Set<TextFormat> formats;
 
     private RoomFeatures(boolean unrestricted, int edit, long editMaxAgeSec, int delete, long deleteMaxAgeSec, boolean deleteForMe,
                          int reply, int reaction, int reactionCount, List<String> allowedReactions, Map<String, Long> files,
-                         boolean anyFile, Map<String, java.util.Set<String>> mimes, java.util.Set<TextFormat> formats) {
+                         boolean anyFile, Map<String, Set<String>> mimes, Set<TextFormat> formats) {
         this.unrestricted = unrestricted;
         this.edit = edit;
         this.editMaxAgeSec = editMaxAgeSec;
@@ -57,17 +57,17 @@ public final class RoomFeatures {
         this.files = files == null ? Map.of() : Map.copyOf(files);
         this.anyFile = anyFile;
         this.mimes = mimes == null ? Map.of() : Map.copyOf(mimes);
-        this.formats = java.util.Set.copyOf(formats);
+        this.formats = Set.copyOf(formats);
     }
 
     public static RoomFeatures parse(JsonNode c) {
         if (c == null || c.isEmpty()) return UNKNOWN; // redacted or emptied: don't strip every option
         Map<String, Long> files = new HashMap<>();
-        Map<String, java.util.Set<String>> mimes = new HashMap<>();
+        Map<String, Set<String>> mimes = new HashMap<>();
         JsonNode file = c.path("file");
         file.fieldNames().forEachRemaining(type -> {
             JsonNode rule = file.path(type);
-            java.util.Set<String> offered = new java.util.HashSet<>();
+            Set<String> offered = new java.util.HashSet<>();
             rule.path("mime_types").fields().forEachRemaining(m -> {
                 if (m.getValue().asInt() >= 1) offered.add(m.getKey().toLowerCase(java.util.Locale.ROOT));
             });
@@ -81,7 +81,7 @@ public final class RoomFeatures {
             allowed = new ArrayList<>();
             for (JsonNode r : c.path("allowed_reactions")) allowed.add(r.asText());
         }
-        java.util.Set<TextFormat> formats = java.util.EnumSet.noneOf(TextFormat.class);
+        Set<TextFormat> formats = java.util.EnumSet.noneOf(TextFormat.class);
         for (TextFormat f : TextFormat.values()) if (c.path("formatting").path(f.feature()).asInt(0) >= 1) formats.add(f);
         return new RoomFeatures(false, c.path("edit").asInt(0), c.path("edit_max_age").asLong(0),
                 c.path("delete").asInt(0), c.path("delete_max_age").asLong(0), c.path("delete_for_me").asBoolean(false),
@@ -109,7 +109,7 @@ public final class RoomFeatures {
     public boolean acceptsMime(String type, String mime) {
         if (anyFile) return true;
         if (!accepts(type)) return false;
-        java.util.Set<String> m = mimes.get(type);
+        Set<String> m = mimes.get(type);
         if (m == null || m.isEmpty()) return true;
         String x = mime == null ? "" : mime.split(";")[0].trim().toLowerCase(java.util.Locale.ROOT);
         int slash = x.indexOf('/');
@@ -128,7 +128,7 @@ public final class RoomFeatures {
 
     public VoiceSend voiceSend() {
         if (anyFile) return new VoiceSend(OGG, true);
-        java.util.Set<String> voice = mimes.get(VOICE);
+        Set<String> voice = mimes.get(VOICE);
         if (voice != null && voice.contains(OPUS_WITH_CODEC)) return new VoiceSend(OPUS_WITH_CODEC, true);
         if (voice != null && voice.contains(OGG)) return new VoiceSend(OGG, true);
         return acceptsMime("m.audio", OGG) ? new VoiceSend(OGG, false) : null;

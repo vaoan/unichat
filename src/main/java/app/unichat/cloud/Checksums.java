@@ -30,7 +30,8 @@ final class Checksums {
             }
             MessageDigest d = MessageDigest.getInstance(SHA1.equals(kind) ? "SHA-1" : "SHA-256");
             byte[] buf = new byte[1 << 16];
-            for (int n; (n = in.read(buf)) > 0; ) d.update(buf, 0, n);
+            int n;
+            while ((n = in.read(buf)) > 0) d.update(buf, 0, n);
             return HexFormat.of().formatHex(d.digest());
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);

@@ -131,7 +131,7 @@ final class VaultParts {
         Storage personal(Storage plain) {
             return switch (state) {
                 case NONE -> plain;
-                case OPEN -> new SealedStorage(plain, () -> vk.clone(), path -> replaceable(plain, path),
+                case OPEN -> new SealedStorage(plain, vk::clone, path -> replaceable(plain, path),
                     path -> { if (damaged.contains(path)) replaced.add(path); });
                 case LOCKED, DECLINED, REMOVED, UNRECOGNIZED, MISSING -> null;
             };

@@ -37,7 +37,7 @@ public final class StickerConverter {
      * and odd sizes are padded to even, as H.264 needs. Written as {@code sticker.mp4} in a new folder under {@code dir}.
      */
     static Result toMp4(Path gif, Path dir) throws IOException {
-        java.util.List<GifFrames.Frame> frames = GifFrames.read(gif);
+        List<GifFrames.Frame> frames = GifFrames.read(gif);
         if (frames.isEmpty()) throw new IOException(I18n.t("sticker.noFrames"));
         int w = frames.get(0).image().getWidth(), h = frames.get(0).image().getHeight();
         int ew = w + (w & 1), eh = h + (h & 1);

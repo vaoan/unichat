@@ -39,8 +39,9 @@ import java.util.function.Consumer;
  * Offline demo backend: a believable multi-network inbox that lives in memory. Incoming messages,
  * typing and read receipts are simulated so every UI state can be exercised without a server.
  */
+@SuppressWarnings("PMD.TooManyMethods") // ChatService's whole interface, as the demo answers it
 public class MockChatService implements ChatService, FolderForwarding {
-    private final Map<String, app.unichat.model.LinkPreview> demoLinks = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, app.unichat.model.LinkPreview> demoLinks = new ConcurrentHashMap<>();
     static final String ME = "@me:demo.unichat";
     static final String WA_PERSONAL = "whatsapp:personal";
     static final String WA_WORK = "whatsapp:work";
@@ -185,7 +186,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         });
     }
 
-    private final List<String> channelLoads = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<String> channelLoads = new CopyOnWriteArrayList<>();
 
     @Override
     public CompletableFuture<Void> loadAllChannels(String spaceId) {
@@ -315,8 +316,7 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     /** Whether someone answers now and then what's sent (the demo's life); tests turn it off and play the others. */
     private volatile boolean autoReplies = true;
-
-    public void noAutoReplies() { autoReplies = false; }
+    public final void noAutoReplies() { autoReplies = false; }
 
     @Override
     public CompletableFuture<List<app.unichat.model.StickerPack.Ref>> stickerPacks() { return DemoStickers.packs(); }
@@ -691,7 +691,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     /** Demo pauses run at once (in the same order): tests wait for what they bring, not for them. */
     private volatile boolean noPauses;
 
-    public void skipDemoPauses() { noPauses = true; }
+    public final void skipDemoPauses() { noPauses = true; }
 
     /** {@code r} after the demo's pause of {@code ms}, or right away (queued in order) with {@link #skipDemoPauses}. */
     private void after(long ms, Runnable r) {
@@ -716,7 +716,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         List<Member> others = chat.members().stream().filter(mb -> !mb.id().equals(ME)).toList();
         if (others.isEmpty()) return;
         Member who = others.get(random.nextInt(others.size()));
-        ScheduledExecutorService s = scheduler();
+        ScheduledExecutorService s = scheduler(); // NOPMD: CloseResource, the demo's one scheduler, shut down with it
         var _ = s.schedule(() -> setTyping(chat, who, true), 1, TimeUnit.SECONDS);
         var _ = s.schedule(() -> {
             setTyping(chat, who, false);

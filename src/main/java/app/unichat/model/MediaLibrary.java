@@ -35,7 +35,7 @@ public final class MediaLibrary {
     private final List<Item> favorites = new ArrayList<>();
     private final List<Item> recents = new ArrayList<>();
     /** How often each emoji was used to react, most recent first among equals: the quick reactions are the top ones. */
-    private final java.util.LinkedHashMap<String, Integer> reactions = new java.util.LinkedHashMap<>();
+    private final java.util.SequencedMap<String, Integer> reactions = new java.util.LinkedHashMap<>();
     private final List<Runnable> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public MediaLibrary(Path file) {

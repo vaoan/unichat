@@ -137,7 +137,7 @@ public final class AnimatedImage {
     /** Parsed RIFF container: canvas size and frame layout (empty list for a still WebP). */
     record WebpLayout(int canvasWidth, int canvasHeight, List<AnimFrame> frames) {}
 
-    private static final LinkedHashMap<String, Frames> CACHE = new LinkedHashMap<>(16, 0.75f, true);
+    private static final java.util.SequencedMap<String, Frames> CACHE = new LinkedHashMap<>(16, 0.75f, true);
     private static long cachedBytes;
 
     /** What's already decoded for this file at this size, or null: shown at once, with no blank moment. */
@@ -178,7 +178,8 @@ public final class AnimatedImage {
     /** RGBA bytes as an image (straight, not premultiplied, alpha). */
     private static Image fromRgba(byte[] rgba, int w, int h) {
         int[] argb = new int[w * h];
-        for (int i = 0, b = 0; i < argb.length; i++, b += 4) {
+        for (int i = 0; i < argb.length; i++) {
+            int b = i * 4;
             argb[i] = (rgba[b + 3] & 0xFF) << 24 | (rgba[b] & 0xFF) << 16 | (rgba[b + 1] & 0xFF) << 8 | (rgba[b + 2] & 0xFF);
         }
         javafx.scene.image.WritableImage img = new javafx.scene.image.WritableImage(w, h);
@@ -281,8 +282,8 @@ public final class AnimatedImage {
      * All the frames of an animated WebP, GIF, video sticker (WebM), GIF sent as an MP4 or Lottie sticker (as the
      * animated WebP made of it once), or the one of a plain picture, whatever the file claims to be. Blocking.
      */
-    public static Frames decode(Path file, int maxW, int maxH) throws IOException {
-        file = drawable(file);
+    public static Frames decode(Path given, int maxW, int maxH) throws IOException {
+        Path file = drawable(given);
         boolean webm = app.unichat.support.ImageHeaders.isVideo(file), webp = !webm && isWebp(file), gif = !webm && !webp && isGif(file);
         if (!webm && !webp && !gif) return decodePlain(file, maxW, maxH);
         Frames hit = decoded(file, maxW, maxH);
@@ -302,8 +303,8 @@ public final class AnimatedImage {
      * A still picture of {@code file} fitting {@code maxW}x{@code maxH}: a GIF shows its first frame (never JavaFX's
      * own animation, which leaks). For thumbnails and avatars; blocking, call off the FX thread.
      */
-    public static Image still(Path file, int maxW, int maxH) throws IOException {
-        file = drawable(file);
+    public static Image still(Path given, int maxW, int maxH) throws IOException {
+        Path file = drawable(given);
         if (app.unichat.support.ImageHeaders.isVideo(file)) return video(file, maxW, maxH, 1).images().getFirst();
         if (isBigWebp(file) || tooBigToDecode(file)) return new Image(shrunk(file).toUri().toString(), maxW, maxH, true, true, false);
         if (isGif(file) || isWebp(file)) { // JavaFX can't read WebP; ImageIO can (TwelveMonkeys), its first frame if animated
@@ -366,8 +367,9 @@ public final class AnimatedImage {
         if (wh == null) return false;
         long pixels = (long) wh[0] * wh[1];
         if (!webpAnimated(file)) return pixels > MAX_WEBP_PIXELS;
-        if (pixels <= MAX_ANIMATION_PIXELS / MAX_FRAMES) return false; // a sticker: no need to count
-        return pixels * parseLayout(Files.readAllBytes(file)).frames().size() > MAX_ANIMATION_PIXELS;
+        // A sticker (few pixels) needs no counting of its frames.
+        return pixels > MAX_ANIMATION_PIXELS / MAX_FRAMES
+                && pixels * parseLayout(Files.readAllBytes(file)).frames().size() > MAX_ANIMATION_PIXELS;
     }
 
     /** Width and height from a WebP's first chunk (VP8X, VP8 or VP8L), or null if it isn't one. */

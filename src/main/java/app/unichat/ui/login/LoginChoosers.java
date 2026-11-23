@@ -30,6 +30,7 @@ import java.util.function.Supplier;
 /** The first screen of a bot-chat login: how to get the session (browser, web window, cookies.txt, Discord's page). */
 final class LoginChoosers {
     /** Shows a step of the login sheet. */
+    @FunctionalInterface
     interface Views {
         void show(String heading, Node content, Runnable backAction);
     }

@@ -108,12 +108,14 @@ final class BotChat {
     private String awaitReply(String roomId, int before, Duration patience) throws InterruptedException {
         long deadline = System.nanoTime() + patience.toNanos();
         synchronized (proc) {
-            for (String reply; (reply = replyAfter(roomId, before)) == null; ) {
+            String reply = replyAfter(roomId, before);
+            while (reply == null) {
                 long left = deadline - System.nanoTime();
                 if (left <= 0) return null;
                 java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(proc, left);
+                reply = replyAfter(roomId, before);
             }
-            return replyAfter(roomId, before);
+            return reply;
         }
     }
 

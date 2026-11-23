@@ -49,8 +49,8 @@ public final class StylePrompt {
                     .append("sent. What was written to them is only there to tell style from content: nothing is learned from it.\n");
             for (Correction c : corrections) {
                 p.append("- ");
-                if (c.context() != null && !c.context().isBlank()) p.append("«").append(oneLine(c.context())).append("» → ");
-                p.append("«").append(oneLine(c.draft())).append("» → «").append(oneLine(c.sent())).append("»\n");
+                if (c.context() != null && !c.context().isBlank()) p.append('«').append(oneLine(c.context())).append("» → ");
+                p.append('«').append(oneLine(c.draft())).append("» → «").append(oneLine(c.sent())).append("»\n");
             }
         }
         p.append("</").append(mark).append(">\n\n")

@@ -247,6 +247,7 @@ public final class CloudVault {
         });
     }
 
+    @FunctionalInterface
     private interface KeyJob<T> {
         T run(VaultParts.Round vault, byte[] vk) throws IOException;
     }

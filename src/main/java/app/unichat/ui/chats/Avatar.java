@@ -50,7 +50,7 @@ public final class Avatar extends StackPane {
         badge.setAlignment(Pos.CENTER);
         badge.setStyle("-fx-font-size: " + Math.round(b * 0.55) + "px;");
         badge.setVisible(false);
-        StackPane.setAlignment(badge, Pos.BOTTOM_RIGHT);
+        setAlignment(badge, Pos.BOTTOM_RIGHT);
         badge.setTranslateX(b * 0.2);
         badge.setTranslateY(b * 0.2);
         getChildren().addAll(initials, image, badge);

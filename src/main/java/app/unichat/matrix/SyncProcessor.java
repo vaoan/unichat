@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
-import static app.unichat.matrix.SyncEvents.*;
+import static app.unichat.matrix.SyncEvents.*; // NOPMD: OnDemandImport, SyncEvents holds this class's own JSON helpers, split off for size
 
 /**
  * Turns Matrix /sync and /messages JSON into live {@link Chat} and {@link Message} objects.
@@ -148,10 +148,7 @@ final class SyncProcessor {
         room.invite = false;
         r.chatsChanged = true;
 
-        JsonNode summary = j.path("summary");
-        if (summary.has("m.heroes")) room.heroes = strings(summary.get("m.heroes"));
-        if (summary.has("m.joined_member_count")) room.joinedCount = summary.get("m.joined_member_count").asInt();
-        if (summary.has("m.invited_member_count")) room.invitedCount = summary.get("m.invited_member_count").asInt();
+        applySummary(room, j.path("summary"));
 
         for (JsonNode ev : j.path("state").path("events")) applyState(room, ev);
 
@@ -168,9 +165,7 @@ final class SyncProcessor {
         for (JsonNode ev : j.path("ephemeral").path("events")) applyEphemeral(room, ev, r);
         for (JsonNode ev : j.path("account_data").path("events")) applyRoomAccountData(room, ev);
 
-        JsonNode un = j.path("unread_notifications");
-        if (un.has("notification_count")) room.chat.setUnreadCount(un.get("notification_count").asInt());
-        if (un.has("highlight_count")) room.chat.setMentionCount(un.get("highlight_count").asInt());
+        applyUnread(room, j.path("unread_notifications"));
 
         fields.refresh(room);
     }
@@ -571,7 +566,7 @@ final class SyncProcessor {
             return;
         }
         Message m = room.byId.get(targetId);
-        if (m != null && m.outgoing() && m.status() == app.unichat.model.MessageStatus.FAILED) {
+        if (m != null && m.outgoing() && m.status() == MessageStatus.FAILED) {
             // One of ours that never got through, redacted because it went again: it leaves, no "deleted" in its place.
             room.byId.remove(targetId);
             room.timeline.remove(m);
@@ -594,7 +589,7 @@ final class SyncProcessor {
         String type = text(ev, "type");
         JsonNode c = ev.path("content");
         if ("m.typing".equals(type)) {
-            Set<String> typing = new java.util.LinkedHashSet<>();
+            Set<String> typing = new LinkedHashSet<>();
             for (JsonNode u : c.path("user_ids")) {
                 String uid = u.asText();
                 if (!uid.equals(me)) typing.add(fields.nameOf(room, uid));
@@ -639,8 +634,8 @@ final class SyncProcessor {
     private void applyRoomAccountData(MatrixRoom room, JsonNode ev) {
         String type = text(ev, "type");
         JsonNode c = ev.path("content");
-        Chat chat = room.chat;
         if (type == null) return;
+        Chat chat = room.chat;
         switch (type) {
             case "m.tag" -> {
                 room.serverTags = new HashSet<>();

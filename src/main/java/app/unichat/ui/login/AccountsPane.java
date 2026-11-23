@@ -75,7 +75,7 @@ public final class AccountsPane extends VBox {
         HBox.setHgrow(grow, Priority.ALWAYS);
         HBox head = new HBox(6, back, title, grow);
         head.setAlignment(Pos.CENTER_LEFT);
-        VBox.setVgrow(body, Priority.ALWAYS);
+        setVgrow(body, Priority.ALWAYS);
         getChildren().addAll(head, body);
         showList();
     }
@@ -126,7 +126,7 @@ public final class AccountsPane extends VBox {
         ScrollPane scroll = new ScrollPane(rows);
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("sheet-scroll");
-        VBox.setVgrow(scroll, Priority.ALWAYS);
+        setVgrow(scroll, Priority.ALWAYS);
         Label sub = new Label(I18n.n("accounts.count", accounts.size()));
         sub.getStyleClass().add("sheet-subtitle");
         VBox content = new VBox(12, sub, scroll, add);
@@ -150,7 +150,7 @@ public final class AccountsPane extends VBox {
             // Discord bridges no server by default: choosing them is part of connecting Discord.
             Button servers = new Button(I18n.t("accounts.servers"));
             servers.getStyleClass().add("secondary-button");
-            servers.setMinWidth(Region.USE_PREF_SIZE);
+            servers.setMinWidth(USE_PREF_SIZE);
             servers.setAccessibleText(I18n.t("accounts.serversA11y"));
             servers.setOnAction(e -> showDiscordServers(m));
             row.getChildren().add(2, servers);
@@ -159,7 +159,7 @@ public final class AccountsPane extends VBox {
             // Telegram lists your chats only once, at login: this goes through the list again.
             Button sync = new Button(I18n.t("accounts.syncChats"));
             sync.getStyleClass().add("secondary-button");
-            sync.setMinWidth(Region.USE_PREF_SIZE);
+            sync.setMinWidth(USE_PREF_SIZE);
             sync.setAccessibleText(I18n.t("accounts.syncChatsA11y"));
             sync.setOnAction(e -> {
                 sync.setDisable(true);
@@ -183,12 +183,11 @@ public final class AccountsPane extends VBox {
     }
 
     private ContextMenu accountMenu(Account a) {
-        ContextMenu m = new ContextMenu(
+        return new ContextMenu(
                 ChatMenus.item(I18n.t("accounts.rename"), () -> showRename(a)),
                 ChatMenus.item(I18n.t("accounts.addAnotherOf", a.network().displayName()), () -> startLogin(a.network())),
                 new SeparatorMenuItem(),
                 ChatMenus.danger(ChatMenus.item(I18n.t("accounts.disconnectMenu"), () -> showDisconnect(a))));
-        return m;
     }
 
     /** Disconnecting logs the account out on the bridge, so it always asks first. */
@@ -256,7 +255,7 @@ public final class AccountsPane extends VBox {
             if (count > 0) {
                 Label c = new Label(I18n.n("accounts.connectedCount", count));
                 c.getStyleClass().addAll("status-pill", "ok");
-                c.setMinWidth(Region.USE_PREF_SIZE);
+                c.setMinWidth(USE_PREF_SIZE);
                 row.getChildren().add(c);
             }
             row.getChildren().add(Icons.icon(Icons.BACK, 14));
@@ -275,15 +274,15 @@ public final class AccountsPane extends VBox {
         ScrollPane scroll = new ScrollPane(rows);
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("sheet-scroll");
-        VBox.setVgrow(scroll, Priority.ALWAYS);
+        setVgrow(scroll, Priority.ALWAYS);
         Label sub = new Label(I18n.t("accounts.pickNetwork"));
         sub.setWrapText(true);
         sub.getStyleClass().add("sheet-subtitle");
-        sub.setMinHeight(Region.USE_PREF_SIZE);
+        sub.setMinHeight(USE_PREF_SIZE);
         // Unofficial bridges: said once, calmly, before the person picks a network (the same text is in Acerca de).
         Label risk = Labels.help(I18n.t("accounts.riskNotice"));
         risk.getStyleClass().add("risk-notice");
-        risk.setMinHeight(Region.USE_PREF_SIZE);
+        risk.setMinHeight(USE_PREF_SIZE);
         setView(I18n.t("accounts.add"), new VBox(12, sub, risk, scroll), this::showList);
     }
 
@@ -372,7 +371,7 @@ public final class AccountsPane extends VBox {
             case NOT_AVAILABLE -> I18n.t("accounts.status.unavailable");
         });
         l.getStyleClass().addAll("status-pill", s == AccountStatus.CONNECTED ? "ok" : "warn");
-        l.setMinWidth(Region.USE_PREF_SIZE);
+        l.setMinWidth(USE_PREF_SIZE);
         return l;
     }
 }

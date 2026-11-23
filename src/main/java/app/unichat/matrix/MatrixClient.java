@@ -67,12 +67,12 @@ final class MatrixClient {
     }
 
     /** Sends a JSON request; {@code path} starts with {@code /_matrix/...}. Throws {@link MatrixException} on non-2xx. */
-    JsonNode request(String method, String path, Object body, Duration timeout) throws IOException {
+    JsonNode request(String method, String path, Object given, Duration timeout) throws IOException {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(baseUrl + path))
                 .timeout(timeout)
                 .header("Accept", "application/json");
         if (accessToken != null) b.header("Authorization", "Bearer " + accessToken);
-        if (body == null && (method.equals("POST") || method.equals("PUT"))) body = JSON.createObjectNode();
+        Object body = given == null && (method.equals("POST") || method.equals("PUT")) ? JSON.createObjectNode() : given;
         if (body != null) {
             b.header("Content-Type", "application/json");
             b.method(method, HttpRequest.BodyPublishers.ofByteArray(JSON.writeValueAsBytes(body)));
@@ -143,7 +143,8 @@ final class MatrixClient {
             byte[] buf = new byte[64 * 1024];
             long got = 0;
             int told = -1;
-            for (int n; (n = in.read(buf)) > 0; ) {
+            int n;
+            while ((n = in.read(buf)) > 0) {
                 out.write(buf, 0, n);
                 got += n;
                 int percent = (int) Math.min(100, got * 100 / size);
@@ -156,7 +157,7 @@ final class MatrixClient {
     }
 
     private <T> HttpResponse<T> send(HttpRequest req, HttpResponse.BodyHandler<T> handler) throws IOException {
-        HttpClient c = http;
+        HttpClient c = http; // NOPMD: CloseResource, the client's own, for its whole life
         try {
             return c.send(req, handler);
         } catch (IOException e) {
@@ -170,7 +171,7 @@ final class MatrixClient {
             throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new InterruptedIOException("interrupted");
+            throw new InterruptedIOException("interrupted"); // NOPMD: PreserveStackTrace, an interrupt has no trace worth keeping; a cause would be what LoginTexts.rootMessage shows
         }
     }
 

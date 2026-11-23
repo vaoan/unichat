@@ -47,6 +47,7 @@ public final class CloakTool {
     private static final long PACKAGES_SECONDS = 45 * 60;
 
     /** Where installing is at: a text key ({@code cloak.install.*}) and 0..1, or -1 when it can't tell. */
+    @FunctionalInterface
     public interface Progress {
         void at(String stepKey, double fraction);
     }

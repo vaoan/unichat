@@ -202,10 +202,10 @@ public final class WebDav implements Storage {
     private URI uri(String path) {
         StringBuilder u = new StringBuilder(base).append('/');
         String[] parts = path.split("/");
-        for (int i = 0; i < parts.length; i++) {
-            if (parts[i].isEmpty()) continue;
+        for (String part : parts) {
+            if (part.isEmpty()) continue;
             if (u.charAt(u.length() - 1) != '/') u.append('/');
-            u.append(Urls.enc(parts[i]));
+            u.append(Urls.enc(part));
         }
         return URI.create(u.toString());
     }

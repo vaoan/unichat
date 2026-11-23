@@ -69,7 +69,7 @@ public final class TelegramKeysForm extends VBox {
 
     private static Label help(String text) {
         Label l = Labels.help(text);
-        l.setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+        l.setMinHeight(USE_PREF_SIZE);
         return l;
     }
 }

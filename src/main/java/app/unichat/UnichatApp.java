@@ -137,6 +137,11 @@ public final class UnichatApp extends Application {
             stage.setOpacity(0);
             stage.setX(-10000);
         }
+        showStage();
+    }
+
+    /** The window shown, then what follows it: the login asked for, the snapshot, the update check, the passkey probe. */
+    private void showStage() {
         // A menu bar app isn't made active by opening: the window would open behind the others. Diagnostics never take focus.
         if (System.getProperty("unichat.snapshot") == null) DockIcon.show();
         stage.show();
@@ -165,7 +170,7 @@ public final class UnichatApp extends Application {
     private void showLogin() {
         if (mainView != null) mainView.dispose();
         mainView = null;
-        scene.setRoot(new LoginView(svc -> showMain(svc), () -> {
+        scene.setRoot(new LoginView(this::showMain, () -> {
             Settings.get().setBackend("demo");
             showMain(demoService());
         }, Browser::open));
@@ -232,7 +237,7 @@ public final class UnichatApp extends Application {
         });
         mainView = new MainView(svc, stage, notifier, this::logout, Browser::open);
         // Never in the demo (its made-up chats would reach the person's account), but for a snapshot of Ajustes → Nube.
-        if (!(svc instanceof app.unichat.service.MockChatService) || System.getProperty("unichat.snapshot") != null) {
+        if (!(svc instanceof MockChatService) || System.getProperty("unichat.snapshot") != null) {
             cloud = app.unichat.cloud.Cloud.create(Settings.dataDir(), svc::preferencesJson, svc::adoptPreferences,
                     () -> Platform.runLater(() -> { if (mainView != null) mainView.settingsSynced(); }),
                     () -> app.unichat.autosave.AutoSave.of(svc).folders(),
@@ -415,7 +420,7 @@ public final class UnichatApp extends Application {
             // Exit off the FX thread: System.exit on it can deadlock with AWT's shutdown on macOS.
             Shutdown.stopThenEnd(stops, () -> {
                 Platform.exit();
-                System.exit(0);
+                System.exit(0); // NOPMD: DoNotTerminateVM, quitting the app
             });
         });
     }

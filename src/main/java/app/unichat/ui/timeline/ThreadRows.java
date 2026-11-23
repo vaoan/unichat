@@ -79,7 +79,7 @@ public final class ThreadRows {
         if (a == null || b == null) return false;
         if (a.type() == MessageType.SYSTEM || b.type() == MessageType.SYSTEM) return false;
         if (!a.senderId().equals(b.senderId())) return false;
-        if (!a.timestamp().atZone(zone).toLocalDate().equals(b.timestamp().atZone(zone).toLocalDate())) return false;
-        return Duration.between(a.timestamp(), b.timestamp()).abs().compareTo(GROUP_GAP) <= 0;
+        return a.timestamp().atZone(zone).toLocalDate().equals(b.timestamp().atZone(zone).toLocalDate())
+                && Duration.between(a.timestamp(), b.timestamp()).abs().compareTo(GROUP_GAP) <= 0;
     }
 }

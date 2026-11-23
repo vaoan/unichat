@@ -18,11 +18,12 @@ public final class StyleLearner {
     private static final Duration TIMEOUT = Duration.ofMinutes(2);
 
     /** The AI program; tests use their own. */
+    @FunctionalInterface
     public interface Program {
         String write(String prompt) throws ReplyWriter.Failure;
 
         /** The draft was cancelled: stop learning too. */
-        default void cancel() { }
+        default void cancel() { /* nothing by default */ }
     }
 
     /** One learning at a time: they all share the file. Not the file's own lock, which the AI call would hold for minutes. */

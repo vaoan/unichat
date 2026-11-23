@@ -71,7 +71,7 @@ public final class BridgeConfig {
         if (s.statusEndpoint() != null) set(c, "/homeserver/status_endpoint", s.statusEndpoint());
         else obj(c, "/homeserver").putNull("status_endpoint");
         set(c, "/appservice/address", "http://127.0.0.1:" + s.port());
-        set(c, "/appservice/hostname", "127.0.0.1");
+        set(c, "/appservice/hostname", "127.0.0.1"); // NOPMD: AvoidUsingHardCodedIP, the bridge listens on the loopback only
         obj(c, "/appservice").put("port", s.port());
         set(c, "/appservice/id", b);
         set(c, "/appservice/bot/username", b + "bot");
@@ -161,7 +161,7 @@ public final class BridgeConfig {
      */
     static boolean setExisting(ObjectNode root, String path, int value) {
         int slash = path.lastIndexOf('/');
-        com.fasterxml.jackson.databind.JsonNode parent = root.at(path.substring(0, slash));
+        JsonNode parent = root.at(path.substring(0, slash));
         String key = path.substring(slash + 1);
         if (!(parent instanceof ObjectNode o) || !o.has(key)) {
             System.err.println("Bridge config key not found, left as is: " + path);

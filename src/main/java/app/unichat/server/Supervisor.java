@@ -96,11 +96,11 @@ public final class Supervisor {
          * A line of {@code name}'s output was handed to its log. Only an urgent one (warn, error, fatal, or not JSON) is
          * on disk by now; the others wait in the buffer for the next flush.
          */
-        default void logged(String name) {}
+        default void logged(String name) { /* nothing by default */ }
         /** {@code name}'s process ended; {@code restarting} says whether a restart was scheduled for it. */
-        default void exited(String name, boolean restarting) {}
+        default void exited(String name, boolean restarting) { /* nothing by default */ }
         /** {@code name} was started again after an exit. */
-        default void restarted(String name) {}
+        default void restarted(String name) { /* nothing by default */ }
     }
 
     private volatile Listener listener = new Listener() { };

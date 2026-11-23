@@ -33,7 +33,7 @@ final class VaultNames {
      * Tests: each runs once, on the migrating thread holding what it holds: right before {@link Vault#INFO} is written
      * (every file and slot copied), and right after the old one is deleted (before the old files go).
      */
-    static volatile Runnable beforeSwitch, afterSwitch;
+    static volatile Runnable beforeSwitch, afterSwitch; // NOPMD: MutableStaticState, a seam tests swap
 
     private VaultNames() {}
 

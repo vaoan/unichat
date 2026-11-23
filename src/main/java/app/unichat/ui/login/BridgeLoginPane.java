@@ -35,7 +35,6 @@ import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -95,7 +94,7 @@ final class BridgeLoginPane extends StackPane {
             List<LoginCopy.Choice> choices = LoginCopy.choices(network, api.flows());
             Platform.runLater(() -> {
                 if (closed) return;
-                if (choices.isEmpty()) error(I18n.t("login.pane.noFlows"), null);
+                if (choices.isEmpty()) error(I18n.t("login.pane.noFlows"), null); // NOPMD: GuardLogStatement, error() shows it on screen; no logger
                 else if (choices.size() == 1) begin(choices.get(0).flow()); // nothing to choose: straight in
                 else showChoices(choices);
             });
@@ -201,7 +200,7 @@ final class BridgeLoginPane extends StackPane {
             qr.setAccessibleText(I18n.t("login.wizard.qrA11y", network.displayName()));
             StackPane boxed = new StackPane(qr);
             boxed.getStyleClass().add("qr-box");
-            boxed.setMaxWidth(Region.USE_PREF_SIZE);
+            boxed.setMaxWidth(USE_PREF_SIZE);
             Label renew = new Label(I18n.t("login.pane.qrRenews"));
             renew.getStyleClass().add("settings-help");
             shown = new VBox(8, boxed, renew);
@@ -239,27 +238,7 @@ final class BridgeLoginPane extends StackPane {
         for (BridgeLogin.Field f : s.fields()) {
             Label l = new Label(f.optional() ? I18n.t("login.field.optional", LoginCopy.fieldLabel(f)) : LoginCopy.fieldLabel(f));
             l.getStyleClass().add("settings-label");
-            Node input;
-            if ("select".equals(f.type()) && !f.options().isEmpty()) {
-                ComboBox<String> cb = new ComboBox<>();
-                cb.getItems().setAll(f.options());
-                cb.setValue(f.defaultValue() != null ? f.defaultValue() : f.options().get(0));
-                cb.setAccessibleText(LoginCopy.fieldLabel(f));
-                input = cb;
-            } else {
-                TextInputControl t = "password".equals(f.type()) ? new PasswordField() : new TextField();
-                t.getStyleClass().add("login-field");
-                if ("2fa_code".equals(f.type())) t.getStyleClass().add("login-code-input");
-                if (f.defaultValue() != null) t.setText(f.defaultValue());
-                t.setPromptText(switch (f.type()) {
-                    case "phone_number" -> "+57 300 123 4567";
-                    case "2fa_code" -> sampleDigits(f.pattern());
-                    case "email" -> I18n.t("login.field.emailExample");
-                    default -> "";
-                });
-                t.setAccessibleText(LoginCopy.fieldLabel(f));
-                input = t;
-            }
+            Node input = input(f);
             inputs.put(f, input);
             box.getChildren().addAll(l, input);
             if (f.description() != null && !f.description().isBlank() && "select".equals(f.type())) {
@@ -296,6 +275,29 @@ final class BridgeLoginPane extends StackPane {
         box.getChildren().addAll(problem, next);
         inputs.values().stream().findFirst().ifPresent(n -> Platform.runLater(((Node) n)::requestFocus));
         return box;
+    }
+
+    /** Where field {@code f} is answered: a list to choose from, or a box to type in. */
+    private static Node input(BridgeLogin.Field f) {
+        if ("select".equals(f.type()) && !f.options().isEmpty()) {
+            ComboBox<String> cb = new ComboBox<>();
+            cb.getItems().setAll(f.options());
+            cb.setValue(f.defaultValue() != null ? f.defaultValue() : f.options().get(0));
+            cb.setAccessibleText(LoginCopy.fieldLabel(f));
+            return cb;
+        }
+        TextInputControl t = "password".equals(f.type()) ? new PasswordField() : new TextField();
+        t.getStyleClass().add("login-field");
+        if ("2fa_code".equals(f.type())) t.getStyleClass().add("login-code-input");
+        if (f.defaultValue() != null) t.setText(f.defaultValue());
+        t.setPromptText(switch (f.type()) {
+            case "phone_number" -> "+57 300 123 4567";
+            case "2fa_code" -> sampleDigits(f.pattern());
+            case "email" -> I18n.t("login.field.emailExample");
+            default -> "";
+        });
+        t.setAccessibleText(LoginCopy.fieldLabel(f));
+        return t;
     }
 
     /** "1234" for a pattern like ^[0-9]{4}$, else "123456" (the usual code length). */
@@ -387,7 +389,7 @@ final class BridgeLoginPane extends StackPane {
         cancel.setOnAction(e -> login.cancel());
         show(new VBox(10, new HBox(8, spinner(16), wait), cancel));
         background(() -> {
-            java.util.Map<String, String> values;
+            Map<String, String> values;
             try {
                 values = login.run();
             } catch (InterruptedException e) {

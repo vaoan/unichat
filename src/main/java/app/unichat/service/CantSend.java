@@ -13,4 +13,8 @@ public final class CantSend extends IOException {
     public CantSend(String why) {
         super(why);
     }
+
+    public CantSend(String why, Throwable cause) {
+        super(why, cause);
+    }
 }

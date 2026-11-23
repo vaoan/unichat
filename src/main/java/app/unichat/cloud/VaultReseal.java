@@ -36,6 +36,7 @@ final class VaultReseal {
     }
 
     /** One file of the vault, by where it's kept. */
+    @FunctionalInterface
     interface Visit {
         void file(String stored) throws IOException;
     }

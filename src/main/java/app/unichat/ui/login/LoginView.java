@@ -88,13 +88,13 @@ public final class LoginView extends StackPane {
         Hyperlink help = helpLink(openLink);
 
         StackPane loginRow = new StackPane(login, spin);
-        StackPane.setAlignment(spin, Pos.CENTER_RIGHT);
+        setAlignment(spin, Pos.CENTER_RIGHT);
         VBox card = new VBox(12, logo, title, sub);
         if (local != null) card.getChildren().addAll(useLocal, localStatus, new Label(I18n.t("login.orOwnServer")));
         card.getChildren().addAll(server, user, pass, error, loginRow, new Label(I18n.t("login.or")), demo, help);
         card.setAlignment(Pos.CENTER);
         card.getStyleClass().addAll("login-card", "card");
-        card.setMaxSize(420, VBox.USE_PREF_SIZE);
+        card.setMaxSize(420, USE_PREF_SIZE);
         getChildren().add(card);
     }
 

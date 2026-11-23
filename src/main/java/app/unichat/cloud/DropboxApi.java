@@ -246,7 +246,7 @@ public final class DropboxApi implements Storage {
     private <T> HttpResponse<T> authorized(HttpRequest.Builder b, HttpResponse.BodyHandler<T> handler) throws IOException {
         HttpResponse<T> r = send(b, handler, token(false));
         if (r.statusCode() != 401) return r;
-        if (r.body() instanceof InputStream unread) unread.close();
+        if (r.body() instanceof InputStream unread) unread.close(); // NOPMD: CloseResource, closed right here
         return send(b, handler, token(true));
     }
 

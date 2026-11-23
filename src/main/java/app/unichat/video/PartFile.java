@@ -19,11 +19,13 @@ final class PartFile {
     static final Path SIPS = Path.of("/usr/bin/sips");
 
     /** One way to make it: the command that writes {@code into}; null when this way isn't there (no ffmpeg). */
+    @FunctionalInterface
     interface Way {
         List<String> command(Path into) throws IOException, InterruptedException;
     }
 
     /** An ffmpeg command writing {@code into}. */
+    @FunctionalInterface
     interface WithFfmpeg {
         List<String> command(Path ffmpeg, Path into) throws IOException;
     }

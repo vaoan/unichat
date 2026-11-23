@@ -46,8 +46,8 @@ final class DemoMedia {
         Graphics2D g = img.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         int seed = Math.abs(name.hashCode());
-        Color a = Color.getHSBColor((seed % 360) / 360f, 0.55f, 0.95f);
-        Color b = Color.getHSBColor(((seed / 7) % 360) / 360f, 0.65f, 0.55f);
+        Color a = Color.getHSBColor(seed % 360 / 360f, 0.55f, 0.95f);
+        Color b = Color.getHSBColor(seed / 7 % 360 / 360f, 0.65f, 0.55f);
         g.setPaint(new GradientPaint(0, 0, a, w, h, b));
         g.fillRect(0, 0, w, h);
         g.setColor(new Color(255, 255, 255, 60));

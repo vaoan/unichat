@@ -65,7 +65,7 @@ public final class SendablePhotos {
     }
 
     static List<String> ffmpeg(Path ffmpeg, Path in, Path out) throws IOException {
-        List<String> c = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error"));
+        List<String> c = new ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error"));
         c.addAll(Ffmpeg.input(in)); // the person's own, but it may have been downloaded from anywhere
         c.addAll(List.of("-vf", "scale='min(" + SIDE + ",iw)':'min(" + SIDE + ",ih)':force_original_aspect_ratio=decrease",
                 "-q:v", "3", "-frames:v", "1", out.toString()));

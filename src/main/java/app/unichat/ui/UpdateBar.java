@@ -12,7 +12,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.util.Objects;
@@ -34,7 +33,7 @@ final class UpdateBar extends VBox {
         this.openLink = openLink;
         getStyleClass().add("account-alerts");
         setAccessibleRole(AccessibleRole.TEXT);
-        setMinHeight(Region.USE_PREF_SIZE);
+        setMinHeight(USE_PREF_SIZE);
         Nodes.show(this, false);
         checker.addListener(listener);
         show(checker.pending());
@@ -57,16 +56,16 @@ final class UpdateBar extends VBox {
         Label line = new Label(text);
         line.setWrapText(true);
         line.setMinWidth(0);
-        line.setMinHeight(Region.USE_PREF_SIZE);
+        line.setMinHeight(USE_PREF_SIZE);
         line.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(line, Priority.ALWAYS);
         Button download = new Button(I18n.t("update.download"));
         download.getStyleClass().add("alert-action");
-        download.setMinWidth(Region.USE_PREF_SIZE);
+        download.setMinWidth(USE_PREF_SIZE);
         download.setAccessibleText(I18n.t("update.downloadA11y", r.shown()));
         download.setOnAction(e -> openLink.accept(r.url()));
         Button later = Icons.iconButton(Icons.CLOSE, I18n.t("update.dismiss", r.shown()), () -> checker.dismiss(r));
-        later.setMinWidth(Region.USE_PREF_SIZE);
+        later.setMinWidth(USE_PREF_SIZE);
         HBox row = new HBox(8, Icons.icon(Icons.DOWNLOAD, 16), line, download, later);
         row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().addAll("account-alert", "update");

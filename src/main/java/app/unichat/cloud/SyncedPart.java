@@ -99,7 +99,7 @@ final class SyncedPart {
         if (!path.equals(remotePath)) return false;
         Bundle b = Bundle.parse(plain);
         String base = Settings.get().getString(baseKey, null);
-        return b != null && base != null && b.hash().equals(base);
+        return b != null && base != null && base.equals(b.hash());
     }
 
     /**

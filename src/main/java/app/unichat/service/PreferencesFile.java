@@ -392,16 +392,16 @@ public final class PreferencesFile {
     }
 
     /** What the chat with this key saves of what it receives ({@code mine}: of what I send); empty when nothing. */
-    public synchronized java.util.Set<app.unichat.model.SaveKind> saveKinds(String key, boolean mine) {
+    public synchronized Set<app.unichat.model.SaveKind> saveKinds(String key, boolean mine) {
         Entry e = chats.get(key);
-        java.util.Set<app.unichat.model.SaveKind> out = EnumSet.noneOf(app.unichat.model.SaveKind.class);
+        Set<app.unichat.model.SaveKind> out = EnumSet.noneOf(app.unichat.model.SaveKind.class);
         if (e == null || !is(e, mine ? Flag.AUTO_SAVE_MINE : Flag.AUTO_SAVE)) return out;
         for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) if (is(e, flag(k, mine)) == chosen(k)) out.add(k);
         return out;
     }
 
     /** The person chose what this chat saves of what it receives ({@code mine}: of what they send); nothing turns it off. */
-    public synchronized void chooseSaveKinds(String key, boolean mine, java.util.Set<app.unichat.model.SaveKind> kinds) {
+    public synchronized void chooseSaveKinds(String key, boolean mine, Set<app.unichat.model.SaveKind> kinds) {
         Entry e = entry(key);
         e.values.put(mine ? Flag.AUTO_SAVE_MINE : Flag.AUTO_SAVE, !kinds.isEmpty());
         for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) e.values.put(flag(k, mine), kinds.contains(k) == chosen(k));
@@ -458,7 +458,7 @@ public final class PreferencesFile {
             }
             readRoot(root);
             return true;
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException e) { // NOPMD: ExceptionAsFlowControl, one failure path for a foreign file and a broken one
             chats.clear();
             folders.clear();
             extraRoot.removeAll();

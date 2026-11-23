@@ -38,7 +38,7 @@ final class MatrixRoom {
     String canonicalAlias;
     String bridgeProtocol;
     /** Content of com.beeper.room_features (what the network supports), or null. */
-    com.fasterxml.jackson.databind.JsonNode roomFeatures;
+    JsonNode roomFeatures;
     /** {@code com.beeper.room_type} from bridgev2 bridge info: dm, group or space. */
     String bridgeRoomType;
     /** {@code m.room.create} type m.space. */

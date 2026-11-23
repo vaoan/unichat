@@ -19,7 +19,7 @@ final class UploadProgress {
             }
 
             @Override public void subscribe(Flow.Subscriber<? super ByteBuffer> s) {
-                inner.subscribe(new Flow.Subscriber<ByteBuffer>() {
+                inner.subscribe(new Flow.Subscriber<>() {
                     private long sent; // per subscription: a retried request starts again from zero
 
                     @Override public void onSubscribe(Flow.Subscription sub) {

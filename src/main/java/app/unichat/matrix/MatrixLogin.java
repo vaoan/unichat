@@ -16,7 +16,6 @@ import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
 import static app.unichat.matrix.MatrixClient.CLIENT;
-import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** Signing in: finds the homeserver of a name or URL, logs in, and restores a stored session. */
 public final class MatrixLogin {
@@ -45,8 +44,8 @@ public final class MatrixLogin {
     }
 
     /** Short translated message for an error coming out of this service's futures. */
-    public static String userMessage(Throwable t) {
-        t = Errors.unwrap(t);
+    public static String userMessage(Throwable error) {
+        Throwable t = Errors.unwrap(error);
         if (t instanceof MatrixException me) {
             if (me.errcode() == null) return me.getMessage();
             return switch (me.errcode()) {
@@ -72,37 +71,38 @@ public final class MatrixLogin {
         String hs = homeserverOrDomain == null ? "" : homeserverOrDomain.trim();
         if (hs.isEmpty() && u.startsWith("@") && u.contains(":")) hs = u.substring(u.indexOf(':') + 1);
         if (hs.isEmpty() || u.isEmpty()) throw new MatrixException(0, null, I18n.t("matrix.login.needServerUser"));
-        HttpClient http = MatrixClient.newHttpClient();
-        String base = resolveHomeserver(http, hs);
+        try (HttpClient http = MatrixClient.newHttpClient()) {
+            String base = resolveHomeserver(http, hs);
 
-        ObjectNode body = MatrixClient.JSON.createObjectNode();
-        body.put("type", "m.login.password");
-        body.putObject("identifier").put("type", "m.id.user").put("user", u);
-        body.put("password", password == null ? "" : password);
-        body.put("initial_device_display_name", "Unichat");
-        JsonNode resp;
-        try {
-            resp = new MatrixClient(http, base, null).post(CLIENT + "/login", body);
-        } catch (MatrixException e) {
-            String msg = switch (e.errcode() == null ? "" : e.errcode()) {
-                case "M_FORBIDDEN" -> I18n.t("matrix.login.badCredentials");
-                case "M_USER_DEACTIVATED" -> I18n.t("matrix.err.deactivated");
-                case "M_LIMIT_EXCEEDED" -> I18n.t("matrix.err.limit");
-                case "M_UNKNOWN", "M_BAD_JSON", "M_INVALID_USERNAME" -> I18n.t("matrix.login.badUser");
-                default -> I18n.t("matrix.login.failed", e.getMessage());
-            };
-            throw new MatrixException(e.status(), e.errcode(), msg);
+            ObjectNode body = MatrixClient.JSON.createObjectNode();
+            body.put("type", "m.login.password");
+            body.putObject("identifier").put("type", "m.id.user").put("user", u);
+            body.put("password", password == null ? "" : password);
+            body.put("initial_device_display_name", "Unichat");
+            JsonNode resp;
+            try {
+                resp = new MatrixClient(http, base, null).post(CLIENT + "/login", body);
+            } catch (MatrixException e) {
+                String msg = switch (e.errcode() == null ? "" : e.errcode()) {
+                    case "M_FORBIDDEN" -> I18n.t("matrix.login.badCredentials");
+                    case "M_USER_DEACTIVATED" -> I18n.t("matrix.err.deactivated");
+                    case "M_LIMIT_EXCEEDED" -> I18n.t("matrix.err.limit");
+                    case "M_UNKNOWN", "M_BAD_JSON", "M_INVALID_USERNAME" -> I18n.t("matrix.login.badUser");
+                    default -> I18n.t("matrix.login.failed", e.getMessage());
+                };
+                throw new MatrixException(e.status(), e.errcode(), msg); // NOPMD: PreserveStackTrace, the login screen shows the deepest cause (LoginTexts.rootMessage): this message, not the server's
+            }
+            String token = resp.path("access_token").asText(null);
+            String uid = resp.path("user_id").asText(null);
+            if (token == null || uid == null) throw new MatrixException(0, null, I18n.t("matrix.login.badResponse"));
+            String wkBase = resp.path("well_known").path("m.homeserver").path("base_url").asText(null);
+            if (wkBase != null && !wkBase.isBlank() && safeBase(wkBase) && isHomeserver(http, wkBase)) {
+                base = MatrixClient.stripSlash(wkBase);
+            }
+            SyncCache.drop();
+            Settings.get().setMatrixSession(base, uid, token, resp.path("device_id").asText(null));
+            return new MatrixChatService(base, uid, token);
         }
-        String token = resp.path("access_token").asText(null);
-        String uid = resp.path("user_id").asText(null);
-        if (token == null || uid == null) throw new MatrixException(0, null, I18n.t("matrix.login.badResponse"));
-        String wkBase = resp.path("well_known").path("m.homeserver").path("base_url").asText(null);
-        if (wkBase != null && !wkBase.isBlank() && safeBase(wkBase) && isHomeserver(http, wkBase)) {
-            base = MatrixClient.stripSlash(wkBase);
-        }
-        SyncCache.drop();
-        Settings.get().setMatrixSession(base, uid, token, resp.path("device_id").asText(null));
-        return new MatrixChatService(base, uid, token);
     }
 
     /** Finds the client-server base URL for a domain or URL via .well-known, verifying /versions. */

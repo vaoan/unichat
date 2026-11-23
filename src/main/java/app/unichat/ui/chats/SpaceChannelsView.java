@@ -60,7 +60,7 @@ final class SpaceChannelsView extends VBox {
         setSpacing(6);
         getChildren().addAll(header, list);
         getStyleClass().add("space-view");
-        VBox.setVgrow(this, Priority.ALWAYS);
+        setVgrow(this, Priority.ALWAYS);
         Nodes.show(this, false);
     }
 
@@ -84,7 +84,7 @@ final class SpaceChannelsView extends VBox {
                 if (list.getSelectionModel().getSelectedItem() == c) open.accept(c);
             });
         });
-        VBox.setVgrow(list, Priority.ALWAYS);
+        setVgrow(list, Priority.ALWAYS);
     }
 
     String openId() { return openId; }
@@ -126,7 +126,7 @@ final class SpaceChannelsView extends VBox {
 
     /** Puts the rows in the list and runs {@code select}: what a redraw selects isn't the person opening a channel. */
     void showRows(Runnable select) {
-        updating = true;
+        updating = true; // NOPMD: UnusedAssignment, read by the listeners the change below fires
         try {
             ListRows.show(items, rows.rows(), Chat::id);
             select.run();
@@ -162,7 +162,7 @@ final class SpaceChannelsView extends VBox {
     void focusOnOpening() {
         list.requestFocus();
         if (list.getSelectionModel().isEmpty() && !items.isEmpty()) {
-            updating = true;
+            updating = true; // NOPMD: UnusedAssignment, read by the listeners the change below fires
             list.getSelectionModel().select(0);
             updating = false;
         }

@@ -36,7 +36,7 @@ final class EmojiArt {
     private static Set<String> pieces;
     private static CompletableFuture<Map<String, Image>> pictures;
     /** Emoji met in messages (skin tones included, not only the list's): their picture, or none when JavaFX draws them whole. */
-    private static final Map<String, java.util.Optional<Image>> met = new HashMap<>();
+    private static final Map<String, java.util.Optional<Image>> MET = new HashMap<>();
 
     /** A run of a message's text, or one emoji in it to show as {@code picture}. */
     record Segment(String text, Image picture) {}
@@ -45,14 +45,14 @@ final class EmojiArt {
 
     /** Whether JavaFX draws {@code e} in pieces. On the FX thread. */
     static boolean inPieces(String e) {
-        if (pieces == null) pieces = measure();
+        if (pieces == null) pieces = measure(); // NOPMD: NonThreadSafeSingleton, only on the FX thread
         return pieces.contains(e);
     }
 
     /** The pictures of those drawn in pieces, for the ones Java2D could join; started on first use. On the FX thread. */
     static CompletableFuture<Map<String, Image>> pictures() {
-        if (pictures == null) {
-            if (pieces == null) pieces = measure();
+        if (pictures == null) { // NOPMD: NonThreadSafeSingleton, only on the FX thread
+            if (pieces == null) pieces = measure(); // NOPMD: NonThreadSafeSingleton, only on the FX thread
             Set<String> todo = Set.copyOf(pieces);
             String family = family();
             pictures = family == null || todo.isEmpty() ? CompletableFuture.completedFuture(Map.of())
@@ -66,7 +66,7 @@ final class EmojiArt {
         if (family == null) return Set.of();
         Font f = Font.font(family, 20);
         double plain = width("😀", f);
-        java.util.HashSet<String> out = new java.util.HashSet<>();
+        Set<String> out = new java.util.HashSet<>();
         for (List<String> group : EmojiPicker.CATEGORIES.values()) {
             for (String e : group) if (width(e, f) > plain * SAME_WIDTH) out.add(e);
         }
@@ -111,12 +111,15 @@ final class EmojiArt {
         java.text.BreakIterator chars = java.text.BreakIterator.getCharacterInstance(Locale.ROOT);
         chars.setText(text);
         int runStart = 0;
-        for (int start = chars.first(), end = chars.next(); end != java.text.BreakIterator.DONE; start = end, end = chars.next()) {
+        int start = chars.first();
+        for (int end = chars.next(); end != java.text.BreakIterator.DONE; end = chars.next()) {
             Image picture = picture(text.substring(start, end));
-            if (picture == null) continue;
-            if (start > runStart) out.add(new Segment(text.substring(runStart, start), null));
-            out.add(new Segment(text.substring(start, end), picture));
-            runStart = end;
+            if (picture != null) {
+                if (start > runStart) out.add(new Segment(text.substring(runStart, start), null));
+                out.add(new Segment(text.substring(start, end), picture));
+                runStart = end;
+            }
+            start = end;
         }
         if (runStart < text.length() || out.isEmpty()) out.add(new Segment(text.substring(runStart), null));
         return out;
@@ -125,7 +128,7 @@ final class EmojiArt {
     /** The picture for one character as a person sees it, if it's an emoji JavaFX would draw in pieces. */
     private static Image picture(String cluster) {
         if (cluster.codePointCount(0, cluster.length()) < 2 || !Character.isEmoji(cluster.codePointAt(0))) return null;
-        return met.computeIfAbsent(cluster, c -> {
+        return MET.computeIfAbsent(cluster, c -> {
             String family = family();
             if (family == null || width(c, Font.font(family, 20)) <= width("😀", Font.font(family, 20)) * SAME_WIDTH) {
                 return java.util.Optional.empty();

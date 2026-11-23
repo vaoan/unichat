@@ -104,7 +104,7 @@ final class SyncEvents {
 
     /** A voice note's waveform as the MSC writes it, each value 0 to 1024; anything else in it left out. */
     private static List<Integer> waveform(JsonNode wave) {
-        List<Integer> bars = new java.util.ArrayList<>();
+        List<Integer> bars = new ArrayList<>();
         for (JsonNode v : wave) {
             if (bars.size() == MAX_BARS) break;
             if (v.isInt()) bars.add(Math.clamp(v.asInt(), 0, 1024));
@@ -187,5 +187,18 @@ final class SyncEvents {
         List<String> out = new ArrayList<>();
         for (JsonNode n : arr) if (n.isTextual()) out.add(n.asText());
         return List.copyOf(out);
+    }
+
+    /** Who's in it, from the sync's summary: the heroes and how many joined and are invited. */
+    static void applySummary(MatrixRoom room, JsonNode summary) {
+        if (summary.has("m.heroes")) room.heroes = strings(summary.get("m.heroes"));
+        if (summary.has("m.joined_member_count")) room.joinedCount = summary.get("m.joined_member_count").asInt();
+        if (summary.has("m.invited_member_count")) room.invitedCount = summary.get("m.invited_member_count").asInt();
+    }
+
+    /** The server's unread and mention counts, when it sent them. */
+    static void applyUnread(MatrixRoom room, JsonNode un) {
+        if (un.has("notification_count")) room.chat.setUnreadCount(un.get("notification_count").asInt());
+        if (un.has("highlight_count")) room.chat.setMentionCount(un.get("highlight_count").asInt());
     }
 }

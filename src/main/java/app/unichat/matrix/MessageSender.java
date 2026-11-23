@@ -177,7 +177,7 @@ final class MessageSender {
                     info.put("size", Files.size(r.file()));
                     Files.deleteIfExists(r.file());
                 }
-                info.remove(java.util.List.of("thumbnail_url", "thumbnail_info")); // on the same bridge as the sticker
+                info.remove(List.of("thumbnail_url", "thumbnail_info")); // on the same bridge as the sticker
                 if (!own) info.remove("fi.mau.bridged_sticker"); // no longer that network's own sticker
                 info.set(MediaLibrary.ORIGINAL, MediaLibrary.json(item)); // seen back, it's still this sticker
                 return content;
@@ -306,7 +306,7 @@ final class MessageSender {
     /** Seconds before each try again: a bridge that restarts with Unichat connects within seconds. Tests pass zeros. */
     private long[] retrySeconds = {15, 30, 60};
 
-    void retrySeconds(long... seconds) { this.retrySeconds = seconds; }
+    void retrySeconds(long... seconds) { this.retrySeconds = seconds.clone(); }
 
     /**
      * {@code eventId}, refused by its bridge only because it wasn't connected yet (a sticker sent as Unichat restarted
@@ -373,7 +373,7 @@ final class MessageSender {
                         sendMedia(chatId, p.file(), replyToId, new Kind(p.mime(), p.width(), p.height(), 0, false, progress), content -> { }))
                 : sendMedia(chatId, file, replyToId, new Kind(mime, 0, 0, 0, as == SendAs.DOCUMENT, progress), content -> { });
         Chat c = core.chat(chatId);
-        if (c == null || c.network() == app.unichat.model.Network.MATRIX) return sent.thenApply(id -> null);
+        if (c == null || c.network() == Network.MATRIX) return sent.thenApply(id -> null);
         // Bridged: done when the network has it (a batch sends the next file only then), or failed if it refused it.
         return sent.thenCompose(id -> id == null ? CompletableFuture.completedFuture(null) : core.statuses.await(id, NETWORK_PATIENCE));
     }
@@ -382,10 +382,10 @@ final class MessageSender {
         try {
             return OutgoingPhotos.moving(file);
         } catch (IOException e) {
-            throw new java.util.concurrent.CompletionException(e);
+            throw new CompletionException(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new java.util.concurrent.CompletionException(e);
+            throw new CompletionException(e);
         }
     }
 

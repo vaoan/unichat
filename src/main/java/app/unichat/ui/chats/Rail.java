@@ -78,7 +78,7 @@ public final class Rail extends VBox {
         cloudRing.radiusYProperty().bind(cloudRing.radiusXProperty());
 
         Region grow = new Region();
-        VBox.setVgrow(grow, Priority.ALWAYS);
+        setVgrow(grow, Priority.ALWAYS);
         networks.setAlignment(Pos.TOP_CENTER);
         Region sep = new Region();
         sep.getStyleClass().add("rail-separator");
@@ -102,8 +102,8 @@ public final class Rail extends VBox {
         scroll.setFocusTraversable(false);
         scroll.setMinHeight(0);
         scroll.prefViewportHeightProperty().bind(networks.heightProperty());
-        scroll.setMaxHeight(Region.USE_PREF_SIZE);
-        VBox.setMargin(scroll, new Insets(0, -RAIL_SIDE, 0, -RAIL_SIDE));
+        scroll.setMaxHeight(USE_PREF_SIZE);
+        setMargin(scroll, new Insets(0, -RAIL_SIDE, 0, -RAIL_SIDE));
         return scroll;
     }
 

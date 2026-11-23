@@ -29,37 +29,40 @@ public final class Markup {
         String[] lines = text.split("\n", -1);
         List<String[]> parts = new ArrayList<>(); // {kind, html}: kind "line" or "block"
         boolean any = false;
-        for (int i = 0; i < lines.length; i++) {
+        int i = 0;
+        while (i < lines.length) {
             if (FENCE.matcher(lines[i].strip()).matches()) {
                 int end = i + 1;
                 while (end < lines.length && !lines[end].strip().equals("```")) end++;
                 if (end < lines.length) {
                     parts.add(new String[]{"block", "<pre><code>" + escape(String.join("\n", java.util.Arrays.copyOfRange(lines, i + 1, end))) + "</code></pre>"});
                     any = true;
-                    i = end;
+                    i = end + 1; // past the closing fence
                     continue;
                 }
             }
             if (lines[i].startsWith("> ")) {
                 StringBuilder q = new StringBuilder();
-                for (; i < lines.length && lines[i].startsWith("> "); i++) {
+                int next = i;
+                for (; next < lines.length && lines[next].startsWith("> "); next++) {
                     if (!q.isEmpty()) q.append("<br>");
-                    q.append(inline(lines[i].substring(2)));
+                    q.append(inline(lines[next].substring(2)));
                 }
-                i--;
                 parts.add(new String[]{"block", "<blockquote>" + q + "</blockquote>"});
                 any = true;
+                i = next; // the first line past the quote
                 continue;
             }
             String html = inline(lines[i]);
             any |= !html.equals(escape(lines[i]));
             parts.add(new String[]{"line", html});
+            i++;
         }
         if (!any) return null;
         StringBuilder out = new StringBuilder();
-        for (int i = 0; i < parts.size(); i++) {
-            if (i > 0 && parts.get(i - 1)[0].equals("line") && parts.get(i)[0].equals("line")) out.append("<br>");
-            out.append(parts.get(i)[1]);
+        for (int k = 0; k < parts.size(); k++) {
+            if (k > 0 && parts.get(k - 1)[0].equals("line") && parts.get(k)[0].equals("line")) out.append("<br>");
+            out.append(parts.get(k)[1]);
         }
         return out.toString();
     }

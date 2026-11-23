@@ -123,7 +123,8 @@ public final class VoiceEnhancer {
              InputStream in = new BufferedInputStream(Files.newInputStream(pcm))) {
             byte[] bytes = new byte[8192];
             short[] samples = new short[bytes.length / 2];
-            for (int n; (n = in.readNBytes(bytes, 0, bytes.length)) > 1; ) {
+            int n;
+            while ((n = in.readNBytes(bytes, 0, bytes.length)) > 1) {
                 ByteBuffer.wrap(bytes, 0, n & ~1).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(samples, 0, n / 2);
                 encoder.feed(samples, n / 2);
             }

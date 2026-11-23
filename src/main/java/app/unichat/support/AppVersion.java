@@ -19,7 +19,10 @@ public final class AppVersion {
     /** "1.0.0", or {@value #UNKNOWN} when the build didn't fill it in. */
     public static String current() {
         String v = current;
-        if (v == null) current = v = read();
+        if (v == null) {
+            v = read();
+            current = v;
+        }
         return v;
     }
 
@@ -58,13 +61,13 @@ public final class AppVersion {
         if (plus >= 0) s = s.substring(0, plus);
         int dash = s.indexOf('-');
         String core = dash < 0 ? s : s.substring(0, dash);
-        String pre = dash < 0 ? "" : s.substring(dash + 1);
         if (core.isEmpty()) return null;
         List<Integer> numbers = new ArrayList<>();
         for (String part : core.split("\\.", -1)) {
             if (part.isEmpty() || !part.chars().allMatch(Character::isDigit) || part.length() > 9) return null;
             numbers.add(Integer.parseInt(part));
         }
+        String pre = dash < 0 ? "" : s.substring(dash + 1);
         return new Parsed(numbers, pre);
     }
 

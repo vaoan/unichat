@@ -90,7 +90,7 @@ public final class Transcriber {
         List<String> cmd;
         if (ffmpeg != null) {
             List<String> c = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-loglevel", "error", "-y"));
-            c.addAll(app.unichat.video.Ffmpeg.input(audio)); // the file comes from other people
+            c.addAll(Ffmpeg.input(audio)); // the file comes from other people
             c.addAll(List.of("-ar", "16000", "-ac", "1", wav.toString()));
             cmd = c;
         } else if (Os.mac()) {
@@ -125,7 +125,7 @@ public final class Transcriber {
         try {
             r = Processes.capture(new ProcessBuilder(cmd).directory(work.toFile()).redirectError(err.toFile()), TIMEOUT_SECONDS);
         } catch (IOException e) {
-            throw new IOException(I18n.t("stt.runFailed", Path.of(cmd.get(0)).getFileName(), e.getMessage()));
+            throw new IOException(I18n.t("stt.runFailed", Path.of(cmd.get(0)).getFileName(), e.getMessage()), e);
         }
         if (!r.finished()) throw new IOException(I18n.t("stt.tooLong"));
         if (r.exit() != 0) {

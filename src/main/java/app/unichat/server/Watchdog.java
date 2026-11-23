@@ -56,7 +56,7 @@ final class Watchdog {
     private static final SessionKeeper NO_KEEPER = new SessionKeeper() {
         @Override public boolean fragile(String bridge) { return false; }
         @Override public boolean safeToRestart(String bridge) { return true; }
-        @Override public void tick(boolean online, long now) { }
+        @Override public void tick(boolean online, long now) { /* not needed here */ }
     };
 
     /** What's known about one process. {@code troubledSince}: -1 when every account is fine. */
@@ -162,33 +162,7 @@ final class Watchdog {
             wasLow = round.low();
             for (String name : running.get()) {
                 Integer port = ports.get(name);
-                if (port == null) continue;
-                int f = HttpProbe.answers(http, port, Duration.ofSeconds(10), HttpProbe.Up.ALIVE) ? 0 : failures.getOrDefault(name, 0) + 1;
-                failures.put(name, f);
-                Health h = name.equals("tuwunel") ? new Health(f, -1, 0)
-                        : new Health(f, states.troubledSince(name), states.dropsWithin(name, FLAP_WINDOW_MS, now));
-                boolean bridge = !name.equals("tuwunel");
-                // Things that happen once (the internet or room on the disk back): no waiting after the last restart.
-                String once = round.roomBack() ? "the disk has room again"
-                        : round.internetBack() && bridge && !keeper.fragile(name) ? "internet is back" : null;
-                String why = once != null ? once : why(name, h, round);
-                Long last = lastRestart.get(name);
-                int row = inARow.getOrDefault(name, 0);
-                // Once, or a long quiet run since the last restart: the next one starts with a short wait again.
-                if (once != null || (last != null && why == null && now - last > MAX_COOLDOWN_MS)) {
-                    row = 0;
-                    inARow.put(name, row);
-                }
-                if (once == null && (why == null || (last != null && now - last < cooldown(row)))) continue;
-                // A hung process can't lose more than it has; anything else waits until a restart can't cost its session.
-                if (h.probeFailures() < PROBE_FAILURES && !keeper.safeToRestart(name)) continue;
-                System.err.println("Watchdog: restarting " + name + " (" + why + ")");
-                lastRestart.put(name, now);
-                inARow.put(name, row + 1);
-                failures.put(name, 0);
-                if (bridge) states.restarting(name, now);
-                storage.startedOver(name);
-                restart.accept(name, why);
+                if (port != null) checkProcess(name, port, round);
             }
             keeper.tick(online, now);
             states.tick();
@@ -199,5 +173,36 @@ final class Watchdog {
             // The watchdog itself must never stop.
             System.err.println("Watchdog check failed: " + t);
         }
+    }
+
+    /** One process this round: probed, and started over when it should be. */
+    private void checkProcess(String name, int port, Round round) throws InterruptedException {
+        long now = round.now();
+        int f = HttpProbe.answers(http, port, Duration.ofSeconds(10), HttpProbe.Up.ALIVE) ? 0 : failures.getOrDefault(name, 0) + 1;
+        failures.put(name, f);
+        Health h = name.equals("tuwunel") ? new Health(f, -1, 0)
+                : new Health(f, states.troubledSince(name), states.dropsWithin(name, FLAP_WINDOW_MS, now));
+        boolean bridge = !name.equals("tuwunel");
+        // Things that happen once (the internet or room on the disk back): no waiting after the last restart.
+        String once = round.roomBack() ? "the disk has room again"
+                : round.internetBack() && bridge && !keeper.fragile(name) ? "internet is back" : null;
+        String why = once != null ? once : why(name, h, round);
+        Long last = lastRestart.get(name);
+        int row = inARow.getOrDefault(name, 0);
+        // Once, or a long quiet run since the last restart: the next one starts with a short wait again.
+        if (once != null || (last != null && why == null && now - last > MAX_COOLDOWN_MS)) {
+            row = 0;
+            inARow.put(name, row);
+        }
+        if (once == null && (why == null || (last != null && now - last < cooldown(row)))) return;
+        // A hung process can't lose more than it has; anything else waits until a restart can't cost its session.
+        if (h.probeFailures() < PROBE_FAILURES && !keeper.safeToRestart(name)) return;
+        System.err.println("Watchdog: restarting " + name + " (" + why + ")");
+        lastRestart.put(name, now);
+        inARow.put(name, row + 1);
+        failures.put(name, 0);
+        if (bridge) states.restarting(name, now);
+        storage.startedOver(name);
+        restart.accept(name, why);
     }
 }

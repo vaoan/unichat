@@ -161,7 +161,7 @@ public final class Notifier {
         }), onOpen, onShow);
         if (b == null) return false;
         bar = b;
-        b.setGlobalShortcut(app.unichat.settings.Settings.get().globalShortcut());
+        b.setGlobalShortcut(Settings.get().globalShortcut());
         b.setLeftClickMenu(windowShown && windowFocused);
         EventQueue.invokeLater(() -> {
             b.setTooltip(tooltip);

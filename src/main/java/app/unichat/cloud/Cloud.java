@@ -51,6 +51,7 @@ public final class Cloud {
                          Notice vaultNotice, boolean mediaPaused) {
         static final Status OFF = new Status(false, null, null, 0, 0);
 
+        @SuppressWarnings("PMD.ExcessiveParameterList") // the record's own components, less the last
         public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
                       int retrying, Instant nextRetry, int conflicts, Instant lastVerified, VaultState vault, Moving moving,
                       Notice vaultNotice) {
@@ -62,6 +63,7 @@ public final class Cloud {
             this(connected, lastSync, error, uploaded, waiting, null, 0, null, 0, null);
         }
 
+        @SuppressWarnings("PMD.ExcessiveParameterList") // the record's own components, before the vault's
         public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
                       int retrying, Instant nextRetry, int conflicts, Instant lastVerified) {
             this(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts, lastVerified, VaultState.NONE, Moving.NONE, null);
@@ -139,7 +141,7 @@ public final class Cloud {
     }
 
     /** How often everything uploaded is checked against the account (also on "Verificar ahora"). */
-    static final java.time.Duration VERIFY_EVERY = java.time.Duration.ofDays(1);
+    static final Duration VERIFY_EVERY = Duration.ofDays(1);
 
     /** What a round is doing right now, for the page to say: checking a part, or uploading file {@code done} of {@code total}. */
     public record Activity(Step step, int done, int total, String item, long sent, long size, long bytesPerSecond) {
@@ -563,7 +565,7 @@ public final class Cloud {
     public synchronized CompletableFuture<Void> textsNow() {
         if (textsPending != null) return textsPending;
         CompletableFuture<Void> f = new CompletableFuture<>();
-        textsPending = f;
+        textsPending = f; // NOPMD: UnusedAssignment, the next caller reads it while the worker runs
         textsWorker.execute(() -> {
             synchronized (this) {
                 textsPending = null;
@@ -593,6 +595,7 @@ public final class Cloud {
     /** What Ajustes → Nube → Bóveda does with the vault, each job on the vault's thread ({@link CloudVault}). */
     public CloudVault vault() { return vaultJobs; }
 
+    @FunctionalInterface
     interface Job<T> {
         T run(Storage dav) throws IOException;
     }
@@ -630,7 +633,7 @@ public final class Cloud {
                     vaultPart.unlock();
                     toldAsRead();
                 }
-            } catch (IOException e) {
+            } catch (IOException e) { // NOPMD: ExceptionAsFlowControl, one failure path for no account and a failed job
                 throw new java.util.concurrent.CompletionException(e);
             }
         }, vaultWorker);

@@ -13,11 +13,13 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 final class CloudRenames {
     /** Every part reading the account's file afresh. */
+    @FunctionalInterface
     interface Unseen {
         void run() throws IOException;
     }
 
     /** The vault's state here, read through the storage given ({@link Cloud#openVault}). */
+    @FunctionalInterface
     interface Opener {
         VaultParts.Round open(Storage at) throws IOException;
     }

@@ -9,18 +9,13 @@ import app.unichat.ui.media.ProfileMedia;
 import app.unichat.model.Chat;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
-import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
 import app.unichat.support.I18n;
-import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -122,7 +117,7 @@ public final class InfoPane extends ScrollPane {
             box.getChildren().add(rem);
         }
 
-        List<javafx.scene.Node> shared = media.section(c);
+        List<Node> shared = media.section(c);
         if (!shared.isEmpty()) {
             box.getChildren().add(section(I18n.t("info.mediaTitle")));
             box.getChildren().addAll(shared);

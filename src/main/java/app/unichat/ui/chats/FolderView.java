@@ -96,7 +96,7 @@ final class FolderView extends VBox {
         configureChats(cells);
         insideView = new VBox(6, header, chatList);
 
-        for (VBox v : List.of(namesView, insideView)) VBox.setVgrow(v, Priority.ALWAYS);
+        for (VBox v : List.of(namesView, insideView)) setVgrow(v, Priority.ALWAYS);
         getChildren().addAll(namesView, insideView);
         showCurrent();
     }
@@ -128,7 +128,7 @@ final class FolderView extends VBox {
             e.consume();
         });
         ChatMenus.onMenuKey(nameList, this::folderMenu);
-        VBox.setVgrow(nameList, Priority.ALWAYS);
+        setVgrow(nameList, Priority.ALWAYS);
     }
 
     private void configureChats(Supplier<ListCell<Chat>> cells) {
@@ -155,7 +155,7 @@ final class FolderView extends VBox {
                 if (chatList.getSelectionModel().getSelectedItem() == c) open.accept(c);
             });
         });
-        VBox.setVgrow(chatList, Priority.ALWAYS);
+        setVgrow(chatList, Priority.ALWAYS);
     }
 
     /** Back to the names, on the folder you came from. */
@@ -286,7 +286,7 @@ final class FolderView extends VBox {
         ListView<?> shown = openId == null ? nameList : chatList;
         shown.requestFocus();
         if (shown.getSelectionModel().isEmpty() && !shown.getItems().isEmpty()) {
-            updating = true;
+            updating = true; // NOPMD: UnusedAssignment, read by the listeners the change below fires
             shown.getSelectionModel().select(0);
             updating = false;
         }
@@ -341,11 +341,11 @@ final class FolderView extends VBox {
             name.getStyleClass().add("chat-name");
             name.setMinWidth(0);
             stamp.getStyleClass().add("chat-stamp");
-            stamp.setMinWidth(Region.USE_PREF_SIZE);
+            stamp.setMinWidth(USE_PREF_SIZE);
             preview.getStyleClass().add("chat-preview");
             preview.setMinWidth(0);
             badge.getStyleClass().add("unread-badge");
-            badge.setMinWidth(Region.USE_PREF_SIZE);
+            badge.setMinWidth(USE_PREF_SIZE);
             tile.getStyleClass().add("folder-tile");
             tile.setMinSize(TILE, TILE);
             tile.setPrefSize(TILE, TILE);

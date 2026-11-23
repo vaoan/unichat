@@ -64,6 +64,7 @@ final class MessageSelection {
     private boolean on;
 
     /** A row of the list that shows whether its message is picked (its look and what a screen reader says). */
+    @FunctionalInterface
     interface Shows {
         void showPicked();
     }
@@ -172,7 +173,7 @@ final class MessageSelection {
                 .map(r -> ((ThreadRows.MessageRow) r).message().id()).toList();
     }
 
-    private java.util.Set<String> inRange() {
+    private Set<String> inRange() {
         return new java.util.HashSet<>(range.of(ids()));
     }
 

@@ -59,7 +59,7 @@ final class OutgoingPhotos {
         try {
             webp = MovingPictures.toWebp(file, dir.resolve(name), p -> { });
         } catch (IOException e) { // too long, not a video, no ffmpeg: trying again won't change it
-            throw new CantSend(e.getMessage());
+            throw new CantSend(e.getMessage(), e);
         }
         int[] size = ImageHeaders.size(webp);
         return new Photo(webp, "image/webp", size[0], size[1]);

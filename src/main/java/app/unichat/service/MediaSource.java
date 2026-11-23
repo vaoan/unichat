@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 
 /** Getting the file behind a media URL. */
+@FunctionalInterface
 public interface MediaSource {
     /**
      * Returns a local file for a media/avatar URL (mxc://, http(s)://, file:), downloading and
@@ -45,8 +46,8 @@ public interface MediaSource {
     }
 
     /** Media that must stay on disk whatever the cache's limit: the person's saved stickers and GIFs. Replaces the last list. */
-    default void keepCached(java.util.Collection<String> urls) { }
+    default void keepCached(java.util.Collection<String> urls) { /* nothing by default */ }
 
     /** The person's favourites, which get a copy of their own in the data folder. Replaces the last list. */
-    default void keepSaved(java.util.Collection<String> urls) { }
+    default void keepSaved(java.util.Collection<String> urls) { /* nothing by default */ }
 }

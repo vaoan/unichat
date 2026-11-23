@@ -211,7 +211,7 @@ public final class MainView extends StackPane {
         toast.setMaxWidth(560);
         toast.setVisible(false);
         toast.setMouseTransparent(true);
-        StackPane.setAlignment(toast, Pos.BOTTOM_CENTER);
+        setAlignment(toast, Pos.BOTTOM_CENTER);
         toast.setTranslateY(-90);
         // Above the message box, whatever its height: at a fixed place it covered a box grown to several lines.
         thread.composer().layoutBoundsProperty().addListener((o, a, b) -> { if (toast.isVisible()) placeToast(); });
@@ -241,13 +241,13 @@ public final class MainView extends StackPane {
     private final javafx.beans.value.ChangeListener<Boolean> onShowing = this::showingChanged;
     private final javafx.beans.value.ChangeListener<Boolean> onFocused = this::focusChanged;
 
-    private void showingChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean showing) {
+    private void showingChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean showing) { // NOPMD: UnusedFormalParameter, a ChangeListener by method reference
         if (showing) catchingUp.request(); // the window shown again is brought up to date: a redraw to come
     }
 
     private final FxCoalescer catchingUp = new FxCoalescer(this::catchUp);
 
-    private void focusChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean focused) {
+    private void focusChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean focused) { // NOPMD: UnusedFormalParameter, a ChangeListener by method reference
         if (focused && thread.chat() != null) svc.markRead(thread.chat().id());
     }
 
@@ -302,7 +302,7 @@ public final class MainView extends StackPane {
     /** Warms the photo cache with the most recent chats, so even the first open of a chat shows no initials. */
     private void preloadAvatars() {
         if (avatarsPreloaded) return;
-        java.util.List<Chat> recent = svc.chats().stream().filter(c -> !c.bridgeBot() && c.avatarUrl() != null)
+        List<Chat> recent = svc.chats().stream().filter(c -> !c.bridgeBot() && c.avatarUrl() != null)
                 .sorted(ChatFilter.ORDER).limit(150).toList();
         if (recent.isEmpty()) return;
         avatarsPreloaded = true;
@@ -458,7 +458,7 @@ public final class MainView extends StackPane {
     }
 
     /** As if dropped on the open chat. */
-    public void sendFiles(java.util.List<java.io.File> files, app.unichat.service.SendAs as) {
+    public void sendFiles(List<java.io.File> files, app.unichat.service.SendAs as) {
         thread.composer().sendFiles(files, as);
     }
 
@@ -632,7 +632,7 @@ public final class MainView extends StackPane {
     private void showOverlay(Node card) {
         if (card instanceof javafx.scene.layout.Region r) r.maxHeightProperty().bind(overlay.heightProperty().subtract(130));
         overlay.getChildren().setAll(card);
-        StackPane.setAlignment(card, Pos.TOP_CENTER);
+        setAlignment(card, Pos.TOP_CENTER);
         card.setTranslateY(90);
         overlay.setVisible(true);
         app.unichat.ui.media.AnimatedImage.cover(getScene(), overlay);

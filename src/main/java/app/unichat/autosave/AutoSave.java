@@ -84,9 +84,9 @@ public final class AutoSave implements ChatService.Listener {
     private final ChatReader chats;
     private final SavedUpTo savedUpTo;
     private volatile Progress progress = new Progress() {
-        @Override public void changed(int done, int total) { }
-        @Override public void finished(int saved, Chat chat) { }
-        @Override public void failed(String what, Chat chat, String messageId, String why) { }
+        @Override public void changed(int done, int total) { /* not needed here */ }
+        @Override public void finished(int saved, Chat chat) { /* not needed here */ }
+        @Override public void failed(String what, Chat chat, String messageId, String why) { /* not needed here */ }
     };
     /** What {@link #progress} is now: the parts keep this one, {@link #setProgress} may change it later. */
     private final Progress tell = new Progress() {
@@ -348,8 +348,8 @@ public final class AutoSave implements ChatService.Listener {
                 try {
                     return media.media(mediaUrl, 0, 0, progress).get();
                 } catch (java.util.concurrent.ExecutionException e) {
-                    if (media.gone(e.getCause())) throw new Gone(e.getCause().getMessage(), e.getCause());
-                    throw new IOException(e.getCause());
+                    if (media.gone(e.getCause())) throw new Gone(e.getCause().getMessage(), e.getCause()); // NOPMD: PreserveStackTrace, the future's wrapper is dropped; its cause has the trace
+                    throw new IOException(e.getCause()); // NOPMD: PreserveStackTrace, as above
                 }
             }
 

@@ -3,6 +3,7 @@ package app.unichat.support;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -33,7 +34,7 @@ public final class Storage {
     private final LongSupplier clock;
     private volatile long free = Long.MAX_VALUE;
     private final Map<String, Long> failedAt = new ConcurrentHashMap<>();
-    private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
+    private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private ScheduledExecutorService timer;
 
     /**

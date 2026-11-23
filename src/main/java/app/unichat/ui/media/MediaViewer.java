@@ -122,7 +122,7 @@ public final class MediaViewer {
                         area.getChildren().setAll(photo);
                         return true;
                     }, photo);
-                } catch (Exception e) {
+                } catch (Exception e) { // NOPMD: ExceptionAsFlowControl, one failure path for no file and a file that won't load
                     Platform.runLater(() -> {
                         if (generation[0] != mine) return;
                         Label l = new Label(I18n.t("viewer.openFailed"));

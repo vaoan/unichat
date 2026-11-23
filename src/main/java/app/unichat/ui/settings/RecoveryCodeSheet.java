@@ -32,9 +32,9 @@ import static app.unichat.ui.settings.SettingsForm.stacked;
  */
 final class RecoveryCodeSheet extends VBox {
     /** Where "Guardar como .txt" writes: the file the system's save dialog gives (null: cancelled). Tests give one. */
-    static Function<Window, File> saveTo = RecoveryCodeSheet::chooseFile;
+    static Function<Window, File> saveTo = RecoveryCodeSheet::chooseFile; // NOPMD: MutableStaticState, a seam tests swap
     /** "Imprimir": through the system's print dialog; whether it was printed. Tests replace it. */
-    static BiPredicate<Window, String> printer = RecoveryCodeSheet::print;
+    static BiPredicate<Window, String> printer = RecoveryCodeSheet::print; // NOPMD: MutableStaticState, a seam tests swap
     /** The system's clipboard as "Copiar" uses it: the code put there, and emptied after while it still holds it. */
     interface Clip {
         void put(String text);
@@ -46,9 +46,9 @@ final class RecoveryCodeSheet extends VBox {
     }
 
     /** The system's clipboard; tests give one of their own. */
-    static Clip clipboard = new Clip() {
+    static Clip clipboard = new Clip() { // NOPMD: MutableStaticState, a seam tests swap
         @Override public void put(String text) {
-            ClipboardContent c = new ClipboardContent();
+            var c = new ClipboardContent();
             c.putString(text);
             Clipboard.getSystemClipboard().setContent(c);
         }

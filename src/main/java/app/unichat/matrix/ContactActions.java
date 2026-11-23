@@ -9,9 +9,9 @@ import app.unichat.support.I18n;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 
-import static app.unichat.matrix.BridgeProtocol.*;
+import static app.unichat.matrix.BridgeProtocol.loginIdOf;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Contacts and new chats through the bridges' own API. */
 final class ContactActions {
@@ -24,7 +24,7 @@ final class ContactActions {
     }
 
     /** Accounts whose bridge answered that it has no user search. */
-    private final Set<String> noSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<String> noSearch = ConcurrentHashMap.newKeySet();
 
     /** The bridge's contacts API for {@code a}, or null when there's no bridge API (external server). */
     private BridgeContacts bridgeContacts(Account a) {

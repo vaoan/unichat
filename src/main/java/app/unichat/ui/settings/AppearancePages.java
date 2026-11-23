@@ -41,7 +41,7 @@ final class AppearancePages {
             s.setTheme(t);
             changed.run();
         });
-        java.util.List<String> languages = new java.util.ArrayList<>(List.of(I18n.AUTO));
+        List<String> languages = new java.util.ArrayList<>(List.of(I18n.AUTO));
         languages.addAll(I18n.available());
         Node language = plainChips(I18n.t("settings.appearance.language"), languages,
                 code -> I18n.AUTO.equals(code) ? I18n.t("language.auto") : I18n.nativeName(code), s.language(), code -> {

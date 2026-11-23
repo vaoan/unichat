@@ -59,9 +59,9 @@ final class LinkSaver {
                         if (fraction >= 0) progress.accept(fraction);
                     }
 
-                    @Override public void title(String title) { }
+                    @Override public void title(String title) { /* not needed here */ }
 
-                    @Override public void line(String rawOutputLine) { }
+                    @Override public void line(String rawOutputLine) { /* not needed here */ }
                 });
         return switch (r.outcome()) {
             case DONE -> {

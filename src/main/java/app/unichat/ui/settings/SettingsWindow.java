@@ -73,7 +73,7 @@ public final class SettingsWindow {
             new Page("about", "settings.nav.about"));
 
     /** The id of the page showing ("appearance"), or null when the window is closed. */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // lookup() gives a Node: ".settings-nav" is the ListView<String> built above
     public static String currentPage() {
         if (open == null) return null;
         Node nav = open.getScene().getRoot().lookup(".settings-nav");
@@ -82,7 +82,7 @@ public final class SettingsWindow {
     }
 
     /** Selects the page named {@code page}: its id ("accessibility") or the start of its shown title. */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // as above
     public static void select(String page) {
         if (open == null) return;
         Node nav = open.getScene().getRoot().lookup(".settings-nav");
@@ -115,7 +115,7 @@ public final class SettingsWindow {
         nav.getStyleClass().add("settings-nav");
         nav.getSelectionModel().selectedIndexProperty().addListener((o, a, idx) -> {
             if (accounts != null) accounts.dispose();
-            accounts = null;
+            accounts = null; // NOPMD: UnusedAssignment, stays null when another page is chosen
             String s = idx.intValue() < 0 ? null : PAGES.get(idx.intValue()).id();
             if ("accounts".equals(s) || s == null) {
                 accounts = new AccountsPane(svc, toast, id -> {
@@ -231,7 +231,7 @@ public final class SettingsWindow {
      */
     private static Node gifsPage() {
         Settings s = Settings.get();
-        java.util.List<Node> groups = new java.util.ArrayList<>();
+        List<Node> groups = new java.util.ArrayList<>();
         Label intro = Labels.help(I18n.t("settings.gifs.intro"));
         groups.add(intro);
         for (GifProviders.Known k : GifProviders.known()) {

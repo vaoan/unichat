@@ -26,6 +26,7 @@ import java.util.stream.Stream;
  */
 public final class LinkVideo {
     /** What fetches {@code url} into {@code dir}: null when done, else why not. */
+    @FunctionalInterface
     interface Fetch {
         Failure save(String url, Path dir) throws IOException, InterruptedException;
     }

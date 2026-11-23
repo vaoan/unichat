@@ -70,10 +70,11 @@ public final class LottieStickers {
             in.mark(2);
             boolean gzip = in.read() == 0x1F && in.read() == 0x8B;
             in.reset();
-            InputStream body = gzip ? new GZIPInputStream(in) : in;
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            if (body.transferTo(new Capped(out)) > MAX_JSON_BYTES) throw new IOException(I18n.t("video.stickerFailed"));
-            return out.toByteArray();
+            try (InputStream body = gzip ? new GZIPInputStream(in) : in) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                if (body.transferTo(new Capped(out)) > MAX_JSON_BYTES) throw new IOException(I18n.t("video.stickerFailed"));
+                return out.toByteArray();
+            }
         }
     }
 
@@ -171,7 +172,7 @@ public final class LottieStickers {
             try {
                 return (theirs == null ? mine : theirs).get();
             } catch (java.util.concurrent.ExecutionException e) {
-                throw e.getCause() instanceof IOException io ? io : new IOException(e.getCause());
+                throw e.getCause() instanceof IOException io ? io : new IOException(e.getCause()); // NOPMD: PreserveStackTrace, the future's wrapper is dropped; its cause has the trace
             }
         }
 

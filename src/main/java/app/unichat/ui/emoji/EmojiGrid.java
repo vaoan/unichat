@@ -75,7 +75,7 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
                 e.consume();
             }
         });
-        javafx.scene.layout.StackPane searchBox = SearchFields.clearable(search);
+        StackPane searchBox = SearchFields.clearable(search);
         searchBox.getStyleClass().add("emoji-search-box");
         getStyleClass().add("emoji-picker");
         list.getStyleClass().add("emoji-list");
@@ -91,7 +91,7 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
         probeBox.setManaged(false);
         probeBox.setVisible(false);
         StackPane body = new StackPane(probeBox, list);
-        javafx.scene.layout.VBox.setVgrow(body, javafx.scene.layout.Priority.ALWAYS);
+        setVgrow(body, javafx.scene.layout.Priority.ALWAYS);
         getChildren().addAll(searchBox, body);
         list.widthProperty().addListener(o -> fit());
         probe.widthProperty().addListener(o -> fit());
@@ -248,7 +248,7 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
             label.setWrapText(true);
             // A row's graphic isn't told the list's width: without a bound, a long hint ran past the edge.
             label.maxWidthProperty().bind(list.widthProperty().subtract(2 * 10 + 16));
-            label.setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+            label.setMinHeight(USE_PREF_SIZE);
         }
 
         @Override

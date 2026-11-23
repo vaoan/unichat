@@ -1,8 +1,6 @@
 package app.unichat.ui.timeline;
 
-import app.unichat.ui.Icons;
 import app.unichat.model.Message;
-import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.scene.Node;

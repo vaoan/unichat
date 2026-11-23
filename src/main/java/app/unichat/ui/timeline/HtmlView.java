@@ -146,7 +146,7 @@ final class HtmlView {
         if (s.isBlank() && (b.run == null || (!look.pre() && s.isEmpty()))) return;
         for (RichText.Span span : RichText.addressSpans(s)) {
             if (span.kind() == RichText.Kind.LINK) b.inline(RichText.link(span.text(), span.text(), openLink, b.width));
-            else for (javafx.scene.Node n : EmojiInline.nodes(span.text(), run -> styled(run, look))) b.inline(n);
+            else for (Node n : EmojiInline.nodes(span.text(), run -> styled(run, look))) b.inline(n);
         }
     }
 
@@ -171,14 +171,28 @@ final class HtmlView {
             nested(e, b, look, null);
             return;
         }
+        Look text = textLook(tag, look);
+        if (text != null) walk(e, b, text);
+        else structure(e, b, look, tag);
+    }
+
+    /** How a tag of the text's own (bold, italic, code…) changes the look; null for any other tag. */
+    private static Look textLook(String tag, Look look) {
+        return switch (tag) {
+            case "b", "strong", "th" -> look.bolder();
+            case "i", "em", "cite", "dfn", "var" -> look.slanted();
+            case "u", "ins" -> look.underlined();
+            case "s", "del", "strike" -> look.struck();
+            case "code", "kbd", "samp", "tt" -> look.coded();
+            case "sub", "sup", "small" -> look.scaled(0.8);
+            default -> null;
+        };
+    }
+
+    /** Headings, quotes, lists, tables, links, pictures and the rest: what isn't only a change of look. */
+    private void structure(Element e, Blocks b, Look look, String tag) {
         switch (tag) {
             case "br" -> b.inline(styled("\n", look));
-            case "b", "strong", "th" -> walk(e, b, look.bolder());
-            case "i", "em", "cite", "dfn", "var" -> walk(e, b, look.slanted());
-            case "u", "ins" -> walk(e, b, look.underlined());
-            case "s", "del", "strike" -> walk(e, b, look.struck());
-            case "code", "kbd", "samp", "tt" -> walk(e, b, look.coded());
-            case "sub", "sup", "small" -> walk(e, b, look.scaled(0.8));
             case "h1" -> heading(e, b, look, 1.5);
             case "h2" -> heading(e, b, look, 1.3);
             case "h3" -> heading(e, b, look, 1.15);

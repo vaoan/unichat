@@ -64,18 +64,18 @@ public abstract class TaskBar extends HBox {
         VBox middle = new VBox(3, bar, stage);
         middle.setAlignment(Pos.CENTER_LEFT);
         middle.setMinWidth(80);
-        HBox.setHgrow(middle, Priority.ALWAYS);
+        setHgrow(middle, Priority.ALWAYS);
 
         big.getStyleClass().add("upload-percent");
         small.getStyleClass().add("audio-time");
         // The column is fixed, and "falta menos de un minuto" didn't fit it with Linux's wider fonts: it goes on two
         // lines there rather than end in "…".
         small.setWrapText(true);
-        small.setMinHeight(Region.USE_PREF_SIZE);
+        small.setMinHeight(USE_PREF_SIZE);
         numbers.setAlignment(Pos.CENTER_LEFT);
         fixedEm(numbers, 10);
         actions.setAlignment(Pos.CENTER_LEFT);
-        getChildren().addAll(lead, texts, middle, numbers, actions);
+        getChildren().addAll(lead, texts, middle, numbers, actions); // NOPMD: ConstructorCallsOverridableMethod, how a JavaFX pane is filled
     }
 
     /** Its buttons, at the end. */

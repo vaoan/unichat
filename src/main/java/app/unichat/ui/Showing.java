@@ -34,6 +34,7 @@ public final class Showing {
     private Showing() {}
 
     /** What {@link #whileShowing} returns: stops watching (a node handed another animation). */
+    @FunctionalInterface
     public interface Watch {
         void cancel();
     }
@@ -139,7 +140,7 @@ public final class Showing {
         }
 
         private void set(double v) {
-            setting = true;
+            setting = true; // NOPMD: UnusedAssignment, read by the listeners the change below fires
             try {
                 p.setProgress(v);
             } finally {

@@ -33,7 +33,7 @@ public interface ChatMessaging {
     CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId);
 
     /** Sends a GIF (mp4 or gif file) from the GIF tab. */
-    default CompletableFuture<Void> sendGif(String chatId, java.nio.file.Path file, String mime, int width, int height, String replyToId) {
+    default CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, String replyToId) {
         return sendFile(chatId, file, replyToId);
     }
 }

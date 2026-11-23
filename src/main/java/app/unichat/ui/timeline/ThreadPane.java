@@ -41,11 +41,11 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
-import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
+import java.time.Instant;
 
 /** Right side: chat header, message timeline, typing line and composer. */
 public final class ThreadPane extends BorderPane {
@@ -440,7 +440,7 @@ public final class ThreadPane extends BorderPane {
     public void showSavedText(boolean none) {
         if (savedTextSheet == null || svc.messages(chat.id()).isEmpty()) return;
         Message m = svc.messages(chat.id()).getLast();
-        java.time.Instant at = m.timestamp() == null ? java.time.Instant.now() : m.timestamp();
+        Instant at = m.timestamp() == null ? Instant.now() : m.timestamp();
         List<app.unichat.autosave.SavedText> versions = none ? List.of() : List.of(
                 new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at, m.senderName(), m.senderId(), m.outgoing(), m.body().toLowerCase(Locale.ROOT), true),
                 new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at.plusSeconds(5), m.senderName(), m.senderId(), m.outgoing(), m.body() + "…", false),
@@ -507,12 +507,12 @@ public final class ThreadPane extends BorderPane {
             serverLink.setAccessibleText(I18n.t("thread.viewChannels", server.title()));
             serverLink.setTooltip(new javafx.scene.control.Tooltip(I18n.t("thread.viewChannels", server.title())));
         }
-        String sub = chat.network().displayName();
+        StringBuilder sub = new StringBuilder(chat.network().displayName());
         String account = Accounts.forChat(svc, chat);
-        if (account != null) sub += " · " + account;
-        if (chat.group()) sub += " · " + I18n.t("thread.participants", chat.members().size());
-        if (chat.muted()) sub += " · " + I18n.t("thread.muted");
-        headerSubtitle.setText(sub);
+        if (account != null) sub.append(" · ").append(account);
+        if (chat.group()) sub.append(" · ").append(I18n.t("thread.participants", chat.members().size()));
+        if (chat.muted()) sub.append(" · ").append(I18n.t("thread.muted"));
+        headerSubtitle.setText(sub.toString());
         Nodes.style(favButton, "active", chat.favorite());
         Nodes.style(archiveButton, "active", chat.archived());
         TypingDots.show(typing, chat.typing().isEmpty() ? null : Formats.typing(chat.typing()));
@@ -678,8 +678,8 @@ public final class ThreadPane extends BorderPane {
             audio.toggle(m, chat);
         } else if (code == javafx.scene.input.KeyCode.C && e.isShortcutDown() && !m.isMedia()) {
             Clipboards.copy(m.body());
-        } else if ((code == javafx.scene.input.KeyCode.ENTER || code == javafx.scene.input.KeyCode.SPACE
-                || code == javafx.scene.input.KeyCode.CONTEXT_MENU)) { // a deleted one's too: what it said
+        } else if (code == javafx.scene.input.KeyCode.ENTER || code == javafx.scene.input.KeyCode.SPACE
+                || code == javafx.scene.input.KeyCode.CONTEXT_MENU) { // a deleted one's too: what it said
             var cell = list.lookupAll(".row-cell").stream()
                     .filter(n -> n instanceof RowCell rc && rc.isSelected()).findFirst().orElse(list);
             messageActions.messageMenu(m).show(cell, Side.BOTTOM, 40, -10);

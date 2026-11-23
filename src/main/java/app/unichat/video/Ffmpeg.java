@@ -27,6 +27,7 @@ public final class Ffmpeg {
     private static final String AUTO_KEY = "video.ffmpegAuto";
 
     /** Where an ffmpeg comes from when one is needed: null when there's none to use. */
+    @FunctionalInterface
     public interface Source {
         Path get() throws IOException, InterruptedException;
     }
@@ -60,7 +61,7 @@ public final class Ffmpeg {
      */
     public static List<String> input(Path file) throws IOException {
         byte[] head;
-        try (var in = java.nio.file.Files.newInputStream(file)) {
+        try (var in = Files.newInputStream(file)) {
             head = in.readNBytes(64);
         }
         String start = new String(head, java.nio.charset.StandardCharsets.ISO_8859_1).replace("\u00EF\u00BB\u00BF", "").stripLeading();

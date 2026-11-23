@@ -24,7 +24,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
@@ -33,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import javafx.scene.layout.StackPane;
 
 /**
  * GIFs tab: search across the providers turned on in Ajustes → GIFs, plus favourite and recent GIFs (shared by every
@@ -71,14 +71,14 @@ public final class GifGrid extends VBox {
         search.setAccessibleText(I18n.t("gif.search"));
         search.setOnAction(e -> refresh());
         debounce.setOnFinished(e -> refresh());
-        library.addListener(() -> javafx.application.Platform.runLater(() -> {
+        library.addListener(() -> Platform.runLater(() -> {
             if (getScene() != null) refreshLibrary();
         }));
         search.textProperty().addListener((o, a, b) -> debounce.playFromStart());
         ScrollPane scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("side-panel-scroll");
-        VBox.setVgrow(scroll, javafx.scene.layout.Priority.ALWAYS);
+        setVgrow(scroll, javafx.scene.layout.Priority.ALWAYS);
         getChildren().addAll(SearchFields.clearable(search), scroll);
     }
 
@@ -135,7 +135,7 @@ public final class GifGrid extends VBox {
     private void refreshLibrary() {
         libraryTiles.next();
         libraryBox.getChildren().clear();
-        if (!search.getText().strip().isEmpty()) return;
+        if (!search.getText().isBlank()) return;
         Chat c = chat.get();
         boolean accepted = c == null || c.features().accepts(RoomFeatures.GIF);
         libraryRow(true, library.favorites(MediaLibrary.Kind.GIF), accepted);
@@ -165,7 +165,7 @@ public final class GifGrid extends VBox {
         MediaLibrary.Item shown = preview != null && preview.startsWith("http")
                 ? new MediaLibrary.Item(MediaLibrary.Kind.STICKER, preview, "image/gif", i.width(), i.height(), null) : i;
         Node tile = tile(probe, what, accepted, () -> sendFromLibrary(i));
-        if (tile instanceof javafx.scene.layout.StackPane box) {
+        if (tile instanceof StackPane box) {
             MediaLoading.track(box, progress -> MessageMedia.loadMedia(svc, probe, MediaItems.message(shown), TILE_W * 2, TILE_H * 2, progress));
         }
         LibraryMenu.attach(tile, library, i, accepted ? () -> sendFromLibrary(i) : null, toast, svc);

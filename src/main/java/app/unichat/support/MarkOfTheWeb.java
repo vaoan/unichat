@@ -23,7 +23,7 @@ public final class MarkOfTheWeb {
     @org.gaul.modernizer_maven_annotations.SuppressModernizer // java.io on purpose: NIO refuses the stream's colon
     public static void mark(Path file) {
         if (!Os.windows()) return;
-        try (OutputStream out = new FileOutputStream(stream(file))) {
+        try (OutputStream out = new FileOutputStream(stream(file))) { // NOPMD: AvoidFileStream, java.io on purpose (above)
             out.write(ZONE.getBytes(StandardCharsets.US_ASCII));
         } catch (IOException | RuntimeException e) {
             // no streams on this drive: the file stays, unmarked

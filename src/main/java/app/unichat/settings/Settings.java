@@ -19,6 +19,7 @@ import java.util.Properties;
  * A change never waits for the disk: it's written on a thread of its own, once for many changes in a row
  * ({@link #flush} waits for it, and quitting must call it).
  */
+@SuppressWarnings("PMD.ExcessivePublicCount") // the preferences' one door: a getter and a setter for each
 public final class Settings {
     public enum Theme { SYSTEM, LIGHT, DARK }
 

@@ -95,7 +95,8 @@ final class LoginTexts {
 
     /** The deepest cause: what these screens show comes from a bridge's login step, wrapped in whatever carried it here. */
     static String rootMessage(Throwable t) {
-        while (t.getCause() != null) t = t.getCause();
-        return Errors.message(t);
+        Throwable root = t;
+        while (root.getCause() != null) root = root.getCause();
+        return Errors.message(root);
     }
 }

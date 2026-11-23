@@ -122,7 +122,7 @@ public final class DropboxLogin {
         JsonNode n = JSON.readTree(r.body());
         String refresh = n.path("refresh_token").asText(null);
         if (r.statusCode() != 200 || refresh == null) {
-            throw new IOException(I18n.t("cloud.dropbox.failed", n.path("error_description").asText(n.path("error").asText(r.statusCode() + ""))));
+            throw new IOException(I18n.t("cloud.dropbox.failed", n.path("error_description").asText(n.path("error").asText(String.valueOf(r.statusCode())))));
         }
         return refresh;
     }

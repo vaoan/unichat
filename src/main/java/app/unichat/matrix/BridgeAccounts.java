@@ -23,7 +23,21 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static app.unichat.matrix.BridgeProtocol.*;
+import static app.unichat.matrix.BridgeProtocol.BotChatLogin;
+import static app.unichat.matrix.BridgeProtocol.Login;
+import static app.unichat.matrix.BridgeProtocol.accountId;
+import static app.unichat.matrix.BridgeProtocol.botCommand;
+import static app.unichat.matrix.BridgeProtocol.inferFromBotChat;
+import static app.unichat.matrix.BridgeProtocol.liveDetail;
+import static app.unichat.matrix.BridgeProtocol.liveStatus;
+import static app.unichat.matrix.BridgeProtocol.loginCommand;
+import static app.unichat.matrix.BridgeProtocol.loginStatus;
+import static app.unichat.matrix.BridgeProtocol.needsChatResync;
+import static app.unichat.matrix.BridgeProtocol.parseDiscordPing;
+import static app.unichat.matrix.BridgeProtocol.parseLogins;
+import static app.unichat.matrix.BridgeProtocol.requireSuccess;
+import static app.unichat.matrix.BridgeProtocol.startsLoginByItself;
+import static app.unichat.matrix.BridgeProtocol.statusCommand;
 import static app.unichat.matrix.MatrixClient.CLIENT;
 import static app.unichat.support.Urls.enc;
 import static app.unichat.matrix.MatrixLogin.userMessage;
@@ -195,7 +209,7 @@ final class BridgeAccounts {
         refreshLogins(n);
     }
 
-    static volatile BridgeProvisioner provisioner;
+    static volatile BridgeProvisioner provisioner; // NOPMD: MutableStaticState, a seam tests swap
 
     CompletableFuture<String> connectNetwork(Network network) {
         if (!network.isBridged()) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.networkUnsupported")));
@@ -373,7 +387,7 @@ final class BridgeAccounts {
         });
     }
 
-    private final Set<Network> resyncStarted = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<Network> resyncStarted = ConcurrentHashMap.newKeySet();
 
     private void waitForRoom(String roomId) throws InterruptedException {
         for (int i = 0; i < 20 && core.chat(roomId) == null; i++) Thread.sleep(250);

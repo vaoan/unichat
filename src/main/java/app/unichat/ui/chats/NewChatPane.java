@@ -119,7 +119,7 @@ public final class NewChatPane extends VBox {
                 close.run();
             }
         });
-        VBox.setVgrow(list, Priority.ALWAYS);
+        setVgrow(list, Priority.ALWAYS);
         networks.setAccessibleText(I18n.t("newChat.network"));
         accountRow.setAccessibleText(I18n.t("newChat.account"));
         getChildren().addAll(title, networks, accountRow, SearchFields.clearable(search), status, list);

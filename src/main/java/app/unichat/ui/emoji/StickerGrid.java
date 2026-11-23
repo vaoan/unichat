@@ -87,7 +87,7 @@ public final class StickerGrid extends ScrollPane {
     }
 
     /** The look of a media tab; a favourite added or removed anywhere (chat, Favoritos tab) shows on it at once. */
-    static void setUp(javafx.scene.control.ScrollPane pane, javafx.scene.layout.Region content, MediaLibrary library, Runnable refresh) {
+    static void setUp(ScrollPane pane, Region content, MediaLibrary library, Runnable refresh) {
         content.getStyleClass().add("sticker-grid");
         pane.setContent(content);
         pane.setFitToWidth(true);

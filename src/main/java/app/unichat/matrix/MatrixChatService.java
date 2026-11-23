@@ -39,7 +39,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static app.unichat.matrix.BridgeProtocol.*;
+import static app.unichat.matrix.BridgeProtocol.loginChanged;
 import static app.unichat.matrix.MatrixClient.CLIENT;
 import static app.unichat.support.Urls.enc;
 
@@ -48,6 +48,7 @@ import static app.unichat.support.Urls.enc;
  * Model mutations happen under the {@link SyncProcessor} lock; listeners are called from background threads.
  * End-to-end encryption is not supported: bridges must be configured without encryption.
  */
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessivePublicCount"}) // ChatService's and BridgeAccess's whole interfaces
 public final class MatrixChatService implements ChatService, BridgeAccess, FolderForwarding {
     private static final String HISTORY_FILTER = "{\"lazy_load_members\":true}";
     private final MatrixClient client;
@@ -259,46 +260,27 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         }
     }
 
-    private void syncRounds(boolean catchUp) {
+    private void syncRounds(boolean catchUpFirst) {
+        boolean catchUp = catchUpFirst; // false from the first rejected token on
         int failures = 0;
         boolean quick = false;
         while (core.running) {
             try {
                 boolean initial = nextBatch == null;
                 if (initial) setState(ConnectionState.SYNCING);
-                // Between two rounds: what rests changes, and a part of a catch-up comes in (ArchiveRest).
-                boolean more = !initial && !catchUp && core.initialSyncDone && rest.beforeRequest();
-                // A catch-up (from the cached token, after waking, or of woken rooms) must return at once, not long-poll for 30 s.
-                int timeout = initial || catchUp || quick || more ? 0 : 30000;
+                int timeout = pollTimeout(initial, catchUp, quick);
                 synchronized (pollLock) {
                     longPolling = timeout > 0; // before the filter is read: a change from here on drops this poll
                 }
                 String filterParam = syncFilter.forRequest(initial);
-                String path = CLIENT + "/sync?filter=" + enc(filterParam) + "&timeout=" + timeout
-                        + (initial ? "" : "&since=" + enc(nextBatch));
                 JsonNode resp;
                 try {
-                    resp = client.request("GET", path, null, Duration.ofSeconds(initial || catchUp ? 180 : 75));
+                    resp = poll(filterParam, timeout, initial, catchUp);
                 } catch (MatrixException e) {
-                    if (!filterParam.equals(SyncFilter.BASE) && SyncFilter.unknown(e)) {
-                        rest.filterForgotten(filterParam); // the server's database was wiped: post it again
-                        // Once at once; a fresh id refused too waits its turn (the backoff), never a loop of posts.
-                        if (!forgotJustNow) {
-                            forgotJustNow = true;
-                            continue;
-                        }
-                    }
-                    if (catchUp && sinceRejected(e)) {
-                        // The cached token was rejected (expired/purged): fall back to a full sync. A busy or
-                        // restarting server (429, 5xx) goes to the backoff instead, keeping the cache.
-                        catchUp = false;
-                        nextBatch = null;
-                        synchronized (proc) {
-                            proc.forgetServerValues();
-                        }
-                        continue;
-                    }
-                    throw e;
+                    Refusal what = refused(e, filterParam, catchUp);
+                    if (what == Refusal.FAIL) throw e;
+                    if (what == Refusal.FULL_SYNC) catchUp = false;
+                    continue;
                 } finally {
                     dropped = pollEnded();
                 }
@@ -306,14 +288,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 forgotJustNow = false;
                 // Missed messages during the catch-up don't notify, like the initial sync.
                 boolean live = core.initialSyncDone && !catchUp;
-                SyncProcessor.Result r;
-                synchronized (proc) {
-                    r = proc.process(resp, live);
-                }
-                applyQuietRules();
-                nextBatch = resp.path("next_batch").asText(null);
-                if (initial) cache.save(resp);
-                else if (catchUp) refreshSyncCache();
+                SyncProcessor.Result r = take(resp, initial, catchUp, live);
                 boolean firstRound = !core.initialSyncDone;
                 catchUp = false;
                 quick = false;
@@ -323,19 +298,12 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 setState(ConnectionState.ONLINE);
                 dispatch(r, live && !firstRound);
                 if (firstRound) chatActions.checkReminders();
-            } catch (MatrixException e) {
-                if ("M_UNKNOWN_TOKEN".equals(e.errcode())) {
-                    core.running = false;
-                    Settings.get().clearSession();
-                    setState(ConnectionState.LOGGED_OUT);
-                    return;
-                }
+            } catch (MatrixException e) { // NOPMD: ExceptionAsFlowControl, one failure path for every refusal of a round
+                if (loggedOut(e)) return;
                 failures = backoff(++failures, e);
             } catch (InterruptedIOException e) {
                 if (!core.running) return;
-                if (woke) {
-                    woke = false;
-                    Thread.interrupted();
+                if (wokenUp()) {
                     quick = true;
                     continue;
                 }
@@ -345,6 +313,75 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 failures = backoff(++failures, e);
             }
         }
+    }
+
+    /** One /sync request: the first or a catch-up may take minutes to answer. */
+    private JsonNode poll(String filterParam, int timeout, boolean initial, boolean catchUp) throws IOException {
+        String path = CLIENT + "/sync?filter=" + enc(filterParam) + "&timeout=" + timeout
+                + (initial ? "" : "&since=" + enc(nextBatch));
+        return client.request("GET", path, null, Duration.ofSeconds(initial || catchUp ? 180 : 75));
+    }
+
+    /** How long this round's request may wait for news: 0 to come back at once. */
+    private int pollTimeout(boolean initial, boolean catchUp, boolean quick) {
+        // Between two rounds: what rests changes, and a part of a catch-up comes in (ArchiveRest).
+        boolean more = !initial && !catchUp && core.initialSyncDone && rest.beforeRequest();
+        // A catch-up (from the cached token, after waking, or of woken rooms) must return at once, not long-poll for 30 s.
+        return initial || catchUp || quick || more ? 0 : 30000;
+    }
+
+    /** The session refused for good (its token unknown): logged out, and the sync ends. */
+    private boolean loggedOut(MatrixException e) {
+        if (!"M_UNKNOWN_TOKEN".equals(e.errcode())) return false;
+        core.running = false;
+        Settings.get().clearSession();
+        setState(ConnectionState.LOGGED_OUT);
+        return true;
+    }
+
+    /** The poll was cut short by a wake-up (its interrupt spent here): the next round goes at once. */
+    private boolean wokenUp() {
+        if (!woke) return false;
+        woke = false;
+        var _ = Thread.interrupted();
+        return true;
+    }
+
+    /** What a refused sync request leads to: the filter posted again, a full sync, or the backoff. */
+    private enum Refusal { FILTER_AGAIN, FULL_SYNC, FAIL }
+
+    private Refusal refused(MatrixException e, String filterParam, boolean catchUp) {
+        if (!filterParam.equals(SyncFilter.BASE) && SyncFilter.unknown(e)) {
+            rest.filterForgotten(filterParam); // the server's database was wiped: post it again
+            // Once at once; a fresh id refused too waits its turn (the backoff), never a loop of posts.
+            if (!forgotJustNow) {
+                forgotJustNow = true;
+                return Refusal.FILTER_AGAIN;
+            }
+        }
+        if (catchUp && sinceRejected(e)) {
+            // The cached token was rejected (expired/purged): fall back to a full sync. A busy or
+            // restarting server (429, 5xx) goes to the backoff instead, keeping the cache.
+            nextBatch = null;
+            synchronized (proc) {
+                proc.forgetServerValues();
+            }
+            return Refusal.FULL_SYNC;
+        }
+        return Refusal.FAIL;
+    }
+
+    /** A sync's answer taken in: the model, the quiet rules, the next token and the cache. */
+    private SyncProcessor.Result take(JsonNode resp, boolean initial, boolean catchUp, boolean live) {
+        SyncProcessor.Result r;
+        synchronized (proc) {
+            r = proc.process(resp, live);
+        }
+        applyQuietRules();
+        nextBatch = resp.path("next_batch").asText(null);
+        if (initial) cache.save(resp);
+        else if (catchUp) refreshSyncCache();
+        return r;
     }
 
     private final Object pollLock = new Object();
@@ -414,6 +451,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     static final int STILL_CONNECTING = 5;
 
     /** How a retry waits its turn: {@link Thread#sleep} (interrupted by waking); tests that only care about the order skip it. */
+    @FunctionalInterface
     interface Pause { void pause(long millis) throws InterruptedException; }
 
     private volatile Pause pause = Thread::sleep;
@@ -448,7 +486,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
             }
         }
         if (notify) {
-            java.time.Instant now = java.time.Instant.now();
+            Instant now = Instant.now();
             for (Message m : r.newMessages) {
                 // History a bridge backfills or resends arrives as new events: only what's really new is announced.
                 if (!notifyGate.isNew(m, now)) continue;
@@ -599,10 +637,10 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public CompletableFuture<Void> setMarkedUnread(String chatId, boolean unread) { return chatActions.setMarkedUnread(chatId, unread); }
     @Override public CompletableFuture<Void> setFavorite(String chatId, boolean favorite) { return chatActions.setFavorite(chatId, favorite); }
     @Override public CompletableFuture<Void> setLowPriority(String chatId, boolean lowPriority) { return chatActions.setLowPriority(chatId, lowPriority); }
-    @Override public CompletableFuture<Void> setAutoSave(String chatId, boolean mine, java.util.Set<app.unichat.model.SaveKind> kinds) {
+    @Override public CompletableFuture<Void> setAutoSave(String chatId, boolean mine, Set<app.unichat.model.SaveKind> kinds) {
         return chatActions.setAutoSave(chatId, mine, kinds);
     }
-    @Override public java.util.Set<app.unichat.model.SaveKind> autoSaves(String chatId, boolean mine) { return chatActions.autoSaves(chatId, mine); }
+    @Override public Set<app.unichat.model.SaveKind> autoSaves(String chatId, boolean mine) { return chatActions.autoSaves(chatId, mine); }
     @Override public CompletableFuture<Void> setMediaHidden(String chatId, boolean hidden) { return chatActions.setMediaHidden(chatId, hidden); }
     @Override public byte[] preferencesJson() { return prefs.json(); }
 

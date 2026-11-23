@@ -197,13 +197,13 @@ final class MessageActionsUi {
     }
 
     /** The quick reactions: the ones the person reacts with most (the usual six until there's history), as this chat allows. */
-    java.util.List<String> quick() {
+    List<String> quick() {
         return chat.get().features().reactionsOffered(library.mostReacted(EmojiPicker.QUICK.size(), EmojiPicker.QUICK));
     }
 
     /** Adds or takes away the person's {@code e} on {@code m}; an added one counts towards the quick ones. */
     void react(Message m, String e) {
-        java.util.Set<String> who = m.reactions().get(e);
+        Set<String> who = m.reactions().get(e);
         if (who == null || !who.contains(svc.myUserId())) library.reacted(e);
         var _ = svc.toggleReaction(chat.get().id(), m.id(), e);
     }

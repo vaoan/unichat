@@ -262,7 +262,7 @@ final class ArchiveRest {
             try {
                 filter.exclude(Set.of());
             } catch (IOException never) {
-                throw new IllegalStateException(never); // the usual filter is never posted
+                throw new IllegalStateException(never); // NOPMD: PreserveStackTrace, e was answered by this fallback; the usual filter is never posted
             }
             for (String r : resting) owed.add(r);
             resting = Set.of();

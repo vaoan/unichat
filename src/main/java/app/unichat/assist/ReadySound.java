@@ -16,7 +16,7 @@ public final class ReadySound {
     static final int RATE = 44_100;
     private static final AudioFormat FORMAT = new AudioFormat(RATE, 16, 1, true, false);
     /** Where the samples go; tests swap it. Off the UI thread. */
-    public static volatile Consumer<short[]> player = ReadySound::playNow;
+    public static volatile Consumer<short[]> player = ReadySound::playNow; // NOPMD: MutableStaticState, a seam tests swap
 
     private ReadySound() {}
 

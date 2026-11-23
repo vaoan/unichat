@@ -37,7 +37,7 @@ final class MediaUpload {
     interface Progress {
         void uploading(int done, int total, String name);
 
-        default void sent(long bytes, long size) { }
+        default void sent(long bytes, long size) { /* nothing by default */ }
     }
 
     private final Path record;

@@ -39,6 +39,7 @@ public final class UploadQueue {
     public record Upload(String chatId, Path file, String replyToId, SendAs as) {}
 
     /** Runs {@code r} after {@code ms} (tests run it at once, or keep it). */
+    @FunctionalInterface
     interface Later {
         void run(long ms, Runnable r);
     }

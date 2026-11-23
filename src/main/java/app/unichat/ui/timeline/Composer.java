@@ -96,7 +96,7 @@ public final class Composer extends VBox {
     private boolean stacked;
     /** Held here: the global properties only keep a weak reference, so a closed chat's composer can go. */
     @SuppressWarnings("UnusedVariable") // held, never read: that's what keeps the weak listeners' target alive
-    private final javafx.beans.InvalidationListener frameFit;
+    private final javafx.beans.InvalidationListener frameFit; // NOPMD: UnusedPrivateField, as above
     /** Below this many characters' width the text goes on its own line (160 % text, a narrow window, the info panel). */
     private static final double MIN_INPUT_EM = 14;
     private final Button send;
@@ -146,7 +146,7 @@ public final class Composer extends VBox {
         });
         Button send = Icons.iconButton(Icons.SEND, I18n.t("composer.send"), this::send);
         send.getStyleClass().add("send-button");
-        send.disableProperty().bind(input.textProperty().map(t -> t.isBlank()));
+        send.disableProperty().bind(input.textProperty().map(String::isBlank));
 
         this.send = send;
         voice = new VoiceRecording(svc, onError, new VoiceRecording.Box() {
@@ -254,7 +254,7 @@ public final class Composer extends VBox {
             input.minHeightProperty().bind(row.heightProperty());
         } else {
             input.minHeightProperty().unbind();
-            input.setMinHeight(Region.USE_COMPUTED_SIZE);
+            input.setMinHeight(USE_COMPUTED_SIZE);
             frame.getChildren().remove(input);
             row.getChildren().remove(rowGrow);
             row.getChildren().add(1, input);
@@ -445,15 +445,7 @@ public final class Composer extends VBox {
     private void onKey(KeyEvent e) {
         if (FormatMenu.onKey(e, input, features())) return;
         if (e.getCode() == KeyCode.ENTER) {
-            boolean sendOnEnter = Settings.get().sendOnEnter();
-            boolean modifier = e.isShortcutDown();
-            if ((sendOnEnter && !e.isShiftDown() && !e.isAltDown()) || (!sendOnEnter && modifier)) {
-                e.consume();
-                send();
-            } else if (e.isShiftDown() || e.isAltDown() || modifier) {
-                e.consume();
-                input.insertText(input.getCaretPosition(), "\n");
-            }
+            onEnter(e);
         } else if ((e.getCode() == KeyCode.UP || e.getCode() == KeyCode.DOWN) && e.isShiftDown()
                 && !e.isShortcutDown() && !e.isAltDown()) {
             e.consume();
@@ -468,14 +460,32 @@ public final class Composer extends VBox {
             e.consume();
             cancelMode();
         } else if (e.getCode() == KeyCode.UP && input.getText().isEmpty() && chatId != null) {
-            List<Message> msgs = svc.messages(chatId);
-            for (int i = msgs.size() - 1; i >= 0; i--) {
-                Message m = msgs.get(i);
-                if (m.outgoing() && !m.deleted() && !m.isMedia()) {
-                    e.consume();
-                    edit(m);
-                    return;
-                }
+            editLastSent(e);
+        }
+    }
+
+    /** Enter sends or breaks the line, as the setting says; with a modifier, the other one. */
+    private void onEnter(KeyEvent e) {
+        boolean sendOnEnter = Settings.get().sendOnEnter();
+        boolean modifier = e.isShortcutDown();
+        if ((sendOnEnter && !e.isShiftDown() && !e.isAltDown()) || (!sendOnEnter && modifier)) {
+            e.consume();
+            send();
+        } else if (e.isShiftDown() || e.isAltDown() || modifier) {
+            e.consume();
+            input.insertText(input.getCaretPosition(), "\n");
+        }
+    }
+
+    /** ↑ in an empty box: the last text I sent, to edit. */
+    private void editLastSent(KeyEvent e) {
+        List<Message> msgs = svc.messages(chatId);
+        for (int i = msgs.size() - 1; i >= 0; i--) {
+            Message m = msgs.get(i);
+            if (m.outgoing() && !m.deleted() && !m.isMedia()) {
+                e.consume();
+                edit(m);
+                return;
             }
         }
     }
@@ -604,7 +614,7 @@ public final class Composer extends VBox {
      */
     private void autoGrow() {
         if (drawn == null) {
-            for (javafx.scene.Node n : input.lookupAll(".text")) { // the paragraph, inside a Group; the placeholder isn't
+            for (Node n : input.lookupAll(".text")) { // the paragraph, inside a Group; the placeholder isn't
                 if (n instanceof Text t && t.getParent() instanceof javafx.scene.Group) drawn = t;
             }
             // Wrapped to a new width after the box's own layout: its size changing is what says so.

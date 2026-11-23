@@ -4,7 +4,6 @@ import app.unichat.ui.SearchFields;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatReader;
 import app.unichat.service.MediaSource;
-import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -84,7 +83,7 @@ public final class CommandBar extends VBox {
                 default -> { }
             }
         });
-        VBox.setVgrow(list, Priority.ALWAYS);
+        setVgrow(list, Priority.ALWAYS);
         getChildren().addAll(SearchFields.clearable(field), list);
         filter("");
     }

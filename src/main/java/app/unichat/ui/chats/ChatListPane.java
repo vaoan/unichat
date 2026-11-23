@@ -84,7 +84,7 @@ public final class ChatListPane extends VBox {
         this.svc = svc;
         this.onOpen = onOpen;
         this.folderDialogs = folderDialogs;
-        this.spaces = new Spaces(svc, c -> open(c));
+        this.spaces = new Spaces(svc, this::open);
         spaces.setOnChanged(this::refresh);
         getStyleClass().add("chat-list-pane");
 
@@ -112,7 +112,7 @@ public final class ChatListPane extends VBox {
             list.requestFocus();
         });
         ChatMenus.onMenuKey(folderView.chatList(), this::rowMenu);
-        VBox.setVgrow(folderView, Priority.ALWAYS);
+        setVgrow(folderView, Priority.ALWAYS);
         getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list, channels, folderView);
         filter.addListener((o, a, b) -> {
             syncChips(b);
@@ -188,13 +188,13 @@ public final class ChatListPane extends VBox {
         empty.setWrapText(true);
         list.setPlaceholder(empty);
         ChatMenus.onMenuKey(list, this::rowMenu);
-        VBox.setVgrow(list, Priority.ALWAYS);
+        setVgrow(list, Priority.ALWAYS);
     }
 
     private ToggleButton chip(String text, java.util.function.UnaryOperator<ChatFilter> change) {
         ToggleButton b = new ToggleButton(text);
         b.getStyleClass().add("chip");
-        b.setMinWidth(Region.USE_PREF_SIZE);
+        b.setMinWidth(USE_PREF_SIZE);
         b.setToggleGroup(chips);
         b.setOnAction(e -> filter.set(change.apply(filter.get())));
         return b;
@@ -275,7 +275,12 @@ public final class ChatListPane extends VBox {
         }
         ListRows.redraw(list);
         channels.redraw();
+        refreshTitles(f);
+        refreshFavorites(f, all);
+    }
 
+    /** The title, the account row, the view's chips and what an empty list says, for {@code f}. */
+    private void refreshTitles(ChatFilter f) {
         String base = switch (f.view()) {
             case INBOX -> f.unreadOnly() ? I18n.t("chatList.title.unread") : I18n.t("chatList.title.inbox");
             case FAVORITES -> I18n.t("chatList.title.favorites");
@@ -292,7 +297,10 @@ public final class ChatListPane extends VBox {
                 : svc.accounts().stream().noneMatch(a -> a.status() == AccountStatus.CONNECTED)
                     ? I18n.t("chatList.empty.noNetwork")
                 : I18n.t("chatList.empty.none"));
+    }
 
+    /** The favorites row: in the inbox only, not while searching or inside a server or the folders. */
+    private void refreshFavorites(ChatFilter f, List<Chat> all) {
         boolean showFavs = f.view() == ChatFilter.View.INBOX && !f.searching() && !f.unreadOnly() && !channels.isOpen() && !foldersOpen();
         List<Chat> favs = showFavs ? all.stream().filter(c -> c.favorite() && !c.personalSpace() && !c.archived() && !c.bridgeBot()
                 && (f.network() == null || c.network() == f.network())).sorted(ChatFilter.ORDER).toList() : List.of();
@@ -318,14 +326,14 @@ public final class ChatListPane extends VBox {
             favorites.setTiles(tiles);
         }
         for (int i = 0; i < favs.size(); i++) {
-            javafx.scene.Node tile = favorites.tiles().get(i);
+            Node tile = favorites.tiles().get(i);
             Chat c = favs.get(i);
             Nodes.style(tile, "selected", c.id().equals(selectedId));
             tile.lookup(".unread-dot").setVisible(c.space() ? rows.unread().getOrDefault(c.id(), 0) > 0 : c.isUnread());
             tile.setAccessibleText(I18n.t("chatList.favoriteA11y", A11yText.chat(c, Accounts.forChat(accounts, c), Instant.now(), ZoneId.systemDefault())));
         }
         for (int i = 0; i < folders.size(); i++) {
-            javafx.scene.Node tile = favorites.tiles().get(favs.size() + i);
+            Node tile = favorites.tiles().get(favs.size() + i);
             long unread = FolderRows.unread(folders.get(i), all);
             tile.lookup(".unread-dot").setVisible(unread > 0);
             tile.setAccessibleText(I18n.t("chatList.favoriteFolderA11y", folders.get(i).name(), unread > 0 ? ", " + I18n.n("rail.unread", unread) : ""));
@@ -509,7 +517,7 @@ public final class ChatListPane extends VBox {
         for (int i = 0; i < items.size(); i++) {
             if (items.get(i).id().equals(was)) {
                 arrowedRow = was;
-                updating = true;
+                updating = true; // NOPMD: UnusedAssignment, read by the listeners the change below fires
                 list.getSelectionModel().select(i);
                 list.scrollTo(i);
                 updating = false;

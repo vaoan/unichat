@@ -76,8 +76,8 @@ public final class SafeFile {
         Path part = part();
         try {
             Files.deleteIfExists(part);
-            try (FileChannel channel = FileChannel.open(part, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE), attributes())) {
-                OutputStream out = new KeptOpen(Channels.newOutputStream(channel));
+            try (FileChannel channel = FileChannel.open(part, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE), attributes());
+                 OutputStream out = new KeptOpen(Channels.newOutputStream(channel))) {
                 content.writeTo(out);
                 out.flush();
                 channel.force(true);

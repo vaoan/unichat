@@ -2,7 +2,12 @@ package app.unichat.login;
 
 import app.unichat.model.Network;
 
-import java.util.*;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 /** Which cookies a "cookie network" needs, and on which domains they live. */
 public final class CookieSpec {

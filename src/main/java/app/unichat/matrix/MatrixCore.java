@@ -63,6 +63,7 @@ final class MatrixCore {
         }
     }
 
+    @FunctionalInterface
     interface IoAction { void run() throws Exception; }
 
     CompletableFuture<Void> run(IoAction action) {

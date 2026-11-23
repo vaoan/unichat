@@ -106,7 +106,7 @@ final class MessageRowView {
                 quote(who, text, known);
             } else if (!asked.isDone()) {
                 text.setText(I18n.t("message.loadingOriginal"));
-                var _ = asked.thenAccept(r -> javafx.application.Platform.runLater(() -> {
+                var _ = asked.thenAccept(r -> Platform.runLater(() -> {
                     if (r != null) quote(who, text, r);
                     else text.setText(I18n.t("message.notLoaded"));
                 }));
@@ -133,7 +133,7 @@ final class MessageRowView {
 
     /** A day's line between messages ("Hoy", "Ayer", a date), as the chat and a capture of it draw it. */
     static Node dayRow(ThreadRows.DayRow d) {
-        Label l = new Label(app.unichat.ui.Formats.daySeparator(d.day(), java.time.Instant.now(), java.time.ZoneId.systemDefault()));
+        Label l = new Label(Formats.daySeparator(d.day(), java.time.Instant.now(), ZoneId.systemDefault()));
         l.getStyleClass().add("day-separator");
         HBox box = new HBox(l);
         box.setAlignment(Pos.CENTER);
@@ -324,10 +324,10 @@ final class MessageRowView {
         return l;
     }
 
-    private static java.util.List<String> links(Message m) {
+    private static List<String> links(Message m) {
         java.util.Set<String> out = new java.util.LinkedHashSet<>(m.html() != null ? HtmlView.links(m.html()) : RichText.addresses(m.body()));
         m.linkPreviews().stream().map(LinkPreview::url).filter(u -> !u.isEmpty()).forEach(out::add);
-        return java.util.List.copyOf(out);
+        return List.copyOf(out);
     }
 
     /** A bridge sends the video it could get as a message of its own right after, at the same moment: no second player. */

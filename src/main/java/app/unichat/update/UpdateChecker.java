@@ -56,6 +56,7 @@ public final class UpdateChecker {
     private final Fetcher fetcher;
 
     /** What answers GitHub's call: the body, or an exception. */
+    @FunctionalInterface
     interface Fetcher { String fetch() throws Exception; }
 
     private UpdateChecker() { this(System::currentTimeMillis, UpdateChecker::fetch); }
@@ -146,7 +147,7 @@ public final class UpdateChecker {
             s.set(LATEST, latest.version());
             s.set(LATEST_URL, latest.url());
             r = new Result(AppVersion.isNewer(latest.version(), AppVersion.current()) ? Outcome.NEWER : Outcome.UP_TO_DATE, latest);
-        } catch (Exception e) {
+        } catch (Exception e) { // NOPMD: ExceptionAsFlowControl, one failure path for no release and a failed call
             System.err.println("Update check failed: " + e.getMessage());
             r = new Result(Outcome.FAILED, null);
         }
