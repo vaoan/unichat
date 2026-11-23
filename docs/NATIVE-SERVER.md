@@ -30,8 +30,9 @@ When Unichat starts, it checks what's missing and installs it without asking:
    (passwords and tokens are kept).
 4. **Account:** the first time the user is created and Unichat signs in by itself; the user never sees a
    password or a server URL.
-5. **Startup and supervision:** Unichat starts the server, waits for it to answer, starts the bridges and
-   restarts them if they crash. When Unichat quits (tray menu → Quit Unichat) they are stopped.
+5. **Startup and supervision:** Unichat starts the server, waits for it to answer, starts the bridges that
+   have an account and restarts them if they crash. A bridge with no account (no login kept in `matrix.logins.<network>`,
+   nor in its own database when none was kept yet) doesn't run until the person opens its sign-in, then runs for the session. When Unichat quits (tray menu → Quit Unichat) they are stopped.
 
 With that, **updating Unichat = getting everything**: new versions of the bridges, of the server and configuration
 changes come with the app.
@@ -98,7 +99,7 @@ container names:
 - **Live status** (`status_endpoint`): each bridge reports its accounts' connection changes to
   `127.0.0.1:<free port>/status/<bridge>` (served by Unichat, `StatusEndpoint`; it only accepts that bridge's
   `as_token`). `BridgeStates` keeps them and the account list uses them instead of asking `list-logins`.
-- **Watchdog** (`Watchdog`): every 30 s it asks the server and each bridge whether they answer. It restarts one that doesn't
+- **Watchdog** (`Watchdog`): every 30 s it asks the server and each bridge meant to run whether they answer. It restarts one that doesn't
   answer 3 times in a row, whose accounts have been disconnected for 10 min, or that disconnected 5 times in 10 min
   (mautrix-discord piles up server subscriptions on each reconnection until Discord cuts it off with 4008). Between
   restarts it waits 5 min, twice as long each time, up to 1 h. A logged-out session isn't restarted: only linking

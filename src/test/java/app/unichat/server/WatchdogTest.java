@@ -1,6 +1,15 @@
 package app.unichat.server;
 
+import app.unichat.bridge.BridgeStates;
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
+
+import java.net.InetSocketAddress;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -30,4 +39,35 @@ class WatchdogTest {
         assertEquals(40 * 60_000, Watchdog.cooldown(4));
         assertEquals(60 * 60_000, Watchdog.cooldown(9));
     }
+
+    @Test
+    void theWatchdogLeavesABridgeWithoutAccountsAlone() throws Exception {
+        HttpServer whatsapp = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        whatsapp.createContext("/", ex -> {
+            ex.sendResponseHeaders(200, -1);
+            ex.close();
+        });
+        whatsapp.start();
+        try {
+            // gmessages has no account: not running, so nothing answers on its port.
+            HttpServer closed = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            int nobody = closed.getAddress().getPort();
+            closed.stop(0);
+            BridgeDemand demand = new BridgeDemand(Set.of("whatsapp")::contains, b -> true, Duration.ZERO, 1);
+            List<String> usable = List.of("whatsapp", "gmessages");
+            demand.atLaunch(usable);
+            List<String> restarted = new ArrayList<>();
+            boolean[] online = {false};
+            Watchdog dog = new Watchdog(Map.of("whatsapp", whatsapp.getAddress().getPort(), "gmessages", nobody),
+                    () -> demand.meant(usable), new BridgeStates(), (name, why) -> restarted.add(name + ": " + why), () -> online[0]);
+            for (int i = 0; i < PROBE_ROUNDS; i++) dog.check();
+            online[0] = true;
+            dog.check();
+            assertEquals(List.of("whatsapp: internet is back"), restarted, "never probed, counted nor restarted");
+        } finally {
+            whatsapp.stop(0);
+        }
+    }
+
+    private static final int PROBE_ROUNDS = Watchdog.PROBE_FAILURES + 1;
 }

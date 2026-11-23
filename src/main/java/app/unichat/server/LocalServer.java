@@ -4,6 +4,7 @@ import app.unichat.support.BundledTools;
 import app.unichat.settings.Settings;
 import app.unichat.bridge.BridgePorts;
 import app.unichat.bridge.BridgeStates;
+import app.unichat.bridge.LoginsCache;
 import app.unichat.support.I18n;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -11,8 +12,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -55,6 +54,8 @@ public final class LocalServer {
     private final StatusEndpoint statusEndpoint = new StatusEndpoint(states, this::asToken);
     private final java.util.Map<String, String> asTokens = new java.util.concurrent.ConcurrentHashMap<>();
     private final Watchdog watchdog;
+    /** Which bridges run: a bridge with no account waits until its sign-in is opened. */
+    private final BridgeDemand demand;
 
     private LocalServer(Platform platform) {
         this.platform = platform;
@@ -66,6 +67,9 @@ public final class LocalServer {
         this.supervisor = new Supervisor(dir.resolve("run"));
         java.util.Map<String, Integer> ports = new java.util.HashMap<>(BridgePorts.BRIDGE_PORTS);
         ports.put("tuwunel", PORT);
+        this.demand = new BridgeDemand(this::hasAccount,
+                b -> HttpProbe.answers(http, BridgePorts.BRIDGE_PORTS.get(b), Duration.ofSeconds(3), HttpProbe.Up.ALIVE),
+                Duration.ofMillis(500), 120);
         this.metaSessions = new MetaSessions(dir, states, MetaSessions::redirecting, this::restoreSession);
         this.watchdog = new Watchdog(ports, this::watched, states, (name, why) -> supervisor.kill(name), Internet::reachable,
                 metaSessions);
@@ -89,7 +93,7 @@ public final class LocalServer {
 
     private synchronized void restoreSession(String bridge) {
         try {
-            if (!running || !usableBridges().contains(bridge)) return;
+            if (!running || !usableBridges().contains(bridge) || !demand.isMeant(bridge)) return;
             supervisor.stop(bridge);
             metaSessions.restore(bridge);
             states.restarting(bridge, BridgeStates.now());
@@ -99,16 +103,22 @@ public final class LocalServer {
         }
     }
 
-    /** The processes that should be up: the server and the bridges in use. */
+    /** The processes that should be up: the server and the bridges meant to run. */
     private Iterable<String> watched() {
         java.util.List<String> out = new java.util.ArrayList<>();
         if (supervisor.isRunning("tuwunel") || running) out.add("tuwunel");
         try {
-            out.addAll(usableBridges());
+            out.addAll(demand.meant(usableBridges()));
         } catch (IOException e) {
             // no list yet
         }
         return out;
+    }
+
+    /** Whether {@code bridge} has an account, so it starts at launch ({@link AccountCheck}). */
+    private boolean hasAccount(String bridge) {
+        return AccountCheck.hasAccount(Settings.get().getString(LoginsCache.key(bridge), null),
+                dir.resolve(bridge).resolve(bridge + ".db"));
     }
 
     /** A bridge's as_token, from its registration (it authorizes the bridge's status reports). */
@@ -141,7 +151,7 @@ public final class LocalServer {
     }
 
     /**
-     * Installs what's missing, starts the server and the bridges already in use, and creates the account the first
+     * Installs what's missing, starts the server and the bridges in use that have an account, and creates the account the first
      * time. Blocking (call off the FX thread); {@code progress} gets short Spanish status lines.
      */
     public synchronized void ensureRunning(Consumer<String> progress) throws IOException, InterruptedException {
@@ -160,7 +170,7 @@ public final class LocalServer {
 
         if (!supervisor.isRunning("tuwunel")) startHomeserver(progress);
         ensureAccount(secrets);
-        for (String b : usableBridges()) {
+        for (String b : demand.atLaunch(usableBridges())) {
             if (!supervisor.isRunning(b)) startBridge(b);
         }
         running = true;
@@ -169,7 +179,8 @@ public final class LocalServer {
 
     /**
      * Makes {@code bridge} available before signing in to that network: downloads it the first time, registers
-     * it with the server (a restart of a few seconds) and starts it. Blocking.
+     * it with the server (a restart of a few seconds), starts it and waits until it answers: from then on it runs,
+     * account or not. Blocking.
      */
     public synchronized void ensureBridge(String bridge, Consumer<String> progress) throws IOException, InterruptedException {
         if (!provides(bridge)) throw new IOException(I18n.t("server.networkUnavailable", bridge));
@@ -184,13 +195,12 @@ public final class LocalServer {
             supervisor.stop("tuwunel");
             startHomeserver(progress);
         }
-        if (!supervisor.isRunning(bridge)) {
-            // Skipped at startup if its keys were missing then: its config needs them now.
-            prepareBridge(bridge, secretsFile.load(), progress);
-            startBridge(bridge);
-        }
         progress.accept(I18n.t("server.waitingBridge"));
-        awaitPort(BridgePorts.BRIDGE_PORTS.get(bridge), 60);
+        demand.open(bridge, supervisor.isRunning(bridge), b -> {
+            // Not started at launch (no account, or Telegram's keys missing then): its config is written again first.
+            prepareBridge(b, secretsFile.load(), progress);
+            startBridge(b);
+        });
     }
 
     public synchronized void stop() {
@@ -237,19 +247,6 @@ public final class LocalServer {
         supervisor.start(b, bd, List.of(store.path(b).toString(), "-c", "config.yaml"), bd.resolve("bridge.log"));
     }
 
-    private static void awaitPort(int port, int seconds) throws IOException, InterruptedException {
-        long end = System.currentTimeMillis() + seconds * 1000L;
-        while (System.currentTimeMillis() < end) {
-            try (Socket s = new Socket()) {
-                s.connect(new InetSocketAddress("127.0.0.1", port), 500);
-                return;
-            } catch (IOException e) {
-                Thread.sleep(500);
-            }
-        }
-        throw new IOException(I18n.t("server.bridgeNoStart", port));
-    }
-
     /** Registers the account the first time (registration-token flow, two requests). */
     private void ensureAccount(Properties secrets) throws IOException, InterruptedException {
         if ("yes".equals(secrets.getProperty("account_created"))) return;
@@ -293,9 +290,9 @@ public final class LocalServer {
         return out;
     }
 
-    /** Applies new settings to a bridge that's in use (its config is rewritten, then it restarts). Blocking. */
+    /** Applies new settings to a bridge that runs (its config is rewritten, then it restarts); one that doesn't gets them when it starts. Blocking. */
     public synchronized void restartBridge(String bridge, Consumer<String> progress) throws IOException, InterruptedException {
-        if (!running || !usableBridges().contains(bridge)) return;
+        if (!running || !usableBridges().contains(bridge) || !demand.isMeant(bridge)) return;
         prepareBridge(bridge, secretsFile.load(), progress);
         supervisor.stop(bridge);
         states.restarting(bridge, BridgeStates.now());

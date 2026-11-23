@@ -6,6 +6,7 @@ import app.unichat.model.AccountStatus;
 import app.unichat.model.Network;
 import app.unichat.bridge.BridgePorts;
 import app.unichat.bridge.BridgeStates;
+import app.unichat.bridge.LoginsCache;
 import app.unichat.service.ChatService.Listener;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
@@ -291,7 +292,7 @@ final class BridgeAccounts {
             sb.append(l.id()).append('\t').append(l.name() == null ? "" : l.name()).append('\t')
                     .append(l.state() == null ? "" : l.state()).append('\n');
         }
-        Settings.get().set("matrix.logins." + n.protocolId(), System.currentTimeMillis() + "\n" + sb);
+        Settings.get().set(LoginsCache.key(n.protocolId()), System.currentTimeMillis() + "\n" + sb);
         loginsCachedAt.put(n, System.currentTimeMillis());
         lastAccounts = accounts();
         core.fire(Listener::accountsChanged);
@@ -303,7 +304,7 @@ final class BridgeAccounts {
     void loadCachedLogins() {
         for (Network n : Network.values()) {
             if (!n.isBridged()) continue;
-            String cached = Settings.get().getString("matrix.logins." + n.protocolId(), null);
+            String cached = Settings.get().getString(LoginsCache.key(n.protocolId()), null);
             if (cached == null) continue;
             String[] lines = cached.split("\n");
             long ts = 0;

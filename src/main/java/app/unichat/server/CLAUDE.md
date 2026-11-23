@@ -9,6 +9,7 @@ The local server: installs, starts and watches tuwunel and the bridges.
   `MatrixChatService.accounts()` and `ui/chats/AccountAlerts` + `AccountAlertBar` (foot of the chat list, so chats don't jump); `server/Watchdog` restarts hung,
   stuck or flapping processes (awake time, backoff), and all but Meta's bridges when the internet returns; `server/MetaSessions` keeps Meta cookies safe from the bridge erasing them over a redirect (see docs/NATIVE-SERVER.md). Demo: `-Dunichat.demoAccounts=WHATSAPP:NEEDS_LOGIN,...`.
 
+- A bridge with no account doesn't run (`BridgeDemand`): at launch only those with one start (`AccountCheck`: a login in `LoginsCache`, else in the bridge's own database; when nothing tells, it starts, since an account gone silent is worse than the battery). `ensureBridge` (opening a sign-in) starts one and waits for its probe, and it runs for the rest of the session. The watchdog and `restartBridge` touch only what `BridgeDemand.meant` lists.
 - "Does it answer?" is `HttpProbe` (`/_matrix/client/versions`): `READY` (a 200: `LocalServer` waiting for tuwunel) or `ALIVE` (any answer: `Watchdog`); an interrupted probe throws, so stopping never counts as down.
 - What each chat allows (edit, delete for everyone) is what its bridge published in the room (`com.beeper.room_features`); X's bridge publishes it again at each start (`BridgeCapabilities`, before it runs: the capabilities' half of `kv_store.bridge_info_version` marked stale, so only chats whose answer changed are sent).
 
