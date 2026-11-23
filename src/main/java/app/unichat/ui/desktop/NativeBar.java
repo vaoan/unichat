@@ -171,15 +171,20 @@ public final class NativeBar {
 
     /** Hears whether the screen is locked or asleep ({@link MacScreen}); the helper may start before or after it. */
     private static volatile java.util.function.Consumer<Boolean> screen = away -> { };
+    /** The helper's last "screen" line; null before it says one and once it ends. */
+    private static volatile Boolean lastScreen;
 
     /**
-     * From now on {@code away} hears the helper's "screen" lines, and not away once when it ends. With no helper
-     * running there's no way to know: it hears not away at once.
+     * From now on {@code away} hears the helper's "screen" lines, and not away once when it ends. What the running
+     * helper already said (it starts before Unichat listens, and says at once if the screen is locked) is heard at
+     * once; with no helper running there's no way to know: it hears not away at once.
      */
     static void onScreen(java.util.function.Consumer<Boolean> away) {
         screen = away;
         NativeBar b = current;
+        Boolean said = lastScreen;
         if (b == null || !b.alive) away.accept(false);
+        else if (said != null) away.accept(said);
     }
 
     /** "screen 1" (locked or asleep) is true, "screen 0" false; anything else null. */
@@ -218,6 +223,7 @@ public final class NativeBar {
                 }
                 Boolean away = screenLine(line);
                 if (away != null) {
+                    lastScreen = away;
                     screen.accept(away);
                     continue;
                 }
@@ -236,6 +242,7 @@ public final class NativeBar {
         } catch (IOException ignored) {
         }
         alive = false;
+        lastScreen = null;
         screen.accept(false); // gone: nothing says the screen is away any more
         onExit.run();
     }

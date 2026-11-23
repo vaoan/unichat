@@ -108,6 +108,29 @@ class NativeBarScreenTest {
     }
 
     @Test
+    void aLockSaidBeforeAnyoneListensIsHeardWhenTheyDo() throws Exception {
+        // Started locked: the helper says so at once, before UnichatApp's followSeen listens. "show" comes after it on
+        // the same reader thread, so once it's heard the lock has been read.
+        Path script = Files.writeString(dir.resolve("helper"), "#!/bin/sh\nprintf 'screen\\t1\\nshow\\n'\nread a\n");
+        assertTrue(script.toFile().setExecutable(true));
+        new MacScreen().start(away -> { });
+        CountDownLatch read = new CountDownLatch(1);
+        CountDownLatch ended = new CountDownLatch(1);
+        NativeBar bar = NativeBar.start(script, null, ended::countDown, id -> { }, read::countDown);
+        List<Boolean> told = new CopyOnWriteArrayList<>();
+        try {
+            read.await();
+            new MacScreen().start(told::add);
+            assertEquals(List.of(true), told, "the lock already said");
+            bar.setCount(1); // it ends
+            ended.await();
+            assertEquals(List.of(true, false), told, "then not away when it ends");
+        } finally {
+            bar.close();
+        }
+    }
+
+    @Test
     void withNoHelperRunningTheScreenIsHere() {
         List<Boolean> told = new CopyOnWriteArrayList<>();
         new MacScreen().start(told::add);
