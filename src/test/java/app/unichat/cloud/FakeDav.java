@@ -31,6 +31,8 @@ final class FakeDav implements AutoCloseable {
     final Set<String> failListOnce = ConcurrentHashMap.newKeySet();
     /** Paths whose next MOVE fails, once each. */
     final Set<String> failMoveOnce = ConcurrentHashMap.newKeySet();
+    /** Paths whose every GET fails (a file the server can't give), until taken out of here. */
+    final Set<String> failReads = ConcurrentHashMap.newKeySet();
     /** Paths whose next DELETE fails, once each. */
     final Set<String> failDeleteOnce = ConcurrentHashMap.newKeySet();
     /** Paths whose next PUT waits until its latch is let go (a slow network), once each. */
@@ -194,7 +196,7 @@ final class FakeDav implements AutoCloseable {
     private void get(HttpExchange x, String path) throws IOException {
         waitIfHeld(holdReadOnce, path);
         log.add("GET " + path);
-        if (failReadOnce.remove(path)) {
+        if (failReadOnce.remove(path) || failReads.contains(path)) {
             x.sendResponseHeaders(503, -1);
             return;
         }

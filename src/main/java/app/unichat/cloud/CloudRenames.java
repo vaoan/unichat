@@ -104,15 +104,17 @@ final class CloudRenames {
 
     /**
      * The account as a job that writes the vault's keys or files is to see it, held under the job's locks. Anything of the
-     * vault still under its old names is moved or finished first: open here, all of it; not open, its slots (they need no
-     * key). So the job never writes the old names while another computer switches them, and no old slot comes back
+     * vault still under its old names is moved first where it's open here; once the names are switched, only the slots
+     * left are finished (they need no key; the files are the rounds' to finish). So the job never writes the old names while another computer switches them, and no old slot comes back
      * later over a way in it changes or takes away. One that can't be finished now refuses the job (the next round tries
      * again). Still under the old names and not open here (a way in about to open it), the old names'.
      */
     Storage forJob(Storage dav) throws IOException {
         Storage at = VaultNames.at(dav);
-        boolean old = at instanceof OldVault;
-        if (!old && !VaultNames.left(dav)) return at;
+        if (!(at instanceof OldVault)) {
+            if (VaultNames.left(dav)) slots(dav); // switched already: only the slots matter to a job; the files are the rounds'
+            return at;
+        }
         boolean open;
         try (VaultParts.Round vault = opener.open(at)) {
             open = vault.open();
@@ -128,12 +130,17 @@ final class CloudRenames {
         if (open) throw new IOException(I18n.t("cloud.error.vaultRenameFirst"));
         Storage again = VaultNames.at(dav); // another computer may have switched it meanwhile
         if (again instanceof OldVault) return at;
+        slots(dav);
+        return again;
+    }
+
+    /** The slots left under the old names taken across, or the job refused: none may come back over what it writes. */
+    private static void slots(Storage dav) throws IOException {
         try {
             VaultNames.slotsLeft(dav);
         } catch (IOException | RuntimeException e) {
             throw new IOException(I18n.t("cloud.error.vaultRenameFirst"), e);
         }
-        return again;
     }
 
     /**

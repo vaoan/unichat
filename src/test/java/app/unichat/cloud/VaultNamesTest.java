@@ -388,4 +388,13 @@ class VaultNamesTest {
         assertFalse(Vault.computers(dav()).containsKey(DESK), "its way in never comes back");
         assertFalse(anyUnder(CloudNames.OLD_SLOTS));
     }
+
+    @Test
+    void anOldFileThatNeverReadsDoesntStopAJobOnceTheNamesAreSwitched() throws Exception {
+        switchedWithTheOldSlotsLeft();
+        cloud.failReads.add("Unichat/Bóveda/Textos/" + LAPTOP + "/index.json"); // left for the rounds to finish, or keep
+        desk.as(() -> desk.cloud.vault().removeComputer(LAPTOP));
+        assertFalse(Vault.computers(dav()).containsKey(LAPTOP), "removed: only the old slots needed finishing first");
+        assertFalse(anyUnder(CloudNames.OLD_SLOTS), "and they were");
+    }
 }
