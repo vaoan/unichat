@@ -207,6 +207,9 @@ public final class Notifier {
 
     public boolean hasTray() { return tray != null || bar != null; }
 
+    /** The chat of the last message or reminder posted: where a click on the tray goes. */
+    String lastChatId() { return lastChatId; }
+
     public void notify(Chat chat, Message m) {
         Settings s = Settings.get();
         if (!s.notificationsEnabled()) return;

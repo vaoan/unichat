@@ -12,6 +12,8 @@ import app.unichat.service.MockChatService;
 import app.unichat.service.PreferencesFile;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import app.unichat.support.ScreenAway;
+import app.unichat.support.Seen;
 import app.unichat.ui.Browser;
 import app.unichat.ui.desktop.DockIcon;
 import app.unichat.ui.desktop.NotificationTarget;
@@ -57,6 +59,7 @@ public final class UnichatApp extends Application {
     @Override
     public void start(Stage primary) {
         stage = primary;
+        Seen.get().windows(true); // it starts with its window shown (never in the tray), before anything listens
         Recovery.watchUi(); // a window that stops answering starts Unichat again
         // A full disk stops messages with no other sign. Not for a snapshot: the screen it shows mustn't hang on this disk.
         if (System.getProperty("unichat.snapshot") == null) app.unichat.support.Storage.SHARED.watch(Settings.dataDir());
@@ -66,13 +69,7 @@ public final class UnichatApp extends Application {
         stage.setTitle("Unichat");
         stage.setMinWidth(760);
         stage.setMinHeight(480);
-        for (String size : new String[]{"16", "32", "64", "128", "256"}) {
-            try (InputStream in = getClass().getResourceAsStream("/app/unichat/icons/app-" + size + ".png")) {
-                if (in != null) stage.getIcons().add(new Image(in));
-            } catch (Exception ignored) {
-                // Icons are optional.
-            }
-        }
+        loadIcons();
         Settings s = Settings.get();
         stage.setWidth(s.getDouble("window.width", 1180));
         stage.setHeight(s.getDouble("window.height", 760));
@@ -141,6 +138,7 @@ public final class UnichatApp extends Application {
         // A menu bar app isn't made active by opening: the window would open behind the others. Diagnostics never take focus.
         if (System.getProperty("unichat.snapshot") == null) DockIcon.show();
         stage.show();
+        followSeen();
         if (System.getProperty("unichat.snapshot") != null) stage.toBack();
         // -Dunichat.startLogin=<protocol id>: open Ajustes > Cuentas with that network's login wizard.
         String startLogin = System.getProperty("unichat.startLogin");
@@ -292,6 +290,26 @@ public final class UnichatApp extends Application {
     }
 
     private long hiddenAt;
+
+    private void loadIcons() {
+        for (String size : new String[]{"16", "32", "64", "128", "256"}) {
+            try (InputStream in = getClass().getResourceAsStream("/app/unichat/icons/app-" + size + ".png")) {
+                if (in != null) stage.getIcons().add(new Image(in));
+            } catch (Exception ignored) {
+                // Icons are optional.
+            }
+        }
+    }
+
+    /** From the window shown on: whether anyone can see Unichat. A snapshot is seen, whatever its windows do. */
+    private void followSeen() {
+        if (System.getProperty("unichat.snapshot") != null) {
+            Seen.reset(true);
+            return;
+        }
+        app.unichat.ui.desktop.AppWindows.watchShown(Seen.get()::windows);
+        ScreenAway.none().start(Seen.get()::screenAway); // the macOS and Windows sources come with their own tasks
+    }
 
     private boolean toTray() {
         return notifier.hasTray() && Settings.get().minimizeToTray();

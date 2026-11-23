@@ -1,5 +1,6 @@
 package app.unichat.ui.desktop;
 
+import javafx.beans.InvalidationListener;
 import javafx.collections.ListChangeListener;
 import javafx.event.EventHandler;
 import javafx.scene.Scene;
@@ -10,6 +11,7 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Moving between Unichat's own windows (the main one, photos, videos, settings): ⌘` / ⌘⇧` (Ctrl on Windows) from any of
@@ -34,6 +36,38 @@ public final class AppWindows {
             while (c.next()) for (Window w : c.getAddedSubList()) watch(w);
             DockIcon.setOtherWindows(Window.getWindows().stream().anyMatch(w -> w != main && counts(w)));
         });
+    }
+
+    /**
+     * Calls {@code to} with whether any window is on screen ({@link #onScreen}), now and on each change, until the
+     * returned stop runs. FX thread. Hidden windows leave {@code Window.getWindows()}, so only those in it are asked.
+     */
+    public static Runnable watchShown(Consumer<Boolean> to) {
+        InvalidationListener check = o -> to.accept(Window.getWindows().stream().anyMatch(AppWindows::onScreen));
+        ListChangeListener<Window> list = c -> {
+            while (c.next()) {
+                for (Window w : c.getRemoved()) follow(w, check, false);
+                for (Window w : c.getAddedSubList()) follow(w, check, true);
+            }
+            check.invalidated(null);
+        };
+        for (Window w : Window.getWindows()) follow(w, check, true);
+        Window.getWindows().addListener(list);
+        check.invalidated(null);
+        return () -> {
+            Window.getWindows().removeListener(list);
+            for (Window w : Window.getWindows()) follow(w, check, false);
+        };
+    }
+
+    private static void follow(Window w, InvalidationListener check, boolean on) {
+        if (on) {
+            w.showingProperty().addListener(check);
+            if (w instanceof Stage s) s.iconifiedProperty().addListener(check);
+        } else {
+            w.showingProperty().removeListener(check);
+            if (w instanceof Stage s) s.iconifiedProperty().removeListener(check);
+        }
     }
 
     private static void watch(Window w) {
@@ -78,5 +112,10 @@ public final class AppWindows {
     /** A real window on screen: not a menu, tooltip or popup. */
     private static boolean counts(Window w) {
         return w.isShowing() && !(w instanceof PopupWindow);
+    }
+
+    /** A window someone can see: one that {@link #counts}, not minimised. */
+    static boolean onScreen(Window w) {
+        return counts(w) && !(w instanceof Stage s && s.isIconified());
     }
 }
