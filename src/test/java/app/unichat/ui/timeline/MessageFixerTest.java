@@ -57,7 +57,7 @@ class MessageFixerTest {
         assertEquals("creo que mañana no puedo", m.body());
         assertTrue(m.edited());
         assertEquals(List.of("Mensaje corregido"), told);
-        assertTrue(prompts.getFirst().contains("Corrige la ortografía, la gramática"), "the same correction as ⌘O");
+        assertTrue(prompts.getFirst().contains("Correct the spelling, grammar"), "the same correction as ⌘O");
     }
 
     @Test

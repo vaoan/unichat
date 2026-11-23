@@ -90,10 +90,10 @@ class AiReplyUiTest {
         write("sí pero el sábado");
         fx(() -> { composer.replyWithAi(older); return null; });
         FxWait.until("the draft in the box", () -> text().equals("Claro, el sábado sí"));
-        String draft = prompts.stream().filter(p -> p.startsWith("Redacta")).reduce((a, b) -> b).orElseThrow();
+        String draft = prompts.stream().filter(p -> p.startsWith("Draft the message")).reduce((a, b) -> b).orElseThrow();
         String ask = draft.substring(draft.lastIndexOf("</chat-"));
-        assertTrue(ask.contains("eligió responder a este mensaje") && ask.contains(older.preview()), ask);
-        assertTrue(ask.contains("sí pero el sábado") && ask.contains("Úsalo como base"), ask);
+        assertTrue(ask.contains("chose to reply to this message") && ask.contains(older.preview()), ask);
+        assertTrue(ask.contains("sí pero el sábado") && ask.contains("Use it as the base"), ask);
         assertTrue(fx(() -> composer.lookup(".composer-banner") != null
                 && composer.lookup(".composer-banner").isVisible()), "still a reply to that message once sent");
     }
@@ -103,9 +103,9 @@ class AiReplyUiTest {
         List<Boolean> searched = new ArrayList<>();
         AiReplyButton.Writer plain = new AiReplyButton.Writer() {
             // Learning how the person writes calls the program too: only the drafts count here.
-            @Override public String write(String p) { if (p.startsWith("Redacta")) searched.add(false); return "listo"; }
+            @Override public String write(String p) { if (p.startsWith("Draft the message")) searched.add(false); return "listo"; }
             @Override public AiReplyButton.Writer searching() {
-                return p -> { if (p.startsWith("Redacta")) searched.add(true); return "listo, buscado"; };
+                return p -> { if (p.startsWith("Draft the message")) searched.add(true); return "listo, buscado"; };
             }
         };
         writer(plain);
@@ -137,7 +137,7 @@ class AiReplyUiTest {
         FxWait.until("the draft in the box", () -> text().equals("Claro, voy"));
         assertEquals(before, svc.messages(CHAT).size(), "only a draft");
         String last = svc.messages(CHAT).get(before - 1).preview();
-        String draft = prompts.stream().filter(p -> p.startsWith("Redacta")).reduce((a, b) -> b).orElseThrow(); // learning comes after
+        String draft = prompts.stream().filter(p -> p.startsWith("Draft the message")).reduce((a, b) -> b).orElseThrow(); // learning comes after
         assertTrue(draft.contains(last), "the chat goes along");
         assertTrue(draft.contains("dile que sí"), "what was written, as the idea");
     }
@@ -152,10 +152,10 @@ class AiReplyUiTest {
         List<Boolean> searched = new ArrayList<>();
         writer(new AiReplyButton.Writer() {
             @Override public String write(String p) {
-                if (!p.startsWith("Redacta")) return "listo"; // learning how the person writes calls it too
+                if (!p.startsWith("Draft the message")) return "listo"; // learning how the person writes calls it too
                 prompts.add(p);
                 searched.add(false);
-                return p.contains("Amplíalo") ? "Sí, nos vemos el sábado. Llevo algo de comer, ¿te parece?" : "Sí, el sábado";
+                return p.contains("Expand it") ? "Sí, nos vemos el sábado. Llevo algo de comer, ¿te parece?" : "Sí, el sábado";
             }
 
             @Override public AiReplyButton.Writer searching() {
@@ -166,12 +166,12 @@ class AiReplyUiTest {
         press();
         FxWait.until("longer, in the box", () -> text().startsWith("Sí, nos vemos el sábado. Llevo"));
         String longer = prompts.getLast();
-        assertTrue(longer.contains("Amplíalo") && !longer.contains("[+]") && longer.contains(svc.messages(CHAT).get(before - 1).preview()),
+        assertTrue(longer.contains("Expand it") && !longer.contains("[+]") && longer.contains(svc.messages(CHAT).get(before - 1).preview()),
                 "what was written, without the mark, with the chat");
         write(text() + " [-]");
         press();
         FxWait.until("shorter, in the box", () -> text().equals("Sí, el sábado"));
-        assertTrue(prompts.getLast().contains("Resúmelo"));
+        assertTrue(prompts.getLast().contains("Condense it"));
         assertEquals(List.of(false, false), searched, "a mark isn't a gap: no web");
         assertEquals(before, svc.messages(CHAT).size(), "never sent");
         fx(() -> { ((TextArea) composer.lookup(".text-area")).undo(); return null; });
@@ -369,7 +369,7 @@ class AiReplyUiTest {
         CountDownLatch learning = new CountDownLatch(1);
         List<String> order = new java.util.concurrent.CopyOnWriteArrayList<>();
         writer(p -> {
-            if (p.startsWith("Redacta")) {
+            if (p.startsWith("Draft the message")) {
                 order.add("draft");
                 return "Claro, voy";
             }
@@ -397,7 +397,7 @@ class AiReplyUiTest {
             @Override public AiReplyButton.Writer searching() {
                 return p -> {
                     try {
-                        if (p.startsWith("Redacta")) release.await();
+                        if (p.startsWith("Draft the message")) release.await();
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
@@ -452,7 +452,7 @@ class AiReplyUiTest {
             style.forget();
             List<String> learned = new java.util.concurrent.CopyOnWriteArrayList<>();
             writer(p -> {
-                if (p.startsWith("Redacta")) return "Claro, voy";
+                if (p.startsWith("Draft the message")) return "Claro, voy";
                 learned.add(p);
                 // Only the run with the correction writes this: once it's saved, that run (the last one) is done.
                 return p.contains("«Claro, voy» → «Claro, ya voy»") ? "- escribe ya voy" : "- frases cortas";

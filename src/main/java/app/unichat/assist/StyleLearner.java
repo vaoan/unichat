@@ -56,7 +56,8 @@ public final class StyleLearner {
             String current = store.text();
             if (corrections.isEmpty() && !fresh) return current;
             try {
-                String answer = program.write(StylePrompt.learn(current, mine.stream().map(Message::body).toList(), corrections));
+                String answer = program.write(StylePrompt.learn(current, mine.stream().map(Message::body).toList(), corrections,
+                        app.unichat.support.I18n.locale()));
                 if (answer == null) return current; // cancelled
                 StylePrompt.Verdict v = StylePrompt.check(answer);
                 if (v.problem() == StylePrompt.Problem.TOO_LONG) {

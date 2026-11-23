@@ -184,4 +184,20 @@ class StyleLearnerTest {
         b.join(); // lesson-ok: test-future-join (a thread)
         assertEquals(1, most.get());
     }
+
+    /** The notes are asked in Unichat's language, the one the person reads them in. */
+    @Test
+    void theNotesAreAskedInUnichatsLanguage() {
+        java.util.Locale before = app.unichat.support.I18n.locale();
+        List<String> asked = new java.util.ArrayList<>();
+        try {
+            app.unichat.support.I18n.use("en");
+            new StyleLearner(new WritingStyle(dir), p -> { asked.add(p); return "- lol"; }).learn("!c", CHAT);
+        } finally {
+            app.unichat.support.I18n.use(before.getLanguage());
+        }
+        assertTrue(asked.getFirst().contains("Write the file in English"), asked.toString());
+        new StyleLearner(new WritingStyle(dir.resolve("es")), p -> { asked.add(p); return "- jajaja"; }).learn("!c", CHAT);
+        assertTrue(asked.getLast().contains("Write the file in Spanish"), "the tests run in Spanish");
+    }
 }
