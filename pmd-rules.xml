@@ -114,31 +114,39 @@
       <property name="reportLevel" value="10000"/>
     </properties>
   </rule>
-  <!-- How big a class may be is Checkstyle's 800 lines. These count the same size in methods, public members,
-       types used, imports and fields: each is set to what 800 lines hold at about ten lines a method. -->
+  <!-- A class's breadth, counted five ways. Each limit sits just above today's largest (measured 2026-11-23, PMD's
+       own count): a class that grows past it is split, or says on its declaration why it can't be. Suppressed on
+       their declarations: Settings (TooManyMethods, ExcessivePublicCount: a getter and setter per preference),
+       MatrixChatService (TooManyMethods, ExcessivePublicCount) and MockChatService (TooManyMethods): ChatService's
+       whole interface. -->
+  <!-- Largest: MainView, PreferencesSyncTest and FoldersUiTest, 61 methods. -->
   <rule ref="category/java/design.xml/TooManyMethods">
     <properties>
-      <property name="maxmethods" value="80"/>
+      <property name="maxmethods" value="62"/>
     </properties>
   </rule>
+  <!-- Largest: MockChatService, 70 public members (ChatService's interface); Message 64, Chat 61. -->
   <rule ref="category/java/design.xml/ExcessivePublicCount">
     <properties>
-      <property name="minimum" value="80"/>
+      <property name="minimum" value="72"/>
     </properties>
   </rule>
+  <!-- Largest: MatrixChatService, 69 types used; MainView 59. -->
   <rule ref="category/java/design.xml/CouplingBetweenObjects">
     <properties>
-      <property name="threshold" value="80"/>
+      <property name="threshold" value="70"/>
     </properties>
   </rule>
+  <!-- Largest: MainView, 57 imports; ThreadPane 45. -->
   <rule ref="category/java/design.xml/ExcessiveImports">
     <properties>
-      <property name="minimum" value="80"/>
+      <property name="minimum" value="59"/>
     </properties>
   </rule>
+  <!-- Largest: Chat, 29 fields (the live fields of a chat); MatrixRoom and Message 21 to 25. -->
   <rule ref="category/java/design.xml/TooManyFields">
     <properties>
-      <property name="maxfields" value="40"/>
+      <property name="maxfields" value="30"/>
     </properties>
   </rule>
   <rule ref="category/java/design.xml/AvoidDeeplyNestedIfStmts">
