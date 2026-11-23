@@ -29,6 +29,8 @@ class MediaUploadTest {
         final Map<String, byte[]> files = new HashMap<>();
         final Set<String> failing = new HashSet<>();
         final Set<String> damaging = new HashSet<>();
+        /** Each path whose copy was looked at ({@link #info}), in order. */
+        final List<String> looked = new java.util.ArrayList<>();
 
         @Override public void check() { }
         @Override public boolean exists(String path) { return files.containsKey(path); }
@@ -64,6 +66,7 @@ class MediaUploadTest {
         }
 
         @Override public RemoteFile info(String path) throws IOException {
+            looked.add(path);
             byte[] f = files.get(path);
             if (f == null) return null;
             Path tmp = Files.createTempFile("sum", ".bin");
@@ -156,6 +159,24 @@ class MediaUploadTest {
         assertEquals(1, up.verify(acc, (d, t, n) -> { }, yes(1)), "the first repaired, then no");
         assertEquals("co", new String(acc.files.get(remote("b.jpg")), StandardCharsets.UTF_8), "the second waits");
         assertEquals(1, up.verify(acc, (d, t, n) -> { }, () -> true));
+    }
+
+    @Test
+    void aCheckCutShortGoesOnFromWhereItStopped() throws Exception {
+        Account acc = new Account();
+        Path c = chat("a.jpg", "b.jpg", "c.jpg");
+        MediaUpload up = uploader(c);
+        up.run(acc, (d, t, n) -> { }, () -> true);
+        assertEquals(0, up.verify(acc, (d, t, n) -> { }, yes(1)), "a checked, then no");
+        acc.looked.clear();
+        up.verify(acc, (d, t, n) -> { }, yes(1));
+        assertEquals(List.of(remote("b.jpg")), acc.looked, "b next, a not again");
+        acc.looked.clear();
+        up.verify(acc, (d, t, n) -> { }, () -> true);
+        assertEquals(List.of(remote("c.jpg")), acc.looked, "c, and the check is whole");
+        acc.looked.clear();
+        up.verify(acc, (d, t, n) -> { }, () -> true);
+        assertEquals(List.of(remote("a.jpg"), remote("b.jpg"), remote("c.jpg")), acc.looked, "a whole check done: the next starts over");
     }
 
     @Test

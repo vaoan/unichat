@@ -187,7 +187,11 @@ class CloudUnseenTest {
         assertEquals(old, round.get().lastVerified(), "cut short: still due");
         assertEquals("otra", new String(account.files.get(SECOND), StandardCharsets.UTF_8), "the next file waited");
         Seen.reset(true);
+        int from = account.asked.size();
         assertTrue(desk.cloud.syncNow().get().lastVerified().isAfter(old));
+        List<String> again = account.asked.subList(from, account.asked.size());
+        assertFalse(again.contains("PROPFIND " + PHOTO), "it went on from where it stopped: " + again);
+        assertTrue(again.contains("PROPFIND " + SECOND), "with the next: " + again);
         assertEquals("otra foto", new String(account.files.get(SECOND), StandardCharsets.UTF_8));
     }
 
@@ -198,8 +202,55 @@ class CloudUnseenTest {
         assertTrue(desk.cloud.status().mediaPaused());
         Seen.reset(true);
         assertFalse(desk.cloud.syncNow().get().mediaPaused(), "seen: it went");
+        Seen.reset(false);
+        assertFalse(desk.cloud.syncNow().get().mediaPaused(), "everything up and checked: nothing waits");
+        desk.write("Ana/b.jpg", "otra foto");
+        assertTrue(desk.cloud.syncNow().get().mediaPaused(), "a new photo waits");
+        Seen.reset(true);
+        desk.cloud.syncNow().get();
+        Settings.get().set("cloud.lastVerify", Instant.now().minus(Cloud.VERIFY_EVERY.multipliedBy(2)).toString());
+        Seen.reset(false);
+        assertTrue(desk.cloud.syncNow().get().mediaPaused(), "the day's check due waits");
         CloudAccount.setMedia(false);
         Seen.reset(false);
         assertFalse(desk.cloud.syncNow().get().mediaPaused(), "media off: nothing waits for being seen");
+    }
+
+    @Test
+    void aRoundThatFailsWhileUnseenStillSaysMediaWaits() throws Exception {
+        Seen.reset(false);
+        account.failReadOnce.add(Vault.INFO);
+        Cloud.Status s = desk.cloud.syncNow().get();
+        assertFalse(account.failReadOnce.contains(Vault.INFO), "the round failed reading the vault");
+        assertTrue(s.error() != null, "told");
+        assertTrue(s.mediaPaused(), "and the photo still waits for being seen");
+    }
+
+    @Test
+    void verifyNowPressedDuringACheckGetsAnotherCheck() throws Exception {
+        assertNull(desk.cloud.syncNow().get().error()); // up and checked
+        account.put(PHOTO, "fo".getBytes(StandardCharsets.UTF_8));
+        CountDownLatch there = new CountDownLatch(1);
+        CountDownLatch release = holdPut(PHOTO, there); // the first check's repair
+        CompletableFuture<Cloud.Status> first = desk.cloud.verifyNow();
+        there.await();
+        CompletableFuture<Cloud.Status> second = desk.cloud.verifyNow(); // pressed while it checks
+        release.countDown();
+        first.get();
+        second.get();
+        int secondRound = account.asked.lastIndexOf("GET " + Vault.INFO);
+        List<String> after = account.asked.subList(secondRound, account.asked.size());
+        assertTrue(after.contains("PROPFIND " + PHOTO), "the press got a check of its own: " + after);
+    }
+
+    @Test
+    void stoppedItNoLongerFollowsSeen() throws Exception {
+        started();
+        desk.cloud.stop();
+        long before = rounds();
+        Seen.reset(false);
+        Seen.reset(true);
+        desk.cloud.syncNow().get(); // after anything being seen would have queued
+        assertEquals(before + 1, rounds(), "only the one asked");
     }
 }

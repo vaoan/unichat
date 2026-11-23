@@ -140,7 +140,6 @@ public final class Cloud {
 
     /** How often everything uploaded is checked against the account (also on "Verificar ahora"). */
     static final java.time.Duration VERIFY_EVERY = java.time.Duration.ofDays(1);
-    private volatile boolean verifyNext;
 
     /** What a round is doing right now, for the page to say: checking a part, or uploading file {@code done} of {@code total}. */
     public record Activity(Step step, int done, int total, String item, long sent, long size, long bytesPerSecond) {
@@ -157,6 +156,7 @@ public final class Cloud {
     private final List<SyncedPart> parts;
     private final SyncedPart settingsPart;
     private final MediaUpload media;
+    private final MediaTurn mediaTurn;
     private final TextSync texts;
     private final VaultParts vaultParts;
     private final CloudVault vaultJobs = new CloudVault(this);
@@ -234,6 +234,7 @@ public final class Cloud {
         this.settingsPart = settingsPart;
         this.parts = List.of(settingsPart, stylePart);
         this.media = media;
+        this.mediaTurn = new MediaTurn(media, Seen.get()::now);
     }
 
     /**
@@ -351,40 +352,15 @@ public final class Cloud {
         try {
             pass = vaultPass(dav, now);
         } catch (IOException | RuntimeException e) {
-            return publish(finished(status().lastSync(), Errors.message(e), status().vault(), null, false));
+            return publish(finished(status().lastSync(), Errors.message(e), status().vault(), null, mediaTurn.waitsNow(now)));
         }
-        boolean waited;
         try {
-            waited = media(dav, now);
+            uploaded += mediaTurn.run(dav, now, progressOf(Step.UPLOADING), progressOf(Step.VERIFYING));
         } catch (IOException | RuntimeException e) {
-            return publish(finished(status().lastSync(), Errors.message(e), vaultAfter(dav, pass), null, false));
+            return publish(finished(status().lastSync(), Errors.message(e), vaultAfter(dav, pass), null, mediaTurn.waited()));
         }
         VaultState vault = vaultAfter(dav, pass);
-        return publish(finished(now, pass.textsFailed(), vault, vault == pass.state() ? pass.notice() : null, waited));
-    }
-
-    /**
-     * Media's turn, by its switch: what's saved goes up, then the day's check when due. Each asks before each file whether
-     * anyone can see Unichat ({@link Seen}): nobody, and the rest waits for a round once seen again, and a check cut short
-     * or not begun stays due. Whether media waited so.
-     */
-    private boolean media(Storage dav, Instant now) throws IOException {
-        if (!CloudAccount.media()) return false;
-        java.util.function.BooleanSupplier seen = Seen.get()::now;
-        boolean[] waited = {false};
-        java.util.function.BooleanSupplier mayGoOn = () -> {
-            if (seen.getAsBoolean()) return true;
-            waited[0] = true;
-            return false;
-        };
-        if (!mayGoOn.getAsBoolean()) return true;
-        uploaded += media.run(dav, progressOf(Step.UPLOADING), mayGoOn);
-        if (waited[0] || !(verifyNext || verifyDue(now))) return waited[0];
-        uploaded += media.verify(dav, progressOf(Step.VERIFYING), mayGoOn);
-        if (waited[0]) return true;
-        verifyNext = false;
-        Settings.get().set("cloud.lastVerify", now.toString());
-        return false;
+        return publish(finished(now, pass.textsFailed(), vault, vault == pass.state() ? pass.notice() : null, mediaTurn.waited()));
     }
 
     /** What a round's vault part found: the state, why the texts or the move failed (or null), and what the vault left. */
@@ -620,11 +596,6 @@ public final class Cloud {
         return CompletableFuture.runAsync(() -> { }, vaultWorker);
     }
 
-    private static boolean verifyDue(Instant now) {
-        String last = Settings.get().getString("cloud.lastVerify", null);
-        return last == null || Instant.parse(last).plus(VERIFY_EVERY).isBefore(now);
-    }
-
     private Status finished(Instant lastSync, String error, VaultState vault, Notice vaultNotice, boolean mediaPaused) {
         int waiting;
         try {
@@ -632,14 +603,14 @@ public final class Cloud {
         } catch (IOException ignored) {
             waiting = status().waiting();
         }
-        String verified = Settings.get().getString("cloud.lastVerify", null);
+        String verified = Settings.get().getString(MediaTurn.LAST_VERIFY, null);
         return new Status(true, lastSync, error, uploaded, waiting, null, media.retrying(), media.nextRetry(), media.conflicts(),
                 verified == null ? null : Instant.parse(verified), vault, moving, vaultNotice, mediaPaused);
     }
 
     /** Checks everything uploaded against the account now, repairing what differs, then the usual round. */
     public CompletableFuture<Status> verifyNow() {
-        verifyNext = true;
+        mediaTurn.verifyAsked();
         return syncNow();
     }
 

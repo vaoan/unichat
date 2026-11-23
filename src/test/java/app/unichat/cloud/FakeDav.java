@@ -40,6 +40,8 @@ final class FakeDav implements AutoCloseable {
     final Map<String, java.util.concurrent.CountDownLatch> arrived = new ConcurrentHashMap<>();
     /** Each request as it was answered ("PUT path", "GET path"), in order: what came before what. */
     final java.util.List<String> log = new java.util.concurrent.CopyOnWriteArrayList<>();
+    /** Every request as it came ("PROPFIND path", "PUT path"…), held or not: what was asked, even what changes nothing. */
+    final java.util.List<String> asked = new java.util.concurrent.CopyOnWriteArrayList<>();
     /** Paths that can't be read once a PUT of them lands (every GET answers a failure), until taken out of here. */
     final Set<String> unreadableAfterPut = ConcurrentHashMap.newKeySet();
     private final Set<String> unreadable = ConcurrentHashMap.newKeySet();
@@ -79,6 +81,7 @@ final class FakeDav implements AutoCloseable {
             }
             String path = URLDecoder.decode(x.getRequestURI().getRawPath(), StandardCharsets.UTF_8).replaceFirst("^/dav/?", "").replaceFirst("/$", "");
             byte[] body = x.getRequestBody().readAllBytes();
+            asked.add(x.getRequestMethod() + " " + path);
             switch (x.getRequestMethod()) {
                 case "PROPFIND" -> {
                     if (!path.isEmpty() && !files.containsKey(path) && !dirs.contains(path)) {

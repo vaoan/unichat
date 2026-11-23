@@ -47,6 +47,8 @@ final class MediaUpload {
     private final Map<String, Retry> retries = new ConcurrentHashMap<>();
     private final Set<String> conflicts = ConcurrentHashMap.newKeySet();
     private final java.util.function.Predicate<Path> made;
+    /** What the check under way has looked at: one cut short goes on from there, and a whole one starts over. */
+    private final Set<String> checked = new java.util.HashSet<>();
     private boolean loaded;
 
     /**
@@ -97,7 +99,8 @@ final class MediaUpload {
     /**
      * Checks everything that went up whose file is still here, and repairs what differs; how many were repaired. A
      * file deleted here stays in the account (it's an archive). {@code mayGoOn} is asked before each file, as in
-     * {@link #run}.
+     * {@link #run}; a check cut short so goes on from where it stopped the next time (a day's check of hundreds of files
+     * would otherwise never end in short windows).
      */
     int verify(Storage dav, Progress progress, BooleanSupplier mayGoOn) throws IOException {
         load();
@@ -106,19 +109,21 @@ final class MediaUpload {
             for (String entry : done) {
                 if (!entry.startsWith(folder.getFileName() + "/")) continue;
                 Path file = folder.resolve(entry.substring(entry.indexOf('/') + 1));
-                if (Files.isRegularFile(file)) here.put(entry, file);
+                if (Files.isRegularFile(file) && !checked.contains(entry)) here.put(entry, file);
             }
         }
         int repaired = 0, index = 0;
         for (Map.Entry<String, Path> e : here.entrySet()) {
-            if (!mayGoOn.getAsBoolean()) break;
+            if (!mayGoOn.getAsBoolean()) return repaired;
             progress.uploading(index++, here.size(), e.getValue().getFileName().toString());
             try {
                 if (settle(dav, e.getKey(), e.getValue(), progress)) repaired++;
             } catch (IOException ex) {
                 failed(e.getKey(), ex);
             }
+            checked.add(e.getKey());
         }
+        checked.clear();
         return repaired;
     }
 
