@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +25,7 @@ class BotChatDirectTest {
     private final List<String> calls = Collections.synchronizedList(new ArrayList<>());
     private HttpServer server;
 
-    private BotChat bots(int getStatus, String getBody) throws Exception {
+    private BotChat bots(int getStatus, String getBody) throws IOException {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             calls.add(ex.getRequestMethod());

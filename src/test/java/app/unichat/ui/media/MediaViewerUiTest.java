@@ -252,7 +252,7 @@ class MediaViewerUiTest {
                 true, false, false, false, false, still, null));
     }
 
-    private void key(String text, KeyCode code) throws Exception {
+    private void key(String text, KeyCode code) throws InterruptedException {
         fx(() -> {
             Event.fireEvent(viewer().orElseThrow().getScene(),
                     new KeyEvent(KeyEvent.KEY_PRESSED, KeyEvent.CHAR_UNDEFINED, text, code, false, false, false, false));
@@ -270,7 +270,7 @@ class MediaViewerUiTest {
                 .filter(PhotoPane.class::isInstance).findFirst().orElseThrow();
     }
 
-    private static void waitFor(Callable<Boolean> done) throws Exception {
+    private static void waitFor(Callable<Boolean> done) throws InterruptedException {
         try {
             FxWait.until("the photo showed", done); // a throw (the picture isn't in the window yet) counts as not yet
         } catch (AssertionError timedOut) {
@@ -279,7 +279,7 @@ class MediaViewerUiTest {
         }
     }
 
-    private static List<String> windows() throws Exception {
+    private static List<String> windows() throws InterruptedException {
         return fx(() -> Window.getWindows().stream()
                 .map(w -> w.getClass().getSimpleName() + (w.getScene() == null ? "" : ":" + w.getScene().getRoot().getStyleClass()
                         + w.getScene().getRoot().lookupAll("*").stream().filter(PhotoPane.class::isInstance).findFirst()
@@ -289,7 +289,7 @@ class MediaViewerUiTest {
                 .toList());
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

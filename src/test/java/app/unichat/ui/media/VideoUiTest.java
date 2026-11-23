@@ -2,6 +2,8 @@ package app.unichat.ui.media;
 
 import app.unichat.ui.FxWait;
 import app.unichat.service.MediaSource;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -43,15 +45,15 @@ class VideoUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
-    private Path mp4() throws Exception {
+    private Path mp4() throws IOException {
         return mp4(160, 120);
     }
 
-    private Path mp4(int width, int height) throws Exception {
+    private Path mp4(int width, int height) throws IOException {
         Path f = dir.resolve("clip-" + width + "x" + height + ".mp4");
         var enc = org.jcodec.api.awt.AWTSequenceEncoder.createSequenceEncoder(f.toFile(), 25);
         for (int i = 0; i < 50; i++) {
@@ -66,15 +68,15 @@ class VideoUiTest {
         return f;
     }
 
-    private static app.unichat.model.MediaLibrary library() throws Exception {
+    private static app.unichat.model.MediaLibrary library() throws IOException {
         return new app.unichat.model.MediaLibrary(Files.createTempDirectory("unichat-library").resolve("media-library.json"));
     }
 
-    private static void await(Callable<Boolean> c, String what) throws Exception {
+    private static void await(Callable<Boolean> c, String what) {
         FxWait.until(what, c);
     }
 
-    private Stage window(StackPane root) throws Exception {
+    private Stage window(StackPane root) throws InterruptedException {
         return fx(() -> {
             Stage s = new Stage();
             s.setScene(new Scene(root, 320, 240));
@@ -272,7 +274,7 @@ class VideoUiTest {
         assertTrue(played[0] / wall > 1.4, "after starting over it still plays at " + rate + "x, not " + played[0] / wall);
     }
 
-    private static void key(Stage stage,javafx.scene.input.KeyCode code, String text) throws Exception {
+    private static void key(Stage stage,javafx.scene.input.KeyCode code, String text) throws InterruptedException {
         fx(() -> {
             Node target = stage.getScene().getFocusOwner() != null ? stage.getScene().getFocusOwner() : stage.getScene().getRoot();
             javafx.event.Event.fireEvent(target, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,
@@ -318,14 +320,14 @@ class VideoUiTest {
     }
 
     /** A real GIF: bridges deliver one for a sticker they still label video/webm. */
-    private Path gif() throws Exception {
+    private Path gif() throws IOException {
         Path f = dir.resolve("disfrazado.gif");
         BufferedImage img = new BufferedImage(64, 64, BufferedImage.TYPE_INT_RGB);
         assertTrue(javax.imageio.ImageIO.write(img, "gif", f.toFile()));
         return f;
     }
 
-    private static app.unichat.model.Message webmSticker() throws Exception {
+    private static app.unichat.model.Message webmSticker() throws JsonProcessingException {
         app.unichat.model.Message m = new app.unichat.model.Message("$1", "!c", "@a:s", "A", false, java.time.Instant.EPOCH);
         app.unichat.matrix.TestMessages.apply(m, "m.sticker", "{\"body\":\"s\",\"url\":\"mxc://s/1\",\"info\":{\"mimetype\":\"video/webm\",\"w\":64,\"h\":64}}");
         return m;

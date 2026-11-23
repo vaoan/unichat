@@ -62,7 +62,7 @@ class SeenWindowsUiTest {
     }
 
     /** Closes whatever other tests left showing, so only this test's windows count; then starts watching. */
-    private void watchFromNothing() throws Exception {
+    private void watchFromNothing() throws InterruptedException {
         FxWait.fx(() -> {
             for (javafx.stage.Window w : new ArrayList<>(javafx.stage.Window.getWindows())) w.hide();
             stopWatching = AppWindows.watchShown(Seen.get()::windows);

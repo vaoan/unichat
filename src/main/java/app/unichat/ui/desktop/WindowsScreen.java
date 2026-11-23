@@ -21,7 +21,7 @@ public final class WindowsScreen implements ScreenAway {
     /** The native window; {@link #open} and {@link #run} are called on the watch's one thread. */
     interface MessageWindow {
         /** Makes the window and registers it; throws with why when it can't. */
-        void open(Handler onMessage) throws Exception;
+        void open(Handler onMessage) throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: Win32 through JNA, or a test's fake
 
         /** Hands every message to the handler until {@link #close}; throws with why if the loop fails first. */
         void run();

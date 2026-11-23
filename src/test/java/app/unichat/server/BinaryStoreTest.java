@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import com.sun.net.httpserver.HttpServer;
+import java.security.NoSuchAlgorithmException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -174,7 +175,7 @@ class BinaryStoreTest {
         assertFalse(Files.exists(dir.resolve("whatsapp.version")));
     }
 
-    private static String sha(byte[] b) throws Exception {
+    private static String sha(byte[] b) throws NoSuchAlgorithmException {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(b));
     }
 }

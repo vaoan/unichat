@@ -96,11 +96,11 @@ class MessageFixUiTest {
         return null;
     }
 
-    private List<String> menu(Message m) throws Exception {
+    private List<String> menu(Message m) throws InterruptedException {
         return FxWait.fx(() -> thread.actions().messageMenu(m).getItems().stream().map(MenuItem::getText).toList());
     }
 
-    private long fixingNotes() throws Exception {
+    private long fixingNotes() throws InterruptedException {
         return FxWait.fx(() -> thread.lookupAll(".message-fixing").stream().filter(Node::isVisible).count());
     }
 

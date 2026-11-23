@@ -2,6 +2,8 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,16 +63,16 @@ class VaultActionsTest {
         return new WebDav(cloud.url(), "u", "p");
     }
 
-    private VaultView view(VaultComputer c) throws Exception {
+    private VaultView view(VaultComputer c) throws InterruptedException, ExecutionException {
         return c.as(c.cloud.vault()::vaultView);
     }
 
-    private String create(VaultComputer c) throws Exception {
+    private String create(VaultComputer c) throws InterruptedException, ExecutionException {
         return c.as(c.cloud.vault()::createVault);
     }
 
-    private <T> T as(VaultComputer c, java.util.concurrent.Callable<CompletableFuture<T>> call) throws Exception {
-        return c.as(call::call);
+    private <T> T as(VaultComputer c, java.util.function.Supplier<CompletableFuture<T>> call) throws InterruptedException, ExecutionException {
+        return c.as(call::get);
     }
 
     private static String message(ExecutionException e) {
@@ -166,7 +168,7 @@ class VaultActionsTest {
      * account she puts it back in place of the new password's, its generation as {@code claims} (null: as it was), and
      * strips {@code vault.json}'s vouch.
      */
-    private void oldPasswordSlotPutBack(Long claims) throws Exception {
+    private void oldPasswordSlotPutBack(Long claims) throws JsonProcessingException, IOException, InterruptedException, ExecutionException {
         create(desk);
         as(desk, () -> desk.cloud.vault().addPassword(PASSWORD.toCharArray()));
         String slotPath = passwordSlot();
@@ -184,7 +186,7 @@ class VaultActionsTest {
         cloud.put(Vault.INFO, json.writeValueAsBytes(info));
     }
 
-    private String passwordSlot() throws Exception {
+    private String passwordSlot() throws IOException {
         return Vault.slots(dav()).stream().filter(s -> s.method() == VaultSlot.Method.PASSWORD).map(s -> Vault.SLOTS + "/" + s.id() + ".json")
             .findFirst().orElseThrow();
     }

@@ -40,7 +40,7 @@ class RestBarUiTest {
     private final List<Runnable> later = new CopyOnWriteArrayList<>();
     private final SimpleBooleanProperty archiveOpen = new SimpleBooleanProperty(false);
 
-    private static void toolkit() throws Exception {
+    private static void toolkit() throws InterruptedException {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
@@ -51,11 +51,11 @@ class RestBarUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private RestBar show(double px) throws Exception {
+    private RestBar show(double px) throws InterruptedException {
         return show(px, false);
     }
 
-    private RestBar show(double px, boolean contrast) throws Exception {
+    private RestBar show(double px, boolean contrast) throws InterruptedException {
         return FxWait.fx(() -> {
             RestBar b = new RestBar(state::get, listeners::add, listeners::remove, told::add, opened::add, shown::add, archiveOpen, later::add);
             VBox root = new VBox(b);
@@ -77,7 +77,7 @@ class RestBarUiTest {
         listeners.forEach(Runnable::run);
     }
 
-    private static void close(RestBar bar) throws Exception {
+    private static void close(RestBar bar) throws InterruptedException {
         FxWait.fx(() -> {
             bar.dispose();
             bar.getScene().getWindow().hide();
@@ -171,7 +171,7 @@ class RestBarUiTest {
         for (boolean contrast : List.of(false, true)) cutNothing(contrast);
     }
 
-    private void cutNothing(boolean contrast) throws Exception {
+    private void cutNothing(boolean contrast) throws InterruptedException {
         state.set(new Waking(Step.CHATS, 3699, 3699));
         RestBar bar = show(21, contrast);
         FxWait.settled();

@@ -594,12 +594,12 @@ class FoldersUiTest {
 
     // ------------------------------------------------------------------ helpers
 
-    private ListView<Chat> inboxListNow() throws Exception {
+    private ListView<Chat> inboxListNow() throws InterruptedException {
         return fx(this::inboxList);
     }
 
     /** Selects {@code chatId} and presses the menu key: what the menu that opens offers. */
-    private List<String> menuKeyOn(ListView<Chat> list, String chatId) throws Exception {
+    private List<String> menuKeyOn(ListView<Chat> list, String chatId) throws InterruptedException {
         fx(() -> {
             int row = -1;
             for (int i = 0; i < list.getItems().size(); i++) if (list.getItems().get(i).id().equals(chatId)) row = i;
@@ -611,7 +611,7 @@ class FoldersUiTest {
     }
 
     /** The keyboard's context menu event lands on the focused list, not on a row. */
-    private List<String> menuKey(Node target) throws Exception {
+    private List<String> menuKey(Node target) throws InterruptedException {
         return fx(() -> {
             Event.fireEvent(target, new ContextMenuEvent(ContextMenuEvent.CONTEXT_MENU_REQUESTED, 0, 0, 0, 0, true, null));
             List<ContextMenu> open = Window.getWindows().stream().filter(w -> w instanceof ContextMenu && w.isShowing())
@@ -648,7 +648,7 @@ class FoldersUiTest {
         return svc.chat(chatId).title();
     }
 
-    private int railIndex(String text) throws Exception {
+    private int railIndex(String text) throws InterruptedException {
         return fx(() -> {
             VBox rail = (VBox) scene.getRoot().lookup(".rail");
             for (int i = 0; i < rail.getChildren().size(); i++) {
@@ -659,7 +659,7 @@ class FoldersUiTest {
         });
     }
 
-    private Button railButton(String text) throws Exception {
+    private Button railButton(String text) throws InterruptedException {
         return fx(() -> rail(text));
     }
 
@@ -716,7 +716,7 @@ class FoldersUiTest {
         return (ListView<Chat>) scene.getRoot().lookup(".folder-chats");
     }
 
-    private List<String> texts(String list) throws Exception {
+    private List<String> texts(String list) throws InterruptedException {
         return fx(() -> texts0(list));
     }
 
@@ -736,7 +736,7 @@ class FoldersUiTest {
         return bounds.getMaxY() > 0 && bounds.getMinY() < scene.getHeight();
     }
 
-    private void clickCell(String list, String startsWith) throws Exception {
+    private void clickCell(String list, String startsWith) throws InterruptedException {
         fx(() -> {
             scene.getRoot().applyCss();
             scene.getRoot().layout();
@@ -752,7 +752,7 @@ class FoldersUiTest {
         FxWait.settled();
     }
 
-    private static void fire(Button b) throws Exception {
+    private static void fire(Button b) throws InterruptedException {
         fx(() -> {
             b.fire();
             return null;
@@ -760,7 +760,7 @@ class FoldersUiTest {
         FxWait.settled();
     }
 
-    private static void key(Node target, KeyCode code) throws Exception {
+    private static void key(Node target, KeyCode code) throws InterruptedException {
         fx(() -> {
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false));
             return null;
@@ -769,11 +769,11 @@ class FoldersUiTest {
     }
 
     /** chatsChanged reaches the list through a Throttle: wait for it instead of guessing how long. */
-    private static void eventually(String what, Callable<Boolean> condition) throws Exception {
+    private static void eventually(String what, Callable<Boolean> condition) {
         FxWait.until(what, condition);
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

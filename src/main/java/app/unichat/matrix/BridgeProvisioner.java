@@ -6,7 +6,7 @@ import app.unichat.bridge.BridgeStates;
 /** Makes a network's bridge available before signing in to it (the local server downloads and starts it). */
 @FunctionalInterface
 public interface BridgeProvisioner {
-    void ensure(Network network) throws Exception;
+    void ensure(Network network) throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: the local server installs and starts a bridge, failing as it does
 
     /** Whether this provisioner can install {@code network}'s bridge (it's offered in Cuentas before it exists). */
     default boolean provides(Network network) { return true; }

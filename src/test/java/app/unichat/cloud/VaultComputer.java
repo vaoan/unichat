@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,7 +10,6 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -31,7 +31,7 @@ final class VaultComputer {
     /** Whether the account is still connected here: false, as disconnecting in Ajustes leaves it (no account). */
     volatile boolean connected = true;
 
-    VaultComputer(FakeDav account, Path dir, String machine) throws Exception {
+    VaultComputer(FakeDav account, Path dir, String machine) throws IOException {
         values.put("cloud.machine", machine);
         data = Files.createDirectories(dir.resolve(machine));
         Path photos = Files.createDirectories(data.resolve("Ana"));
@@ -44,7 +44,7 @@ final class VaultComputer {
                 pinnedAdopted.incrementAndGet();
                 try {
                     Files.write(data.resolve("pinned-messages.json"), theirs);
-                } catch (java.io.IOException e) {
+                } catch (IOException e) {
                     throw new java.io.UncheckedIOException(e);
                 }
             }, data.resolve("transcripts")));
@@ -63,7 +63,7 @@ final class VaultComputer {
         try {
             Path p = data.resolve("pinned-messages.json");
             return Files.exists(p) ? Files.readAllBytes(p) : "{}".getBytes(StandardCharsets.UTF_8);
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             throw new java.io.UncheckedIOException(e);
         }
     }
@@ -85,20 +85,26 @@ final class VaultComputer {
         return values.get(key);
     }
 
-    VaultComputer write(String file, String text) throws Exception {
+    VaultComputer write(String file, String text) throws IOException {
         Path p = data.resolve(file);
         Files.createDirectories(p.getParent());
         Files.writeString(p, text);
         return this;
     }
 
-    String read(String file) throws Exception {
+    String read(String file) throws IOException {
         Path p = data.resolve(file);
         return Files.exists(p) ? Files.readString(p) : null;
     }
 
+    /** What starts the work {@link #as} waits for; throwing nothing checked, it adds nothing to what {@code as} throws. */
+    @FunctionalInterface
+    interface Call<T, E extends Exception> {
+        T call() throws E;
+    }
+
     /** What {@code call} gives, run as this computer: its settings in while it runs. */
-    <T> T as(Callable<Future<T>> call) throws Exception {
+    <T, E extends Exception> T as(Call<Future<T>, E> call) throws E, InterruptedException, java.util.concurrent.ExecutionException {
         in();
         try {
             return call.call().get();
@@ -107,11 +113,11 @@ final class VaultComputer {
         }
     }
 
-    Cloud.Status round() throws Exception {
+    Cloud.Status round() throws InterruptedException, java.util.concurrent.ExecutionException {
         return as(cloud::syncNow);
     }
 
-    void textsNow() throws Exception {
+    void textsNow() throws InterruptedException, java.util.concurrent.ExecutionException {
         as(cloud::textsNow);
     }
 

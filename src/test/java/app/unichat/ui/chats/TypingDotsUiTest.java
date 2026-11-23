@@ -17,7 +17,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,7 +39,7 @@ class TypingDotsUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 

@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
@@ -47,7 +46,7 @@ class GroupsUiTest {
         }
     }
 
-    private Scene open(Network n) throws Exception {
+    private Scene open(Network n) throws InterruptedException {
         svc = new MockChatService();
         Scene scene = fx(() -> {
             Stage stage = new Stage();
@@ -66,7 +65,7 @@ class GroupsUiTest {
     }
 
     /** Presses {@code code} on {@code target}, then waits until the window has done what it set off. */
-    private static void key(Node target, KeyCode code) throws Exception {
+    private static void key(Node target, KeyCode code) throws InterruptedException {
         fx(() -> {
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false));
             return null;
@@ -102,7 +101,7 @@ class GroupsUiTest {
     }
 
     /** Opens a list row by id with Enter. */
-    private void enter(javafx.scene.control.ListView<app.unichat.model.Chat> list, String id) throws Exception {
+    private void enter(javafx.scene.control.ListView<app.unichat.model.Chat> list, String id) throws InterruptedException {
         int i = fx(() -> {
             for (int k = 0; k < list.getItems().size(); k++) if (list.getItems().get(k).id().equals(id)) return k;
             throw new AssertionError("no row " + id + " in " + list.getItems().stream().map(app.unichat.model.Chat::id).toList());
@@ -169,7 +168,7 @@ class GroupsUiTest {
         svc.stop();
     }
 
-    private static String toastText(Scene s) throws Exception {
+    private static String toastText(Scene s) throws InterruptedException {
         return fx(() -> {
             Node t = s.getRoot().lookup(".toast");
             return t != null && t.isVisible() ? ((javafx.scene.control.Label) t).getText() : "";
@@ -277,11 +276,11 @@ class GroupsUiTest {
         return (ThreadPane) s.getRoot().lookupAll("*").stream().filter(n -> n instanceof ThreadPane).findFirst().orElseThrow();
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
-    private static void clickRail(Scene s, String accessibleText) throws Exception {
+    private static void clickRail(Scene s, String accessibleText) throws InterruptedException {
         fx(() -> {
             for (Node n : s.getRoot().lookupAll(".rail-button")) {
                 String t = n.getAccessibleText();

@@ -82,7 +82,7 @@ class VaultPageUiTest extends VaultPageTestBase {
     }
 
     /** Telegram's keys and a GIF service's key typed in Ajustes and kept here, as before the vault. */
-    private void keysByHand(String where) throws Exception {
+    private void keysByHand(String where) throws InterruptedException {
         GifProviders.Known gif = GifProviders.known().get(0);
         MockChatService svc = new MockChatService();
         try {
@@ -267,7 +267,7 @@ class VaultPageUiTest extends VaultPageTestBase {
     }
 
     /** This computer opened the vault another made, with a password and a laptop besides. */
-    private String openedWithOthers() throws Exception {
+    private String openedWithOthers() throws Exception { // NOPMD: SignatureDeclareThrowsException, it passes on Vault.Exists, which only Exception names outside cloud
         String code = account.otherComputerMadeIt(PASSWORD);
         account.anotherComputer(LAPTOP, "Portátil");
         account.cloud().vault().openVault(app.unichat.cloud.VaultView.Way.RECOVERY, code.toCharArray()).get();
@@ -366,7 +366,7 @@ class VaultPageUiTest extends VaultPageTestBase {
     }
 
     /** Fires the button a screen reader names {@code accessible}. */
-    private void clickNamed(String accessible) throws Exception {
+    private void clickNamed(String accessible) throws InterruptedException {
         FxWait.fx(() -> {
             showing().stream().filter(n -> n instanceof ButtonBase b && accessible.equals(b.getAccessibleText())).map(n -> (ButtonBase) n)
                 .findFirst().orElseThrow(() -> new AssertionError("no button named " + accessible)).fire();
@@ -412,7 +412,7 @@ class VaultPageUiTest extends VaultPageTestBase {
         unseen();
         account.cloud().syncNow().get();
         FxWait.settled();
-        assertTrue(FxWait.fx(saysBefore), "unseen: nothing heard");
+        assertTrue(FxWait.fx(saysBefore::call), "unseen: nothing heard");
         app.unichat.support.Seen.reset(true);
         FxWait.until("seen again: the round that went meanwhile", () -> !saysBefore.call());
         FxWait.fx(() -> { s.close(); return null; });
@@ -435,7 +435,7 @@ class VaultPageUiTest extends VaultPageTestBase {
     }
 
     /** Nobody can see Unichat, and the pages have heard it ({@code Showing} hears it on the FX thread). */
-    private static void unseen() throws Exception {
+    private static void unseen() throws InterruptedException {
         app.unichat.support.Seen.reset(false);
         FxWait.fx(() -> null);
     }
@@ -686,12 +686,12 @@ class VaultPageUiTest extends VaultPageTestBase {
     }
 
     /** The squeezed texts on Nube with the vault drawn, after pressing {@code press} if given (a step: the code, a confirmation). */
-    private List<String> squeezedOnCloudPage(MockChatService svc, String where, String... presses) throws Exception {
+    private List<String> squeezedOnCloudPage(MockChatService svc, String where, String... presses) throws InterruptedException {
         return squeezedUntil(svc, where, null, presses);
     }
 
     /** The same, measured once a label saying {@code until} shows (null: a code, or a confirmation). */
-    private List<String> squeezedUntil(MockChatService svc, String where, String until, String... presses) throws Exception {
+    private List<String> squeezedUntil(MockChatService svc, String where, String until, String... presses) throws InterruptedException {
         Stage owner = FxWait.fx(() -> {
             Stage o = new Stage();
             o.setOpacity(0);

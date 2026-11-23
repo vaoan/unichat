@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.scene.control.ContextMenu;
 import javafx.stage.Stage;
@@ -62,7 +63,7 @@ public final class LeftoverWindows implements BeforeEachCallback, AfterEachCallb
      * exited (a test's last window closed with implicit exit on), when {@code runLater} drops the task silently and a
      * wait for it would never end.
      */
-    private static <T> T onFx(Callable<T> c) throws Exception {
+    private static <T> T onFx(Callable<T> c) throws InterruptedException, ExecutionException {
         boolean fxThread = Thread.getAllStackTraces().keySet().stream()
                 .anyMatch(t -> t.isAlive() && "JavaFX Application Thread".equals(t.getName()));
         if (!fxThread) return null;

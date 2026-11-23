@@ -6,6 +6,7 @@ import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.service.MockChatService;
 import app.unichat.voice.PcmSource;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -49,11 +50,11 @@ class VoiceUiTest {
         @Override public int rate() { return RATE; }
 
         @Override
-        public int read(short[] into) throws java.io.IOException {
+        public int read(short[] into) throws IOException {
             try {
                 reads.acquire();
             } catch (InterruptedException e) {
-                throw new java.io.IOException(e);
+                throw new IOException(e);
             }
             if (closed) return -1;
             for (int i = 0; i < into.length; i++) into[i] = i % 2 == 0 ? amplitude : (short) -amplitude;
@@ -121,17 +122,17 @@ class VoiceUiTest {
         svc.stop();
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
-    private static void await(Callable<Boolean> c, String what) throws Exception {
+    private static void await(Callable<Boolean> c, String what) {
         FxWait.until(what, c);
     }
 
     private Node mic() { return composer.lookup(".mic-button"); }
 
-    private void startRecording() throws Exception {
+    private void startRecording() throws InterruptedException {
         fx(() -> { ((Button) mic()).fire(); return null; });
         await(() -> composer.lookup(".voice-bar") != null, "the recording bar shows");
     }
@@ -204,7 +205,7 @@ class VoiceUiTest {
     }
 
     /** The recordings' files there are now. */
-    private static java.util.Set<Path> recordings() throws java.io.IOException {
+    private static java.util.Set<Path> recordings() throws IOException {
         Path media = app.unichat.settings.Settings.get().cacheDir().resolve("media");
         if (!Files.isDirectory(media)) return new java.util.HashSet<>();
         try (var files = Files.list(media)) {
@@ -243,7 +244,7 @@ class VoiceUiTest {
     @Test
     void noMicSaysSo() throws Exception {
         fx(() -> {
-            composer.setMicrophone(() -> { throw new java.io.IOException("No se encontró un micrófono disponible"); });
+            composer.setMicrophone(() -> { throw new IOException("No se encontró un micrófono disponible"); });
             ((Button) mic()).fire();
             return null;
         });

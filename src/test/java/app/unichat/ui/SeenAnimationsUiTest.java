@@ -45,7 +45,7 @@ class SeenAnimationsUiTest {
         FxWait.fx(() -> { stages.forEach(Stage::close); return null; });
     }
 
-    private Stage window(StackPane root) throws Exception {
+    private Stage window(StackPane root) throws InterruptedException {
         return FxWait.fx(() -> {
             Stage s = new Stage();
             s.setOpacity(0);
@@ -64,7 +64,7 @@ class SeenAnimationsUiTest {
         java.util.concurrent.Callable<Boolean> spinning = () -> line.node().lookupAll(".progress-indicator").stream()
                 .anyMatch(n -> ((javafx.scene.control.ProgressIndicator) n).isIndeterminate());
         assertTrue(FxWait.fx(() -> Showing.animating(line.node())), "counting while seen");
-        assertTrue(FxWait.fx(spinning), "its wheel turns while seen");
+        assertTrue(FxWait.fx(spinning::call), "its wheel turns while seen");
 
         Seen.reset(false); // from another thread, as the screen's source does
         FxWait.until("resting while nobody can see it", () -> !Showing.animating(line.node()) && !spinning.call());
@@ -89,7 +89,7 @@ class SeenAnimationsUiTest {
         Stage stage = window(FxWait.fx(() -> new StackPane(task)));
         java.util.concurrent.Callable<Boolean> spinning = task.bar::isIndeterminate;
         FxWait.fx(() -> { task.bar.setProgress(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS); return null; });
-        assertTrue(FxWait.fx(spinning), "it moves while seen");
+        assertTrue(FxWait.fx(spinning::call), "it moves while seen");
 
         Seen.reset(false);
         FxWait.until("resting while nobody can see it", () -> !spinning.call());
@@ -102,7 +102,7 @@ class SeenAnimationsUiTest {
             task.bar.setProgress(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS); // told again meanwhile
             return null;
         });
-        assertFalse(FxWait.fx(spinning), "told to move while minimised, it still rests");
+        assertFalse(FxWait.fx(spinning::call), "told to move while minimised, it still rests");
         FxWait.fx(() -> { stage.setIconified(false); return null; });
         FxWait.until("moving again once restored", spinning);
 

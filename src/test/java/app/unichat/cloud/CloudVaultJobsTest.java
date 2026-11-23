@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,7 @@ class CloudVaultJobsTest {
     }
 
     /** The one computer of these tests: its settings stay in for the whole test, so its rounds can run while the test goes on. */
-    private VaultComputer desk() throws Exception {
+    private VaultComputer desk() throws IOException {
         return new VaultComputer(account, dir, DESK).write("texts/here/" + TEXT, "{}\n");
     }
 
@@ -62,7 +63,7 @@ class CloudVaultJobsTest {
     }
 
     /** A round held in its media: its photo's upload waits until the returned latch goes. */
-    private CountDownLatch roundInMedia(VaultComputer desk, CompletableFuture<?>[] round) throws Exception {
+    private CountDownLatch roundInMedia(VaultComputer desk, CompletableFuture<?>[] round) throws InterruptedException {
         CountDownLatch there = new CountDownLatch(1);
         CountDownLatch release = holdPut(PHOTO, there);
         round[0] = desk.cloud.syncNow();
@@ -133,7 +134,7 @@ class CloudVaultJobsTest {
     }
 
     /** A round held on its first photo; once let go, it holds on the second, its progress told for it in between. */
-    private CompletableFuture<Cloud.Status> roundHeldOnTwoPhotos(VaultComputer desk, CountDownLatch[] second) throws Exception {
+    private CompletableFuture<Cloud.Status> roundHeldOnTwoPhotos(VaultComputer desk, CountDownLatch[] second) throws InterruptedException, IOException {
         desk.write("Ana/b.jpg", "otra foto");
         CountDownLatch atFirst = new CountDownLatch(1), atSecond = new CountDownLatch(1);
         CountDownLatch first = holdPut(PHOTO, atFirst);

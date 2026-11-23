@@ -6,6 +6,7 @@ import app.unichat.service.MockChatService;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.MainView;
 import app.unichat.ui.desktop.Notifier;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.Node;
@@ -104,12 +105,12 @@ class CaptureUiTest {
     }
 
     @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
-    private ListView<ThreadRows.Row> list() throws Exception {
+    private ListView<ThreadRows.Row> list() throws InterruptedException {
         return FxWait.fx(() -> (ListView<ThreadRows.Row>) thread.lookup(".timeline"));
     }
 
     /** Space on {@code m}, as a click on it while picking. */
-    private void press(Message m) throws Exception {
+    private void press(Message m) throws InterruptedException {
         ListView<ThreadRows.Row> l = list();
         FxWait.fx(() -> {
             for (int i = 0; i < l.getItems().size(); i++) {
@@ -120,17 +121,17 @@ class CaptureUiTest {
         });
     }
 
-    private String count() throws Exception {
+    private String count() throws InterruptedException {
         return FxWait.fx(() -> ((Label) thread.lookup(".selection-count")).getText());
     }
 
-    private void start(Message m) throws Exception {
+    private void start(Message m) throws InterruptedException {
         MenuItem capture = FxWait.fx(() -> thread.actions().messageMenu(m).getItems().stream()
                 .filter(i -> "Capturar conversación…".equals(i.getText())).findFirst().orElseThrow());
         FxWait.fx(() -> { capture.fire(); return null; });
     }
 
-    private List<String> ends() throws Exception {
+    private List<String> ends() throws InterruptedException {
         FxWait.settled();
         return FxWait.fx(() -> thread.lookupAll(".range-end-label").stream().map(n -> ((Label) n).getText()).toList());
     }
@@ -171,11 +172,11 @@ class CaptureUiTest {
         assertEquals("Capturando 3 mensajes", count(), "the end is back where clicked");
     }
 
-    private Node sheet() throws Exception {
+    private Node sheet() throws InterruptedException {
         return FxWait.fx(() -> stage.getScene().getRoot().lookup(".capture-sheet"));
     }
 
-    private void captureLast(int n) throws Exception {
+    private void captureLast(int n) throws InterruptedException {
         List<Message> all = chat();
         // The window shows new messages a moment later (MainView paces its redraws), and one still going out can't be an
         // end (its id is a temporary one): pick once the newest is listed and the server has it.
@@ -190,7 +191,7 @@ class CaptureUiTest {
         FxWait.until("the capture is ready", () -> FxWait.fx(() -> sheet() != null && !sheet().lookupAll(".capture-picture").isEmpty()));
     }
 
-    private List<ImageView> pictures() throws Exception {
+    private List<ImageView> pictures() throws InterruptedException {
         return FxWait.fx(() -> sheet().lookupAll(".capture-picture").stream().map(n -> (ImageView) n).toList());
     }
 
@@ -237,7 +238,7 @@ class CaptureUiTest {
         savesToAFolder();
     }
 
-    private void savesToAFolder() throws Exception {
+    private void savesToAFolder() throws InterruptedException {
         captureLast(3);
         FxWait.fx(() -> { thread.captureSheet().useFolderChooser(w -> dir.toFile()); return null; });
         Button save = FxWait.fx(() -> sheet().lookupAll(".button").stream().map(n -> (Button) n)
@@ -346,7 +347,7 @@ class CaptureUiTest {
         assertEquals(before, names(sending), "straight into the folder chosen");
     }
 
-    private static java.util.Set<String> names(Path folder) throws java.io.IOException {
+    private static java.util.Set<String> names(Path folder) throws IOException {
         if (!Files.isDirectory(folder)) return java.util.Set.of();
         try (var s = Files.list(folder)) {
             return s.map(p -> p.getFileName().toString()).collect(java.util.stream.Collectors.toSet());

@@ -1,6 +1,7 @@
 package app.unichat.login;
 
 import app.unichat.model.Network;
+import java.net.URISyntaxException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -15,7 +16,7 @@ class CookieTxtTest {
     private static final Instant NOW = Instant.parse("2026-10-26T00:00:00Z");
     private final CookieSpec spec = CookieSpec.forNetwork(Network.INSTAGRAM);
 
-    private Path sample() throws Exception {
+    private Path sample() throws URISyntaxException {
         return Path.of(getClass().getResource("sample-cookies.txt").toURI());
     }
 

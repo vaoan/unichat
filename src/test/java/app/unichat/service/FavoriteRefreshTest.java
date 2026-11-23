@@ -2,6 +2,7 @@ package app.unichat.service;
 
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.StickerPack;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -25,12 +26,12 @@ class FavoriteRefreshTest {
     @TempDir Path dir;
     private final List<String> asked = new ArrayList<>();
 
-    private static JsonNode info(String id, String mime) throws Exception {
+    private static JsonNode info(String id, String mime) throws JsonProcessingException {
         return JSON.readTree("{\"mimetype\":\"" + mime + "\",\"fi.mau.bridged_sticker\":{\"network\":\"telegram\",\"id\":\"" + id
                 + "\",\"pack_url\":\"" + SET + "\"}}");
     }
 
-    private static MediaLibrary.Item tg(String url, String id, String mime, int w) throws Exception {
+    private static MediaLibrary.Item tg(String url, String id, String mime, int w) throws JsonProcessingException {
         return new MediaLibrary.Item(MediaLibrary.Kind.STICKER, url, mime, w, w, info(id, mime));
     }
 

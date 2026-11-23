@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgeStates;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +67,7 @@ class WatchdogInternetTest {
     }
 
     /** A keeper where facebook is fragile, and {@code safe} says whether it may be restarted. */
-    private Watchdog withFragileFacebook(boolean[] safe) throws Exception {
+    private Watchdog withFragileFacebook(boolean[] safe) throws JsonProcessingException {
         int port = everyoneAnswers.getAddress().getPort();
         BridgeStates states = new BridgeStates();
         for (int i = 0; i < Watchdog.FLAPS; i++) {

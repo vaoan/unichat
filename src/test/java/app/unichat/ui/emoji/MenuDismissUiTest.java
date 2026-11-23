@@ -78,7 +78,7 @@ class MenuDismissUiTest {
         assertFalse(FxWait.fx(() -> open() != null));
     }
 
-    private static ContextMenu open() throws Exception {
+    private static ContextMenu open() throws InterruptedException {
         return FxWait.fx(() -> Window.getWindows().stream().filter(w -> w instanceof ContextMenu && w.isShowing())
                 .map(w -> (ContextMenu) w).findFirst().orElse(null));
     }

@@ -59,7 +59,7 @@ class PasskeyProbeRowUiTest {
         return session;
     }
 
-    private Stage show(Node row) throws Exception {
+    private Stage show(Node row) throws InterruptedException {
         return FxWait.fx(() -> {
             Stage s = new Stage();
             s.setOpacity(0);

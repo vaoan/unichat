@@ -3,6 +3,7 @@ package app.unichat.ui.timeline;
 import app.unichat.ui.FxWait;
 import app.unichat.cloak.CloakJob;
 import app.unichat.cloak.CloakLevel;
+import java.lang.reflect.InvocationTargetException;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Node;
@@ -78,7 +79,7 @@ class CloakBarUiTest {
     }
 
     /** A job whose protection reports 37 % and then waits to be cancelled; installing is instant. */
-    private static CloakJob runningJob() throws Exception {
+    private static CloakJob runningJob() throws ClassNotFoundException, InstantiationException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
         Class<?> runner = Class.forName("app.unichat.cloak.CloakJob$Runner");
         Object fake = Proxy.newProxyInstance(runner.getClassLoader(), new Class<?>[] {runner}, (p, m, args) -> {
             if (m.getName().equals("protect")) {

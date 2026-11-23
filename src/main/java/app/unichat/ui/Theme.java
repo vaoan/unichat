@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.settings.Settings;
 import app.unichat.support.Os;
 import app.unichat.support.Processes;
+import java.io.IOException;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 
@@ -187,7 +188,7 @@ public final class Theme {
         return systemDark;
     }
 
-    private static String run(String... cmd) throws Exception {
+    private static String run(String... cmd) throws IOException, InterruptedException {
         return Processes.capture(List.of(cmd), 3).out();
     }
 }

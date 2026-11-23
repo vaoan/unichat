@@ -1,5 +1,6 @@
 package app.unichat.support;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ImageHeadersTest {
     @TempDir Path dir;
 
-    private Path iso(String brand) throws Exception {
+    private Path iso(String brand) throws IOException {
         byte[] b = new byte[32];
         b[3] = 24;
         System.arraycopy(("ftyp" + brand).getBytes(StandardCharsets.US_ASCII), 0, b, 4, 8);

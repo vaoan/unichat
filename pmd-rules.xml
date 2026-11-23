@@ -81,9 +81,12 @@
     <exclude name="GodClass"/>
     <!-- Fixed metrics with no threshold to set; records and JNA structures hold data on purpose. -->
     <exclude name="DataClass"/>
-    <!-- "throws Exception": callback interfaces throw what they run, as Callable does (GifSearch.Call,
-         MatrixCore.IoAction, BridgeProvisioner), and test helpers so a failure is the test's error (377). -->
-    <exclude name="SignatureDeclareThrowsException"/>
+  </rule>
+  <rule ref="category/java/design.xml/SignatureDeclareThrowsException">
+    <properties>
+      <!-- A JUnit test "throws Exception" so a failure is the test's error. -->
+      <property name="IgnoreJUnitCompletely" value="true"/>
+    </properties>
   </rule>
   <rule ref="category/java/design.xml/NcssCount">
     <properties>

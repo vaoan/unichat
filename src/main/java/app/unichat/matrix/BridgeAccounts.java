@@ -200,7 +200,7 @@ final class BridgeAccounts {
         return url == null ? null : new BridgeLogin(url, core.accessToken, userId);
     }
 
-    void prepareBridge(Network n) throws Exception {
+    void prepareBridge(Network n) throws Exception { // NOPMD: SignatureDeclareThrowsException, passes on what the provisioner throws
         BridgeProvisioner p = provisioner;
         if (p != null) p.ensure(n);
     }

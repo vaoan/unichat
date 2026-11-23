@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.model.Message;
 import app.unichat.service.ScriptedChatService;
+import java.util.concurrent.ExecutionException;
 import javafx.scene.input.KeyCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -30,13 +31,13 @@ class TimelineReadingUiTest {
         if (w != null) w.close();
     }
 
-    private TimelineWindow.Frames readingOlder() throws Exception {
+    private TimelineWindow.Frames readingOlder() throws InterruptedException, ExecutionException {
         w = TimelineWindow.open(30);
         return w.readingOlder();
     }
 
     /** The messages in view now, but not the newest: one above the one read and one below it. */
-    private Message[] around() throws Exception {
+    private Message[] around() throws InterruptedException {
         String read = FxWait.fx(w::readMessage);
         List<Message> all = FxWait.fx(() -> w.svc.messages(CHAT));
         for (int i = 1; i < all.size() - 1; i++) {
@@ -245,7 +246,7 @@ class TimelineReadingUiTest {
         }
     }
 
-    private void tinyTrackpadUpAndDown() throws Exception {
+    private void tinyTrackpadUpAndDown() throws InterruptedException {
         for (int i = 0; i < 6; i++) w.wheel(3);
         assertTrue(FxWait.fx(() -> w.newestGap() == null || w.newestGap() > 1), "precondition: moved up a little");
         for (int i = 0; i < 6; i++) w.wheel(-3);
@@ -392,7 +393,7 @@ class TimelineReadingUiTest {
     }
 
     /** At the newest message again, the next one to arrive is followed without a frame out of place. */
-    private void followsFromHere(double gap) throws Exception {
+    private void followsFromHere(double gap) throws InterruptedException {
         TimelineWindow.Frames frames = w.watch(w.atBottom(gap));
         w.svc.receive(CHAT, "y otro más");
         FxWait.until("it shows", () -> "y otro más".equals(w.newest().body()) && w.showsNewest());

@@ -9,6 +9,7 @@ import app.unichat.service.MockChatService;
 import app.unichat.ui.FxWait;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.Node;
@@ -73,7 +74,7 @@ class StickerSearchUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private MediaLibrary.Item sticker(String name, String emoji) throws Exception {
+    private MediaLibrary.Item sticker(String name, String emoji) throws IOException {
         Path f = dir.resolve(name + ".png");
         ImageIO.write(new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB), "png", f.toFile());
         ObjectNode info = JsonNodeFactory.instance.objectNode();
@@ -122,17 +123,17 @@ class StickerSearchUiTest {
         FxWait.fx(() -> { stage.close(); return null; });
     }
 
-    private TextField search() throws Exception {
+    private TextField search() throws InterruptedException {
         return FxWait.fx(() -> (TextField) grid.lookup(".emoji-search"));
     }
 
-    private void type(String text) throws Exception {
+    private void type(String text) throws InterruptedException {
         FxWait.fx(() -> { search().setText(text); return null; });
         FxWait.settled();
     }
 
     /** The texts and the stickers shown under the search, in order: a label's text, or "sticker:<file>". */
-    private List<String> shown() throws Exception {
+    private List<String> shown() throws InterruptedException {
         return FxWait.fx(() -> {
             List<String> out = new ArrayList<>();
             for (Node n : ((VBox) grid.getContent()).getChildren()) {
@@ -144,7 +145,7 @@ class StickerSearchUiTest {
         });
     }
 
-    private List<Node> tiles() throws Exception {
+    private List<Node> tiles() throws InterruptedException {
         return FxWait.fx(() -> {
             List<Node> out = new ArrayList<>();
             for (Node n : ((VBox) grid.getContent()).getChildren()) if (n instanceof FlowPane f) out.addAll(f.getChildren());
@@ -153,7 +154,7 @@ class StickerSearchUiTest {
     }
 
     /** Enter on a tile, as the keyboard sends one. */
-    private static void send(Node tile) throws Exception {
+    private static void send(Node tile) throws InterruptedException {
         FxWait.fx(() -> {
             Event.fireEvent(tile, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
             return null;

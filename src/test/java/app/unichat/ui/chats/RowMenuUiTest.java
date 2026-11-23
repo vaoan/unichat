@@ -5,6 +5,7 @@ import app.unichat.ui.MainView;
 import app.unichat.ui.Theme;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.Node;
@@ -23,7 +24,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -152,7 +152,7 @@ class RowMenuUiTest {
         assertNull(closedBy[0], "the menu closed when the list refreshed");
     }
 
-    private void assertMenuSurvivesRefresh(String list) throws Exception {
+    private void assertMenuSurvivesRefresh(String list) throws InterruptedException, ExecutionException {
         fx(() -> {
             scene.getRoot().applyCss();
             scene.getRoot().layout();
@@ -193,7 +193,7 @@ class RowMenuUiTest {
                 .map(ContextMenu.class::cast).toList();
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

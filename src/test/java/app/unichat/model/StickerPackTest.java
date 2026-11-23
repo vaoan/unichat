@@ -1,5 +1,6 @@
 package app.unichat.model;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -10,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class StickerPackTest {
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    private static String of(String bridged) throws Exception {
+    private static String of(String bridged) throws JsonProcessingException {
         return StickerPack.urlOf(JSON.readTree("{\"fi.mau.bridged_sticker\":" + bridged + "}"));
     }
 

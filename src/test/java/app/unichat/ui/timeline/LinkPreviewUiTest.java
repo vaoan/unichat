@@ -68,7 +68,7 @@ class LinkPreviewUiTest {
         return scene.getRoot().lookupAll(".link-preview").stream().filter(n -> shown(n) && texts(n).contains(text)).findFirst().orElse(null);
     }
 
-    private static Scene open(MockChatService svc) throws Exception {
+    private static Scene open(MockChatService svc) throws InterruptedException {
         return FxWait.fx(() -> {
             Stage stage = new Stage();
             stage.setOpacity(0);

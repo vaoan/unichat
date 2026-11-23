@@ -61,7 +61,7 @@ class AvatarFlashUiTest {
         return a.getChildren().stream().anyMatch(n -> n instanceof ImageView v && v.isVisible() && v.getImage() != null);
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
+    private static <T> T fx(Supplier<T> s) throws InterruptedException {
         return FxWait.fx(s::get);
     }
 }

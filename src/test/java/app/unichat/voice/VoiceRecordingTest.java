@@ -2,6 +2,7 @@ package app.unichat.voice;
 
 import app.unichat.model.VoiceNote;
 import app.unichat.stt.OggOpus;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -52,7 +53,7 @@ class VoiceRecordingTest {
         @Override public void close() { closed = true; }
     }
 
-    private VoiceNote record(PcmSource source) throws Exception {
+    private VoiceNote record(PcmSource source) throws IOException, IllegalAccessException, InterruptedException, NoSuchFieldException {
         VoiceRecorder r = new VoiceRecorder(source, dir.resolve("nota.ogg"));
         r.start();
         awaitEnd(r);
@@ -63,14 +64,14 @@ class VoiceRecordingTest {
      * Until the recording stops by itself (its source ran out, or the limit): joins its thread, which is what
      * {@link VoiceRecorder#ended} looks at.
      */
-    private static void awaitEnd(VoiceRecorder r) throws Exception {
+    private static void awaitEnd(VoiceRecorder r) throws IllegalAccessException, InterruptedException, NoSuchFieldException {
         // VoiceRecorder offers no way to wait for its end; a future it completed on ending would spare this reflection.
         Field thread = VoiceRecorder.class.getDeclaredField("thread");
         thread.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
         ((Thread) thread.get(r)).join(); // lesson-ok: test-future-join (a thread)
     }
 
-    private static double rms(Path wav) throws Exception {
+    private static double rms(Path wav) throws IOException {
         ByteBuffer b = ByteBuffer.wrap(Files.readAllBytes(wav)).order(ByteOrder.LITTLE_ENDIAN);
         b.position(44);
         double sum = 0;

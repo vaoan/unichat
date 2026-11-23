@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.support.I18n;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -28,7 +29,7 @@ class PasskeyPageTest {
     private final List<PasskeyPage.Finding> found = new CopyOnWriteArrayList<>();
     private final URI[] opened = {null};
 
-    private CompletableFuture<Void> start() throws Exception {
+    private CompletableFuture<Void> start() throws IOException {
         return PasskeyPage.start(u -> opened[0] = u, found::add, 0, PCloudTest.NO_LIMIT);
     }
 
@@ -37,13 +38,13 @@ class PasskeyPageTest {
         return URI.create("http://127.0.0.1:" + opened[0].getPort() + path);
     }
 
-    private HttpResponse<String> post(String body) throws Exception {
+    private HttpResponse<String> post(String body) throws IOException, InterruptedException {
         return HTTP.send(HttpRequest.newBuilder(at("/passkey/result"))
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    private String state() throws Exception {
+    private String state() throws IOException, InterruptedException {
         String page = HTTP.send(HttpRequest.newBuilder(at("/passkey")).build(), HttpResponse.BodyHandlers.ofString()).body();
         var m = Pattern.compile("const STATE = \"([0-9a-f]+)\"").matcher(page);
         assertTrue(m.find(), "the page carries its state");
@@ -160,7 +161,7 @@ class PasskeyPageTest {
     }
 
     /** What a browser sends for another name (DNS rebinding: evil.example resolved to 127.0.0.1); HttpClient won't set Host. */
-    private int raw(String request) throws Exception {
+    private int raw(String request) throws IOException {
         try (java.net.Socket s = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), opened[0].getPort())) {
             s.getOutputStream().write(request.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
             s.getOutputStream().flush();

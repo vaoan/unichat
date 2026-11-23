@@ -35,7 +35,7 @@ class TimelineWidthUiTest {
     @TempDir
     Path dir;
 
-    private static void toolkit() throws Exception {
+    private static void toolkit() throws InterruptedException {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);

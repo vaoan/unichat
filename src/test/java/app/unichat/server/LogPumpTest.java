@@ -48,7 +48,7 @@ class LogPumpTest {
             thread.start();
         }
 
-        void send(String line) throws Exception {
+        void send(String line) throws IOException, InterruptedException {
             feed.write((line + "\n").getBytes(StandardCharsets.UTF_8));
             feed.flush();
             done.take(); // the pump handled it; JUnit's global timeout is the only limit

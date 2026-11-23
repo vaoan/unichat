@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,7 +68,7 @@ class VaultNamesTest {
      * a computer's plain texts moved in and so the list of who sent plain), all of it then put under the old names, as
      * the person's account is today; what each file of the vault holds, by its new logical path.
      */
-    private Map<String, byte[]> anOldVault() throws Exception {
+    private Map<String, byte[]> anOldVault() throws VaultCrypto.Broken, IOException, Vault.Exists, InterruptedException, java.util.concurrent.ExecutionException {
         VaultComputer plain = new VaultComputer(cloud, dir, PLAIN).write("texts/here/" + TEXT, "{\"de\":\"antes\"}\n");
         plain.round(); // a computer sending plain before the vault
         made = Vault.create(dav(), DESK, "Escritorio");
@@ -86,7 +87,7 @@ class VaultNamesTest {
     }
 
     /** Every sealed file under {@code root}, opened (under its old path when {@code old}), by its new logical path. */
-    private Map<String, byte[]> opened(String root, byte[] vk, boolean old) throws Exception {
+    private Map<String, byte[]> opened(String root, byte[] vk, boolean old) throws VaultCrypto.Broken {
         Map<String, byte[]> out = new TreeMap<>();
         for (Map.Entry<String, byte[]> f : new HashMap<>(cloud.files).entrySet()) {
             String p = f.getKey();
@@ -100,7 +101,7 @@ class VaultNamesTest {
     }
 
     /** The vault put back under its old names, each file sealed under its old logical path, its file without {@code names}. */
-    private void toOldNames(byte[] vk) throws Exception {
+    private void toOldNames(byte[] vk) throws VaultCrypto.Broken {
         for (Map.Entry<String, byte[]> f : new HashMap<>(cloud.files).entrySet()) {
             String p = f.getKey();
             if (!p.startsWith(Vault.ROOT + "/")) continue;
@@ -262,7 +263,7 @@ class VaultNamesTest {
         VaultNames.afterSwitch = () -> {
             try {
                 oldNames.set(Vault.info(new OldVault(dav()))); // a computer still reading the old names
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 throw new java.io.UncheckedIOException(e);
             }
             cloud.put(stored, VaultCrypto.seal(made.vk(), text, "{".getBytes(StandardCharsets.UTF_8))); // a late, shorter copy
@@ -303,7 +304,7 @@ class VaultNamesTest {
         VaultNames.beforeSwitch = () -> {
             try {
                 Vault.addComputer(new OldVault(dav()), made.vk(), THIRD, "Tercero"); // another computer joins under the old names
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 throw new java.io.UncheckedIOException(e);
             }
         };
@@ -350,7 +351,7 @@ class VaultNamesTest {
     }
 
     /** The vault moved by the laptop, its finish cut short right after the switch: every old slot still there. */
-    private void switchedWithTheOldSlotsLeft() throws Exception {
+    private void switchedWithTheOldSlotsLeft() throws VaultCrypto.Broken, InterruptedException, IOException, java.util.concurrent.ExecutionException, Vault.Exists {
         anOldVault();
         cloud.failDeleteOnce.add(CloudNames.OLD_SLOTS + "/" + DESK + ".json");
         assertNotNull(laptop.round().error());

@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.WithLocale;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -15,7 +16,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class HomeserverConfigTest {
     @TempDir Path dir;
 
-    private String mode(Path f) throws Exception {
+    private String mode(Path f) throws IOException {
         return PosixFilePermissions.toString(Files.getPosixFilePermissions(f));
     }
 

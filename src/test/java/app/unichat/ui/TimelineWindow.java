@@ -5,6 +5,7 @@ import app.unichat.service.ScriptedChatService;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.ui.timeline.Composer;
 import app.unichat.ui.timeline.ThreadRows;
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.Node;
@@ -45,7 +46,7 @@ final class TimelineWindow {
         this.scene = scene;
     }
 
-    static void toolkit() throws Exception {
+    static void toolkit() throws InterruptedException {
         System.setProperty("java.awt.headless", "true");
         try {
             CountDownLatch started = new CountDownLatch(1);
@@ -59,17 +60,17 @@ final class TimelineWindow {
     }
 
     /** {@link #CHAT} with {@code messages} of four lines each (more than the window holds), open and at its newest. */
-    static TimelineWindow open(int messages) throws Exception {
+    static TimelineWindow open(int messages) throws InterruptedException, ExecutionException {
         return open(messages, "Mensaje largo %d\nsegunda línea\ntercera línea\ncuarta línea");
     }
 
     /** {@code format} gets the message's number. Another chat is opened first, as a person comes from one. */
-    static TimelineWindow open(int messages, String format) throws Exception {
+    static TimelineWindow open(int messages, String format) throws InterruptedException, ExecutionException {
         return open(messages, format, svc -> { });
     }
 
     /** {@code before} changes the chat before the window opens (a message's HTML, say). */
-    static TimelineWindow open(int messages, String format, java.util.function.Consumer<ScriptedChatService> before) throws Exception {
+    static TimelineWindow open(int messages, String format, java.util.function.Consumer<ScriptedChatService> before) throws InterruptedException, ExecutionException {
         return open(messages, format, before, HEIGHT);
     }
 
@@ -78,7 +79,7 @@ final class TimelineWindow {
 
     /** {@code height}: the window's. */
     static TimelineWindow open(int messages, String format, java.util.function.Consumer<ScriptedChatService> before,
-                               int height) throws Exception {
+                               int height) throws InterruptedException, ExecutionException {
         toolkit();
         ScriptedChatService svc = new ScriptedChatService();
         for (int i = 0; i < messages; i++) svc.sendText(CHAT, format.formatted(i), null).get();
@@ -101,7 +102,7 @@ final class TimelineWindow {
     }
 
     /** Opens {@link #CHAT} and waits until it's at its newest message. */
-    void openChat() throws Exception {
+    void openChat() throws InterruptedException {
         FxWait.fx(() -> { view.openChatId(CHAT); return null; });
         FxWait.until("the chat's newest message is listed", this::showsNewest);
         untilAtBottom();
@@ -116,7 +117,7 @@ final class TimelineWindow {
     }
 
     /** The item {@code text} of {@code m}'s menu, opened from the keys as a person would (Enter on it). */
-    javafx.scene.control.MenuItem menuItem(Message m, String text) throws Exception {
+    javafx.scene.control.MenuItem menuItem(Message m, String text) throws InterruptedException {
         return FxWait.fx(() -> {
             javafx.scene.control.ListCell<?> cell = cellOf(m);
             list().getSelectionModel().select(cell.getIndex());
@@ -130,7 +131,7 @@ final class TimelineWindow {
     }
 
     /** Runs a menu item as a click on it would. */
-    static void fire(javafx.scene.control.MenuItem item) throws Exception {
+    static void fire(javafx.scene.control.MenuItem item) throws InterruptedException {
         FxWait.fx(() -> {
             item.fire();
             return null;
@@ -229,7 +230,7 @@ final class TimelineWindow {
     }
 
     /** Until the newest message is at the bottom, edge to edge, and stays so once all is done. */
-    double untilAtBottom() throws Exception {
+    double untilAtBottom() throws InterruptedException {
         FxWait.until("the newest message is at the bottom", () -> {
             Double gap = newestGap();
             return gap != null && gap <= 1 && gap > -6;
@@ -243,7 +244,7 @@ final class TimelineWindow {
     }
 
     /** One turn of the wheel or trackpad: {@code dy} up (positive) or down (negative), as a person would. */
-    void wheel(double dy) throws Exception {
+    void wheel(double dy) throws InterruptedException {
         FxWait.fx(() -> {
             Event.fireEvent(flow(), new ScrollEvent(ScrollEvent.SCROLL, 200, 200, 200, 200, false, false, false, false,
                     false, false, 0, dy, 0, dy, ScrollEvent.HorizontalTextScrollUnits.NONE, 0,
@@ -254,7 +255,7 @@ final class TimelineWindow {
     }
 
     /** Up into older messages, far enough that the newest is out of view. */
-    void scrollUp() throws Exception {
+    void scrollUp() throws InterruptedException {
         for (int i = 0; i < 8; i++) wheel(120);
         FxWait.until("the list stops following the newest", this::jumpDownShown);
         FxWait.settled();
@@ -262,7 +263,7 @@ final class TimelineWindow {
     }
 
     /** A key pressed in the message box. */
-    void key(KeyCode code, boolean shift) throws Exception {
+    void key(KeyCode code, boolean shift) throws InterruptedException {
         FxWait.fx(() -> {
             input().requestFocus();
             input().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, shift, false, false, false));
@@ -271,7 +272,7 @@ final class TimelineWindow {
     }
 
     /** {@code text} in the message box, one line at a time, a frame between each, as typing it would. */
-    void type(String text) throws Exception {
+    void type(String text) throws InterruptedException {
         String[] lines = text.split("\n", -1);
         StringBuilder sofar = new StringBuilder();
         for (int i = 0; i < lines.length; i++) {
@@ -285,7 +286,7 @@ final class TimelineWindow {
     Message newest() { return svc.messages(CHAT).getLast(); }
 
     /** ⌘+ / ⌘- / ⌘0 on the window: the text bigger, smaller or back to 100 % (Ctrl on Linux: both are pressed). */
-    void zoom(KeyCode code) throws Exception {
+    void zoom(KeyCode code) throws InterruptedException {
         FxWait.fx(() -> {
             scene.getRoot().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, true, false, true));
             return null;
@@ -294,7 +295,7 @@ final class TimelineWindow {
     }
 
     /** A key pressed on the message list itself (it has the focus, as after F6 or a click on a message). */
-    void listKey(KeyCode code) throws Exception {
+    void listKey(KeyCode code) throws InterruptedException {
         FxWait.fx(() -> {
             list().requestFocus();
             list().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false));
@@ -304,7 +305,7 @@ final class TimelineWindow {
     }
 
     /** The scrollbar's thumb pressed, moved to {@code fraction} of the way down (0 top, 1 bottom), and let go. */
-    void dragScrollbar(double fraction) throws Exception {
+    void dragScrollbar(double fraction) throws InterruptedException {
         FxWait.fx(() -> {
             javafx.scene.control.ScrollBar bar = list().lookupAll(".scroll-bar").stream()
                     .filter(n -> n instanceof javafx.scene.control.ScrollBar sb
@@ -328,7 +329,7 @@ final class TimelineWindow {
      * the message box's caret, focused when it closed, kept blinking (JavaFX's own timeline) with the whole view held:
      * eighty of them ran the test run out of heap. In the app a window that closes loses the focus; here it doesn't.
      */
-    void close() throws Exception {
+    void close() throws InterruptedException {
         svc.stop();
         FxWait.fx(() -> {
             view.dispose();
@@ -339,7 +340,7 @@ final class TimelineWindow {
     }
 
     /** Every frame drawn from now on, until {@link Frames#stop}. */
-    Frames watch(Frames.Probe probe) throws Exception {
+    Frames watch(Frames.Probe probe) throws InterruptedException {
         Frames f = new Frames(probe);
         FxWait.fx(() -> { scene.addPostLayoutPulseListener(f.listener); return null; });
         return f;
@@ -353,7 +354,7 @@ final class TimelineWindow {
         @FunctionalInterface
         interface Probe {
             /** Null when the frame is right, else what's wrong with it. */
-            String check() throws Exception;
+            String check() throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: each test's probe looks as it needs
         }
 
         private final Probe probe;
@@ -376,7 +377,7 @@ final class TimelineWindow {
         }
 
         /** Stops watching once the window has done all it was asked, and fails with the frames that were wrong. */
-        void stop(String what) throws Exception {
+        void stop(String what) throws InterruptedException {
             FxWait.settled();
             FxWait.fx(() -> { scene.removePostLayoutPulseListener(listener); return null; });
             if (!wrong.isEmpty()) fail(what + ": " + wrong.size() + " of " + count + " frames wrong: " + wrong);
@@ -403,7 +404,7 @@ final class TimelineWindow {
     }
 
     /** Up in older messages, and every frame from there watched: what's being read stays where it is. */
-    Frames readingOlder() throws Exception {
+    Frames readingOlder() throws InterruptedException {
         scrollUp();
         String read = FxWait.fx(this::readMessage);
         return watch(stays(read, FxWait.fx(() -> yOf(read))));

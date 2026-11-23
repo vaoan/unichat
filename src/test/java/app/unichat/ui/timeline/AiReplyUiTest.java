@@ -16,7 +16,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
@@ -68,17 +67,17 @@ class AiReplyUiTest {
         });
     }
 
-    private void writer(AiReplyButton.Writer w) throws Exception {
+    private void writer(AiReplyButton.Writer w) throws InterruptedException {
         fx(() -> { composer.useAiWriter(() -> w); return null; });
     }
 
-    private void press() throws Exception {
+    private void press() throws InterruptedException {
         fx(() -> { button().fire(); return null; });
     }
 
     private Button button() { return (Button) composer.lookup(".ai-button"); }
 
-    private String text() throws Exception {
+    private String text() throws InterruptedException {
         return fx(() -> ((TextArea) composer.lookup(".text-area")).getText());
     }
 
@@ -189,11 +188,11 @@ class AiReplyUiTest {
 
     private Button fixButton() { return (Button) composer.lookup(".ai-fix-button"); }
 
-    private void pressFix(AiReplyButton.Writer w) throws Exception {
+    private void pressFix(AiReplyButton.Writer w) throws InterruptedException {
         fx(() -> { composer.useFixWriter(() -> w); fixButton().fire(); return null; });
     }
 
-    private void write(String text) throws Exception {
+    private void write(String text) throws InterruptedException {
         fx(() -> { ((TextArea) composer.lookup(".text-area")).setText(text); return null; });
     }
 
@@ -497,7 +496,7 @@ class AiReplyUiTest {
         }
     }
 
-    private void send() throws Exception {
+    private void send() throws InterruptedException {
         fx(() -> { ((Button) composer.lookup(".send-button")).fire(); return null; });
     }
 
@@ -534,7 +533,7 @@ class AiReplyUiTest {
         assertFalse(fx(() -> button().isVisible()));
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

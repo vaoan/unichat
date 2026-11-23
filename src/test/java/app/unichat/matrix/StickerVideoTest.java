@@ -4,6 +4,8 @@ import app.unichat.gif.GifFrames;
 import app.unichat.model.Network;
 import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
+import java.io.IOException;
+import javax.imageio.metadata.IIOInvalidTreeException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -34,7 +36,7 @@ class StickerVideoTest {
     }
 
     /** A two-frame animated GIF (red, then blue), 0.5 s per frame. */
-    static Path animatedGif(Path dir) throws Exception {
+    static Path animatedGif(Path dir) throws IOException, IIOInvalidTreeException {
         Path f = dir.resolve("anim.gif");
         ImageWriter w = ImageIO.getImageWritersByFormatName("gif").next();
         try (ImageOutputStream out = ImageIO.createImageOutputStream(f.toFile())) {

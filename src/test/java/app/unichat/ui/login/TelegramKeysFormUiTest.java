@@ -1,6 +1,7 @@
 package app.unichat.ui.login;
 
 import app.unichat.server.TelegramKeys;
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -64,7 +65,7 @@ class TelegramKeysFormUiTest {
         TelegramKeys.save("", "");
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T> T fx(Callable<T> c) throws InterruptedException, ExecutionException {
         CompletableFuture<T> f = new CompletableFuture<>();
         Platform.runLater(() -> {
             try {

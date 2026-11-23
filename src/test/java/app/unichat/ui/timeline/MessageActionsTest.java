@@ -3,6 +3,7 @@ package app.unichat.ui.timeline;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.RoomFeatures;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MessageActionsTest {
     private static final Instant SENT = Instant.parse("2026-10-26T10:00:00Z");
 
-    private static RoomFeatures f(String json) throws Exception {
+    private static RoomFeatures f(String json) throws JsonProcessingException {
         return RoomFeatures.parse(new ObjectMapper().readTree(json));
     }
 

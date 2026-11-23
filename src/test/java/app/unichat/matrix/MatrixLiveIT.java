@@ -6,8 +6,11 @@ import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -144,12 +147,12 @@ class MatrixLiveIT {
         changes.until(what, cond);
     }
 
-    private String bobLogin() throws Exception {
+    private String bobLogin() throws JsonProcessingException, IOException, InterruptedException {
         String body = "{\"type\":\"m.login.password\",\"identifier\":{\"type\":\"m.id.user\",\"user\":\"bob\"},\"password\":\"pass1234\"}";
         return call("POST", "/login", null, body).get("access_token").asText();
     }
 
-    private String bobUpload(String token, Path file) throws Exception {
+    private String bobUpload(String token, Path file) throws JsonProcessingException, FileNotFoundException, IOException, InterruptedException {
         HttpRequest req = HttpRequest.newBuilder(URI.create(hs + "/_matrix/media/v3/upload?filename=bob.png"))
                 .header("Content-Type", "image/png")
                 .header("Authorization", "Bearer " + token)
@@ -158,20 +161,20 @@ class MatrixLiveIT {
         return JSON.readTree(r.body()).get("content_uri").asText();
     }
 
-    private void bobSend(String token, String roomId, String text) throws Exception {
+    private void bobSend(String token, String roomId, String text) throws JsonProcessingException, IOException, InterruptedException {
         bobPut(token, "/rooms/" + enc(roomId) + "/send/m.room.message/" + UUID.randomUUID(),
                 "{\"msgtype\":\"m.text\",\"body\":\"" + text + "\"}");
     }
 
-    private JsonNode bobPost(String token, String path, String body) throws Exception {
+    private JsonNode bobPost(String token, String path, String body) throws JsonProcessingException, IOException, InterruptedException {
         return call("POST", path, token, body);
     }
 
-    private JsonNode bobPut(String token, String path, String body) throws Exception {
+    private JsonNode bobPut(String token, String path, String body) throws JsonProcessingException, IOException, InterruptedException {
         return call("PUT", path, token, body);
     }
 
-    private JsonNode call(String method, String path, String token, String body) throws Exception {
+    private JsonNode call(String method, String path, String token, String body) throws JsonProcessingException, IOException, InterruptedException {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(hs + "/_matrix/client/v3" + path))
                 .header("Content-Type", "application/json")
                 .method(method, HttpRequest.BodyPublishers.ofString(body));

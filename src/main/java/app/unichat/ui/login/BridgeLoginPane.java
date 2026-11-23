@@ -478,7 +478,7 @@ final class BridgeLoginPane extends StackPane {
 
     @FunctionalInterface
     private interface ThrowingRunnable {
-        void run() throws Exception;
+        void run() throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: any login step, shown by background()
     }
 
     private void show(Node n) {

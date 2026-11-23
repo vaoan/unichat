@@ -1,5 +1,6 @@
 package app.unichat.ui.media;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,7 +18,7 @@ class BigWebpTest {
     @TempDir Path dir;
 
     /** RIFF + WEBP + one chunk header and {@code body} (the bytes after the chunk's size). */
-    private Path webp(String chunk, int... body) throws Exception {
+    private Path webp(String chunk, int... body) throws IOException {
         byte[] d = new byte[40];
         System.arraycopy("RIFF".getBytes(UTF_8), 0, d, 0, 4);
         System.arraycopy("WEBP".getBytes(UTF_8), 0, d, 8, 4);
@@ -27,7 +28,7 @@ class BigWebpTest {
     }
 
     /** VP8X: flags, 3 reserved, then width-1 and height-1 in 24 bits each. */
-    private Path vp8x(int flags, int w, int h) throws Exception {
+    private Path vp8x(int flags, int w, int h) throws IOException {
         int a = w - 1, b = h - 1;
         return webp("VP8X", flags, 0, 0, 0, a & 0xFF, (a >> 8) & 0xFF, (a >> 16) & 0xFF, b & 0xFF, (b >> 8) & 0xFF, (b >> 16) & 0xFF);
     }
@@ -54,7 +55,7 @@ class BigWebpTest {
     }
 
     /** An animated WebP of {@code frames} frames on a {@code w}x{@code h} canvas: the chunk headers, no picture data. */
-    private Path animated(int w, int h, int frames) throws Exception {
+    private Path animated(int w, int h, int frames) throws IOException {
         var out = new java.io.ByteArrayOutputStream();
         out.writeBytes("RIFF".getBytes(UTF_8));
         out.writeBytes(new byte[4]);

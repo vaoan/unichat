@@ -4,6 +4,7 @@ import app.unichat.ui.FxWait;
 import app.unichat.autosave.SaveFolders;
 import app.unichat.model.SaveKind;
 import app.unichat.service.MockChatService;
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -27,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ChatOptionsUiTest {
     /** The chat's options, opened in a window of their own; saving starts off, what's sent and what I send. */
-    private static StackPane open(MockChatService svc, String id) throws Exception {
+    private static StackPane open(MockChatService svc, String id) throws InterruptedException, ExecutionException {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
@@ -53,7 +54,7 @@ class ChatOptionsUiTest {
         return overlay;
     }
 
-    private static CheckBox box(StackPane overlay, String text) throws Exception {
+    private static CheckBox box(StackPane overlay, String text) throws InterruptedException {
         return FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
                 .filter(b -> b.getText().equals(text)).findFirst().orElseThrow());
     }

@@ -16,7 +16,6 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -25,11 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** ⌘I writes a draft from anywhere in the window and leaves the focus in the text box; the info panel has ⌘⇧I. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class AiShortcutUiTest {
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
-    private static void press(Node target, boolean shift) throws Exception {
+    private static void press(Node target, boolean shift) throws InterruptedException {
         fx(() -> {
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.I, shift, true, false, true));
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_RELEASED, "", "", KeyCode.I, shift, true, false, true));
@@ -37,7 +36,7 @@ class AiShortcutUiTest {
         });
     }
 
-    private static boolean infoOpen(Scene scene) throws Exception {
+    private static boolean infoOpen(Scene scene) throws InterruptedException {
         return fx(() -> scene.getRoot().lookupAll(".info-pane").stream().anyMatch(n -> n.isVisible() && n.getScene() != null));
     }
 

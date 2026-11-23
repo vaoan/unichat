@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class TranscriptsTest {
-    private static void await(Transcripts t, String url) throws Exception {
+    private static void await(Transcripts t, String url) throws InterruptedException {
         CountDownLatch done = new CountDownLatch(1);
         t.addListener(() -> {
             Transcripts.State s = t.state(url);

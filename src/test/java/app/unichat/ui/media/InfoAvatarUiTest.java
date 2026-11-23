@@ -60,7 +60,7 @@ class InfoAvatarUiTest {
                 && w.getScene().getRoot().getStyleClass().contains("media-viewer")).findFirst();
     }
 
-    private InfoPane panel(MockChatService svc, Chat c) throws Exception {
+    private InfoPane panel(MockChatService svc, Chat c) throws InterruptedException {
         return FxWait.fx(() -> {
             InfoPane info = new InfoPane(svc, () -> { }, t -> { });
             stage = new Stage();

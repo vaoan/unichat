@@ -51,7 +51,7 @@ class LastLearnedUiTest {
         WritingStyle.get().forget();
     }
 
-    private Parent page() throws Exception {
+    private Parent page() throws InterruptedException {
         return fx(() -> {
             stage = new Stage();
             stage.setOpacity(0);
@@ -61,12 +61,12 @@ class LastLearnedUiTest {
         });
     }
 
-    private static List<String> texts(Parent root) throws Exception {
+    private static List<String> texts(Parent root) throws InterruptedException {
         return fx(() -> root.lookupAll(".label").stream().filter(Node::isVisible)
                 .map(n -> ((Label) n).getText()).filter(t -> t != null && !t.isBlank()).toList());
     }
 
-    private static Button undo(Parent root) throws Exception {
+    private static Button undo(Parent root) throws InterruptedException {
         return fx(() -> root.lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Deshacer lo último aprendido".equals(b.getText())).findFirst().orElseThrow());
     }

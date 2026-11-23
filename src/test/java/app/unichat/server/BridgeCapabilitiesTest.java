@@ -1,5 +1,7 @@
 package app.unichat.server;
 
+import java.io.IOException;
+import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -22,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 class BridgeCapabilitiesTest {
     @TempDir Path dir;
 
-    private Path db(String bridge, String value) throws Exception {
+    private Path db(String bridge, String value) throws IOException, SQLException {
         Path d = dir.resolve(bridge);
         Files.createDirectories(d);
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + d.resolve(bridge + ".db")); Statement s = c.createStatement()) {
@@ -33,7 +35,7 @@ class BridgeCapabilitiesTest {
         return d;
     }
 
-    private static String value(Path bridgeDir, String bridge, String key) throws Exception {
+    private static String value(Path bridgeDir, String bridge, String key) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + bridgeDir.resolve(bridge + ".db"));
              Statement s = c.createStatement(); ResultSet r = s.executeQuery("SELECT value FROM kv_store WHERE key = '" + key + "'")) {
             return r.next() ? r.getString(1) : null;

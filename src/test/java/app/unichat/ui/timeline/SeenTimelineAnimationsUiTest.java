@@ -61,7 +61,7 @@ class SeenTimelineAnimationsUiTest {
         });
     }
 
-    private void window(Parent root) throws Exception {
+    private void window(Parent root) throws InterruptedException {
         FxWait.fx(() -> {
             Stage s = new Stage();
             s.setOpacity(0);
@@ -73,7 +73,7 @@ class SeenTimelineAnimationsUiTest {
     }
 
     /** Hides Unichat, then shows it again, checking {@code animating} each time. */
-    private static void restsWhileUnseen(String what, java.util.concurrent.Callable<Boolean> animating) throws Exception {
+    private static void restsWhileUnseen(String what, java.util.concurrent.Callable<Boolean> animating) {
         FxWait.until(what + " counts while seen", animating);
         Seen.reset(false);
         FxWait.until(what + " rests while nobody can see it", () -> !animating.call());

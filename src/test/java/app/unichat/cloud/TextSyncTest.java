@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,7 +25,7 @@ class TextSyncTest {
         return new TextSync(dir.resolve(machine + "/texts"), dir.resolve(machine + "/cloud-texts.json"), machine);
     }
 
-    private Path own(String machine) throws Exception {
+    private Path own(String machine) throws IOException {
         return Files.createDirectories(dir.resolve(machine + "/texts/here"));
     }
 
@@ -91,7 +92,7 @@ class TextSyncTest {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
             Files.writeString(own(DESK).resolve(FILE), "{\"id\":\"$1\"}\n", StandardCharsets.UTF_8);
             cloud.failOnce.add("Unichat/Texts/" + DESK + "/index.json");
-            assertThrows(java.io.IOException.class, () -> computer(DESK).run(dav), "the network dropped after the file");
+            assertThrows(IOException.class, () -> computer(DESK).run(dav), "the network dropped after the file");
             computer(DESK).run(dav); // nothing new to send, but the index is still due
             assertEquals(Set.of(CHAT), computer(LAPTOP).run(dav), "the laptop sees the desk's file");
         }

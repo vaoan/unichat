@@ -2,6 +2,7 @@ package app.unichat.video;
 
 import app.unichat.support.Downloads;
 import com.sun.net.httpserver.HttpServer;
+import java.security.NoSuchAlgorithmException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +53,7 @@ class FfmpegTest {
         System.clearProperty("unichat.ffmpeg");
     }
 
-    private PinnedTool build(byte[] zip, String entry) throws Exception {
+    private PinnedTool build(byte[] zip, String entry) throws NoSuchAlgorithmException {
         served = zip;
         return new PinnedTool("http://127.0.0.1:" + server.getAddress().getPort() + "/z", zip.length,
                 HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(zip)), entry);

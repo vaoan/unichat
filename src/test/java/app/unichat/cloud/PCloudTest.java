@@ -108,7 +108,7 @@ class PCloudTest {
     }
 
     /** What the browser does after the person signs in: pCloud sends it to our page, which passes the "#" part on. */
-    private static Map<String, String> signIn(URI authorize, String hash) throws Exception {
+    private static Map<String, String> signIn(URI authorize, String hash) throws IOException, InterruptedException {
         Map<String, String> q = new HashMap<>();
         for (String pair : authorize.getRawQuery().split("&")) {
             int eq = pair.indexOf('=');

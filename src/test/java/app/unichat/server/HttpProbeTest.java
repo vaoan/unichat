@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetAddress;
@@ -18,7 +19,7 @@ class HttpProbeTest {
     private static final Duration NO_LIMIT = Duration.ofDays(1);
 
     /** A server whose {@code /_matrix/client/versions} answers {@code status}. */
-    private static HttpServer answering(int status) throws Exception {
+    private static HttpServer answering(int status) throws IOException {
         HttpServer s = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         s.createContext("/_matrix/client/versions", x -> {
             x.sendResponseHeaders(status, -1);

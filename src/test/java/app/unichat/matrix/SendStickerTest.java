@@ -2,8 +2,10 @@ package app.unichat.matrix;
 
 import app.unichat.model.MediaLibrary;
 import app.unichat.service.StickerMode;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -117,7 +119,7 @@ class SendStickerTest {
                 "the copy names what it was made from: seen back in the chat, it's that sticker, not a new recent");
     }
 
-    private JsonNode sendAs(StickerMode mode) throws Exception {
+    private JsonNode sendAs(StickerMode mode) throws JsonProcessingException, InterruptedException, ExecutionException {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
         app.unichat.model.RoomFeatures wa = app.unichat.model.RoomFeatures.parse(MatrixClient.JSON.readTree(
                 "{\"id\":\"wa\",\"file\":{\"m.sticker\":{\"mime_types\":{\"image/webp\":2}},\"m.video\":{\"mime_types\":{\"video/mp4\":2}}}}"));
@@ -221,11 +223,11 @@ class SendStickerTest {
         assertEquals("image/png", MatrixClient.JSON.readTree(body).path("info").path("mimetype").asText());
     }
 
-    private MatrixChatService telegramChat() throws Exception {
+    private MatrixChatService telegramChat() throws JsonProcessingException {
         return chatOn("telegram");
     }
 
-    private MatrixChatService chatOn(String protocol) throws Exception {
+    private MatrixChatService chatOn(String protocol) throws JsonProcessingException {
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
         svc.processor().process(MatrixClient.JSON.readTree("""
                 {"rooms":{"join":{"!c:example.org":{"state":{"events":[

@@ -1,5 +1,6 @@
 package app.unichat.assist;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -20,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ReplyWriterTest {
     @TempDir Path dir;
 
-    private Path script(String body) throws Exception {
+    private Path script(String body) throws IOException {
         Path f = Files.writeString(dir.resolve("cli"), "#!/bin/sh\n" + body + "\n");
         assertTrue(f.toFile().setExecutable(true));
         return f;
@@ -104,7 +105,7 @@ class ReplyWriterTest {
         Thread.ofVirtual().start(() -> {
             try (var in = Files.newInputStream(started)) {
                 in.read();
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 throw new java.io.UncheckedIOException(e);
             }
             w.cancel();
@@ -134,7 +135,7 @@ class ReplyWriterTest {
         assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false), "the program was left running");
     }
 
-    private Path fifo(String name) throws Exception {
+    private Path fifo(String name) throws IOException, InterruptedException {
         Path f = dir.resolve(name);
         assertEquals(0, new ProcessBuilder("mkfifo", f.toString()).inheritIO().start().waitFor());
         return f;
@@ -156,7 +157,7 @@ class ReplyWriterTest {
     }
 
     /** The real text a program answers with; null when it isn't signed in here, so there's nothing to learn from it. */
-    private static String corrected(AiEngine engine, String text) throws Exception {
+    private static String corrected(AiEngine engine, String text) throws ReplyWriter.Failure {
         if (engine.find() == null) return null;
         try {
             String reply = new ReplyWriter().write(engine, null, FixPrompt.build(text));

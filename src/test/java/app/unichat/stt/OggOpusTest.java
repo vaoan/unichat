@@ -1,5 +1,6 @@
 package app.unichat.stt;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -16,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OggOpusTest {
     /** The demo voice note: 2 s of a 440 Hz tone, Ogg/Opus like WhatsApp's. */
-    private static Path fixture(Path dir) throws Exception {
+    private static Path fixture(Path dir) throws IOException {
         Path f = dir.resolve("nota.ogg");
         try (InputStream in = OggOpusTest.class.getResourceAsStream("/app/unichat/demo/voice-note.ogg")) {
             Files.copy(in, f);

@@ -5,6 +5,7 @@ import app.unichat.ui.media.MessageMedia;
 import app.unichat.ui.FxWait;
 import app.unichat.model.MediaLibrary;
 import app.unichat.service.MockChatService;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -24,7 +25,6 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -54,7 +54,7 @@ class MediaTilesUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private MediaLibrary.Item sticker(String name) throws Exception {
+    private MediaLibrary.Item sticker(String name) throws IOException {
         Path f = dir.resolve(name + ".png");
         ImageIO.write(new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB), "png", f.toFile());
         return new MediaLibrary.Item(MediaLibrary.Kind.STICKER, f.toUri().toString(), "image/png", 8, 8, null);
@@ -86,7 +86,7 @@ class MediaTilesUiTest {
         fx(() -> { stage.close(); return null; });
     }
 
-    private List<Node> tiles() throws Exception {
+    private List<Node> tiles() throws InterruptedException {
         return fx(() -> ((VBox) grid.getContent()).getChildren().stream().filter(FlowPane.class::isInstance).findFirst()
                 .map(g -> List.copyOf(((FlowPane) g).getChildren())).orElseThrow());
     }
@@ -130,7 +130,7 @@ class MediaTilesUiTest {
         assertNotNull(shown);
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

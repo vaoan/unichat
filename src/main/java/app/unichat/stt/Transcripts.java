@@ -33,7 +33,7 @@ public final class Transcripts {
 
     @FunctionalInterface
     public interface Engine {
-        String transcribe(Path audio, java.util.function.Consumer<String> status) throws Exception;
+        String transcribe(Path audio, java.util.function.Consumer<String> status) throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: each engine (whisper, a test's) fails its own way
     }
 
     private static Transcripts instance;

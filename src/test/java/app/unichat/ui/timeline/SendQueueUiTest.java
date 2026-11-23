@@ -106,7 +106,7 @@ class SendQueueUiTest {
         return null;
     }
 
-    private void send(String text) throws Exception {
+    private void send(String text) throws InterruptedException {
         TextArea box = FxWait.fx(() -> (TextArea) thread.lookup(".composer .text-area"));
         FxWait.fx(() -> {
             box.setText(text);
@@ -120,13 +120,13 @@ class SendQueueUiTest {
     }
 
     /** The texts of the rows waiting, as shown once the window is done. */
-    private List<String> rows() throws Exception {
+    private List<String> rows() throws InterruptedException {
         FxWait.settled();
         return rowsNow();
     }
 
     /** The same, as they are now: for an until's condition, which may only look. */
-    private List<String> rowsNow() throws Exception {
+    private List<String> rowsNow() throws InterruptedException {
         return FxWait.fx(() -> thread.lookupAll(".send-queue-text").stream().filter(Node::isVisible)
                 .map(n -> ((Label) n).getText()).toList());
     }
@@ -140,7 +140,7 @@ class SendQueueUiTest {
         return (int) svc.messages(CHAT).stream().filter(Message::outgoing).count();
     }
 
-    private Button button(String accessible) throws Exception {
+    private Button button(String accessible) throws InterruptedException {
         return FxWait.fx(() -> thread.lookupAll(".send-queue-row .button").stream().map(n -> (Button) n)
                 .filter(b -> accessible.equals(b.getAccessibleText())).findFirst().orElseThrow());
     }

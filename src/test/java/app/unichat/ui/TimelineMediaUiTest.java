@@ -8,6 +8,8 @@ import app.unichat.settings.Settings;
 import app.unichat.video.Ffmpeg;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 import javafx.scene.image.ImageView;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,11 +50,11 @@ class TimelineMediaUiTest {
     // ---------------------------------------------------------------- files to send
 
     /** A still picture, its own file each time (pictures are cached by address). */
-    private String still(String format, int width, int height) throws Exception {
+    private String still(String format, int width, int height) throws IOException {
         return TestPictures.still(Files.createTempFile(dir, "foto", "." + format), format, width, height).toUri().toString();
     }
 
-    private String gif(int width, int height) throws Exception {
+    private String gif(int width, int height) throws IOException {
         return TestPictures.gif(Files.createTempFile(dir, "anim", ".gif"), width, height, 12).toUri().toString();
     }
 
@@ -90,7 +92,7 @@ class TimelineMediaUiTest {
      * Opens the chat at its newest message, holds downloads, and watches every frame while {@code arrive} brings messages
      * and their files then come in (or fail): the newest message never leaves the bottom edge.
      */
-    private void arrivesAtTheNewest(String what, boolean fails, Runnable arrive) throws Exception {
+    private void arrivesAtTheNewest(String what, boolean fails, Runnable arrive) throws InterruptedException, ExecutionException {
         if (w == null) w = TimelineWindow.open(20);
         double gap = w.untilAtBottom();
         int before = FxWait.fx(this::picturesShown);
@@ -110,12 +112,12 @@ class TimelineMediaUiTest {
         frames.stop(what);
     }
 
-    private void arrives(String what, Consumer<Message> message) throws Exception {
+    private void arrives(String what, Consumer<Message> message) throws InterruptedException, ExecutionException {
         arrivesAtTheNewest(what, false, () -> w.svc.receive(CHAT, message));
     }
 
     /** A message with no picture to wait for (a voice note, a document). */
-    private void arrivesWithoutPicture(String what, Consumer<Message> message) throws Exception {
+    private void arrivesWithoutPicture(String what, Consumer<Message> message) throws InterruptedException, ExecutionException {
         pictures = false;
         arrives(what, message);
     }
@@ -289,7 +291,7 @@ class TimelineMediaUiTest {
     // ---------------------------------------------------------------- reading older messages
 
     /** A chat with a photo every few messages, none downloaded yet, read from further up. */
-    private ScriptedChatService.Gate readingAmongPhotos(boolean sizesKnown) throws Exception {
+    private ScriptedChatService.Gate readingAmongPhotos(boolean sizesKnown) throws IOException, InterruptedException, ExecutionException {
         List<String> urls = new java.util.ArrayList<>();
         for (int i = 0; i < 8; i++) urls.add(i % 2 == 0 ? still("png", 800, 600) : gif(300, 300));
         ScriptedChatService.Gate[] downloads = new ScriptedChatService.Gate[1];

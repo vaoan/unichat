@@ -3,6 +3,7 @@ package app.unichat.voice;
 import app.unichat.model.VoiceNote;
 import app.unichat.stt.OggOpus;
 import app.unichat.video.Ffmpeg;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +44,7 @@ class VoiceEnhancerTest {
     }
 
     /** One second of tone and one of "silence", all over a noise floor; returned as raw samples. */
-    private Path noisyRecording() throws Exception {
+    private Path noisyRecording() throws IOException {
         Random random = new Random(7);
         ByteBuffer b = ByteBuffer.allocate(RATE * 2 * 2).order(ByteOrder.LITTLE_ENDIAN);
         for (int i = 0; i < RATE * 2; i++) {
@@ -53,7 +54,7 @@ class VoiceEnhancerTest {
         return Files.write(dir.resolve("nota.ogg.pcm"), b.array());
     }
 
-    private VoiceNote recorded() throws Exception {
+    private VoiceNote recorded() throws IOException {
         Path ogg = dir.resolve("nota.ogg");
         Files.write(ogg, new byte[]{1, 2, 3});
         return new VoiceNote(ogg, 2000, List.of(1, 2));
@@ -117,7 +118,7 @@ class VoiceEnhancerTest {
     }
 
     /** Speech from the Mac's own voice, with a long pause, over pink noise (a tone isn't speech: RNNoise leaves it alone). */
-    private void speechAndNoise(Path clean, Path noisy) throws Exception {
+    private void speechAndNoise(Path clean, Path noisy) throws IOException, InterruptedException {
         Path aiff = dir.resolve("voz.aiff");
         run("say", "-o", aiff.toString(), "Oye, te cuento que perdí el vuelo. [[slnc 4000]] Te llamo cuando llegue.");
         String ffmpeg = Ffmpeg.find().toString();
@@ -127,7 +128,7 @@ class VoiceEnhancerTest {
                 "-filter_complex", "[0][1]amix=inputs=2:duration=first:normalize=0", "-f", "s16le", "-ar", "48000", "-ac", "1", noisy.toString());
     }
 
-    private static void run(String... command) throws Exception {
+    private static void run(String... command) throws IOException, InterruptedException {
         Process p = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
         assumeTrue(p.waitFor() == 0, command[0] + " can't make the sample");
     }

@@ -2,6 +2,8 @@ package app.unichat.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.sql.SQLException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,19 +58,19 @@ class MetaSessionsTest {
 
     private Path db() { return dir.resolve("facebook/facebook.db"); }
 
-    private void sql(String bridge, String statement) throws Exception {
+    private void sql(String bridge, String statement) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve(bridge + "/" + bridge + ".db"));
              Statement s = c.createStatement()) {
             s.execute(statement);
         }
     }
 
-    private void login(String id, String cookies) throws Exception {
+    private void login(String id, String cookies) throws SQLException {
         sql("facebook", "INSERT INTO user_login (bridge_id, user_mxid, id, remote_name, metadata) VALUES ('b','@yo:localhost','" + id
                 + "','Yo','{\"platform\":\"facebook\",\"cookies\":" + cookies + ",\"wa_device_id\":7}')");
     }
 
-    private String metadata(String id) throws Exception {
+    private String metadata(String id) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db());
              Statement s = c.createStatement();
              ResultSet r = s.executeQuery("SELECT metadata FROM user_login WHERE id='" + id + "'")) {
@@ -76,7 +78,7 @@ class MetaSessionsTest {
         }
     }
 
-    private void wipe(String id) throws Exception {
+    private void wipe(String id) throws SQLException {
         sql("facebook", "UPDATE user_login SET metadata='{\"platform\":\"facebook\",\"cookies\":null,\"wa_device_id\":7}' WHERE id='" + id + "'");
     }
 
@@ -179,7 +181,7 @@ class MetaSessionsTest {
         assertTrue(sessions.safeToRestart("telegram"));
     }
 
-    private URI serving(int status, String location) throws Exception {
+    private URI serving(int status, String location) throws IOException {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             if (location != null) ex.getResponseHeaders().add("Location", location);

@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.ui.chats.InfoPane;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.Node;
@@ -30,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class SearchKeysUiTest {
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T> T fx(Callable<T> c) throws InterruptedException, ExecutionException {
         CompletableFuture<T> f = new CompletableFuture<>();
         Platform.runLater(() -> {
             try {
@@ -42,7 +43,7 @@ class SearchKeysUiTest {
         return f.get();
     }
 
-    private static void press(Node target, KeyCode code, boolean shortcut) throws Exception {
+    private static void press(Node target, KeyCode code, boolean shortcut) throws InterruptedException, ExecutionException {
         fx(() -> {
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, shortcut, false, shortcut));
             return null;

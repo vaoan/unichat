@@ -6,6 +6,7 @@ import app.unichat.model.Network;
 import app.unichat.service.ArchiveWaking.Waking;
 import app.unichat.service.PreferencesFile;
 import app.unichat.settings.Settings;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -145,7 +146,7 @@ class ArchiveRestTest {
     }
 
     /** Waits for the loop to have sent its request with the filter as it is now. */
-    private void requestSent() throws Exception {
+    private void requestSent() throws InterruptedException, ExecutionException {
         CompletableFuture<Void> f = new CompletableFuture<>();
         loop.execute(() -> f.complete(null));
         f.get();

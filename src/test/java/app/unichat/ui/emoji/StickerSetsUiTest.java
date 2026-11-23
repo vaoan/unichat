@@ -7,6 +7,7 @@ import app.unichat.model.StickerPack;
 import app.unichat.service.ChatService;
 import app.unichat.service.MockChatService;
 import app.unichat.ui.FxWait;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.Node;
@@ -64,7 +65,7 @@ class StickerSetsUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private StickerPack pack(String title, String url, String... names) throws Exception {
+    private StickerPack pack(String title, String url, String... names) throws IOException {
         List<MediaLibrary.Item> items = new java.util.ArrayList<>();
         for (String n : names) {
             Path f = dir.resolve(n + ".png");
@@ -110,16 +111,16 @@ class StickerSetsUiTest {
         FxWait.fx(() -> { stage.close(); return null; });
     }
 
-    private List<Node> content() throws Exception {
+    private List<Node> content() throws InterruptedException {
         return FxWait.fx(() -> List.copyOf(((VBox) grid.getContent()).getChildren()));
     }
 
-    private Button set(String title) throws Exception {
+    private Button set(String title) throws InterruptedException {
         return (Button) content().stream().filter(n -> n instanceof Button b && b.getText().equals(title)).findFirst().orElse(null);
     }
 
     /** The stickers shown under {@code title}'s header, if it's open. */
-    private List<Node> stickersOf(String title) throws Exception {
+    private List<Node> stickersOf(String title) throws InterruptedException {
         List<Node> c = content();
         int i = c.indexOf(set(title));
         return i >= 0 && i + 1 < c.size() && c.get(i + 1) instanceof FlowPane f ? FxWait.fx(() -> List.copyOf(f.getChildren())) : List.of();

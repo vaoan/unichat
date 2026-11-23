@@ -6,6 +6,7 @@ import app.unichat.model.MessageType;
 import app.unichat.model.SaveKind;
 import app.unichat.service.ChatReader;
 import app.unichat.service.MockChatService;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,10 +82,10 @@ class AutoSaveTest {
     /** Tried again only when the chat changes, as the tests below that count tries need: the timer never comes. */
     private static final java.time.Duration NO_RETRY = java.time.temporal.ChronoUnit.FOREVER.getDuration();
 
-    private AutoSave create(java.time.Duration retryAfter) throws Exception {
+    private AutoSave create(java.time.Duration retryAfter) throws IOException {
         Path cached = Files.writeString(dir.resolve("cached.bin"), "contenido");
         AutoSave a = new AutoSave(svc, reader(), new SavedUpTo(dir.resolve("autosave.json")), retryAfter, new AutoSave.Saver() {
-            @Override public Path media(String mediaUrl, java.util.function.DoubleConsumer progress) throws java.io.IOException, InterruptedException {
+            @Override public Path media(String mediaUrl, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
                 if (mediaUrl.endsWith("/grande.mov")) {
                     progress.accept(0.25);
                     progress.accept(0.5);
@@ -92,7 +93,7 @@ class AutoSaveTest {
                 asked.add(mediaUrl);
                 if (mediaUrl.equals(BROKEN)) throw new AutoSave.Gone("el puente no respondió", null);
                 String why = flaky;
-                if (mediaUrl.equals(FLAKY) && why != null) throw new java.io.IOException(why);
+                if (mediaUrl.equals(FLAKY) && why != null) throw new IOException(why);
                 if (mediaUrl.equals(ENDLESS)) {
                     endlessStarted.countDown();
                     new CountDownLatch(1).await(); // until interrupted
@@ -177,7 +178,7 @@ class AutoSaveTest {
         done.await();
     }
 
-    private List<String> saved() throws Exception {
+    private List<String> saved() throws IOException {
         Path folder = save.folder(chat);
         if (!Files.isDirectory(folder)) return List.of();
         try (Stream<Path> s = Files.list(folder)) {
@@ -515,7 +516,7 @@ class AutoSaveTest {
         };
         AutoSave.Saver saver = AutoSave.downloading(source);
         org.junit.jupiter.api.Assertions.assertThrows(AutoSave.Gone.class, () -> saver.media("mxc://s/gone", p -> { }));
-        java.io.IOException e = org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, () -> saver.media("mxc://s/x", p -> { }));
+        IOException e = org.junit.jupiter.api.Assertions.assertThrows(IOException.class, () -> saver.media("mxc://s/x", p -> { }));
         assertFalse(e instanceof AutoSave.Gone, "a 502 may work next time");
     }
 

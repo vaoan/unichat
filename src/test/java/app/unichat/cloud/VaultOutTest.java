@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,7 +59,7 @@ class VaultOutTest {
         return new WebDav(cloud.url(), "u", "p");
     }
 
-    private VaultComputer desk() throws Exception {
+    private VaultComputer desk() throws IOException {
         return new VaultComputer(cloud, dir, DESK).opened(made.info(), made.computer()).set("ui.theme", "DARK")
             .write("writing-style.md", "escribo corto").write("texts/here/" + TEXT, "{\"d\":1}\n")
             .write("pinned-messages.json", "{\"!c\":[]}").write("transcripts/" + TRANSCRIPT, "hola")
@@ -75,7 +76,7 @@ class VaultOutTest {
     }
 
     /** A computer of the vault that's off now: what it sent while it ran, sealed. */
-    private void offlineLaptopSent(String text) throws Exception {
+    private void offlineLaptopSent(String text) throws IOException {
         Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil");
         SealedStorage sealed = new SealedStorage(dav(), () -> made.vk().clone());
         String folder = TextSync.ROOT + "/" + LAPTOP;
@@ -135,7 +136,7 @@ class VaultOutTest {
         offlineLaptopSent("{\"l\":1}\n");
         String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT;
         Storage plain = new Through(dav()) {
-            @Override public void delete(String path) throws java.io.IOException {
+            @Override public void delete(String path) throws IOException {
                 // Another computer's round, still open, lets the plain copy go: its sealed one is as long.
                 if (path.equals(Vault.ROOT)) cloud.files.remove(text);
                 super.delete(path);
@@ -189,7 +190,7 @@ class VaultOutTest {
         sealed.put(SETTINGS, Bundle.of(DESK, java.time.Instant.now(), Map.of("ui.theme", "DARK", "ui.x", "y".repeat(40)), null).toBytes());
         byte[] shorter = Bundle.of(OTHER, java.time.Instant.now(), Map.of("ui.theme", "LIGHT"), null).toBytes();
         Storage plain = new Through(dav()) {
-            @Override public void delete(String path) throws java.io.IOException {
+            @Override public void delete(String path) throws IOException {
                 if (path.equals(Vault.ROOT)) cloud.put(SETTINGS, shorter); // a computer, plain already, sent its own
                 super.delete(path);
             }
@@ -204,7 +205,7 @@ class VaultOutTest {
         String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT;
         boolean[] gone = {false};
         Storage plain = new Through(dav()) {
-            @Override public void delete(String path) throws java.io.IOException {
+            @Override public void delete(String path) throws IOException {
                 if (path.equals(Vault.ROOT)) {
                     cloud.files.remove(text); // let go meanwhile
                     gone[0] = true;
@@ -212,12 +213,12 @@ class VaultOutTest {
                 super.delete(path);
             }
 
-            @Override public void put(String path, byte[] data) throws java.io.IOException {
+            @Override public void put(String path, byte[] data) throws IOException {
                 if (gone[0] && path.equals(text)) cloud.put(text, new byte[] {'{'}); // landed cut short
                 else super.put(path, data);
             }
         };
-        java.io.IOException e = assertThrows(java.io.IOException.class, () -> VaultOut.run(plain, new SealedStorage(dav(), () -> made.vk().clone()), made.info(), made.vk()));
+        IOException e = assertThrows(IOException.class, () -> VaultOut.run(plain, new SealedStorage(dav(), () -> made.vk().clone()), made.info(), made.vk()));
         assertEquals(app.unichat.support.I18n.t("cloud.error.vaultNotBack"), e.getMessage());
     }
 
@@ -258,7 +259,7 @@ class VaultOutTest {
         Arrays.fill(later.vk(), (byte) 0);
     }
 
-    private VaultComputer laptopOpen() throws Exception {
+    private VaultComputer laptopOpen() throws IOException, InterruptedException, ExecutionException {
         Vault.Computer laptopWay = Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil");
         VaultComputer laptop = new VaultComputer(cloud, dir, LAPTOP).opened(made.info(), laptopWay).write("texts/here/" + TEXT, "{\"l\":1}\n")
             .set("ui.theme", "SEPIA");
@@ -320,7 +321,7 @@ class VaultOutTest {
     }
 
     /** A computer that saw the vault and never opened it: the file deleted by hand is no sign it was turned off. */
-    private void neverOpenedFindsTheFileGone(VaultComputer other, Cloud.VaultState was) throws Exception {
+    private void neverOpenedFindsTheFileGone(VaultComputer other, Cloud.VaultState was) throws IOException, InterruptedException, ExecutionException {
         other.write("texts/here/" + TEXT, "{\"o\":1}\n").set("ui.theme", "LIGHT");
         assertEquals(was, other.round().vault());
         cloud.files.remove(Vault.INFO); // someone with only the account

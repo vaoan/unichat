@@ -40,11 +40,11 @@ class ReactionEmojiUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
-    private Label shown(String key, MediaSource source) throws Exception {
+    private Label shown(String key, MediaSource source) throws InterruptedException {
         return fx(() -> {
             Label l = ReactionEmoji.of(key, source);
             Stage s = new Stage();
@@ -54,7 +54,7 @@ class ReactionEmojiUiTest {
         });
     }
 
-    private static void await(Callable<Boolean> c, String what) throws Exception {
+    private static void await(Callable<Boolean> c, String what) {
         FxWait.until(what, c);
     }
 

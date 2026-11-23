@@ -4,6 +4,7 @@ import app.unichat.support.I18n;
 import instatray.core.Fetch;
 import instatray.core.Site;
 import instatray.core.Tools;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -28,7 +29,7 @@ class LinkSaverTest {
     Path dir;
 
     /** A yt-dlp that prints what the real one does with the engine's options, and saves a file; it says it ran. */
-    private Tools fakeYtDlp() throws Exception {
+    private Tools fakeYtDlp() throws IOException {
         return fakeYtDlp("""
                 touch "$FAKE_OUT/.ran"
                 f="$FAKE_OUT/clip [abc].mp4"
@@ -41,7 +42,7 @@ class LinkSaverTest {
     }
 
     /** A yt-dlp that runs {@code body}, with {@code $FAKE_OUT} the chat's folder. */
-    private Tools fakeYtDlp(String body) throws Exception {
+    private Tools fakeYtDlp(String body) throws IOException {
         Path tool = dir.resolve("yt-dlp");
         Files.writeString(tool, "#!/bin/sh\n" + body);
         Files.setPosixFilePermissions(tool, PosixFilePermissions.fromString("rwx------"));

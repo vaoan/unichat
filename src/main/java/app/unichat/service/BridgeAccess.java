@@ -18,7 +18,7 @@ public interface BridgeAccess {
     BridgeLogin bridgeLogin(Network n);
 
     /** Installs and starts {@code n}'s bridge when the local server provides it. Blocking. */
-    void prepareBridge(Network n) throws Exception;
+    void prepareBridge(Network n) throws Exception; // NOPMD: SignatureDeclareThrowsException, passes on what BridgeProvisioner throws
 
     /** After a login through the bridge's API: refresh that network's accounts. */
     void loginFinished(Network n);

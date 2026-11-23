@@ -4,6 +4,7 @@ import app.unichat.cloud.Cloud;
 import app.unichat.cloud.VaultFixture;
 import app.unichat.support.I18n;
 import app.unichat.ui.FxWait;
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -93,7 +94,7 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
     }
 
     /** The section alone in a window of its own (a new one each time: the page as it's opened again). */
-    protected void page() throws Exception {
+    protected void page() throws InterruptedException {
         if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
         stage = FxWait.fx(() -> {
             Stage s = new Stage();
@@ -139,30 +140,30 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
         return showing().stream().anyMatch(n -> n instanceof Labeled l && l.getText() != null && l.getText().contains(text));
     }
 
-    protected void waitFor(String what) throws Exception {
+    protected void waitFor(String what) {
         FxWait.until("the page to say \"" + what + "\"", () -> says(what));
     }
 
-    protected void click(String text) throws Exception {
+    protected void click(String text) throws InterruptedException {
         FxWait.fx(() -> { button(text).fire(); return null; });
     }
 
-    protected void type(String accessible, String text) throws Exception {
+    protected void type(String accessible, String text) throws InterruptedException {
         FxWait.fx(() -> { field(accessible).setText(text); return null; });
     }
 
     /** The code on screen, as one would copy it from there (two lines, read as one). */
-    protected String codeShown() throws Exception {
+    protected String codeShown() throws InterruptedException {
         FxWait.until("a code shown", () -> root().lookup(".text-area.vault-code") instanceof TextArea t && !t.isEditable());
         return FxWait.fx(() -> ((TextArea) root().lookup(".text-area.vault-code")).getText().replace("\n", ""));
     }
 
-    protected RecoveryCodeSheet sheet() throws Exception {
+    protected RecoveryCodeSheet sheet() throws InterruptedException {
         return FxWait.fx(() -> (RecoveryCodeSheet) root().lookup(".recovery-code-sheet"));
     }
 
     /** Groups asked back typed from {@code code}, or wrong ones. */
-    protected void typeGroups(String code, boolean right) throws Exception {
+    protected void typeGroups(String code, boolean right) throws InterruptedException {
         click(I18n.t("settings.vault.code.keptIt"));
         int[] asked = sheet().asked();
         String[] groups = code.split("-");
@@ -171,11 +172,11 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
         click(I18n.t("settings.vault.code.check"));
     }
 
-    protected void waitOpen() throws Exception {
+    protected void waitOpen() {
         waitFor(I18n.t("settings.vault.open"));
     }
 
-    protected Cloud.VaultState round() throws Exception {
+    protected Cloud.VaultState round() throws InterruptedException, ExecutionException {
         return account.cloud().syncNow().get().vault();
     }
 }

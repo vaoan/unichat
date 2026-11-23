@@ -34,7 +34,7 @@ class SpeechCommandExampleUiTest {
         }
     }
 
-    private static String example() throws Exception {
+    private static String example() throws InterruptedException {
         return FxWait.fx(() -> SpeechPage.build().lookupAll(".text-field").stream()
                 .map(n -> (TextField) n).filter(t -> I18n.t("settings.speech.ownCommand").equals(t.getAccessibleText()))
                 .findFirst().orElseThrow().getPromptText());

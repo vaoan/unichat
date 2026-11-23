@@ -186,7 +186,7 @@ class ForwardUiTest {
     }
 
     /** The header's "Reenviar", which asks where the picked ones go. */
-    private void forwardPicked() throws Exception {
+    private void forwardPicked() throws InterruptedException {
         FxWait.fx(() -> {
             ((Button) w.scene.getRoot().lookup(".thread-header .selection-bar .primary-button")).fire();
             return null;
@@ -194,7 +194,7 @@ class ForwardUiTest {
     }
 
     /** Searches {@code name} in the sheet and picks the first chat found, with the keys. */
-    private static void choose(Node sheet, String name) throws Exception {
+    private static void choose(Node sheet, String name) throws InterruptedException {
         FxWait.fx(() -> {
             TextField search = (TextField) sheet.lookup(".text-field");
             search.setText(name);

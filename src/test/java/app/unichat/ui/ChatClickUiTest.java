@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 
@@ -68,7 +67,7 @@ class ChatClickUiTest {
         clickChats(true);
     }
 
-    private void clickChats(boolean unreadOnly) throws Exception {
+    private void clickChats(boolean unreadOnly) throws InterruptedException {
         svc = new MockChatService();
         Scene scene = fx(() -> {
             Thread.currentThread().setUncaughtExceptionHandler((t, e) -> failures.add(e));
@@ -130,7 +129,7 @@ class ChatClickUiTest {
                 true, false, false, true, false, true, null);
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

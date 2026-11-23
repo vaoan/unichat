@@ -3,6 +3,7 @@ package app.unichat.service;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -38,7 +39,7 @@ class MockChatServiceTest {
         }
     }
 
-    private static List<String> shownTexts(MockChatService svc) throws Exception {
+    private static List<String> shownTexts(MockChatService svc) throws InterruptedException, ExecutionException {
         var out = new java.util.ArrayList<String>();
         for (Chat c : svc.chats()) {
             out.add(c.title());

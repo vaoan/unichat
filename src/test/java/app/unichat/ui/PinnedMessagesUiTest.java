@@ -34,15 +34,15 @@ class PinnedMessagesUiTest {
         if (w != null) w.close();
     }
 
-    private Node bar() throws Exception {
+    private Node bar() throws InterruptedException {
         return FxWait.fx(() -> w.scene.getRoot().lookup(".pinned-bar"));
     }
 
-    private String barText() throws Exception {
+    private String barText() throws InterruptedException {
         return FxWait.fx(() -> ((Label) bar().lookup(".pinned-preview")).getText());
     }
 
-    private void clickBar() throws Exception {
+    private void clickBar() throws InterruptedException {
         FxWait.fx(() -> {
             ((Button) bar().lookup(".pinned-go")).fire();
             return null;
@@ -50,7 +50,7 @@ class PinnedMessagesUiTest {
     }
 
     /** Whether {@code m} is the selected row and drawn in the list. */
-    private boolean shown(Message m) throws Exception {
+    private boolean shown(Message m) throws InterruptedException {
         return FxWait.fx(() -> w.cellOf(m) != null && w.list().getSelectionModel().getSelectedItem() instanceof app.unichat.ui.timeline.ThreadRows.MessageRow mr
                 && mr.message().id().equals(m.id()));
     }

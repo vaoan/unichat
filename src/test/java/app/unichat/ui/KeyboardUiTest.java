@@ -21,7 +21,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -155,7 +154,7 @@ class KeyboardUiTest {
     }
 
     /** As the system sends a letter: pressed, then typed, each to whatever has the focus at that moment. */
-    private static void typeLetter(Scene scene, String letter) throws Exception {
+    private static void typeLetter(Scene scene, String letter) throws InterruptedException {
         KeyCode code = KeyCode.getKeyCode(letter.toUpperCase(Locale.ROOT));
         for (var type : List.of(KeyEvent.KEY_PRESSED, KeyEvent.KEY_TYPED)) {
             fx(() -> {
@@ -169,7 +168,7 @@ class KeyboardUiTest {
         FxWait.settled(); // what the key started (focus moves, redraws) has run
     }
 
-    private static void press(Scene scene, KeyCode code, boolean shift, boolean shortcut) throws Exception {
+    private static void press(Scene scene, KeyCode code, boolean shift, boolean shortcut) throws InterruptedException {
         fx(() -> {
             Node target = scene.getFocusOwner() != null ? scene.getFocusOwner() : scene.getRoot();
             boolean mac = MainView.MAC;
@@ -181,13 +180,13 @@ class KeyboardUiTest {
     }
 
     /** The chat list and the open chat are drawn, and the focus has landed. */
-    private static void untilOpen(Scene scene) throws Exception {
+    private static void untilOpen(Scene scene) throws InterruptedException {
         FxWait.until("the chat list and the open chat show", () -> !scene.getRoot().lookupAll(".chat-cell").isEmpty()
                 && !scene.getRoot().lookupAll(".row-cell").isEmpty());
         FxWait.settled();
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

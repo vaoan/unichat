@@ -10,6 +10,7 @@ import java.awt.Color;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
@@ -26,6 +27,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
@@ -55,7 +57,7 @@ class ScrollPerfUiTest {
     private final List<Path> photos = new ArrayList<>();
     private final List<Path> videos = new ArrayList<>();
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T> T fx(Callable<T> c) throws InterruptedException, ExecutionException {
         CompletableFuture<T> f = new CompletableFuture<>();
         Platform.runLater(() -> {
             try {
@@ -78,11 +80,11 @@ class ScrollPerfUiTest {
         }
     }
 
-    private static Path gif(Path dir, String name, int w, int h, int frames, int seed) throws Exception {
+    private static Path gif(Path dir, String name, int w, int h, int frames, int seed) throws IOException {
         return app.unichat.TestPictures.gif(dir.resolve(name), w, h, frames, (g, f) -> paint(g, w, h, f, seed));
     }
 
-    private static Path photo(Path dir, String name, int seed) throws Exception {
+    private static Path photo(Path dir, String name, int seed) throws IOException {
         BufferedImage b = new BufferedImage(1600, 1200, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = b.createGraphics();
         paint(g, 1600, 1200, 0, seed);
@@ -92,7 +94,7 @@ class ScrollPerfUiTest {
         return p;
     }
 
-    private static Path video(Path gif) throws Exception {
+    private static Path video(Path gif) throws IOException, InterruptedException {
         Path out = Path.of(gif + ".mp4");
         new ProcessBuilder("ffmpeg", "-y", "-loglevel", "error", "-i", gif.toString(), "-pix_fmt", "yuv420p", "-c:v", "libx264",
                 "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", out.toString())
@@ -215,7 +217,7 @@ class ScrollPerfUiTest {
      * Scrolls one step per frame for {@code seconds} worth of frames (at 60 a second) and, with {@code live}, brings a
      * message every 6 frames: the load is counted in frames, not in time, so a slower machine does the same work.
      */
-    private static void run(String name, Node target, double delta, int seconds, Thread ui, Runnable live) throws Exception {
+    private static void run(String name, Node target, double delta, int seconds, Thread ui, Runnable live) throws InterruptedException, ExecutionException {
         List<Long> gaps = Collections.synchronizedList(new ArrayList<>());
         long[] last = {0};
         int[] direction = {-1};
@@ -265,7 +267,7 @@ class ScrollPerfUiTest {
         }
     }
 
-    private static void histogram() throws Exception {
+    private static void histogram() throws IOException {
         Process p = new ProcessBuilder("jcmd", Long.toString(ProcessHandle.current().pid()), "GC.class_histogram").redirectErrorStream(true).start();
         List<String> lines = new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).lines().skip(2).limit(14).toList();
         lines.forEach(l -> System.out.println("PERF heap " + l));

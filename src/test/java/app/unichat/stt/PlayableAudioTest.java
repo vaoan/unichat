@@ -1,5 +1,6 @@
 package app.unichat.stt;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PlayableAudioTest {
     @TempDir Path dir;
 
-    private Path voiceNote() throws Exception {
+    private Path voiceNote() throws IOException {
         Path f = dir.resolve("nota.ogg");
         try (InputStream in = PlayableAudioTest.class.getResourceAsStream("/app/unichat/demo/voice-note.ogg")) {
             Files.copy(in, f);

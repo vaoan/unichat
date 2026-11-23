@@ -40,7 +40,7 @@ public final class Browser {
     /** How a file is opened with the system's app; tests put a recorder here. Runs on AWT's thread. */
     @FunctionalInterface
     interface Opener {
-        void open(java.nio.file.Path file) throws Exception;
+        void open(java.nio.file.Path file) throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: a test's recorder or the system, failing as they do
     }
 
     static Opener opener = Browser::systemOpen; // NOPMD: MutableStaticState, a seam tests swap
@@ -60,7 +60,7 @@ public final class Browser {
     }
 
     /** AWT's Desktop; where it can't (it isn't supported), the system's own command: open, start, xdg-open. */
-    private static void systemOpen(java.nio.file.Path file) throws Exception {
+    private static void systemOpen(java.nio.file.Path file) throws java.io.IOException {
         if (java.awt.Desktop.isDesktopSupported() && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)) {
             java.awt.Desktop.getDesktop().open(file.toFile());
             return;

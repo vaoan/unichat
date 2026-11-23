@@ -71,7 +71,7 @@ class ListRepaintUiTest {
     }
 
     /** Each row (cell) → the chat it shows and its network icon node. A cell may show another chat after a scroll. */
-    private Map<Node, Object[]> badgeIcons() throws Exception {
+    private Map<Node, Object[]> badgeIcons() throws InterruptedException {
         return FxWait.fx(() -> {
             Map<Node, Object[]> m = new HashMap<>(); // cells: Node keeps Object's identity equals
             for (Node n : scene.getRoot().lookupAll(".chat-list .list-cell")) {
@@ -87,7 +87,7 @@ class ListRepaintUiTest {
         return cells.entrySet().stream().map(e -> Integer.toHexString(System.identityHashCode(e.getKey())) + "=" + e.getValue()[0]).sorted().toList();
     }
 
-    private List<Node> favoriteTiles() throws Exception {
+    private List<Node> favoriteTiles() throws InterruptedException {
         return FxWait.fx(() -> List.copyOf(scene.getRoot().lookupAll(".favorite-tile")));
     }
 

@@ -2,6 +2,7 @@ package app.unichat.links;
 
 import app.unichat.model.LinkMedia;
 import com.sun.net.httpserver.HttpServer;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,7 +63,7 @@ class LinkInspectorTest {
         handlers.shutdown();
     }
 
-    private Optional<LinkMedia> inspect(LinkInspector i, String path) throws Exception {
+    private Optional<LinkMedia> inspect(LinkInspector i, String path) throws InterruptedException, ExecutionException {
         return i.inspect(base + path).get();
     }
 

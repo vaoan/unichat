@@ -2,6 +2,8 @@ package app.unichat.ui.media;
 
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import java.io.IOException;
+import java.net.URISyntaxException;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
@@ -16,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Animated WebP stickers (WhatsApp) must keep all their frames instead of a static thumbnail. */
 class AnimatedImageTest {
-    private static Path fixture() throws Exception {
+    private static Path fixture() throws URISyntaxException {
         // 48x40, 4 frames at 4 fps, generated with ffmpeg's libwebp_anim (testsrc pattern).
         return Path.of(AnimatedImageTest.class.getResource("/app/unichat/ui/anim.webp").toURI());
     }
@@ -107,7 +109,7 @@ class AnimatedImageTest {
     }
 
     /** A {@code frames}-frame 20x20 GIF. */
-    private static void writeGif(Path out, int frames) throws Exception {
+    private static void writeGif(Path out, int frames) throws IOException {
         app.unichat.TestPictures.gif(out, 20, 20, frames);
     }
 
@@ -151,7 +153,7 @@ class AnimatedImageTest {
         org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.video.AnimDump.find() != null, "no anim_dump");
         Path still = Path.of(AnimatedImageTest.class.getResource("/app/unichat/ui/still.webp").toURI());
         AnimatedImage.WebpOpener failing = file -> new AnimatedImage.WebpReader() {
-            @Override public BufferedImage read(int i) throws java.io.IOException { throw new java.io.EOFException(); }
+            @Override public BufferedImage read(int i) throws IOException { throw new java.io.EOFException(); }
             @Override public void close() { /* the fake ignores it */ }
         };
         AnimatedImage.RawFrames frames = AnimatedImage.composeWebp(still, 64, 64, failing);

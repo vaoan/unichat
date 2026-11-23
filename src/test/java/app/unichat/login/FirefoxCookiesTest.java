@@ -1,6 +1,7 @@
 package app.unichat.login;
 
 import app.unichat.model.Network;
+import java.sql.SQLException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,7 +28,7 @@ class FirefoxCookiesTest {
         System.clearProperty("unichat.browserRoots");
     }
 
-    private void makeDb(Path db) throws Exception {
+    private void makeDb(Path db) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db);
              Statement st = c.createStatement()) {
             st.execute("CREATE TABLE moz_cookies(name TEXT, value TEXT, host TEXT, path TEXT, expiry INTEGER, isSecure INTEGER)");
@@ -41,7 +42,7 @@ class FirefoxCookiesTest {
         }
     }
 
-    private static void row(PreparedStatement ps, String n, String v, String h, long exp) throws Exception {
+    private static void row(PreparedStatement ps, String n, String v, String h, long exp) throws SQLException {
         ps.setString(1, n); ps.setString(2, v); ps.setString(3, h);
         ps.setString(4, "/"); ps.setLong(5, exp); ps.setInt(6, 1);
         ps.executeUpdate();

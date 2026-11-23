@@ -15,7 +15,6 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -88,7 +87,7 @@ class FilterUiTest {
                 .filter(Node::isVisible).findFirst().orElseThrow(() -> new AssertionError("no rail button " + name));
     }
 
-    private static void click(ButtonBase b) throws Exception {
+    private static void click(ButtonBase b) throws InterruptedException {
         fx(() -> {
             b.fire();
             return null;
@@ -96,7 +95,7 @@ class FilterUiTest {
         FxWait.settled();
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

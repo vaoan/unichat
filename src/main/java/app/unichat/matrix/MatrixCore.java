@@ -64,7 +64,7 @@ final class MatrixCore {
     }
 
     @FunctionalInterface
-    interface IoAction { void run() throws Exception; }
+    interface IoAction { void run() throws Exception; } // NOPMD: SignatureDeclareThrowsException, a callback: any request, failing as it does
 
     CompletableFuture<Void> run(IoAction action) {
         return CompletableFuture.runAsync(() -> {

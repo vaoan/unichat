@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,7 +19,7 @@ class LogFilesTest {
     @TempDir Path root;
     private final Instant now = Instant.parse("2026-10-26T12:00:00Z");
 
-    private Path file(String rel, int daysOld) throws Exception {
+    private Path file(String rel, int daysOld) throws IOException {
         Path f = root.resolve(rel);
         Files.createDirectories(f.getParent());
         Files.writeString(f, "x".repeat(10));

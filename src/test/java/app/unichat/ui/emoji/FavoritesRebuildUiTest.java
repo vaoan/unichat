@@ -7,6 +7,7 @@ import app.unichat.model.StickerPack;
 import app.unichat.service.ChatService;
 import app.unichat.service.MockChatService;
 import app.unichat.ui.FxWait;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.application.Platform;
@@ -47,7 +48,7 @@ class FavoritesRebuildUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private static MediaLibrary.Item sticker(String url, String mime) throws Exception {
+    private static MediaLibrary.Item sticker(String url, String mime) throws JsonProcessingException {
         JsonNode info = new ObjectMapper().readTree("{\"mimetype\":\"" + mime
                 + "\",\"fi.mau.bridged_sticker\":{\"network\":\"telegram\",\"id\":\"5\",\"pack_url\":\"" + SET + "\"}}");
         return new MediaLibrary.Item(MediaLibrary.Kind.STICKER, url, mime, 256, 256, info);

@@ -41,7 +41,7 @@ public final class GifSearch {
 
     @FunctionalInterface
     private interface Call {
-        List<Gif> run(GifProvider p) throws Exception;
+        List<Gif> run(GifProvider p) throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: whatever the provider throws, as Callable
     }
 
     private List<Gif> gather(Call call, int limit) {

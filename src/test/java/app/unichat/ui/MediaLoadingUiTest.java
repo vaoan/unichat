@@ -5,6 +5,7 @@ import app.unichat.model.MessageType;
 import app.unichat.service.ScriptedChatService;
 import app.unichat.settings.Settings;
 import app.unichat.ui.chats.SidePanel;
+import java.io.IOException;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.image.ImageView;
@@ -32,7 +33,7 @@ class MediaLoadingUiTest {
         if (w != null) w.close();
     }
 
-    private String sticker() throws Exception {
+    private String sticker() throws IOException {
         Files.createDirectories(Settings.dataDir());
         Path p = Files.createTempFile(Settings.dataDir(), "sticker", ".png");
         return TestPictures.still(p, "png", 256, 256).toUri().toString();
@@ -53,7 +54,7 @@ class MediaLoadingUiTest {
     }
 
     /** {@code -Dunichat.loadingShot=<prefix>} saves what {@code n} looks like (a load is too short for a snapshot run). */
-    private static void shot(Node n, String name) throws Exception {
+    private static void shot(Node n, String name) throws IOException, InterruptedException {
         String prefix = System.getProperty("unichat.loadingShot");
         if (prefix == null) return;
         var img = FxWait.fx(() -> n.snapshot(null, null));

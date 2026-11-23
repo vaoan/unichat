@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.Seen;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,7 +77,7 @@ class CloudUnseenTest {
     }
 
     /** Started as Unichat starts it, and its first round (the timer's, at once) over. */
-    private void started() throws Exception {
+    private void started() throws InterruptedException, ExecutionException {
         desk.cloud.start(Duration.ofDays(1));
         while (rounds() == 0) Thread.onSpinWait(); // the timer's round began; one asked now runs after it
         desk.cloud.syncNow().get();

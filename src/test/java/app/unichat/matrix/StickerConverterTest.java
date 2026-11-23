@@ -2,7 +2,9 @@ package app.unichat.matrix;
 
 import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -24,7 +26,7 @@ class StickerConverterTest {
     @TempDir
     Path dir;
 
-    private static RoomFeatures features(String stickerMimes) throws Exception {
+    private static RoomFeatures features(String stickerMimes) throws JsonProcessingException {
         return RoomFeatures.parse(new ObjectMapper().readTree(
                 "{\"id\":\"x\",\"file\":{\"m.sticker\":{\"mime_types\":" + stickerMimes + "}}}"));
     }
@@ -120,7 +122,7 @@ class StickerConverterTest {
         assertEquals("image/webp", NetworkFormats.sticker(Network.WHATSAPP, "image/gif", true, false, wa), "WhatsApp: what its bridge says");
     }
 
-    private Path gif() throws Exception {
+    private Path gif() throws IOException {
         BufferedImage img = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);
         img.setRGB(3, 3, 0xff0000);
         Path f = dir.resolve("s.gif");

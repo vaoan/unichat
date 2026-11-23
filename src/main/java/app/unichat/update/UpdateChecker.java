@@ -4,6 +4,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.AppVersion;
 import app.unichat.support.Seen;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -57,7 +58,7 @@ public final class UpdateChecker {
 
     /** What answers GitHub's call: the body, or an exception. */
     @FunctionalInterface
-    interface Fetcher { String fetch() throws Exception; }
+    interface Fetcher { String fetch() throws Exception; } // NOPMD: SignatureDeclareThrowsException, a callback: GitHub's call or a test's answer, failing as they do
 
     private UpdateChecker() { this(System::currentTimeMillis, UpdateChecker::fetch); }
 
@@ -160,7 +161,7 @@ public final class UpdateChecker {
         for (Consumer<Release> l : listeners) l.accept(p);
     }
 
-    private static String fetch() throws Exception {
+    private static String fetch() throws IOException, InterruptedException {
         HttpRequest req = HttpRequest.newBuilder(API).timeout(Duration.ofSeconds(15))
                 .header("Accept", "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")

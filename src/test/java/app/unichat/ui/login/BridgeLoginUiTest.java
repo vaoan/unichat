@@ -5,6 +5,7 @@ import app.unichat.ui.Theme;
 import app.unichat.login.BridgeLogin;
 import app.unichat.model.Network;
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -98,7 +99,7 @@ class BridgeLoginUiTest {
 
     private Stage stage;
 
-    private Scene open(AtomicBoolean connected) throws Exception {
+    private Scene open(AtomicBoolean connected) throws InterruptedException {
         BridgeLogin api = new BridgeLogin("http://127.0.0.1:" + server.getAddress().getPort() + "/_matrix/provision", "t", "@yo:localhost");
         return fx(() -> {
             stage = new Stage();
@@ -155,7 +156,7 @@ class BridgeLoginUiTest {
     // ---------------------------------------------------------------- helpers
 
     /** -Dunichat.loginShots=<dir>: saves a PNG of the (invisible) window, for checking the design. */
-    private static void shot(Scene s, String name) throws Exception {
+    private static void shot(Scene s, String name) throws IOException, InterruptedException {
         String dir = System.getProperty("unichat.loginShots");
         if (dir == null) return;
         java.awt.image.BufferedImage img = fx(() -> javafx.embed.swing.SwingFXUtils.fromFXImage(s.snapshot(null), null));
@@ -215,11 +216,11 @@ class BridgeLoginUiTest {
         }
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
+    private static <T> T fx(Supplier<T> s) throws InterruptedException {
         return FxWait.fx(s::get);
     }
 
-    private static void await(String what, BooleanSupplier c) throws Exception {
+    private static void await(String what, BooleanSupplier c) {
         FxWait.until(what, c::getAsBoolean);
     }
 }

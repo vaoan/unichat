@@ -8,6 +8,7 @@ import app.unichat.model.Network;
 import app.unichat.service.Changes;
 import app.unichat.settings.Settings;
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,7 +93,7 @@ class StartupBeforeSyncTest {
     }
 
     /** What a previous run left on disk: the logins each bridge reported and the last full sync. */
-    private void previousRun(MatrixChatService svc) throws Exception {
+    private void previousRun(MatrixChatService svc) throws IOException {
         long now = System.currentTimeMillis();
         Settings.get().set("matrix.logins.whatsapp", now + "\n573001112233\t+57 300 111 2233\tCONNECTED\n");
         Settings.get().set("matrix.logins.telegram", now + "\n900000042\tJuan\tCONNECTED\n");

@@ -84,13 +84,13 @@ class ArchiveOpenUiTest {
         svc.stop();
     }
 
-    private static ButtonBase rail(Node root, String name) throws Exception {
+    private static ButtonBase rail(Node root, String name) throws InterruptedException {
         return FxWait.fx(() -> (ButtonBase) root.lookupAll("*").stream()
                 .filter(n -> n instanceof ButtonBase b && b.getAccessibleText() != null && b.getAccessibleText().startsWith(name))
                 .filter(Node::isVisible).findFirst().orElseThrow(() -> new AssertionError("no rail button " + name)));
     }
 
-    private static void click(ButtonBase b) throws Exception {
+    private static void click(ButtonBase b) throws InterruptedException {
         FxWait.fx(() -> { b.fire(); return null; });
         FxWait.settled();
     }

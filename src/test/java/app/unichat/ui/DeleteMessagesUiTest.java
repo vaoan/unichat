@@ -32,30 +32,30 @@ class DeleteMessagesUiTest {
     @AfterEach
     void close() throws Exception { if (w != null) w.close(); }
 
-    private Node sheet() throws Exception {
+    private Node sheet() throws InterruptedException {
         return FxWait.fx(() -> w.scene.getRoot().lookup(".delete-sheet"));
     }
 
-    private String title() throws Exception {
+    private String title() throws InterruptedException {
         return FxWait.fx(() -> ((Label) sheet().lookup(".sheet-title")).getText());
     }
 
     /** The sheet's red button: "Borrar…" first, then "Sí, borrar para todos". */
-    private void danger() throws Exception {
+    private void danger() throws InterruptedException {
         FxWait.fx(() -> {
             ((Button) sheet().lookup(".danger-button")).fire();
             return null;
         });
     }
 
-    private void cancel() throws Exception {
+    private void cancel() throws InterruptedException {
         FxWait.fx(() -> {
             ((Button) sheet().lookup(".secondary-button")).fire();
             return null;
         });
     }
 
-    private boolean cancelFocused() throws Exception {
+    private boolean cancelFocused() throws InterruptedException {
         return FxWait.fx(() -> w.scene.getFocusOwner() == sheet().lookup(".secondary-button"));
     }
 

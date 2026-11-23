@@ -1,5 +1,6 @@
 package app.unichat.model;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -12,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RoomFeaturesTest {
-    private static JsonNode json(String s) throws Exception {
+    private static JsonNode json(String s) throws JsonProcessingException {
         return new ObjectMapper().readTree(s);
     }
 

@@ -4,6 +4,7 @@ import app.unichat.ui.chats.ChatFilter;
 import app.unichat.ui.chats.Rail;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -75,7 +76,7 @@ class HiddenWindowUiTest {
         });
     }
 
-    private int changedNodes() throws Exception {
+    private int changedNodes() throws InterruptedException, NoSuchFieldException {
         Field f = Scene.class.getDeclaredField("dirtyNodesSize");
         f.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
         return fx(() -> {
@@ -87,7 +88,7 @@ class HiddenWindowUiTest {
         });
     }
 
-    private void changeChatsAndMessages(int rounds) throws Exception {
+    private void changeChatsAndMessages(int rounds) throws InterruptedException, ExecutionException {
         for (int i = 0; i < rounds; i++) {
             var _ = svc.setPinned(FAMILIA, i % 2 == 0);
             var _ = svc.setFavorite(FAMILIA, i % 2 == 0);
@@ -178,7 +179,7 @@ class HiddenWindowUiTest {
         return false;
     }
 
-    private static <T> T fx(java.util.concurrent.Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

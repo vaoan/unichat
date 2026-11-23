@@ -14,7 +14,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -67,7 +66,7 @@ class SaveFailureToastUiTest {
 
     private static Label toast(Scene scene) { return (Label) scene.getRoot().lookup(".toast"); }
 
-    private static <T> T fx(Callable<T> call) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> call) throws E, InterruptedException {
         return FxWait.fx(call);
     }
 }

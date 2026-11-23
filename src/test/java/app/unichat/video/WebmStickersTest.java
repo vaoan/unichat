@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class WebmStickersTest {
     @TempDir Path dir;
 
-    private Path webmWithTransparency(Path ffmpeg) throws Exception {
+    private Path webmWithTransparency(Path ffmpeg) throws IOException, InterruptedException {
         Path webm = dir.resolve("hash.webm");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi",
                 "-i", "testsrc=s=128x128:d=1:r=10,format=yuva420p,colorchannelmixer=aa=0.5", "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", webm.toString())

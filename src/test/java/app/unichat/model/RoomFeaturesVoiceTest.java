@@ -1,5 +1,6 @@
 package app.unichat.model;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -10,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** With what each bridge really publishes. */
 class RoomFeaturesVoiceTest {
-    private static RoomFeatures parse(String json) throws Exception {
+    private static RoomFeatures parse(String json) throws JsonProcessingException {
         return RoomFeatures.parse(new ObjectMapper().readTree(json));
     }
 

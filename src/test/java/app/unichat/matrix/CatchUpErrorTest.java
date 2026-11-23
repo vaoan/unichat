@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -33,7 +34,7 @@ class CatchUpErrorTest {
     private final CountDownLatch testOver = new CountDownLatch(1);
     private MatrixChatService svc;
 
-    private void fakeHomeserver(int status, String errcode) throws Exception {
+    private void fakeHomeserver(int status, String errcode) throws IOException {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String path = ex.getRequestURI().getPath();

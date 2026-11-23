@@ -50,7 +50,7 @@ class AutoFixSettingUiTest {
         AiSettings.setKeepThread(true);
     }
 
-    private Parent page() throws Exception {
+    private Parent page() throws InterruptedException {
         return fx(() -> {
             stage = new Stage();
             stage.setOpacity(0);
@@ -60,7 +60,7 @@ class AutoFixSettingUiTest {
         });
     }
 
-    private static ToggleButton chip(Parent root, String text) throws Exception {
+    private static ToggleButton chip(Parent root, String text) throws InterruptedException {
         return fx(() -> root.lookupAll(".toggle-button").stream().map(n -> (ToggleButton) n)
                 .filter(b -> text.equals(b.getText())).findFirst().orElseThrow());
     }

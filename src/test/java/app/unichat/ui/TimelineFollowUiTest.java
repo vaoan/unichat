@@ -4,6 +4,7 @@ import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.settings.Settings;
+import java.util.concurrent.ExecutionException;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Region;
 import org.junit.jupiter.api.AfterEach;
@@ -29,7 +30,7 @@ class TimelineFollowUiTest {
     }
 
     /** The chat open at its newest message, and the frames watched from there: the newest stays where it is. */
-    private TimelineWindow.Frames atBottom(int messages) throws Exception {
+    private TimelineWindow.Frames atBottom(int messages) throws InterruptedException, ExecutionException {
         w = TimelineWindow.open(messages);
         double gap = w.untilAtBottom();
         return w.watch(w.atBottom(gap));

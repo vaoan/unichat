@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -13,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MediaCacheTest {
-    private static Path file(Path dir, String name, int size, long usedMillis) throws Exception {
+    private static Path file(Path dir, String name, int size, long usedMillis) throws IOException {
         Path p = Files.write(dir.resolve(name), new byte[size]);
         Files.setLastModifiedTime(p, FileTime.fromMillis(usedMillis));
         return p;

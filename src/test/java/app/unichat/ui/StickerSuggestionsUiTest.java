@@ -60,7 +60,7 @@ class StickerSuggestionsUiTest {
         openWith(new MockChatService());
     }
 
-    private void openWith(MockChatService service) throws Exception {
+    private void openWith(MockChatService service) throws InterruptedException {
         svc = service;
         svc.noAutoReplies();
         chat = svc.chats().stream().filter(c -> c.features().accepts(RoomFeatures.STICKER)).findFirst().orElseThrow().id();
@@ -88,21 +88,21 @@ class StickerSuggestionsUiTest {
         });
     }
 
-    private TextArea box() throws Exception {
+    private TextArea box() throws InterruptedException {
         return FxWait.fx(() -> (TextArea) view.lookup(".composer-input"));
     }
 
-    private void type(String text) throws Exception {
+    private void type(String text) throws InterruptedException {
         FxWait.fx(() -> { box().setText(text); return null; });
         FxWait.settled();
     }
 
-    private ScrollPane suggestions() throws Exception {
+    private ScrollPane suggestions() throws InterruptedException {
         return FxWait.fx(() -> (ScrollPane) view.lookup(".sticker-suggestions"));
     }
 
     /** The stickers offered, or none when the line is hidden. */
-    private List<Node> offered() throws Exception {
+    private List<Node> offered() throws InterruptedException {
         return FxWait.fx(() -> suggestions().isVisible() ? List.copyOf(((HBox) suggestions().getContent()).getChildren()) : List.of());
     }
 
@@ -253,7 +253,7 @@ class StickerSuggestionsUiTest {
         assertSame(tile, FxWait.fx(() -> view.getScene().getFocusOwner()), "⇧Tab from the box reaches it, past " + passed);
     }
 
-    private static void press(Node tile) throws Exception {
+    private static void press(Node tile) throws InterruptedException {
         FxWait.fx(() -> {
             Event.fireEvent(tile, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
             return null;

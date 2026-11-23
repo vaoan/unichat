@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
@@ -96,7 +95,7 @@ class NewChatUiTest {
         svc.stop();
     }
 
-    private Scene start(MockChatService svc) throws Exception {
+    private Scene start(MockChatService svc) throws InterruptedException {
         Scene scene = fx(() -> {
             Stage stage = new Stage();
             stage.setOpacity(0);
@@ -209,17 +208,17 @@ class NewChatUiTest {
         return arrived;
     }
 
-    private static List<String> rows(Scene s) throws Exception {
+    private static List<String> rows(Scene s) throws InterruptedException {
         return fx(() -> s.getRoot().lookupAll(".new-chat-list .list-cell").stream()
                 .map(n -> (String) n.queryAccessibleAttribute(javafx.scene.AccessibleAttribute.TEXT))
                 .filter(NewChatUiTest::n).toList());
     }
 
-    private static List<String> names(Scene s) throws Exception {
+    private static List<String> names(Scene s) throws InterruptedException {
         return rows(s).stream().map(r -> r.split(",")[0]).toList();
     }
 
-    private static void chooseNetwork(Scene s, String name) throws Exception {
+    private static void chooseNetwork(Scene s, String name) throws InterruptedException {
         // The pane is built on the next pulse after ⌘N: wait for its network chips.
         FxWait.until("the " + name + " chip", () -> s.getRoot().lookupAll(".new-chat-network").stream()
                 .anyMatch(n -> name.equals(((ToggleButton) n).getText())));
@@ -230,7 +229,7 @@ class NewChatUiTest {
         });
     }
 
-    private static void type(Scene s, String text) throws Exception {
+    private static void type(Scene s, String text) throws InterruptedException {
         FxWait.until("the search field", () -> search(s) != null);
         fx(() -> {
             search(s).setText(text);
@@ -239,7 +238,7 @@ class NewChatUiTest {
     }
 
     /** Enter in the search field, then what it set off on the FX thread (opening a chat that exists) has run. */
-    private static void enter(Scene s) throws Exception {
+    private static void enter(Scene s) throws InterruptedException {
         fx(() -> {
             Event.fireEvent(search(s), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
             return null;
@@ -247,7 +246,7 @@ class NewChatUiTest {
         FxWait.settled();
     }
 
-    private static void shortcutN(Scene s) throws Exception {
+    private static void shortcutN(Scene s) throws InterruptedException {
         fx(() -> {
             boolean mac = MainView.MAC;
             Event.fireEvent(s.getRoot(), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.N, false, !mac, false, mac));
@@ -260,7 +259,7 @@ class NewChatUiTest {
         return (ThreadPane) s.getRoot().lookupAll("*").stream().filter(n -> n instanceof ThreadPane).findFirst().orElseThrow();
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

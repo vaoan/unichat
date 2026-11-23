@@ -1,5 +1,6 @@
 package app.unichat.video;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -51,7 +52,7 @@ class AnimDumpTest {
         return AnimDump.find();
     }
 
-    private Path asset() throws Exception {
+    private Path asset() throws IOException {
         Path f = dir.resolve("moving.webp");
         try (InputStream in = AnimDumpTest.class.getResourceAsStream("/app/unichat/video/moving.webp")) {
             Files.copy(in, f);

@@ -61,7 +61,7 @@ class ReadOnReplyTest {
         Settings.get().setReadReceipts(was);
     }
 
-    private void open(Settings.ReadReceipts when) throws Exception {
+    private void open(Settings.ReadReceipts when) throws InterruptedException {
         Settings.get().setReadReceipts(when);
         svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "read-on-reply-" + when);
         Changes changes = new Changes();

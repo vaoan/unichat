@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -33,12 +34,12 @@ class SavedMediaTest {
         return new SavedMedia(temp.resolve("saved"), url -> {
             fetched.add(url);
             Path file = available.get(url);
-            return file == null ? CompletableFuture.failedFuture(new java.io.IOException("the bridge lost it"))
+            return file == null ? CompletableFuture.failedFuture(new IOException("the bridge lost it"))
                     : CompletableFuture.completedFuture(file);
         }, url -> "h" + url, io, retrySeconds);
     }
 
-    private Path file(String name, String content) throws Exception {
+    private Path file(String name, String content) throws IOException {
         return Files.writeString(temp.resolve(name), content);
     }
 

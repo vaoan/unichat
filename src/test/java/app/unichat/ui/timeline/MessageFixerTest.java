@@ -3,6 +3,7 @@ package app.unichat.ui.timeline;
 import app.unichat.assist.ReplyWriter;
 import app.unichat.model.Message;
 import app.unichat.service.MockChatService;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +45,7 @@ class MessageFixerTest {
         svc.stop();
     }
 
-    private Message sent(String text) throws Exception {
+    private Message sent(String text) throws InterruptedException, ExecutionException {
         svc.sendText(CHAT, text, null).get();
         List<Message> all = svc.messages(CHAT);
         return all.getLast();

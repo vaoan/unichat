@@ -31,7 +31,7 @@ class SavedTextUiTest {
     @AfterEach
     void close() throws Exception { if (w != null) w.close(); }
 
-    private List<String> sheetTexts() throws Exception {
+    private List<String> sheetTexts() throws InterruptedException {
         return FxWait.fx(() -> {
             Node sheet = w.scene.getRoot().lookup(".saved-text-sheet");
             return sheet == null ? List.<String>of()

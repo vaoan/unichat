@@ -1,6 +1,7 @@
 package app.unichat.ui.desktop;
 
 import app.unichat.support.Seen;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -33,7 +34,7 @@ class NativeBarScreenTest {
      * A helper that waits for a "go" (any line), says {@code lines}, waits for another before saying {@code after}, then
      * ends. It is running before {@link MacScreen} starts, so that start reports nothing of its own.
      */
-    private NativeBar helper(String lines, String after, Runnable ended) throws Exception {
+    private NativeBar helper(String lines, String after, Runnable ended) throws IOException {
         Path helper = Files.writeString(dir.resolve("helper"),
                 "#!/bin/sh\nread a\nprintf '" + lines + "'\nread b\nprintf '" + after + "'\n");
         assertTrue(helper.toFile().setExecutable(true));

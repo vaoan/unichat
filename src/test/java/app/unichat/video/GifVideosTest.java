@@ -2,7 +2,9 @@ package app.unichat.video;
 
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -34,7 +36,7 @@ class GifVideosTest {
         GifVideos.setLargestSide(720);
     }
 
-    private static Message message(MessageType type, String mime, boolean gifMark) throws Exception {
+    private static Message message(MessageType type, String mime, boolean gifMark) throws JsonProcessingException {
         Message m = new Message("$1", "!c", "@x", "X", false, Instant.EPOCH);
         m.setType(type);
         m.setMimeType(mime);
@@ -43,7 +45,7 @@ class GifVideosTest {
         return m;
     }
 
-    private static Message lasting(int ms) throws Exception {
+    private static Message lasting(int ms) throws JsonProcessingException {
         Message m = message(MessageType.VIDEO, "video/mp4", true);
         m.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true,\"duration\":" + ms + "}"));
         return m;
@@ -113,7 +115,7 @@ class GifVideosTest {
         assertTrue(webp.containsAll(List.of("-loop", "0", "-lossy", "f00001.pam", "f00002.pam")) && webp.getLast().equals("out.webp"), webp.toString());
     }
 
-    private Path mp4(String name, String size, boolean sound) throws Exception {
+    private Path mp4(String name, String size, boolean sound) throws IOException, InterruptedException {
         Path ffmpeg = Ffmpeg.find();
         Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
         Assumptions.assumeTrue(AnimatedWebp.img2webp() != null, "no img2webp");

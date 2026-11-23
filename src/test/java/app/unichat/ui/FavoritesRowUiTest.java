@@ -3,6 +3,8 @@ package app.unichat.ui;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
 import app.unichat.settings.Settings;
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.scene.Node;
@@ -49,7 +51,7 @@ class FavoritesRowUiTest {
         });
     }
 
-    private Scene open(double fontScale) throws Exception {
+    private Scene open(double fontScale) throws InterruptedException, ExecutionException {
         scale = Settings.get().fontScale();
         Settings.get().setFontScale(fontScale);
         svc = new MockChatService();
@@ -69,7 +71,7 @@ class FavoritesRowUiTest {
         return scene;
     }
 
-    private void check(Scene scene) throws Exception {
+    private void check(Scene scene) throws IOException, InterruptedException {
         String shot = System.getProperty("unichat.favoritesShot");
         if (shot != null) FxWait.fx(() -> {
             Node row = scene.getRoot().lookup(".favorites");
@@ -124,7 +126,7 @@ class FavoritesRowUiTest {
     }
 
     /** The favorites' row: one line, never wider than the column; true when a "+N" tile stands for the rest. */
-    private List<String> oneRowProblems(Scene scene) throws Exception {
+    private List<String> oneRowProblems(Scene scene) throws IOException, InterruptedException {
         String shot = System.getProperty("unichat.favoritesShot");
         if (shot != null) FxWait.fx(() -> {
             Node row = scene.getRoot().lookup(".favorites").getParent();

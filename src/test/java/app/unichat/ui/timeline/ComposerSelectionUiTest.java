@@ -31,7 +31,7 @@ class ComposerSelectionUiTest {
     private Stage stage;
     private TextArea box;
 
-    private void open(String text, double width) throws Exception {
+    private void open(String text, double width) throws InterruptedException {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
@@ -60,7 +60,7 @@ class ComposerSelectionUiTest {
         if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
     }
 
-    private String shift(KeyCode arrow) throws Exception {
+    private String shift(KeyCode arrow) throws InterruptedException {
         return FxWait.fx(() -> {
             Event.fireEvent(box, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", arrow, true, false, false, false));
             return box.getSelectedText();
@@ -68,7 +68,7 @@ class ComposerSelectionUiTest {
     }
 
     /** ⇧⌘ and an arrow (⌘: the shortcut key, as the Mac sends it); where the selection is after it: "anchor-caret". */
-    private String shiftShortcut(KeyCode arrow) throws Exception {
+    private String shiftShortcut(KeyCode arrow) throws InterruptedException {
         return FxWait.fx(() -> {
             Event.fireEvent(box, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", arrow, true, false, false, true));
             return box.getAnchor() + "-" + box.getCaretPosition();
@@ -93,7 +93,7 @@ class ComposerSelectionUiTest {
         assertEquals(from + "-0", shiftShortcut(KeyCode.UP));
     }
 
-    private void caretAt(int at) throws Exception {
+    private void caretAt(int at) throws InterruptedException {
         FxWait.fx(() -> { box.positionCaret(at); return null; });
     }
 

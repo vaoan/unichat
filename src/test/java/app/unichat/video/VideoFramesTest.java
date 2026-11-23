@@ -1,5 +1,6 @@
 package app.unichat.video;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VideoFramesTest {
     @TempDir Path dir;
 
-    private Path webm(String filter, String size, int seconds, int rate) throws Exception {
+    private Path webm(String filter, String size, int seconds, int rate) throws IOException, InterruptedException {
         Path ffmpeg = Ffmpeg.find();
         Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
         Path webm = dir.resolve("s.webm");

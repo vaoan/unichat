@@ -48,7 +48,7 @@ class NotificationOpenUiTest {
         });
     }
 
-    private void open() throws Exception {
+    private void open() throws InterruptedException {
         svc = new MockChatService();
         scene = FxWait.fx(() -> {
             stage = new Stage();
@@ -65,7 +65,7 @@ class NotificationOpenUiTest {
     }
 
     /** The message box's frame against the row inside it (text and buttons), and the text box's height. */
-    private String box() throws Exception {
+    private String box() throws InterruptedException {
         return FxWait.fx(() -> {
             Node frame = scene.getRoot().lookup(".composer-row");
             Node input = frame.lookup(".text-area");
@@ -76,7 +76,7 @@ class NotificationOpenUiTest {
     }
 
     /** As UnichatApp.showWindow then the notification's chat: two runLaters, in that order. */
-    private void clickNotification(String chatId) throws Exception {
+    private void clickNotification(String chatId) throws InterruptedException {
         FxWait.fx(() -> {
             Platform.runLater(() -> {
                 stage.show();

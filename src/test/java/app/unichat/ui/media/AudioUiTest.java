@@ -70,11 +70,11 @@ class AudioUiTest {
         });
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
-    private static void await(Callable<Boolean> c, String what) throws Exception {
+    private static void await(Callable<Boolean> c, String what) {
         FxWait.until(what, c);
     }
 
@@ -86,7 +86,7 @@ class AudioUiTest {
     }
 
     /** Playing, or failed to: a failure ends the wait at once and says so (it waited to the limit on a machine with no sound). */
-    private void awaitPlaying(Message m) throws Exception {
+    private void awaitPlaying(Message m) {
         await(() -> !toasts.isEmpty() || (playback.isCurrent(m) && playback.state() == AudioPlayback.State.PLAYING), m.id() + " plays");
         assertEquals(List.of(), toasts, m.id() + " didn't play");
     }

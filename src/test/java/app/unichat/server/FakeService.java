@@ -1,4 +1,5 @@
 package app.unichat.server;
+import java.io.IOException;
 
 /**
  * Child process for SupervisorTest: "run" stays up until its input closes (it's stopped, or the JVM that started it
@@ -7,7 +8,7 @@ package app.unichat.server;
  * up and prints "after". "bridge ..." and "broken-bridge ..." are a bridge's setup commands, for BridgeInstallerTest.
  */
 public final class FakeService {
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws IOException {
         if (args.length > 0 && args[0].endsWith("bridge")) {
             bridgeSetup(args);
             return;
@@ -25,7 +26,7 @@ public final class FakeService {
                 System.out.println("after");
                 System.out.flush();
                 if (System.out.checkError()) System.exit(5);
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 System.exit(4);
             }
         }
@@ -33,7 +34,7 @@ public final class FakeService {
     }
 
     /** Works in its current folder, like a bridge: writes what it's asked for and leaves a line per call in calls.txt. */
-    private static void bridgeSetup(String[] args) throws java.io.IOException {
+    private static void bridgeSetup(String[] args) throws IOException {
         java.nio.file.Path here = java.nio.file.Path.of("").toAbsolutePath();
         java.nio.file.Files.writeString(here.resolve("calls.txt"), String.join(" ", args).substring(args[0].length()).strip() + "\n",
                 java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);

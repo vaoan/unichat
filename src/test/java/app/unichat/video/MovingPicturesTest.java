@@ -18,7 +18,7 @@ class MovingPicturesTest {
     @TempDir Path dir;
 
     /** A video made by ffmpeg's own test source: {@code extra} adds sound or changes the format. */
-    private Path video(String name, double seconds, String... extra) throws Exception {
+    private Path video(String name, double seconds, String... extra) throws IOException, InterruptedException {
         Path ffmpeg = Ffmpeg.find();
         assumeTrue(ffmpeg != null, "no ffmpeg");
         assumeTrue(AnimatedWebp.img2webp() != null, "no img2webp");

@@ -6,6 +6,7 @@ import app.unichat.model.MessageType;
 import app.unichat.model.SaveKind;
 import app.unichat.service.ChatReader;
 import app.unichat.service.MockChatService;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,7 +82,7 @@ class TextKeepingTest {
         done.await();
     }
 
-    private String copy() throws Exception {
+    private String copy() throws IOException {
         return Files.readString(dir.resolve("out").resolve(TextCopy.name(chat)), StandardCharsets.UTF_8);
     }
 
@@ -151,7 +152,7 @@ class TextKeepingTest {
     @Test
     void aCloudThatFailsShowsWhatsHere() throws Exception {
         svc.setAutoSave(chat.id(), EnumSet.of(SaveKind.TEXTS)).get();
-        keeping.setSync(() -> { }, () -> CompletableFuture.failedFuture(new java.io.IOException("sin red")));
+        keeping.setSync(() -> { }, () -> CompletableFuture.failedFuture(new IOException("sin red")));
         Message m = said("$1", "hola");
         timeline.add(m);
         keeping.changed(chat.id());

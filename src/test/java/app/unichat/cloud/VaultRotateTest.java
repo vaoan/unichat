@@ -2,6 +2,8 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,11 +72,11 @@ class VaultRotateTest {
         return new WebDav(cloud.url(), "u", "p");
     }
 
-    private Cloud.KeyChanged rotate(VaultComputer c) throws Exception {
+    private Cloud.KeyChanged rotate(VaultComputer c) throws InterruptedException, ExecutionException {
         return c.as(c.cloud.vault()::rotateKey);
     }
 
-    private VaultSlot slot(String id) throws Exception {
+    private VaultSlot slot(String id) throws IOException {
         return Vault.slot(dav(), Vault.info(dav()), id);
     }
 
@@ -99,7 +101,7 @@ class VaultRotateTest {
     }
 
     /** The vault's key as {@code c} holds it now, from its own slot and its key. */
-    private byte[] keyOf(VaultComputer c) throws Exception {
+    private byte[] keyOf(VaultComputer c) throws VaultCrypto.Broken, IOException {
         return slot(c.get("cloud.machine")).unwrap(Base64.getDecoder().decode(c.get(VaultParts.KEY)));
     }
 
@@ -315,7 +317,7 @@ class VaultRotateTest {
         assertTrue(slot(LAPTOP).params().has("next"), "offered now");
     }
 
-    private void goneAndPutBackWithAnotherKey() throws Exception {
+    private void goneAndPutBackWithAnotherKey() throws NoSuchAlgorithmException, InterruptedException, ExecutionException {
         cloud.files.remove(Vault.SLOTS + "/" + LAPTOP + ".json");
         assertNull(desk.round().error());
         laptopSlotWithKey(KeyPairGenerator.getInstance("X25519").generateKeyPair().getPublic().getEncoded());
@@ -334,7 +336,7 @@ class VaultRotateTest {
     }
 
     /** {@link #LAPTOP}'s slot written anew with {@code publicKey} sealed with the vault key: what one holding it can do. */
-    private void laptopSlotWithKey(byte[] publicKey) throws Exception {
+    private void laptopSlotWithKey(byte[] publicKey) {
         ObjectNode params = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
         VaultNext.bind(params, made.vk(), made.info().id(), LAPTOP, publicKey);
         VaultSlot slot = VaultSlot.wrap(made.info().id(), LAPTOP, VaultSlot.Method.COMPUTER, "Portátil", 0, VaultCrypto.randomKey(), params, made.vk());
@@ -362,7 +364,7 @@ class VaultRotateTest {
     }
 
     /** {@code id}'s slot given another public key, sealed with the vault key: what a computer removed but not yet shut out can do. */
-    private void tamper(String id) throws Exception {
+    private void tamper(String id) throws NoSuchAlgorithmException, IOException {
         VaultSlot was = slot(id);
         ObjectNode params = was.params().deepCopy();
         VaultNext.bind(params, made.vk(), was.vault(), id, KeyPairGenerator.getInstance("X25519").generateKeyPair().getPublic().getEncoded());
@@ -520,7 +522,7 @@ class VaultRotateTest {
 
     @Test
     void aWrongKeyChangesNothing() throws Exception {
-        assertThrows(java.io.IOException.class, () -> Vault.rotate(dav(), VaultCrypto.randomKey(), DESK, VaultPeers.load(made.info().id())));
+        assertThrows(IOException.class, () -> Vault.rotate(dav(), VaultCrypto.randomKey(), DESK, VaultPeers.load(made.info().id())));
         assertEquals(0, Vault.info(dav()).generation());
         assertFalse(slot(LAPTOP).params().has("next"));
     }
@@ -574,7 +576,7 @@ class VaultRotateTest {
     }
 
     /** {@code id}'s slot given another public key without the vault key's seal: what someone with only the account can do. */
-    private void tamperWithoutTheVaultKey(String id) throws Exception {
+    private void tamperWithoutTheVaultKey(String id) throws NoSuchAlgorithmException, IOException {
         VaultSlot was = slot(id);
         ObjectNode params = was.params().deepCopy();
         params.put("x25519", Base64.getEncoder().encodeToString(KeyPairGenerator.getInstance("X25519").generateKeyPair().getPublic().getEncoded()));
@@ -611,7 +613,7 @@ class VaultRotateTest {
     }
 
     /** {@code vault.json} rewritten at {@code generation} by someone with only the account: nothing vouches for it. */
-    private void raiseByHand(long generation) throws Exception {
+    private void raiseByHand(long generation) {
         cloud.put(Vault.INFO, ("{\"id\":\"" + made.info().id() + "\",\"created\":\"" + made.info().created()
             + "\",\"generation\":" + generation + "}").getBytes(StandardCharsets.UTF_8));
     }
