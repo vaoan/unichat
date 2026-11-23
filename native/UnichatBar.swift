@@ -156,21 +156,34 @@ final class Hotkey {
 
 /**
  * Whether the screen is away: locked (distributed notifications, as no public API says it) or the displays asleep.
- * Away while either holds; tells Unichat only when that changes. Every observer runs on the main queue.
+ * Away while either holds; tells Unichat only when that changes. Every observer runs on the main thread.
+ * Checked by hand only (a real lock and display sleep): native/CLAUDE.md.
  */
-final class Screen {
+final class Screen: NSObject {
     private var locked = false
     private var asleep = false
     private var reported = false
 
     func watch() {
+        // An accessory app counts as inactive: by default its distributed notifications wait until it's active, so a
+        // lock could arrive late, after its unlock, and leave the screen away for good.
         let distributed = DistributedNotificationCenter.default()
-        distributed.addObserver(forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main) { [self] _ in set(locked: true) }
-        distributed.addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [self] _ in set(locked: false) }
+        distributed.addObserver(self, selector: #selector(didLock), name: Notification.Name("com.apple.screenIsLocked"),
+                                object: nil, suspensionBehavior: .deliverImmediately)
+        distributed.addObserver(self, selector: #selector(didUnlock), name: Notification.Name("com.apple.screenIsUnlocked"),
+                                object: nil, suspensionBehavior: .deliverImmediately)
         let workspace = NSWorkspace.shared.notificationCenter
-        workspace.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [self] _ in set(asleep: true) }
-        workspace.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [self] _ in set(asleep: false) }
+        workspace.addObserver(self, selector: #selector(didSleep), name: NSWorkspace.screensDidSleepNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(didWake), name: NSWorkspace.screensDidWakeNotification, object: nil)
+        // Started while locked: away from the start, not only at the next lock.
+        let session = CGSessionCopyCurrentDictionary() as? [String: Any]
+        if (session?["CGSSessionScreenIsLocked"] as? Bool) == true { set(locked: true) }
     }
+
+    @objc private func didLock(_ n: Notification) { set(locked: true) }
+    @objc private func didUnlock(_ n: Notification) { set(locked: false) }
+    @objc private func didSleep(_ n: Notification) { set(asleep: true) }
+    @objc private func didWake(_ n: Notification) { set(asleep: false) }
 
     private func set(locked: Bool? = nil, asleep: Bool? = nil) {
         if let locked { self.locked = locked }

@@ -43,10 +43,12 @@ class NativeBarScreenTest {
     @Test
     void lockedThenUnlockedFollowsSeen() throws Exception {
         Seen.reset(true);
+        List<Boolean> told = new CopyOnWriteArrayList<>();
         CountDownLatch away = new CountDownLatch(1);
         CountDownLatch ended = new CountDownLatch(1);
         NativeBar bar = helper("screen\\t1\\n", "screen\\t0\\n", ended::countDown);
         new MacScreen().start(a -> {
+            told.add(a);
             Seen.get().screenAway(a);
             if (a) away.countDown();
         });
@@ -56,6 +58,7 @@ class NativeBarScreenTest {
             assertFalse(Seen.get().now(), "locked: nobody sees Unichat");
             bar.setCount(1); // the second "go"
             ended.await();
+            assertEquals(List.of(true, false, false), told, "locked, unlocked, then the helper's end");
             assertTrue(Seen.get().now(), "unlocked: seen again");
         } finally {
             bar.close();
