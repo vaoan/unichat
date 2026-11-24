@@ -9,11 +9,17 @@ import org.w3c.dom.NodeList;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -135,7 +141,8 @@ class BuildRulesTest {
     @Test
     void noExecutionIsUnbound() {
         for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin",
-                "spotbugs-maven-plugin", "exec-maven-plugin", "properties-maven-plugin", "maven-checkstyle-plugin")) {
+                "spotbugs-maven-plugin", "exec-maven-plugin", "properties-maven-plugin", "maven-checkstyle-plugin",
+                "jacoco-maven-plugin")) {
             Element executions = elements(plugin(plugin), "executions").stream().findFirst().orElse(null);
             if (executions == null) continue;
             for (Element e : elements(executions, "execution")) {
@@ -149,7 +156,7 @@ class BuildRulesTest {
         for (Element profile : elements(child(POM.getDocumentElement(), "profiles"), "profile")) {
             for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin",
                     "spotbugs-maven-plugin", "findsecbugs-plugin", "spotbugs-exclude.xml", "exec-maven-plugin",
-                    "properties-maven-plugin", "SpotBugsCache", "maven-checkstyle-plugin", "checkstyle.xml")) {
+                    "properties-maven-plugin", "SpotBugsCache", "maven-checkstyle-plugin", "checkstyle.xml", "jacoco")) {
                 assertFalse(profile.getTextContent().contains(plugin), text(profile, "id") + " leaves " + plugin + " as it is");
             }
         }
@@ -165,8 +172,118 @@ class BuildRulesTest {
                 "spotbugs.testClassFilesDirectory", "exec.skip", "skip.exec", "properties.skip", "checkstyle.skip",
                 "checkstyle.failOnViolation", "checkstyle.failsOnError", "checkstyle.violationSeverity",
                 "checkstyle.includeTestSourceDirectory", "checkstyle.config.location", "checkstyle.suppressions.location",
-                "checkstyle.excludes", "checkstyle.includes", "checkstyle.maxAllowedViolations", "checkstyle.consoleOutput")) {
+                "checkstyle.excludes", "checkstyle.includes", "checkstyle.maxAllowedViolations", "checkstyle.consoleOutput",
+                "jacoco.skip", "jacoco.haltOnFailure", "jacoco.destFile", "jacoco.dataFile", "jacoco.append", "jacoco.propertyName")) {
             assertEquals(0, POM.getElementsByTagName(property).getLength(), property + " isn't set in pom.xml");
+        }
+    }
+
+    @Test
+    void jacocoMeasuresEveryRunThatTestsAndChecksItInVerify() {
+        Element agent = execution("jacoco-maven-plugin", "prepare-agent");
+        Element report = execution("jacoco-maven-plugin", "report");
+        Element check = execution("jacoco-maven-plugin", "check");
+        assertEquals(3, elements(child(plugin("jacoco-maven-plugin"), "executions"), "execution").size(), "JaCoCo runs only these");
+        assertEquals("initialize", text(agent, "phase"), "the agent is on surefire's command line before the tests");
+        assertEquals("test", text(report, "phase"), "the report on every build that runs the tests, verify or not");
+        assertEquals("verify", text(check, "phase"));
+        assertTrue(text(configuration("maven-surefire-plugin"), "argLine").startsWith("@{argLine} "),
+                "surefire's command line starts with what prepare-agent set (late, so the agent and headless-ui's flags both get in)");
+        assertTrue(texts(child(POM.getDocumentElement(), "properties"), "argLine").getFirst().isEmpty(),
+                "argLine starts empty: only headless-ui's flags and the agent go in it");
+        // This run's own file: a build with -DskipTests has none (report and check skip), and never reads an earlier run's.
+        String exec = "${project.build.directory}/jacoco/" + RUN + ".exec";
+        assertEquals(exec, text(child(agent, "configuration"), "destFile"));
+        assertEquals(exec, text(child(report, "configuration"), "dataFile"));
+        assertEquals(exec, text(child(check, "configuration"), "dataFile"));
+        assertEquals(List.of("app.unichat.*"), texts(child(child(agent, "configuration"), "includes"), "include"),
+                "the agent instruments all of ours (and only ours: the libraries' coverage isn't ours to keep)");
+        assertEquals(List.of("destFile", "includes"), childNames(child(agent, "configuration")));
+        assertEquals(List.of("dataFile"), childNames(child(report, "configuration")));
+        assertEquals(List.of("dataFile", "haltOnFailure", "rules"), childNames(child(check, "configuration")));
+        assertEquals("true", text(child(check, "configuration"), "haltOnFailure"), "a package below its floor fails the build");
+        assertEquals(List.of("groupId", "artifactId", "version", "executions"), childNames(plugin("jacoco-maven-plugin")),
+                "no configuration for every execution, where an <excludes> or a skip would reach them all");
+        assertEquals(0, plugin("jacoco-maven-plugin").getElementsByTagName("excludes").getLength(), "no class left out");
+    }
+
+    @Test
+    void everyPackageHasACoverageFloorNeverBelowTheOneRecorded() {
+        Map<String, BigDecimal> floors = new TreeMap<>();
+        for (Element rule : elements(child(child(execution("jacoco-maven-plugin", "check"), "configuration"), "rules"), "rule")) {
+            assertEquals(List.of("element", "includes", "limits"), childNames(rule), "a rule is a package and its floor, no excludes");
+            assertEquals("PACKAGE", text(rule, "element"));
+            List<String> pkg = texts(child(rule, "includes"), "include");
+            assertEquals(1, pkg.size(), "one package a rule: " + pkg);
+            Element limit = child(child(rule, "limits"), "limit");
+            assertEquals(List.of("counter", "value", "minimum"), childNames(limit), pkg + ": a floor, no maximum");
+            assertEquals("LINE", text(limit, "counter"), pkg.getFirst());
+            assertEquals("COVEREDRATIO", text(limit, "value"), pkg.getFirst());
+            assertNull(floors.put(pkg.getFirst(), new BigDecimal(text(limit, "minimum"))), pkg + " has one rule");
+        }
+        assertEquals(mainPackages(), floors.keySet(), "every package with main code has its floor, and only those");
+        assertEquals(FLOORS.keySet(), floors.keySet(), "FLOORS records every package's floor");
+        for (Map.Entry<String, BigDecimal> floor : floors.entrySet()) {
+            String pkg = floor.getKey();
+            BigDecimal min = floor.getValue();
+            assertEquals(0, min.remainder(new BigDecimal("0.05")).signum(), pkg + "'s floor is a multiple of 0.05: " + min);
+            assertTrue(min.compareTo(BigDecimal.ONE) <= 0, pkg + "'s floor is a ratio: " + min);
+            assertTrue(min.compareTo(new BigDecimal(FLOORS.get(pkg))) >= 0,
+                    pkg + "'s floor " + min + " is below the one recorded, " + FLOORS.get(pkg) + ": lowering one needs its reason");
+            assertEquals(ZERO_IN_THE_PLAIN_BUILD.contains(pkg), min.signum() == 0,
+                    pkg + ": a floor of 0 only where the plain build covers under 5 % (its tests are UI tests)");
+        }
+    }
+
+    /**
+     * Each package's floor as measured at 067a1bd: the lower line coverage of {@code verify} and {@code verify -Pheadless-ui},
+     * rounded down to 0.05. A floor in the pom may go up from here; one below it needs this changed, and its reason.
+     */
+    private static final Map<String, String> FLOORS = floors();
+
+    /** Packages whose tests are UI tests, which the plain build doesn't run: under 5 % there, so a floor of 0. */
+    private static final List<String> ZERO_IN_THE_PLAIN_BUILD = List.of("app.unichat.ui.login", "app.unichat.ui.settings");
+
+    private static Map<String, String> floors() {
+        Map<String, String> m = new TreeMap<>();
+        m.put("app.unichat", "0.10");
+        m.put("app.unichat.assist", "0.85");
+        m.put("app.unichat.autosave", "0.85");
+        m.put("app.unichat.bridge", "0.95");
+        m.put("app.unichat.cloak", "0.65");
+        m.put("app.unichat.cloud", "0.90");
+        m.put("app.unichat.gif", "0.85");
+        m.put("app.unichat.links", "0.85");
+        m.put("app.unichat.login", "0.70");
+        m.put("app.unichat.matrix", "0.80");
+        m.put("app.unichat.model", "0.95");
+        m.put("app.unichat.server", "0.70");
+        m.put("app.unichat.service", "0.75");
+        m.put("app.unichat.settings", "0.65");
+        m.put("app.unichat.stt", "0.80");
+        m.put("app.unichat.support", "0.90");
+        m.put("app.unichat.ui", "0.10");
+        m.put("app.unichat.ui.chats", "0.10");
+        m.put("app.unichat.ui.desktop", "0.25");
+        m.put("app.unichat.ui.emoji", "0.05");
+        m.put("app.unichat.ui.login", "0.00");
+        m.put("app.unichat.ui.media", "0.10");
+        m.put("app.unichat.ui.settings", "0.00");
+        m.put("app.unichat.ui.timeline", "0.10");
+        m.put("app.unichat.update", "0.60");
+        m.put("app.unichat.video", "0.80");
+        m.put("app.unichat.voice", "0.80");
+        return m;
+    }
+
+    /** The packages with a class under src/main/java. */
+    private static Set<String> mainPackages() {
+        Path root = Path.of("src/main/java");
+        try (Stream<Path> files = Files.walk(root)) {
+            return files.filter(f -> f.toString().endsWith(".java")).map(f -> root.relativize(f.getParent()).toString()
+                    .replace(f.getFileSystem().getSeparator(), ".")).collect(TreeSet::new, Set::add, Set::addAll);
+        } catch (IOException e) {
+            throw new IllegalStateException("src/main/java can't be read", e);
         }
     }
 

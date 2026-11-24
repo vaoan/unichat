@@ -8,7 +8,7 @@ This file holds only what applies everywhere. Each folder's own notes are in its
 
 ## Commands
 - Build and check everything: `JAVA_HOME=/opt/homebrew/opt/openjdk@25 ./mvnw verify` (tests, architecture, copied code, style, lessons).
-- UI tests, headless: `./mvnw verify -Pheadless-ui` (one: `-Dtest=X -Dsurefire.failIfNoSpecifiedTests=false`).
+- UI tests, headless: `./mvnw verify -Pheadless-ui` (one: `./mvnw test -Pheadless-ui -Dtest=X -Dsurefire.failIfNoSpecifiedTests=false`; `verify` with `-Dtest` fails JaCoCo's coverage floors, measured on the whole run).
 - One file against the lessons: `bash .claude/hooks/java.sh Lessons <file>…` (the edit hook runs it by itself).
 - Install on this Mac: `./install-mac.sh` (with `JAVA_HOME` exported), then `open /Applications/Unichat.app`.
 - See a screen: the `snapshot` skill (`.claude/skills/snapshot/`), headless by itself.
