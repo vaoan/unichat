@@ -38,7 +38,7 @@ jobs:
       builds: ${{ steps.plan.outputs.builds }}
       tuwunel: ${{ steps.plan.outputs.tuwunel }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - id: plan
@@ -104,7 +104,7 @@ jobs:
         shell: bash
     steps:
       # Unichat's own checkout, for the patches and the macOS minimum check only (Unichat's code is not built here).
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
           path: unichat
@@ -112,7 +112,7 @@ jobs:
             native/patches
             native/check-macos-min.sh
           sparse-checkout-cone-mode: false
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           repository: ${{ matrix.build.repo }}
           ref: ${{ matrix.build.commit }}
@@ -136,7 +136,7 @@ jobs:
             echo "Applied $name"
           done
           git diff --stat
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
@@ -187,7 +187,7 @@ jobs:
             *) "./$f" -e -c "$RUNNER_TEMP/$PREFIX.yaml"
                test -s "$RUNNER_TEMP/$PREFIX.yaml" ;;
           esac
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: bridge-${{ matrix.build.name }}-${{ matrix.build.platform }}
           path: out/
@@ -213,14 +213,14 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           repository: matrix-construct/tuwunel
           ref: ${{ needs.plan.outputs.tuwunel }}
           persist-credentials: false
       - name: Rust (the version in rust-toolchain.toml)
         run: rustup toolchain install || rustup show
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: ${{ needs.plan.outputs.tuwunel }}
       - name: LLVM for rocksdb's bindings (Windows)
@@ -237,7 +237,7 @@ jobs:
           exe=target/release/tuwunel; [ "$RUNNER_OS" = Windows ] && exe="$exe.exe"
           "$exe" --version
           mkdir out && cp "$exe" "out/tuwunel-$PLATFORM"
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: tuwunel-${{ matrix.platform }}
           path: out/
@@ -252,7 +252,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           path: out
           merge-multiple: true
@@ -276,7 +276,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           path: out
           merge-multiple: true

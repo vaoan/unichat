@@ -129,4 +129,3 @@ Left alone because fixing it changes behaviour or needs tests that don't exist. 
 3. **`catch` blocks that ignore errors:** they have to be reviewed one by one; some are intentional.
 4. **Global state:** `Settings.get()`, `LocalServer.get()` and the static `provisioner` of `BridgeAccounts` force
    the tests to share state.
-5. **CI:** the GitHub actions are pinned by tag, not by SHA.

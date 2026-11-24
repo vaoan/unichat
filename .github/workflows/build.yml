@@ -15,8 +15,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: "25"
@@ -28,8 +28,8 @@ jobs:
     runs-on: ubuntu-24.04
     # Blocking: a failing UI test fails the build (it was informative while ComposerHeightUiTest failed on Linux).
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: "25"
@@ -45,17 +45,57 @@ jobs:
           printf 'pcm.!default { type pulse }\nctl.!default { type pulse }\n' | sudo tee /etc/asound.conf
       - run: ./mvnw -B verify -Pheadless-ui
 
+  dependency-check:
+    # OWASP Dependency-Check: no dependency with a known CVE of CVSS 7 or more (NVD). CI only: its database is ~2 GB
+    # and takes long to build, so it's cached one day at a time, each run starting from the latest and bringing it up
+    # to date. False positives go in dependency-check-suppressions.xml, each with its reason.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      # No "cache: maven": this job resolves a part of the repository only, and saving it under the key the others
+      # share would leave their cache short.
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "25"
+      - id: day
+        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.dependency-check
+          key: dependency-check-${{ steps.day.outputs.day }}
+          restore-keys: dependency-check-
+      # NVD's own data feeds (no API key needed). OSS Index is off: Sonatype now asks for an account, and without one
+      # its analyzer fails the run.
+      - name: No dependency with a known CVE of CVSS 7 or more
+        run: >-
+          ./mvnw -B org.owasp:dependency-check-maven:12.2.2:check
+          -DfailBuildOnCVSS=7
+          -DsuppressionFile=dependency-check-suppressions.xml
+          -DdataDirectory="$HOME/.dependency-check"
+          -DnvdDatafeedUrl='https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-{0}.json.gz'
+          -DossIndexAnalyzerEnabled=false
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        if: failure()
+        with:
+          name: dependency-check-report
+          path: target/dependency-check-report.html
+          if-no-files-found: ignore
+          retention-days: 1
+
   lottie-windows:
     # LottieConverter for Windows (Telegram's animated stickers), cross-built here with MinGW-w64 from the sources
     # native/build-lottie.sh pins: no official build, and Linux minutes cost half of Windows'.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends mingw-w64 cmake make
       - run: mkdir -p out && native/build-lottie.sh --windows out/lottieconverter.exe
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: lottie-windows
           path: out/lottieconverter.exe
@@ -66,8 +106,8 @@ jobs:
     needs: [test, lottie-windows]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: lottie-windows
           path: target/lottie
@@ -76,7 +116,7 @@ jobs:
         run: |
           target/lottie/lottieconverter.exe src/test/resources/app/unichat/video/moving.json "$RUNNER_TEMP/moving.gif" gif 64x64 30
           test -s "$RUNNER_TEMP/moving.gif"
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: "25"
@@ -96,7 +136,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: .\package.ps1
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: unichat-windows
           path: |
@@ -111,8 +151,8 @@ jobs:
     needs: test
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: "25"
@@ -120,7 +160,7 @@ jobs:
       - run: ./package.sh
         env:
           GH_TOKEN: ${{ github.token }}
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: unichat-macos
           path: release/*.dmg
@@ -128,17 +168,17 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [windows, macos, ui-headless]
+    needs: [windows, macos, ui-headless, dependency-check]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: The tag is the pom's version
         run: |
           pom="$(sed -n 's:^  <version>\(.*\)</version>:\1:p' pom.xml | head -1)"
           [ "v$pom" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME, pom $pom: change the pom first" >&2; exit 1; }
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           path: release
           merge-multiple: true
