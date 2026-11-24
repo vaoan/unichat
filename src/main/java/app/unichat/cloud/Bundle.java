@@ -9,7 +9,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -54,8 +53,8 @@ public record Bundle(String machine, Instant savedAt, Map<String, String> settin
         if (prefs == null || !prefs.isObject()) return JSON.nullNode();
         ObjectNode copy = prefs.deepCopy();
         if (copy.get("chats") instanceof ObjectNode chats) {
-            for (Iterator<Map.Entry<String, JsonNode>> it = chats.fields(); it.hasNext(); ) {
-                if (!(it.next().getValue() instanceof ObjectNode chat)) continue;
+            for (Map.Entry<String, JsonNode> e : chats.properties()) {
+                if (!(e.getValue() instanceof ObjectNode chat)) continue;
                 for (JsonNode f : chat.path("fromServer")) chat.remove(f.asText());
                 chat.remove("fromServer");
             }
@@ -77,7 +76,7 @@ public record Bundle(String machine, Instant savedAt, Map<String, String> settin
             JsonNode n = JSON.readTree(data);
             if (n == null || n.path("version").asInt() != 1 || !n.path("settings").isObject()) return null;
             Map<String, String> settings = new TreeMap<>();
-            n.path("settings").fields().forEachRemaining(e -> settings.put(e.getKey(), e.getValue().asText()));
+            n.path("settings").properties().forEach(e -> settings.put(e.getKey(), e.getValue().asText()));
             return new Bundle(n.path("machine").asText(), Instant.parse(n.path("savedAt").asText()), settings,
                     n.path("preferences").isObject() ? n.get("preferences") : null);
         } catch (IOException | RuntimeException e) {

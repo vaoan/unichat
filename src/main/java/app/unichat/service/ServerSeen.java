@@ -11,7 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -33,8 +32,7 @@ final class ServerSeen {
         try {
             JsonNode root = PreferencesFile.JSON.readTree(file.toFile());
             s.server = root.path("server").asText(null);
-            for (Iterator<Map.Entry<String, JsonNode>> it = root.path("seen").fields(); it.hasNext(); ) {
-                var c = it.next();
+            for (Map.Entry<String, JsonNode> c : root.path("seen").properties()) {
                 Set<Flag> flags = EnumSet.noneOf(Flag.class);
                 for (JsonNode n : c.getValue()) for (Flag f : Flag.values()) if (f.json.equals(n.asText())) flags.add(f);
                 if (!flags.isEmpty()) s.seen.put(c.getKey(), flags);

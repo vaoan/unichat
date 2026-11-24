@@ -163,7 +163,7 @@ public final class MediaLibrary {
             JsonNode root = JSON.readTree(file.toFile());
             for (JsonNode n : root.path("favorites")) if (known(n)) favorites.add(item(n));
             for (JsonNode n : root.path("recents")) if (known(n)) recents.add(item(n));
-            root.path("reactions").fields().forEachRemaining(f -> reactions.put(f.getKey(), f.getValue().asInt()));
+            root.path("reactions").properties().forEach(f -> reactions.put(f.getKey(), f.getValue().asInt()));
             boolean droppedFavorites = dropCopies(favorites); // both lists lose their copies, whatever the first did
             boolean droppedRecents = dropCopies(recents);
             if (droppedFavorites || droppedRecents) save();

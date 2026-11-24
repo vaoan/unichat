@@ -99,7 +99,7 @@ final class SavedUpTo {
         if (!Files.isRegularFile(file)) return;
         try {
             JsonNode root = JSON.readTree(file.toFile());
-            root.fields().forEachRemaining(f -> {
+            root.properties().forEach(f -> {
                 Set<String> ids = new HashSet<>();
                 f.getValue().path("ids").forEach(n -> ids.add(n.asText()));
                 if (f.getValue().hasNonNull("at")) {

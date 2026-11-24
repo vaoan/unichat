@@ -13,7 +13,7 @@
     <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javafx.version>27.0.1</javafx.version>
-    <jackson.version>2.17.2</jackson.version>
+    <jackson.version>2.22.4</jackson.version>
     <main.class>app.unichat.Launcher</main.class>
     <!-- Names each build run (SpotBugsCache's decision file): to the millisecond, a valid file name everywhere. -->
     <maven.build.timestamp.format>yyyyMMdd-HHmmss-SSS</maven.build.timestamp.format>

@@ -73,7 +73,7 @@ public final class RoomFeatures {
         file.fieldNames().forEachRemaining(type -> {
             JsonNode rule = file.path(type);
             Set<String> offered = new java.util.HashSet<>();
-            rule.path("mime_types").fields().forEachRemaining(m -> {
+            rule.path("mime_types").properties().forEach(m -> {
                 if (m.getValue().asInt() >= 1) offered.add(m.getKey().toLowerCase(java.util.Locale.ROOT));
             });
             if (!offered.isEmpty()) {

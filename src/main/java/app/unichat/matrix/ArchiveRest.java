@@ -347,7 +347,7 @@ final class ArchiveRest {
         try {
             JsonNode resp = sync(f, tagsSince);
             ObjectNode join = MatrixClient.JSON.createObjectNode();
-            for (Map.Entry<String, JsonNode> e : (Iterable<Map.Entry<String, JsonNode>>) () -> resp.path("rooms").path("join").fields()) {
+            for (Map.Entry<String, JsonNode> e : resp.path("rooms").path("join").properties()) {
                 JsonNode data = e.getValue().path("account_data");
                 if (!data.path("events").isEmpty() && rooms.contains(e.getKey())) join.putObject(e.getKey()).set("account_data", data);
             }

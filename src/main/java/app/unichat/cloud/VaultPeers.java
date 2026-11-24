@@ -60,10 +60,10 @@ final class VaultPeers {
             try {
                 JsonNode n = JSON.readTree(saved);
                 if (n != null && vault.equals(n.path("vault").asText()) && n.path("pins").isObject()) {
-                    n.get("pins").fields().forEachRemaining(e -> { if (e.getValue().isTextual()) pins.put(e.getKey(), e.getValue().asText()); });
+                    n.get("pins").properties().forEach(e -> { if (e.getValue().isTextual()) pins.put(e.getKey(), e.getValue().asText()); });
                     n.path("removed").forEach(id -> { if (id.isTextual()) removed.add(id.asText()); });
-                    n.path("seen").fields().forEachRemaining(e -> { if (e.getValue().isTextual()) seen.put(e.getKey(), e.getValue().asText()); });
-                    n.path("after").fields().forEachRemaining(e -> { if (e.getValue().isInt()) after.put(e.getKey(), e.getValue().asInt()); });
+                    n.path("seen").properties().forEach(e -> { if (e.getValue().isTextual()) seen.put(e.getKey(), e.getValue().asText()); });
+                    n.path("after").properties().forEach(e -> { if (e.getValue().isInt()) after.put(e.getKey(), e.getValue().asInt()); });
                     removals = Math.max(0, n.path("removals").asInt(0));
                 }
             } catch (IOException e) {

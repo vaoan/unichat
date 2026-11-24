@@ -211,7 +211,7 @@ final class BridgeProtocol {
         ObjectNode out = MatrixClient.JSON.createObjectNode();
         for (@Nullable JsonNode src : new @Nullable JsonNode[] {serverContent, cachedContent}) {
             if (src == null || !src.isObject()) continue;
-            src.fields().forEachRemaining(e -> {
+            src.properties().forEach(e -> {
                 ArrayNode arr = out.has(e.getKey()) && out.get(e.getKey()) instanceof ArrayNode a
                         ? a : out.putArray(e.getKey());
                 if (!e.getValue().isArray()) return;

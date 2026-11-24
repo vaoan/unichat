@@ -16,7 +16,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -484,8 +483,7 @@ public final class PreferencesFile {
         if (root.has("chats") && !root.get("chats").isObject()) throw new IllegalArgumentException("chats");
         if (root.has("folders") && !root.get("folders").isArray()) throw new IllegalArgumentException("folders");
         copyExtra(root, extraRoot, "version", "chats", "folders");
-        for (Iterator<Map.Entry<String, JsonNode>> it = root.path("chats").fields(); it.hasNext(); ) {
-            var c = it.next();
+        for (Map.Entry<String, JsonNode> c : root.path("chats").properties()) {
             if (!c.getValue().isObject()) throw new IllegalArgumentException("chat entry");
             chats.put(c.getKey(), readEntry(c.getValue()));
         }
@@ -523,8 +521,7 @@ public final class PreferencesFile {
 
     private static void copyExtra(JsonNode from, ObjectNode to, String... known) {
         Set<String> skip = Set.of(known);
-        for (Iterator<Map.Entry<String, JsonNode>> it = from.fields(); it.hasNext(); ) {
-            var f = it.next();
+        for (Map.Entry<String, JsonNode> f : from.properties()) {
             if (!skip.contains(f.getKey())) to.set(f.getKey(), f.getValue());
         }
     }

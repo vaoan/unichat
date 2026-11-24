@@ -186,7 +186,7 @@ public final class LoginWebView {
     private static Map<String, String> seenHeaders(Object json) {
         Map<String, String> out = new HashMap<>();
         try {
-            JSON.readTree(String.valueOf(json)).fields().forEachRemaining(e -> out.put(e.getKey(), e.getValue().asText()));
+            JSON.readTree(String.valueOf(json)).properties().forEach(e -> out.put(e.getKey(), e.getValue().asText()));
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             return out; // never the contents: these are credentials
         }

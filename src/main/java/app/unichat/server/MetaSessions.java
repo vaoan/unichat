@@ -191,7 +191,7 @@ final class MetaSessions implements Watchdog.SessionKeeper {
         Path f = backupFile(bridge);
         Map<String, JsonNode> out = new LinkedHashMap<>();
         if (!Files.isRegularFile(f)) return out;
-        JSON.readTree(f.toFile()).fields().forEachRemaining(e -> out.put(e.getKey(), e.getValue()));
+        JSON.readTree(f.toFile()).properties().forEach(e -> out.put(e.getKey(), e.getValue()));
         return out;
     }
 

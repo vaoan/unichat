@@ -127,12 +127,10 @@ final class SyncProcessor {
         for (JsonNode ev : sync.path("account_data").path("events")) applyGlobalAccountData(ev, r);
 
         JsonNode roomsNode = sync.path("rooms");
-        for (Iterator<Map.Entry<String, JsonNode>> it = roomsNode.path("join").fields(); it.hasNext(); ) {
-            Map.Entry<String, JsonNode> e = it.next();
+        for (Map.Entry<String, JsonNode> e : roomsNode.path("join").properties()) {
             processJoined(e.getKey(), e.getValue(), live, r);
         }
-        for (Iterator<Map.Entry<String, JsonNode>> it = roomsNode.path("invite").fields(); it.hasNext(); ) {
-            Map.Entry<String, JsonNode> e = it.next();
+        for (Map.Entry<String, JsonNode> e : roomsNode.path("invite").properties()) {
             processInvite(e.getKey(), e.getValue(), r);
         }
         for (Iterator<String> it = roomsNode.path("leave").fieldNames(); it.hasNext(); ) {
@@ -604,8 +602,7 @@ final class SyncProcessor {
             room.chat.setTyping(typing);
             r.chatsChanged = true;
         } else if ("m.receipt".equals(type)) {
-            for (Iterator<Map.Entry<String, JsonNode>> it = c.fields(); it.hasNext(); ) {
-                Map.Entry<String, JsonNode> e = it.next();
+            for (Map.Entry<String, JsonNode> e : c.properties()) {
                 boolean byOther = false;
                 for (Iterator<String> users = e.getValue().path("m.read").fieldNames(); users.hasNext(); ) {
                     if (!users.next().equals(me)) byOther = true;
@@ -670,8 +667,7 @@ final class SyncProcessor {
         if ("m.direct".equals(type) && c.isObject()) {
             directContent = (ObjectNode) c.deepCopy();
             directRoomUser.clear();
-            for (Iterator<Map.Entry<String, JsonNode>> it = c.fields(); it.hasNext(); ) {
-                Map.Entry<String, JsonNode> e = it.next();
+            for (Map.Entry<String, JsonNode> e : c.properties()) {
                 for (JsonNode roomId : e.getValue()) directRoomUser.put(roomId.asText(), e.getKey());
             }
             rooms.values().forEach(this::refresh);

@@ -202,8 +202,8 @@ final class TextSync {
         loaded = true;
         if (!Files.exists(record)) return;
         JsonNode n = JSON.readTree(record.toFile());
-        n.path("sent").fields().forEachRemaining(e -> sent.put(e.getKey(), e.getValue().asLong()));
-        n.path("stamps").fields().forEachRemaining(e -> stamps.put(e.getKey(), e.getValue().asText()));
+        n.path("sent").properties().forEach(e -> sent.put(e.getKey(), e.getValue().asLong()));
+        n.path("stamps").properties().forEach(e -> stamps.put(e.getKey(), e.getValue().asText()));
         indexDue = n.path("indexDue").asBoolean(false);
         sentTo = n.path("sentTo").asText(PLAIN);
     }
