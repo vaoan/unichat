@@ -158,7 +158,7 @@ class BuildRulesTest {
                 "pmd.failOnViolation", "pmd.failurePriority", "spotbugs.skip", "spotbugs.failOnError", "spotbugs.effort",
                 "spotbugs.threshold", "spotbugs.includeTests", "spotbugs.onlyAnalyze", "spotbugs.omitVisitors",
                 "spotbugs.maxAllowedViolations", "spotbugs.excludeFilterFile", "spotbugs.classFilesDirectory",
-                "spotbugs.testClassFilesDirectory")) {
+                "spotbugs.testClassFilesDirectory", "exec.skip", "skip.exec", "properties.skip")) {
             assertEquals(0, POM.getElementsByTagName(property).getLength(), property + " isn't set in pom.xml");
         }
     }
@@ -244,13 +244,21 @@ class BuildRulesTest {
             assertEquals("app.unichat.build.SpotBugsCache", text(c, "mainClass"));
             assertEquals("test", text(c, "classpathScope"));
         }
-        assertEquals(List.of("check", "${project.basedir}"), texts(child(child(check, "configuration"), "arguments"), "argument"));
-        assertEquals(List.of("passed", "${project.basedir}"), texts(child(child(passed, "configuration"), "arguments"), "argument"));
+        assertEquals(List.of("check", "${project.basedir}", RUN), texts(child(child(check, "configuration"), "arguments"), "argument"));
+        assertEquals(List.of("passed", "${project.basedir}", RUN), texts(child(child(passed, "configuration"), "arguments"), "argument"));
         Element decision = executionById("properties-maven-plugin", "spotbugs-decision");
         assertEquals(1, elements(child(plugin("properties-maven-plugin"), "executions"), "execution").size(), "properties reads only it");
         assertEquals(List.of("read-project-properties"), texts(child(decision, "goals"), "goal"));
-        assertEquals(List.of("${project.build.directory}/spotbugs-cache/skip.properties"),
-                texts(child(child(decision, "configuration"), "files"), "file"), "only SpotBugsCache's decision");
+        assertEquals(List.of("${project.build.directory}/spotbugs-cache/skip-" + RUN + ".properties"),
+                texts(child(child(decision, "configuration"), "files"), "file"), "only this run's decision: a run whose check"
+                        + " didn't run finds none and stops, never an earlier run's");
+        assertTrue(text(child(POM.getDocumentElement(), "properties"), "maven.build.timestamp.format").matches("[yMdHms\\-S]+"),
+                "the run's name is its start, to the millisecond, as a file name on every system");
+        for (String plugin : List.of("exec-maven-plugin", "properties-maven-plugin")) {
+            for (String quiet : List.of("skip", "quiet")) {
+                assertEquals(0, plugin(plugin).getElementsByTagName(quiet).getLength(), plugin + " has no <" + quiet + ">");
+            }
+        }
         // The order Maven runs them in: the check, then the read (post-integration-test), then SpotBugs, then the mark (verify).
         assertEquals("post-integration-test", text(check, "phase"));
         assertEquals("post-integration-test", text(decision, "phase"));
@@ -304,6 +312,9 @@ class BuildRulesTest {
     private static Element configuration(String artifactId) {
         return child(plugin(artifactId), "configuration");
     }
+
+    /** What names this build run: the decision SpotBugsCache writes for it, and only it, is the one read. */
+    private static final String RUN = "${maven.build.timestamp}";
 
     /** The plugin's execution named {@code id}. */
     private static Element executionById(String artifactId, String id) {

@@ -15,6 +15,8 @@
     <javafx.version>27.0.1</javafx.version>
     <jackson.version>2.17.2</jackson.version>
     <main.class>app.unichat.Launcher</main.class>
+    <!-- Names each build run (SpotBugsCache's decision file): to the millisecond, a valid file name everywhere. -->
+    <maven.build.timestamp.format>yyyyMMdd-HHmmss-SSS</maven.build.timestamp.format>
     <!-- The headless-ui profile sets it; surefire adds the temp folder to it. -->
     <argLine></argLine>
   </properties>
@@ -386,7 +388,8 @@
       <!-- SpotBugs' one allowed skip, a repeat of a run that passed (it has no cache of its own: a minute each build).
            Before it, app.unichat.build.SpotBugsCache (test code, SpotBugsCacheTest) hashes all it reads (the classes, the
            tests' classes, this pom, spotbugs-exclude.xml, the libraries, the JDK) and writes spotbugs.skip, true only
-           when that hash is the one marked after its last pass; properties-maven-plugin reads it into the build. After
+           when that hash is the one marked after its last pass, in a file named after this run (maven.build.timestamp), so
+           a run whose check didn't run finds none and stops; properties-maven-plugin reads it into the build. After
            SpotBugs, in verify, the hash is marked: a run that fails never is. BuildRulesTest keeps it to exactly this. -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -400,7 +403,7 @@
             <configuration>
               <mainClass>app.unichat.build.SpotBugsCache</mainClass>
               <classpathScope>test</classpathScope>
-              <arguments><argument>check</argument><argument>${project.basedir}</argument></arguments>
+              <arguments><argument>check</argument><argument>${project.basedir}</argument><argument>${maven.build.timestamp}</argument></arguments>
             </configuration>
           </execution>
           <execution>
@@ -410,7 +413,7 @@
             <configuration>
               <mainClass>app.unichat.build.SpotBugsCache</mainClass>
               <classpathScope>test</classpathScope>
-              <arguments><argument>passed</argument><argument>${project.basedir}</argument></arguments>
+              <arguments><argument>passed</argument><argument>${project.basedir}</argument><argument>${maven.build.timestamp}</argument></arguments>
             </configuration>
           </execution>
         </executions>
@@ -425,7 +428,7 @@
             <phase>post-integration-test</phase>
             <goals><goal>read-project-properties</goal></goals>
             <configuration>
-              <files><file>${project.build.directory}/spotbugs-cache/skip.properties</file></files>
+              <files><file>${project.build.directory}/spotbugs-cache/skip-${maven.build.timestamp}.properties</file></files>
             </configuration>
           </execution>
         </executions>

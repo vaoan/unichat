@@ -23,18 +23,27 @@ import java.util.stream.Stream;
  * after SpotBugs last passed; {@code passed} runs after SpotBugs, so a run that fails never marks anything.
  */
 public final class SpotBugsCache {
-    /** The hash of this run's inputs, the one a pass then marks, and what Maven reads (properties-maven-plugin). */
-    static final String INPUTS = "inputs.sha256", PASSED = "passed.sha256", DECISION = "skip.properties";
+    /** The hash of this run's inputs, and the one a pass then marks. */
+    static final String INPUTS = "inputs.sha256", PASSED = "passed.sha256";
 
     private SpotBugsCache() {}
 
-    /** {@code check <project dir>} or {@code passed <project dir>}. */
+    /**
+     * What Maven reads (properties-maven-plugin) in run {@code run}: one file per run, so a run whose check didn't run
+     * (exec skipped) finds none and stops, instead of reading an earlier run's "skip".
+     */
+    static String decision(String run) {
+        return "skip-" + run + ".properties";
+    }
+
+    /** {@code check <project dir> <run>} or {@code passed <project dir> <run>}; the run is the build's start time. */
     public static void main(String[] args) throws IOException {
-        if (args.length != 2) throw new IllegalArgumentException("check|passed <project dir>");
+        if (args.length != 3) throw new IllegalArgumentException("check|passed <project dir> <run>");
         Path project = Path.of(args[1]);
+        String run = args[2];
         Path cache = project.resolve("target/spotbugs-cache");
         switch (args[0]) {
-            case "check" -> System.out.println("SpotBugs " + (check(project, cache, classpath()) ? "skipped: nothing it reads changed since"
+            case "check" -> System.out.println("SpotBugs " + (check(project, cache, classpath(), run) ? "skipped: nothing it reads changed since"
                     + " it last passed" : "runs: what it reads changed, or it hasn't passed on it yet"));
             case "passed" -> passed(cache);
             default -> throw new IllegalArgumentException("check|passed, not " + args[0]);
@@ -42,14 +51,17 @@ public final class SpotBugsCache {
     }
 
     /** Whether SpotBugs may skip: the inputs' hash is the one marked after its last pass. Writes the hash and the decision. */
-    static boolean check(Path project, Path cache, List<String> classpath) throws IOException {
+    static boolean check(Path project, Path cache, List<String> classpath, String run) throws IOException {
         String inputs = hash(project, classpath);
         Files.createDirectories(cache);
         Path passed = cache.resolve(PASSED);
         boolean skip = Files.isDirectory(project.resolve("target/classes")) && Files.isRegularFile(passed)
                 && Files.readString(passed).equals(inputs);
         Files.writeString(cache.resolve(INPUTS), inputs);
-        Files.writeString(cache.resolve(DECISION), "spotbugs.skip=" + skip + "\n");
+        try (Stream<Path> old = Files.list(cache)) {
+            for (Path p : old.filter(p -> app.unichat.support.PathParts.name(p).startsWith("skip-")).toList()) Files.delete(p);
+        }
+        Files.writeString(cache.resolve(decision(run)), "spotbugs.skip=" + skip + "\n");
         return skip;
     }
 

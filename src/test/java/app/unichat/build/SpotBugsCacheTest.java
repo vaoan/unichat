@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SpotBugsCacheTest {
     @TempDir Path project;
     private Path cache;
+    private int run;
     private final List<String> classpath = List.of("/repo/jackson-databind-2.17.2.jar", "/repo/jsoup-1.18.3.jar");
 
     @BeforeEach
@@ -45,8 +46,9 @@ class SpotBugsCacheTest {
     }
 
     private boolean check(List<String> cp) throws IOException {
-        boolean skip = SpotBugsCache.check(project, cache, cp);
-        assertEquals("spotbugs.skip=" + skip + "\n", Files.readString(cache.resolve(SpotBugsCache.DECISION)), "what Maven reads");
+        String id = "run" + ++run;
+        boolean skip = SpotBugsCache.check(project, cache, cp, id);
+        assertEquals("spotbugs.skip=" + skip + "\n", Files.readString(cache.resolve(SpotBugsCache.decision(id))), "what Maven reads");
         return skip;
     }
 
@@ -126,6 +128,17 @@ class SpotBugsCacheTest {
     @Test
     void noClassesYetAnalyses() throws IOException {
         Path empty = Files.createDirectories(project.resolve("other"));
-        assertFalse(SpotBugsCache.check(empty, empty.resolve("target/spotbugs-cache"), classpath));
+        assertFalse(SpotBugsCache.check(empty, empty.resolve("target/spotbugs-cache"), classpath, "run1"));
+    }
+
+    @Test
+    void eachRunReadsOnlyItsOwnDecision() throws IOException {
+        build(true);
+        assertTrue(build(true));
+        try (var files = Files.list(cache)) {
+            assertEquals(List.of(SpotBugsCache.decision("run2")), files.map(app.unichat.support.PathParts::name)
+                    .filter(n -> n.startsWith("skip-")).toList(), "an earlier run's \"skip\" is gone: a run whose check didn't run"
+                    + " finds no decision, and the build stops there");
+        }
     }
 }
