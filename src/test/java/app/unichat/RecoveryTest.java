@@ -26,6 +26,17 @@ class RecoveryTest {
     }
 
     @Test
+    void aJavaLineTheSystemDoesNotGiveIsRebuiltFromTheJvmItself() {
+        // Linux gave no arguments for a long java line (CI: "Unrecognized option: --unichat-after=7372:1").
+        assertEquals(List.of("-Xmx1g", "-cp", "a.jar:b.jar", "app.unichat.Launcher", "--x"),
+                Recovery.javaLine("/usr/bin/java", List.of("-Xmx1g"), "a.jar:b.jar", "app.unichat.Launcher --x"));
+        assertEquals(List.of("-jar", "unichat.jar", "--x"),
+                Recovery.javaLine("C:\\jdk\\bin\\java.exe", List.of(), "unichat.jar", "unichat.jar --x"));
+        assertEquals(List.of(), Recovery.javaLine("/Applications/Unichat.app/Contents/MacOS/Unichat", List.of("-Xmx1g"),
+                "x.jar", "app.unichat.Launcher"), "a launcher's arguments aren't a java line's");
+    }
+
+    @Test
     void theMarkIsReadAndLeftOutOfTheAppsArguments() {
         Recovery.Start s = Recovery.Start.of(new String[] {"--unichat-after=42:2", "other"});
         assertEquals(42, s.waitFor());

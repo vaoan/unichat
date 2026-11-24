@@ -111,6 +111,27 @@ final class Recovery {
         return c;
     }
 
+    /**
+     * A java line's arguments rebuilt from the JVM itself, for when the system gives none: Linux gave none for a long
+     * one (a class path of a few hundred jars), and the restart ran {@code java --unichat-after=…}, which the JVM
+     * refused. Its options, the class path, then the main class (or {@code -jar} and the jar) and its arguments as
+     * {@code sun.java.command} has them. Nothing for a launcher: its arguments aren't a java line's.
+     */
+    static List<String> javaLine(String program, List<String> jvmOptions, String classPath, String javaCommand) {
+        String name = program.substring(Math.max(program.lastIndexOf('/'), program.lastIndexOf('\\')) + 1);
+        if (!"java".equals(name) && !"java.exe".equals(name)) return List.of();
+        List<String> main = List.of(javaCommand.strip().split(" +"));
+        List<String> c = new ArrayList<>(jvmOptions);
+        if (main.getFirst().endsWith(".jar")) {
+            c.add("-jar");
+        } else {
+            c.add("-cp");
+            c.add(classPath);
+        }
+        c.addAll(main);
+        return c;
+    }
+
     /** Logs why with every thread's stack, starts the next run when allowed, and ends this one. Once. */
     @SuppressFBWarnings(value = {"COMMAND_INJECTION", "DM_EXIT"}, justification = "starts this same program again: its own command and arguments from ProcessHandle.info() plus two of ours, as a list, no shell; starting over means this JVM ends (as its NOPMD says)")
     static void restart(String why) {
@@ -124,9 +145,12 @@ final class Recovery {
         Duration uptime = Duration.ofMillis(ManagementFactory.getRuntimeMXBean().getUptime());
         ProcessHandle.Info info = ProcessHandle.current().info();
         if (mayRestart(restartsSoFar, uptime) && info.command().isPresent()) {
-            List<String> args = info.arguments().map(Arrays::asList).orElse(List.of());
+            String program = info.command().orElseThrow();
+            List<String> args = info.arguments().map(Arrays::asList).orElseGet(() -> javaLine(program,
+                    ManagementFactory.getRuntimeMXBean().getInputArguments(), System.getProperty("java.class.path", ""),
+                    System.getProperty("sun.java.command", "")));
             try {
-                new ProcessBuilder(command(info.command().orElseThrow(), args, ProcessHandle.current().pid(),
+                new ProcessBuilder(command(program, args, ProcessHandle.current().pid(),
                         nextCount(restartsSoFar, uptime))).inheritIO().start();
             } catch (Exception e) {
                 System.err.println("Recovery: could not start again: " + e);
