@@ -32,13 +32,12 @@ import java.util.TreeSet;
  * file {@link TextSync} makes, an {@code unichat-<part>.json}) are touched.
  */
 final class VaultMove {
-    /**
-     * Machine-only markers: when this computer's move was done, since when no stray changed, and what the strays' files
-     * were then (their stamps' hash): kept here, so a restart doesn't make them look new.
-     */
+    // Machine-only markers: when this computer's move was done, since when no stray changed, and what the strays'
+    // files were then (their stamps' hash): kept here, so a restart doesn't make them look new.
     static final String MOVED_AT = "cloud.vault.movedAt";
     static final String QUIET_SINCE = "cloud.vault.strayQuietSince";
     static final String STRAYS_SEEN = "cloud.vault.straySeen";
+
     static final Duration QUIET = Duration.ofDays(1);
     /**
      * The machines sending plain texts when the move started, one list inside the vault (sealed: only a key holder writes

@@ -44,13 +44,15 @@ class AutoSaveTest {
     private final List<String> linkedInto = new CopyOnWriteArrayList<>();
     /** The message each failure told came in. */
     private final List<String> failedIn = new CopyOnWriteArrayList<>();
-    /** A link that has no video, and a file that can't be downloaded. */
+    // A link that has no video, and a file that can't be downloaded.
     private static final String NO_VIDEO = "https://example.org/sin-video";
     private static final String BROKEN = "mxc://s/roto.jpg";
     private static final String ENDLESS = "mxc://s/enorme.mov";
-    /** A file and a link that fail for {@link #flaky}'s reason while it's set, and are saved once it isn't. */
+
+    // A file and a link that fail for flaky's reason while it's set, and are saved once it isn't.
     private static final String FLAKY = "mxc://s/a-veces.jpg";
     private static final String FLAKY_LINK = "https://example.org/a-veces";
+
     private volatile String flaky;
     /** Every file asked for, in order. */
     private final List<String> asked = new CopyOnWriteArrayList<>();

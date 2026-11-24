@@ -286,8 +286,9 @@ class VaultRotateTest {
 
     @Test
     void aTextForgedInAComputersFolderWithTheOldKeyIsLeftAndNeverSpread() throws Exception {
+        // the same size: only what it says differs
         String mine = "{\"mio\":12345}\n";
-        String forged = "{\"forjado\":1}\n"; // the same size: only what it says differs
+        String forged = "{\"forjado\":1}\n";
         assertNull(laptop.write("texts/here/" + TEXT, mine).round().error());
         assertNull(desk.round().error());
         rotate(desk);
@@ -551,10 +552,12 @@ class VaultRotateTest {
 
     @Test
     void aForgedTextNeverHoldsBackTheNextOnesAndItsWriterSendsItsOwnAgain() throws Exception {
+        // October sorts first
         String first = "3f2a9c1b2d4e 2026-10.jsonl";
-        String second = TEXT; // October sorts first
+        String second = TEXT;
+        // the same size
         String real = "{\"mio\":12345}\n";
-        String forged = "{\"forjado\":1}\n"; // the same size
+        String forged = "{\"forjado\":1}\n";
         assertNull(laptop.write("texts/here/" + first, "{}\n").write("texts/here/" + second, "{}\n").round().error());
         assertNull(desk.round().error());
         assertNull(laptop.write("texts/here/" + first, "{}\n" + real).write("texts/here/" + second, "{}\n{\"b\":1}\n").round().error());

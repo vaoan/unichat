@@ -17,8 +17,9 @@ class CloudShownTest {
         Cloud.Status older = new Cloud.Status(true, null, null, 1, 5);
         Cloud.Status newer = new Cloud.Status(true, null, null, 2, 4);
         AtomicReference<Cloud.Status> status = new AtomicReference<>(older);
+        // both threads held: what's posted waits
         List<Runnable> awt = new ArrayList<>();
-        List<Runnable> fx = new ArrayList<>(); // both threads held: what's posted waits
+        List<Runnable> fx = new ArrayList<>();
         AtomicReference<Cloud.Status> onTray = new AtomicReference<>();
         AtomicReference<Cloud.Status> onGear = new AtomicReference<>();
         CloudShown shown = new CloudShown(status::get, onTray::set, awt::add, onGear::set, fx::add);

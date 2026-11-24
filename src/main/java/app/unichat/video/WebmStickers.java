@@ -21,7 +21,7 @@ public final class WebmStickers {
     static final long TIMEOUT_SECONDS = 60;
     /** A sticker is small: a file claiming more isn't one, and it shouldn't cost more than one. */
     private static final String MAX_SIDE = "512";
-    /** Telegram's video stickers: VP9 with transparency, 512 px on the long side, at most 3 s and 30 fps, no sound. */
+    // Telegram's video stickers: VP9 with transparency, 512 px on the long side, at most 3 s and 30 fps, no sound.
     private static final String TELEGRAM_SIDE = "512";
     private static final String TELEGRAM_SECONDS = "3";
     private static final String TELEGRAM_FPS = "30";

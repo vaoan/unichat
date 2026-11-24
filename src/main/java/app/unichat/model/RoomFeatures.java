@@ -18,7 +18,7 @@ import java.util.Set;
  * {@link #UNKNOWN} (no event: external server, older bridge) offers everything, as Unichat always did.
  */
 public final class RoomFeatures {
-    /** Pseudo message types used in the {@code file} map besides m.image/m.video/m.audio/m.file. */
+    // Pseudo message types used in the file map besides m.image/m.video/m.audio/m.file.
     public static final String STICKER = "m.sticker";
     public static final String GIF = "fi.mau.gif";
     public static final String VOICE = "org.matrix.msc3245.voice";

@@ -91,10 +91,11 @@ public final class Notifier {
     private final java.util.concurrent.CompletableFuture<Boolean> ready = new java.util.concurrent.CompletableFuture<>();
     /** Null until built, and without a display. AWT thread. */
     private PopupMenu menu;
-    /** The menu's own items, by name: the cloud's lines go above them, so their places change. AWT thread. */
+    // The menu's own items, by name: the cloud's lines go above them, so their places change. AWT thread.
     private MenuItem windowItem;
     private MenuItem notificationsItem;
     private MenuItem quitItem;
+
     /** The cloud's lines shown at the menu's top (and their separator), and what they say. AWT thread. */
     private final java.util.List<MenuItem> cloudItems = new java.util.ArrayList<>();
     private java.util.List<String> cloudLines = java.util.List.of();

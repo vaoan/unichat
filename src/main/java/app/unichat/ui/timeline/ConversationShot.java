@@ -40,12 +40,12 @@ import java.util.function.Function;
 final class ConversationShot {
     /** How wide it's drawn, in points: a phone's screen, so it reads there as the chat does (its messages fit it). */
     static final double WIDTH = 420;
-    /**
-     * The most it draws: a stretch longer is refused, said, before it's made. One picture of a thousand messages (or one
-     * stranger's message of 60 000 lines) at 2x is gigabytes: the window's heap would run out (`ui/media/CLAUDE.md`).
-     */
+    // The most it draws: a stretch longer is refused, said, before it's made. One picture of a thousand messages (or
+    // one stranger's message of 60 000 lines) at 2x is gigabytes: the window's heap would run out
+    // (`ui/media/CLAUDE.md`).
     static final int MAX_MESSAGES = 400;
     static final int MAX_HEIGHT_PX = 16_000;
+
     /** Pixels a point: sharp on a phone's screen and a retina one. */
     static final double SCALE = 2;
     /** How often it looks whether its pictures arrived. */

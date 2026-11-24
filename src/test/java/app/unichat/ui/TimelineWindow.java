@@ -74,7 +74,7 @@ final class TimelineWindow {
         return open(messages, format, before, HEIGHT);
     }
 
-    /** The window's usual height; {@link #SHORT} leaves a list as short as Linux's taller fonts do (416 px there). */
+    // The window's usual height; SHORT leaves a list as short as Linux's taller fonts do (416 px there).
     static final int HEIGHT = 560;
     static final int SHORT = 480;
 

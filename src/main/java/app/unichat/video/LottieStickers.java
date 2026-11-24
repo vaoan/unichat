@@ -28,10 +28,11 @@ import java.util.zip.GZIPInputStream;
  * LottieConverter (Samsung's rlottie, {@code native/build-lottie.sh}) frame by frame and put together by img2webp.
  */
 public final class LottieStickers {
-    /** Telegram's are 512 px, at most 3 s and 60 frames a second; 30 is plenty to look at. */
+    // Telegram's are 512 px, at most 3 s and 60 frames a second; 30 is plenty to look at.
     private static final int SIDE = 512;
     private static final int FPS = 30;
     private static final int QUALITY = 80;
+
     /**
      * Longer isn't a sticker (Telegram's last 3 s at most): each frame is written whole to disk (1 MB at 512 px) before
      * the WebP is made, so this caps that at 300 MB.
@@ -40,9 +41,10 @@ public final class LottieStickers {
     /** A .tgs may be 64 KB; its JSON a few hundred. More is a file made to fill the memory as it unpacks. */
     static final int MAX_JSON_BYTES = 8 * 1024 * 1024;
     private static final long TIMEOUT_SECONDS = 60;
-    /** Telegram's run at 30 or 60 frames a second; anything far from that isn't a sticker. */
+    // Telegram's run at 30 or 60 frames a second; anything far from that isn't a sticker.
     private static final double MIN_RATE = 1;
     private static final double MAX_RATE = 120;
+
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private LottieStickers() {}

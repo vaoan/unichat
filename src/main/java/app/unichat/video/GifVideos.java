@@ -70,10 +70,11 @@ public final class GifVideos {
     }
 
     private static final String KEY = "video.gifVideosAsGif";
-    /** Ajustes → Redes' choices: the longest one made a picture, the most a forwarded one may weigh, its largest side. */
+    // Ajustes → Redes' choices: the longest one made a picture, the most a forwarded one may weigh, its largest side.
     public static final List<Integer> LONGEST_CHOICES = List.of(NO_LIMIT, 10, 15, 30);
     public static final List<Integer> MB_CHOICES = List.of(8, 10, 25, 50);
     public static final List<Integer> SIDE_CHOICES = List.of(320, 480, 640, 720);
+
     private static final String LONGEST_KEY = "video.gifLongestSeconds";
     private static final String MB_KEY = "video.gifMaxMb";
     private static final String SIDE_KEY = "video.gifLargestSide";

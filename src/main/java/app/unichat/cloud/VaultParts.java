@@ -26,10 +26,11 @@ import java.util.stream.Stream;
  * which {@link SealedStorage} keeps inside the vault; they never go up plain.
  */
 final class VaultParts {
-    /** This computer's hold on the vault (machine-only, as every {@code cloud.} key): its id, its slot's key, its X25519 key. */
+    // This computer's hold on the vault (machine-only, as every cloud. key): its id, its slot's key, its X25519 key.
     static final String ID = "cloud.vault.id";
     static final String KEY = "cloud.vault.key";
     static final String PRIVATE = "cloud.vault.private";
+
     /** "Seguir sin la bóveda en este equipo": never asked again, nothing personal sent, everything entered by hand. */
     static final String DECLINED = "cloud.vault.declined";
     /**
@@ -101,7 +102,8 @@ final class VaultParts {
         private final Cloud.VaultState state;
         private final byte[] vk;
         private final Vault.Info vault;
-        /** The vault's parts that didn't open this round (their logical paths), and those of them that went up anew from here. */
+        // The vault's parts that didn't open this round (their logical paths), and those of them that went up anew
+        // from here.
         private final Set<String> damaged = new java.util.concurrent.CopyOnWriteArraySet<>();
         private final Set<String> replaced = new java.util.concurrent.CopyOnWriteArraySet<>();
 

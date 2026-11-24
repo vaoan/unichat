@@ -24,7 +24,7 @@ import java.util.stream.Stream;
  * inputs and found nothing (its own report, newer than the check, with no finding and no error).
  */
 public final class SpotBugsCache {
-    /** The hash of this run's inputs, and the one a pass then marks. */
+    // The hash of this run's inputs, and the one a pass then marks.
     static final String INPUTS = "inputs.sha256";
     static final String PASSED = "passed.sha256";
 

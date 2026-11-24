@@ -209,7 +209,7 @@ final class MessageSelection {
         return null;
     }
 
-    /** Picks or unpicks {@code m}; {@code range}: picks every message from the last one picked to it. */
+    /** Picks or unpicks {@code m}; {@code extend}: picks every message from the last one picked to it. */
     private void toggle(Message m, boolean extend) {
         if (!purpose.pickable().test(m)) return;
         if (purpose.range()) { // a stretch: the click moves an end (or puts one back), never leaves one out

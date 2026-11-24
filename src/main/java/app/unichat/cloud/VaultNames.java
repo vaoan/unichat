@@ -29,10 +29,8 @@ import java.util.Set;
  * meanwhile (another one's round) finds every slot and file where it was.
  */
 final class VaultNames {
-    /**
-     * Tests: each runs once, on the migrating thread holding what it holds: right before {@link Vault#INFO} is written
-     * (every file and slot copied), and right after the old one is deleted (before the old files go).
-     */
+    // Tests: each runs once, on the migrating thread holding what it holds: right before Vault#INFO is written (every
+    // file and slot copied), and right after the old one is deleted (before the old files go).
     static volatile Runnable beforeSwitch; // NOPMD: MutableStaticState, a seam tests swap
     static volatile Runnable afterSwitch; // NOPMD: MutableStaticState, a seam tests swap
 

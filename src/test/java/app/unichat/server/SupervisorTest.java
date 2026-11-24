@@ -20,9 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SupervisorTest {
     @TempDir Path dir;
-    /** No wait before a restart: the tests follow the Supervisor's events, not its timing. */
+    // No wait before a restart: the tests follow the Supervisor's events, not its timing.
     private static final Duration FIRST_BACKOFF = Duration.ZERO;
     private static final Duration MAX_BACKOFF = Duration.ZERO;
+
     private final Supervisor sup = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF);
     private final app.unichat.service.Changes changes = new app.unichat.service.Changes();
     /** Each exit the Supervisor handled: "name:true" when it scheduled a restart. */
