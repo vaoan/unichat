@@ -234,7 +234,7 @@ final class RestServer implements AutoCloseable {
             answer(ex, 503, "{\"errcode\":\"M_UNKNOWN\"}");
             return;
         }
-        long from = since == null ? -1 : Long.parseLong(since.replaceAll("\\D", ""));
+        long from = since == null ? -1 : app.unichat.Present.of(app.unichat.support.Numbers.longOf(since.replaceAll("\\D", "")));
         ObjectNode join = MatrixClient.JSON.createObjectNode();
         for (JsonNode r : rooms) {
             String t = tags.get(r.asText());

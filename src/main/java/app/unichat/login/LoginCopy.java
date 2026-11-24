@@ -159,7 +159,8 @@ public final class LoginCopy {
     /** The digits a pattern like {@code ^[0-9]{6}$} asks for; 0 when it doesn't say. */
     public static int digits(@Nullable String pattern) {
         java.util.regex.Matcher m = pattern == null ? null : java.util.regex.Pattern.compile("\\{(\\d{1,2})}").matcher(pattern);
-        return m != null && m.find() ? Integer.parseInt(m.group(1)) : 0;
+        Integer n = m != null && m.find() ? app.unichat.support.Numbers.intOf(m.group(1)) : null;
+        return n == null ? 0 : n;
     }
 
     /** Translated label for an input field, by its type (the bridge's name when we don't know it). */

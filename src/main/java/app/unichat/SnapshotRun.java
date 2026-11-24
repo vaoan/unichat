@@ -38,7 +38,8 @@ final class SnapshotRun {
         wait.setOnFinished(e -> {
             MainView view = mainView;
             if (view != null) setUp(view);
-            PauseTransition shoot = new PauseTransition(Duration.seconds(Double.parseDouble(System.getProperty("unichat.snapshotDelay", "1.5"))));
+            PauseTransition shoot = new PauseTransition(Duration.seconds(java.util.Objects.requireNonNullElse(
+                    app.unichat.support.Numbers.doubleOf(System.getProperty("unichat.snapshotDelay", "1.5")), 1.5)));
             shoot.setOnFinished(ev -> shoot(out));
             shoot.play();
         });

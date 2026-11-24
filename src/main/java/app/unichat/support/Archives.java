@@ -48,7 +48,8 @@ public final class Archives {
             while (in.readNBytes(h, 0, TAR_BLOCK) == TAR_BLOCK && h[0] != 0) {
                 String prefix = text(h, 345, 155);
                 String name = prefix.isEmpty() ? text(h, 0, 100) : prefix + "/" + text(h, 0, 100);
-                long size = Long.parseLong(text(h, 124, 12).isEmpty() ? "0" : text(h, 124, 12), 8);
+                Long size = Numbers.longOf(text(h, 124, 12).isEmpty() ? "0" : text(h, 124, 12), 8);
+                if (size == null || size < 0) throw new IOException("Not a tar archive: an entry's size isn't one");
                 char type = (char) h[156];
                 if ((type == '0' || type == 0) && matches(name, entry)) {
                     copy(new java.io.FilterInputStream(in) {

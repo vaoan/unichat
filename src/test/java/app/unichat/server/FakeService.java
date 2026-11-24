@@ -25,7 +25,7 @@ public final class FakeService {
             String line = "x".repeat(1023);
             for (int i = 0; i < 1024; i++) System.out.println(line);
             System.out.flush();
-            try (java.net.Socket test = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), Integer.parseInt(args[1]))) {
+            try (java.net.Socket test = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), app.unichat.Present.of(app.unichat.support.Numbers.intOf(args[1])))) {
                 test.getInputStream().transferTo(java.io.OutputStream.nullOutputStream()); // until the test hangs up
                 System.out.println("after");
                 System.out.flush();

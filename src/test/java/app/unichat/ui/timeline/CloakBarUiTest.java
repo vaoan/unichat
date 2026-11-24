@@ -50,7 +50,7 @@ class CloakBarUiTest {
                 VBox root = new VBox(b);
                 root.getStyleClass().add("root");
                 root.setStyle("-fx-font-size: " + px + "px; -fx-font-family: '" + font + "';");
-                Scene scene = new Scene(root, Double.parseDouble(System.getProperty("unichat.barWidth", "900")), 200);
+                Scene scene = new Scene(root, app.unichat.Present.of(app.unichat.support.Numbers.doubleOf(System.getProperty("unichat.barWidth", "900"))), 200);
                 scene.getStylesheets().add(CloakBarUiTest.class.getResource("/app/unichat/css/app.css").toExternalForm());
                 stage.setScene(scene);
                 stage.show();

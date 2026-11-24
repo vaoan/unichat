@@ -2,6 +2,7 @@ package app.unichat.video;
 
 import app.unichat.support.BundledTools;
 import app.unichat.support.Folders;
+import app.unichat.support.Numbers;
 import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
 
@@ -88,6 +89,13 @@ public final class AnimDump {
         }
     }
 
+    /** A number of a PAM header; a value that isn't one is no PAM file libwebp wrote. */
+    private static int pamNumber(String value) throws IOException {
+        Integer n = Numbers.intOf(value);
+        if (n == null) throw new IOException("unexpected PAM header");
+        return n;
+    }
+
     /** A PAM file as libwebp writes it: RGB_ALPHA, 8 bits per sample. */
     static BufferedImage readPam(Path f) throws IOException {
         try (InputStream in = new BufferedInputStream(Files.newInputStream(f))) {
@@ -99,9 +107,9 @@ public final class AnimDump {
                 String[] kv = line.strip().split("\\s+", 2);
                 if (kv.length < 2) continue;
                 switch (kv[0]) {
-                    case "WIDTH" -> width = Integer.parseInt(kv[1]);
-                    case "HEIGHT" -> height = Integer.parseInt(kv[1]);
-                    case "DEPTH" -> depth = Integer.parseInt(kv[1]);
+                    case "WIDTH" -> width = pamNumber(kv[1]);
+                    case "HEIGHT" -> height = pamNumber(kv[1]);
+                    case "DEPTH" -> depth = pamNumber(kv[1]);
                     default -> { }
                 }
             }

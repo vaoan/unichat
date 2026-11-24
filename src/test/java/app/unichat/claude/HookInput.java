@@ -43,7 +43,7 @@ final class HookInput {
                 case 'b' -> out.append('\b');
                 case 'f' -> out.append('\f');
                 case 'u' -> {
-                    out.append((char) Integer.parseInt(json.substring(i + 1, i + 5), 16));
+                    out.append((char) Integer.parseInt(json.substring(i + 1, i + 5), 16)); // lgtm[java/uncaught-number-format-exception] Claude Code's own JSON: a broken escape fails the hook, as it should
                     i += 4;
                 }
                 default -> out.append(e);

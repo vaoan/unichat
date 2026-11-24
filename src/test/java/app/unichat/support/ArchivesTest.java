@@ -1,6 +1,5 @@
 package app.unichat.support;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -54,6 +53,23 @@ class ArchivesTest {
         assertEquals("ok", Files.readString(target));
     }
 
+    /** A header whose size isn't octal is a damaged archive: an IOException, as the caller handles, and nothing extracted. */
+    @Test
+    void anEntrySizeThatIsntANumberIsADamagedArchive() throws IOException {
+        Path tgz = dir.resolve("a.tar.gz");
+        ByteArrayOutputStream tar = new ByteArrayOutputStream();
+        tarEntry(tar, "d/uv", '0', "ok".getBytes(StandardCharsets.UTF_8));
+        byte[] bytes = tar.toByteArray();
+        System.arraycopy("zz".getBytes(StandardCharsets.US_ASCII), 0, bytes, 124, 2);
+        try (OutputStream out = new GZIPOutputStream(Files.newOutputStream(tgz))) {
+            out.write(bytes);
+            out.write(new byte[1024]);
+        }
+        Path target = dir.resolve("uv");
+        assertThrows(IOException.class, () -> Archives.extractOne(tgz, "uv", target));
+        assertFalse(Files.exists(target), "nothing extracted");
+    }
+
     @Test
     void aZipGivesItsEntryAndANameThatOnlyEndsLikeItIsNotTaken() throws IOException {
         Path zip = dir.resolve("uv.zip");
@@ -71,10 +87,8 @@ class ArchivesTest {
 
     /** An archive cut short replaces nothing and leaves no temp file behind. */
     @Test
-    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aCutShortArchiveKeepsTheOldProgramAndLeavesNoTemp() throws IOException {
-        byte[] noise = new byte[200_000];
-        new java.util.Random(7).nextBytes(noise);
+        byte[] noise = app.unichat.SeededBytes.noise(200_000, 7);
         ByteArrayOutputStream whole = new ByteArrayOutputStream();
         try (ZipOutputStream z = new ZipOutputStream(whole)) {
             z.putNextEntry(new ZipEntry("uv.exe"));

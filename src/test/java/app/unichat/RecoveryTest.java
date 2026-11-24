@@ -47,6 +47,17 @@ class RecoveryTest {
         assertEquals(0, fresh.restarts());
     }
 
+    /** A mark that doesn't read as "pid:count" (typed by hand, cut short) starts Unichat as with none, never a crash at start. */
+    @Test
+    void aMarkThatDoesntReadIsNoMarkAtAll() {
+        for (String bad : List.of("--unichat-after=x:1", "--unichat-after=42:y", "--unichat-after=42", "--unichat-after=")) {
+            Recovery.Start s = Recovery.Start.of(new String[] {bad, "other"});
+            assertEquals(-1, s.waitFor(), bad);
+            assertEquals(0, s.restarts(), bad);
+            assertEquals(List.of("other"), List.of(s.args()), bad);
+        }
+    }
+
     @Test
     void neverInALoop() {
         assertTrue(Recovery.mayRestart(0, Duration.ofSeconds(30)));

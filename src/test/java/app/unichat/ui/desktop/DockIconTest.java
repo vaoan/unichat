@@ -30,7 +30,7 @@ class DockIconTest {
     void itKnowsWhichWayThisMacActivates() {
         assertTrue(DockIcon.responds("activateIgnoringOtherApps:"));
         assertFalse(DockIcon.responds("noSuchSelectorAtAll:"));
-        int major = Integer.parseInt(System.getProperty("os.version").split("\\.")[0]);
+        int major = app.unichat.Present.of(app.unichat.support.Numbers.intOf(System.getProperty("os.version").split("\\.")[0]));
         assertEquals(major >= 14, DockIcon.responds("activate"), "macOS " + major);
     }
 }

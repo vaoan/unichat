@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.Numbers;
 import app.unichat.support.Os;
 import app.unichat.support.Processes;
 import java.io.IOException;
@@ -108,13 +109,17 @@ public final class Theme {
 
     /** WCAG contrast ratio between two #RRGGBB colors. */
     static double contrast(String a, String b) {
-        double la = luminance(a);
-        double lb = luminance(b);
+        double la = luminance(Objects.requireNonNull(rgb(a), "a #RRGGBB color"));
+        double lb = luminance(Objects.requireNonNull(rgb(b), "a #RRGGBB color"));
         return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
     }
 
-    private static double luminance(String hex) {
-        int rgb = Integer.parseInt(hex.substring(1), 16);
+    /** {@code hex} ("#RRGGBB") as a number, or null when it isn't such a color. */
+    private static @Nullable Integer rgb(String hex) {
+        return hex.matches("#[0-9A-Fa-f]{6}") ? Numbers.intOf(hex.substring(1), 16) : null;
+    }
+
+    private static double luminance(int rgb) {
         double[] c = {(rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255};
         for (int i = 0; i < 3; i++) {
             double v = c[i] / 255.0;
@@ -123,9 +128,14 @@ public final class Theme {
         return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
     }
 
-    /** Darkens {@code hex} until white text on it reaches 4.5:1 (WCAG AA). */
+    /**
+     * Darkens {@code hex} until white text on it reaches 4.5:1 (WCAG AA). A setting that isn't a #RRGGBB color (the
+     * settings file written by hand) is given back as it is: JavaFX ignores it and the accent stays the stylesheet's.
+     */
     static String accessibleAccent(String hex) {
-        int rgb = Integer.parseInt(hex.substring(1), 16);
+        Integer color = rgb(hex);
+        if (color == null) return hex;
+        int rgb = color;
         int r = (rgb >> 16) & 255;
         int g = (rgb >> 8) & 255;
         int b = rgb & 255;

@@ -20,11 +20,11 @@ public final class WebmStickers {
     public static final ExecutorService WORKER = Executors.newSingleThreadExecutor(Threads.daemon("video-convert"));
     static final long TIMEOUT_SECONDS = 60;
     /** A sticker is small: a file claiming more isn't one, and it shouldn't cost more than one. */
-    private static final String MAX_SIDE = "512";
+    private static final int MAX_SIDE = 512;
     // Telegram's video stickers: VP9 with transparency, 512 px on the long side, at most 3 s and 30 fps, no sound.
     private static final String TELEGRAM_SIDE = "512";
     private static final String TELEGRAM_SECONDS = "3";
-    private static final String TELEGRAM_FPS = "30";
+    private static final int TELEGRAM_FPS = 30;
 
     private WebmStickers() {}
 
@@ -46,8 +46,8 @@ public final class WebmStickers {
         if (ffmpeg == null) throw new NoConverter();
         Path img2webp = AnimatedWebp.img2webp();
         if (img2webp == null) throw new IOException("img2webp isn't there");
-        AnimatedWebp.make(ffmpeg, img2webp, webm, AnimatedWebp.Source.WEBM, out, Integer.parseInt(TELEGRAM_FPS),
-                Integer.parseInt(MAX_SIDE), 80, AnimatedWebp.probe(ffmpeg, webm, AnimatedWebp.Source.WEBM));
+        AnimatedWebp.make(ffmpeg, img2webp, webm, AnimatedWebp.Source.WEBM, out, TELEGRAM_FPS,
+                MAX_SIDE, 80, AnimatedWebp.probe(ffmpeg, webm, AnimatedWebp.Source.WEBM));
         return out;
     }
 

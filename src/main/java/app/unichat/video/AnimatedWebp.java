@@ -3,6 +3,7 @@ package app.unichat.video;
 import app.unichat.support.BundledTools;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
+import app.unichat.support.Numbers;
 import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
 import app.unichat.support.SafeFile;
@@ -171,13 +172,18 @@ public final class AnimatedWebp {
     @SuppressFBWarnings(value = "REDOS", justification = "no nested repetition: digits, an optional fraction, then a literal; linear on ffmpeg's output")
     static Probe parse(String out) {
         Matcher d = DURATION.matcher(out);
-        double seconds = d.find() ? Integer.parseInt(d.group(1)) * 3600 + Integer.parseInt(d.group(2)) * 60 + Double.parseDouble(d.group(3)) : 0;
+        double seconds = d.find() ? digits(d.group(1)) * 3600 + digits(d.group(2)) * 60 + digits(d.group(3)) : 0;
         Matcher v = VIDEO.matcher(out);
         String video = v.find() ? v.group(1) : "";
         Matcher f = Pattern.compile("([0-9]+(?:\\.[0-9]+)?) fps").matcher(video);
         Matcher wh = Pattern.compile(", ([0-9]{2,5})x([0-9]{2,5})").matcher(video);
         boolean sized = wh.find();
-        return new Probe(AUDIO.matcher(out).find(), seconds, f.find() ? Double.parseDouble(f.group(1)) : 0,
-                sized ? Integer.parseInt(wh.group(1)) : 0, sized ? Integer.parseInt(wh.group(2)) : 0);
+        return new Probe(AUDIO.matcher(out).find(), seconds, f.find() ? digits(f.group(1)) : 0,
+                sized ? (int) digits(wh.group(1)) : 0, sized ? (int) digits(wh.group(2)) : 0);
+    }
+
+    /** What a pattern above matched as digits (an optional fraction): always a number. */
+    private static double digits(String matched) {
+        return java.util.Objects.requireNonNull(Numbers.doubleOf(matched), "digits, as the pattern matched");
     }
 }
