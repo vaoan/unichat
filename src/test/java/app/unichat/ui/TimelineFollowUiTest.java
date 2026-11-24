@@ -4,6 +4,8 @@ import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
+import java.util.concurrent.ExecutionException;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Region;
 import org.junit.jupiter.api.AfterEach;
@@ -21,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class TimelineFollowUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @AfterEach
@@ -29,7 +32,7 @@ class TimelineFollowUiTest {
     }
 
     /** The chat open at its newest message, and the frames watched from there: the newest stays where it is. */
-    private TimelineWindow.Frames atBottom(int messages) throws Exception {
+    private TimelineWindow.Frames atBottom(int messages) throws InterruptedException, ExecutionException {
         w = TimelineWindow.open(messages);
         double gap = w.untilAtBottom();
         return w.watch(w.atBottom(gap));
@@ -71,7 +74,7 @@ class TimelineFollowUiTest {
         w.type("uno\ndos\ntres\ncuatro\ncinco");
         double gap = w.untilAtBottom();
         TimelineWindow.Frames frames = w.watch(w.atBottom(gap));
-        FxWait.fx(() -> { w.input().clear(); return null; });
+        FxWait.onFx(() -> w.input().clear());
         frames.stop("the box shrinking without sending");
     }
 
@@ -168,10 +171,9 @@ class TimelineFollowUiTest {
     void theNewestMessageGrowsAfterItShows() throws Exception {
         TimelineWindow.Frames frames = atBottom(20);
         // Like a photo finishing its download: the bubble gets taller after it was drawn.
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Region r = (Region) w.flow().getLastVisibleCell().getGraphic();
             r.setMinHeight(r.getHeight() + 220);
-            return null;
         });
         frames.stop("the newest bubble growing");
     }
@@ -182,7 +184,7 @@ class TimelineFollowUiTest {
     void answeringAMessageOpensAndClosesItsBanner() throws Exception {
         TimelineWindow.Frames frames = atBottom(20);
         Message first = w.svc.messages(CHAT).getFirst();
-        FxWait.fx(() -> { w.composer().reply(first); return null; });
+        FxWait.onFx(() -> w.composer().reply(first));
         FxWait.settled();
         w.key(KeyCode.ESCAPE, false);
         frames.stop("the reply banner opening and closing");
@@ -192,7 +194,7 @@ class TimelineFollowUiTest {
     void answeringAndSending() throws Exception {
         TimelineWindow.Frames frames = atBottom(20);
         Message first = w.svc.messages(CHAT).getFirst();
-        FxWait.fx(() -> { w.composer().reply(first); return null; });
+        FxWait.onFx(() -> w.composer().reply(first));
         w.type("te respondo\nen dos líneas");
         w.key(KeyCode.ENTER, false);
         FxWait.until("it's sent", () -> w.newest().body().startsWith("te respondo") && w.showsNewest());
@@ -214,7 +216,7 @@ class TimelineFollowUiTest {
     void theWindowGetsShorterAndTaller() throws Exception {
         TimelineWindow.Frames frames = atBottom(20);
         for (double h : new double[] {480, 420, 600, 700, 560}) {
-            FxWait.fx(() -> { w.stage.setHeight(h); return null; });
+            FxWait.onFx(() -> w.stage.setHeight(h));
             FxWait.settled();
         }
         frames.stop("the window resized");
@@ -224,7 +226,7 @@ class TimelineFollowUiTest {
     void theWindowGetsNarrowerAndWider() throws Exception {
         TimelineWindow.Frames frames = atBottom(20);
         for (double width : new double[] {860, 760, 1000}) {
-            FxWait.fx(() -> { w.stage.setWidth(width); return null; });
+            FxWait.onFx(() -> w.stage.setWidth(width));
             FxWait.settled();
         }
         frames.stop("the window narrower and wider (bubbles re-wrap)");
@@ -299,9 +301,9 @@ class TimelineFollowUiTest {
     @Test
     void theSidePanelOpensAndCloses() throws Exception {
         TimelineWindow.Frames frames = atBottom(20);
-        FxWait.fx(() -> { w.view.toggleInfo(); return null; });
+        FxWait.onFx(w.view::toggleInfo);
         FxWait.settled();
-        FxWait.fx(() -> { w.view.toggleInfo(); return null; });
+        FxWait.onFx(w.view::toggleInfo);
         frames.stop("the side panel opening and closing (the list narrower, bubbles re-wrapped)");
     }
 
@@ -310,8 +312,8 @@ class TimelineFollowUiTest {
         TimelineWindow.Frames frames = atBottom(20);
         java.nio.file.Path file = java.nio.file.Files.createTempFile(Settings.dataDir(), "scroll", ".txt");
         java.nio.file.Files.writeString(file, "hola");
-        FxWait.fx(() -> { w.composer().sendFiles(java.util.List.of(file.toFile())); return null; });
-        FxWait.until("it's sent", () -> file.getFileName().toString().equals(w.newest().fileName()) && w.showsNewest());
+        FxWait.onFx(() -> w.composer().sendFiles(java.util.List.of(file.toFile())));
+        FxWait.until("it's sent", () -> PathParts.name(file).equals(w.newest().fileName()) && w.showsNewest());
         frames.stop("a file sent, its bar coming and going");
     }
 
@@ -338,7 +340,7 @@ class TimelineFollowUiTest {
     @Test
     void aVeryShortWindow() throws Exception {
         w = TimelineWindow.open(20);
-        FxWait.fx(() -> { w.stage.setHeight(330); return null; });
+        FxWait.onFx(() -> w.stage.setHeight(330));
         double gap = w.untilAtBottom();
         TimelineWindow.Frames frames = w.watch(w.atBottom(gap));
         w.type("en\nuna\nventana\nbajita");

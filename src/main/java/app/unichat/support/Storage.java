@@ -1,8 +1,11 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -33,10 +36,15 @@ public final class Storage {
     private final LongSupplier clock;
     private volatile long free = Long.MAX_VALUE;
     private final Map<String, Long> failedAt = new ConcurrentHashMap<>();
-    private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
-    private ScheduledExecutorService timer;
+    private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
+    private @Nullable ScheduledExecutorService timer;
 
-    /** @param measure the free bytes now; @param clock milliseconds */
+    /**
+     * Measures with {@code measure} until {@link #watch} gives it a folder.
+     *
+     * @param measure the free bytes now
+     * @param clock milliseconds
+     */
     public Storage(LongSupplier measure, LongSupplier clock) {
         this.measure = measure;
         this.clock = clock;
@@ -46,7 +54,7 @@ public final class Storage {
     public synchronized void watch(Path dir) {
         measure = () -> {
             try {
-                return Files.getFileStore(Files.exists(dir) ? dir : dir.getParent()).getUsableSpace();
+                return Files.getFileStore(Files.exists(dir) ? dir : PathParts.parent(dir)).getUsableSpace();
             } catch (IOException | RuntimeException e) {
                 return Long.MAX_VALUE; // can't tell: never a false alarm
             }
@@ -58,7 +66,7 @@ public final class Storage {
             t.setDaemon(true);
             return t;
         });
-        timer.scheduleWithFixedDelay(this::check, CHECK_EVERY_MS, CHECK_EVERY_MS, TimeUnit.MILLISECONDS);
+        var _ = timer.scheduleWithFixedDelay(this::check, CHECK_EVERY_MS, CHECK_EVERY_MS, TimeUnit.MILLISECONDS);
     }
 
     /** Measures again; the listeners hear when being low changed. */

@@ -1,7 +1,9 @@
 package app.unichat.cloak;
 
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -10,6 +12,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The picture being protected, one at a time for the whole app (it takes minutes and a good part of the memory), so the
@@ -24,8 +27,8 @@ public final class CloakJob {
      * @param fraction 0..1, or -1 when it can't tell
      * @param startedMs when the current phase started, for the time left
      */
-    public record Status(Phase phase, String file, CloakLevel level, String stepKey, double fraction, long startedMs,
-                         String error) {
+    public record Status(Phase phase, @Nullable String file, @Nullable CloakLevel level, @Nullable String stepKey, double fraction,
+                         long startedMs, @Nullable String error) {
         static final Status IDLE = new Status(Phase.IDLE, null, null, null, 0, 0, null);
 
         public boolean busy() { return phase == Phase.INSTALLING || phase == Phase.PROTECTING; }
@@ -45,13 +48,14 @@ public final class CloakJob {
     private final Runner runner;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private volatile Status status = Status.IDLE;
-    private Thread worker;
+    private @Nullable Thread worker;
     /**
      * Which start the status belongs to (guarded by this). A cancelled job's thread can take a while to stop (a download
      * doesn't end at the interrupt): what it reports then is its own job's, never the next one's.
      */
     private long job;
 
+    @SuppressFBWarnings(value = "SING_SINGLETON_HAS_NONPRIVATE_CONSTRUCTOR", justification = "package-private for the tests, which each make their own")
     CloakJob(Runner runner) {
         this.runner = runner;
     }
@@ -70,7 +74,7 @@ public final class CloakJob {
      */
     public synchronized boolean start(Path in, Path out, CloakLevel level, Consumer<Path> onDone) {
         if (status.busy()) return false;
-        String name = in.getFileName().toString();
+        String name = PathParts.name(in);
         long id = ++job;
         set(new Status(Phase.INSTALLING, name, level, "cloak.install.checking", -1, System.currentTimeMillis(), null));
         worker = Thread.ofPlatform().daemon().name("cloak").start(() -> work(id, in, out, level, onDone, name));
@@ -100,9 +104,9 @@ public final class CloakJob {
         } catch (InterruptedException e) {
             // Cancelled: the status already says so.
         } catch (IOException | RuntimeException e) {
-            System.err.println("Image protection failed: " + e.getMessage());
-            update(id, new Status(Phase.FAILED, name, level, null, 0, 0,
-                    e.getMessage() == null ? I18n.t("cloak.error.run") : e.getMessage()));
+            String why = e.getMessage();
+            System.err.println("Image protection failed: " + why);
+            update(id, new Status(Phase.FAILED, name, level, null, 0, 0, why == null ? I18n.t("cloak.error.run") : why));
         }
     }
 
@@ -123,7 +127,8 @@ public final class CloakJob {
         String[] p = line.strip().split(" ");
         if (p.length != 3 || !p[0].equals("progress")) return -1;
         try {
-            double done = Double.parseDouble(p[1]), total = Double.parseDouble(p[2]);
+            double done = Double.parseDouble(p[1]);
+            double total = Double.parseDouble(p[2]);
             return total > 0 ? Math.min(1, done / total) : -1;
         } catch (NumberFormatException e) {
             return -1;
@@ -146,8 +151,9 @@ public final class CloakJob {
     }
 
     /** Runs the script, reading its progress; killed when interrupted or silent too long. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the Python script uv installed, with our own paths (the picture's copy in our cache, absolute) as a list, no shell")
     static void run(List<String> command, Path out, DoubleConsumer progress) throws IOException, InterruptedException {
-        Files.createDirectories(out.getParent());
+        Files.createDirectories(PathParts.parent(out));
         Files.deleteIfExists(out);
         Processes.Result r = Processes.capture(new ProcessBuilder(command).redirectErrorStream(true),
                 Processes.Limit.whileTalking(SILENCE_SECONDS), null, line -> {

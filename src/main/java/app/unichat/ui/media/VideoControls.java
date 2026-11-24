@@ -5,6 +5,7 @@ import app.unichat.ui.Icons;
 import app.unichat.ui.Nodes;
 import app.unichat.autosave.FileNames;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.animation.PauseTransition;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Pos;
@@ -28,6 +29,7 @@ import javafx.scene.media.MediaView;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.util.Locale;
@@ -63,7 +65,7 @@ final class VideoControls extends VBox {
     private boolean ended;
 
     /** @param onSave saves the video (null: no button); {@code openElsewhere} hands it to the system's player */
-    VideoControls(MediaPlayer p, Stage stage, MediaView view, StackPane screen, Runnable onSave, Runnable openElsewhere) {
+    VideoControls(MediaPlayer p, Stage stage, MediaView view, StackPane screen, @Nullable Runnable onSave, Runnable openElsewhere) {
         super(6);
         this.p = p;
         this.stage = stage;
@@ -79,7 +81,7 @@ final class VideoControls extends VBox {
         volume.setPrefWidth(90);
         volume.setMinWidth(60);
         p.volumeProperty().bind(volume.valueProperty());
-        volume.valueProperty().addListener((o, a, v) -> lastVolume = v.doubleValue());
+        volume.valueProperty().addListener((o, a, v) -> lastVolume = v.doubleValue()); // NOPMD: AssignmentToNonFinalStatic, the volume the next video starts at
         repeat = Icons.iconButton(Icons.REPEAT, I18n.t("video.repeat"), this::toggleRepeat);
         Button frame = Icons.iconButton(Icons.CAMERA, I18n.t("video.saveFrame"), this::saveFrame);
         Button elsewhere = Icons.iconButton(Icons.EXTERNAL, I18n.t("video.openElsewhere"), openElsewhere);
@@ -89,7 +91,7 @@ final class VideoControls extends VBox {
 
         Label time = new Label(Formats.clock(0));
         time.getStyleClass().add("video-time");
-        time.setMinWidth(Region.USE_PREF_SIZE);
+        time.setMinWidth(USE_PREF_SIZE);
         HBox.setMargin(time, new javafx.geometry.Insets(0, 0, 0, 8));
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.ALWAYS);
@@ -132,7 +134,7 @@ final class VideoControls extends VBox {
         p.currentTimeProperty().addListener((o, a, now) -> {
             double total = p.getTotalDuration().toSeconds();
             time.setText(Formats.clock(now.toSeconds()) + " / " + Formats.clock(total));
-            if (position.isValueChanging() || !(total > 0)) return;
+            if (position.isValueChanging() || !(total > 0)) return; // NOPMD: LogicInversion, !(x > 0) is also true for NaN, an unknown length
             fromPlayer[0] = true;
             position.setValue(now.toSeconds() / total);
             fromPlayer[0] = false;
@@ -147,6 +149,7 @@ final class VideoControls extends VBox {
         return position;
     }
 
+    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY", justification = "the speeds are the menu's own constants, and lastRate is one of them")
     private void speedMenu() {
         speed.getStyleClass().add("video-speed");
         for (double r : RATES) {
@@ -335,11 +338,15 @@ final class VideoControls extends VBox {
     boolean key(KeyEvent e) {
         if (e.isShortcutDown()) return false;
         wake();
-        String text = e.getText() == null ? "" : e.getText();
         KeyCode c = e.getCode();
         // A focused control keeps its own keys: Space and Enter press a button, the arrows move a slider.
         if ((c == KeyCode.SPACE || c == KeyCode.ENTER) && e.getTarget() instanceof javafx.scene.control.ButtonBase) return false;
         if (c.isArrowKey() && e.getTarget() == volume) return false;
+        return act(c, e.getText() == null ? "" : e.getText());
+    }
+
+    /** What key {@code c} (typing {@code text}) does to the video; false when it does nothing. */
+    private boolean act(KeyCode c, String text) {
         if (c == KeyCode.SPACE || c == KeyCode.K) togglePlay();
         else if (c == KeyCode.LEFT || c == KeyCode.RIGHT) seekBy(c == KeyCode.LEFT ? -ARROW_SKIP : ARROW_SKIP);
         else if (c == KeyCode.J || c == KeyCode.L) seekBy(c == KeyCode.J ? -SKIP : SKIP);
@@ -377,10 +384,10 @@ final class VideoControls extends VBox {
     }
 
     /** "clip.mp4" at 65.4 s → "clip-1m05s.png". */
-    static String frameName(String title, double seconds) {
+    static String frameName(@Nullable String title, double seconds) {
         String base = FileNames.safe(title == null ? "" : title.replaceAll("\\.[A-Za-z0-9]{1,5}$", ""));
         if (base.isEmpty()) base = "video";
         long s = (long) Math.max(0, seconds);
-        return base + "-" + (s / 60) + "m" + String.format("%02d", s % 60) + "s.png";
+        return base + "-" + (s / 60) + "m" + String.format(Locale.ROOT, "%02d", s % 60) + "s.png";
     }
 }

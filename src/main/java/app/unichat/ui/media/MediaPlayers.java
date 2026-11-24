@@ -5,6 +5,7 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaException;
 import javafx.scene.media.MediaPlayer;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 
@@ -14,8 +15,8 @@ final class MediaPlayers {
 
     private MediaPlayers() {}
 
-    /** @return the player, or null after calling {@code onFailure} (which may also run later, on the FX thread) */
-    static MediaPlayer open(Path file, Runnable onFailure) {
+    /** Returns the player, or null after calling {@code onFailure} (which may also run later, on the FX thread). */
+    static @Nullable MediaPlayer open(Path file, Runnable onFailure) {
         Media media;
         MediaPlayer player;
         try {

@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -8,11 +9,12 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MediaCacheTest {
-    private static Path file(Path dir, String name, int size, long usedMillis) throws Exception {
+    private static Path file(Path dir, String name, int size, long usedMillis) throws IOException {
         Path p = Files.write(dir.resolve(name), new byte[size]);
         Files.setLastModifiedTime(p, FileTime.fromMillis(usedMillis));
         return p;
@@ -75,7 +77,7 @@ class MediaCacheTest {
         long twoHoursAgo = System.currentTimeMillis() - 2 * 3_600_000L;
         Path frames = Files.createDirectories(dir.resolve(".abc.webp.frames.part"));
         file(frames, "f00.pam", 1_000, twoHoursAgo);
-        Files.setLastModifiedTime(frames, java.nio.file.attribute.FileTime.fromMillis(twoHoursAgo));
+        Files.setLastModifiedTime(frames, FileTime.fromMillis(twoHoursAgo));
 
         MediaCache.trim(dir, 1_000_000);
 
@@ -110,7 +112,7 @@ class MediaCacheTest {
         String direct = "mxc://media-whatsapp.localhost/abc";
         assertEquals(MediaDownloader.cacheKey(direct, 0, 0), MediaDownloader.cacheKey(direct, 152, 152));
         assertEquals(MediaDownloader.cacheKey("https://x/y.gif", 0, 0), MediaDownloader.cacheKey("https://x/y.gif", 200, 200));
-        assertFalse(MediaDownloader.cacheKey("mxc://local/abc", 0, 0).equals(MediaDownloader.cacheKey("mxc://local/abc", 152, 152)));
+        assertNotEquals(MediaDownloader.cacheKey("mxc://local/abc", 152, 152), MediaDownloader.cacheKey("mxc://local/abc", 0, 0));
     }
 
     @Test

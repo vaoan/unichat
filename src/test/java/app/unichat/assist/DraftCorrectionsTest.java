@@ -1,5 +1,6 @@
 package app.unichat.assist;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import org.junit.jupiter.api.Test;
@@ -87,7 +88,7 @@ class DraftCorrectionsTest {
     void theContextIsShortAndCanBeNone() {
         List<Message> many = new java.util.ArrayList<>();
         for (int i = 0; i < 5; i++) many.add(msg("$" + i, false, "mensaje " + i + " " + "x".repeat(300)));
-        String c = DraftCorrections.context(many);
+        String c = Present.of(DraftCorrections.context(many));
         assertEquals(DraftCorrections.CONTEXT_MESSAGES, c.split("\n").length);
         assertTrue(c.startsWith("mensaje 2 "), c);
         assertTrue(c.lines().allMatch(l -> l.length() <= DraftCorrections.CONTEXT_CHARS + 1));

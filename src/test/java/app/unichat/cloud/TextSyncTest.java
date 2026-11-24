@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,8 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TextSyncTest {
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
-    private static final String CHAT = "3f2a9c1b2d4e", FILE = CHAT + " 2026-11.jsonl";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String CHAT = "3f2a9c1b2d4e";
+    private static final String FILE = CHAT + " 2026-11.jsonl";
 
     @TempDir
     Path dir;
@@ -24,7 +27,7 @@ class TextSyncTest {
         return new TextSync(dir.resolve(machine + "/texts"), dir.resolve(machine + "/cloud-texts.json"), machine);
     }
 
-    private Path own(String machine) throws Exception {
+    private Path own(String machine) throws IOException {
         return Files.createDirectories(dir.resolve(machine + "/texts/here"));
     }
 
@@ -32,7 +35,8 @@ class TextSyncTest {
     void eachComputerSendsOnlyItsOwnAndBringsTheOthersSoBothHaveAll() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
-            TextSync desk = computer(DESK), laptop = computer(LAPTOP);
+            TextSync desk = computer(DESK);
+            TextSync laptop = computer(LAPTOP);
             Files.writeString(own(DESK).resolve(FILE), "{\"id\":\"$1\"}\n", StandardCharsets.UTF_8);
             Files.writeString(own(LAPTOP).resolve(FILE), "{\"id\":\"$2\"}\n", StandardCharsets.UTF_8);
 
@@ -49,7 +53,8 @@ class TextSyncTest {
             assertTrue(cloud.files.containsKey("Unichat/Texts/" + DESK + "/" + FILE));
             assertFalse(cloud.files.keySet().stream().anyMatch(p -> p.contains("/here/")), "each under its own machine");
 
-            int puts = cloud.puts.get(), gets = cloud.gets.get();
+            int puts = cloud.puts.get();
+            int gets = cloud.gets.get();
             assertEquals(Set.of(), desk.run(dav), "nothing new");
             assertEquals(puts, cloud.puts.get(), "nothing sent again");
             assertEquals(gets, cloud.gets.get(), "nothing brought again: the index's stamp didn't change");
@@ -91,7 +96,7 @@ class TextSyncTest {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
             Files.writeString(own(DESK).resolve(FILE), "{\"id\":\"$1\"}\n", StandardCharsets.UTF_8);
             cloud.failOnce.add("Unichat/Texts/" + DESK + "/index.json");
-            assertThrows(java.io.IOException.class, () -> computer(DESK).run(dav), "the network dropped after the file");
+            assertThrows(IOException.class, () -> computer(DESK).run(dav), "the network dropped after the file");
             computer(DESK).run(dav); // nothing new to send, but the index is still due
             assertEquals(Set.of(CHAT), computer(LAPTOP).run(dav), "the laptop sees the desk's file");
         }

@@ -1,6 +1,9 @@
 package app.unichat.video;
 
+import app.unichat.Present;
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -8,6 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,9 +38,9 @@ class VideoTranscoderTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aVp9VideoBecomesH264InItsPlace() throws Exception {
-        Path ffmpeg = Ffmpeg.find();
-        Assumptions.assumeTrue(ffmpeg != null, "needs an ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "needs an ffmpeg");
         Path vp9 = dir.resolve("Video by alguien [Dx1] [abc].mp4");
         Processes.Result made = Processes.capture(new ProcessBuilder(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
                 "-f", "lavfi", "-i", "testsrc=size=64x64:rate=10:duration=1", "-c:v", "libvpx-vp9", vp9.toString())
@@ -48,8 +52,10 @@ class VideoTranscoderTest {
         String info = Processes.capture(new ProcessBuilder(ffmpeg.toString(), "-hide_banner", "-nostdin", "-i", result.toString())
                 .redirectErrorStream(true), NO_LIMIT).out();
         assertTrue(VideoTranscoder.playsEverywhere(info), info);
-        assertEquals(List.of("Video by alguien [Dx1] [abc].mp4"), Files.list(dir).map(p -> p.getFileName().toString()).toList(),
-                "nothing half-written left behind");
+        try (Stream<Path> stream = Files.list(dir)) {
+            assertEquals(List.of("Video by alguien [Dx1] [abc].mp4"), stream.map(PathParts::name).toList(),
+                    "nothing half-written left behind");
+        }
 
         assertEquals(result, VideoTranscoder.makePlayable(ffmpeg, result), "H.264 already: left as it is");
     }
@@ -70,9 +76,9 @@ class VideoTranscoderTest {
 
     /** gallery-dl saves a link's pictures: each stays the picture it is, never a one-frame MP4. */
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void picturesAreLeftAlone() throws Exception {
-        Path ffmpeg = Ffmpeg.find();
-        Assumptions.assumeTrue(ffmpeg != null, "needs an ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "needs an ffmpeg");
         for (String name : List.of("foto [1].png", "foto [2].jpg", "animada [3].gif")) {
             Path picture = dir.resolve(name);
             List<String> make = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
@@ -86,7 +92,9 @@ class VideoTranscoderTest {
             assertEquals(picture, VideoTranscoder.makePlayable(ffmpeg, picture), name);
             org.junit.jupiter.api.Assertions.assertArrayEquals(before, Files.readAllBytes(picture), name + " untouched");
         }
-        assertEquals(List.of("animada [3].gif", "foto [1].png", "foto [2].jpg"),
-                Files.list(dir).map(p -> p.getFileName().toString()).sorted().toList(), "no .mp4 beside them");
+        try (Stream<Path> stream = Files.list(dir)) {
+            assertEquals(List.of("animada [3].gif", "foto [1].png", "foto [2].jpg"),
+                    stream.map(PathParts::name).sorted().toList(), "no .mp4 beside them");
+        }
     }
 }

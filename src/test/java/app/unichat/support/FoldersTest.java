@@ -17,25 +17,25 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 class FoldersTest {
     @Test
-    void whatsInAFolderLongerThanItsTimeGoesTheRestStays(@org.junit.jupiter.api.io.TempDir Path tmp) throws Exception {
-        Path old = java.nio.file.Files.createDirectories(tmp.resolve("capture-1"));
-        java.nio.file.Files.writeString(old.resolve("a.png"), "x");
-        java.nio.file.Files.setLastModifiedTime(old, java.nio.file.attribute.FileTime.from(java.time.Instant.now().minus(java.time.Duration.ofDays(2))));
-        Path recent = java.nio.file.Files.createDirectories(tmp.resolve("capture-2"));
+    void whatsInAFolderLongerThanItsTimeGoesTheRestStays(@TempDir Path tmp) throws Exception {
+        Path old = Files.createDirectories(tmp.resolve("capture-1"));
+        Files.writeString(old.resolve("a.png"), "x");
+        Files.setLastModifiedTime(old, java.nio.file.attribute.FileTime.from(java.time.Instant.now().minus(java.time.Duration.ofDays(2))));
+        Path recent = Files.createDirectories(tmp.resolve("capture-2"));
         Folders.deleteOlderThan(tmp, java.time.Duration.ofDays(1));
-        assertFalse(java.nio.file.Files.exists(old), "a day old: gone, with what was in it");
-        assertTrue(java.nio.file.Files.exists(recent));
+        assertFalse(Files.exists(old), "a day old: gone, with what was in it");
+        assertTrue(Files.exists(recent));
         Folders.deleteOlderThan(tmp.resolve("nada"), java.time.Duration.ofDays(1)); // no folder: nothing to do
     }
 
     @Test
-    void aPrivateFolderIsTheOwnersAlone(@org.junit.jupiter.api.io.TempDir Path tmp) throws Exception {
-        Path dir = Folders.ownerOnly(tmp.resolve("texts/here"));
-        assertTrue(java.nio.file.Files.isDirectory(dir));
-        if (dir.getFileSystem().supportedFileAttributeViews().contains("posix")) {
-            assertEquals("rwx------", java.nio.file.attribute.PosixFilePermissions.toString(java.nio.file.Files.getPosixFilePermissions(dir)));
+    void aPrivateFolderIsTheOwnersAlone(@TempDir Path tmp) throws Exception {
+        Path made = Folders.ownerOnly(tmp.resolve("texts/here"));
+        assertTrue(Files.isDirectory(made));
+        if (made.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            assertEquals("rwx------", PosixFilePermissions.toString(Files.getPosixFilePermissions(made)));
         }
-        assertEquals(dir, Folders.ownerOnly(dir), "there already: fine");
+        assertEquals(made, Folders.ownerOnly(made), "there already: fine");
     }
 
     @TempDir Path dir;

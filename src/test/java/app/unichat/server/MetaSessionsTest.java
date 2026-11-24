@@ -1,8 +1,11 @@
 package app.unichat.server;
 
-import app.unichat.bridge.BridgeStates;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.sql.SQLException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +13,7 @@ import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.file.Files;
@@ -32,11 +36,10 @@ class MetaSessionsTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String COOKIES = "{\"xs\":\"secreto\",\"c_user\":\"1\"}";
     @TempDir Path dir;
-    private final BridgeStates states = new BridgeStates();
     private final List<String> restored = new ArrayList<>();
     private boolean redirecting;
     private MetaSessions sessions;
-    private HttpServer server;
+    private @Nullable HttpServer server;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -44,7 +47,7 @@ class MetaSessionsTest {
         Files.createDirectories(dir.resolve("instagram"));
         sql("facebook", "CREATE TABLE user_login (bridge_id TEXT NOT NULL, user_mxid TEXT NOT NULL, id TEXT NOT NULL, remote_name TEXT NOT NULL,"
                 + " remote_profile jsonb, space_room TEXT, metadata jsonb NOT NULL, PRIMARY KEY (bridge_id, id))");
-        sessions = new MetaSessions(dir, states, bridge -> redirecting, bridge -> {
+        sessions = new MetaSessions(dir, bridge -> redirecting, bridge -> {
             restored.add(bridge);
             sessions.restore(bridge);
         });
@@ -57,19 +60,22 @@ class MetaSessionsTest {
 
     private Path db() { return dir.resolve("facebook/facebook.db"); }
 
-    private void sql(String bridge, String statement) throws Exception {
+    @SuppressFBWarnings(value = "SQL_INJECTION_JDBC", justification = "builds or reads a fixture database with the test's own SQL")
+    private void sql(String bridge, String statement) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + dir.resolve(bridge + "/" + bridge + ".db"));
              Statement s = c.createStatement()) {
             s.execute(statement);
         }
     }
 
-    private void login(String id, String cookies) throws Exception {
+    @SuppressFBWarnings(value = "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE", justification = "builds or reads a fixture database with the test's own SQL")
+    private void login(String id, String cookies) throws SQLException {
         sql("facebook", "INSERT INTO user_login (bridge_id, user_mxid, id, remote_name, metadata) VALUES ('b','@yo:localhost','" + id
                 + "','Yo','{\"platform\":\"facebook\",\"cookies\":" + cookies + ",\"wa_device_id\":7}')");
     }
 
-    private String metadata(String id) throws Exception {
+    @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
+    private @Nullable String metadata(String id) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db());
              Statement s = c.createStatement();
              ResultSet r = s.executeQuery("SELECT metadata FROM user_login WHERE id='" + id + "'")) {
@@ -77,7 +83,8 @@ class MetaSessionsTest {
         }
     }
 
-    private void wipe(String id) throws Exception {
+    @SuppressFBWarnings(value = "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE", justification = "builds or reads a fixture database with the test's own SQL")
+    private void wipe(String id) throws SQLException {
         sql("facebook", "UPDATE user_login SET metadata='{\"platform\":\"facebook\",\"cookies\":null,\"wa_device_id\":7}' WHERE id='" + id + "'");
     }
 
@@ -98,7 +105,7 @@ class MetaSessionsTest {
         login("1", COOKIES);
         sessions.tick(true, 0);
         wipe("1");
-        redirecting = true;
+        redirecting = true; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         sessions.tick(true, 1000);
         sessions.tick(false, 2000);
         assertEquals(List.of(), restored, "it would be wiped again");
@@ -135,7 +142,7 @@ class MetaSessionsTest {
         login("1", COOKIES);
         sessions.tick(true, 0);
         wipe("1");
-        redirecting = true;
+        redirecting = true; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         sessions.tick(true, MetaSessions.BACKUP_EVERY_MS + 1);
         redirecting = false;
         sessions.tick(true, MetaSessions.BACKUP_EVERY_MS * 2 + 2);
@@ -180,8 +187,8 @@ class MetaSessionsTest {
         assertTrue(sessions.safeToRestart("telegram"));
     }
 
-    private URI serving(int status, String location) throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    private URI serving(int status, @Nullable String location) throws IOException {
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             if (location != null) ex.getResponseHeaders().add("Location", location);
             ex.sendResponseHeaders(status, -1);

@@ -2,6 +2,7 @@ package app.unichat.video;
 
 import app.unichat.support.BundledTools;
 import app.unichat.support.Folders;
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
 
 import java.awt.image.BufferedImage;
@@ -13,6 +14,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Every frame of an animated WebP, composited by libwebp's {@code anim_dump} (shipped in app/server, beside gif2webp): as a
@@ -28,12 +30,12 @@ public final class AnimDump {
     private AnimDump() {}
 
     /** {@code -Dunichat.animDump} (development), the copy inside the app, or one on the PATH; null when there's none. */
-    public static Path find() {
+    public static @Nullable Path find() {
         return BundledTools.find("unichat.animDump", null, "anim_dump");
     }
 
     /** The frames, oldest first, each the whole canvas; null when there's no anim_dump or it can't read the file. */
-    public static List<BufferedImage> frames(Path webp) {
+    public static @Nullable List<BufferedImage> frames(Path webp) {
         return frames(webp, f -> f);
     }
 
@@ -41,7 +43,7 @@ public final class AnimDump {
      * The frames, oldest first, each made {@code each} (smaller) as it's read: a 512 px sticker's frames all whole at
      * once (1 MB each) were the peak that filled the memory when the sticker panel opened. Null as {@link #frames(Path)}.
      */
-    public static List<BufferedImage> frames(Path webp, java.util.function.UnaryOperator<BufferedImage> each) {
+    public static @Nullable List<BufferedImage> frames(Path webp, java.util.function.UnaryOperator<BufferedImage> each) {
         Path tool = find();
         if (tool == null) return null;
         Path dir = null;
@@ -52,7 +54,7 @@ public final class AnimDump {
             if (!r.finished() || r.exit() != 0) return null;
             List<Path> files;
             try (Stream<Path> s = Files.list(dir)) {
-                files = s.filter(p -> p.getFileName().toString().endsWith(".pam")).sorted().toList();
+                files = s.filter(p -> PathParts.name(p).endsWith(".pam")).sorted().toList();
             }
             if (files.isEmpty()) return null;
             List<BufferedImage> out = new ArrayList<>();
@@ -78,7 +80,7 @@ public final class AnimDump {
 
     static void sweep(Path tmp, long now) {
         try (Stream<Path> s = Files.list(tmp)) {
-            for (Path d : s.filter(p -> p.getFileName().toString().startsWith(PREFIX) && Files.isDirectory(p)).toList()) {
+            for (Path d : s.filter(p -> PathParts.name(p).startsWith(PREFIX) && Files.isDirectory(p)).toList()) {
                 if (now - Files.getLastModifiedTime(d).toMillis() > LEFT_MS) Folders.deleteQuietly(d);
             }
         } catch (IOException e) {
@@ -89,7 +91,9 @@ public final class AnimDump {
     /** A PAM file as libwebp writes it: RGB_ALPHA, 8 bits per sample. */
     static BufferedImage readPam(Path f) throws IOException {
         try (InputStream in = new BufferedInputStream(Files.newInputStream(f))) {
-            int width = -1, height = -1, depth = -1;
+            int width = -1;
+            int height = -1;
+            int depth = -1;
             for (String line = line(in); !"ENDHDR".equals(line); line = line(in)) {
                 if (line == null) throw new IOException("not a PAM file");
                 String[] kv = line.strip().split("\\s+", 2);
@@ -105,7 +109,8 @@ public final class AnimDump {
             byte[] px = in.readNBytes(width * height * depth);
             if (px.length < width * height * depth) throw new IOException("short PAM file");
             int[] argb = new int[width * height];
-            for (int i = 0, p = 0; i < argb.length; i++, p += depth) {
+            for (int i = 0; i < argb.length; i++) {
+                int p = i * depth;
                 int a = depth == 4 ? px[p + 3] & 0xFF : 0xFF;
                 argb[i] = a << 24 | (px[p] & 0xFF) << 16 | (px[p + 1] & 0xFF) << 8 | (px[p + 2] & 0xFF);
             }
@@ -115,7 +120,7 @@ public final class AnimDump {
         }
     }
 
-    private static String line(InputStream in) throws IOException {
+    private static @Nullable String line(InputStream in) throws IOException {
         StringBuilder b = new StringBuilder();
         for (int c = in.read(); c != '\n'; c = in.read()) {
             if (c < 0) return b.isEmpty() ? null : b.toString();

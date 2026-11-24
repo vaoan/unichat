@@ -22,7 +22,7 @@ class StorageTest {
         assertFalse(s.low());
         assertEquals(0, told.get(), "nothing changed");
 
-        free = Storage.LOW_BYTES - 1;
+        free = Storage.LOW_BYTES - 1; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         s.check();
         assertTrue(s.low());
         assertEquals(Storage.LOW_BYTES - 1, s.free());

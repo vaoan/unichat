@@ -1,5 +1,7 @@
 package app.unichat.video;
 
+import app.unichat.support.PathParts;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -10,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.zip.GZIPOutputStream;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,11 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /** Telegram's animated stickers (Lottie, a .tgs is gzipped JSON): told by their bytes, checked, made an animated WebP. */
-public class LottieStickersTest {
+public class LottieStickersTest { // NOPMD: JUnitJupiterTestShouldBePackagePrivate, its fixtures serve ui.media's tests too
     @TempDir Path dir;
 
     /** The one built for development (native/build-lottie.sh), when this machine has it: CI has none and skips. */
-    public static Path tool() {
+    public static @Nullable Path tool() {
         Path built = Path.of(System.getProperty("user.home"), "Library/Caches/unichat-build/lottieconverter");
         if (System.getProperty("unichat.lottieconverter") == null && Files.isExecutable(built)) {
             System.setProperty("unichat.lottieconverter", built.toString());
@@ -115,7 +118,8 @@ public class LottieStickersTest {
     void oneFileIsMadeOnceAtATimeAndAFailureIsntTriedAgain() throws Exception {
         LottieStickers.Once once = new LottieStickers.Once();
         Path f = dir.resolve("s.tgs");
-        java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(1), release = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.atomic.AtomicInteger runs = new java.util.concurrent.atomic.AtomicInteger();
         java.util.concurrent.Callable<Path> make = () -> {
             runs.incrementAndGet();
@@ -158,7 +162,7 @@ public class LottieStickersTest {
         assertTrue(text.contains("ANIM"), "animated");
         assertTrue(text.contains("ALPH") || (bytes[20] & 0x10) != 0, "with its transparency");
         try (var left = Files.list(dir)) {
-            assertTrue(left.noneMatch(f -> f.getFileName().toString().contains(".part")), "its frames gone");
+            assertTrue(left.noneMatch(f -> PathParts.name(f).contains(".part")), "its frames gone");
         }
     }
 

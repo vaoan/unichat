@@ -10,6 +10,7 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.Consumer;
 
@@ -48,10 +49,11 @@ final class LinkPreviewCard {
         VBox card = new VBox(6);
         card.getStyleClass().add("link-preview");
         card.setMaxWidth(width);
-        if (thumbnailed(p)) {
+        String thumbnail = thumbnailed(p) ? p.image() : null; // thumbnailed: there is one
+        if (thumbnail != null) {
             HBox.setHgrow(text, Priority.ALWAYS);
             text.setMaxWidth(inner - THUMBNAIL - 8);
-            HBox row = new HBox(8, text, media.htmlPicture(p.image(), THUMBNAIL, THUMBNAIL, 1));
+            HBox row = new HBox(8, text, media.htmlPicture(thumbnail, THUMBNAIL, THUMBNAIL, 1));
             row.setAlignment(Pos.TOP_LEFT);
             card.getChildren().add(row);
         } else {
@@ -68,12 +70,13 @@ final class LinkPreviewCard {
         return p.video() == null && p.image() != null && small && !(p.title().isEmpty() && p.description().isEmpty());
     }
 
-    private static Node mediaOf(LinkPreview p, double width, MessageMedia media, Chat chat) {
+    private static @Nullable Node mediaOf(LinkPreview p, double width, MessageMedia media, Chat chat) {
         LinkMedia v = p.video();
         if (v != null) return media.linkPlayer(v, p.width(), p.height(), p.gif(), chat);
-        if (p.image() == null) return null;
+        String image = p.image();
+        if (image == null) return null;
         double shape = p.width() > 0 && p.height() > 0 ? (double) p.width() / p.height() : 0;
-        return media.htmlPicture(p.image(), width, MAX_MEDIA_HEIGHT, shape);
+        return media.htmlPicture(image, width, MAX_MEDIA_HEIGHT, shape);
     }
 
     private static Label label(String text, String style, double width) {

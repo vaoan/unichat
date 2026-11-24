@@ -1,9 +1,12 @@
 package app.unichat.model;
 
+import app.unichat.support.PathParts;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,7 +23,7 @@ public final class MediaLibrary {
     public enum Kind { STICKER, GIF, EMOJI }
 
     /** {@code info}: the original event's info (keeps e.g. fi.mau.bridged_sticker so bridges resend the native sticker). */
-    public record Item(Kind kind, String url, String mime, int width, int height, JsonNode info) {}
+    public record Item(Kind kind, String url, @Nullable String mime, int width, int height, @Nullable JsonNode info) {}
 
     /**
      * In the info of a sticker sent as a converted copy (a GIF for Discord, a copy on our server): the item it was made
@@ -35,7 +38,7 @@ public final class MediaLibrary {
     private final List<Item> favorites = new ArrayList<>();
     private final List<Item> recents = new ArrayList<>();
     /** How often each emoji was used to react, most recent first among equals: the quick reactions are the top ones. */
-    private final java.util.LinkedHashMap<String, Integer> reactions = new java.util.LinkedHashMap<>();
+    private final java.util.SequencedMap<String, Integer> reactions = new java.util.LinkedHashMap<>();
     private final List<Runnable> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public MediaLibrary(Path file) {
@@ -112,7 +115,7 @@ public final class MediaLibrary {
     public synchronized List<String> mostReacted(int count, List<String> usual) {
         List<String> keys = new ArrayList<>(reactions.keySet());
         java.util.Collections.reverse(keys); // newest first, so a stable sort keeps the newest ahead among equals
-        keys.sort((a, b) -> reactions.get(b) - reactions.get(a));
+        keys.sort((a, b) -> reactions.getOrDefault(b, 0) - reactions.getOrDefault(a, 0)); // keys are its own: never the 0
         List<String> out = new ArrayList<>(keys.subList(0, Math.min(count, keys.size())));
         for (String u : usual) if (out.size() < count && !out.contains(u)) out.add(u);
         return out;
@@ -124,7 +127,11 @@ public final class MediaLibrary {
     /** Each one's {@code was} becomes its {@code now} where it stands, in favourites and recents; one change for all. */
     public synchronized void replace(List<Replacement> replacements) {
         boolean any = false;
-        for (Replacement r : replacements) any |= replaceIn(favorites, r) | replaceIn(recents, r);
+        for (Replacement r : replacements) {
+            boolean inFavorites = replaceIn(favorites, r); // both lists change, whatever the first did
+            boolean inRecents = replaceIn(recents, r);
+            any |= inFavorites || inRecents;
+        }
         if (!any) return;
         dropCopies(favorites);
         dropCopies(recents);
@@ -157,7 +164,9 @@ public final class MediaLibrary {
             for (JsonNode n : root.path("favorites")) if (known(n)) favorites.add(item(n));
             for (JsonNode n : root.path("recents")) if (known(n)) recents.add(item(n));
             root.path("reactions").fields().forEachRemaining(f -> reactions.put(f.getKey(), f.getValue().asInt()));
-            if (dropCopies(favorites) | dropCopies(recents)) save();
+            boolean droppedFavorites = dropCopies(favorites); // both lists lose their copies, whatever the first did
+            boolean droppedRecents = dropCopies(recents);
+            if (droppedFavorites || droppedRecents) save();
         } catch (IOException | RuntimeException e) {
             favorites.clear();
             recents.clear();
@@ -182,7 +191,8 @@ public final class MediaLibrary {
     static boolean same(Item a, Item b) {
         if (a.kind() != b.kind()) return false;
         if (a.url().equals(b.url())) return true;
-        String idA = bridgeId(a), idB = bridgeId(b);
+        String idA = bridgeId(a);
+        String idB = bridgeId(b);
         if (idA != null && idB != null) return idA.equals(idB);
         long size = size(a);
         return size > 0 && size == size(b) && a.width() == b.width() && a.height() == b.height()
@@ -190,13 +200,15 @@ public final class MediaLibrary {
     }
 
     /** The bridge's own id of the sticker ({@code fi.mau.bridged_sticker}), null when it has none. */
-    public static String bridgeId(Item i) {
-        JsonNode sticker = i.info() == null ? null : i.info().get("fi.mau.bridged_sticker");
+    public static @Nullable String bridgeId(Item i) {
+        JsonNode info = i.info();
+        JsonNode sticker = info == null ? null : info.get("fi.mau.bridged_sticker");
         return sticker == null ? null : sticker.path("id").asText(null);
     }
 
     private static long size(Item i) {
-        return i.info() == null ? 0 : i.info().path("size").asLong(0);
+        JsonNode info = i.info();
+        return info == null ? 0 : info.path("size").asLong(0);
     }
 
     /** An item of a kind this version doesn't know (written by a newer Unichat) is skipped, not the whole file. */
@@ -211,13 +223,14 @@ public final class MediaLibrary {
 
     private void save() {
         ObjectNode root = JSON.createObjectNode();
-        ArrayNode fav = root.putArray("favorites"), rec = root.putArray("recents");
+        ArrayNode fav = root.putArray("favorites");
+        ArrayNode rec = root.putArray("recents");
         favorites.forEach(i -> fav.add(node(i)));
         recents.forEach(i -> rec.add(node(i)));
         ObjectNode react = root.putObject("reactions");
         reactions.forEach(react::put);
         try {
-            Files.createDirectories(file.getParent());
+            Files.createDirectories(PathParts.parent(file));
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
             JSON.writeValue(tmp.toFile(), root);
             Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE); // lesson-ok: atomic-move (model may not use support)
@@ -235,7 +248,8 @@ public final class MediaLibrary {
 
     /** The item {@code sent} was converted from, when its info names one with a media address; else {@code sent}. */
     public static Item original(Item sent) {
-        JsonNode o = sent.info() == null ? null : sent.info().get(ORIGINAL);
+        JsonNode info = sent.info();
+        JsonNode o = info == null ? null : info.get(ORIGINAL);
         if (o == null || !o.isObject() || !known(o) || Mxc.parse(o.path("url").asText()) == null) return sent;
         Item i = item(o);
         return i.kind() == sent.kind() ? i : sent;
@@ -249,7 +263,8 @@ public final class MediaLibrary {
     private static ObjectNode node(Item i) {
         ObjectNode n = JSON.createObjectNode().put("kind", i.kind().name()).put("url", i.url()).put("mime", i.mime())
                 .put("width", i.width()).put("height", i.height());
-        if (i.info() != null) n.set("info", i.info().deepCopy());
+        JsonNode info = i.info();
+        if (info != null) n.set("info", info.deepCopy());
         return n;
     }
 }

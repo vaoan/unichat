@@ -1,6 +1,8 @@
 package app.unichat.server;
 
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetAddress;
@@ -18,7 +20,7 @@ class HttpProbeTest {
     private static final Duration NO_LIMIT = Duration.ofDays(1);
 
     /** A server whose {@code /_matrix/client/versions} answers {@code status}. */
-    private static HttpServer answering(int status) throws Exception {
+    private static HttpServer answering(int status) throws IOException {
         HttpServer s = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         s.createContext("/_matrix/client/versions", x -> {
             x.sendResponseHeaders(status, -1);
@@ -30,7 +32,8 @@ class HttpProbeTest {
 
     @Test
     void readyNeedsA200AliveAnyAnswer() throws Exception {
-        HttpServer ok = answering(200), starting = answering(503);
+        HttpServer ok = answering(200);
+        HttpServer starting = answering(503);
         try {
             assertTrue(HttpProbe.answers(HTTP, ok.getAddress().getPort(), NO_LIMIT, HttpProbe.Up.READY));
             assertTrue(HttpProbe.answers(HTTP, ok.getAddress().getPort(), NO_LIMIT, HttpProbe.Up.ALIVE));
@@ -43,6 +46,7 @@ class HttpProbeTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void nothingListeningIsDown() throws Exception {
         int port;
         try (ServerSocket free = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
@@ -52,6 +56,7 @@ class HttpProbeTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void aHungProcessIsDown() throws Exception {
         try (ServerSocket silent = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
             assertFalse(HttpProbe.answers(HTTP, silent.getLocalPort(), Duration.ofNanos(1), HttpProbe.Up.ALIVE));
@@ -59,6 +64,7 @@ class HttpProbeTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void anInterruptedProbeIsNeitherUpNorDown() throws Exception {
         try (ServerSocket silent = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
             Thread.currentThread().interrupt();

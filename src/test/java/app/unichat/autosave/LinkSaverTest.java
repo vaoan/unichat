@@ -4,6 +4,7 @@ import app.unichat.support.I18n;
 import instatray.core.Fetch;
 import instatray.core.Site;
 import instatray.core.Tools;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -28,7 +30,7 @@ class LinkSaverTest {
     Path dir;
 
     /** A yt-dlp that prints what the real one does with the engine's options, and saves a file; it says it ran. */
-    private Tools fakeYtDlp() throws Exception {
+    private Tools fakeYtDlp() throws IOException {
         return fakeYtDlp("""
                 touch "$FAKE_OUT/.ran"
                 f="$FAKE_OUT/clip [abc].mp4"
@@ -41,15 +43,15 @@ class LinkSaverTest {
     }
 
     /** A yt-dlp that runs {@code body}, with {@code $FAKE_OUT} the chat's folder. */
-    private Tools fakeYtDlp(String body) throws Exception {
+    private Tools fakeYtDlp(String body) throws IOException {
         Path tool = dir.resolve("yt-dlp");
         Files.writeString(tool, "#!/bin/sh\n" + body);
         Files.setPosixFilePermissions(tool, PosixFilePermissions.fromString("rwx------"));
         Path out = Files.createDirectories(dir.resolve("Ana"));
         return new Tools() {
             @Override public String ytDlp() { return tool.toString(); }
-            @Override public String galleryDl() { return null; }
-            @Override public String ffmpeg() { return null; }
+            @Override public @Nullable String galleryDl() { return null; }
+            @Override public @Nullable String ffmpeg() { return null; }
             @Override public Map<String, String> environment() {
                 Map<String, String> env = new HashMap<>(Tools.super.environment());
                 env.put("FAKE_OUT", out.toString());

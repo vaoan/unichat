@@ -1,15 +1,23 @@
 package app.unichat.login;
 
+import app.unichat.support.PathParts;
+
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Reads the user's own Firefox session cookies. Only runs on an explicit user action and only
@@ -29,14 +37,14 @@ public final class FirefoxCookies {
 
     static Path profilesRoot(String osName) {
         String os = osName == null ? "" : osName.toLowerCase(Locale.ROOT);
-        Path home = Paths.get(System.getProperty("user.home", "."));
+        Path home = Path.of(System.getProperty("user.home", "."));
         if (os.contains("mac")) {
             return home.resolve("Library").resolve("Application Support").resolve("Firefox").resolve("Profiles");
         }
         if (os.contains("win")) {
             String appData = System.getenv("APPDATA");
             Path base = appData != null && !appData.isBlank()
-                    ? Paths.get(appData) : home.resolve("AppData").resolve("Roaming");
+                    ? Path.of(appData) : home.resolve("AppData").resolve("Roaming");
             return base.resolve("Mozilla").resolve("Firefox").resolve("Profiles");
         }
         return home.resolve(".mozilla").resolve("firefox");
@@ -86,7 +94,7 @@ public final class FirefoxCookies {
                 if (!Files.isRegularFile(db)) continue;
                 SessionCookies cookies = CookieDbCopy.read(db, copy -> read(copy, spec, Instant.now()));
                 if (cookies != null) {
-                    out.add(new BrowserSession("Firefox", profile.getFileName().toString(), cookies));
+                    out.add(new BrowserSession("Firefox", PathParts.name(profile), cookies));
                 }
             }
         }
@@ -94,12 +102,12 @@ public final class FirefoxCookies {
     }
 
     /** The folders set in {@link #ROOTS_PROPERTY}, or null when it isn't set. */
-    static List<Path> rootsOverride() {
+    static @Nullable List<Path> rootsOverride() {
         String override = System.getProperty(ROOTS_PROPERTY);
         if (override == null || override.isBlank()) return null;
         List<Path> out = new ArrayList<>();
         for (String part : override.split(";|" + java.util.regex.Pattern.quote(java.io.File.pathSeparator))) {
-            if (!part.isBlank()) out.add(Paths.get(part.trim()));
+            if (!part.isBlank()) out.add(Path.of(part.trim()));
         }
         return out;
     }

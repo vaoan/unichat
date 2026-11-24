@@ -1,11 +1,14 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.service.MockChatService;
+import app.unichat.support.PathParts;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.MainView;
 import app.unichat.ui.desktop.Notifier;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.Node;
@@ -26,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,6 +38,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -45,7 +50,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CaptureUiTest {
     private static final String CHAT = "!family:demo";
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private MainView view;
     private ThreadPane thread;
     @TempDir
@@ -74,22 +81,21 @@ class CaptureUiTest {
             stage.setScene(new Scene(view, 900, 700));
             stage.show();
             view.openChatId(CHAT);
-            return find(view);
+            return Present.of(find(view));
         });
     }
 
     @AfterEach
     void close() throws Exception {
         svc.stop();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.dispose();
             stage.close();
             stage.getScene().setRoot(new javafx.scene.layout.Pane());
-            return null;
         });
     }
 
-    private static ThreadPane find(Node n) {
+    private static @Nullable ThreadPane find(Node n) {
         if (n instanceof ThreadPane t) return t;
         if (n instanceof Parent p) for (Node c : p.getChildrenUnmodifiable()) {
             ThreadPane t = find(c);
@@ -102,34 +108,33 @@ class CaptureUiTest {
         return svc.messages(CHAT);
     }
 
-    @SuppressWarnings("unchecked")
-    private ListView<ThreadRows.Row> list() throws Exception {
+    @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
+    private ListView<ThreadRows.Row> list() throws InterruptedException {
         return FxWait.fx(() -> (ListView<ThreadRows.Row>) thread.lookup(".timeline"));
     }
 
     /** Space on {@code m}, as a click on it while picking. */
-    private void press(Message m) throws Exception {
+    private void press(Message m) throws InterruptedException {
         ListView<ThreadRows.Row> l = list();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             for (int i = 0; i < l.getItems().size(); i++) {
                 if (l.getItems().get(i) instanceof ThreadRows.MessageRow mr && mr.message().id().equals(m.id())) l.getSelectionModel().select(i);
             }
             l.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, " ", " ", KeyCode.SPACE, false, false, false, false));
-            return null;
         });
     }
 
-    private String count() throws Exception {
+    private String count() throws InterruptedException {
         return FxWait.fx(() -> ((Label) thread.lookup(".selection-count")).getText());
     }
 
-    private void start(Message m) throws Exception {
+    private void start(Message m) throws InterruptedException {
         MenuItem capture = FxWait.fx(() -> thread.actions().messageMenu(m).getItems().stream()
                 .filter(i -> "Capturar conversación…".equals(i.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { capture.fire(); return null; });
+        FxWait.onFx(capture::fire);
     }
 
-    private List<String> ends() throws Exception {
+    private List<String> ends() throws InterruptedException {
         FxWait.settled();
         return FxWait.fx(() -> thread.lookupAll(".range-end-label").stream().map(n -> ((Label) n).getText()).toList());
     }
@@ -137,7 +142,9 @@ class CaptureUiTest {
     @Test
     void aStretchIsEverythingBetweenItsTwoMarkers() throws Exception {
         List<Message> all = chat();
-        Message a = all.get(all.size() - 6), b = all.get(all.size() - 4), c = all.get(all.size() - 2);
+        Message a = all.get(all.size() - 6);
+        Message b = all.get(all.size() - 4);
+        Message c = all.get(all.size() - 2);
         start(b);
         assertEquals("Capturando 1 mensaje", count(), "the first is both ends");
         FxWait.settled();
@@ -158,23 +165,24 @@ class CaptureUiTest {
     @Test
     void anEndTakenAwayIsPutBackByTheNextClick() throws Exception {
         List<Message> all = chat();
-        Message a = all.get(all.size() - 5), b = all.get(all.size() - 2);
+        Message a = all.get(all.size() - 5);
+        Message b = all.get(all.size() - 2);
         start(a);
         press(b);
         Button removeEnd = FxWait.fx(() -> thread.lookupAll(".range-ends .button").stream().map(n -> (Button) n)
                 .filter(x -> x.getAccessibleText().startsWith("Quitar «Hasta:")).findFirst().orElseThrow());
-        FxWait.fx(() -> { removeEnd.fire(); return null; });
+        FxWait.onFx(removeEnd::fire);
         assertEquals("Capturando 1 mensaje", count(), "its start alone");
         assertEquals(1, ends().size());
         press(all.get(all.size() - 3));
         assertEquals("Capturando 3 mensajes", count(), "the end is back where clicked");
     }
 
-    private Node sheet() throws Exception {
+    private Node sheet() throws InterruptedException {
         return FxWait.fx(() -> stage.getScene().getRoot().lookup(".capture-sheet"));
     }
 
-    private void captureLast(int n) throws Exception {
+    private void captureLast(int n) throws InterruptedException {
         List<Message> all = chat();
         // The window shows new messages a moment later (MainView paces its redraws), and one still going out can't be an
         // end (its id is a temporary one): pick once the newest is listed and the server has it.
@@ -185,11 +193,11 @@ class CaptureUiTest {
         press(all.getLast());
         Button go = FxWait.fx(() -> thread.lookupAll(".selection-bar .button").stream().map(x -> (Button) x)
                 .filter(x -> "Capturar…".equals(x.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { go.fire(); return null; });
+        FxWait.onFx(go::fire);
         FxWait.until("the capture is ready", () -> FxWait.fx(() -> sheet() != null && !sheet().lookupAll(".capture-picture").isEmpty()));
     }
 
-    private List<ImageView> pictures() throws Exception {
+    private List<ImageView> pictures() throws InterruptedException {
         return FxWait.fx(() -> sheet().lookupAll(".capture-picture").stream().map(n -> (ImageView) n).toList());
     }
 
@@ -201,7 +209,7 @@ class CaptureUiTest {
         double whole = FxWait.fx(() -> pictures().getFirst().getImage().getHeight());
         ToggleButton phone = FxWait.fx(() -> sheet().lookupAll(".toggle-button").stream().map(n -> (ToggleButton) n)
                 .filter(t -> "Varias para teléfono".equals(t.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { phone.fire(); return null; });
+        FxWait.onFx(phone::fire);
         List<ImageView> pieces = pictures(); // shown small: 380 wide, each a phone's screen tall
         assertTrue(pieces.size() > 1, "a dozen messages are more than a screen: " + pieces.size() + " pieces of " + whole);
         double width = pieces.getFirst().getImage().getWidth();
@@ -214,16 +222,15 @@ class CaptureUiTest {
         captureLast(3);
         Button send = FxWait.fx(() -> sheet().lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Enviar a un chat…".equals(b.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { send.fire(); return null; });
+        FxWait.onFx(send::fire);
         int before = svc.messages("!mom:demo").size();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ListView<?> chats = (ListView<?>) sheet().lookup(".forward-chats");
             for (int i = 0; i < chats.getItems().size(); i++) {
                 if (((app.unichat.model.Chat) chats.getItems().get(i)).id().equals("!mom:demo")) chats.getSelectionModel().select(i);
             }
             chats.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, " ", " ", KeyCode.SPACE, false, false, false, false));
             ((Button) sheet().lookupAll(".button").stream().filter(b -> "Enviar".equals(((Button) b).getText())).findFirst().orElseThrow()).fire();
-            return null;
         });
         FxWait.until("the picture went", () -> svc.messages("!mom:demo").size() == before + 1);
         Message sent = svc.messages("!mom:demo").getLast();
@@ -233,14 +240,18 @@ class CaptureUiTest {
 
     @Test
     void itCanBeSavedToAFolder() throws Exception {
+        savesToAFolder();
+    }
+
+    private void savesToAFolder() throws InterruptedException {
         captureLast(3);
-        FxWait.fx(() -> { thread.captureSheet().useFolderChooser(w -> dir.toFile()); return null; });
+        FxWait.onFx(() -> Present.of(thread.captureSheet()).useFolderChooser(w -> dir.toFile()));
         Button save = FxWait.fx(() -> sheet().lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Guardar…".equals(b.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { save.fire(); return null; });
+        FxWait.onFx(save::fire);
         FxWait.until("saved", () -> {
             try (var s = Files.list(dir)) {
-                return s.anyMatch(p -> p.getFileName().toString().startsWith("Conversación ") && p.toString().endsWith(".png"));
+                return s.anyMatch(p -> PathParts.name(p).startsWith("Conversación ") && p.toString().endsWith(".png"));
             }
         });
     }
@@ -258,7 +269,7 @@ class CaptureUiTest {
         captureLast(3);
         Button copy = FxWait.fx(() -> sheet().lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Copiar".equals(b.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { copy.fire(); return null; });
+        FxWait.onFx(copy::fire);
         FxWait.until("on the clipboard: the picture and its file", () -> FxWait.fx(() -> {
             javafx.scene.input.Clipboard c = javafx.scene.input.Clipboard.getSystemClipboard();
             return c.hasImage() && c.hasFiles() && c.getFiles().getFirst().getName().endsWith(".png");
@@ -270,7 +281,7 @@ class CaptureUiTest {
         captureLast(3);
         double with = FxWait.fx(() -> pictures().getFirst().getImage().getHeight());
         javafx.scene.control.CheckBox footer = FxWait.fx(() -> (javafx.scene.control.CheckBox) sheet().lookup(".check-box"));
-        FxWait.fx(() -> { footer.fire(); return null; });
+        FxWait.onFx(footer::fire);
         FxWait.until("made again without it", () -> FxWait.fx(() -> !pictures().isEmpty() && pictures().getFirst().getImage().getHeight() < with));
     }
 
@@ -281,21 +292,15 @@ class CaptureUiTest {
         press(all.getLast());
         FxWait.settled();
         Button x = FxWait.fx(() -> (Button) thread.lookup(".range-marker-end .button"));
-        FxWait.fx(() -> { // a real click, through the list's own handling while picking
+        FxWait.onFx(() -> { // a real click, through the list's own handling while picking
             javafx.geometry.Bounds b = x.localToScene(x.getBoundsInLocal());
             for (var type : List.of(javafx.scene.input.MouseEvent.MOUSE_PRESSED, javafx.scene.input.MouseEvent.MOUSE_RELEASED,
                     javafx.scene.input.MouseEvent.MOUSE_CLICKED)) {
-                javafx.event.Event.fireEvent(x, new javafx.scene.input.MouseEvent(type, 2, 2, b.getCenterX(), b.getCenterY(),
+                Event.fireEvent(x, new javafx.scene.input.MouseEvent(type, 2, 2, b.getCenterX(), b.getCenterY(),
                         javafx.scene.input.MouseButton.PRIMARY, 1, false, false, false, false, true, false, false, true, false, false, null));
             }
-            return null;
         });
         assertEquals("Capturando 1 mensaje", count(), "only its start is left");
-    }
-
-    private String status() throws Exception {
-        return FxWait.fx(() -> sheet().lookupAll(".label").stream().map(n -> ((Label) n).getText())
-                .filter(t -> t != null && (t.startsWith("Lista") || t.startsWith("No se pudo") || t.startsWith("Preparando"))).findFirst().orElse(""));
     }
 
     @Test
@@ -309,7 +314,7 @@ class CaptureUiTest {
         }, stage.getScene(), ConversationShot.WIDTH, false, java.time.Duration.ZERO));
         java.util.concurrent.ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(
                 java.util.concurrent.ExecutionException.class, f::get);
-        assertTrue(e.getCause() instanceof ConversationShot.TooLong);
+        assertInstanceOf(ConversationShot.TooLong.class, e.getCause());
         assertEquals(0, drawn.get(), "not one row made");
     }
 
@@ -323,7 +328,7 @@ class CaptureUiTest {
         }, stage.getScene(), ConversationShot.WIDTH, false, java.time.Duration.ZERO));
         java.util.concurrent.ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(
                 java.util.concurrent.ExecutionException.class, f::get);
-        assertTrue(e.getCause() instanceof ConversationShot.TooLong, String.valueOf(e.getCause()));
+        assertInstanceOf(ConversationShot.TooLong.class, e.getCause(), String.valueOf(e.getCause()));
     }
 
     @Test
@@ -338,25 +343,25 @@ class CaptureUiTest {
         captureLast(3);
         Path sending = app.unichat.settings.Settings.dataDir().resolve("cache").resolve("sending");
         java.util.Set<String> before = names(sending);
-        FxWait.fx(() -> { thread.captureSheet().useFolderChooser(w -> dir.toFile()); return null; });
+        FxWait.onFx(() -> Present.of(thread.captureSheet()).useFolderChooser(w -> dir.toFile()));
         Button save = FxWait.fx(() -> sheet().lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Guardar…".equals(b.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { save.fire(); return null; });
+        FxWait.onFx(save::fire);
         FxWait.until("saved", () -> names(dir).size() == 1);
         assertEquals(before, names(sending), "straight into the folder chosen");
     }
 
-    private static java.util.Set<String> names(Path folder) throws java.io.IOException {
+    private static java.util.Set<String> names(Path folder) throws IOException {
         if (!Files.isDirectory(folder)) return java.util.Set.of();
         try (var s = Files.list(folder)) {
-            return s.map(p -> p.getFileName().toString()).collect(java.util.stream.Collectors.toSet());
+            return s.map(PathParts::name).collect(java.util.stream.Collectors.toSet());
         }
     }
 
     @Test
     void aChatsVeryLongNameStillMakesAFile() throws Exception {
-        FxWait.fx(() -> { svc.chat(CHAT).setTitle("😀".repeat(120)); return null; });
-        itCanBeSavedToAFolder();
+        FxWait.onFx(() -> Present.of(svc.chat(CHAT)).setTitle("😀".repeat(120)));
+        savesToAFolder();
     }
 
     @Test
@@ -375,7 +380,10 @@ class CaptureUiTest {
         start(all.get(all.size() - 3));
         press(all.getLast());
         Button x = FxWait.fx(() -> (Button) thread.lookup(".range-ends .button"));
-        FxWait.fx(() -> { x.requestFocus(); x.fire(); return null; });
+        FxWait.onFx(() -> {
+            x.requestFocus();
+            x.fire();
+        });
         assertTrue(FxWait.fx(() -> stage.getScene().getFocusOwner() == list()), "not lost with the button rebuilt");
     }
 
@@ -387,17 +395,16 @@ class CaptureUiTest {
         FxWait.settled();
         Node line = FxWait.fx(() -> thread.lookup(".range-marker-end").getParent().getChildrenUnmodifiable().stream()
                 .filter(n -> n instanceof MessageLine).findFirst().orElseThrow());
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(line, new javafx.scene.input.MouseEvent(javafx.scene.input.MouseEvent.MOUSE_ENTERED, 1, 1, 1, 1,
                     javafx.scene.input.MouseButton.NONE, 0, false, false, false, false, false, false, false, false, false, false, null));
-            return null;
         });
         assertTrue(FxWait.fx(() -> line.lookupAll(".hover-actions").stream().noneMatch(Node::isVisible)), "picking: a click only picks");
     }
 
     @Test
     void itsHeaderNamesTheNetworkAndHowManyNeverTheAccount() throws Exception {
-        app.unichat.model.Chat c = FxWait.fx(() -> svc.chat(CHAT));
+        app.unichat.model.Chat c = Present.of(FxWait.fx(() -> svc.chat(CHAT)));
         String onScreen = FxWait.fx(() -> ((Label) thread.lookup(".thread-header .thread-subtitle")).getText());
         assertTrue(onScreen.contains("+57"), "the window's header shows the account it's on: " + onScreen);
         String captured = FxWait.fx(() -> ((Label) thread.captureHeader(c).lookup(".thread-subtitle")).getText());

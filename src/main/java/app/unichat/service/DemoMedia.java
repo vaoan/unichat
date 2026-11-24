@@ -2,6 +2,7 @@ package app.unichat.service;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;
@@ -35,18 +36,21 @@ final class DemoMedia {
     }
 
     /** Renders a placeholder "photo" (gradient + caption) once and caches it. */
+    @SuppressWarnings("MathAbsoluteNegative") // only one hash in 2^32 stays negative, and that seed still draws a picture
+    @SuppressFBWarnings(value = "RV_ABSOLUTE_VALUE_OF_HASHCODE", justification = "as MathAbsoluteNegative above: only one hash in 2^32 stays negative, and that seed still draws a picture")
     static synchronized Path demoImage(String name) throws IOException {
         Path dir = Settings.get().cacheDir().resolve("demo");
         Files.createDirectories(dir);
         Path file = dir.resolve(name + ".png");
         if (Files.exists(file)) return file;
-        int w = 640, h = 420;
+        int w = 640;
+        int h = 420;
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         int seed = Math.abs(name.hashCode());
-        Color a = Color.getHSBColor((seed % 360) / 360f, 0.55f, 0.95f);
-        Color b = Color.getHSBColor(((seed / 7) % 360) / 360f, 0.65f, 0.55f);
+        Color a = Color.getHSBColor(seed % 360 / 360f, 0.55f, 0.95f);
+        Color b = Color.getHSBColor(seed / 7 % 360 / 360f, 0.65f, 0.55f);
         g.setPaint(new GradientPaint(0, 0, a, w, h, b));
         g.fillRect(0, 0, w, h);
         g.setColor(new Color(255, 255, 255, 60));

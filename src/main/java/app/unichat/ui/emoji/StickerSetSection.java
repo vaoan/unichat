@@ -11,6 +11,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.FlowPane;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,20 +31,21 @@ final class StickerSetSection {
 
     private final StickerSets svc;
     private final Runnable refresh;
-    private List<StickerPack.Ref> yours;
+    private @Nullable List<StickerPack.Ref> yours;
     private long askedAt;
     private boolean asking;
     /** Sets opened from a sticker that aren't among yours, newest first. */
     private final List<StickerPack.Ref> others = new ArrayList<>();
     private final Map<String, StickerPack> packs = new HashMap<>();
-    private final Set<String> open = new HashSet<>(), loading = new HashSet<>();
+    private final Set<String> open = new HashSet<>();
+    private final Set<String> loading = new HashSet<>();
     /** Sets that couldn't be brought, and when: searching tries one again after {@link #ASK_AGAIN_MS} (the bridge wasn't ready). */
     private final Map<String, Long> failed = new HashMap<>();
     /** The clock failures are timed by (a test moves it). */
     java.util.function.LongSupplier clock = System::currentTimeMillis;
     /** Sets are brought for searching one after another: each is asked of Telegram sticker by sticker. */
     private boolean bringingAll;
-    private String scrollTo;
+    private @Nullable String scrollTo;
 
     StickerSetSection(StickerSets svc, Runnable refresh) {
         this.svc = svc;
@@ -102,7 +104,7 @@ final class StickerSetSection {
     }
 
     /** The first set listed that isn't here, being brought, or failed a moment ago; null when none. */
-    private String missing() {
+    private @Nullable String missing() {
         List<StickerPack.Ref> all = new ArrayList<>(others);
         if (yours != null) all.addAll(yours);
         long now = clock.getAsLong();
@@ -116,8 +118,16 @@ final class StickerSetSection {
     /** The sets brought so far: yours first, then others opened. */
     List<StickerPack> loaded() {
         List<StickerPack> out = new ArrayList<>();
-        if (yours != null) for (StickerPack.Ref r : yours) if (packs.containsKey(r.url())) out.add(packs.get(r.url()));
-        for (StickerPack.Ref r : others) if (packs.containsKey(r.url()) && !out.contains(packs.get(r.url()))) out.add(packs.get(r.url()));
+        if (yours != null) {
+            for (StickerPack.Ref r : yours) {
+                StickerPack p = packs.get(r.url());
+                if (p != null) out.add(p);
+            }
+        }
+        for (StickerPack.Ref r : others) {
+            StickerPack p = packs.get(r.url());
+            if (p != null && !out.contains(p)) out.add(p);
+        }
         return out;
     }
 
@@ -163,7 +173,7 @@ final class StickerSetSection {
             then.run();
             return;
         }
-        svc.stickerPack(url).whenComplete((p, err) -> Platform.runLater(() -> {
+        var _ = svc.stickerPack(url).whenComplete((p, err) -> Platform.runLater(() -> {
             loading.remove(url);
             if (err != null) {
                 System.err.println("Sticker set not fetched: " + err);
@@ -178,9 +188,9 @@ final class StickerSetSection {
     }
 
     private void askForYours() {
-        if (asking || yours != null && (!yours.isEmpty() || System.currentTimeMillis() - askedAt < ASK_AGAIN_MS)) return;
+        if (asking || (yours != null && (!yours.isEmpty() || System.currentTimeMillis() - askedAt < ASK_AGAIN_MS))) return;
         asking = true;
-        svc.stickerPacks().whenComplete((l, err) -> Platform.runLater(() -> {
+        var _ = svc.stickerPacks().whenComplete((l, err) -> Platform.runLater(() -> {
             if (err != null) System.err.println("Sticker sets not listed: " + err);
             asking = false;
             askedAt = System.currentTimeMillis();

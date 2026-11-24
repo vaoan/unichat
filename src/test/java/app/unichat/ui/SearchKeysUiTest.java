@@ -1,8 +1,10 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.ui.chats.InfoPane;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.Node;
@@ -30,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class SearchKeysUiTest {
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T> T fx(Callable<T> c) throws InterruptedException, ExecutionException {
         CompletableFuture<T> f = new CompletableFuture<>();
         Platform.runLater(() -> {
             try {
@@ -42,10 +44,9 @@ class SearchKeysUiTest {
         return f.get();
     }
 
-    private static void press(Node target, KeyCode code, boolean shortcut) throws Exception {
-        fx(() -> {
+    private static void press(Node target, KeyCode code, boolean shortcut) throws InterruptedException, ExecutionException {
+        FxWait.onFx(() -> {
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, shortcut, false, shortcut));
-            return null;
         });
     }
 
@@ -61,12 +62,18 @@ class SearchKeysUiTest {
         MockChatService svc = new MockChatService();
         InfoPane info = fx(() -> new InfoPane(svc, () -> { }, t -> { }));
         javafx.scene.layout.VBox box = fx(() -> (javafx.scene.layout.VBox) info.getContent());
-        fx(() -> { info.show(svc.chat("!family:demo")); return null; });
+        FxWait.onFx(() -> {
+            info.show(Present.of(svc.chat("!family:demo")));
+        });
         Node first = fx(() -> box.getChildren().get(0));
-        fx(() -> { info.refresh(); return null; });
+        FxWait.onFx(() -> {
+            info.refresh();
+        });
         assertTrue(fx(() -> box.getChildren().get(0) == first), "nothing changed: the same nodes");
-        svc.setFavorite("!family:demo", !svc.chat("!family:demo").favorite()).get();
-        fx(() -> { info.refresh(); return null; });
+        svc.setFavorite("!family:demo", !Present.of(svc.chat("!family:demo")).favorite()).get();
+        FxWait.onFx(() -> {
+            info.refresh();
+        });
         assertFalse(fx(() -> box.getChildren().get(0) == first), "a change: built again");
     }
 
@@ -94,12 +101,19 @@ class SearchKeysUiTest {
         Button clear = fx(() -> (Button) scene.getRoot().lookup(".search-box .search-clear"));
         assertFalse(fx(clear::isVisible), "no ✕ while it's empty");
 
-        fx(() -> { search.requestFocus(); search.setText("fam"); return null; });
+        FxWait.onFx(() -> {
+            search.requestFocus();
+            search.setText("fam");
+        });
         assertTrue(fx(clear::isVisible));
-        fx(() -> { clear.fire(); return null; });
+        FxWait.onFx(() -> {
+            clear.fire();
+        });
         assertEquals("", fx(search::getText));
 
-        fx(() -> { search.setText("fam"); return null; });
+        FxWait.onFx(() -> {
+            search.setText("fam");
+        });
         press(search, KeyCode.ESCAPE, false);
         assertEquals("", fx(search::getText), "Esc empties it");
 

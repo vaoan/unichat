@@ -3,6 +3,7 @@ package app.unichat.assist;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.File;
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /** Runs one AI program over one prompt. The prompt and the chat never reach a log. */
 public final class ReplyWriter {
@@ -32,31 +34,36 @@ public final class ReplyWriter {
         public Failure(String message) {
             super(message);
         }
+
+        public Failure(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     /** The thread waiting for the program, which {@link #cancel} interrupts; both guarded by this. */
-    private Thread waiting;
+    private @Nullable Thread waiting;
     private boolean cancelled;
 
     /** Blocks until it answers. Null if {@link #cancel} stopped it. */
-    public String write(AiEngine engine, Path folder, String prompt) throws Failure {
+    public @Nullable String write(AiEngine engine, @Nullable Path folder, String prompt) throws Failure {
         return write(engine, folder, prompt, false);
     }
 
     /** {@code web}: it may search the web ({@link AiEngine#command(Path, Path, Path, Path, boolean)}). */
-    public String write(AiEngine engine, Path folder, String prompt, boolean web) throws Failure {
+    public @Nullable String write(AiEngine engine, @Nullable Path folder, String prompt, boolean web) throws Failure {
         Path bin = engine.find();
         if (bin == null) throw new Failure(I18n.t("ai.failure.notInstalled", engine.label()));
         if (folder != null && !Files.isDirectory(folder)) throw new Failure(I18n.t("ai.failure.noFolder", folder));
         return run(engine, bin, folder, prompt, web);
     }
 
-    String run(AiEngine engine, Path bin, Path folder, String prompt) throws Failure {
+    @Nullable String run(AiEngine engine, Path bin, @Nullable Path folder, String prompt) throws Failure {
         return run(engine, bin, folder, prompt, false);
     }
 
     /** Stopped (cancelled, or its thread interrupted), the program goes with its children ({@link Processes}). */
-    String run(AiEngine engine, Path bin, Path folder, String prompt, boolean web) throws Failure {
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the AI program with arguments of ours as a list (AiEngine.command: its path, the folder, flags); the chat's text goes on stdin, never in an argument")
+    @Nullable String run(AiEngine engine, Path bin, @Nullable Path folder, String prompt, boolean web) throws Failure {
         synchronized (this) {
             if (cancelled) return null;
             waiting = Thread.currentThread();
@@ -79,7 +86,7 @@ public final class ReplyWriter {
             if (text.isEmpty()) throw new Failure(I18n.t("ai.failure.empty", engine.label()));
             return text;
         } catch (IOException e) {
-            throw new Failure(I18n.t("ai.failure.open", engine.label()));
+            throw new Failure(I18n.t("ai.failure.open", engine.label()), e);
         } catch (InterruptedException e) {
             if (!isCancelled()) Thread.currentThread().interrupt(); // someone else's interrupt stays theirs
             return null;
@@ -104,7 +111,8 @@ public final class ReplyWriter {
     /** Codex is a node script: the programs next to it, and the usual places, have to be found too. */
     private static String searchPath(Path bin) {
         Set<String> folders = new LinkedHashSet<>();
-        if (bin.getParent() != null) folders.add(bin.getParent().toString());
+        Path here = bin.getParent();
+        if (here != null) folders.add(here.toString());
         for (String d : System.getenv().getOrDefault("PATH", "").split(File.pathSeparator)) {
             if (!d.isBlank()) folders.add(d);
         }

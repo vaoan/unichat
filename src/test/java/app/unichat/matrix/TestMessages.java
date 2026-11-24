@@ -1,13 +1,14 @@
 package app.unichat.matrix;
 
 import app.unichat.model.Message;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 
 /** For tests outside this package: a message filled the way a sync fills it. */
-public final class TestMessages {
+public final class TestMessages { // NOPMD: TestClassWithoutTestCases, a helper for tests, not one
     private TestMessages() {}
 
-    public static void apply(Message m, String msgtype, String contentJson) throws Exception {
+    public static void apply(Message m, String msgtype, String contentJson) throws JsonProcessingException {
         JsonNode content = MatrixClient.JSON.readTree(contentJson);
         SyncEvents.applyContent(m, msgtype, content.path("body").asText(), content);
     }

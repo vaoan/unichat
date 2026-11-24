@@ -4,6 +4,8 @@ import app.unichat.gif.GifFrames;
 import app.unichat.model.Network;
 import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
+import java.io.IOException;
+import javax.imageio.metadata.IIOInvalidTreeException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -20,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** WhatsApp → Redes → Stickers animados: GIF or Video sends the animated sticker as an mp4 instead. */
@@ -33,7 +36,7 @@ class StickerVideoTest {
     }
 
     /** A two-frame animated GIF (red, then blue), 0.5 s per frame. */
-    static Path animatedGif(Path dir) throws Exception {
+    static Path animatedGif(Path dir) throws IOException, IIOInvalidTreeException {
         Path f = dir.resolve("anim.gif");
         ImageWriter w = ImageIO.getImageWritersByFormatName("gif").next();
         try (ImageOutputStream out = ImageIO.createImageOutputStream(f.toFile())) {
@@ -74,7 +77,7 @@ class StickerVideoTest {
         StickerConverter.Result r = StickerConverter.toMp4(animatedGif(dir), dir);
         assertEquals("video/mp4", r.mime());
         byte[] b = Files.readAllBytes(r.file());
-        assertEquals("ftyp", new String(b, 4, 4));
+        assertEquals("ftyp", new String(b, 4, 4, UTF_8));
     }
 
     @Test

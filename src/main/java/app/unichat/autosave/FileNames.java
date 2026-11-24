@@ -3,16 +3,19 @@ package app.unichat.autosave;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.MimeTypes;
+import app.unichat.support.PathParts;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 /** Names for saved files and folders that are safe on any system, and never step outside the folder. Pure. */
 public final class FileNames {
-    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT);
     private static final Pattern RESERVED = Pattern.compile("(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\\..*)?");
 
     private FileNames() {}
@@ -22,7 +25,8 @@ public final class FileNames {
      * ("image-20261026-100405.jpg": a name on disk, English in every UI language). Stickers always get the made-up name.
      */
     public static String forMessage(Message m, ZoneId zone) {
-        String name = m.fileName() == null ? "" : m.fileName().replace('\\', '/');
+        String sent = m.fileName();
+        String name = sent == null ? "" : sent.replace('\\', '/');
         name = safe(name.substring(name.lastIndexOf('/') + 1).strip());
         String ext = MimeTypes.extension(m.mimeType());
         if (name.isEmpty() || name.equals(".") || name.equals("..") || m.type() == MessageType.STICKER) {
@@ -49,7 +53,7 @@ public final class FileNames {
         String tag = " [" + tag(m) + "]";
         String ext = dot > 0 ? name.substring(dot) : "";
         String saved = dot > 0 ? name.substring(0, dot) + tag + ext : name + tag;
-        return SHELL_ACTIVE.contains(ext.toLowerCase(java.util.Locale.ROOT)) ? saved + ".txt" : saved;
+        return SHELL_ACTIVE.contains(ext.toLowerCase(Locale.ROOT)) ? saved + ".txt" : saved;
     }
 
     /**
@@ -73,7 +77,7 @@ public final class FileNames {
         String mark = "[" + tag(m) + "]";
         try (var in = Files.newDirectoryStream(dir)) {
             for (Path p : in) {
-                String n = p.getFileName().toString();
+                String n = PathParts.name(p);
                 if (n.contains(mark) && !n.startsWith(".") && !n.endsWith(".part")) return true;
             }
         } catch (java.io.IOException e) {
@@ -89,7 +93,7 @@ public final class FileNames {
      * and leading dots too: a hidden file was skipped by {@link #savedIn} and folder moves, so saved again each time.
      */
     public static String safe(String name) {
-        String n = name.replaceAll("\\p{Cf}", "").replaceAll("[<>:\"|?*/\\\\\\x00-\\x1F]", "_")
+        String n = name.replaceAll("\\p{Cf}", "").replaceAll("[<>:\"|?*/\\\\\\x00-\\x1F%]", "_")
                 .replaceAll("[. ]+$", "").replaceAll("^[. ]+", "").strip();
         if (RESERVED.matcher(n).matches()) n = "_" + n;
         if (n.length() > 200) {
@@ -101,7 +105,7 @@ public final class FileNames {
     }
 
     /** A folder named after a chat: {@link #safe}, and never empty nor "..". */
-    public static String folder(String chatName) {
+    public static String folder(@Nullable String chatName) {
         String n = safe(chatName == null ? "" : chatName);
         return n.isEmpty() || n.equals("..") ? "_" : n;
     }
@@ -110,7 +114,8 @@ public final class FileNames {
     public static Path free(Path dir, String name) {
         Path p = dir.resolve(name);
         int dot = name.lastIndexOf('.');
-        String base = dot > 0 ? name.substring(0, dot) : name, ext = dot > 0 ? name.substring(dot) : "";
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        String ext = dot > 0 ? name.substring(dot) : "";
         for (int i = 2; Files.exists(p); i++) p = dir.resolve(base + " (" + i + ")" + ext);
         return p;
     }

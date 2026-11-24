@@ -6,6 +6,7 @@ import app.unichat.model.MessageType;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The first step of a draft: when there's something new (corrections to drafts, or messages of mine in the chat since
@@ -18,11 +19,12 @@ public final class StyleLearner {
     private static final Duration TIMEOUT = Duration.ofMinutes(2);
 
     /** The AI program; tests use their own. */
+    @FunctionalInterface
     public interface Program {
-        String write(String prompt) throws ReplyWriter.Failure;
+        @Nullable String write(String prompt) throws ReplyWriter.Failure;
 
         /** The draft was cancelled: stop learning too. */
-        default void cancel() { }
+        default void cancel() { /* nothing by default */ }
     }
 
     /** One learning at a time: they all share the file. Not the file's own lock, which the AI call would hold for minutes. */
@@ -40,7 +42,7 @@ public final class StyleLearner {
     public static Program program(AiEngine engine) {
         ReplyWriter writer = new ReplyWriter(TIMEOUT);
         return new Program() {
-            @Override public String write(String prompt) throws ReplyWriter.Failure { return writer.write(engine, null, prompt); }
+            @Override public @Nullable String write(String prompt) throws ReplyWriter.Failure { return writer.write(engine, null, prompt); }
 
             @Override public void cancel() { writer.cancel(); }
         };
@@ -66,13 +68,14 @@ public final class StyleLearner {
                     if (shorter == null) return current; // cancelled
                     v = StylePrompt.check(shorter);
                 }
-                if (v.file() == null) {
+                String file = v.file();
+                if (file == null) {
                     System.err.println("Writing style not learned: " + v.problem());
                     return current;
                 }
-                if (!store.commit(current, v.file(), corrections.size(), chatId, newest)) return store.text();
-                System.out.println(learned(StyleDiff.between(current, v.file()), corrections.size(), mine.size()));
-                return v.file();
+                if (!store.commit(current, file, corrections.size(), chatId, newest)) return store.text();
+                System.out.println(learned(StyleDiff.between(current, file), corrections.size(), mine.size()));
+                return file;
             } catch (ReplyWriter.Failure e) {
                 System.err.println("Writing style not learned: the AI program failed");
                 return current;

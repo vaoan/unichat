@@ -35,11 +35,11 @@ import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,20 +55,20 @@ import java.util.regex.Pattern;
 final class BridgeLoginPane extends StackPane {
     private final Network network;
     private final BridgeLogin api;
-    private final Supplier<Window> owner;
+    private final Supplier<@Nullable Window> owner;
     private final Runnable onConnected;
     private final Runnable onUseBotChat;
     private volatile boolean closed;
-    private volatile ChromeLogin chromeLogin;
-    private volatile BridgeLogin.Step current;
-    private String lastStepId;
+    private volatile @Nullable ChromeLogin chromeLogin;
+    private volatile BridgeLogin.@Nullable Step current;
+    private @Nullable String lastStepId;
     private int stepNumber;
 
     /**
      * @param onConnected  the login finished ("Listo")
      * @param onUseBotChat the bridge asked for something Unichat can't collect: fall back to the bot chat
      */
-    BridgeLoginPane(Network network, BridgeLogin api, Supplier<Window> owner, Runnable onConnected, Runnable onUseBotChat) {
+    BridgeLoginPane(Network network, BridgeLogin api, Supplier<@Nullable Window> owner, Runnable onConnected, Runnable onUseBotChat) {
         this.network = network;
         this.api = api;
         this.owner = owner;
@@ -95,7 +95,7 @@ final class BridgeLoginPane extends StackPane {
             List<LoginCopy.Choice> choices = LoginCopy.choices(network, api.flows());
             Platform.runLater(() -> {
                 if (closed) return;
-                if (choices.isEmpty()) error(I18n.t("login.pane.noFlows"), null);
+                if (choices.isEmpty()) error(I18n.t("login.pane.noFlows"), null); // NOPMD: GuardLogStatement, error() shows it on screen; no logger
                 else if (choices.size() == 1) begin(choices.get(0).flow()); // nothing to choose: straight in
                 else showChoices(choices);
             });
@@ -195,27 +195,28 @@ final class BridgeLoginPane extends StackPane {
 
     private Node displayAndWait(BridgeLogin.Step s) {
         BridgeLogin.Display d = s.display();
+        String data = d == null ? null : d.data();
         Node shown;
-        if (d != null && "qr".equals(d.type()) && d.data() != null) {
-            ImageView qr = new ImageView(qr(d.data(), 260));
+        if (d != null && "qr".equals(d.type()) && data != null) {
+            ImageView qr = new ImageView(qr(data, 260));
             qr.setAccessibleText(I18n.t("login.wizard.qrA11y", network.displayName()));
             StackPane boxed = new StackPane(qr);
             boxed.getStyleClass().add("qr-box");
-            boxed.setMaxWidth(Region.USE_PREF_SIZE);
+            boxed.setMaxWidth(USE_PREF_SIZE);
             Label renew = new Label(I18n.t("login.pane.qrRenews"));
             renew.getStyleClass().add("settings-help");
             shown = new VBox(8, boxed, renew);
-        } else if (d != null && ("code".equals(d.type()) || "emoji".equals(d.type())) && d.data() != null) {
-            Label code = new Label(d.data());
+        } else if (d != null && ("code".equals(d.type()) || "emoji".equals(d.type())) && data != null) {
+            Label code = new Label(data);
             code.getStyleClass().add("emoji".equals(d.type()) ? "login-emoji" : "login-code");
-            code.setAccessibleText("emoji".equals(d.type()) ? I18n.t("login.pane.emojiA11y", d.data()) : I18n.t("login.pane.codeA11y", d.data()));
+            code.setAccessibleText("emoji".equals(d.type()) ? I18n.t("login.pane.emojiA11y", data) : I18n.t("login.pane.codeA11y", data));
             HBox row = new HBox(12, code);
             row.setAlignment(Pos.CENTER_LEFT);
             if ("code".equals(d.type())) {
                 Button copy = new Button(I18n.t("common.copy"));
                 copy.getStyleClass().add("secondary-button");
                 copy.setOnAction(e -> {
-                    Clipboards.copy(d.data());
+                    Clipboards.copy(data);
                     copy.setText(I18n.t("common.copied"));
                 });
                 row.getChildren().add(copy);
@@ -239,27 +240,7 @@ final class BridgeLoginPane extends StackPane {
         for (BridgeLogin.Field f : s.fields()) {
             Label l = new Label(f.optional() ? I18n.t("login.field.optional", LoginCopy.fieldLabel(f)) : LoginCopy.fieldLabel(f));
             l.getStyleClass().add("settings-label");
-            Node input;
-            if ("select".equals(f.type()) && !f.options().isEmpty()) {
-                ComboBox<String> cb = new ComboBox<>();
-                cb.getItems().setAll(f.options());
-                cb.setValue(f.defaultValue() != null ? f.defaultValue() : f.options().get(0));
-                cb.setAccessibleText(LoginCopy.fieldLabel(f));
-                input = cb;
-            } else {
-                TextInputControl t = "password".equals(f.type()) ? new PasswordField() : new TextField();
-                t.getStyleClass().add("login-field");
-                if ("2fa_code".equals(f.type())) t.getStyleClass().add("login-code-input");
-                if (f.defaultValue() != null) t.setText(f.defaultValue());
-                t.setPromptText(switch (f.type()) {
-                    case "phone_number" -> "+57 300 123 4567";
-                    case "2fa_code" -> sampleDigits(f.pattern());
-                    case "email" -> I18n.t("login.field.emailExample");
-                    default -> "";
-                });
-                t.setAccessibleText(LoginCopy.fieldLabel(f));
-                input = t;
-            }
+            Node input = input(f);
             inputs.put(f, input);
             box.getChildren().addAll(l, input);
             if (f.description() != null && !f.description().isBlank() && "select".equals(f.type())) {
@@ -298,21 +279,47 @@ final class BridgeLoginPane extends StackPane {
         return box;
     }
 
+    /** Where field {@code f} is answered: a list to choose from, or a box to type in. */
+    private static Node input(BridgeLogin.Field f) {
+        if ("select".equals(f.type()) && !f.options().isEmpty()) {
+            ComboBox<String> cb = new ComboBox<>();
+            cb.getItems().setAll(f.options());
+            String given = f.defaultValue();
+            cb.setValue(given != null ? given : f.options().get(0));
+            cb.setAccessibleText(LoginCopy.fieldLabel(f));
+            return cb;
+        }
+        TextInputControl t = "password".equals(f.type()) ? new PasswordField() : new TextField();
+        t.getStyleClass().add("login-field");
+        if ("2fa_code".equals(f.type())) t.getStyleClass().add("login-code-input");
+        String given = f.defaultValue();
+        if (given != null) t.setText(given);
+        t.setPromptText(switch (f.type()) {
+            case "phone_number" -> "+57 300 123 4567";
+            case "2fa_code" -> sampleDigits(f.pattern());
+            case "email" -> I18n.t("login.field.emailExample");
+            default -> "";
+        });
+        t.setAccessibleText(LoginCopy.fieldLabel(f));
+        return t;
+    }
+
     /** "1234" for a pattern like ^[0-9]{4}$, else "123456" (the usual code length). */
-    static String sampleDigits(String pattern) {
+    static String sampleDigits(@Nullable String pattern) {
         int n = LoginCopy.digits(pattern) > 0 ? LoginCopy.digits(pattern) : 6;
         return "1234567890".repeat(2).substring(0, Math.max(1, Math.min(n, 12)));
     }
 
     /** Translated reason a value isn't accepted, or null. */
-    static String invalid(BridgeLogin.Field f, String v) {
+    static @Nullable String invalid(BridgeLogin.Field f, String v) {
         if (v.isEmpty()) return I18n.t("login.pane.fillField", LoginCopy.fieldLabel(f));
         if ("phone_number".equals(f.type()) && !v.matches("\\+\\d{6,15}")) {
             return I18n.t("login.pane.phoneFormat");
         }
-        if (f.pattern() != null) {
+        String pattern = f.pattern();
+        if (pattern != null) {
             try {
-                if (!Pattern.compile(f.pattern()).matcher(v).find()) return I18n.t("login.pane.badFormat", LoginCopy.fieldLabel(f));
+                if (!Pattern.compile(pattern).matcher(v).find()) return I18n.t("login.pane.badFormat", LoginCopy.fieldLabel(f));
             } catch (RuntimeException ignored) {
                 // A pattern Java can't read: let the bridge validate.
             }
@@ -321,15 +328,17 @@ final class BridgeLoginPane extends StackPane {
     }
 
     private Node cookies(BridgeLogin.Step s) {
-        if (BridgeCookies.needsWindowCapture(s.cookies())) return capture(s);
-        if (!BridgeCookies.canCollect(s.cookies())) return unsupported();
-        CookieSpec spec = BridgeCookies.spec(network, s.cookies());
+        BridgeLogin.CookieParams params = s.cookies();
+        if (params == null) return unsupported(); // nothing to collect
+        if (BridgeCookies.needsWindowCapture(params)) return capture(s, params);
+        if (!BridgeCookies.canCollect(params)) return unsupported();
+        CookieSpec spec = BridgeCookies.spec(network, params);
         VBox found = new VBox(8, new HBox(8, spinner(16), Labels.help(I18n.t("login.pane.searchingSessions"))));
         Label status = Labels.help("");
         Nodes.show(status, false);
         java.util.function.Consumer<SessionCookies> send = cookies -> {
             show(waiting(I18n.t("login.pane.connecting")));
-            submit(s, BridgeCookies.values(s.cookies(), cookies));
+            submit(s, BridgeCookies.values(params, cookies));
         };
         Button here = new Button(I18n.t("login.pane.signInHere"));
         here.getStyleClass().add("secondary-button");
@@ -340,7 +349,7 @@ final class BridgeLoginPane extends StackPane {
             status.setText(text);
             Nodes.show(status, true);
         });
-        CookieLogin.findBrowserSessions(spec).whenComplete((sessions, err) -> Platform.runLater(() -> {
+        var _ = CookieLogin.findBrowserSessions(spec).whenComplete((sessions, err) -> Platform.runLater(() -> {
             if (closed) return;
             found.getChildren().clear();
             List<BrowserSession> list = err != null || sessions == null ? List.of() : sessions;
@@ -358,13 +367,13 @@ final class BridgeLoginPane extends StackPane {
     }
 
     /** This network needs what its page sends while you use it: only signing in here can get that. */
-    private Node capture(BridgeLogin.Step s) {
+    private Node capture(BridgeLogin.Step s, BridgeLogin.CookieParams params) {
         Label why = Labels.help(I18n.t("login.pane.captureWhy", network.displayName()));
         Button here = new Button(I18n.t("login.pane.signInTo", network.displayName()));
         here.getStyleClass().add("primary-button");
         here.setMaxWidth(Double.MAX_VALUE);
         here.setAccessibleText(I18n.t("login.pane.openWindowA11y", network.displayName()));
-        here.setOnAction(e -> openCapture(s));
+        here.setOnAction(e -> openCapture(s, params));
         java.nio.file.Path browser = ChromeLogin.usefulFor(network) ? ChromeLogin.findChrome() : null;
         if (browser == null) return new VBox(10, why, here);
         why.setText(I18n.t("login.pane.chromeWhy", network.displayName()));
@@ -372,14 +381,14 @@ final class BridgeLoginPane extends StackPane {
         chrome.getStyleClass().add("primary-button");
         chrome.setMaxWidth(Double.MAX_VALUE);
         chrome.setAccessibleText(I18n.t("login.pane.chromeA11y", network.displayName()));
-        chrome.setOnAction(e -> signInWithChrome(s, browser));
+        chrome.setOnAction(e -> signInWithChrome(s, params, browser));
         here.setText(I18n.t("login.pane.emailPasswordHere"));
         here.getStyleClass().setAll("button", "secondary-button");
         return new VBox(10, why, chrome, here);
     }
 
-    private void signInWithChrome(BridgeLogin.Step s, java.nio.file.Path browser) {
-        ChromeLogin login = new ChromeLogin(network, s.cookies(), browser, Settings.get().cacheDir().resolve("login-chrome"));
+    private void signInWithChrome(BridgeLogin.Step s, BridgeLogin.CookieParams params, java.nio.file.Path browser) {
+        ChromeLogin login = new ChromeLogin(network, params, browser, Settings.get().cacheDir().resolve("login-chrome"));
         chromeLogin = login;
         Label wait = Labels.help(I18n.t("login.pane.chromeWait"));
         Button cancel = new Button(I18n.t("common.cancel"));
@@ -387,7 +396,7 @@ final class BridgeLoginPane extends StackPane {
         cancel.setOnAction(e -> login.cancel());
         show(new VBox(10, new HBox(8, spinner(16), wait), cancel));
         background(() -> {
-            java.util.Map<String, String> values;
+            Map<String, String> values;
             try {
                 values = login.run();
             } catch (InterruptedException e) {
@@ -402,8 +411,8 @@ final class BridgeLoginPane extends StackPane {
         });
     }
 
-    private void openCapture(BridgeLogin.Step s) {
-        LoginWebView.openCapturing(owner.get(), network, s.cookies(), values -> {
+    private void openCapture(BridgeLogin.Step s, BridgeLogin.CookieParams params) {
+        LoginWebView.openCapturing(owner.get(), network, params, values -> {
             show(waiting(I18n.t("login.pane.connecting")));
             submit(s, values);
         }, () -> { });
@@ -443,7 +452,7 @@ final class BridgeLoginPane extends StackPane {
 
     // ---------------------------------------------------------------- helpers
 
-    private void error(String message, Throwable cause) {
+    private void error(String message, @Nullable Throwable cause) {
         if (closed) return;
         String detail = cause instanceof BridgeLogin.BridgeLoginException b ? b.getMessage()
                 : cause != null ? LoginTexts.rootMessage(cause) : null;
@@ -476,7 +485,7 @@ final class BridgeLoginPane extends StackPane {
 
     @FunctionalInterface
     private interface ThrowingRunnable {
-        void run() throws Exception;
+        void run() throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: any login step, shown by background()
     }
 
     private void show(Node n) {

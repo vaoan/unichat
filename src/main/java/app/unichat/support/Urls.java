@@ -1,5 +1,8 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
+
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
@@ -19,9 +22,11 @@ public final class Urls {
     public static final String ADDRESS = "https?://(?:(?!\\]\\()[^\\s<>\"])+[^\\s<>\".,;:!?)\\]']";
 
     /** Whether {@code a} and {@code b} are the same page: host and path, whatever the query, fragment or a last slash. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "both hosts come from java.net.URI, ASCII only; it only tells whether two links are one page")
     public static boolean samePage(String a, String b) {
         try {
-            java.net.URI x = java.net.URI.create(a), y = java.net.URI.create(b);
+            java.net.URI x = java.net.URI.create(a);
+            java.net.URI y = java.net.URI.create(b);
             return x.getHost() != null && x.getHost().equalsIgnoreCase(y.getHost()) && path(x).equals(path(y));
         } catch (IllegalArgumentException e) {
             return false;
@@ -35,7 +40,7 @@ public final class Urls {
     private static final java.util.regex.Pattern ADDRESSES = java.util.regex.Pattern.compile(ADDRESS);
 
     /** The web addresses in {@code text}, in order; none for null. */
-    public static java.util.List<String> in(String text) {
+    public static java.util.List<String> in(@Nullable String text) {
         if (text == null) return java.util.List.of();
         return ADDRESSES.matcher(text).results().map(java.util.regex.MatchResult::group).toList();
     }

@@ -10,14 +10,18 @@ import java.time.Instant;
 public final class MediaItems {
     private MediaItems() {}
 
-    /** One's own sticker sent as a converted copy is the sticker it was made from; what others write there isn't trusted. */
+    /**
+     * One's own sticker sent as a converted copy is the sticker it was made from; what others write there isn't trusted.
+     * Only for a message with an address: what's offered for the library ({@code MessageActions}' FAVORITE, "Ver en
+     * grande", what the chat shows) has one.
+     */
     public static MediaLibrary.Item of(Message m) {
         MediaLibrary.Kind kind = m.type() == MessageType.STICKER ? MediaLibrary.Kind.STICKER : MediaLibrary.Kind.GIF;
-        MediaLibrary.Item item = new MediaLibrary.Item(kind, m.mediaUrl(), m.mimeType(), m.width(), m.height(), m.mediaInfo());
+        String url = java.util.Objects.requireNonNull(m.mediaUrl(), "a library item is offered only for a message with an address");
+        MediaLibrary.Item item = new MediaLibrary.Item(kind, url, m.mimeType(), m.width(), m.height(), m.mediaInfo());
         return m.outgoing() ? MediaLibrary.original(item) : item;
     }
 
-    /** A stand-in message so a library item loads like any chat media (thumbnail, then the animation). */
     /** The saved stickers and GIFs (and their previews) stay on disk whatever the cache's limit. */
     public static void keepCached(app.unichat.service.MediaSource svc, MediaLibrary library) {
         java.util.Set<String> urls = new java.util.HashSet<>();
@@ -39,6 +43,7 @@ public final class MediaItems {
         if (preview != null) urls.add(preview);
     }
 
+    /** A stand-in message so a library item loads like any chat media (thumbnail, then the animation). */
     static Message message(MediaLibrary.Item i) {
         Message m = new Message("lib-" + i.url(), "", "", "", false, Instant.EPOCH);
         m.setType(i.kind() == MediaLibrary.Kind.STICKER ? MessageType.STICKER : MessageType.IMAGE);

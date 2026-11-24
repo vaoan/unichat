@@ -3,6 +3,7 @@ package app.unichat.ui.desktop;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
+import app.unichat.Present;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -15,11 +16,11 @@ class WindowsScreenTest {
         WindowsScreen screen = new WindowsScreen();
         screen.start(away -> { });
         assertTrue(screen.registered().get(), "the window is made and both notifications registered");
-        assertTrue(screen.thread().isAlive(), "its thread waits on GetMessage");
-        assertTrue(screen.thread().isDaemon(), "it never keeps Unichat from quitting");
+        assertTrue(Present.of(screen.thread()).isAlive(), "its thread waits on GetMessage");
+        assertTrue(Present.of(screen.thread()).isDaemon(), "it never keeps Unichat from quitting");
         screen.stop();
-        screen.thread().join(); // lesson-ok: test-future-join (a Thread's join, ends once the window is destroyed)
-        assertFalse(screen.thread().isAlive());
+        Present.of(screen.thread()).join(); // lesson-ok: test-future-join (a Thread's join, ends once the window is destroyed)
+        assertFalse(Present.of(screen.thread()).isAlive());
     }
 
     @Test
@@ -34,8 +35,8 @@ class WindowsScreenTest {
         } finally {
             first.stop();
             second.stop();
-            first.thread().join(); // lesson-ok: test-future-join (a Thread's join)
-            second.thread().join(); // lesson-ok: test-future-join (a Thread's join)
+            Present.of(first.thread()).join(); // lesson-ok: test-future-join (a Thread's join)
+            Present.of(second.thread()).join(); // lesson-ok: test-future-join (a Thread's join)
         }
     }
 }

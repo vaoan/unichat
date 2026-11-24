@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -50,7 +51,7 @@ class MessageTest {
         assertEquals("$2", copy.id());
         for (Field f : Message.class.getDeclaredFields()) {
             if (Modifier.isStatic(f.getModifiers()) || f.getName().equals("id")) continue;
-            f.setAccessible(true);
+            f.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
             assertNotNull(f.get(m), "give " + f.getName() + " a value above");
             assertEquals(f.get(m), f.get(copy), f.getName());
         }
@@ -78,7 +79,9 @@ class MessageTest {
         Message m = message();
         m.addReaction("👍", "@a");
         assertThrows(UnsupportedOperationException.class, () -> m.reactions().clear());
-        assertThrows(UnsupportedOperationException.class, () -> m.reactions().get("👍").add("@b"));
+        Set<String> users = m.reactions().get("👍");
+        assertNotNull(users, "the reaction is there");
+        assertThrows(UnsupportedOperationException.class, () -> users.add("@b"));
     }
 
     @Test
@@ -116,7 +119,7 @@ class MessageTest {
         Message m = message();
         int before = m.revision();
         m.addReaction("👍", "@a");
-        assertFalse(before == m.revision());
+        assertNotEquals(before, m.revision());
     }
 
     /**

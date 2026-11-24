@@ -1,8 +1,12 @@
 package app.unichat.voice;
 
+import app.unichat.Present;
 import app.unichat.model.VoiceNote;
 import app.unichat.stt.OggOpus;
+import app.unichat.support.PathParts;
 import app.unichat.video.Ffmpeg;
+import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +47,8 @@ class VoiceEnhancerTest {
     }
 
     /** One second of tone and one of "silence", all over a noise floor; returned as raw samples. */
-    private Path noisyRecording() throws Exception {
+    @SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "seeded test data, the same on every run on purpose; nothing secret")
+    private Path noisyRecording() throws IOException {
         Random random = new Random(7);
         ByteBuffer b = ByteBuffer.allocate(RATE * 2 * 2).order(ByteOrder.LITTLE_ENDIAN);
         for (int i = 0; i < RATE * 2; i++) {
@@ -53,7 +58,7 @@ class VoiceEnhancerTest {
         return Files.write(dir.resolve("nota.ogg.pcm"), b.array());
     }
 
-    private VoiceNote recorded() throws Exception {
+    private VoiceNote recorded() throws IOException {
         Path ogg = dir.resolve("nota.ogg");
         Files.write(ogg, new byte[]{1, 2, 3});
         return new VoiceNote(ogg, 2000, List.of(1, 2));
@@ -84,14 +89,15 @@ class VoiceEnhancerTest {
         assertSame(note, VoiceEnhancer.improve(note, noisyRecording(), RATE, p -> { }));
         assertArrayEquals(new byte[]{1, 2, 3}, Files.readAllBytes(note.file()));
         try (var files = Files.list(dir)) {
-            assertTrue(files.noneMatch(f -> f.getFileName().toString().contains(".clean")), "no leftovers");
+            assertTrue(files.noneMatch(f -> PathParts.name(f).contains(".clean")), "no leftovers");
         }
     }
 
     @Test
     void theCommandsReadOnlyTheRawFileAndNameTheModelBare() {
         List<List<String>> c = VoiceEnhancer.commands(Path.of("ffmpeg"), Path.of("a.pcm"), 16_000, Path.of("m.pcm"), Path.of("b.pcm"), true);
-        List<String> first = c.get(0), second = c.get(1);
+        List<String> first = c.get(0);
+        List<String> second = c.get(1);
         assertEquals("file", first.get(first.indexOf("-protocol_whitelist") + 1));
         assertEquals("16000", first.get(first.indexOf("-ar") + 1), "the input's rate comes first");
         assertEquals("a.pcm", first.get(first.indexOf("-i") + 1));
@@ -112,22 +118,23 @@ class VoiceEnhancerTest {
         VoiceNote out = VoiceEnhancer.improve(note, noisyRecording(), RATE, p -> { });
         assertEquals(note.file(), out.file());
         assertTrue(OggOpus.isOggOpus(out.file()), "encoded again");
-        assertEquals(2000, out.durationMs(), 100);
+        assertEquals(2000, (float) out.durationMs(), 100);
         assertFalse(out.waveform().isEmpty());
     }
 
     /** Speech from the Mac's own voice, with a long pause, over pink noise (a tone isn't speech: RNNoise leaves it alone). */
-    private void speechAndNoise(Path clean, Path noisy) throws Exception {
+    private void speechAndNoise(Path clean, Path noisy) throws IOException, InterruptedException {
         Path aiff = dir.resolve("voz.aiff");
         run("say", "-o", aiff.toString(), "Oye, te cuento que perdí el vuelo. [[slnc 4000]] Te llamo cuando llegue.");
-        String ffmpeg = Ffmpeg.find().toString();
+        String ffmpeg = Present.of(Ffmpeg.find()).toString();
         run(ffmpeg, "-y", "-loglevel", "error", "-i", aiff.toString(), "-f", "s16le", "-ar", "48000", "-ac", "1", clean.toString());
         run(ffmpeg, "-y", "-loglevel", "error", "-f", "s16le", "-ar", "48000", "-ac", "1", "-i", clean.toString(),
                 "-f", "lavfi", "-i", "anoisesrc=c=pink:a=0.05:r=48000",
                 "-filter_complex", "[0][1]amix=inputs=2:duration=first:normalize=0", "-f", "s16le", "-ar", "48000", "-ac", "1", noisy.toString());
     }
 
-    private static void run(String... command) throws Exception {
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
+    private static void run(String... command) throws IOException, InterruptedException {
         Process p = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
         assumeTrue(p.waitFor() == 0, command[0] + " can't make the sample");
     }
@@ -138,7 +145,8 @@ class VoiceEnhancerTest {
         double sum = 0;
         int n = 0;
         for (int w = 0; (w + 1) * window <= Math.min(audio.length, clean.length); w++) {
-            double c = 0, a = 0;
+            double c = 0;
+            double a = 0;
             for (int i = w * window; i < (w + 1) * window; i++) {
                 c += clean[i] * (double) clean[i];
                 a += audio[i] * (double) audio[i];
@@ -164,7 +172,8 @@ class VoiceEnhancerTest {
     void theRealModelQuietsTheNoiseAndKeepsTheVoice() throws Exception {
         assumeTrue(Ffmpeg.find() != null, "no ffmpeg");
         Ffmpeg.setAutoInstall(true);
-        Path clean = dir.resolve("limpia.pcm"), noisy = dir.resolve("nota.ogg.pcm");
+        Path clean = dir.resolve("limpia.pcm");
+        Path noisy = dir.resolve("nota.ogg.pcm");
         speechAndNoise(clean, noisy);
         VoiceNote out = VoiceEnhancer.improve(recorded(), noisy, RATE, p -> { });
         assertTrue(Files.isRegularFile(app.unichat.settings.Settings.get().dir().resolve("tools/rnnoise/sh.rnnn")));
@@ -174,7 +183,8 @@ class VoiceEnhancerTest {
         short[] reference = samples(Files.readAllBytes(clean), 0);
         short[] before = samples(Files.readAllBytes(noisy), 0);
         short[] after = samples(Files.readAllBytes(wav), 44);
-        double noiseBefore = power(before, reference, false), noiseAfter = power(after, reference, false);
+        double noiseBefore = power(before, reference, false);
+        double noiseAfter = power(after, reference, false);
         assertTrue(noiseAfter < noiseBefore - 8, "noise " + noiseBefore + " -> " + noiseAfter + " dB");
         assertTrue(power(after, reference, true) >= power(before, reference, true) - 1, "the voice stays as loud");
     }

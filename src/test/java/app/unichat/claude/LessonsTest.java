@@ -1,5 +1,7 @@
 package app.unichat.claude;
 
+import app.unichat.support.PathParts;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -11,6 +13,8 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,6 +40,8 @@ class LessonsTest {
             Map.entry("fx-coalesce-by-hand", new String[] {"src/main/java/app/unichat/ui/X.java",
                     "        if (scheduled.compareAndSet(false, true)) Platform.runLater(() -> {"}),
             Map.entry("script-spanish", new String[] {"native/x.sh", "  echo \"Descargando $asset $tag...\""}),
+            Map.entry("ffmpeg-raw-input", new String[] {"src/main/java/X.java", "        List.of(ffmpeg, \"-i\", picture.toString(), out)"}),
+            Map.entry("bounded-map", new String[] {"src/main/java/X.java", "        @Override protected boolean removeEldestEntry(Map.Entry<K, V> e) {"}),
             Map.entry("atomic-move",new String[] {"src/main/java/X.java", "        Files.move(tmp, file, REPLACE_EXISTING, ATOMIC_MOVE);"}));
 
     @Test
@@ -64,9 +70,9 @@ class LessonsTest {
         var lessons = new Lessons(root);
         for (Lessons.Lesson l : lessons.all()) {
             String[] example = CAUGHT.get(l.id());
-            assertTrue(example != null, "Lesson " + l.id() + " needs an example in LessonsTest.CAUGHT");
+            assertNotNull(example, "Lesson " + l.id() + " needs an example in LessonsTest.CAUGHT");
             Path file = root.resolve(example[0]);
-            Files.createDirectories(file.getParent());
+            Files.createDirectories(PathParts.parent(file));
             Files.writeString(file, "first line\n" + example[1] + "\n");
             var found = lessons.check(file);
             assertEquals(1, found.size(), l.id() + " should catch: " + example[1]);
@@ -90,6 +96,6 @@ class LessonsTest {
         String json = "{\"tool_input\":{\"file_path\":\"C:\\\\repo\\\\A.java\",\"command\":\"echo \\\"hi\\\" \\u00e9\"}}";
         assertEquals("C:\\repo\\A.java", HookInput.string(json, "file_path"));
         assertEquals("echo \"hi\" é", HookInput.string(json, "command"));
-        assertEquals(null, HookInput.string(json, "missing"));
+        assertNull(HookInput.string(json, "missing"));
     }
 }

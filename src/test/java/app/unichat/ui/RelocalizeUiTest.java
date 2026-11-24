@@ -2,15 +2,16 @@ package app.unichat.ui;
 
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -32,7 +33,7 @@ class RelocalizeUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
@@ -41,6 +42,7 @@ class RelocalizeUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DM_GC", justification = "it measures what is kept after a collection (as its NOPMD says)")
     void theWindowBuiltBeforeIsLetGo() throws Exception {
         MockChatService svc = new MockChatService();
         Stage[] stage = new Stage[1];
@@ -59,9 +61,12 @@ class RelocalizeUiTest {
         });
         // Held by the stage's listeners, it marked its chat read each time the window got the focus.
         FxWait.until("nothing holds the old window's contents", () -> {
-            System.gc();
+            System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection
             return old.get() == null;
         });
-        fx(() -> { stage[0].close(); svc.stop(); return null; });
+        FxWait.onFx(() -> {
+            stage[0].close();
+            svc.stop();
+        });
     }
 }

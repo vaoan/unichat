@@ -16,9 +16,9 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,7 +42,7 @@ class ReplyStickerUiTest {
         }
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
@@ -57,9 +57,8 @@ class ReplyStickerUiTest {
         library.addRecent(new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "demo://sticker", "image/png", 64, 64, null));
         Composer composer = fx(() -> new Composer(svc, m -> { }));
         Chat chat = svc.chat(CHAT);
-        fx(() -> {
+        FxWait.onFx(() -> {
             composer.setChat(CHAT);
-            return null;
         });
         Message original = svc.messages(CHAT).get(0);
         StickerGrid grid = fx(() -> {
@@ -72,10 +71,9 @@ class ReplyStickerUiTest {
             return g;
         });
         FxWait.until("the sticker's tile", () -> grid.lookup(".sticker-tile") != null);
-        fx(() -> {
+        FxWait.onFx(() -> {
             composer.reply(original);
             press(grid.lookup(".sticker-tile"));
-            return null;
         });
         List<Message> messages = fx(() -> svc.messages(CHAT));
         Message first = messages.get(messages.size() - 1);
@@ -83,9 +81,8 @@ class ReplyStickerUiTest {
         assertEquals(original.id(), first.replyToId());
         assertNull(fx(composer::takeReply), "the mode ended, as after a text");
 
-        fx(() -> {
+        FxWait.onFx(() -> {
             press(grid.lookup(".sticker-tile"));
-            return null;
         });
         List<Message> after = fx(() -> svc.messages(CHAT));
         assertNull(after.get(after.size() - 1).replyToId(), "the next one answers nothing");

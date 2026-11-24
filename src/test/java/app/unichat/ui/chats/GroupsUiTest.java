@@ -1,5 +1,6 @@
 package app.unichat.ui.chats;
 
+import app.unichat.Present;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.MainView;
 import app.unichat.ui.Theme;
@@ -18,20 +19,23 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Servers/groups are rows of the Bandeja whose channels open over the list, like a Telegram group. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class GroupsUiTest {
+    @SuppressWarnings("NullAway.Init") // open() sets it, and every test opens first
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // open() sets it, and every test opens first
     private MainView view;
 
     @BeforeAll
@@ -46,7 +50,7 @@ class GroupsUiTest {
         }
     }
 
-    private Scene open(Network n) throws Exception {
+    private Scene open(@Nullable Network n) throws InterruptedException {
         svc = new MockChatService();
         Scene scene = fx(() -> {
             Stage stage = new Stage();
@@ -65,10 +69,9 @@ class GroupsUiTest {
     }
 
     /** Presses {@code code} on {@code target}, then waits until the window has done what it set off. */
-    private static void key(Node target, KeyCode code) throws Exception {
-        fx(() -> {
+    private static void key(Node target, KeyCode code) throws InterruptedException {
+        FxWait.onFx(() -> {
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false));
-            return null;
         });
         FxWait.settled();
     }
@@ -80,12 +83,12 @@ class GroupsUiTest {
                 .filter(t -> t != null && !t.isEmpty()).toList();
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
     private static javafx.scene.control.ListView<app.unichat.model.Chat> chatList(Scene s) {
         return (javafx.scene.control.ListView<app.unichat.model.Chat>) s.getRoot().lookup(".chat-list");
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
     private static javafx.scene.control.ListView<app.unichat.model.Chat> spaceList(Scene s) {
         return (javafx.scene.control.ListView<app.unichat.model.Chat>) s.getRoot().lookup(".space-list");
     }
@@ -101,12 +104,16 @@ class GroupsUiTest {
     }
 
     /** Opens a list row by id with Enter. */
-    private void enter(Scene scene, javafx.scene.control.ListView<app.unichat.model.Chat> list, String id) throws Exception {
+    private void enter(javafx.scene.control.ListView<app.unichat.model.Chat> list, String id) throws InterruptedException {
         int i = fx(() -> {
             for (int k = 0; k < list.getItems().size(); k++) if (list.getItems().get(k).id().equals(id)) return k;
             throw new AssertionError("no row " + id + " in " + list.getItems().stream().map(app.unichat.model.Chat::id).toList());
         });
-        fx(() -> { list.requestFocus(); list.getSelectionModel().select(i); list.scrollTo(i); return null; });
+        FxWait.onFx(() -> {
+            list.requestFocus();
+            list.getSelectionModel().select(i);
+            list.scrollTo(i);
+        });
         key(list, KeyCode.ENTER);
     }
 
@@ -126,7 +133,7 @@ class GroupsUiTest {
         var list = fx(() -> chatList(scene));
         assertTrue(fx(list::getItems).stream().noneMatch(c -> c.id().equals("!srv-general:demo")),
                 "its channels live inside it, like a Telegram group");
-        enter(scene, list, "!server:demo");
+        enter(list, "!server:demo");
         assertTrue(fx(() -> spaceOpen(scene)));
         assertFalse(fx(list::isVisible), "the channels cover the list");
         // The names of channels you aren't in come from the server's hierarchy, asked on opening it.
@@ -136,8 +143,8 @@ class GroupsUiTest {
         assertTrue(channels.stream().anyMatch(t -> t.startsWith("#anuncios, canal sin unirte")), channels.toString());
 
         var spaces = fx(() -> spaceList(scene));
-        enter(scene, spaces, "!srv-general:demo");
-        assertEquals("!srv-general:demo", fx(() -> thread(scene).chat().id()), "a channel opens like a chat");
+        enter(spaces, "!srv-general:demo");
+        assertEquals("!srv-general:demo", fx(() -> Present.of(thread(scene).chat()).id()), "a channel opens like a chat");
         assertTrue(fx(() -> spaceOpen(scene)), "and the server stays open");
 
         key(spaces, KeyCode.ESCAPE);
@@ -149,10 +156,10 @@ class GroupsUiTest {
     @Test
     void openingADiscordServerBringsAllItsChannels() throws Exception {
         Scene scene = open(null);
-        enter(scene, fx(() -> chatList(scene)), "!server:demo");
+        enter(fx(() -> chatList(scene)), "!server:demo");
         assertEquals(List.of("!server:demo"), svc.channelLoads(), "asked the bridge for every channel");
         key(fx(() -> spaceList(scene)), KeyCode.ESCAPE);
-        enter(scene, fx(() -> chatList(scene)), "!server:demo");
+        enter(fx(() -> chatList(scene)), "!server:demo");
         assertEquals(1, svc.channelLoads().size(), "once");
         svc.stop();
     }
@@ -160,17 +167,17 @@ class GroupsUiTest {
     @Test
     void joiningAChannelOpensItWhenItArrives() throws Exception {
         Scene scene = open(Network.DISCORD);
-        enter(scene, fx(() -> chatList(scene)), "!server:demo");
-        enter(scene, fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
-        FxWait.until("the joined channel opens", () -> MockChatService.UNJOINED_CHANNEL_ID.equals(thread(scene).chat().id()));
-        assertTrue(svc.chat(MockChatService.UNJOINED_CHANNEL_ID) != null, "Enter joined the channel");
-        assertEquals(MockChatService.UNJOINED_CHANNEL_ID, fx(() -> thread(scene).chat().id()), "and opened it");
+        enter(fx(() -> chatList(scene)), "!server:demo");
+        enter(fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
+        FxWait.until("the joined channel opens", () -> MockChatService.UNJOINED_CHANNEL_ID.equals(Present.of(thread(scene).chat()).id()));
+        assertNotNull(svc.chat(MockChatService.UNJOINED_CHANNEL_ID), "Enter joined the channel");
+        assertEquals(MockChatService.UNJOINED_CHANNEL_ID, fx(() -> Present.of(thread(scene).chat()).id()), "and opened it");
         svc.stop();
     }
 
-    private static String toastText(Scene s) throws Exception {
+    private static String toastText(Scene s) throws InterruptedException {
         return fx(() -> {
-            javafx.scene.Node t = s.getRoot().lookup(".toast");
+            Node t = s.getRoot().lookup(".toast");
             return t != null && t.isVisible() ? ((javafx.scene.control.Label) t).getText() : "";
         });
     }
@@ -179,8 +186,8 @@ class GroupsUiTest {
     void aFailedJoinSaysSo() throws Exception {
         Scene scene = open(Network.DISCORD);
         svc.failJoins(true);
-        enter(scene, fx(() -> chatList(scene)), "!server:demo");
-        enter(scene, fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
+        enter(fx(() -> chatList(scene)), "!server:demo");
+        enter(fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
         FxWait.until("a toast about the failed join", () -> toastText(scene).startsWith("No se pudo unir"));
         assertTrue(toastText(scene).startsWith("No se pudo unir"), toastText(scene));
         svc.stop();
@@ -193,15 +200,15 @@ class GroupsUiTest {
         Spaces.joinWaitMs = 0;
         try {
             Runnable letTheRoomIn = svc.holdBridge();
-            fx(() -> { view.openChatId("!family:demo"); return null; });
-            enter(scene, fx(() -> chatList(scene)), "!server:demo");
+            FxWait.onFx(() -> view.openChatId("!family:demo"));
+            enter(fx(() -> chatList(scene)), "!server:demo");
             CompletableFuture<Void> arrived = arrival(svc, MockChatService.UNJOINED_CHANNEL_ID);
-            enter(scene, fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
+            enter(fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
             FxWait.until("the toast that it will show up later", () -> toastText(scene).contains("aparecerá"));
             letTheRoomIn.run();
             arrived.get(); // the room came in after all, and every listener heard of it
             FxWait.settled(); // and what they asked the window to do has run
-            assertEquals("!family:demo", fx(() -> thread(scene).chat().id()), "no surprise jump minutes later");
+            assertEquals("!family:demo", fx(() -> Present.of(thread(scene).chat()).id()), "no surprise jump minutes later");
             assertTrue(toastText(scene).contains("aparecerá"), toastText(scene));
         } finally {
             Spaces.joinWaitMs = 30_000;
@@ -214,14 +221,14 @@ class GroupsUiTest {
         Scene scene = open(null);
         svc.setFavorite("!server:demo", true).get();
         FxWait.until("the server's favourite tile", () -> favouriteTile(scene) != null);
-        javafx.scene.Node tile = fx(() -> favouriteTile(scene));
+        Node tile = Present.of(fx(() -> favouriteTile(scene)));
         key(tile, KeyCode.ENTER);
         FxWait.until("the server's channels", () -> spaceTexts(scene).stream().anyMatch(t -> t.startsWith("#anuncios")));
         assertTrue(fx(() -> spaceTexts(scene)).stream().anyMatch(t -> t.startsWith("#anuncios")), fx(() -> spaceTexts(scene)).toString());
         svc.stop();
     }
 
-    private static javafx.scene.Node favouriteTile(Scene scene) {
+    private static @Nullable Node favouriteTile(Scene scene) {
         return scene.getRoot().lookupAll(".favorites > *").stream()
                 .filter(n -> String.valueOf(n.queryAccessibleAttribute(javafx.scene.AccessibleAttribute.TEXT)).contains("Servidor Unichat"))
                 .findFirst().orElse(null);
@@ -237,7 +244,7 @@ class GroupsUiTest {
         FxWait.settled();
         assertTrue(fx(list::getItems).stream().anyMatch(c -> c.id().equals(offer)), "its own row, among the chats");
         assertTrue(fx(list::getItems).stream().noneMatch(c -> c.title().startsWith("Otros servidores")), "no separate zone");
-        enter(scene, list, offer);
+        enter(list, offer);
         FxWait.until("the added server's row", () -> list.getItems().stream()
                 .anyMatch(c -> c.space() && "Servidor de juegos".equals(c.title())));
         assertTrue(svc.chats().stream().anyMatch(c -> c.space() && "Servidor de juegos".equals(c.title())), "the server came in");
@@ -250,7 +257,7 @@ class GroupsUiTest {
     @Test
     void searchFindsServersToAdd() throws Exception {
         Scene scene = open(Network.DISCORD);
-        fx(() -> { ((javafx.scene.control.TextField) scene.getRoot().lookup(".search-field")).setText("juegos"); return null; });
+        FxWait.onFx(() -> ((javafx.scene.control.TextField) scene.getRoot().lookup(".search-field")).setText("juegos"));
         String offer = Spaces.OFFER_PREFIX + MockChatService.OFFERED_GUILD_ID;
         FxWait.until("the server to add found", () -> chatList(scene).getItems().stream().anyMatch(c -> c.id().equals(offer)));
         assertTrue(fx(() -> chatList(scene).getItems()).stream().anyMatch(c -> c.id().equals(offer)));
@@ -276,11 +283,11 @@ class GroupsUiTest {
         return (ThreadPane) s.getRoot().lookupAll("*").stream().filter(n -> n instanceof ThreadPane).findFirst().orElseThrow();
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
-    private static void clickRail(Scene s, String accessibleText) throws Exception {
+    private static void clickRail(Scene s, String accessibleText) throws InterruptedException {
         fx(() -> {
             for (Node n : s.getRoot().lookupAll(".rail-button")) {
                 String t = n.getAccessibleText();
@@ -299,13 +306,13 @@ class GroupsUiTest {
     void theRailAlwaysTakesYouOutOfAServer() throws Exception {
         Scene scene = open(null);
         var list = fx(() -> chatList(scene));
-        enter(scene, list, "!server:demo");
+        enter(list, "!server:demo");
         assertTrue(fx(() -> spaceOpen(scene)));
         clickRail(scene, "Bandeja unificada");
         assertFalse(fx(() -> spaceOpen(scene)), "Bandeja from inside a server, already on Bandeja: back to the inbox");
         assertTrue(fx(list::isVisible));
 
-        enter(scene, list, "!server:demo");
+        enter(list, "!server:demo");
         clickRail(scene, "WhatsApp");
         assertFalse(fx(() -> spaceOpen(scene)), "another network: its chats, not the server");
         assertTrue(fx(list::getItems).stream().allMatch(c -> c.network() == Network.WHATSAPP || c.id().startsWith("offer")),

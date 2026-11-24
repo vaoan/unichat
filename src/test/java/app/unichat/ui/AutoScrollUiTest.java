@@ -11,6 +11,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import static app.unichat.ui.TimelineWindow.CHAT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class AutoScrollUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @AfterEach
@@ -34,16 +36,15 @@ class AutoScrollUiTest {
         w.svc.sendText(CHAT, "te respondo", firstId).get();
         FxWait.until("the sent message shows", w::showsNewest);
         w.untilAtBottom();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             // The demo chat has replies of its own: this one's is the lowest on screen.
             Node quote = w.list().lookupAll(".reply-quote").stream()
                     .max(java.util.Comparator.comparingDouble(n -> n.localToScene(n.getBoundsInLocal()).getMinY())).orElseThrow();
             TimelineWindow.click(quote);
-            return null;
         });
         FxWait.until("the original is on screen", () -> w.yOf(firstId) != null);
         FxWait.settled();
-        assertTrue(FxWait.fx(w::newestGap) == null, "it stayed up");
+        assertNull(FxWait.fx(w::newestGap), "it stayed up");
         assertNotNull(FxWait.fx(() -> w.yOf(firstId)), "the original is on screen");
         assertTrue(FxWait.fx(w::jumpDownShown), "a way back down");
     }

@@ -24,6 +24,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.imageio.ImageIO;
+import org.jspecify.annotations.Nullable;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MediaViewerUiTest {
     @TempDir
     Path dir;
+    @SuppressWarnings("NullAway.Init") // open() (@BeforeEach) sets it on the FX thread
     private Stage owner;
     private int saves;
 
@@ -62,37 +64,34 @@ class MediaViewerUiTest {
     void open() throws Exception {
         Path png = dir.resolve("foto.png");
         ImageIO.write(new BufferedImage(1600, 1200, BufferedImage.TYPE_INT_RGB), "png", png.toFile());
-        fx(() -> {
+        FxWait.onFx(() -> {
             owner = new Stage();
             owner.setScene(new Scene(new StackPane(), 1000, 800));
             owner.show();
             MediaViewer.show(owner, CompletableFuture.completedFuture(png), "Foto", () -> saves++);
-            return null;
         });
         waitFor(() -> fx(() -> viewer().isPresent() && photo().getWidth() > 0 && photo().view().getImage() != null));
     }
 
     @AfterEach
     void close() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             viewer().ifPresent(Window::hide);
             owner.close();
-            return null;
         });
     }
 
     @Test
     void fullScreenFillsTheScreen() throws Exception {
         Stage v = (Stage) fx(() -> viewer().orElseThrow());
-        fx(() -> {
+        FxWait.onFx(() -> {
             // F, as the person presses it; an owned window hung in setFullScreen on macOS
-            javafx.event.Event.fireEvent(v.getScene().getRoot(), new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,
-                    "", "f", javafx.scene.input.KeyCode.F, false, false, false, false));
-            return null;
+            Event.fireEvent(v.getScene().getRoot(), new KeyEvent(KeyEvent.KEY_PRESSED,
+                    "", "f", KeyCode.F, false, false, false, false));
         });
         double screenWidth = fx(() -> javafx.stage.Screen.getScreensForRectangle(v.getX(), v.getY(), 1, 1).get(0).getBounds().getWidth());
         FxWait.until("the window fills the screen (" + screenWidth + " wide)", () -> v.isFullScreen() && v.getWidth() >= screenWidth - 1);
-        fx(() -> { v.setFullScreen(false); return null; });
+        FxWait.onFx(() -> v.setFullScreen(false));
         FxWait.until("back to a window", () -> !v.isFullScreen());
     }
 
@@ -100,21 +99,20 @@ class MediaViewerUiTest {
     void aTallPictureLeavesRoomForTheControls() throws Exception {
         Path tall = dir.resolve("alta.png");
         ImageIO.write(new BufferedImage(300, 5000, BufferedImage.TYPE_INT_RGB), "png", tall.toFile());
-        fx(() -> {
+        FxWait.onFx(() -> {
             viewer().ifPresent(Window::hide);
             MediaViewer.show(owner, CompletableFuture.completedFuture(tall), "Alta", () -> saves++);
-            return null;
         });
         FxWait.until("the tall picture shows", () -> viewer().isPresent() && photo().view().getImage() != null
                 && photo().view().getImage().getHeight() > 1000);
         FxWait.settled();
         String where = fx(() -> {
-            javafx.scene.Node bar = viewer().orElseThrow().getScene().getRoot().lookup(".media-viewer-bar");
+            Node bar = viewer().orElseThrow().getScene().getRoot().lookup(".media-viewer-bar");
             javafx.geometry.Bounds b = bar.localToScene(bar.getBoundsInLocal());
             return b.getMinY() + ".." + b.getMaxY() + " in " + viewer().orElseThrow().getScene().getHeight();
         });
         assertTrue(fx(() -> {
-            javafx.scene.Node bar = viewer().orElseThrow().getScene().getRoot().lookup(".media-viewer-bar");
+            Node bar = viewer().orElseThrow().getScene().getRoot().lookup(".media-viewer-bar");
             javafx.geometry.Bounds b = bar.localToScene(bar.getBoundsInLocal());
             return b.getHeight() > 0 && b.getMaxY() <= viewer().orElseThrow().getScene().getHeight() + 0.5;
         }), "the controls are inside the window: " + where);
@@ -138,14 +136,14 @@ class MediaViewerUiTest {
 
     @Test
     void theArrowsStepThroughTheChatsPictures() throws Exception {
-        fx(() -> { viewer().ifPresent(Window::hide); return null; });
-        java.util.List<MediaViewer.Item> items = new java.util.ArrayList<>();
+        FxWait.onFx(() -> viewer().ifPresent(Window::hide));
+        List<MediaViewer.Item> items = new ArrayList<>();
         for (int i = 1; i <= 3; i++) {
             Path f = dir.resolve("foto" + i + ".png");
             ImageIO.write(new BufferedImage(1600, 1200, BufferedImage.TYPE_INT_RGB), "png", f.toFile());
             items.add(new MediaViewer.Item("foto" + i, () -> CompletableFuture.completedFuture(f), () -> saves++));
         }
-        fx(() -> { MediaViewer.show(owner, items, 1); return null; });
+        FxWait.onFx(() -> MediaViewer.show(owner, items, 1));
         waitFor(() -> fx(() -> viewer().isPresent() && photo().view().getImage() != null));
         assertEquals("foto2", fx(() -> ((Stage) viewer().orElseThrow()).getTitle()), "opens on the one clicked");
 
@@ -173,26 +171,24 @@ class MediaViewerUiTest {
     @Test
     void theWheelZoomsAndTheNodeFollows() throws Exception {
         double before = fx(() -> photo().view().getFitWidth());
-        fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(photo(), new ScrollEvent(ScrollEvent.SCROLL, 100, 100, 100, 100, false, false, false, false,
                     false, false, 0, 120, 0, 120, ScrollEvent.HorizontalTextScrollUnits.NONE, 0,
                     ScrollEvent.VerticalTextScrollUnits.NONE, 0, 0, null));
-            return null;
         });
-        assertTrue((double) fx(() -> photo().view().getFitWidth()) > before);
+        assertTrue(fx(() -> photo().view().getFitWidth()) > before);
     }
 
     @Test
     void draggingMovesThePictureAndDoesNotCloseTheWindow() throws Exception {
         key("1", KeyCode.DIGIT1);
         double left = fx(() -> photo().view().getLayoutX());
-        fx(() -> {
+        FxWait.onFx(() -> {
             PhotoPane pane = photo();
             fire(pane, MouseEvent.MOUSE_PRESSED, 300, 1, true);
             fire(pane, MouseEvent.MOUSE_DRAGGED, 250, 1, false);
             fire(pane, MouseEvent.MOUSE_RELEASED, 250, 1, false);
             fire(pane, MouseEvent.MOUSE_CLICKED, 250, 1, false);
-            return null;
         });
         assertEquals(left - 50, (double) fx(() -> photo().view().getLayoutX()), 1e-6);
         assertTrue(fx(() -> viewer().isPresent()), "the end of a drag is no click beside the picture");
@@ -200,28 +196,24 @@ class MediaViewerUiTest {
 
     @Test
     void aClickBesideThePictureClosesAndOnItDoesNot() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             fire(photo().view(), MouseEvent.MOUSE_CLICKED, 300, 1, true);
-            return null;
         });
         assertTrue(fx(() -> viewer().isPresent()));
-        fx(() -> {
+        FxWait.onFx(() -> {
             fire(photo(), MouseEvent.MOUSE_CLICKED, 1, 1, true);
-            return null;
         });
         assertFalse(fx(() -> viewer().isPresent()));
     }
 
     @Test
     void aDoubleClickTogglesRealSize() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             fire(photo().view(), MouseEvent.MOUSE_CLICKED, 300, 2, true);
-            return null;
         });
         assertEquals(100, (int) fx(() -> photo().zoom().percent()));
-        fx(() -> {
+        FxWait.onFx(() -> {
             fire(photo().view(), MouseEvent.MOUSE_CLICKED, 300, 2, true);
-            return null;
         });
         assertTrue(fx(() -> photo().zoom().isFitted()));
     }
@@ -233,9 +225,8 @@ class MediaViewerUiTest {
         for (Button b : buttons) {
             assertTrue(b.getAccessibleText() != null || !b.getText().isEmpty(), String.valueOf(b));
         }
-        fx(() -> {
+        FxWait.onFx(() -> {
             buttons.stream().filter(b -> "Guardar como…".equals(b.getText())).findFirst().orElseThrow().fire();
-            return null;
         });
         assertEquals(1, saves);
     }
@@ -252,11 +243,10 @@ class MediaViewerUiTest {
                 true, false, false, false, false, still, null));
     }
 
-    private void key(String text, KeyCode code) throws Exception {
-        fx(() -> {
+    private void key(String text, KeyCode code) throws InterruptedException {
+        FxWait.onFx(() -> {
             Event.fireEvent(viewer().orElseThrow().getScene(),
                     new KeyEvent(KeyEvent.KEY_PRESSED, KeyEvent.CHAR_UNDEFINED, text, code, false, false, false, false));
-            return null;
         });
     }
 
@@ -270,7 +260,7 @@ class MediaViewerUiTest {
                 .filter(PhotoPane.class::isInstance).findFirst().orElseThrow();
     }
 
-    private static void waitFor(java.util.concurrent.Callable<Boolean> done) throws Exception {
+    private static void waitFor(Callable<Boolean> done) throws InterruptedException {
         try {
             FxWait.until("the photo showed", done); // a throw (the picture isn't in the window yet) counts as not yet
         } catch (AssertionError timedOut) {
@@ -279,17 +269,17 @@ class MediaViewerUiTest {
         }
     }
 
-    private static List<String> windows() throws Exception {
+    private static List<String> windows() throws InterruptedException {
         return fx(() -> Window.getWindows().stream()
                 .map(w -> w.getClass().getSimpleName() + (w.getScene() == null ? "" : ":" + w.getScene().getRoot().getStyleClass()
-                        + (w.getScene().getRoot().lookupAll("*").stream().filter(PhotoPane.class::isInstance).findFirst()
+                        + w.getScene().getRoot().lookupAll("*").stream().filter(PhotoPane.class::isInstance).findFirst()
                                 .map(n -> " photo w=" + ((PhotoPane) n).getWidth() + " img=" + ((PhotoPane) n).view().getImage()
                                         + " area=" + n.getParent()).orElse(" no photo pane; shows " + w.getScene().getRoot().lookupAll(".label, .progress-indicator").stream()
-                                        .map(n -> n instanceof javafx.scene.control.Label l ? "label:" + l.getText() : "spinner").toList()))))
+                                        .map(n -> n instanceof javafx.scene.control.Label l ? "label:" + l.getText() : "spinner").toList())))
                 .toList());
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -40,7 +41,7 @@ class GifSearchTest {
 
     @BeforeEach
     void fakeProviders() throws IOException {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String uri = ex.getRequestURI().toString();
             queries.add(uri);
@@ -48,11 +49,21 @@ class GifSearchTest {
             int status = 200;
             if (uri.startsWith("/giphy/v1/gifs/search")) body = GIPHY;
             else if (uri.startsWith("/klipy/api/v1/KEY2/gifs/search")) body = KLIPY;
-            else if (uri.startsWith("/broken")) { status = 500; body = "{}"; }
+            else if (uri.startsWith("/broken")) {
+                status = 500;
+                body = "{}";
+            }
             else if (uri.startsWith("/slow")) {
-                try { slow.await(); } catch (InterruptedException ignored) { }
+                try {
+                    slow.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
                 body = GIPHY;
-            } else { status = 404; body = "{}"; }
+            } else {
+                status = 404;
+                body = "{}";
+            }
             byte[] b = body.getBytes(StandardCharsets.UTF_8);
             ex.sendResponseHeaders(status, b.length);
             try (OutputStream o = ex.getResponseBody()) {

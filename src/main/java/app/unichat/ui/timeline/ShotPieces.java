@@ -23,7 +23,8 @@ final class ShotPieces {
         List<Piece> out = new ArrayList<>();
         int top = 0;
         while (top < total) {
-            int limit = top + height, bottom = -1;
+            int limit = top + height;
+            int bottom = -1;
             // Not after the last message: what follows it (the footer) never goes alone.
             for (int end : ends.subList(0, Math.max(0, ends.size() - 1))) if (end > top && end <= limit) bottom = end;
             if (total <= limit) bottom = total; // the rest fits: the last piece

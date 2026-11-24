@@ -4,6 +4,7 @@ import app.unichat.model.Network;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -82,7 +83,7 @@ class LoginCopyTest {
         assertEquals("Escribe tu PIN de X Chat", LoginCopy.step(Network.X, enter).title());
     }
 
-    private static BridgeLogin.Field pin(String pattern) {
+    private static BridgeLogin.Field pin(@Nullable String pattern) {
         return new BridgeLogin.Field("password", "pin", "PIN", "", null, true, pattern, List.of());
     }
 

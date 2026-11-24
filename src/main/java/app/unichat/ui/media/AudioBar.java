@@ -24,16 +24,16 @@ public final class AudioBar extends HBox {
         getStyleClass().add("audio-bar");
         setAlignment(Pos.CENTER_LEFT);
         who.getStyleClass().add("audio-who");
-        who.setMinWidth(Region.USE_PREF_SIZE);
+        who.setMinWidth(USE_PREF_SIZE);
         who.setMaxWidth(320);
         who.setOnAction(e -> {
             if (playback.chat() != null) openChat.accept(playback.chat());
         });
         AudioControls controls = new AudioControls(playback, playback::current, playback::togglePlay);
         controls.setMaxWidth(480);
-        HBox.setHgrow(controls, Priority.ALWAYS);
+        setHgrow(controls, Priority.ALWAYS);
         Region grow = new Region();
-        HBox.setHgrow(grow, Priority.SOMETIMES);
+        setHgrow(grow, Priority.SOMETIMES);
         Button close = Icons.iconButton(Icons.CLOSE, I18n.t("audioBar.close"), playback::stop);
         getChildren().addAll(who, controls, grow, close);
         playback.addListener(this::refresh);
@@ -45,7 +45,7 @@ public final class AudioBar extends HBox {
         boolean showing = m != null;
         setVisible(showing);
         setManaged(showing);
-        if (!showing) return;
+        if (m == null) return;
         String sender = m.outgoing() ? I18n.t("common.you") : m.senderName();
         Chat c = playback.chat();
         String title = c == null || c.title() == null || c.title().equals(sender) ? sender : sender + " · " + c.title();

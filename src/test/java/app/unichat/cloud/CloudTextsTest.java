@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The texts in the cloud's rounds: alone when asked, before the media in a round, and never holding the media back. */
 class CloudTextsTest {
-    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55", CHAT = "3f2a9c1b2d4e", FILE = CHAT + " 2026-11.jsonl";
+    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String CHAT = "3f2a9c1b2d4e";
+    private static final String FILE = CHAT + " 2026-11.jsonl";
 
     @TempDir
     Path dir;
@@ -45,12 +48,14 @@ class CloudTextsTest {
         cloud.close();
     }
 
-    private Cloud cloud(CloudAccount account, Path media) {
+    private Cloud cloud(@Nullable CloudAccount account, @Nullable Path media) {
         return cloud(() -> account, media);
     }
 
-    private Cloud cloud(java.util.function.Supplier<CloudAccount> account, Path media) {
-        SyncedPart unused = new SyncedPart("Unichat/Settings/x.json", "x", now -> null, b -> { });
+    private Cloud cloud(java.util.function.Supplier<@Nullable CloudAccount> account, @Nullable Path media) {
+        SyncedPart unused = new SyncedPart("Unichat/Settings/x.json", "x", now -> {
+            throw new AssertionError("only the texts run here");
+        }, b -> { });
         return new Cloud(account, unused, unused,
                 new MediaUpload(dir.resolve("cloud-uploaded.txt"), () -> media == null ? List.of() : List.of(media), p -> false),
                 new TextSync(dir.resolve("texts"), dir.resolve("cloud-texts.json"), Cloud.machine()), arrived::add,
@@ -79,7 +84,8 @@ class CloudTextsTest {
 
     @Test
     void asksWhileOneIsWaitingJoinItAndOneAfterItStartsGetsItsOwn() throws Exception {
-        java.util.concurrent.CountDownLatch running = new java.util.concurrent.CountDownLatch(1), goOn = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch running = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch goOn = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.atomic.AtomicInteger rounds = new java.util.concurrent.atomic.AtomicInteger();
         Cloud c = cloud(() -> {
             if (rounds.incrementAndGet() == 1) {

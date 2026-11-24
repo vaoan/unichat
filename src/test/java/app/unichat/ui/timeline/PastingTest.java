@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
 import org.junit.jupiter.api.Test;
@@ -22,7 +23,7 @@ class PastingTest {
     void aPictureCopiedFromTheWebGoesAsAPhoto() throws Exception {
         WritableImage copied = new WritableImage(40, 30);
         copied.getPixelWriter().setColor(5, 7, Color.RED);
-        Pasting.Send send = Pasting.toSend(new Pasting.Copied(List.of(), null, copied), dir);
+        Pasting.Send send = Present.of(Pasting.toSend(new Pasting.Copied(List.of(), null, copied), dir));
         assertEquals(app.unichat.service.SendAs.PHOTO, send.as());
         File png = send.files().get(0);
         assertTrue(png.toPath().startsWith(dir) && png.getName().endsWith(".png"), png.toString());
@@ -36,7 +37,7 @@ class PastingTest {
     void copiedFilesGoAsTheyAre() throws Exception {
         List<File> files = List.of(dir.resolve("a.pdf").toFile(), dir.resolve("b.jpg").toFile());
         // Finder also puts the names as text, and an icon as a picture: the files win.
-        Pasting.Send send = Pasting.toSend(new Pasting.Copied(files, "a.pdf\nb.jpg", new WritableImage(8, 8)), dir);
+        Pasting.Send send = Present.of(Pasting.toSend(new Pasting.Copied(files, "a.pdf\nb.jpg", new WritableImage(8, 8)), dir));
         assertEquals(files, send.files());
         assertEquals(app.unichat.service.SendAs.AS_IS, send.as());
     }

@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A post on X, by FxTwitter's public API: X shows its pages only to a browser that runs them, and FixupX gives the
@@ -25,7 +26,7 @@ final class TweetPreview {
     private TweetPreview() {}
 
     /** Where FxTwitter tells about the post a link leads to; null when the link isn't a post on X. */
-    static String api(String url) {
+    static @Nullable String api(String url) {
         try {
             URI u = URI.create(url);
             String host = u.getHost() == null ? "" : u.getHost().toLowerCase(Locale.ROOT);
@@ -38,11 +39,12 @@ final class TweetPreview {
         }
     }
 
-    static LinkPreview parse(String json, String url) throws IOException {
+    static @Nullable LinkPreview parse(String json, String url) throws IOException {
         JsonNode t = JSON.readTree(json).path("tweet");
         if (t.isMissingNode()) return null;
         JsonNode author = t.path("author");
-        String name = author.path("name").asText(""), handle = author.path("screen_name").asText("");
+        String name = author.path("name").asText("");
+        String handle = author.path("screen_name").asText("");
         String title = handle.isEmpty() ? name : name + " (@" + handle + ")";
         JsonNode media = t.path("media").path("all").path(0);
         String type = media.path("type").asText("");
@@ -56,7 +58,7 @@ final class TweetPreview {
                 video, type.equals("gif"));
     }
 
-    private static String web(String url) {
+    private static @Nullable String web(String url) {
         return url.startsWith("https://") || url.startsWith("http://") ? url : null;
     }
 }

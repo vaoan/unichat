@@ -34,7 +34,7 @@ class AvatarFlashUiTest {
         Avatar avatar = fx(() -> new Avatar(44));
         ImageView photo = fx(() -> (ImageView) avatar.getChildren().stream().filter(n -> n instanceof ImageView).findFirst().orElseThrow());
 
-        fx(() -> { avatar.set("Mamá", "!mama", "demo://Avatar-Mama", svc); return null; });
+        FxWait.onFx(() -> avatar.set("Mamá", "!mama", "demo://Avatar-Mama", svc));
         FxWait.until("first load finishes", photo::isVisible);
 
         // The cell is recycled for another chat, then gets Mamá again (what every inbox refresh does).
@@ -61,7 +61,7 @@ class AvatarFlashUiTest {
         return a.getChildren().stream().anyMatch(n -> n instanceof ImageView v && v.isVisible() && v.getImage() != null);
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
+    private static <T> T fx(Supplier<T> s) throws InterruptedException {
         return FxWait.fx(s::get);
     }
 }

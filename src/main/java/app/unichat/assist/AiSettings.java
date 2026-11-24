@@ -3,6 +3,7 @@ package app.unichat.assist;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import java.nio.file.Path;
+import org.jspecify.annotations.Nullable;
 
 /** Ajustes → Escribir con IA. Off until the person turns it on: it sends their chats to another company's service. */
 public final class AiSettings {
@@ -27,7 +28,7 @@ public final class AiSettings {
     public static void setEngine(AiEngine e) { Settings.get().set("ai.engine", e.name()); }
 
     public static String instructions() {
-        String saved = Settings.get().getString("ai.instructions", null);
+        String saved = Settings.get().getString("ai.instructions");
         return saved != null ? saved : defaultInstructions();
     }
 
@@ -76,10 +77,10 @@ public final class AiSettings {
     public static void setReadyVolume(int v) { Settings.get().set("ai.readyVolume", Integer.toString(Math.max(0, Math.min(100, v)))); }
 
     /** The folder it may read, or null. */
-    public static Path folder() {
+    public static @Nullable Path folder() {
         String f = Settings.get().getString("ai.folder", "");
         return f.isBlank() ? null : Path.of(f);
     }
 
-    public static void setFolder(Path folder) { Settings.get().set("ai.folder", folder == null ? "" : folder.toString()); }
+    public static void setFolder(@Nullable Path folder) { Settings.get().set("ai.folder", folder == null ? "" : folder.toString()); }
 }

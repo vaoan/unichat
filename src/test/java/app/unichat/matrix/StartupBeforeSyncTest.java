@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Chat;
@@ -7,12 +8,16 @@ import app.unichat.model.ConnectionState;
 import app.unichat.model.Network;
 import app.unichat.service.Changes;
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -39,12 +44,13 @@ class StartupBeforeSyncTest {
     private final CountDownLatch syncAnswers = new CountDownLatch(1);
     private final AtomicInteger syncsAnswered = new AtomicInteger();
     private final Changes changes = new Changes();
-    private volatile String sinceSeen;
+    private volatile @Nullable String sinceSeen;
+    @SuppressWarnings("NullAway.Init") // each test makes it before use; @AfterEach stops it only if made
     private MatrixChatService svc;
 
     @BeforeEach
     void fakeHomeserver() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String path = ex.getRequestURI().getPath();
             String body = "{}";
@@ -91,7 +97,7 @@ class StartupBeforeSyncTest {
     }
 
     /** What a previous run left on disk: the logins each bridge reported and the last full sync. */
-    private void previousRun(MatrixChatService svc) throws Exception {
+    private void previousRun(MatrixChatService service) throws IOException {
         long now = System.currentTimeMillis();
         Settings.get().set("matrix.logins.whatsapp", now + "\n573001112233\t+57 300 111 2233\tCONNECTED\n");
         Settings.get().set("matrix.logins.telegram", now + "\n900000042\tJuan\tCONNECTED\n");
@@ -110,8 +116,8 @@ class StartupBeforeSyncTest {
                     "timeline":{"events":[{"type":"m.room.message","event_id":"$2","sender":"@telegram_42:localhost",
                        "origin_server_ts":1700000100000,"content":{"msgtype":"m.text","body":"buenas"}}]}}
                 }}}""";
-        Path f = svc.syncCacheFile();
-        Files.createDirectories(f.getParent());
+        Path f = service.syncCacheFile();
+        Files.createDirectories(PathParts.parent(f));
         Files.writeString(f, sync);
     }
 
@@ -130,11 +136,11 @@ class StartupBeforeSyncTest {
         assertTrue(accounts.stream().anyMatch(a -> a.network() == Network.WHATSAPP && a.id().equals("whatsapp:573001112233")), accounts.toString());
         assertTrue(accounts.stream().anyMatch(a -> a.network() == Network.TELEGRAM && a.label().equals("Juan")), accounts.toString());
 
-        Chat wa = svc.chat("!wa:localhost");
+        Chat wa = Present.of(svc.chat("!wa:localhost"));
         assertEquals(Network.WHATSAPP, wa.network());
         assertEquals("Ana", wa.title(), "bridge suffix removed");
         assertEquals("hola", wa.lastPreview());
-        assertEquals(Network.TELEGRAM, svc.chat("!tg:localhost").network());
+        assertEquals(Network.TELEGRAM, Present.of(svc.chat("!tg:localhost")).network());
 
         // The network sync resumes from the cached token instead of downloading everything again.
         changes.until(() -> "s1".equals(sinceSeen));

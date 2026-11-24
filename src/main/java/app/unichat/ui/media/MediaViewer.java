@@ -5,6 +5,7 @@ import app.unichat.ui.Nodes;
 import app.unichat.ui.Theme;
 import app.unichat.support.I18n;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.geometry.Pos;
@@ -21,9 +22,11 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -40,7 +43,7 @@ public final class MediaViewer {
     record Item(String title, java.util.function.Supplier<CompletableFuture<Path>> file, Runnable onSave) {}
 
     /** {@code onSave}: the "Guardar como…" button. */
-    public static void show(Window owner, CompletableFuture<Path> file, String title, Runnable onSave) {
+    public static void show(Window owner, CompletableFuture<Path> file, @Nullable String title, Runnable onSave) {
         show(owner, java.util.List.of(new Item(title == null ? I18n.t("media.image") : title, () -> file, onSave)), 0);
     }
 
@@ -112,7 +115,7 @@ public final class MediaViewer {
             next.setDisable(at[0] == items.size() - 1);
             photo.setAccessibleText(item.title());
             area.getChildren().setAll(spin);
-            item.file().get().whenComplete((p, err) -> {
+            var _ = item.file().get().whenComplete((p, err) -> {
                 try {
                     if (err != null || p == null) throw new IOException("no file", err);
                     load(p, () -> {
@@ -121,7 +124,7 @@ public final class MediaViewer {
                         area.getChildren().setAll(photo);
                         return true;
                     }, photo);
-                } catch (Exception e) {
+                } catch (Exception e) { // NOPMD: ExceptionAsFlowControl, one failure path for no file and a file that won't load
                     Platform.runLater(() -> {
                         if (generation[0] != mine) return;
                         Label l = new Label(I18n.t("viewer.openFailed"));
@@ -131,7 +134,9 @@ public final class MediaViewer {
                 }
             });
             // The next one starts downloading now: stepping through a chat shouldn't wait on each.
-            if (at[0] + 1 < items.size()) items.get(at[0] + 1).file().get();
+            if (at[0] + 1 < items.size()) {
+                var _ = items.get(at[0] + 1).file().get();
+            }
         };
         stage.show();
         go[0].run();
@@ -150,8 +155,14 @@ public final class MediaViewer {
         if (items.size() < 2 || e.isShortcutDown()) return false;
         boolean panning = !photo.zoom().isFitted() && photo.zoom().canPan();
         switch (e.getCode()) {
-            case LEFT -> { if (panning) return false; go(items, at, -1, show); }
-            case RIGHT -> { if (panning) return false; go(items, at, 1, show); }
+            case LEFT -> {
+                if (panning) return false;
+                go(items, at, -1, show);
+            }
+            case RIGHT -> {
+                if (panning) return false;
+                go(items, at, 1, show);
+            }
             case PAGE_UP -> go(items, at, -1, show);
             case PAGE_DOWN -> go(items, at, 1, show);
             case HOME -> go(items, at, -at[0], show);
@@ -209,6 +220,7 @@ public final class MediaViewer {
     }
 
     /** True if the key was one of the viewer's. By character for + and -, which move around between keyboards. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a key the person typed, matched to a shortcut")
     private static boolean key(PhotoPane photo, KeyEvent e) {
         switch (e.getCode()) {
             case LEFT -> photo.change(z -> z.pan(ARROW_STEP, 0));
@@ -218,7 +230,7 @@ public final class MediaViewer {
             case ADD -> photo.change(z -> z.zoomBy(PhotoPane.STEP));
             case SUBTRACT -> photo.change(z -> z.zoomBy(1 / PhotoPane.STEP));
             default -> {
-                switch (e.getText().toLowerCase()) {
+                switch (e.getText().toLowerCase(Locale.ROOT)) {
                     case "+", "=" -> photo.change(z -> z.zoomBy(PhotoPane.STEP));
                     case "-" -> photo.change(z -> z.zoomBy(1 / PhotoPane.STEP));
                     case "0" -> photo.change(PhotoZoom::fit);

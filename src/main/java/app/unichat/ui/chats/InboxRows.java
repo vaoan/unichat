@@ -2,6 +2,7 @@ package app.unichat.ui.chats;
 
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,7 +32,8 @@ public final class InboxRows {
 
     public static Rows build(List<Chat> all, ChatFilter f, Map<String, String> names) {
         Set<Network> networks = new LinkedHashSet<>();
-        if (f.network() != null) networks.add(f.network());
+        Network only = f.network();
+        if (only != null) networks.add(only);
         else for (Chat c : all) if (c.space() && !c.personalSpace()) networks.add(c.network());
 
         Map<String, Integer> unread = new HashMap<>();
@@ -41,10 +43,11 @@ public final class InboxRows {
         List<Chat> top = new ArrayList<>();
         for (Network n : networks) {
             for (SpaceTree.Node node : SpaceTree.build(all, n, f.accountId(), names)) {
-                if (node.loose() || node.chat() == null) continue;
+                Chat server = node.chat();
+                if (node.loose() || server == null) continue;
                 describe(node, unread, latest, activity);
                 collect(node, inServer);
-                if (matches(f, node, unread.get(node.id()))) top.add(node.chat());
+                if (matches(f, server, unread.getOrDefault(node.id(), 0))) top.add(server);
             }
         }
         // A channel lives in its server, except in a search and in the archive (where archived channels go).
@@ -63,7 +66,7 @@ public final class InboxRows {
     }
 
     /** The channels of server {@code spaceId}, newest first, then the ones you could join (and sub-groups' channels). */
-    public static Rows channels(List<Chat> all, String spaceId, String accountId, Map<String, String> names) {
+    public static Rows channels(List<Chat> all, String spaceId, @Nullable String accountId, Map<String, String> names) {
         Chat space = all.stream().filter(c -> c.id().equals(spaceId)).findFirst().orElse(null);
         if (space == null) return Rows.EMPTY;
         return channels(SpaceTree.build(all, space.network(), accountId, names), space);
@@ -86,7 +89,7 @@ public final class InboxRows {
         return new Rows(rows, unjoined, unread, latest);
     }
 
-    private static SpaceTree.Node find(List<SpaceTree.Node> nodes, String id) {
+    private static SpaceTree.@Nullable Node find(List<SpaceTree.Node> nodes, String id) {
         for (SpaceTree.Node n : nodes) {
             if (n.id().equals(id)) return n;
             SpaceTree.Node f = find(n.children(), id);
@@ -97,10 +100,11 @@ public final class InboxRows {
 
     private static void leaves(SpaceTree.Node node, Network network, List<Chat> joined, List<Chat> toJoin, Set<String> unjoined) {
         for (SpaceTree.Node c : node.children()) {
+            Chat chat = c.chat();
             if (c.container()) {
                 leaves(c, network, joined, toJoin, unjoined);
-            } else if (c.chat() != null) {
-                joined.add(c.chat());
+            } else if (chat != null) {
+                joined.add(chat);
             } else {
                 Chat p = new Chat(c.id());
                 p.setTitle(c.name());
@@ -111,8 +115,7 @@ public final class InboxRows {
         }
     }
 
-    private static boolean matches(ChatFilter f, SpaceTree.Node node, int unread) {
-        Chat s = node.chat();
+    private static boolean matches(ChatFilter f, Chat s, int unread) {
         if (f.searching()) return ChatFilter.normalize(s.title()).contains(ChatFilter.normalize(f.query()));
         if (f.unreadOnly() && (unread == 0 || s.muted())) return false;
         return switch (f.view()) {
@@ -131,7 +134,7 @@ public final class InboxRows {
     }
 
     /** Unread count, newest channel and its time for a server and every server inside it. */
-    private static Chat describe(SpaceTree.Node node, Map<String, Integer> unread, Map<String, Chat> latest,
+    private static @Nullable Chat describe(SpaceTree.Node node, Map<String, Integer> unread, Map<String, Chat> latest,
                                  Map<String, Instant> activity) {
         Chat newest = null;
         for (SpaceTree.Node c : node.children()) {

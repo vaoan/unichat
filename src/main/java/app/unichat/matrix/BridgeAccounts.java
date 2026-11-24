@@ -10,6 +10,7 @@ import app.unichat.bridge.LoginsCache;
 import app.unichat.service.ChatService.Listener;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,7 +24,21 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static app.unichat.matrix.BridgeProtocol.*;
+import static app.unichat.matrix.BridgeProtocol.BotChatLogin;
+import static app.unichat.matrix.BridgeProtocol.Login;
+import static app.unichat.matrix.BridgeProtocol.accountId;
+import static app.unichat.matrix.BridgeProtocol.botCommand;
+import static app.unichat.matrix.BridgeProtocol.inferFromBotChat;
+import static app.unichat.matrix.BridgeProtocol.liveDetail;
+import static app.unichat.matrix.BridgeProtocol.liveStatus;
+import static app.unichat.matrix.BridgeProtocol.loginCommand;
+import static app.unichat.matrix.BridgeProtocol.loginStatus;
+import static app.unichat.matrix.BridgeProtocol.needsChatResync;
+import static app.unichat.matrix.BridgeProtocol.parseDiscordPing;
+import static app.unichat.matrix.BridgeProtocol.parseLogins;
+import static app.unichat.matrix.BridgeProtocol.requireSuccess;
+import static app.unichat.matrix.BridgeProtocol.startsLoginByItself;
+import static app.unichat.matrix.BridgeProtocol.statusCommand;
 import static app.unichat.matrix.MatrixClient.CLIENT;
 import static app.unichat.support.Urls.enc;
 import static app.unichat.matrix.MatrixLogin.userMessage;
@@ -62,7 +77,7 @@ final class BridgeAccounts {
     private volatile List<Account> lastAccounts = List.of();
 
     /** The bridges' live reports: accounts are re-read from them on every change (and every 30 s, see tick). */
-    private BridgeStates liveStates;
+    private @Nullable BridgeStates liveStates;
 
     private final Runnable liveChanged;
 
@@ -122,7 +137,8 @@ final class BridgeAccounts {
     }
 
     private static Account accountOf(Network n, Login l) {
-        return new Account(accountId(n, l.id()), n, l.name() == null || l.name().isBlank() ? l.id() : l.name(),
+        String name = l.name();
+        return new Account(accountId(n, l.id()), n, name == null || name.isBlank() ? l.id() : name,
                 loginStatus(l.state()), l.state());
     }
 
@@ -172,7 +188,7 @@ final class BridgeAccounts {
     }
 
     /** What {@code n}'s bot chat and portals tell of its account, when it has either (known logins don't depend on rooms). */
-    private java.util.Optional<Account> fromBotChat(Network n, int portals, MatrixRoom botRoom) {
+    private java.util.Optional<Account> fromBotChat(Network n, int portals, @Nullable MatrixRoom botRoom) {
         if (portals == 0 && botRoom == null) return java.util.Optional.empty();
         BotChatLogin login = inferFromBotChat(botRoom == null ? List.of() : botRoom.timeline, portals, n.displayName());
         String detail = login.status() == AccountStatus.CONNECTED ? I18n.n("account.chats", portals) : I18n.t("account.loginFromBot");
@@ -180,13 +196,13 @@ final class BridgeAccounts {
         return java.util.Optional.of(new Account(n, login.label(), status, detail));
     }
 
-    BridgeLogin bridgeLogin(Network n) {
+    @Nullable BridgeLogin bridgeLogin(Network n) {
         BridgeProvisioner p = provisioner;
         String url = p == null ? null : p.provisioningUrl(n);
         return url == null ? null : new BridgeLogin(url, core.accessToken, userId);
     }
 
-    void prepareBridge(Network n) throws Exception {
+    void prepareBridge(Network n) throws Exception { // NOPMD: SignatureDeclareThrowsException, passes on what the provisioner throws
         BridgeProvisioner p = provisioner;
         if (p != null) p.ensure(n);
     }
@@ -195,7 +211,7 @@ final class BridgeAccounts {
         refreshLogins(n);
     }
 
-    static volatile BridgeProvisioner provisioner;
+    static volatile @Nullable BridgeProvisioner provisioner; // NOPMD: MutableStaticState, a seam tests swap
 
     CompletableFuture<String> connectNetwork(Network network) {
         if (!network.isBridged()) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.networkUnsupported")));
@@ -275,7 +291,7 @@ final class BridgeAccounts {
      * Sends {@code list-logins} to the bridge bot and caches the answer (also in Settings, to skip it next start).
      * Returns the logins the bridge answered with, or null when it gave no answer.
      */
-    private List<Login> refreshLoginsNow(Network n) throws IOException, InterruptedException {
+    private @Nullable List<Login> refreshLoginsNow(Network n) throws IOException, InterruptedException {
         List<Login> parsed;
         BridgeLogin api = bridgeLogin(n);
         if (api != null) {
@@ -302,7 +318,7 @@ final class BridgeAccounts {
      * After the person logged out and the bridge answered with the logins left ({@code answer}, null when it didn't
      * answer): none left, so its bridge stops. Never from a refresh alone, which can come back empty mid-sign-in.
      */
-    static void afterLogout(BridgeProvisioner p, Network n, List<Login> answer) {
+    static void afterLogout(@Nullable BridgeProvisioner p, Network n, @Nullable List<Login> answer) {
         if (p != null && answer != null && answer.isEmpty()) p.loggedOut(n);
     }
 
@@ -312,7 +328,7 @@ final class BridgeAccounts {
     void loadCachedLogins() {
         for (Network n : Network.values()) {
             if (!n.isBridged()) continue;
-            LoginsCache.Cached cached = LoginsCache.parse(Settings.get().getString(LoginsCache.key(n.protocolId()), null));
+            LoginsCache.Cached cached = LoginsCache.parse(Settings.get().getString(LoginsCache.key(n.protocolId())));
             if (cached == null) continue;
             logins.put(n, new ArrayList<>(cached.rows().stream().map(r -> new Login(r.id(), r.name(), r.state())).toList()));
             loginsCachedAt.put(n, cached.at());
@@ -354,25 +370,26 @@ final class BridgeAccounts {
     /** Once per limit raise, after Telegram's login is confirmed (in the background; failures retry next start). */
     private void maybeResyncChats(Network n, List<Login> parsed) {
         if (n != Network.TELEGRAM || parsed.isEmpty() || provisioner == null) return;
-        if (!needsChatResync(Settings.get().getString("telegram.chatSyncLimit", null), BridgePorts.TELEGRAM_CREATE_LIMIT)) return;
+        if (!needsChatResync(Settings.get().getString("telegram.chatSyncLimit"), BridgePorts.TELEGRAM_CREATE_LIMIT)) return;
         if (!resyncStarted.add(n)) return;
         resyncAttempt(n, 1);
     }
 
     /** Right after start the server and bridges are still settling: wait a bit, and retry a failed attempt. */
     private void resyncAttempt(Network n, int attempt) {
-        CompletableFuture.delayedExecutor(attempt == 1 ? 20 : 45, java.util.concurrent.TimeUnit.SECONDS, core.io).execute(() ->
-                syncChats(n).whenComplete((r, err) -> {
-                    if (err == null) return;
-                    Throwable root = err;
-                    while (root.getCause() != null) root = root.getCause();
-                    System.err.println("Telegram chat resync attempt " + attempt + " failed: " + root.getClass().getSimpleName()
-                            + ": " + root.getMessage());
-                    if (attempt < 3) resyncAttempt(n, attempt + 1);
-                }));
+        CompletableFuture.delayedExecutor(attempt == 1 ? 20 : 45, java.util.concurrent.TimeUnit.SECONDS, core.io).execute(() -> {
+            var _ = syncChats(n).whenComplete((r, err) -> {
+                if (err == null) return;
+                Throwable root = err;
+                while (root.getCause() != null) root = root.getCause();
+                System.err.println("Telegram chat resync attempt " + attempt + " failed: " + root.getClass().getSimpleName()
+                        + ": " + root.getMessage());
+                if (attempt < 3) resyncAttempt(n, attempt + 1);
+            });
+        });
     }
 
-    private final Set<Network> resyncStarted = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<Network> resyncStarted = ConcurrentHashMap.newKeySet();
 
     private void waitForRoom(String roomId) throws InterruptedException {
         for (int i = 0; i < 20 && core.chat(roomId) == null; i++) Thread.sleep(250);

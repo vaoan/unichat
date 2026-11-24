@@ -1,5 +1,8 @@
 package app.unichat.matrix;
 
+import app.unichat.support.PathParts;
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,7 +41,7 @@ final class SavedMedia {
     }
 
     /** The copy of {@code url}, or null. */
-    Path find(String url) {
+    @Nullable Path find(String url) {
         return MediaDownloader.findCached(dir, names.apply(url));
     }
 
@@ -61,7 +64,7 @@ final class SavedMedia {
         for (String url : urls) {
             if (find(url) == null) copies.add(fetch.apply(url).handleAsync((file, err) -> err == null && copy(url, file), io));
         }
-        CompletableFuture.allOf(copies.toArray(CompletableFuture[]::new)).thenRun(() -> {
+        var _ = CompletableFuture.allOf(copies.toArray(CompletableFuture[]::new)).thenRun(() -> {
             long failed = copies.stream().filter(c -> !c.join()).count();
             if (failed == 0) return;
             System.err.println("Favourite stickers without a saved copy yet: " + failed);
@@ -76,7 +79,7 @@ final class SavedMedia {
     }
 
     private boolean copy(String url, Path file) {
-        String name = file.getFileName().toString();
+        String name = PathParts.name(file);
         int dot = name.lastIndexOf('.');
         Path tmp = dir.resolve(names.apply(url) + ".download");
         try {

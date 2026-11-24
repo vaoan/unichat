@@ -13,6 +13,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.Supplier;
 
@@ -24,7 +25,7 @@ final class FormatMenu {
     private FormatMenu() {}
 
     /** ⌘B, ⌘U and ⌘⇧X, as in text editors; italic has none, ⌘I writes with AI. */
-    private static KeyCombination shortcut(TextFormat f) {
+    private static @Nullable KeyCombination shortcut(TextFormat f) {
         return switch (f) {
             case BOLD -> new KeyCodeCombination(KeyCode.B, KeyCombination.SHORTCUT_DOWN);
             case UNDERLINE -> new KeyCodeCombination(KeyCode.U, KeyCombination.SHORTCUT_DOWN);
@@ -65,19 +66,21 @@ final class FormatMenu {
     }
 
     /** The format a shortcut asks for, if the chat shows it; the key is used either way so nothing else takes it. */
-    static boolean onKey(KeyEvent e, TextArea box, RoomFeatures features) {
+    static boolean onKey(KeyEvent e, TextArea box, @Nullable RoomFeatures features) {
         for (TextFormat t : TextFormat.values()) {
             KeyCombination k = shortcut(t);
-            if (k == null || !k.match(e)) continue;
-            e.consume();
-            if (features == null || features.formats(t)) apply(box, t);
-            return true;
+            if (k != null && k.match(e)) {
+                e.consume();
+                if (features == null || features.formats(t)) apply(box, t);
+                return true;
+            }
         }
         return false;
     }
 
     static void apply(TextArea box, TextFormat f) {
-        int from = box.getSelection().getStart(), to = box.getSelection().getEnd();
+        int from = box.getSelection().getStart();
+        int to = box.getSelection().getEnd();
         TextFormat.Edit edit = f.apply(box.getText(), from, to);
         box.replaceText(0, box.getLength(), edit.text()); // one step: ⌘Z takes it back whole
         box.selectRange(edit.from(), edit.to());

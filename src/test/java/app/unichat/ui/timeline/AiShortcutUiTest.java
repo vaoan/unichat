@@ -15,8 +15,8 @@ import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -25,19 +25,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** ⌘I writes a draft from anywhere in the window and leaves the focus in the text box; the info panel has ⌘⇧I. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class AiShortcutUiTest {
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
-    private static void press(Node target, boolean shift) throws Exception {
-        fx(() -> {
+    private static void press(Node target, boolean shift) throws InterruptedException {
+        FxWait.onFx(() -> {
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.I, shift, true, false, true));
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_RELEASED, "", "", KeyCode.I, shift, true, false, true));
-            return null;
         });
     }
 
-    private static boolean infoOpen(Scene scene) throws Exception {
+    private static boolean infoOpen(Scene scene) throws InterruptedException {
         return fx(() -> scene.getRoot().lookupAll(".info-pane").stream().anyMatch(n -> n.isVisible() && n.getScene() != null));
     }
 
@@ -75,7 +74,7 @@ class AiShortcutUiTest {
         assertFalse(infoOpen(scene));
 
         Node elsewhere = fx(() -> scene.getRoot().lookup(".chat-cell"));
-        fx(() -> { elsewhere.requestFocus(); return null; });
+        FxWait.onFx(elsewhere::requestFocus);
         press(elsewhere, false);
         wrote.await(); // from anywhere in the window
         assertFalse(infoOpen(scene), "the info panel stays as it was");
@@ -87,7 +86,7 @@ class AiShortcutUiTest {
         press(box, true);
         assertFalse(infoOpen(scene), "also from the text box");
 
-        fx(() -> { AiReplyButton.SHOWN.set(false); return null; });
+        FxWait.onFx(() -> AiReplyButton.SHOWN.set(false));
         press(box, false);
         assertFalse(infoOpen(scene), "with the AI off, nothing");
     }

@@ -1,10 +1,10 @@
 package app.unichat.server;
 
-import app.unichat.bridge.BridgeStates;
 import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.net.URI;
@@ -50,7 +50,6 @@ final class MetaSessions implements Watchdog.SessionKeeper {
             .connectTimeout(Duration.ofSeconds(8)).build();
 
     private final Path dir;
-    private final BridgeStates states;
     private final Predicate<String> redirecting;
     private final Consumer<String> restoreAndRestart;
     private final Map<String, Long> lastBackup = new HashMap<>();
@@ -61,9 +60,8 @@ final class MetaSessions implements Watchdog.SessionKeeper {
      * @param redirecting       whether a bridge's network is doing the redirect now
      * @param restoreAndRestart stops the bridge, calls {@link #restore} and starts it
      */
-    MetaSessions(Path dir, BridgeStates states, Predicate<String> redirecting, Consumer<String> restoreAndRestart) {
+    MetaSessions(Path dir, Predicate<String> redirecting, Consumer<String> restoreAndRestart) {
         this.dir = dir;
-        this.states = states;
         this.redirecting = redirecting;
         this.restoreAndRestart = restoreAndRestart;
     }
@@ -75,6 +73,7 @@ final class MetaSessions implements Watchdog.SessionKeeper {
     }
 
     /** Whether {@code page} sends you to another host; not being able to ask counts as yes: nothing is lost by waiting. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "both hosts come from java.net.URI, ASCII only")
     static boolean redirectsElsewhere(URI page) {
         try {
             HttpResponse<Void> r = HTTP.send(HttpRequest.newBuilder(page).timeout(Duration.ofSeconds(12)).build(),

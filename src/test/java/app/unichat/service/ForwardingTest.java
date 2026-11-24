@@ -1,7 +1,9 @@
 package app.unichat.service;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -14,7 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Forwarding: copies of the messages, in their order, to every chat chosen, saying where they came from only if asked. */
 class ForwardingTest {
-    private static final String FROM = "!family:demo", TO = "!mom:demo", ALSO = "!andres:demo";
+    private static final String FROM = "!family:demo";
+    private static final String TO = "!mom:demo";
+    private static final String ALSO = "!andres:demo";
 
     private static MockChatService svc() {
         MockChatService svc = new MockChatService();
@@ -31,7 +35,8 @@ class ForwardingTest {
     void copiesGoInOrderToEveryChatAndSayNothingByDefault() throws Exception {
         MockChatService svc = svc();
         List<Message> picked = svc.messages(FROM).stream().filter(m -> !m.isMedia() && m.type() == MessageType.TEXT).limit(3).toList();
-        int to = svc.messages(TO).size(), also = svc.messages(ALSO).size();
+        int to = svc.messages(TO).size();
+        int also = svc.messages(ALSO).size();
         Forwarding.Job job = Forwarding.send(svc, picked, List.of(TO, ALSO), m -> null, true);
         job.done().get();
         assertEquals(List.of(6, 6, 0), List.of(job.total(), job.sent(), job.failed()), "each message to each chat, counted");
@@ -46,13 +51,17 @@ class ForwardingTest {
     void aNoteGoesBeforeEachRunOfMessagesItDescribes() throws Exception {
         MockChatService svc = svc();
         List<Message> picked = svc.messages(FROM).stream().filter(m -> m.type() == MessageType.TEXT).limit(4).toList();
-        Function<Message, String> bySender = m -> "↪ " + m.senderName();
+        Function<Message, @Nullable String> bySender = m -> "↪ " + m.senderName();
         int to = svc.messages(TO).size();
         Forwarding.send(svc, picked, List.of(TO), bySender, true).done().get();
         List<String> expected = new java.util.ArrayList<>();
         String last = null;
         for (Message m : picked) {
-            if (!bySender.apply(m).equals(last)) expected.add(last = bySender.apply(m));
+            String line = Present.of(bySender.apply(m));
+            if (!line.equals(last)) {
+                last = line;
+                expected.add(line);
+            }
             expected.add(m.body());
         }
         assertEquals(expected, sentTo(svc, TO, to).stream().map(Message::body).toList());

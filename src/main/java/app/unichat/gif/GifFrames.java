@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The frames of an animated GIF as whole pictures: GIF frames are patches drawn over the previous one (with a
@@ -61,8 +62,10 @@ public final class GifFrames {
             try {
                 r.setInput(in, false);
                 int count = r.getNumImages(true);
-                int w = 0, h = 0;
-                Node screen = child(r.getStreamMetadata() == null ? null : tree(r.getStreamMetadata()), "LogicalScreenDescriptor");
+                int w = 0;
+                int h = 0;
+                IIOMetadata stream = r.getStreamMetadata();
+                Node screen = child(stream == null ? null : tree(stream), "LogicalScreenDescriptor");
                 if (screen != null) {
                     w = intAttr(screen, "logicalScreenWidth", 0);
                     h = intAttr(screen, "logicalScreenHeight", 0);
@@ -76,7 +79,8 @@ public final class GifFrames {
                 for (int i = 0; i < count; i++) {
                     BufferedImage patch = i == 0 ? first : r.read(i);
                     Node meta = tree(r.getImageMetadata(i));
-                    Node desc = child(meta, "ImageDescriptor"), gce = child(meta, "GraphicControlExtension");
+                    Node desc = child(meta, "ImageDescriptor");
+                    Node gce = child(meta, "GraphicControlExtension");
                     int x = desc == null ? 0 : intAttr(desc, "imageLeftPosition", 0);
                     int y = desc == null ? 0 : intAttr(desc, "imageTopPosition", 0);
                     int delay = gce == null ? 0 : intAttr(gce, "delayTime", 0) * 10;
@@ -115,7 +119,7 @@ public final class GifFrames {
         return m.getAsTree(m.getNativeMetadataFormatName());
     }
 
-    private static Node child(Node parent, String name) {
+    private static @Nullable Node child(@Nullable Node parent, String name) {
         if (parent == null) return null;
         for (Node n = parent.getFirstChild(); n != null; n = n.getNextSibling()) {
             if (name.equals(n.getNodeName())) return n;
@@ -124,7 +128,8 @@ public final class GifFrames {
     }
 
     private static String attr(Node n, String name, String fallback) {
-        Node a = n.getAttributes() == null ? null : n.getAttributes().getNamedItem(name);
+        org.w3c.dom.NamedNodeMap all = n.getAttributes();
+        Node a = all == null ? null : all.getNamedItem(name);
         return a == null ? fallback : a.getNodeValue();
     }
 

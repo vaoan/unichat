@@ -1,5 +1,6 @@
 package app.unichat;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -17,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RecoveryRestartTest {
     @Test
     @DisabledOnOs(value = OS.WINDOWS, disabledReason = "ProcessHandle gives no arguments there: the launcher alone restarts")
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aRunOutOfMemoryStartsTheProgramAgainOnceItEnded() throws Exception {
         String java = ProcessHandle.current().info().command().orElseThrow();
         Process first = new ProcessBuilder(List.of(java, "-cp", System.getProperty("java.class.path"),

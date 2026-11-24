@@ -1,0 +1,40 @@
+name: codeql
+
+# CodeQL's security-and-quality queries on the Java code. CI only. The results go to code scanning, and any result
+# fails the run: a finding is fixed, or suppressed in the code with its reason.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Uploading the results to code scanning.
+      security-events: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      # build-mode none (CodeQL reads the sources and resolves the pom's dependencies itself, as GitHub's default setup
+      # does): no Java 25 build to set up, and nothing of the project's build runs with the token.
+      - uses: github/codeql-action/init@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          languages: java-kotlin
+          build-mode: none
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          category: /language:java-kotlin
+          output: sarif
+      - name: CodeQL found nothing
+        run: |
+          found="$(jq -r '.runs[].results[] | select((.suppressions // []) | length == 0)
+            | "\(.ruleId) \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine) \(.message.text)"' sarif/*.sarif)"
+          if [ -n "$found" ]; then printf '%s\n' "$found" >&2; exit 1; fi

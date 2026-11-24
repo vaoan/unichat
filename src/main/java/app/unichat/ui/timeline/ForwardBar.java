@@ -12,6 +12,7 @@ import app.unichat.ui.TaskBar;
 import javafx.animation.PauseTransition;
 import javafx.scene.control.Button;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 /**
  * On top of the window while messages are forwarded, like the upload bar: to which chats, how far, which message goes
@@ -26,8 +27,8 @@ public final class ForwardBar extends TaskBar {
     private final Button close;
     private final FxCoalescer redraw = new FxCoalescer(this::refresh);
     private final PauseTransition hideLater = new PauseTransition(DONE_SHOWN);
-    private Forwarding.Job job;
-    private String chatId;
+    private Forwarding.@Nullable Job job;
+    private @Nullable String chatId;
 
     public ForwardBar(ChatReader chats, java.util.function.Consumer<String> openChat) {
         super("forward-bar");
@@ -76,7 +77,8 @@ public final class ForwardBar extends TaskBar {
         where.setText(I18n.t("uploadBar.where", c == null ? "" : c.title()));
         if (!j.finished()) {
             what.setText(I18n.t(j.cancelled() ? "forwardBar.stopping" : "forwardBar.going", where(j)));
-            detail.setText(j.current() == null ? "" : shown(j.current()));
+            Message going = j.current();
+            detail.setText(going == null ? "" : shown(going));
             stage.setText("");
             hideLater.stop();
         } else {
@@ -102,7 +104,8 @@ public final class ForwardBar extends TaskBar {
 
     /** The message going, in a few words: its file's name, or the start of its text. */
     private static String shown(Message m) {
-        String s = m.isMedia() && m.fileName() != null ? m.fileName() : m.body().strip().replaceAll("\\s+", " ");
+        String name = m.fileName();
+        String s = m.isMedia() && name != null ? name : m.body().strip().replaceAll("\\s+", " ");
         return s.length() > 60 ? s.substring(0, 59) + "…" : s;
     }
 }

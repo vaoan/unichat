@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -26,6 +27,9 @@ final class VaultActions {
 
     /** A secret that opens none of the vault's ways in: nothing was written. */
     static final class WrongSecret extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         WrongSecret() {
             super(I18n.t("cloud.error.vaultWrongSecret"));
         }
@@ -59,7 +63,7 @@ final class VaultActions {
             if (vk != null) Arrays.fill(vk, (byte) 0);
         }
         computers.sort(Comparator.comparing((VaultView.Computer c) -> !c.here()).thenComparing(VaultView.Computer::label));
-        return new VaultView(round.state(), ways, computers, info.id().equals(Settings.get().getString(UNCONFIRMED, null)));
+        return new VaultView(round.state(), ways, computers, info.id().equals(Settings.get().getString(UNCONFIRMED)));
     }
 
     /** A new vault, open here; its recovery code as printed (shown once: never kept). */
@@ -112,13 +116,14 @@ final class VaultActions {
      * The key this computer's own slot opens (it holds {@code vault}, its slot older than the generation), when one of
      * {@code older} opens it with this secret too; null otherwise.
      */
-    private static byte[] heldBefore(Storage dav, Vault.Info vault, List<VaultSlot> older, VaultView.Way way, char[] secret)
+    private static byte @Nullable [] heldBefore(Storage dav, Vault.Info vault, List<VaultSlot> older, VaultView.Way way, char[] secret)
         throws IOException {
         Settings s = Settings.get();
-        VaultSlot own = vault.id().equals(s.getString(VaultParts.ID, null)) ? Vault.slot(dav, vault, Cloud.machine()) : null;
-        String key = s.getString(VaultParts.KEY, null);
+        VaultSlot own = vault.id().equals(s.getString(VaultParts.ID)) ? Vault.slot(dav, vault, Cloud.machine()) : null;
+        String key = s.getString(VaultParts.KEY);
         if (own == null || own.method() != VaultSlot.Method.COMPUTER || key == null) return null;
-        byte[] slotKey = null, held = null;
+        byte[] slotKey = null;
+        byte[] held = null;
         try {
             slotKey = Base64.getDecoder().decode(key);
             held = own.unwrap(slotKey);
@@ -137,18 +142,20 @@ final class VaultActions {
     }
 
     /** The vault key from {@code slot} with this secret; null when it doesn't open it. */
-    private static byte[] unwrap(VaultSlot slot, VaultView.Way way, char[] secret) {
+    private static byte @Nullable [] unwrap(VaultSlot slot, VaultView.Way way, char[] secret) {
         byte[] key = null;
         try {
-            if (way == VaultView.Way.RECOVERY) {
-                RecoveryCode code = RecoveryCode.parse(secret);
-                if (code == null) return null;
-                key = VaultSlot.recoveryKey(code);
-                Arrays.fill(code.bits(), (byte) 0);
-            } else if (way == VaultView.Way.PASSWORD) {
-                key = VaultSlot.passwordKey(secret, slot.params());
-            } else {
-                return null; // Google and the passkey open in the browser
+            switch (way) {
+                case RECOVERY -> {
+                    RecoveryCode code = RecoveryCode.parse(secret);
+                    if (code == null) return null;
+                    key = VaultSlot.recoveryKey(code);
+                    Arrays.fill(code.bits(), (byte) 0);
+                }
+                case PASSWORD -> key = VaultSlot.passwordKey(secret, slot.params());
+                default -> {
+                    return null; // Google and the passkey open in the browser
+                }
             }
             return slot.unwrap(key);
         } catch (VaultCrypto.Broken e) {
@@ -161,7 +168,7 @@ final class VaultActions {
     /** This computer's hold on {@code vault}: its slot's key and its private key, kept here; going on without it is over. */
     private static void hold(Vault.Info vault, Vault.Computer computer) {
         Settings s = Settings.get();
-        String was = s.getString(VaultParts.ID, null);
+        String was = s.getString(VaultParts.ID);
         if (was != null && !was.equals(vault.id())) {
             VaultMove.forget();
             VaultPeers.forget();
@@ -174,7 +181,7 @@ final class VaultActions {
         Arrays.fill(computer.key(), (byte) 0);
     }
 
-    /** Another computer's way into the vault taken away; this one's own goes by {@link Cloud#forgetHere}. */
+    /** Another computer's way into the vault taken away; this one's own goes by {@link CloudVault#forgetHere}. */
     static void remove(Storage dav, String machine) throws IOException {
         if (Cloud.machine().equals(machine)) throw new IllegalArgumentException("This computer is forgotten with forgetHere");
         if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");

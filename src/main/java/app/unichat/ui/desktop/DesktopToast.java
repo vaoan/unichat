@@ -17,8 +17,10 @@ import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.Consumer;
+import java.util.Objects;
 
 /**
  * Unichat's own notification card, top-right of the screen, used on macOS: the system drops AWT tray notifications
@@ -26,7 +28,8 @@ import java.util.function.Consumer;
  * clicked. Clicking the card opens its chat. One card at a time: a newer message replaces it. FX thread only.
  */
 final class DesktopToast {
-    private static final double WIDTH = 340, MARGIN = 14;
+    private static final double WIDTH = 340;
+    private static final double MARGIN = 14;
     private static final Duration VISIBLE = Duration.seconds(6);
 
     private final Consumer<String> onOpen;
@@ -34,28 +37,29 @@ final class DesktopToast {
     private final Label body = new Label();
     private final Button card = new Button();
     private final PauseTransition timer = new PauseTransition(VISIBLE);
-    private Stage stage;
-    private String chatId;
+    private @Nullable Stage stage;
+    private @Nullable String chatId;
 
     DesktopToast(Consumer<String> onOpen) {
         this.onOpen = onOpen;
         timer.setOnFinished(e -> hide());
     }
 
-    void show(String titleText, String bodyText, String chatId) {
-        this.chatId = chatId;
-        if (stage == null) stage = build();
+    void show(String titleText, String bodyText, String forChat) {
+        this.chatId = forChat;
+        Stage shown = stage == null ? build() : stage;
+        stage = shown;
         title.setText(titleText);
         body.setText(bodyText);
         card.setAccessibleText(I18n.t("toast.a11y", titleText, bodyText));
         Rectangle2D area = Screen.getPrimary().getVisualBounds();
-        stage.setX(area.getMaxX() - WIDTH - MARGIN);
-        stage.setY(area.getMinY() + MARGIN);
+        shown.setX(area.getMaxX() - WIDTH - MARGIN);
+        shown.setY(area.getMinY() + MARGIN);
         // Showing a window takes the keyboard: hand it straight back. While someone typed, their next space or
         // Enter "pressed" the card and opened its chat (the chat changed under them).
         javafx.stage.Window had = javafx.stage.Window.getWindows().stream()
-                .filter(w -> w != stage && w.isFocused()).findFirst().orElse(null);
-        stage.show();
+                .filter(w -> w != shown && w.isFocused()).findFirst().orElse(null);
+        shown.show();
         if (had != null) had.requestFocus();
         timer.playFromStart();
     }
@@ -80,7 +84,7 @@ final class DesktopToast {
         card.setFocusTraversable(false);
         card.setOnAction(e -> {
             hide();
-            onOpen.accept(chatId);
+            onOpen.accept(Objects.requireNonNull(chatId, "show sets it before the card is built"));
         });
         card.addEventFilter(javafx.scene.input.KeyEvent.ANY, javafx.event.Event::consume);
         // Keep it while the pointer is on it, like system notifications.
@@ -98,12 +102,13 @@ final class DesktopToast {
         s.setTitle(I18n.t("toast.windowTitle"));
         s.setScene(scene);
         // A card shown while the window is in the tray isn't anyone seeing Unichat: media and checks stay paused.
-        s.getProperties().put(AppWindows.NOT_LOOKED_AT, Boolean.TRUE);
+        s.getProperties().put(AppWindows.NOT_LOOKED_AT, true);
         return s;
     }
 
     void hide() {
         timer.stop();
-        if (stage != null) stage.hide();
+        Stage s = stage;
+        if (s != null) s.hide();
     }
 }

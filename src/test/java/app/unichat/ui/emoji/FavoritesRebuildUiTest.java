@@ -7,10 +7,10 @@ import app.unichat.model.StickerPack;
 import app.unichat.service.ChatService;
 import app.unichat.service.MockChatService;
 import app.unichat.ui.FxWait;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.application.Platform;
-import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.stage.Stage;
@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /** The Stickers tab's button beside "Favoritos" brings each favourite from its set as it is now, and says how many. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
@@ -33,6 +34,7 @@ class FavoritesRebuildUiTest {
     private static final String SET = "https://t.me/addstickers/FluxAnimation";
     @TempDir Path dir;
     private final List<String> toasts = new CopyOnWriteArrayList<>();
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
 
     @BeforeAll
@@ -47,7 +49,7 @@ class FavoritesRebuildUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private static MediaLibrary.Item sticker(String url, String mime) throws Exception {
+    private static MediaLibrary.Item sticker(String url, String mime) throws JsonProcessingException {
         JsonNode info = new ObjectMapper().readTree("{\"mimetype\":\"" + mime
                 + "\",\"fi.mau.bridged_sticker\":{\"network\":\"telegram\",\"id\":\"5\",\"pack_url\":\"" + SET + "\"}}");
         return new MediaLibrary.Item(MediaLibrary.Kind.STICKER, url, mime, 256, 256, info);
@@ -55,7 +57,7 @@ class FavoritesRebuildUiTest {
 
     @AfterEach
     void close() throws Exception {
-        if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
+        if (stage != null) FxWait.onFx(stage::close);
     }
 
     /**
@@ -67,7 +69,7 @@ class FavoritesRebuildUiTest {
         java.util.concurrent.atomic.AtomicInteger asked = new java.util.concurrent.atomic.AtomicInteger();
         MockChatService mock = new MockChatService();
         ChatService svc = (ChatService) java.lang.reflect.Proxy.newProxyInstance(
-                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) {
+                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                     case "freshStickerPack" -> {
                         asked.incrementAndGet();
                         yield CompletableFuture.failedFuture(new IllegalStateException("the bridge isn't ready"));
@@ -82,14 +84,14 @@ class FavoritesRebuildUiTest {
                 "yo", app.unichat.model.AccountStatus.CONNECTED, null));
         StickerGrid grid = FxWait.fx(() -> new StickerGrid(svc, library, () -> null, () -> null, toasts::add));
 
-        FxWait.fx(() -> { grid.rebuildOnce(telegram); return null; });
+        FxWait.onFx(() -> grid.rebuildOnce(telegram));
         FxWait.until("tried", () -> asked.get() == 1);
         FxWait.settled();
-        FxWait.fx(() -> { grid.rebuildOnce(telegram); return null; });
+        FxWait.onFx(() -> grid.rebuildOnce(telegram));
         FxWait.settled();
 
         assertEquals(1, asked.get(), "not again at once");
-        assertEquals(false, app.unichat.settings.Settings.get().favoritesRebuilt());
+        assertFalse(app.unichat.settings.Settings.get().favoritesRebuilt());
     }
 
     @Test
@@ -98,7 +100,7 @@ class FavoritesRebuildUiTest {
         MockChatService mock = new MockChatService();
         Chat chat = mock.chats().stream().filter(c -> c.features().accepts(RoomFeatures.STICKER)).findFirst().orElseThrow();
         ChatService svc = (ChatService) java.lang.reflect.Proxy.newProxyInstance(
-                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) {
+                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                     case "freshStickerPack" -> CompletableFuture.completedFuture(new StickerPack("Flux", SET, List.of(now)));
                     case "stickerPacks" -> CompletableFuture.completedFuture(List.of());
                     default -> m.invoke(mock, args);
@@ -116,8 +118,8 @@ class FavoritesRebuildUiTest {
         });
 
         Button rebuild = FxWait.fx(() -> (Button) grid.lookupAll(".button").stream()
-                .filter(n -> "Actualizar los favoritos desde sus sets".equals(((Node) n).getAccessibleText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { rebuild.fire(); return null; });
+                .filter(n -> "Actualizar los favoritos desde sus sets".equals(n.getAccessibleText())).findFirst().orElseThrow());
+        FxWait.onFx(rebuild::fire);
 
         FxWait.until("rebuilt", () -> toasts.contains("1 favorito actualizado"));
         assertEquals(List.of(now.url()), library.favorites(MediaLibrary.Kind.STICKER).stream().map(MediaLibrary.Item::url).toList());

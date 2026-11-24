@@ -1,5 +1,7 @@
 package app.unichat.cloud;
 
+import org.jspecify.annotations.Nullable;
+
 import java.security.SecureRandom;
 import java.util.Arrays;
 
@@ -8,9 +10,12 @@ import java.util.Arrays;
  * back forgives what the eye mixes up (case, spaces, dashes, O for 0, I or L for 1). It never reaches a log: its text
  * form says nothing of its content.
  */
+@SuppressWarnings("ArrayRecordComponent") // equals and hashCode below compare the bytes
 record RecoveryCode(byte[] bits) {
     private static final String ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-    private static final int BYTES = 20, CHARS = 32, GROUP = 4;
+    private static final int BYTES = 20;
+    private static final int CHARS = 32;
+    private static final int GROUP = 4;
     /** Groups in a code. */
     static final int GROUPS = CHARS / GROUP;
     private static final String DASHES = "-\u2010\u2011\u2012\u2013\u2014\u2015\u2212";
@@ -44,7 +49,7 @@ record RecoveryCode(byte[] bits) {
     }
 
     /** What was typed, or null when it isn't exactly 160 bits of this alphabet. */
-    static RecoveryCode parse(String typed) {
+    static @Nullable RecoveryCode parse(@Nullable String typed) {
         if (typed == null) return null;
         char[] chars = typed.toCharArray();
         try {
@@ -55,7 +60,7 @@ record RecoveryCode(byte[] bits) {
     }
 
     /** The same from the characters as typed, never made into a {@code String} (one stays in memory until collected). */
-    static RecoveryCode parse(char[] typed) {
+    static @Nullable RecoveryCode parse(char @Nullable [] typed) {
         if (typed == null) return null;
         char[] chars = new char[CHARS];
         try {
@@ -68,7 +73,9 @@ record RecoveryCode(byte[] bits) {
             }
             if (n != CHARS) return null;
             byte[] bits = new byte[BYTES];
-            int acc = 0, have = 0, at = 0;
+            int acc = 0;
+            int have = 0;
+            int at = 0;
             for (char c : chars) {
                 int v = ALPHABET.indexOf(c);
                 if (v < 0) return null;
@@ -89,8 +96,8 @@ record RecoveryCode(byte[] bits) {
     /** What was typed as the code's own characters: case, spaces and dashes dropped, O read as 0, I and L as 1. */
     static String normalized(String typed) {
         StringBuilder chars = new StringBuilder();
-        for (char t : typed.toCharArray()) {
-            char c = own(t);
+        for (int i = 0; i < typed.length(); i++) {
+            char c = own(typed.charAt(i));
             if (c != 0) chars.append(c);
         }
         return chars.toString();
@@ -105,7 +112,8 @@ record RecoveryCode(byte[] bits) {
 
     private String plain() {
         StringBuilder out = new StringBuilder();
-        int acc = 0, have = 0;
+        int acc = 0;
+        int have = 0;
         for (byte b : bits) {
             acc = (acc << 8) | (b & 0xff);
             have += 8;

@@ -11,8 +11,10 @@ import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import javafx.event.EventHandler;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import org.jspecify.annotations.Nullable;
 
 /** The keys that work anywhere in the main window, focus cycling between its zones (F6) and the text size. */
 final class WindowShortcuts implements EventHandler<KeyEvent> {
@@ -57,10 +59,16 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
         int zones = thread.chat() == null ? 2 : view.infoVisible() ? 5 : 4;
         int next = Math.floorMod((current < 0 ? (dir > 0 ? -1 : 0) : current) + dir, zones);
         switch (next) {
-            case 0 -> { Node b = rail.lookup(".rail-button"); if (b != null) b.requestFocus(); }
+            case 0 -> {
+                Node b = rail.lookup(".rail-button");
+                if (b != null) b.requestFocus();
+            }
             case 1 -> listPane.focusList();
             case 2 -> thread.focusTimeline();
-            case 4 -> { Node b = panel.lookup(".chip"); if (b != null) b.requestFocus(); }
+            case 4 -> {
+                Node b = panel.lookup(".chip");
+                if (b != null) b.requestFocus();
+            }
             default -> thread.composer().focus();
         }
     }
@@ -90,9 +98,9 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
         return code == KeyCode.R || code == KeyCode.T || code == KeyCode.P || code == KeyCode.E;
     }
 
-    private static boolean inTimeline(Node n) {
-        for (; n != null; n = n.getParent()) {
-            if (n instanceof javafx.scene.control.ListView<?> lv && lv.getStyleClass().contains("timeline")) return true;
+    private static boolean inTimeline(@Nullable Node n) {
+        for (Node at = n; at != null; at = at.getParent()) {
+            if (at instanceof javafx.scene.control.ListView<?> lv && lv.getStyleClass().contains("timeline")) return true;
         }
         return false;
     }
@@ -102,15 +110,21 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
         return text != null && !text.isEmpty() && !text.isBlank() && text.codePoints().noneMatch(Character::isISOControl);
     }
 
-    private Node focusOwner() {
-        return view.getScene() == null ? null : view.getScene().getFocusOwner();
+    private @Nullable Node focusOwner() {
+        Scene scene = view.getScene();
+        return scene == null ? null : scene.getFocusOwner();
     }
 
     @Override public void handle(KeyEvent e) {
+        if (windowKey(e) || chatKey(e) || focusOrZoomKey(e)) e.consume();
+    }
+
+    /** Esc, the window's own panes and the chat list; in this order, before {@link #chatKey}. */
+    private boolean windowKey(KeyEvent e) {
         boolean mod = e.isShortcutDown();
         Chat c = thread.chat();
         if (e.getCode() == KeyCode.ESCAPE && SearchFields.clearOnEscape(focusOwner())) {
-            // First Esc empties the search box; the next one closes what it's in.
+            return true; // First Esc empties the search box; the next one closes what it's in.
         } else if (mod && e.getCode() == KeyCode.K) {
             view.showCommandBar();
         } else if (mod && e.getCode() == KeyCode.N) {
@@ -126,16 +140,36 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
             listPane.focusSearch();
         } else if (e.isAltDown() && (e.getCode() == KeyCode.UP || e.getCode() == KeyCode.DOWN)) {
             listPane.move(e.getCode() == KeyCode.DOWN ? 1 : -1, e.isShiftDown());
-        } else if (mod && e.getCode() == KeyCode.E && c != null) {
-            svc.setArchived(c.id(), !c.archived());
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    /** What's done to the open chat; before {@link #focusOrZoomKey}. */
+    private boolean chatKey(KeyEvent e) {
+        boolean mod = e.isShortcutDown();
+        Chat c = thread.chat();
+        if (mod && e.getCode() == KeyCode.E && c != null) {
+            var _ = svc.setArchived(c.id(), !c.archived());
             view.toast(c.archived() ? I18n.t("windowShortcuts.unarchived") : I18n.t("windowShortcuts.archived"));
         } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.U && c != null) {
-            if (c.isUnread()) svc.markRead(c.id()); else svc.setMarkedUnread(c.id(), true);
+            if (c.isUnread()) svc.markRead(c.id());
+            else {
+                var _ = svc.setMarkedUnread(c.id(), true);
+            }
         } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.I && c != null) {
             view.toggleInfo();
-        } else if (mod && !e.isShiftDown() && c != null && thread.composer().aiKeyPressed(e.getCode())) {
-            e.consume();
-        } else if (e.getCode() == KeyCode.F6) {
+        } else {
+            return mod && !e.isShiftDown() && c != null && thread.composer().aiKeyPressed(e.getCode());
+        }
+        return true;
+    }
+
+    /** F6 between the zones, the text's size and the views by number. */
+    private boolean focusOrZoomKey(KeyEvent e) {
+        boolean mod = e.isShortcutDown();
+        if (e.getCode() == KeyCode.F6) {
             cycleFocus(e.isShiftDown() ? -1 : 1);
         } else if (mod && (e.getCode() == KeyCode.EQUALS || e.getCode() == KeyCode.PLUS || e.getCode() == KeyCode.ADD)) {
             zoom(0.1);
@@ -149,11 +183,11 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
                 case DIGIT2 -> view.setView(ChatFilter.View.INBOX, true);
                 case DIGIT3 -> view.setView(ChatFilter.View.FAVORITES, false);
                 case DIGIT4 -> view.setView(ChatFilter.View.LOW_PRIORITY, false);
-                default -> { return; }
+                default -> { return false; }
             }
         } else {
-            return;
+            return false;
         }
-        e.consume();
+        return true;
     }
 }

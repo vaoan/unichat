@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import static app.unichat.ui.FxWait.fx;
+import static app.unichat.ui.FxWait.onFx;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Ajustes → Escribir con IA's "Lo último que aprendió": what changed, undoing it, and the corrections still waiting. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class LastLearnedUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private Stage stage;
 
     @BeforeAll
@@ -44,14 +46,13 @@ class LastLearnedUiTest {
 
     @AfterEach
     void close() throws Exception {
-        fx(() -> {
+        onFx(() -> {
             if (stage != null) stage.close();
-            return null;
         });
         WritingStyle.get().forget();
     }
 
-    private Parent page() throws Exception {
+    private Parent page() throws InterruptedException {
         return fx(() -> {
             stage = new Stage();
             stage.setOpacity(0);
@@ -61,12 +62,12 @@ class LastLearnedUiTest {
         });
     }
 
-    private static List<String> texts(Parent root) throws Exception {
+    private static List<String> texts(Parent root) throws InterruptedException {
         return fx(() -> root.lookupAll(".label").stream().filter(Node::isVisible)
                 .map(n -> ((Label) n).getText()).filter(t -> t != null && !t.isBlank()).toList());
     }
 
-    private static Button undo(Parent root) throws Exception {
+    private static Button undo(Parent root) throws InterruptedException {
         return fx(() -> root.lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Deshacer lo último aprendido".equals(b.getText())).findFirst().orElseThrow());
     }
@@ -92,7 +93,7 @@ class LastLearnedUiTest {
         Button undo = undo(root);
         assertTrue(fx(() -> !undo.isDisabled() && undo.isFocusTraversable()), "reachable by keyboard");
         assertEquals("Vuelve a la versión anterior. La deshecha queda guardada en este equipo.", fx(undo::getAccessibleHelp));
-        fx(() -> { undo.fire(); return null; });
+        onFx(undo::fire);
 
         assertEquals("- frases cortas\n- ríe con jajaja", style.text());
         TextArea learned = fx(() -> root.lookupAll(".text-area").stream().map(n -> (TextArea) n)
@@ -113,7 +114,7 @@ class LastLearnedUiTest {
         Parent root = page();
         Button forget = fx(() -> root.lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Borrar lo aprendido".equals(b.getText())).findFirst().orElseThrow());
-        fx(() -> { forget.fire(); return null; });
+        onFx(forget::fire);
         FxWait.settled();
         List<String> shown = texts(root);
         assertTrue(shown.contains("Aún no aprendió nada: aprende después de tus borradores."), shown.toString());

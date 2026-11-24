@@ -49,7 +49,8 @@ class SyncedPartTest {
     void whatOneComputerChangesReachesTheOtherAndStops() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
-            Computer a = new Computer("a"), b = new Computer("b");
+            Computer a = new Computer("a");
+            Computer b = new Computer("b");
             a.settings.put("ui.theme", "DARK");
             assertEquals(Action.UPLOAD, a.part.sync(dav, T), "the first computer fills the account");
             b.settings.put("ui.theme", "LIGHT");
@@ -61,7 +62,8 @@ class SyncedPartTest {
             assertEquals(Action.ADOPT, a.part.sync(dav, T.plusSeconds(60)));
             assertEquals("#FF0000", a.settings.get("ui.accent"), "and back the other way");
 
-            int puts = cloud.puts.get(), gets = cloud.gets.get();
+            int puts = cloud.puts.get();
+            int gets = cloud.gets.get();
             assertEquals(Action.NOTHING, a.part.sync(dav, T.plusSeconds(120)));
             assertEquals(Action.NOTHING, b.part.sync(dav, T.plusSeconds(120)));
             assertEquals(puts, cloud.puts.get(), "nothing goes up again");
@@ -73,7 +75,8 @@ class SyncedPartTest {
     void bothChangedTheNewerWins() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
-            Computer a = new Computer("a"), b = new Computer("b");
+            Computer a = new Computer("a");
+            Computer b = new Computer("b");
             a.part.sync(dav, T);
             b.part.sync(dav, T);
             a.settings.put("ui.theme", "DARK");

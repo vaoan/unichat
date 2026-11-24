@@ -1,7 +1,11 @@
 package app.unichat.service;
 
+import app.unichat.Present;
 import app.unichat.service.PreferencesFile.Flag;
+import app.unichat.support.PathParts;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -15,12 +19,17 @@ import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /** preferences.json is the only copy of the person's choices: a damaged one falls back to the previous version. */
 class PreferencesBackupTest {
-    private static final String A = "telegram:1", B = "telegram:2";
+    private static final String A = "telegram:1";
+    private static final String B = "telegram:2";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @TempDir Path dir;
@@ -40,7 +49,7 @@ class PreferencesBackupTest {
         opened.forEach(PreferencesFile::flush);
     }
 
-    private static String warning(PreferencesFile p) { return new FolderActions(p, () -> { }).preferencesWarning(); }
+    private static @Nullable String warning(PreferencesFile p) { return new FolderActions(p, () -> { }).preferencesWarning(); }
 
     /** The last write is in the main file, the one before it in the backup. */
     private void twoSaves() {
@@ -53,7 +62,7 @@ class PreferencesBackupTest {
 
     private long setAsideFiles() throws IOException {
         try (Stream<Path> files = Files.list(dir)) {
-            return files.filter(f -> f.getFileName().toString().contains(".bad-")).count();
+            return files.filter(f -> PathParts.name(f).contains(".bad-")).count();
         }
     }
 
@@ -76,7 +85,7 @@ class PreferencesBackupTest {
         assertFalse(p.current(B).favorite(), "the last change is what's missing");
         assertTrue(p.recoveredFromBackup());
         assertEquals("", Files.readString(dir.resolve(p.setAside())), "the damaged file is set aside, not overwritten");
-        String said = warning(p);
+        String said = Present.of(warning(p));
         assertTrue(said.contains("copia anterior") && said.contains("último cambio") && said.contains(p.setAside()), said);
     }
 
@@ -122,7 +131,7 @@ class PreferencesBackupTest {
         assertFalse(p.recoveredFromBackup());
         assertFalse(p.current(A).muted());
         assertEquals("{roto", Files.readString(dir.resolve(p.setAside())));
-        assertTrue(warning(p).contains("empiezan vacías"), warning(p));
+        assertTrue(Present.of(warning(p)).contains("empiezan vacías"), warning(p));
     }
 
     @Test
@@ -147,6 +156,7 @@ class PreferencesBackupTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     void anUnmovableDamagedFileIsKeptAndItsBackupStillLoads() throws IOException {
         twoSaves();
         Files.writeString(prefs(), "{roto");
@@ -158,7 +168,7 @@ class PreferencesBackupTest {
             p = open();
             assertTrue(p.current(A).muted());
             assertTrue(p.unreadable());
-            assertTrue(warning(p).contains("no se guardará nada"), warning(p));
+            assertTrue(Present.of(warning(p)).contains("no se guardará nada"), warning(p));
             p.choose(B, Flag.PINNED, true);
             p.flush();
             assertEquals("{roto", Files.readString(prefs()));
@@ -180,7 +190,7 @@ class PreferencesBackupTest {
 
     private void unblockWrites(Path obstacle) throws IOException {
         Files.delete(obstacle);
-        Files.delete(obstacle.getParent());
+        Files.delete(PathParts.parent(obstacle));
     }
 
     @Test
@@ -256,8 +266,8 @@ class PreferencesBackupTest {
     void aSuccessfulRecoveryDoesNotWarnAboutSaving() throws Exception {
         twoSaves();
         Files.writeString(prefs(), "{roto");
-        var opened = open();
-        new FolderActions(opened, () -> { }).onSaveFailure(m -> { });
-        assertEquals(0, opened.announcements(), "nothing to warn about");
+        var file = open();
+        new FolderActions(file, () -> { }).onSaveFailure(m -> { });
+        assertEquals(0, file.announcements(), "nothing to warn about");
     }
 }

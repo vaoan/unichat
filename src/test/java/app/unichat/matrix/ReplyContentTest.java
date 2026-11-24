@@ -3,11 +3,13 @@ package app.unichat.matrix;
 import app.unichat.service.Changes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
@@ -23,11 +25,11 @@ class ReplyContentTest {
                "content":{"msgtype":"m.text","body":"la pregunta"}}]}}}}}""";
 
     private HttpServer server;
-    private volatile String sendBody;
+    private volatile @Nullable String sendBody;
 
     @BeforeEach
     void fakeHomeserver() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String p = ex.getRequestURI().getPath();
             String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);

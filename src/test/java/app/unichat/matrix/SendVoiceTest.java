@@ -3,12 +3,14 @@ package app.unichat.matrix;
 import app.unichat.model.VoiceNote;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,18 +18,19 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** What a voice note looks like on the wire: a bridge only sends a voice note if it's flagged as one. */
 class SendVoiceTest {
     @TempDir Path dir;
     private HttpServer server;
-    private volatile String sendBody;
-    private volatile String uploadType;
+    private volatile @Nullable String sendBody;
+    private volatile @Nullable String uploadType;
 
     @BeforeEach
     void fakeHomeserver() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String p = ex.getRequestURI().getPath();
             String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
@@ -78,7 +81,7 @@ class SendVoiceTest {
         svc.sendVoice("!c:example.org", new VoiceNote(f, 2500, List.of(10, 500, 1024)), null).get();
         assertEquals(f, svc.media("mxc://s/v1", 0, 0).get());
         Files.delete(f);
-        assertTrue(!f.equals(svc.media("mxc://s/v1", 0, 0).get()), "a file gone from disk is downloaded");
+        assertNotEquals(svc.media("mxc://s/v1", 0, 0).get(), f, "a file gone from disk is downloaded");
     }
 
     @Test
@@ -89,9 +92,9 @@ class SendVoiceTest {
         java.nio.file.attribute.FileTime sent = Files.getLastModifiedTime(f);
         Files.write(f, new byte[]{9, 9, 9});
         Files.setLastModifiedTime(f, java.nio.file.attribute.FileTime.fromMillis(sent.toMillis() + 60_000));
-        assertTrue(!f.equals(svc.media("mxc://s/v1", 0, 0).get()), "same size, edited since: not what was sent");
+        assertNotEquals(svc.media("mxc://s/v1", 0, 0).get(), f, "same size, edited since: not what was sent");
         Files.write(f, new byte[]{1, 2, 3, 4});
         Files.setLastModifiedTime(f, sent);
-        assertTrue(!f.equals(svc.media("mxc://s/v1", 0, 0).get()), "same time, another size: not what was sent");
+        assertNotEquals(svc.media("mxc://s/v1", 0, 0).get(), f, "same time, another size: not what was sent");
     }
 }

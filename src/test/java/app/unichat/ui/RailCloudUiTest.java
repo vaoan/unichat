@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.ui.settings.SettingsWindow;
 import app.unichat.cloud.Cloud;
@@ -54,23 +55,22 @@ class RailCloudUiTest {
 
         Cloud.Status up = new Cloud.Status(true, Instant.now(), null, 0, 9,
                 new Cloud.Activity(Cloud.Step.UPLOADING, 2, 12, "foto.jpg", 450, 1000, 2_400_000), 0, null, 0, null);
-        FxWait.fx(() -> { view.cloudChanged(up); return null; });
+        FxWait.onFx(() -> view.cloudChanged(up));
         FxWait.settled();
         assertTrue(FxWait.fx(ring::isVisible));
         assertEquals(gearBefore, FxWait.fx(() -> gear.localToScene(gear.getBoundsInLocal())), "the gear didn't move nor grow");
         assertEquals(listBefore, FxWait.fx(() -> timeline.localToScene(timeline.getBoundsInLocal())), "nor did anything beside it");
         assertTrue(FxWait.fx(() -> gear.getTooltip().getText()).startsWith("Nube: subiendo 3 de 12"), "hovering says what it's doing");
 
-        FxWait.fx(() -> { gear.fire(); return null; });
+        FxWait.onFx(gear::fire);
         FxWait.until("Ajustes opens on Nube", () -> "cloud".equals(SettingsWindow.currentPage()));
-        FxWait.fx(() -> {
-            SettingsWindow.current().close();
+        FxWait.onFx(() -> {
+            Present.of(SettingsWindow.current()).close();
             view.cloudChanged(new Cloud.Status(true, Instant.now(), null, 12, 0));
-            return null;
         });
         assertFalse(FxWait.fx(ring::isVisible), "done: the ring goes");
         assertEquals("Ajustes", FxWait.fx(() -> gear.getTooltip().getText()));
-        FxWait.fx(() -> { stage[0].close(); return null; });
+        FxWait.onFx(stage[0]::close);
         svc.stop();
     }
 }

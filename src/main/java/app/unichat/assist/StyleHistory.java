@@ -1,5 +1,6 @@
 package app.unichat.assist;
 
+import app.unichat.support.PathParts;
 import app.unichat.support.SafeFile;
 
 import java.io.IOException;
@@ -14,7 +15,9 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The versions of {@code writing-style.md} that learning replaced ({@code writing-style-history/}, one timestamped file
@@ -25,8 +28,9 @@ import java.util.stream.Stream;
 final class StyleHistory {
     static final int KEEP = 20;
     static final String FOLDER = "writing-style-history";
-    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssSSS'Z'").withZone(ZoneOffset.UTC);
-    private static final String LEARNED = ".md", UNDONE = ".undone.md";
+    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssSSS'Z'", Locale.ROOT).withZone(ZoneOffset.UTC);
+    private static final String LEARNED = ".md";
+    private static final String UNDONE = ".undone.md";
 
     /** One kept version: {@code when} it was replaced (or undone). */
     record Version(Path file, Instant when, boolean undone) {
@@ -70,7 +74,7 @@ final class StyleHistory {
     }
 
     /** The newest version learning replaced (not one undone), or null. */
-    Version lastLearned() {
+    @Nullable Version lastLearned() {
         List<Version> all = versions();
         for (int i = all.size() - 1; i >= 0; i--) if (!all.get(i).undone()) return all.get(i);
         return null;
@@ -86,7 +90,7 @@ final class StyleHistory {
 
     void clear() { versions().forEach(this::remove); }
 
-    private void keep(String text, String suffix) {
+    private void keep(@Nullable String text, String suffix) {
         Instant when = clock.instant();
         // Two in the same millisecond (or a clock gone back) still get their own name, after the newest.
         List<Version> all = versions();
@@ -101,8 +105,8 @@ final class StyleHistory {
         for (int i = 0; i < now.size() - KEEP; i++) remove(now.get(i));
     }
 
-    private static Version parse(Path f) {
-        String name = f.getFileName().toString();
+    private static @Nullable Version parse(Path f) {
+        String name = PathParts.name(f);
         if (!name.startsWith("writing-style-") || !name.endsWith(LEARNED)) return null;
         boolean undone = name.endsWith(UNDONE);
         String stamp = name.substring("writing-style-".length(), name.length() - (undone ? UNDONE : LEARNED).length());

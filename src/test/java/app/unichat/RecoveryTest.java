@@ -1,5 +1,6 @@
 package app.unichat;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -61,7 +62,10 @@ class RecoveryTest {
     void garbageInTheOldGenerationIsCollectedNotRestartedFor() {
         java.util.concurrent.atomic.AtomicInteger collections = new java.util.concurrent.atomic.AtomicInteger();
         long[] used = {950};
-        assertFalse(Recovery.reallyFull(() -> { collections.incrementAndGet(); used[0] = 160; }, () -> used[0], 950),
+        assertFalse(Recovery.reallyFull(() -> {
+            collections.incrementAndGet();
+            used[0] = 160;
+        }, () -> used[0], 950),
                 "mostly garbage: collected, no restart");
         assertEquals(1, collections.get(), "a full collection ran first");
         assertTrue(Recovery.reallyFull(() -> used[0] = 960, () -> used[0], 950), "still full after it: restart");
@@ -71,17 +75,18 @@ class RecoveryTest {
     @Test
     void whenMemoryIsFullTheLogSaysWhatFillsIt() {
         String h = Recovery.heaviest(5);
-        org.junit.jupiter.api.Assertions.assertTrue(h.contains("#instances") && h.contains("java."), h);
-        org.junit.jupiter.api.Assertions.assertTrue(h.lines().count() <= 5 + 4, "only the heaviest: " + h.lines().count());
+        assertTrue(h.contains("#instances") && h.contains("java."), h);
+        assertTrue(h.lines().count() <= 5 + 4, "only the heaviest: " + h.lines().count());
     }
 
     @Test
+    @SuppressFBWarnings(value = "DM_USELESS_THREAD", justification = "a thread named as the sync's, never started: the handler only reads its name")
     void itStartsAgainEvenWhenThereIsNoMemoryToSayWhy() {
         // 2026-11-13: the heap ran out in the sync thread, and the handler's own println ran out too, before it could
         // start Unichat again; the thread was gone, nothing was said and the top bar kept "Conectando…".
-        java.io.PrintStream err = System.err;
+        java.io.PrintStream err = System.err; // NOPMD: CloseResource, put back below
         List<String> restarts = new java.util.ArrayList<>();
-        System.setErr(new java.io.PrintStream(new java.io.OutputStream() {
+        System.setErr(new java.io.PrintStream(new java.io.OutputStream() { // NOPMD: RelianceOnDefaultCharset, it never writes a byte
             @Override public void write(int b) {
                 throw new OutOfMemoryError("Java heap space");
             }

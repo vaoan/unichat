@@ -46,10 +46,9 @@ class ToastPlacementUiTest {
         });
         FxWait.until("the message box", () -> scene.getRoot().lookup(".composer-input") != null);
         for (String text : new String[]{"hola", "uno\ndos\ntres\ncuatro\ncinco\nseis"}) {
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 ((TextArea) scene.getRoot().lookup(".composer-input")).setText(text);
                 ((MainView) scene.getRoot()).toast("Borrador listo: revísalo antes de enviarlo");
-                return null;
             });
             FxWait.settled();
             boolean clear = FxWait.fx(() -> {
@@ -59,6 +58,6 @@ class ToastPlacementUiTest {
             });
             assertTrue(clear, "the notice sits above the box with " + text.lines().count() + " line(s)");
         }
-        FxWait.fx(() -> { stage[0].close(); return null; });
+        FxWait.onFx(stage[0]::close);
     }
 }

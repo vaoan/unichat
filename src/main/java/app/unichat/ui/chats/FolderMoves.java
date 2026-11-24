@@ -11,7 +11,7 @@ public final class FolderMoves {
     private FolderMoves() {}
 
     public static void tell(CompletableFuture<Integer> moving, Runnable redraw, Consumer<String> toast) {
-        moving.whenComplete((moved, err) -> Platform.runLater(() -> {
+        var _ = moving.whenComplete((moved, err) -> Platform.runLater(() -> {
             redraw.run();
             if (err != null) toast.accept(I18n.t("autosave.moveFailed", app.unichat.support.Errors.message(err)));
             else if (moved > 0) toast.accept(I18n.n("autosave.moved", moved));

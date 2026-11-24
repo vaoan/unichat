@@ -4,6 +4,7 @@ import app.unichat.model.LinkPreview;
 import app.unichat.model.Mxc;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.jsoup.Jsoup;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +15,7 @@ final class MessageHtml {
 
     private MessageHtml() {}
 
-    static String of(JsonNode content) {
+    static @Nullable String of(JsonNode content) {
         return "org.matrix.custom.html".equals(content.path("format").asText()) ? content.path("formatted_body").asText(null) : null;
     }
 
@@ -35,7 +36,7 @@ final class MessageHtml {
     }
 
     /** The person's own words, for the chat list, replies and editing: the bridge repeats an embed as "> " lines last. */
-    static String withoutEmbedText(String body, String html) {
+    static String withoutEmbedText(String body, @Nullable String html) {
         if (body == null || html == null || !html.contains(BRIDGED_EMBED)) return body;
         String[] lines = body.split("\n", -1);
         int end = lines.length;

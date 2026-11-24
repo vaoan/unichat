@@ -1,5 +1,8 @@
 package app.unichat.matrix;
 
+import app.unichat.support.PathParts;
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -65,15 +68,16 @@ final class MediaCache {
     /** What a folder holds: the files that may go, and the totals (pinned ones counted); null if it can't be read. */
     private record Listing(List<Entry> entries, long total, int count, long leftovers) {}
 
-    private static Listing list(Path dir, Set<String> pinned) {
+    private static @Nullable Listing list(Path dir, Set<String> pinned) {
         if (!Files.isDirectory(dir)) return null;
         List<Entry> entries = new ArrayList<>();
-        long total = 0, leftovers = 0;
+        long total = 0;
+        long leftovers = 0;
         int count = 0;
         long staleBefore = System.currentTimeMillis() - LEFTOVER_MILLIS;
         try (Stream<Path> files = Files.list(dir)) {
             for (Path p : (Iterable<Path>) files::iterator) {
-                String n = p.getFileName().toString();
+                String n = PathParts.name(p);
                 if (n.endsWith(".download") || n.contains(".part")) {
                     leftovers += deleteIfLeftover(p, staleBefore);
                     continue;

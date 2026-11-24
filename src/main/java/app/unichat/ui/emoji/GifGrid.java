@@ -24,7 +24,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
@@ -33,18 +32,22 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import javafx.scene.layout.StackPane;
+import org.jspecify.annotations.Nullable;
 
 /**
  * GIFs tab: search across the providers turned on in Ajustes → GIFs, plus favourite and recent GIFs (shared by every
  * chat). A chosen GIF is downloaded and sent flagged as a GIF; recents keep it for any other chat or network.
  */
 public final class GifGrid extends VBox {
-    private static final int TILE_W = 132, TILE_H = 100, LIMIT = 24;
+    private static final int TILE_W = 132;
+    private static final int TILE_H = 100;
+    private static final int LIMIT = 24;
 
-    private final Supplier<String> takeReply;
+    private final Supplier<@Nullable String> takeReply;
     private final ChatService svc;
     private final MediaLibrary library;
-    private final Supplier<Chat> chat;
+    private final Supplier<@Nullable Chat> chat;
     private final Consumer<String> toast;
     private final TextField search = new TextField();
     private final VBox content = new VBox(10);
@@ -54,11 +57,11 @@ public final class GifGrid extends VBox {
     private int generation;
     private final TileCache libraryTiles = new TileCache();
     /** What the results on screen were searched for, and when; trending changes, so not for ever. */
-    private String resultsFor;
+    private @Nullable String resultsFor;
     private long resultsAt;
     private static final long RESULTS_LAST_MS = 10 * 60_000;
 
-    public GifGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Supplier<String> takeReply, Consumer<String> toast) {
+    public GifGrid(ChatService svc, MediaLibrary library, Supplier<@Nullable Chat> chat, Supplier<@Nullable String> takeReply, Consumer<String> toast) {
         super(8);
         this.takeReply = takeReply;
         this.svc = svc;
@@ -71,21 +74,21 @@ public final class GifGrid extends VBox {
         search.setAccessibleText(I18n.t("gif.search"));
         search.setOnAction(e -> refresh());
         debounce.setOnFinished(e -> refresh());
-        library.addListener(() -> javafx.application.Platform.runLater(() -> {
+        library.addListener(() -> Platform.runLater(() -> {
             if (getScene() != null) refreshLibrary();
         }));
         search.textProperty().addListener((o, a, b) -> debounce.playFromStart());
         ScrollPane scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("side-panel-scroll");
-        VBox.setVgrow(scroll, javafx.scene.layout.Priority.ALWAYS);
+        setVgrow(scroll, javafx.scene.layout.Priority.ALWAYS);
         getChildren().addAll(SearchFields.clearable(search), scroll);
     }
 
     /** Rebuilds for the open chat: notices, favourites/recents, then search results (or trending). */
     public void refresh() {
         String q0 = search.getText().strip();
-        String shownFor = q0 + "|" + accepts() + "|" + GifProviders.active(k -> Settings.get().getString(k, null)).size();
+        String shownFor = q0 + "|" + accepts() + "|" + GifProviders.active(k -> Settings.get().getString(k)).size();
         // Changing chats shouldn't search the web again or reload what's on screen.
         if (shownFor.equals(resultsFor) && System.currentTimeMillis() - resultsAt < RESULTS_LAST_MS) {
             refreshLibrary();
@@ -96,7 +99,7 @@ public final class GifGrid extends VBox {
         content.getChildren().clear();
         boolean accepted = accepts();
         if (!accepted) content.getChildren().add(Labels.help(I18n.t("gif.networkRefuses")));
-        GifSearch providers = new GifSearch(GifProviders.active(k -> Settings.get().getString(k, null)));
+        GifSearch providers = new GifSearch(GifProviders.active(k -> Settings.get().getString(k)));
         String q = search.getText().strip();
         content.getChildren().add(libraryBox);
         refreshLibrary();
@@ -108,7 +111,7 @@ public final class GifGrid extends VBox {
         FlowPane grid = new FlowPane(6, 6);
         Label loading = Labels.help(I18n.t("gif.searching"));
         content.getChildren().addAll(title, loading, grid);
-        CompletableFuture.supplyAsync(() -> q.isEmpty() ? providers.trending(LIMIT) : providers.search(q, LIMIT))
+        var _ = CompletableFuture.supplyAsync(() -> q.isEmpty() ? providers.trending(LIMIT) : providers.search(q, LIMIT))
                 .thenAccept(gifs -> Platform.runLater(() -> {
                     if (gen != generation) return; // a newer search replaced this one
                     content.getChildren().remove(loading);
@@ -135,7 +138,7 @@ public final class GifGrid extends VBox {
     private void refreshLibrary() {
         libraryTiles.next();
         libraryBox.getChildren().clear();
-        if (!search.getText().strip().isEmpty()) return;
+        if (!search.getText().isBlank()) return;
         Chat c = chat.get();
         boolean accepted = c == null || c.features().accepts(RoomFeatures.GIF);
         libraryRow(true, library.favorites(MediaLibrary.Kind.GIF), accepted);
@@ -165,7 +168,7 @@ public final class GifGrid extends VBox {
         MediaLibrary.Item shown = preview != null && preview.startsWith("http")
                 ? new MediaLibrary.Item(MediaLibrary.Kind.STICKER, preview, "image/gif", i.width(), i.height(), null) : i;
         Node tile = tile(probe, what, accepted, () -> sendFromLibrary(i));
-        if (tile instanceof javafx.scene.layout.StackPane box) {
+        if (tile instanceof StackPane box) {
             MediaLoading.track(box, progress -> MessageMedia.loadMedia(svc, probe, MediaItems.message(shown), TILE_W * 2, TILE_H * 2, progress));
         }
         LibraryMenu.attach(tile, library, i, accepted ? () -> sendFromLibrary(i) : null, toast, svc);
@@ -201,7 +204,7 @@ public final class GifGrid extends VBox {
         if (c == null) return;
         toast.accept(I18n.t("gif.sending"));
         String reply = takeReply.get();
-        file.thenCompose(p -> svc.sendGif(c.id(), p, item.mime() == null ? "image/gif" : item.mime(), item.width(), item.height(), reply))
+        var _ = file.thenCompose(p -> svc.sendGif(c.id(), p, item.mime() == null ? "image/gif" : item.mime(), item.width(), item.height(), reply))
                 .whenComplete((v, err) -> Platform.runLater(() -> {
                     if (err != null) {
                         toast.accept(I18n.t("gif.sendFailed"));

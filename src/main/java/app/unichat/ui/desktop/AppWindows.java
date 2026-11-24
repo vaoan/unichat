@@ -9,6 +9,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.stage.PopupWindow;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -99,7 +100,7 @@ public final class AppWindows {
     }
 
     /** Brings the next (or previous) of {@code windows} that's open forward; which one, or null. */
-    static Stage next(List<Window> windows, boolean backwards) {
+    static @Nullable Stage next(List<Window> windows, boolean backwards) {
         List<Window> open = windows.stream().filter(AppWindows::counts).toList();
         if (open.size() < 2) return null;
         int at = 0;

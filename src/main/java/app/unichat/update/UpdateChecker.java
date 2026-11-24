@@ -3,7 +3,9 @@ package app.unichat.update;
 import app.unichat.settings.Settings;
 import app.unichat.support.AppVersion;
 import app.unichat.support.Seen;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -17,6 +19,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Asks GitHub for Unichat's latest release (Ajustes → Privacidad, {@code app.checkUpdates}): a little after start, then
@@ -29,7 +32,7 @@ public final class UpdateChecker {
     public enum Outcome { UP_TO_DATE, NEWER, FAILED }
 
     /** What a check found: {@code release} is the latest (null when it {@link Outcome#FAILED}). */
-    public record Result(Outcome outcome, Release release) {}
+    public record Result(Outcome outcome, @Nullable Release release) {}
 
     static final String LAST_CHECK = "app.update.lastCheck";
     static final String LATEST = "app.update.latest";
@@ -49,17 +52,20 @@ public final class UpdateChecker {
         t.setDaemon(true);
         return t;
     });
-    private final List<Consumer<Release>> listeners = new CopyOnWriteArrayList<>();
-    private boolean started;
+    private final List<Consumer<@Nullable Release>> listeners = new CopyOnWriteArrayList<>();
+    /** Set under the lock in start(); settingChanged() reads it on the worker. */
+    private volatile boolean started;
 
     private final LongSupplier clock;
     private final Fetcher fetcher;
 
     /** What answers GitHub's call: the body, or an exception. */
-    interface Fetcher { String fetch() throws Exception; }
+    @FunctionalInterface
+    interface Fetcher { String fetch() throws Exception; } // NOPMD: SignatureDeclareThrowsException, a callback: GitHub's call or a test's answer, failing as they do
 
     private UpdateChecker() { this(System::currentTimeMillis, UpdateChecker::fetch); }
 
+    @SuppressFBWarnings(value = "SING_SINGLETON_HAS_NONPRIVATE_CONSTRUCTOR", justification = "package-private for the tests, which give a clock and a fetcher")
     UpdateChecker(LongSupplier clock, Fetcher fetcher) {
         this.clock = clock;
         this.fetcher = fetcher;
@@ -72,7 +78,7 @@ public final class UpdateChecker {
         if (started) return;
         started = true;
         listenToSeen();
-        worker.scheduleWithFixedDelay(this::tick, FIRST_LOOK.toSeconds(), LOOK_EVERY.toSeconds(), TimeUnit.SECONDS);
+        var _ = worker.scheduleWithFixedDelay(() -> { var _ = tick(); }, FIRST_LOOK.toSeconds(), LOOK_EVERY.toSeconds(), TimeUnit.SECONDS);
     }
 
     /** Seen again: looks at once whether a check is due (the ticks missed meanwhile count as one). */
@@ -90,17 +96,17 @@ public final class UpdateChecker {
     CompletableFuture<Void> idle() { return CompletableFuture.runAsync(() -> { }, worker); }
 
     /** Hears the release to tell the person about, or null when there's none any more; on the worker's thread. */
-    public void addListener(Consumer<Release> l) { listeners.add(l); }
+    public void addListener(Consumer<@Nullable Release> l) { listeners.add(l); }
 
-    public void removeListener(Consumer<Release> l) { listeners.remove(l); }
+    public void removeListener(Consumer<@Nullable Release> l) { listeners.remove(l); }
 
     /** The newer version last heard of, unless dismissed or checks are off; null otherwise. */
-    public Release pending() {
+    public @Nullable Release pending() {
         Settings s = Settings.get();
         if (!s.checkUpdates()) return null;
-        String tag = s.getString(LATEST, null);
+        String tag = s.getString(LATEST);
         Release known = tag == null ? null : new Release(tag, s.getString(LATEST_URL, UpdatePolicy.RELEASES));
-        return UpdatePolicy.shouldShow(known, AppVersion.current(), s.getString(DISMISSED, null)) ? known : null;
+        return UpdatePolicy.shouldShow(known, AppVersion.current(), s.getString(DISMISSED)) ? known : null;
     }
 
     /** "Not now" for {@code r}: it isn't offered again, a later version will be. */
@@ -146,7 +152,7 @@ public final class UpdateChecker {
             s.set(LATEST, latest.version());
             s.set(LATEST_URL, latest.url());
             r = new Result(AppVersion.isNewer(latest.version(), AppVersion.current()) ? Outcome.NEWER : Outcome.UP_TO_DATE, latest);
-        } catch (Exception e) {
+        } catch (Exception e) { // NOPMD: ExceptionAsFlowControl, one failure path for no release and a failed call
             System.err.println("Update check failed: " + e.getMessage());
             r = new Result(Outcome.FAILED, null);
         }
@@ -156,10 +162,10 @@ public final class UpdateChecker {
 
     private void tell() {
         Release p = pending();
-        for (Consumer<Release> l : listeners) l.accept(p);
+        for (Consumer<@Nullable Release> l : listeners) l.accept(p);
     }
 
-    private static String fetch() throws Exception {
+    private static String fetch() throws IOException, InterruptedException {
         HttpRequest req = HttpRequest.newBuilder(API).timeout(Duration.ofSeconds(15))
                 .header("Accept", "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")

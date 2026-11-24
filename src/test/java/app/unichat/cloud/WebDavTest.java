@@ -1,5 +1,7 @@
 package app.unichat.cloud;
 
+import app.unichat.CountedReads;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -18,6 +20,7 @@ class WebDavTest {
     java.nio.file.Path dir;
 
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aFileComesDownIntoAFileNeverWholeInMemory() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
@@ -84,6 +87,7 @@ class WebDavTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void aServerThatNeverAnswersEndsInAFailureNotAHang() throws Exception {
         try (java.net.ServerSocket silent = new java.net.ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress())) {
             // It takes the connection and never says a word (pCloud's WebDAV with two-step verification on did this).
@@ -101,5 +105,19 @@ class WebDavTest {
             assertEquals(new Storage.RemoteFile(5, null, null), dav.info("a.jpg"), "WebDAV gives the size, no checksum");
             assertNull(dav.info("nada.jpg"));
         }
+    }
+
+    @Test
+    void aServersAnswerIsReadInLinearTimeWhateverItHolds() {
+        // A tag that never closes made each pattern scan to the end of the answer again from every one of them.
+        CountedReads open = new CountedReads("<d:href ".repeat(5_000));
+        assertEquals(java.util.List.of(), WebDav.hrefs(open));
+        assertTrue(open.perChar() < 20, "each char read a few times: " + open.perChar());
+        CountedReads props = new CountedReads("<d:getetag ".repeat(5_000));
+        assertNull(WebDav.prop(props, "getetag"));
+        assertEquals(java.util.List.of("/dav/a b.txt", "/dav/x&y"), WebDav.hrefs(
+                "<d:response><d:href>/dav/a b.txt</d:href></d:response><D:href lang=\"x\">/dav/x&amp;y</D:href>"));
+        assertEquals("\"x\"", WebDav.prop("<d:getetag>\"x\"</d:getetag>", "getetag"));
+        assertTrue(props.perChar() < 20, "each char read a few times: " + props.perChar());
     }
 }

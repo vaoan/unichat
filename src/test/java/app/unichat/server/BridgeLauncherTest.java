@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import app.unichat.Present;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -56,7 +57,7 @@ class BridgeLauncherTest {
     };
 
     private BridgeLauncher launcher(Duration limit) {
-        BridgeDemand demand = new BridgeDemand(b -> withAccount.contains(b), b -> {
+        BridgeDemand demand = new BridgeDemand(b -> withAccount.contains(b), b -> { // NOPMD: LambdaCanBeMethodReference, withAccount changes below; the lambda reads it then
             calls.add("probe " + b);
             return unanswered-- <= 0;
         }, Duration.ZERO, limit);
@@ -108,8 +109,8 @@ class BridgeLauncherTest {
         unanswered = 5; // a wait that went on would get an answer, and no error
         IOException e = assertThrows(IOException.class, () -> l.open("gmessages", "Google Messages", msg -> { }));
         assertEquals(List.of("prepare gmessages", "start gmessages", "probe gmessages"), calls, "no waiting on a bridge that isn't running");
-        assertTrue(e.getMessage().contains("Google Messages"), e.getMessage());
-        assertTrue(e.getMessage().contains(Path.of("server", "gmessages", "bridge.log").toString()), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("Google Messages"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains(Path.of("server", "gmessages", "bridge.log").toString()), e.getMessage());
     }
 
     @Test
@@ -126,8 +127,8 @@ class BridgeLauncherTest {
             @Override public boolean isRunning(String b) { return false; }
             @Override public void prepare(String b, Consumer<String> progress) throws IOException { throw new IOException("no keys"); }
             @Override public void start(String b) { calls.add("start " + b); }
-            @Override public void stop(String b) { }
-            @Override public void restarting(String b) { }
+            @Override public void stop(String b) { /* the fake ignores it */ }
+            @Override public void restarting(String b) { /* the fake ignores it */ }
             @Override public Path log(String b) { return Path.of(b); }
         };
         BridgeLauncher l = new BridgeLauncher(failing, new BridgeDemand(b -> false, b -> true, Duration.ZERO, NO_LIMIT),

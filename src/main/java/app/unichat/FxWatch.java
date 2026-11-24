@@ -21,6 +21,7 @@ final class FxWatch {
     static final long UNSEEN_EVERY_MS = 60_000;
 
     /** How the watch waits between looks ({@link Thread#sleep} but in tests). */
+    @FunctionalInterface
     interface Sleeper {
         void sleep(long ms) throws InterruptedException;
     }

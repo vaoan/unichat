@@ -78,7 +78,7 @@ public final class Rail extends VBox {
         cloudRing.radiusYProperty().bind(cloudRing.radiusXProperty());
 
         Region grow = new Region();
-        VBox.setVgrow(grow, Priority.ALWAYS);
+        setVgrow(grow, Priority.ALWAYS);
         networks.setAlignment(Pos.TOP_CENTER);
         Region sep = new Region();
         sep.getStyleClass().add("rail-separator");
@@ -102,22 +102,24 @@ public final class Rail extends VBox {
         scroll.setFocusTraversable(false);
         scroll.setMinHeight(0);
         scroll.prefViewportHeightProperty().bind(networks.heightProperty());
-        scroll.setMaxHeight(Region.USE_PREF_SIZE);
-        VBox.setMargin(scroll, new Insets(0, -RAIL_SIDE, 0, -RAIL_SIDE));
+        scroll.setMaxHeight(USE_PREF_SIZE);
+        setMargin(scroll, new Insets(0, -RAIL_SIDE, 0, -RAIL_SIDE));
         return scroll;
     }
 
     /** Scrolls the networks so {@code b} shows whole (keyboard focus). */
     private void reveal(Button b) {
-        double content = networks.getHeight(), view = scroll.getViewportBounds().getHeight();
+        double content = networks.getHeight();
+        double view = scroll.getViewportBounds().getHeight();
         if (content <= view) return;
-        double top = b.getBoundsInParent().getMinY(), bottom = b.getBoundsInParent().getMaxY();
+        double top = b.getBoundsInParent().getMinY();
+        double bottom = b.getBoundsInParent().getMaxY();
         double shown = scroll.getVvalue() * (content - view);
         if (top < shown) scroll.setVvalue(top / (content - view));
         else if (bottom > shown + view) scroll.setVvalue((bottom - view) / (content - view));
     }
 
-    private Button settingsButton;
+    private final Button settingsButton;
     /** Over the settings gear while files go up to the cloud: how far the round got. */
     private final javafx.scene.shape.Arc cloudRing = new javafx.scene.shape.Arc();
     private boolean cloudActive;

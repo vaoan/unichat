@@ -43,12 +43,11 @@ class AppWindowsUiTest {
         // Every window takes the shortcut (a test process never gets the focus, so it's checked by what's reached).
         for (Stage st : s) {
             boolean[] reached = {false};
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 st.getScene().getRoot().addEventHandler(KeyEvent.KEY_PRESSED, e -> reached[0] = true);
                 Event.fireEvent(st.getScene().getRoot(),
                         // The shortcut key: ⌘ on a Mac, Ctrl elsewhere; both held so it's pressed on any system.
                         new KeyEvent(KeyEvent.KEY_PRESSED, "`", "`", KeyCode.BACK_QUOTE, false, true, false, true));
-                return null;
             });
             org.junit.jupiter.api.Assertions.assertFalse(reached[0], "taken by the shortcut in " + st.getTitle());
         }
@@ -62,6 +61,9 @@ class AppWindowsUiTest {
             });
             org.junit.jupiter.api.Assertions.assertSame(expectedAndGot[0], expectedAndGot[1], "with two, either way is the other one");
         }
-        FxWait.fx(() -> { s[0].hide(); s[1].hide(); return null; });
+        FxWait.onFx(() -> {
+            s[0].hide();
+            s[1].hide();
+        });
     }
 }

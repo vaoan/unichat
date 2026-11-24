@@ -1,5 +1,6 @@
 package app.unichat.ui.settings;
 
+import app.unichat.Present;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.Theme;
 import app.unichat.service.MockChatService;
@@ -39,7 +40,7 @@ class SettingsLayoutUiTest {
         }
         Platform.setImplicitExit(false);
         MockChatService svc = new MockChatService();
-        String scale = Settings.get().getString("ui.fontScale", null);
+        String scale = Settings.get().getString("ui.fontScale");
         List<String> bad = new ArrayList<>();
         // Something learned, so Escribir con IA shows its last change filled in (dates, traits, pending corrections).
         app.unichat.assist.WritingStyle style = app.unichat.assist.WritingStyle.get();
@@ -60,11 +61,14 @@ class SettingsLayoutUiTest {
                     return o;
                 });
                 for (String page : PAGES) {
-                    FxWait.fx(() -> { SettingsWindow.select(page); return null; });
+                    FxWait.onFx(() -> SettingsWindow.select(page));
                     FxWait.settled();
-                    bad.addAll(FxWait.fx(() -> squeezed(SettingsWindow.current().getScene().getRoot(), page + " @" + fontScale)));
+                    bad.addAll(FxWait.fx(() -> squeezed(Present.of(SettingsWindow.current()).getScene().getRoot(), page + " @" + fontScale)));
                 }
-                FxWait.fx(() -> { SettingsWindow.current().close(); owner.close(); return null; });
+                FxWait.onFx(() -> {
+                    Present.of(SettingsWindow.current()).close();
+                    owner.close();
+                });
             }
         } finally {
             Settings.get().set("ui.fontScale", scale);
@@ -86,7 +90,8 @@ class SettingsLayoutUiTest {
         if (!l.isVisible() || l.getText() == null || l.getText().isBlank() || l.getScene() == null) return;
         javafx.scene.text.Text t = new javafx.scene.text.Text(l.getText());
         t.setFont(l.getFont());
-        double natural = t.getLayoutBounds().getWidth(), em = l.getFont().getSize();
+        double natural = t.getLayoutBounds().getWidth();
+        double em = l.getFont().getSize();
         if (l.isTextTruncated() || l.getWidth() + 1 < Math.min(natural, MIN_EM * em)) {
             out.add(where + ": \"" + l.getText().substring(0, Math.min(40, l.getText().length())) + "\" " + Math.round(l.getWidth()) + " px");
         }

@@ -3,6 +3,7 @@ package app.unichat.ui;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
 import app.unichat.service.PreferencesFile;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -10,11 +11,11 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,6 +29,7 @@ class SaveFailureToastUiTest {
     @TempDir Path dir;
 
     @Test
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     void aFailedSaveShowsAToast() throws Exception {
         assumeTrue(dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
         try {
@@ -57,17 +59,16 @@ class SaveFailureToastUiTest {
         } finally {
             Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwxr-xr-x"));
             svc.stop();
-            fx(() -> {
+            FxWait.onFx(() -> {
                 ((MainView) scene.getRoot()).dispose();
                 ((Stage) scene.getWindow()).close();
-                return null;
             });
         }
     }
 
     private static Label toast(Scene scene) { return (Label) scene.getRoot().lookup(".toast"); }
 
-    private static <T> T fx(Callable<T> call) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> call) throws E, InterruptedException {
         return FxWait.fx(call);
     }
 }

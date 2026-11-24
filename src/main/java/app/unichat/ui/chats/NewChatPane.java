@@ -23,12 +23,14 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.Objects;
 
 /**
  * Nuevo chat: pick a network (and account), then any contact from the bridge's contact list or search, or type a
@@ -39,12 +41,16 @@ public final class NewChatPane extends VBox {
     private static final long WAIT_FOR_ROOM_MS = 30_000;
 
     /** A list row: a contact, or "Escribir a <what you typed>" (resolved when chosen). */
-    private record Row(Contact contact, String typed) {
-        String label() { return contact != null ? contact.name() : I18n.t("newChat.writeTo", typed); }
+    private record Row(@Nullable Contact contact, @Nullable String typed) {
+        String label() {
+            Contact c = contact;
+            return c != null ? c.name() : I18n.t("newChat.writeTo", typed);
+        }
 
         String detail() {
-            if (contact == null) return "";
-            return contact.identifiers().isEmpty() ? "" : contact.identifiers().get(0).replaceFirst("^tel:", "");
+            Contact c = contact;
+            if (c == null) return "";
+            return c.identifiers().isEmpty() ? "" : c.identifiers().get(0).replaceFirst("^tel:", "");
         }
     }
 
@@ -58,17 +64,17 @@ public final class NewChatPane extends VBox {
     private final Label status = new Label();
     private final ListView<Row> list = new ListView<>();
     private final PauseTransition debounce = new PauseTransition(DEBOUNCE);
-    private Account account;
+    private @Nullable Account account;
     private ChatService.ContactSupport support = new ChatService.ContactSupport(false, false);
     private List<Contact> all = List.of();
     private int generation;
     /** Separate from {@code generation} (searches): a search typed while the account loads must not discard it. */
     private int loadGeneration;
     private boolean loading;
-    private ChatService.Listener pendingListener;
-    private PauseTransition pendingTimeout;
+    private ChatService.@Nullable Listener pendingListener;
+    private @Nullable PauseTransition pendingTimeout;
 
-    public NewChatPane(ChatService svc, Network preferred, Consumer<String> openChatId, Runnable close, Consumer<String> toast) {
+    public NewChatPane(ChatService svc, @Nullable Network preferred, Consumer<String> openChatId, Runnable close, Consumer<String> toast) {
         super(10);
         this.svc = svc;
         this.openChatId = openChatId;
@@ -119,7 +125,7 @@ public final class NewChatPane extends VBox {
                 close.run();
             }
         });
-        VBox.setVgrow(list, Priority.ALWAYS);
+        setVgrow(list, Priority.ALWAYS);
         networks.setAccessibleText(I18n.t("newChat.network"));
         accountRow.setAccessibleText(I18n.t("newChat.account"));
         getChildren().addAll(title, networks, accountRow, SearchFields.clearable(search), status, list);
@@ -191,7 +197,7 @@ public final class NewChatPane extends VBox {
         search.setDisable(false);
         setStatus(I18n.t("common.loading"));
         ChatService.ContactSupport[] found = new ChatService.ContactSupport[1];
-        svc.contactSupport(a).thenCompose(s -> {
+        var _ = svc.contactSupport(a).thenCompose(s -> {
             found[0] = s;
             return s.list() ? svc.contacts(a) : java.util.concurrent.CompletableFuture.completedFuture(List.<Contact>of());
         }).whenComplete((contacts, err) -> Platform.runLater(() -> {
@@ -209,7 +215,8 @@ public final class NewChatPane extends VBox {
     }
 
     private void runQuery() {
-        if (account == null) return;
+        Account acc = account;
+        if (acc == null) return;
         if (loading) {
             ++generation;
             show(List.of(), I18n.t("common.loading"));
@@ -217,7 +224,7 @@ public final class NewChatPane extends VBox {
         }
         if (!support.list() && !support.search()) {
             ++generation;
-            show(List.of(), unavailable(account.network()));
+            show(List.of(), unavailable(acc.network()));
             return;
         }
         String q = search.getText().strip();
@@ -226,7 +233,7 @@ public final class NewChatPane extends VBox {
         if (looksLikeIdentifier(q)) rows.add(new Row(null, q));
         if (q.isEmpty()) {
             all.forEach(c -> rows.add(new Row(c, null)));
-            show(rows, all.isEmpty() && support.search() ? I18n.t("newChat.typeToSearch", account.network().displayName()) : null);
+            show(rows, all.isEmpty() && support.search() ? I18n.t("newChat.typeToSearch", acc.network().displayName()) : null);
             return;
         }
         // The contacts already here that match a part of it come first, at once; the bridge's search (exact where it
@@ -239,13 +246,13 @@ public final class NewChatPane extends VBox {
         }
         show(List.copyOf(rows), null);
         setStatus(I18n.t("newChat.searching"));
-        svc.searchContacts(account, q).whenComplete((found, err) -> Platform.runLater(() -> {
+        var _ = svc.searchContacts(acc, q).whenComplete((found, err) -> Platform.runLater(() -> {
             if (gen != generation) return;
             if (err != null) {
                 Throwable cause = Errors.unwrap(err);
                 if (cause instanceof UnsupportedOperationException) {
                     support = new ChatService.ContactSupport(support.list(), false);
-                    show(rows, rows.isEmpty() ? I18n.t("newChat.noSearchShort", account.network().displayName()) : null);
+                    show(rows, rows.isEmpty() ? I18n.t("newChat.noSearchShort", acc.network().displayName()) : null);
                 } else {
                     show(rows, rows.isEmpty() ? I18n.t("newChat.searchFailed") : null);
                 }
@@ -261,10 +268,11 @@ public final class NewChatPane extends VBox {
      * number's spaces and signs). It was exact where the network searches, and case-sensitive on usernames.
      */
     static List<Contact> matching(List<Contact> all, String q) {
-        String n = ChatFilter.normalize(q), digits = q.replaceAll("\\D", "");
+        String n = ChatFilter.normalize(q);
+        String digits = q.replaceAll("\\D", "");
         return all.stream().filter(c -> ChatFilter.normalize(c.name()).contains(n)
                 || c.identifiers().stream().anyMatch(i -> ChatFilter.normalize(i).contains(n)
-                        || digits.length() >= 3 && i.replaceAll("\\D", "").contains(digits))).toList();
+                        || (digits.length() >= 3 && i.replaceAll("\\D", "").contains(digits)))).toList();
     }
 
     /** {@code local} first, then what {@code found} adds, each contact once. */
@@ -275,13 +283,13 @@ public final class NewChatPane extends VBox {
     }
 
     /** The status line, also given to the search field so a screen reader hears it where the focus is. */
-    private void setStatus(String text) {
+    private void setStatus(@Nullable String text) {
         status.setText(text);
         search.setAccessibleHelp(text == null || text.isEmpty() ? null : text);
         search.notifyAccessibleAttributeChanged(javafx.scene.AccessibleAttribute.HELP);
     }
 
-    private void show(List<Row> rows, String message) {
+    private void show(List<Row> rows, @Nullable String message) {
         list.getItems().setAll(rows);
         setStatus(message == null ? "" : message);
         Nodes.show(status, message != null);
@@ -304,9 +312,11 @@ public final class NewChatPane extends VBox {
         if (a == null || pendingListener != null) return; // already opening one
         setStatus(I18n.t("newChat.opening"));
         Nodes.show(status, true);
-        java.util.concurrent.CompletableFuture<Contact> contact = r.contact() != null
-                ? java.util.concurrent.CompletableFuture.completedFuture(r.contact()) : svc.resolveContact(a, normalizeIdentifier(r.typed()));
-        contact.thenCompose(c -> {
+        Contact known = r.contact();
+        java.util.concurrent.CompletableFuture<@Nullable Contact> contact = known != null
+                ? java.util.concurrent.CompletableFuture.completedFuture(known)
+                : svc.resolveContact(a, normalizeIdentifier(Objects.requireNonNull(r.typed(), "a row without a contact is what was typed")));
+        var _ = contact.thenCompose(c -> {
             if (c == null) throw new java.util.concurrent.CompletionException(new IllegalArgumentException("not found"));
             return svc.openDm(a, c);
         }).whenComplete((roomId, err) -> Platform.runLater(() -> {
@@ -343,20 +353,23 @@ public final class NewChatPane extends VBox {
         };
         pendingListener = l;
         svc.addListener(l);
-        pendingTimeout = new PauseTransition(Duration.millis(WAIT_FOR_ROOM_MS));
-        pendingTimeout.setOnFinished(e -> {
+        PauseTransition wait = new PauseTransition(Duration.millis(WAIT_FOR_ROOM_MS));
+        pendingTimeout = wait;
+        wait.setOnFinished(e -> {
             if (pendingListener != l) return;
             cancelPending();
             close.run();
             toast.accept(I18n.t("newChat.creatingToast"));
         });
-        pendingTimeout.play();
+        wait.play();
     }
 
     private void cancelPending() {
-        if (pendingListener != null) svc.removeListener(pendingListener);
+        ChatService.Listener l = pendingListener;
+        if (l != null) svc.removeListener(l);
         pendingListener = null;
-        if (pendingTimeout != null) pendingTimeout.stop();
+        PauseTransition wait = pendingTimeout;
+        if (wait != null) wait.stop();
         pendingTimeout = null;
     }
 
@@ -383,7 +396,8 @@ public final class NewChatPane extends VBox {
                 setAccessibleText(null);
                 return;
             }
-            avatar.set(r.label(), r.contact() == null ? r.typed() : r.contact().id(), null, null);
+            Contact c = r.contact();
+            avatar.set(r.label(), c == null ? r.typed() : c.id(), null, svc);
             name.setText(r.label());
             detail.setText(r.detail());
             Nodes.show(detail, !r.detail().isEmpty());

@@ -1,7 +1,11 @@
 package app.unichat.video;
 
+import app.unichat.Present;
 import app.unichat.support.Downloads;
+import app.unichat.support.PathParts;
 import com.sun.net.httpserver.HttpServer;
+import java.security.NoSuchAlgorithmException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,6 +23,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -30,11 +36,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FfmpegTest {
     @TempDir Path dir;
     private HttpServer server;
-    private volatile byte[] served;
+    @SuppressFBWarnings(value = "VO_VOLATILE_REFERENCE_TO_ARRAY", justification = "the array is replaced whole, never changed: the volatile hands the new one to the fake server's thread")
+    private volatile byte[] served = new byte[0];
 
     @BeforeEach
     void serve() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/z", ex -> {
             ex.sendResponseHeaders(200, served.length);
             try (var o = ex.getResponseBody()) {
@@ -50,7 +57,7 @@ class FfmpegTest {
         System.clearProperty("unichat.ffmpeg");
     }
 
-    private PinnedTool build(byte[] zip, String entry) throws Exception {
+    private PinnedTool build(byte[] zip, String entry) throws NoSuchAlgorithmException {
         served = zip;
         return new PinnedTool("http://127.0.0.1:" + server.getAddress().getPort() + "/z", zip.length,
                 HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(zip)), entry);
@@ -76,7 +83,9 @@ class FfmpegTest {
         Path got = Ffmpeg.install(build(zip("carpeta/bin/ffmpeg", "#!/bin/sh\nexit 0\n"), "/bin/ffmpeg"), target, p -> { });
         assertEquals(target, got);
         assertTrue(Files.isExecutable(target));
-        assertEquals(List.of("ffmpeg"), Files.list(dir.resolve("tools")).map(f -> f.getFileName().toString()).toList(), "the zip is gone");
+        try (Stream<Path> stream = Files.list(dir.resolve("tools"))) {
+            assertEquals(List.of("ffmpeg"), stream.map(PathParts::name).toList(), "the zip is gone");
+        }
     }
 
     @Test
@@ -92,7 +101,7 @@ class FfmpegTest {
         Path target = dir.resolve("tools/ffmpeg");
         assertThrows(IOException.class, () -> Ffmpeg.install(build(zip("../../malo", "x"), "/bin/ffmpeg"), target, p -> { }));
         assertFalse(Files.exists(target));
-        assertFalse(Files.exists(dir.getParent().resolve("malo")));
+        assertFalse(Files.exists(Present.of(dir.getParent()).resolve("malo")));
     }
 
     @Test

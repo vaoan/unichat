@@ -2,13 +2,14 @@ package app.unichat.ui.media;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.BackgroundWriter;
+import app.unichat.support.BoundedMap;
 import app.unichat.support.SafeFile;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -18,12 +19,10 @@ import java.util.Map;
  */
 public final class PictureShapes {
     static final int KEPT = 4000;
-    private static PictureShapes shared;
+    private static @Nullable PictureShapes shared;
 
     private final Path file;
-    private final Map<String, Double> shapes = new LinkedHashMap<>(16, 0.75f, true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String, Double> e) { return size() > KEPT; }
-    };
+    private final Map<String, Double> shapes = BoundedMap.byUse(KEPT);
     private final BackgroundWriter writer;
 
     PictureShapes(Path file) {
@@ -42,8 +41,12 @@ public final class PictureShapes {
     }
 
     public static synchronized PictureShapes get() {
-        if (shared == null) shared = new PictureShapes(Settings.get().cacheDir().resolve("picture-shapes.tsv"));
-        return shared;
+        PictureShapes s = shared;
+        if (s == null) {
+            s = new PictureShapes(Settings.get().cacheDir().resolve("picture-shapes.tsv"));
+            shared = s;
+        }
+        return s;
     }
 
     /** What {@code url}'s picture looked like last time, else {@code unknown}. */
@@ -54,7 +57,7 @@ public final class PictureShapes {
 
     /** {@code url}'s picture turned out {@code shape} wide per unit of height; saved in the background. */
     public void remember(String url, double shape) {
-        if (!(shape > 0) || Double.isInfinite(shape)) return;
+        if (!(shape > 0) || Double.isInfinite(shape)) return; // NOPMD: LogicInversion, !(x > 0) is also true for NaN
         synchronized (this) {
             Double was = shapes.put(url, shape);
             if (was != null && Math.abs(was - shape) < 1e-6) return;

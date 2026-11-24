@@ -28,23 +28,30 @@ import app.unichat.ui.MainView;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.ui.Theme;
 import app.unichat.update.UpdateChecker;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
+import org.jspecify.annotations.Nullable;
 
 import java.io.InputStream;
 
 /** Chooses login vs. main view, owns the window, tray icon and the active {@link ChatService}. */
 public final class UnichatApp extends Application {
+    @SuppressWarnings("NullAway.Init") // start() sets it first: JavaFX calls nothing of this class before start()
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // start() sets it first: JavaFX calls nothing of this class before start()
     private Scene scene;
+    @SuppressWarnings("NullAway.Init") // start() sets it first: JavaFX calls nothing of this class before start()
     private Notifier notifier;
-    private volatile ChatService service;
-    private MainView mainView;
+    /** The session's service; null on the login screen and after logging out. */
+    private volatile @Nullable ChatService service;
+    /** The main window's view; null on the login screen. */
+    private @Nullable MainView mainView;
     /** The person's own storage, kept up to date while a real session runs; null in the demo. */
-    private app.unichat.cloud.Cloud cloud;
+    private app.unichat.cloud.@Nullable Cloud cloud;
 
     public static void main(String[] args) {
         if (System.getProperty("unichat.snapshot") != null) {
@@ -75,7 +82,8 @@ public final class UnichatApp extends Application {
         Settings s = Settings.get();
         stage.setWidth(s.getDouble("window.width", 1180));
         stage.setHeight(s.getDouble("window.height", 760));
-        double x = s.getDouble("window.x", Double.NaN), y = s.getDouble("window.y", Double.NaN);
+        double x = s.getDouble("window.x", Double.NaN);
+        double y = s.getDouble("window.y", Double.NaN);
         if (!Double.isNaN(x) && !Double.isNaN(y)) {
             stage.setX(x);
             stage.setY(y);
@@ -87,7 +95,7 @@ public final class UnichatApp extends Application {
             hideToTray();
         }), this::openFromNotification, this::quit);
         // The tray is built on AWT's thread: what depends on it waits until it exists.
-        notifier.ready().thenAccept(tray -> Platform.runLater(() -> {
+        var _ = notifier.ready().thenAccept(tray -> Platform.runLater(() -> {
             Platform.setImplicitExit(!tray);
             DockIcon.setTrayAvailable(tray);
         }));
@@ -126,17 +134,24 @@ public final class UnichatApp extends Application {
         }, "preferences-shutdown"));
         LogFiles.scheduleCleanup();
         if (s.localServer()) startLocalServer();
-        ChatService restored = switch (s.backend() == null ? "" : s.backend()) {
+        String backend = s.backend();
+        ChatService restored = switch (backend == null ? "" : backend) {
             case "demo" -> demoService();
             case "matrix" -> MatrixLogin.fromSettings();
             default -> null;
         };
-        if (restored != null) showMain(restored); else showLogin();
+        if (restored != null) showMain(restored);
+        else showLogin();
         if (System.getProperty("unichat.snapshot") != null) {
             // Diagnostics run: invisible and behind other windows so it never takes the user's keyboard.
             stage.setOpacity(0);
             stage.setX(-10000);
         }
+        showStage();
+    }
+
+    /** The window shown, then what follows it: the login asked for, the snapshot, the update check, the passkey probe. */
+    private void showStage() {
         // A menu bar app isn't made active by opening: the window would open behind the others. Diagnostics never take focus.
         if (System.getProperty("unichat.snapshot") == null) DockIcon.show();
         stage.show();
@@ -146,14 +161,18 @@ public final class UnichatApp extends Application {
         String startLogin = System.getProperty("unichat.startLogin");
         if (startLogin != null && mainView != null) {
             javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(3));
-            wait.setOnFinished(e -> mainView.addAccount(Network.fromProtocolId(startLogin)));
+            wait.setOnFinished(e -> {
+                MainView view = mainView;
+                Network n = Network.fromProtocolId(startLogin); // an unknown id opens no login
+                if (view != null && n != null) view.addAccount(n);
+            });
             wait.play();
         }
         String snapshot = System.getProperty("unichat.snapshot");
         if (snapshot != null) new SnapshotRun(mainView, scene, this::quit).start(snapshot);
         else UpdateChecker.get().start(); // diagnostics never ask GitHub
         // The passkey probe, only when asked for (-Dunichat.passkeyProbe=true or --passkey-probe), never in a snapshot.
-        if (snapshot == null) app.unichat.cloud.PasskeyProbe.onStart(uri -> Browser.open(uri.toString()));
+        if (snapshot == null) { var _ = app.unichat.cloud.PasskeyProbe.onStart(uri -> Browser.open(uri.toString())); }
     }
 
     /** The demo keeps its choices and folders in the same files as the real service. */
@@ -165,7 +184,7 @@ public final class UnichatApp extends Application {
     private void showLogin() {
         if (mainView != null) mainView.dispose();
         mainView = null;
-        scene.setRoot(new LoginView(svc -> showMain(svc), () -> {
+        scene.setRoot(new LoginView(this::showMain, () -> {
             Settings.get().setBackend("demo");
             showMain(demoService());
         }, Browser::open));
@@ -199,7 +218,7 @@ public final class UnichatApp extends Application {
                 return local.provides(n.protocolId());
             }
 
-            @Override public String provisioningUrl(Network n) {
+            @Override public @Nullable String provisioningUrl(Network n) {
                 return local.provisioningUrl(n.protocolId());
             }
 
@@ -224,15 +243,15 @@ public final class UnichatApp extends Application {
             @Override public void changed(int done, int total) { notifier.setDownloadProgress(done, total); }
             @Override public void finished(int saved, app.unichat.model.Chat chat) {
                 notifier.downloadsDone(saved, chat);
-                if (cloud != null) cloud.syncNow(); // what was just saved goes up now, not at the next round
+                if (cloud != null) { var _ = cloud.syncNow(); } // what was just saved goes up now, not at the next round
             }
-            @Override public void failed(String what, app.unichat.model.Chat chat, String messageId, String why) {
+            @Override public void failed(String what, app.unichat.model.Chat chat, @Nullable String messageId, String why) {
                 notifier.downloadFailed(what, chat, messageId, why);
             }
         });
         mainView = new MainView(svc, stage, notifier, this::logout, Browser::open);
         // Never in the demo (its made-up chats would reach the person's account), but for a snapshot of Ajustes → Nube.
-        if (!(svc instanceof app.unichat.service.MockChatService) || System.getProperty("unichat.snapshot") != null) {
+        if (!(svc instanceof MockChatService) || System.getProperty("unichat.snapshot") != null) {
             cloud = app.unichat.cloud.Cloud.create(Settings.dataDir(), svc::preferencesJson, svc::adoptPreferences,
                     () -> Platform.runLater(() -> { if (mainView != null) mainView.settingsSynced(); }),
                     () -> app.unichat.autosave.AutoSave.of(svc).folders(),
@@ -242,7 +261,7 @@ public final class UnichatApp extends Application {
                             app.unichat.service.PinnedMessages.get()::adopt, Settings.get().dir().resolve("transcripts")));
             app.unichat.cloud.Cloud c = cloud;
             // What a chat says goes up as soon as it's kept, and looking at a deleted message asks the other computers first.
-            app.unichat.autosave.AutoSave.of(svc).setTextSync(c::textsNow, c::textsNow);
+            app.unichat.autosave.AutoSave.of(svc).setTextSync(() -> { var _ = c.textsNow(); }, c::textsNow);
             // What it's doing: on the tray (its menu's lines and ring) and on the settings gear.
             c.addListener(new app.unichat.ui.CloudShown(c::status, notifier::setCloud, java.awt.EventQueue::invokeLater,
                     st -> { if (mainView != null) mainView.cloudChanged(st); }, Platform::runLater));
@@ -263,7 +282,8 @@ public final class UnichatApp extends Application {
         if (mainView == null || service == null) return;
         String chat = mainView.currentChatId();
         String page = SettingsWindow.currentPage();
-        if (SettingsWindow.current() != null) SettingsWindow.current().close();
+        Stage settings = SettingsWindow.current();
+        if (settings != null) settings.close();
         mainView.dispose();
         mainView = new MainView(service, stage, notifier, this::logout, Browser::open);
         scene.setRoot(mainView);
@@ -282,7 +302,7 @@ public final class UnichatApp extends Application {
         if (cloud != null) cloud.stop();
         cloud = null;
         // Off the UI thread: what's waiting goes first (seconds at most), then the session ends.
-        java.util.concurrent.CompletableFuture.runAsync(() -> sendWhatsWaiting(svc)).thenCompose(v -> svc.logout()).whenComplete((v, err) -> Platform.runLater(() -> {
+        var _ = java.util.concurrent.CompletableFuture.runAsync(() -> sendWhatsWaiting(svc)).thenCompose(v -> svc.logout()).whenComplete((v, err) -> Platform.runLater(() -> {
             svc.stop();
             Settings.get().clearSession();
             if (Settings.get().localServer()) {
@@ -361,12 +381,16 @@ public final class UnichatApp extends Application {
     /** A notification's click: the window, then its chat; the log says what it led to (after the open's own runLaters). */
     private void openFromNotification(String target) {
         showWindow();
-        String id = NotificationTarget.chat(target), message = NotificationTarget.message(target);
+        String id = NotificationTarget.chat(target);
+        String message = NotificationTarget.message(target);
         Platform.runLater(() -> {
             if (mainView == null) return;
             mainView.openChatId(id);
             if (message != null) mainView.showMessage(id, message); // a notice about one message (a file not saved)
-            Platform.runLater(() -> System.err.println("Notification click: " + mainView.openOutcome(id)));
+            Platform.runLater(() -> {
+                MainView view = mainView;
+                if (view != null) System.err.println("Notification click: " + view.openOutcome(id));
+            });
         });
     }
 
@@ -399,6 +423,7 @@ public final class UnichatApp extends Application {
     }
 
     /** The window goes at once; what has to stop stops off the UI thread (it can take seconds per bridge), then the app ends. */
+    @SuppressFBWarnings(value = "DM_EXIT", justification = "quitting the app (as its NOPMD says)")
     private void quit() {
         Platform.runLater(() -> {
             if (stage.isShowing()) saveGeometry();
@@ -415,7 +440,7 @@ public final class UnichatApp extends Application {
             // Exit off the FX thread: System.exit on it can deadlock with AWT's shutdown on macOS.
             Shutdown.stopThenEnd(stops, () -> {
                 Platform.exit();
-                System.exit(0);
+                System.exit(0); // NOPMD: DoNotTerminateVM, quitting the app
             });
         });
     }

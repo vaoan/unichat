@@ -1,7 +1,11 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
+import org.jspecify.annotations.Nullable;
 
+import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -9,6 +13,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * For screens' tests: this computer connected to an account in memory ({@link FakeDav}), with its {@link Cloud} as the
@@ -16,7 +23,8 @@ import java.util.Set;
  * on this computer is put back on {@link #close}.
  */
 public final class VaultFixture implements AutoCloseable {
-    public static final String HERE = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
+    public static final String HERE = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    public static final String OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
     private static final List<String> ACCOUNT = List.of("cloud.service", "cloud.url", "cloud.user", "cloud.secret", "cloud.settingsBase");
 
     private final FakeDav dav;
@@ -25,13 +33,13 @@ public final class VaultFixture implements AutoCloseable {
     private final Cloud cloud;
     private final Path photos;
     private final List<java.util.concurrent.CountDownLatch> held = new java.util.concurrent.CopyOnWriteArrayList<>();
-    private byte[] vk;
+    private byte @Nullable [] vk;
 
-    public VaultFixture(Path dir) throws Exception {
+    public VaultFixture(Path dir) throws IOException {
         dav = new FakeDav("u", "p");
         portableWere = Settings.get().portable();
         were.putAll(VaultComputer.kept());
-        for (String k : ACCOUNT) were.put(k, Settings.get().getString(k, null));
+        for (String k : ACCOUNT) were.put(k, Settings.get().getString(k));
         for (String k : VaultComputer.KEYS) Settings.get().set(k, null);
         Settings.get().set("cloud.machine", HERE);
         Settings.get().set("cloud.media", "false");
@@ -40,7 +48,7 @@ public final class VaultFixture implements AutoCloseable {
         photos = data.resolve("Fotos");
         cloud = Cloud.create(data, () -> null, b -> true, () -> { }, () -> Files.isDirectory(photos) ? List.of(photos) : List.of(),
             new Cloud.Texts(data.resolve("texts"), p -> false, s -> { }),
-            new Cloud.Personal(() -> "{}".getBytes(), b -> { }, data.resolve("transcripts")));
+            new Cloud.Personal(() -> "{}".getBytes(UTF_8), b -> { }, data.resolve("transcripts")));
     }
 
     public Cloud cloud() {
@@ -52,7 +60,7 @@ public final class VaultFixture implements AutoCloseable {
     }
 
     /** Another computer made the vault (and gave it {@code password}, unless null); its recovery code as printed. */
-    public String otherComputerMadeIt(String password) throws Exception {
+    public String otherComputerMadeIt(@Nullable String password) throws IOException, Vault.Exists {
         Vault.Created made = Vault.create(storage(), OTHER, "Escritorio");
         vk = made.vk();
         if (password != null) Vault.addPassword(storage(), vk, password.toCharArray());
@@ -60,20 +68,20 @@ public final class VaultFixture implements AutoCloseable {
     }
 
     /** One more computer of the vault's, under {@code label} (needs the vault made by {@link #otherComputerMadeIt}). */
-    public void anotherComputer(String machine, String label) throws Exception {
-        Vault.addComputer(storage(), vk, machine, label);
+    public void anotherComputer(String machine, String label) throws IOException {
+        Vault.addComputer(storage(), Present.of(vk), machine, label);
     }
 
     /** This computer's way in deleted by another computer: removed from the vault. */
-    public void removeHere() throws Exception {
-        Vault.removeComputer(storage(), Vault.info(storage()), HERE);
+    public void removeHere() throws IOException {
+        Vault.removeComputer(storage(), Present.of(Vault.info(storage())), HERE);
     }
 
     /** {@code vault.json}'s generation raised by someone with only the account: nothing vouches for it. */
-    public void raiseGenerationByHand() throws Exception {
-        Vault.Info info = Vault.info(storage());
+    public void raiseGenerationByHand() throws IOException {
+        Vault.Info info = Present.of(Vault.info(storage()));
         dav.put(Vault.INFO, ("{\"id\":\"" + info.id() + "\",\"created\":\"" + info.created() + "\",\"generation\":"
-            + (info.generation() + 1) + "}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            + (info.generation() + 1) + "}").getBytes(UTF_8));
     }
 
     /** {@code vault.json} deleted by someone with only the account, the vault not turned off. */
@@ -82,19 +90,19 @@ public final class VaultFixture implements AutoCloseable {
     }
 
     /** Whether {@code machine}'s slot holds an offer of the vault's current key (it takes it on its next round). */
-    public boolean offeredTheKey(String machine) throws Exception {
-        Vault.Info info = Vault.info(storage());
+    public boolean offeredTheKey(String machine) throws IOException {
+        Vault.Info info = Present.of(Vault.info(storage()));
         VaultSlot slot = Vault.slot(storage(), info, machine);
         return slot != null && slot.params().has(VaultNext.NEXT);
     }
 
     /** The vault's computers in the account (machine → label). */
-    public Map<String, String> computers() throws Exception {
+    public Map<String, String> computers() throws IOException {
         return Vault.computers(storage());
     }
 
     /** The ways in the account's vault has, by method name. */
-    public Set<String> ways() throws Exception {
+    public Set<String> ways() throws IOException {
         Set<String> out = new java.util.TreeSet<>();
         for (VaultSlot s : Vault.slots(storage())) if (s.method() != VaultSlot.Method.COMPUTER) out.add(s.method().name());
         return out;
@@ -125,7 +133,7 @@ public final class VaultFixture implements AutoCloseable {
     }
 
     /** Media turned on here, with {@code n} photos to go up, in order ({@code p0.jpg}, {@code p1.jpg}…). */
-    public void photos(int n) throws java.io.IOException {
+    public void photos(int n) throws IOException {
         Files.createDirectories(photos);
         for (int i = 0; i < n; i++) Files.writeString(photos.resolve("p" + i + ".jpg"), "foto " + i);
         Settings.get().set("cloud.media", "true");
@@ -158,7 +166,7 @@ public final class VaultFixture implements AutoCloseable {
     }
 
     /** Once every vault job asked so far is done (the page's reloads included). */
-    public void vaultJobsDone() throws Exception {
+    public void vaultJobsDone() throws InterruptedException, ExecutionException {
         cloud.vaultJobsOver().get();
     }
 
@@ -180,14 +188,18 @@ public final class VaultFixture implements AutoCloseable {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() throws ExecutionException, InterruptedIOException {
         dav.holdOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown); // nothing waits past the test
         dav.holdReadOnce.values().forEach(java.util.concurrent.CountDownLatch::countDown);
         held.forEach(java.util.concurrent.CountDownLatch::countDown); // a held upload let go, also once it's under way
-        try {
+        try { // NOPMD: UseTryWithResources, the fixture's own close
             cloud.stop();
             cloud.vaultJobsOver().get(); // what a step asked for runs before the account goes
             cloud.syncNow().get();
+        } catch (InterruptedException e) {
+            // Not thrown as it is: try-with-resources would lose the interrupt when it's suppressed (javac's "try" lint).
+            Thread.currentThread().interrupt();
+            throw (InterruptedIOException) new InterruptedIOException("closing the vault fixture").initCause(e);
         } finally {
             // Put back even when the wait above is cut short (a test's time ran out): the settings outlive the run.
             dav.close();

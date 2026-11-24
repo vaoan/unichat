@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -13,11 +14,13 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 final class CloudRenames {
     /** Every part reading the account's file afresh. */
+    @FunctionalInterface
     interface Unseen {
         void run() throws IOException;
     }
 
     /** The vault's state here, read through the storage given ({@link Cloud#openVault}). */
+    @FunctionalInterface
     interface Opener {
         VaultParts.Round open(Storage at) throws IOException;
     }
@@ -47,7 +50,7 @@ final class CloudRenames {
      * The account's plain old folders moved to the new names and deleted once confirmed, with the texts' lock held over
      * the texts; why it couldn't (the round goes on: the next one goes on from there), or null.
      */
-    String plain(Storage dav) {
+    @Nullable String plain(Storage dav) {
         try {
             CloudNames.migrate(dav, texts);
             mayCheck = true; // nothing missing under media's new name: what's kept under the old one differs
@@ -74,7 +77,7 @@ final class CloudRenames {
      * old names while they're still the vault's, the new ones while they hold this round's key, else null (switched with
      * another key meanwhile: the round's personal parts wait for the next).
      */
-    Storage vault(Storage dav, Storage at, VaultParts.Round vault, java.util.function.Consumer<String> failed) {
+    @Nullable Storage vault(Storage dav, Storage at, VaultParts.Round vault, java.util.function.Consumer<String> failed) {
         try {
             return move(dav, at, vault);
         } catch (IOException | RuntimeException e) {

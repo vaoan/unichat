@@ -1,6 +1,8 @@
 package app.unichat.login;
 
 import app.unichat.model.Network;
+import app.unichat.support.PathParts;
+import java.sql.SQLException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -14,7 +16,9 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FirefoxCookiesTest {
     private static final Instant NOW = Instant.parse("2026-10-26T00:00:00Z");
@@ -27,7 +31,7 @@ class FirefoxCookiesTest {
         System.clearProperty("unichat.browserRoots");
     }
 
-    private void makeDb(Path db) throws Exception {
+    private void makeDb(Path db) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db);
              Statement st = c.createStatement()) {
             st.execute("CREATE TABLE moz_cookies(name TEXT, value TEXT, host TEXT, path TEXT, expiry INTEGER, isSecure INTEGER)");
@@ -41,9 +45,13 @@ class FirefoxCookiesTest {
         }
     }
 
-    private static void row(PreparedStatement ps, String n, String v, String h, long exp) throws Exception {
-        ps.setString(1, n); ps.setString(2, v); ps.setString(3, h);
-        ps.setString(4, "/"); ps.setLong(5, exp); ps.setInt(6, 1);
+    private static void row(PreparedStatement ps, String n, String v, String h, long exp) throws SQLException {
+        ps.setString(1, n);
+        ps.setString(2, v);
+        ps.setString(3, h);
+        ps.setString(4, "/");
+        ps.setLong(5, exp);
+        ps.setInt(6, 1);
         ps.executeUpdate();
     }
 
@@ -87,7 +95,7 @@ class FirefoxCookiesTest {
         System.setProperty("unichat.browserRoots", root.toString());
         FirefoxCookies.findSessions(spec);
         try (var files = Files.list(Path.of(System.getProperty("java.io.tmpdir")))) {
-            List<String> left = files.map(p -> p.getFileName().toString())
+            List<String> left = files.map(PathParts::name)
                     .filter(n -> n.startsWith("unichat-cookies-")).toList();
             assertTrue(left.isEmpty(), "temp cookie copies left: " + left);
         }

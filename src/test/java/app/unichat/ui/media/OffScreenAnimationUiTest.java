@@ -29,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class OffScreenAnimationUiTest {
-    private static final int COUNT = 30, SIDE = 64;
+    private static final int COUNT = 30;
+    private static final int SIDE = 64;
 
     @TempDir Path dir;
 
@@ -54,7 +55,7 @@ class OffScreenAnimationUiTest {
         List<ImageView> views = new ArrayList<>();
         Stage stage = FxWait.fx(() -> {
             VBox column = new VBox(4);
-            for (AnimatedImage.Frames f : decoded) {
+            for (AnimatedImage.Frames _ : decoded) {
                 ImageView v = new ImageView();
                 views.add(v);
                 column.getChildren().add(v);
@@ -68,20 +69,21 @@ class OffScreenAnimationUiTest {
             return s;
         });
         try {
-            ImageView first = views.get(0), last = views.get(COUNT - 1);
+            ImageView first = views.get(0);
+            ImageView last = views.get(COUNT - 1);
             FxWait.until("the first ones move", () -> AnimatedImage.moving(first));
             FxWait.settled();
             assertFalse(FxWait.fx(() -> AnimatedImage.holdsFrames(last)), "out of view: no frames held");
             assertTrue(FxWait.fx(() -> last.getImage() != null), "but its picture still shows when scrolled to");
 
-            FxWait.fx(() -> { ((ScrollPane) stage.getScene().getRoot()).setVvalue(1); return null; });
+            FxWait.onFx(() -> ((ScrollPane) stage.getScene().getRoot()).setVvalue(1));
             FxWait.until("the last one moves, read again from its file", () -> AnimatedImage.moving(last));
             FxWait.until("the first one let go", () -> !AnimatedImage.holdsFrames(first));
             assertTrue(FxWait.fx(() -> first.getImage() != null), "keeping the picture it showed");
             long moving = FxWait.fx(() -> views.stream().filter(AnimatedImage::moving).count());
             assertTrue(moving < COUNT / 2, "only what's in view moves: " + moving);
         } finally {
-            FxWait.fx(() -> { stage.close(); return null; });
+            FxWait.onFx(stage::close);
         }
     }
 
@@ -98,7 +100,7 @@ class OffScreenAnimationUiTest {
         List<ImageView> views = new ArrayList<>();
         Stage stage = FxWait.fx(() -> {
             VBox column = new VBox(4);
-            for (int i = 0; i < decoded.size(); i++) {
+            for (var _ : decoded) {
                 ImageView v = new ImageView();
                 views.add(v);
                 column.getChildren().add(v);
@@ -115,9 +117,9 @@ class OffScreenAnimationUiTest {
             int before = AnimatedImage.RELOADS.get();
             for (int i = 0; i < 5; i++) {
                 VBox sheet = new VBox();
-                FxWait.fx(() -> { AnimatedImage.cover(stage.getScene(), sheet); return null; });
+                FxWait.onFx(() -> AnimatedImage.cover(stage.getScene(), sheet));
                 FxWait.settled();
-                FxWait.fx(() -> { AnimatedImage.cover(stage.getScene(), null); return null; });
+                FxWait.onFx(() -> AnimatedImage.cover(stage.getScene(), null));
                 FxWait.settled();
             }
             assertEquals(0, AnimatedImage.RELOADS.get() - before, "no room: nothing read again");
@@ -125,7 +127,7 @@ class OffScreenAnimationUiTest {
             assertTrue(FxWait.fx(() -> views.stream().allMatch(v -> v.getImage() != null)), "each shows its picture");
         } finally {
             AnimationBudget.SHARED.release(full);
-            FxWait.fx(() -> { stage.close(); return null; });
+            FxWait.onFx(stage::close);
         }
     }
 }

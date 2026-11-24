@@ -4,6 +4,7 @@ import app.unichat.model.Network;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Login commands must name a flow id the installed bridge actually offers (see docs/BRIDGES.md). */
@@ -46,8 +47,8 @@ class LoginCommandTest {
 
     @Test
     void discordWaitsForTheUsersChoice() {
-        assertEquals(false, BridgeProtocol.startsLoginByItself(Network.DISCORD));
-        assertEquals(true, BridgeProtocol.startsLoginByItself(Network.WHATSAPP));
+        assertFalse(BridgeProtocol.startsLoginByItself(Network.DISCORD));
+        assertTrue(BridgeProtocol.startsLoginByItself(Network.WHATSAPP));
     }
 
     @Test

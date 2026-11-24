@@ -2,8 +2,10 @@ package app.unichat.video;
 
 import app.unichat.support.ConvertedFiles;
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
 import app.unichat.support.Os;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -73,12 +75,13 @@ public final class VideoTranscoder {
      * Pictures (still or animated) are left as they are.
      * Whole or not at all: the converted copy replaces it only once finished. The file it ends up as.
      */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "ffmpeg with the file through Ffmpeg.input (only that file, read only as one of Unichat's formats: -protocol_whitelist file, -format_whitelist), as a list, no shell")
     public static Path makePlayable(Path ffmpeg, Path file) throws IOException, InterruptedException {
         List<String> probe = new ArrayList<>(List.of(ffmpeg.toString(), "-hide_banner", "-nostdin"));
         probe.addAll(Ffmpeg.input(file)); // the file comes from other people
         Processes.Result info = Processes.capture(new ProcessBuilder(probe).redirectErrorStream(true), TIMEOUT_SECONDS);
         if (picture(info.out()) || playsEverywhere(info.out())) return file; // a picture stays one
-        String name = file.getFileName().toString();
+        String name = PathParts.name(file);
         Path out = file.resolveSibling((name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name) + ".mp4");
         if (PartFile.firstOf(out, TIMEOUT_SECONDS, ways(ffmpeg, file)) == null) throw new IOException(I18n.t("video.convertFailed"));
         if (!out.equals(file)) Files.deleteIfExists(file);

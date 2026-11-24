@@ -1,6 +1,8 @@
 package app.unichat.model;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -17,8 +19,10 @@ import java.util.Set;
  * {@link #UNKNOWN} (no event: external server, older bridge) offers everything, as Unichat always did.
  */
 public final class RoomFeatures {
-    /** Pseudo message types used in the {@code file} map besides m.image/m.video/m.audio/m.file. */
-    public static final String STICKER = "m.sticker", GIF = "fi.mau.gif", VOICE = "org.matrix.msc3245.voice";
+    // Pseudo message types used in the file map besides m.image/m.video/m.audio/m.file.
+    public static final String STICKER = "m.sticker";
+    public static final String GIF = "fi.mau.gif";
+    public static final String VOICE = "org.matrix.msc3245.voice";
 
     public static final RoomFeatures UNKNOWN = new RoomFeatures(true, 2, 0, 2, 0, false, 2, 2, 0, null, null, true, null,
             java.util.EnumSet.allOf(TextFormat.class));
@@ -32,18 +36,19 @@ public final class RoomFeatures {
     private final int reply;
     private final int reaction;
     private final int reactionCount;
-    private final List<String> allowedReactions;
+    private final @Nullable List<String> allowedReactions;
     /** msgtype → max size in bytes (0 = not stated); only types with some MIME offered. */
     private final Map<String, Long> files;
     private final boolean anyFile;
     /** msgtype → MIME types offered (may hold wildcards like image/*); a type missing here takes any. */
-    private final Map<String, java.util.Set<String>> mimes;
+    private final Map<String, Set<String>> mimes;
     /** The text formats the network shows (the {@code formatting} map). */
-    private final java.util.Set<TextFormat> formats;
+    private final Set<TextFormat> formats;
 
     private RoomFeatures(boolean unrestricted, int edit, long editMaxAgeSec, int delete, long deleteMaxAgeSec, boolean deleteForMe,
-                         int reply, int reaction, int reactionCount, List<String> allowedReactions, Map<String, Long> files,
-                         boolean anyFile, Map<String, java.util.Set<String>> mimes, java.util.Set<TextFormat> formats) {
+                         int reply, int reaction, int reactionCount, @Nullable List<String> allowedReactions,
+                         @Nullable Map<String, Long> files, boolean anyFile, @Nullable Map<String, Set<String>> mimes,
+                         Set<TextFormat> formats) {
         this.unrestricted = unrestricted;
         this.edit = edit;
         this.editMaxAgeSec = editMaxAgeSec;
@@ -57,17 +62,17 @@ public final class RoomFeatures {
         this.files = files == null ? Map.of() : Map.copyOf(files);
         this.anyFile = anyFile;
         this.mimes = mimes == null ? Map.of() : Map.copyOf(mimes);
-        this.formats = java.util.Set.copyOf(formats);
+        this.formats = Set.copyOf(formats);
     }
 
-    public static RoomFeatures parse(JsonNode c) {
+    public static RoomFeatures parse(@Nullable JsonNode c) {
         if (c == null || c.isEmpty()) return UNKNOWN; // redacted or emptied: don't strip every option
         Map<String, Long> files = new HashMap<>();
-        Map<String, java.util.Set<String>> mimes = new HashMap<>();
+        Map<String, Set<String>> mimes = new HashMap<>();
         JsonNode file = c.path("file");
         file.fieldNames().forEachRemaining(type -> {
             JsonNode rule = file.path(type);
-            java.util.Set<String> offered = new java.util.HashSet<>();
+            Set<String> offered = new java.util.HashSet<>();
             rule.path("mime_types").fields().forEachRemaining(m -> {
                 if (m.getValue().asInt() >= 1) offered.add(m.getKey().toLowerCase(java.util.Locale.ROOT));
             });
@@ -81,7 +86,7 @@ public final class RoomFeatures {
             allowed = new ArrayList<>();
             for (JsonNode r : c.path("allowed_reactions")) allowed.add(r.asText());
         }
-        java.util.Set<TextFormat> formats = java.util.EnumSet.noneOf(TextFormat.class);
+        Set<TextFormat> formats = java.util.EnumSet.noneOf(TextFormat.class);
         for (TextFormat f : TextFormat.values()) if (c.path("formatting").path(f.feature()).asInt(0) >= 1) formats.add(f);
         return new RoomFeatures(false, c.path("edit").asInt(0), c.path("edit_max_age").asLong(0),
                 c.path("delete").asInt(0), c.path("delete_max_age").asLong(0), c.path("delete_for_me").asBoolean(false),
@@ -106,10 +111,11 @@ public final class RoomFeatures {
     }
 
     /** Whether {@code type} messages may carry a {@code mime} file (exact, {@code image/*} or {@code *}{@code /*}). */
-    public boolean acceptsMime(String type, String mime) {
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "only decides how a file is sent (as it is or converted); the bridge checks what it takes again")
+    public boolean acceptsMime(String type, @Nullable String mime) {
         if (anyFile) return true;
         if (!accepts(type)) return false;
-        java.util.Set<String> m = mimes.get(type);
+        Set<String> m = mimes.get(type);
         if (m == null || m.isEmpty()) return true;
         String x = mime == null ? "" : mime.split(";")[0].trim().toLowerCase(java.util.Locale.ROOT);
         int slash = x.indexOf('/');
@@ -124,22 +130,23 @@ public final class RoomFeatures {
      */
     public record VoiceSend(String mime, boolean voice) {}
 
-    private static final String OPUS_WITH_CODEC = "audio/ogg; codecs=opus", OGG = "audio/ogg";
+    private static final String OPUS_WITH_CODEC = "audio/ogg; codecs=opus";
+    private static final String OGG = "audio/ogg";
 
-    public VoiceSend voiceSend() {
+    public @Nullable VoiceSend voiceSend() {
         if (anyFile) return new VoiceSend(OGG, true);
-        java.util.Set<String> voice = mimes.get(VOICE);
+        Set<String> voice = mimes.get(VOICE);
         if (voice != null && voice.contains(OPUS_WITH_CODEC)) return new VoiceSend(OPUS_WITH_CODEC, true);
         if (voice != null && voice.contains(OGG)) return new VoiceSend(OGG, true);
         return acceptsMime("m.audio", OGG) ? new VoiceSend(OGG, false) : null;
     }
 
     /** Edit offered for a message sent at {@code sent}, judged at {@code now} (limits count from the send time). */
-    public boolean canEdit(Instant sent, Instant now) {
+    public boolean canEdit(@Nullable Instant sent, Instant now) {
         return edit >= 1 && withinAge(sent, now, editMaxAgeSec);
     }
 
-    public boolean canDeleteForEveryone(Instant sent, Instant now) {
+    public boolean canDeleteForEveryone(@Nullable Instant sent, Instant now) {
         return delete >= 1 && withinAge(sent, now, deleteMaxAgeSec);
     }
 
@@ -160,8 +167,8 @@ public final class RoomFeatures {
 
     public boolean isUnknown() { return unrestricted; }
 
-    private static boolean withinAge(Instant sent, Instant now, long maxAgeSec) {
-        return maxAgeSec <= 0 || sent == null || Duration.between(sent, now).getSeconds() <= maxAgeSec;
+    private static boolean withinAge(@Nullable Instant sent, Instant now, long maxAgeSec) {
+        return maxAgeSec <= 0 || sent == null || Duration.between(sent, now).toSeconds() <= maxAgeSec;
     }
 
     /** "❤️" and "❤" are the same reaction: drop the emoji variation selector. */

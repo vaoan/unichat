@@ -1,6 +1,8 @@
 package app.unichat.ui.desktop;
 
 import app.unichat.ui.Formats;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import java.awt.CheckboxMenuItem;
 import java.awt.EventQueue;
 import java.awt.MenuItem;
@@ -43,7 +45,8 @@ public final class NativeBar {
      * {@code onOpenChat} gets the chat id of a clicked notification, {@code onShow} runs on a left click of the icon
      * or the global shortcut (any thread).
      */
-    static NativeBar start(Path helper, PopupMenu menu, Runnable onExit, java.util.function.Consumer<String> onOpenChat, Runnable onShow) {
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "our own menu-bar helper from the app's folder, no arguments")
+    static @Nullable NativeBar start(@Nullable Path helper, PopupMenu menu, Runnable onExit, java.util.function.Consumer<String> onOpenChat, Runnable onShow) {
         if (helper == null || !Files.isExecutable(helper)) return null;
         try {
             NativeBar bar = new NativeBar(new ProcessBuilder(helper.toString())
@@ -83,7 +86,7 @@ public final class NativeBar {
     private volatile java.util.function.Consumer<String> onOpenChat = id -> { };
     private volatile Runnable onShow = () -> { };
     /** The one running, for Ajustes to reach; null when there's none. */
-    private static volatile NativeBar current;
+    private static volatile @Nullable NativeBar current;
 
     /** Applies the setting at once, if the helper is running. */
     public static void applyGlobalShortcut(boolean on) {
@@ -91,9 +94,9 @@ public final class NativeBar {
         if (b != null) b.setGlobalShortcut(on);
     }
     /** Whether macOS lets the helper post notifications: null until it says, then true or false. */
-    private volatile Boolean notificationsAllowed;
+    private volatile @Nullable Boolean notificationsAllowed;
 
-    Boolean notificationsAllowed() {
+    @Nullable Boolean notificationsAllowed() {
         return notificationsAllowed;
     }
 
@@ -172,7 +175,7 @@ public final class NativeBar {
     /** Hears whether the screen is locked or asleep ({@link MacScreen}); the helper may start before or after it. */
     private static volatile java.util.function.Consumer<Boolean> screen = away -> { };
     /** The helper's last "screen" line; null before it says one and once it ends. */
-    private static volatile Boolean lastScreen;
+    private static volatile @Nullable Boolean lastScreen;
     /**
      * Storing a screen value and telling it is one step, for {@link #onScreen} and the reader alike: else a replayed
      * lock could land after the unlock or the helper's end, and Unichat would stay unseen for good. Always taken before
@@ -191,12 +194,15 @@ public final class NativeBar {
             screen = away;
             NativeBar b = current;
             if (b == null || !b.alive) away.accept(false);
-            else if (lastScreen != null) away.accept(lastScreen);
+            else {
+                Boolean said = lastScreen;
+                if (said != null) away.accept(said);
+            }
         }
     }
 
     /** "screen 1" (locked or asleep) is true, "screen 0" false; anything else null. */
-    static Boolean screenLine(String line) {
+    static @Nullable Boolean screenLine(String line) {
         return switch (line) {
             case "screen\t1" -> true;
             case "screen\t0" -> false;
@@ -225,8 +231,9 @@ public final class NativeBar {
                     continue;
                 }
                 if (line.startsWith("notify-auth\t")) {
-                    notificationsAllowed = line.endsWith("1");
-                    System.err.println("System notifications: " + (notificationsAllowed ? "allowed" : "not allowed (Unichat's own cards instead)"));
+                    boolean allowed = line.endsWith("1");
+                    notificationsAllowed = allowed;
+                    System.err.println("System notifications: " + (allowed ? "allowed" : "not allowed (Unichat's own cards instead)"));
                     continue;
                 }
                 Boolean away = screenLine(line);
@@ -250,6 +257,7 @@ public final class NativeBar {
                 });
             }
         } catch (IOException ignored) {
+            // the helper's pipe broke: it ended, as when it exits
         }
         alive = false;
         synchronized (SCREEN) {

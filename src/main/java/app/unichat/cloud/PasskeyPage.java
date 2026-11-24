@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -37,7 +38,7 @@ public final class PasskeyPage {
      * (a passkey answering 32 bytes of another value would open nothing) and the value itself stays on the page. Every
      * text one line, cut short: the record is the browser's to write into.
      */
-    public record Finding(Step step, Boolean prfEnabled, int prfLength, String fingerprint, String credentialId,
+    public record Finding(Step step, @Nullable Boolean prfEnabled, int prfLength, String fingerprint, String credentialId,
                           String attachment, String userAgent, String error) {
         public boolean prf() {
             return prfLength > 0;
@@ -155,30 +156,31 @@ public final class PasskeyPage {
             Loopback.reply(x, 400, "text/plain; charset=utf-8", "");
             return;
         }
+        String fingerprint = q.getOrDefault("prfFingerprint", "");
         Finding f = new Finding(step, bool(q.get("prfEnabled")), length(q.get("prfLength")),
-                q.getOrDefault("prfFingerprint", "").matches("[0-9a-f]{16}") ? q.get("prfFingerprint") : "",
+                fingerprint.matches("[0-9a-f]{16}") ? fingerprint : "",
                 kept(q.get("credentialId"), "[A-Za-z0-9_-]*"), kept(q.get("attachment"), "[a-z-]*"),
                 line(q.get("userAgent")), line(q.get("error")));
         found.accept(f);
         Loopback.reply(x, 200, "text/plain; charset=utf-8", f.said());
     }
 
-    private static Boolean bool(String s) {
+    private static @Nullable Boolean bool(@Nullable String s) {
         return "true".equals(s) ? Boolean.TRUE : "false".equals(s) ? Boolean.FALSE : null;
     }
 
-    private static int length(String s) {
+    private static int length(@Nullable String s) {
         return s != null && s.matches("\\d{1,4}") ? Integer.parseInt(s) : -1;
     }
 
     /** {@code s} if it's only what such a value is made of, else "?". */
-    private static String kept(String s, String allowed) {
+    private static String kept(@Nullable String s, String allowed) {
         if (s == null || s.isEmpty()) return "";
         return s.length() <= MOST && s.matches(allowed) ? s : "?";
     }
 
     /** One line, no quotes to end the record's field early, cut short. */
-    private static String line(String s) {
+    private static String line(@Nullable String s) {
         if (s == null) return "";
         String one = s.replaceAll("[\\p{Cntrl}\\p{Zl}\\p{Zp}]+", " ").replace('"', '\'').strip();
         return one.length() <= MOST ? one : one.substring(0, MOST);

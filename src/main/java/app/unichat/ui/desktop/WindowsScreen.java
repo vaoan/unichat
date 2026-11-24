@@ -1,6 +1,7 @@
 package app.unichat.ui.desktop;
 
 import app.unichat.support.ScreenAway;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -13,6 +14,7 @@ import java.util.function.Consumer;
  */
 public final class WindowsScreen implements ScreenAway {
     /** One message to the window: its code, wParam, and the display state when it carries one. */
+    @FunctionalInterface
     interface Handler {
         void message(int msg, long wParam, int displayState);
     }
@@ -20,7 +22,7 @@ public final class WindowsScreen implements ScreenAway {
     /** The native window; {@link #open} and {@link #run} are called on the watch's one thread. */
     interface MessageWindow {
         /** Makes the window and registers it; throws with why when it can't. */
-        void open(Handler onMessage) throws Exception;
+        void open(Handler onMessage) throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: Win32 through JNA, or a test's fake
 
         /** Hands every message to the handler until {@link #close}; throws with why if the loop fails first. */
         void run();
@@ -32,7 +34,7 @@ public final class WindowsScreen implements ScreenAway {
     private final MessageWindow window;
     private final Consumer<String> log;
     private final CompletableFuture<Boolean> registered = new CompletableFuture<>();
-    private volatile Thread thread;
+    private volatile @Nullable Thread thread;
 
     public WindowsScreen() {
         this(new WindowsScreenWindow(), System.err::println);
@@ -88,7 +90,7 @@ public final class WindowsScreen implements ScreenAway {
         return registered;
     }
 
-    Thread thread() {
+    @Nullable Thread thread() {
         return thread;
     }
 

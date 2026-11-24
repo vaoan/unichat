@@ -3,6 +3,7 @@ package app.unichat.ui.settings;
 import app.unichat.ui.Formats;
 import app.unichat.cloud.Cloud;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.List;
@@ -14,6 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** What the cloud is doing, in words for the tray's menu and the gear, and how far for their ring. */
 class CloudTextsTest {
     private static final Instant NOW = Instant.parse("2026-11-10T12:00:00Z");
+    /** What the cloud says when nothing moves ({@code Cloud.Moving.NONE}). */
+    private static final Cloud.Moving NOTHING_MOVING = new Cloud.Moving(0, null, java.util.Map.of());
 
     private static Cloud.Status uploading(int done, int total, long sent, long size, long speed) {
         return new Cloud.Status(true, NOW, null, 5, 9, new Cloud.Activity(Cloud.Step.UPLOADING, done, total, "foto.jpg", sent, size, speed),
@@ -49,18 +52,19 @@ class CloudTextsTest {
     @Test
     void mediaWaitingForBeingSeenIsSaidInTheTrayAndInNube() {
         String line = "Las fotos y videos esperan mientras la ventana de Unichat está cerrada";
-        Cloud.Status paused = new Cloud.Status(true, NOW, null, 0, 2, null, 0, null, 0, null, Cloud.VaultState.LOCKED, null, null, true);
+        Cloud.Status paused = new Cloud.Status(true, NOW, null, 0, 2, null, 0, null, 0, null, Cloud.VaultState.LOCKED, NOTHING_MOVING, null, true);
         List<String> lines = CloudTexts.menuLines(paused, NOW);
         assertTrue(lines.contains(line), "the tray: " + lines);
         assertTrue(lines.indexOf(line) < lines.indexOf("Bóveda: no está abierta en este equipo, no sube nada personal."), "before the vault's: " + lines);
         assertTrue(CloudTexts.status(paused, NOW).contains("\n" + line), "Ajustes → Nube");
-        Cloud.Status going = new Cloud.Status(true, NOW, null, 0, 2, null, 0, null, 0, null, Cloud.VaultState.NONE, null, null, false);
+        Cloud.Status going = new Cloud.Status(true, NOW, null, 0, 2, null, 0, null, 0, null, Cloud.VaultState.NONE, NOTHING_MOVING, null, false);
         assertFalse(CloudTexts.menuLines(going, NOW).contains(line), "not paused: not said");
         assertFalse(CloudTexts.status(going, NOW).contains(line));
     }
 
-    private static Cloud.Status vault(Cloud.VaultState state, Cloud.Moving moving, Cloud.Notice notice) {
-        return new Cloud.Status(true, NOW, null, 0, 0, null, 0, null, 0, null, state, moving, notice);
+    /** {@code moving} null: nothing moving, as the cloud says it ({@code Moving.NONE}). */
+    private static Cloud.Status vault(Cloud.VaultState state, Cloud.@Nullable Moving moving, Cloud.@Nullable Notice notice) {
+        return new Cloud.Status(true, NOW, null, 0, 0, null, 0, null, 0, null, state, moving == null ? NOTHING_MOVING : moving, notice);
     }
 
     @Test

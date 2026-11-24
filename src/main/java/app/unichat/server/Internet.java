@@ -1,5 +1,7 @@
 package app.unichat.server;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -12,6 +14,7 @@ final class Internet {
 
     private Internet() {}
 
+    @SuppressFBWarnings(value = "UNENCRYPTED_SOCKET", justification = "only connects to port 443 of a known site to see whether the internet is there, and closes; nothing is sent")
     static boolean reachable() {
         for (String host : HOSTS) {
             try (Socket s = new Socket()) {

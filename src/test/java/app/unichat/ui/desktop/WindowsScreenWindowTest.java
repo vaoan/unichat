@@ -2,6 +2,7 @@ package app.unichat.ui.desktop;
 
 import com.sun.jna.Memory;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,7 +53,7 @@ class WindowsScreenWindowTest {
         return m;
     }
 
-    private static List<String> told(Memory info, int bytes, String osVersion) {
+    private static List<String> told(@Nullable Memory info, int bytes, String osVersion) {
         List<String> told = new ArrayList<>();
         WindowsScreenWindow.lockAtStart((msg, wParam, display) -> told.add(msg + "/" + wParam + "/" + display),
                 info, bytes, osVersion);

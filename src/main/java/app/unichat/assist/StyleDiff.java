@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * What changed between two versions of {@code writing-style.md}, trait by trait: the file is a list of "- " bullets,
@@ -18,9 +19,11 @@ public record StyleDiff(List<String> added, List<String> removed) {
         removed = List.copyOf(removed);
     }
 
-    public static StyleDiff between(String before, String after) {
-        Set<String> was = traits(before), is = traits(after);
-        List<String> added = new ArrayList<>(is), removed = new ArrayList<>(was);
+    public static StyleDiff between(@Nullable String before, @Nullable String after) {
+        Set<String> was = traits(before);
+        Set<String> is = traits(after);
+        List<String> added = new ArrayList<>(is);
+        List<String> removed = new ArrayList<>(was);
         added.removeAll(was);
         removed.removeAll(is);
         return new StyleDiff(added, removed);
@@ -29,7 +32,7 @@ public record StyleDiff(List<String> added, List<String> removed) {
     public boolean isEmpty() { return added.isEmpty() && removed.isEmpty(); }
 
     /** Each bullet's text, without its "- " or "* " and with its spaces evened out; headings and other lines aren't traits. */
-    static Set<String> traits(String file) {
+    static Set<String> traits(@Nullable String file) {
         Set<String> out = new LinkedHashSet<>();
         if (file == null) return out;
         for (String line : file.split("\n")) {

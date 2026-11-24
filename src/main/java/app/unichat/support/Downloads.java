@@ -1,6 +1,7 @@
 package app.unichat.support;
 
-import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -53,6 +54,7 @@ public final class Downloads {
                 return t;
             });
 
+    @SuppressFBWarnings(value = "UNSAFE_HASH_EQUALS", justification = "the downloaded file's SHA-256 against the one pinned in the app: both public, nothing secret to find by timing")
     static void fetch(String url, long size, String sha256, Path target, String what, DoubleConsumer progress,
                       Consumer<Path> beforeMove, Duration stall) throws IOException, InterruptedException {
         // The request's timeout bounds the wait for the headers; the guard below, each wait for the body.
@@ -77,6 +79,7 @@ public final class Downloads {
      * Copies {@code in} to {@code out}, giving up when no byte arrives for {@code stall}: the guard interrupts the read
      * (the HTTP body's read waits interruptibly; closing it doesn't wake that wait).
      */
+    @SuppressWarnings("Finally") // a stall ends the copy with whatever the interrupt threw: the stall is what to say
     private static void copy(InputStream in, java.io.OutputStream out, Duration stall, String what,
                              java.util.function.LongConsumer done) throws IOException {
         Thread reader = Thread.currentThread();
@@ -94,15 +97,16 @@ public final class Downloads {
         try {
             byte[] buf = new byte[1 << 16];
             long total = 0;
-            for (int n; (n = in.read(buf)) > 0; ) {
+            int n;
+            while ((n = in.read(buf)) > 0) {
                 last.set(System.nanoTime());
                 out.write(buf, 0, n);
                 total += n;
                 done.accept(total);
             }
-        } catch (IOException e) {
+        } catch (IOException e) { // NOPMD: ExceptionAsFlowControl, one failure path for a stall and a read error
             if (!stalledAndDone(lock, state, guard)) throw e;
-        } finally {
+        } finally { // NOPMD: DoNotThrowExceptionInFinally, a stall replaces whatever the interrupt threw (as Error Prone's Finally)
             if (stalledAndDone(lock, state, guard)) throw new IOException(I18n.t("download.stalled", what));
         }
     }

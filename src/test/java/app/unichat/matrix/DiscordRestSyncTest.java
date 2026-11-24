@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.Chat;
 import app.unichat.service.ArchiveWaking.Step;
 import app.unichat.service.PreferencesFile;
@@ -11,7 +12,11 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.TreeSet;
 
-import static app.unichat.matrix.RestServer.*;
+import static app.unichat.matrix.RestServer.ME;
+import static app.unichat.matrix.RestServer.channel;
+import static app.unichat.matrix.RestServer.message;
+import static app.unichat.matrix.RestServer.server;
+import static app.unichat.matrix.RestServer.sync;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -45,7 +50,7 @@ class DiscordRestSyncTest {
     }
 
     private Chat chat(String id) {
-        return svc.chat(id);
+        return Present.of(svc.chat(id));
     }
 
     /** The newest sync request the loop made, after the given point in the log. */
@@ -78,7 +83,7 @@ class DiscordRestSyncTest {
 
         int before = server.log.size();
         svc.setArchiveOpen(true);
-        server.changes.until("woken", () -> svc.waking() != null && svc.waking().step() == Step.DONE);
+        server.changes.until("woken", () -> java.util.Optional.ofNullable(svc.waking()).map(w -> w.step() == Step.DONE).orElse(false));
         server.changes.until("the usual filter again, leaving nothing out", () -> syncSince(before, "inline since"));
         assertTrue(svc.messages("!c1:x").stream().anyMatch(m -> m.id().equals("$while")), "shown after waking");
         assertTrue(svc.messages("!c1:x").stream().anyMatch(m -> m.id().equals("$and")));
@@ -91,7 +96,7 @@ class DiscordRestSyncTest {
         svc.setArchived("!s:x", true).get();
         server.changes.until("resting", () -> server.notRoomsPosted().size() == 1);
         Settings.get().setNotifyArchived(true);
-        server.changes.until("woken", () -> svc.waking() != null && svc.waking().step() == Step.DONE);
+        server.changes.until("woken", () -> java.util.Optional.ofNullable(svc.waking()).map(w -> w.step() == Step.DONE).orElse(false));
         assertEquals(1, server.catchUps().size());
     }
 
@@ -124,7 +129,10 @@ class DiscordRestSyncTest {
     void aLiveMessageInAnotherChatDuringAWakeStillNotifies() throws Exception {
         List<String> told = new java.util.concurrent.CopyOnWriteArrayList<>();
         svc.addListener(new app.unichat.service.ChatService.Listener() {
-            @Override public void incomingMessage(Chat chat, app.unichat.model.Message m) { told.add(m.id()); server.changes.changed(); }
+            @Override public void incomingMessage(Chat chat, app.unichat.model.Message m) {
+                told.add(m.id());
+                server.changes.changed();
+            }
         });
         svc.setArchived("!s:x", true).get();
         server.changes.until("resting", () -> server.notRoomsPosted().size() == 1);

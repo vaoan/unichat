@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -31,9 +32,15 @@ import javax.crypto.KeyAgreement;
  * computer off through two changes follows the chain from the key it holds.
  */
 final class VaultNext {
-    static final String PUBLIC = "x25519", PUBLIC_SEALED = "x25519Sealed", NEXT = "next";
-    private static final String EPHEMERAL = "x25519", SEALED = "sealed", INFO = "unichat-vault rotate", AUTH = "auth",
-        PRIOR = "prior", GENERATION = "generation";
+    static final String PUBLIC = "x25519";
+    static final String PUBLIC_SEALED = "x25519Sealed";
+    static final String NEXT = "next";
+    private static final String EPHEMERAL = "x25519";
+    private static final String SEALED = "sealed";
+    private static final String INFO = "unichat-vault rotate";
+    private static final String AUTH = "auth";
+    private static final String PRIOR = "prior";
+    private static final String GENERATION = "generation";
     /** Changes followed back from an offer at most: a chain from the account is untrusted. */
     private static final int CHAIN = 64;
 
@@ -46,7 +53,7 @@ final class VaultNext {
     }
 
     /** The slot's public key when {@code vk} sealed it for that vault and id (in the slot or its offer), or null: one put in by anyone else. */
-    static byte[] publicKey(VaultSlot slot, byte[] vk) {
+    static byte @Nullable [] publicKey(VaultSlot slot, byte[] vk) {
         byte[] shown = bytes(slot.params(), PUBLIC);
         if (shown == null) return null;
         byte[] mine = opened(vk, slot, bytes(slot.params(), PUBLIC_SEALED));
@@ -54,7 +61,7 @@ final class VaultNext {
         return mine != null && Arrays.equals(mine, shown) ? mine : null;
     }
 
-    private static byte[] opened(byte[] vk, VaultSlot slot, byte[] sealed) {
+    private static byte @Nullable [] opened(byte[] vk, VaultSlot slot, byte @Nullable [] sealed) {
         if (sealed == null) return null;
         try {
             return VaultCrypto.open(vk, publicPath(slot.vault(), slot.id()), sealed);
@@ -97,7 +104,7 @@ final class VaultNext {
         PrivateKey own;
         try {
             own = KeyFactory.getInstance("X25519").generatePrivate(new PKCS8EncodedKeySpec(privateKey));
-        } catch (GeneralSecurityException | IllegalArgumentException e) {
+        } catch (GeneralSecurityException | IllegalArgumentException _) {
             throw new VaultCrypto.Broken();
         }
         return taken(slot, next, own, mine, generation, held, CHAIN);
@@ -110,7 +117,8 @@ final class VaultNext {
 
     private static byte[] taken(VaultSlot slot, ObjectNode next, PrivateKey own, byte[] mine, long generation, byte[] held, int depth)
         throws VaultCrypto.Broken {
-        byte[] ephemeral = bytes(next, EPHEMERAL), sealed = bytes(next, SEALED);
+        byte[] ephemeral = bytes(next, EPHEMERAL);
+        byte[] sealed = bytes(next, SEALED);
         if (ephemeral == null || sealed == null) throw new VaultCrypto.Broken();
         if (!vouches(next, slot, generation, held)) {
             // Vouched for with a key this computer never took: the offer before it, if it's that key's.
@@ -128,7 +136,7 @@ final class VaultNext {
         byte[] key;
         try {
             key = key(own, decodePublic(ephemeral), ephemeral, mine);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new VaultCrypto.Broken();
         }
         try {
@@ -140,7 +148,9 @@ final class VaultNext {
 
     /** Whether {@code next}'s vouching opens with {@code oldVk} and names this very offer (its ephemeral key, what it seals). */
     private static boolean vouches(ObjectNode next, VaultSlot slot, long generation, byte[] oldVk) {
-        byte[] ephemeral = bytes(next, EPHEMERAL), sealed = bytes(next, SEALED), auth = bytes(next, AUTH);
+        byte[] ephemeral = bytes(next, EPHEMERAL);
+        byte[] sealed = bytes(next, SEALED);
+        byte[] auth = bytes(next, AUTH);
         if (ephemeral == null || sealed == null || auth == null) return false;
         try {
             return MessageDigest.isEqual(vouching(ephemeral, sealed), VaultCrypto.open(oldVk, offerPath(slot.vault(), slot.id(), generation), auth));
@@ -162,7 +172,7 @@ final class VaultNext {
     }
 
     /** The public half of an X25519 private key (PKCS #8), as X.509: its agreement with the base point; null when it isn't one. */
-    static byte[] publicOf(byte[] privateKey) {
+    static byte @Nullable [] publicOf(byte[] privateKey) {
         try {
             KeyFactory keys = KeyFactory.getInstance("X25519");
             KeyAgreement agreement = KeyAgreement.getInstance("X25519");
@@ -190,7 +200,7 @@ final class VaultNext {
         try {
             return KeyFactory.getInstance("X25519").generatePublic(new X509EncodedKeySpec(encoded));
         } catch (GeneralSecurityException e) {
-            throw new IllegalArgumentException("Not an X25519 public key");
+            throw new IllegalArgumentException("Not an X25519 public key", e);
         }
     }
 
@@ -209,13 +219,13 @@ final class VaultNext {
             System.arraycopy(recipient, 0, info, label.length + ephemeral.length, recipient.length);
             return VaultCrypto.hkdf(shared, info);
         } catch (GeneralSecurityException | IllegalStateException e) {
-            throw new IllegalArgumentException("The keys don't agree");
+            throw new IllegalArgumentException("The keys don't agree", e);
         } finally {
             if (shared != null) Arrays.fill(shared, (byte) 0);
         }
     }
 
-    private static byte[] bytes(ObjectNode n, String field) {
+    private static byte @Nullable [] bytes(ObjectNode n, String field) {
         if (!n.path(field).isTextual()) return null;
         try {
             return Base64.getDecoder().decode(n.get(field).asText());

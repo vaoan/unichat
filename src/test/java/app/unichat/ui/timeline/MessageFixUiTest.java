@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.service.MockChatService;
 import app.unichat.ui.FxWait;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -37,8 +39,10 @@ class MessageFixUiTest {
     private MockChatService svc;
     /** For each text sent, whether it was already waiting to be corrected the moment it went. */
     private final List<Boolean> expectedWhenSent = new java.util.concurrent.CopyOnWriteArrayList<>();
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
     private ThreadPane thread;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private MainView view;
 
     @BeforeAll
@@ -57,7 +61,7 @@ class MessageFixUiTest {
     void open() throws Exception {
         svc = new MockChatService() {
             @Override
-            public java.util.concurrent.CompletableFuture<Void> sendText(String chatId, String text, String replyToId) {
+            public java.util.concurrent.CompletableFuture<Void> sendText(String chatId, String text, @Nullable String replyToId) {
                 // A server that answers at once confirms it before the next line of the box runs.
                 if (thread != null) expectedWhenSent.add(thread.fixer().expecting(chatId, Message.withoutEmoteCommand(text)));
                 return super.sendText(chatId, text, replyToId);
@@ -71,7 +75,7 @@ class MessageFixUiTest {
             stage.setScene(new Scene(view, 900, 700));
             stage.show();
             view.openChatId(CHAT);
-            return find(view);
+            return Present.of(find(view));
         });
     }
 
@@ -79,15 +83,14 @@ class MessageFixUiTest {
     void close() throws Exception {
         AiReplyButton.SHOWN.set(false);
         svc.stop();
-        FxWait.fx(() -> { // the view goes with its window: disposed and out of its scene (src/test/CLAUDE.md)
+        FxWait.onFx(() -> { // the view goes with its window: disposed and out of its scene (src/test/CLAUDE.md)
             view.dispose();
             stage.close();
             stage.getScene().setRoot(new javafx.scene.layout.Pane());
-            return null;
         });
     }
 
-    private static ThreadPane find(Node n) {
+    private static @Nullable ThreadPane find(Node n) {
         if (n instanceof ThreadPane t) return t;
         if (n instanceof Parent p) for (Node c : p.getChildrenUnmodifiable()) {
             ThreadPane t = find(c);
@@ -96,11 +99,11 @@ class MessageFixUiTest {
         return null;
     }
 
-    private List<String> menu(Message m) throws Exception {
+    private List<String> menu(Message m) throws InterruptedException {
         return FxWait.fx(() -> thread.actions().messageMenu(m).getItems().stream().map(MenuItem::getText).toList());
     }
 
-    private long fixingNotes() throws Exception {
+    private long fixingNotes() throws InterruptedException {
         return FxWait.fx(() -> thread.lookupAll(".message-fixing").stream().filter(Node::isVisible).count());
     }
 
@@ -118,19 +121,18 @@ class MessageFixUiTest {
         svc.sendText(CHAT, "creo q mañana no puedo", null).get();
         Message m = svc.messages(CHAT).getLast();
         m.setStatus(app.unichat.model.MessageStatus.SENT); // the server has it: only then can it be edited
-        FxWait.until("listed", () -> FxWait.fx(() -> thread.lookupAll(".bubble").size() > 0));
+        FxWait.until("listed", () -> FxWait.fx(() -> !thread.lookupAll(".bubble").isEmpty()));
         MenuItem fix = FxWait.fx(() -> thread.actions().messageMenu(m).getItems().stream()
                 .filter(i -> "Corregir con IA".equals(i.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { fix.fire(); return null; });
+        FxWait.onFx(fix::fire);
         FxWait.until("only that message says it's being corrected", () -> fixingNotes() == 1);
         assertFalse(menu(m).contains("Corregir con IA"), "not asked twice while going on");
 
         // Nothing waits for it: writing and sending go on.
         TextArea box = FxWait.fx(() -> (TextArea) thread.lookup(".composer .text-area"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             box.setText("otro mensaje");
             box.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         FxWait.until("the next one went", () -> svc.messages(CHAT).getLast().body().equals("otro mensaje"));
         assertEquals("creo q mañana no puedo", m.body(), "still being corrected");
@@ -146,10 +148,9 @@ class MessageFixUiTest {
         app.unichat.assist.AiSettings.setFixMode(app.unichat.assist.AiSettings.FixMode.AFTER);
         try {
             TextArea box = FxWait.fx(() -> (TextArea) thread.lookup(".composer .text-area"));
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 box.setText("creo q sí");
                 box.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-                return null;
             });
             Message m = svc.messages(CHAT).getLast();
             assertEquals("creo q sí", m.body(), "it went at once, as written");
@@ -166,10 +167,9 @@ class MessageFixUiTest {
         app.unichat.assist.AiSettings.setFixMode(app.unichat.assist.AiSettings.FixMode.AFTER);
         try {
             TextArea box = FxWait.fx(() -> (TextArea) thread.lookup(".composer .text-area"));
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 box.setText("/me dice q sí");
                 box.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-                return null;
             });
             Message m = svc.messages(CHAT).getLast();
             assertEquals("dice q sí", m.body(), "sent without the command");
@@ -187,10 +187,9 @@ class MessageFixUiTest {
             return "otra cosa";
         });
         TextArea box = FxWait.fx(() -> (TextArea) thread.lookup(".composer .text-area"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             box.setText("creo q sí");
             box.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         Message m = svc.messages(CHAT).getLast();
         FxWait.until("the server has it", () -> m.status() != app.unichat.model.MessageStatus.SENDING);

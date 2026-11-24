@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import javafx.application.Platform;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,6 @@ class FxWaitUiTest {
             FxWait.settled();
             return true;
         }));
-        assertTrue(e.getMessage().contains("look, don't wait"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("look, don't wait"), e.getMessage());
     }
 }

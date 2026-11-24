@@ -22,7 +22,8 @@ import javafx.util.Duration;
  * circle's bounds, and a thicker stroke than the track's, aren't the circle's).
  */
 final class ProgressRing extends StackPane {
-    private static final double SIZE = 26, UNKNOWN_ARC = -90;
+    private static final double SIZE = 26;
+    private static final double UNKNOWN_ARC = -90;
     private final Arc arc = new Arc();
     private final Group dial = new Group();
     private final Rotate turn = new Rotate();

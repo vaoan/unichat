@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
@@ -13,7 +14,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SyncProcessorTest {
     private static final String ME = "@me:example.org";
@@ -48,7 +52,7 @@ class SyncProcessorTest {
     }
 
     private List<Message> messages(String roomId) {
-        return proc.room(roomId).timeline;
+        return Present.of(proc.room(roomId)).timeline;
     }
 
     @Test
@@ -64,7 +68,7 @@ class SyncProcessorTest {
                 """.formatted(member(ME, "Me"), member("@whatsapp_573001:example.org", "Ana"),
                 member("@whatsappbot:example.org", "WhatsApp bridge bot"),
                 text("$1", "@whatsapp_573001:example.org", 1000, "hola")), false);
-        Chat c = proc.room("!wa:example.org").chat;
+        Chat c = Present.of(proc.room("!wa:example.org")).chat;
         assertEquals(Network.WHATSAPP, c.network());
         assertFalse(c.group());
         assertFalse(c.bridgeBot());
@@ -72,7 +76,7 @@ class SyncProcessorTest {
         assertEquals(2, c.unreadCount());
         assertEquals(1, c.mentionCount());
         assertEquals("hola", c.lastPreview());
-        assertEquals("p1", proc.room("!wa:example.org").prevBatch);
+        assertEquals("p1", Present.of(proc.room("!wa:example.org")).prevBatch);
     }
 
     @Test
@@ -81,7 +85,7 @@ class SyncProcessorTest {
                 {'state':{'events':[%s,%s,%s,%s]},'timeline':{'events':[]}}
                 """.formatted(member(ME, "Me"), member("@telegram_1:example.org", "A"),
                 member("@telegram_2:example.org", "B"), member("@telegram_3:example.org", "C")), false);
-        Chat c = proc.room("!tg:example.org").chat;
+        Chat c = Present.of(proc.room("!tg:example.org")).chat;
         assertEquals(Network.TELEGRAM, c.network());
         assertTrue(c.group());
         assertEquals("A, B, C", c.title());
@@ -93,7 +97,7 @@ class SyncProcessorTest {
                 {'summary':{'m.heroes':['@signalbot:example.org'],'m.joined_member_count':2},
                  'state':{'events':[%s,%s]},'timeline':{'events':[]}}
                 """.formatted(member(ME, "Me"), member("@signalbot:example.org", "Signal bridge bot")), false);
-        Chat c = proc.room("!bot:example.org").chat;
+        Chat c = Present.of(proc.room("!bot:example.org")).chat;
         assertTrue(c.bridgeBot());
         assertEquals(Network.SIGNAL, c.network());
         assertEquals("Signal bridge bot", c.title());
@@ -131,15 +135,35 @@ class SyncProcessorTest {
         assertEquals("plain", SyncEvents.stripReplyFallback("plain"));
     }
 
+    /** A server always names the sender; an event from one that didn't is still the message, by nobody known (no null id). */
+    @Test
+    void aMessageFetchedOnItsOwnWithoutASenderIsStillReadBySomeoneUnknown() {
+        String room = "!nosender:example.org";
+        sync(room, "{'state':{'events':[" + member(ME, "Me") + "]},'timeline':{'events':[]}}", false);
+        Message m = Present.of(proc.standalone(room, json("{'type':'m.room.message','event_id':'$1','content':{'msgtype':'m.text','body':'hola'}}")));
+        assertEquals("hola", m.body());
+        assertEquals("", m.senderId());
+        assertFalse(m.outgoing());
+    }
+
+    /** A member event with a blank state_key names nobody: a sender-less message never takes its name. */
+    @Test
+    void aMessageWithoutASenderNeverTakesABlankMembersName() {
+        String room = "!blank:example.org";
+        sync(room, "{'state':{'events':[" + member(ME, "Me") + "," + member("", "Admin") + "]},'timeline':{'events':[]}}", false);
+        Message m = Present.of(proc.standalone(room, json("{'type':'m.room.message','event_id':'$1','content':{'msgtype':'m.text','body':'hola'}}")));
+        assertEquals("", m.senderName(), "nobody known, not the blank member");
+    }
+
     @Test
     void aMessageFetchedOnItsOwnIsReadButNotAddedToTheChat() {
         String room = "!old:example.org";
         sync(room, "{'state':{'events':[" + member("@bob:example.org", "Bob") + "]},'timeline':{'events':[" + text("$9", ME, 9, "new") + "]}}", false);
-        Message old = proc.standalone(room, json("""
+        Message old = Present.of(proc.standalone(room, json("""
                 {'type':'m.room.message','event_id':'$1','sender':'@bob:example.org','origin_server_ts':1,
-                 'content':{'msgtype':'m.image','body':'IMG_0001.jpg','url':'mxc://s/a'}}"""));
+                 'content':{'msgtype':'m.image','body':'IMG_0001.jpg','url':'mxc://s/a'}}""")));
         assertEquals("Bob", old.senderName());
-        assertEquals(app.unichat.model.MessageType.IMAGE, old.type());
+        assertEquals(MessageType.IMAGE, old.type());
         assertEquals(1, messages(room).size(), "the chat keeps only what it loaded");
         assertNull(proc.standalone(room, json("{'type':'m.room.member','event_id':'$2','sender':'@bob:example.org','state_key':'@bob:example.org','content':{}}")));
         assertNull(proc.standalone("!unknown:example.org", json("{'type':'m.room.message','event_id':'$3','sender':'@bob:example.org','content':{'body':'x'}}")));
@@ -205,7 +229,7 @@ class SyncProcessorTest {
         assertTrue(r.hasMore);
         assertEquals("$old", messages(room).get(0).id());
         assertEquals(Set.of("@bob:example.org"), messages(room).get(0).reactions().get("❤️"));
-        assertEquals("t1", proc.room(room).prevBatch);
+        assertEquals("t1", Present.of(proc.room(room)).prevBatch);
 
         r = proc.processHistory(room, json("{'chunk':[]}"));
         assertFalse(r.hasMore);
@@ -220,7 +244,7 @@ class SyncProcessorTest {
         Message m = messages(room).get(0);
         assertTrue(m.deleted());
         assertEquals("", m.body());
-        assertEquals("Mensaje eliminado", proc.room(room).chat.lastPreview());
+        assertEquals("Mensaje eliminado", Present.of(proc.room(room)).chat.lastPreview());
     }
 
     @Test
@@ -231,7 +255,7 @@ class SyncProcessorTest {
                   {'type':'m.tag','content':{'tags':{'m.favourite':{'order':0.1},'u.archived':{},'u.pinned':{}}}},
                   {'type':'com.famedly.marked_unread','content':{'unread':true}},
                   {'type':'app.unichat.reminder','content':{'ts':1700000000000}}]}}""", false);
-        Chat c = proc.room(room).chat;
+        Chat c = Present.of(proc.room(room)).chat;
         assertTrue(c.favorite());
         assertFalse(c.lowPriority());
         assertTrue(c.archived());
@@ -293,7 +317,7 @@ class SyncProcessorTest {
         assertEquals("Bob cambió el nombre del grupo a Familia", ms.get(0).body());
         assertEquals("Carl se unió", ms.get(1).body());
         assertEquals(MessageType.SYSTEM, ms.get(1).type());
-        assertEquals("Familia", proc.room(room).chat.title());
+        assertEquals("Familia", Present.of(proc.room(room)).chat.title());
     }
 
     @Test
@@ -309,7 +333,7 @@ class SyncProcessorTest {
                  {'type':'m.room.member','state_key':'@dan:example.org','event_id':'$a','sender':'@dan:example.org','origin_server_ts':6000,
                   'content':{'membership':'join','displayname':'Dan','avatar_url':'mxc://example.org/new'}}]}}
                 """, true);
-        assertEquals(java.time.Instant.ofEpochMilli(1000), proc.room(room).chat.lastActivity(), "where its last message put it");
+        assertEquals(Instant.ofEpochMilli(1000), Present.of(proc.room(room)).chat.lastActivity(), "where its last message put it");
 
         String quiet = "!solo-cambios:example.org";
         sync(quiet, people.replace("!grande", "!solo") + """
@@ -317,8 +341,8 @@ class SyncProcessorTest {
                  {'type':'m.room.member','state_key':'@carl:example.org','event_id':'$k','sender':'@carl:example.org','origin_server_ts':7000,
                   'content':{'membership':'join','displayname':'Carl'}}]}}
                 """, false);
-        assertEquals(java.time.Instant.EPOCH, proc.room(quiet).chat.lastActivity(), "nothing to read: not on top");
-        assertEquals("Carl se unió", proc.room(quiet).chat.lastPreview(), "the line still shows");
+        assertEquals(Instant.EPOCH, Present.of(proc.room(quiet)).chat.lastActivity(), "nothing to read: not on top");
+        assertEquals("Carl se unió", Present.of(proc.room(quiet)).chat.lastPreview(), "the line still shows");
     }
 
     @Test
@@ -342,7 +366,7 @@ class SyncProcessorTest {
                 {'ephemeral':{'events':[{'type':'m.receipt','content':{'$real':{'m.read':{'@bob:example.org':{'ts':10}}}}},
                   {'type':'m.typing','content':{'user_ids':['@bob:example.org','@me:example.org']}}]}}""", true);
         assertEquals(MessageStatus.READ, real.status());
-        assertEquals(Set.of("bob"), proc.room(room).chat.typing());
+        assertEquals(Set.of("bob"), Present.of(proc.room(room)).chat.typing());
     }
 
     @Test
@@ -376,14 +400,14 @@ class SyncProcessorTest {
         sync(room, "{'timeline':{'events':[]}}", false);
         proc.addLocalEcho(room, "t3", m -> m.setBody("foto"));
         proc.confirmLocalEcho(room, "t3", "$mine");
-        long server = java.time.Instant.now().plusSeconds(3600).toEpochMilli();
+        long server = Instant.now().plusSeconds(3600).toEpochMilli();
         SyncProcessor.Result r = sync(room, "{'timeline':{'events':[" + text("$mine", ME, server, "foto") + "]}}", true);
         assertEquals(1, messages(room).size(), "still one message");
         Message mine = messages(room).get(0);
         assertEquals("$mine", mine.id());
-        assertEquals(java.time.Instant.ofEpochMilli(server), mine.timestamp());
+        assertEquals(Instant.ofEpochMilli(server), mine.timestamp());
         assertEquals("foto", mine.body());
-        assertEquals(mine, proc.room(room).byId.get("$mine"));
+        assertEquals(mine, Present.of(proc.room(room)).byId.get("$mine"));
         assertTrue(r.messagesChanged.contains(room), "so autosave looks again");
         assertTrue(r.newMessages.isEmpty(), "never a notification for what I sent");
     }
@@ -395,14 +419,14 @@ class SyncProcessorTest {
         String room = "!v:example.org";
         sync(room, "{'timeline':{'events':[]}}", false);
         proc.addLocalEcho(room, "t4", m -> {
-            m.setType(app.unichat.model.MessageType.AUDIO);
+            m.setType(MessageType.AUDIO);
             m.setMediaUrl("file:///tmp/nota.ogg");
             m.setFileName("nota.ogg");
             m.setMimeType("audio/ogg");
         });
         proc.confirmLocalEcho(room, "t4", "$voz");
         assertEquals("file:///tmp/nota.ogg", messages(room).get(0).mediaUrl(), "until its event comes, it plays from disk");
-        long server = java.time.Instant.now().plusSeconds(3600).toEpochMilli();
+        long server = Instant.now().plusSeconds(3600).toEpochMilli();
         SyncProcessor.Result r = sync(room, "{'timeline':{'events':[{'type':'m.room.message','event_id':'$voz','sender':'" + ME
                 + "','origin_server_ts':" + server + ",'content':{'msgtype':'m.audio','body':'nota.ogg','filename':'nota.ogg',"
                 + "'url':'mxc://example.org/v1','info':{'mimetype':'audio/ogg','size':3,'duration':2500},"
@@ -414,8 +438,8 @@ class SyncProcessorTest {
         assertEquals(2500, mine.durationMs());
         assertEquals(3, mine.fileSize());
         assertEquals("nota.ogg", mine.fileName());
-        assertEquals(java.time.Instant.ofEpochMilli(server), mine.timestamp(), "the server's time as before");
-        assertEquals(mine, proc.room(room).byId.get("$voz"));
+        assertEquals(Instant.ofEpochMilli(server), mine.timestamp(), "the server's time as before");
+        assertEquals(mine, Present.of(proc.room(room)).byId.get("$voz"));
         assertTrue(r.messagesChanged.contains(room));
     }
 
@@ -447,7 +471,7 @@ class SyncProcessorTest {
                   {'type':'m.room.member','state_key':'@me:example.org','sender':'@bob:example.org','content':{'membership':'invite'}}]}}}}}"""),
                 true);
         assertEquals(List.of("!i:example.org"), r.invites);
-        assertEquals("Equipo", proc.room("!i:example.org").chat.title());
+        assertEquals("Equipo", Present.of(proc.room("!i:example.org")).chat.title());
         proc.process(json("{'rooms':{'leave':{'!i:example.org':{}}}}"), true);
         assertNull(proc.room("!i:example.org"));
     }
@@ -455,9 +479,9 @@ class SyncProcessorTest {
     @Test
     void aChatSaysItIsAnInvitationUntilJoined() {
         proc.process(json("{'rooms':{'invite':{'!i:example.org':{'invite_state':{'events':[]}}}}}"), true);
-        assertTrue(proc.room("!i:example.org").chat.invite());
+        assertTrue(Present.of(proc.room("!i:example.org")).chat.invite());
         sync("!i:example.org", "{'timeline':{'events':[" + text("$1", "@bob:example.org", 1, "hola") + "]}}", true);
-        assertFalse(proc.room("!i:example.org").chat.invite());
+        assertFalse(Present.of(proc.room("!i:example.org")).chat.invite());
     }
 
     @Test
@@ -465,7 +489,7 @@ class SyncProcessorTest {
         proc.process(json("{'account_data':{'events':[{'type':'m.direct','content':{'@bob:example.org':['!dm:example.org']}}]}}"), false);
         sync("!dm:example.org", "{'state':{'events':[%s,%s,%s,%s]}}".formatted(member(ME, "Me"),
                 member("@bob:example.org", "Bob"), member("@x:example.org", "X"), member("@y:example.org", "Y")), false);
-        Chat c = proc.room("!dm:example.org").chat;
+        Chat c = Present.of(proc.room("!dm:example.org")).chat;
         assertFalse(c.group());
         assertEquals("Bob", c.title());
     }
@@ -475,11 +499,11 @@ class SyncProcessorTest {
         String name = "{'type':'m.room.name','state_key':'','sender':'@bob:example.org','content':{'name':'Equipo'}}";
         sync("!named:example.org", "{'state':{'events':[%s,%s,%s]}}".formatted(member(ME, "Me"),
                 member("@bob:example.org", "Bob"), name), false);
-        assertTrue(proc.room("!named:example.org").chat.group());
+        assertTrue(Present.of(proc.room("!named:example.org")).chat.group());
 
         sync("!portal:example.org", "{'state':{'events':[%s,%s,%s]}}".formatted(member(ME, "Me"),
                 member("@whatsapp_573001:example.org", "Ana"), name), false);
-        assertFalse(proc.room("!portal:example.org").chat.group());
+        assertFalse(Present.of(proc.room("!portal:example.org")).chat.group());
     }
 
     @Test
@@ -520,7 +544,7 @@ class SyncProcessorTest {
         sync(room, "{'timeline':{'events':[{'type':'m.room.message','event_id':'$2','sender':'@bob:example.org','origin_server_ts':2,"
                 + "'content':{'msgtype':'m.text','body':'* x','m.new_content':" + nc + ",'m.relates_to':{'rel_type':'m.replace','event_id':'$1'}}}]}}", true);
         assertEquals("https://a.example", m.body());
-        assertTrue(m.html().contains("discord-embed"));
+        assertTrue(Present.of(m.html()).contains("discord-embed"));
         assertEquals("Hola", m.htmlText());
         sync(room, "{'timeline':{'events':[{'type':'m.room.message','event_id':'$3','sender':'@bob:example.org','origin_server_ts':3,"
                 + "'content':{'msgtype':'m.text','body':'* y','m.new_content':{'msgtype':'m.text','body':'y'},'m.relates_to':{'rel_type':'m.replace','event_id':'$1'}}}]}}", true);
@@ -540,7 +564,7 @@ class SyncProcessorTest {
         }
         sync("!r:example.org", "{'state':{'events':[" + member(ME, "Me") + "]},'timeline':{'events':[" + events + "]}}", true);
 
-        MatrixRoom room = proc.room("!r:example.org");
+        MatrixRoom room = Present.of(proc.room("!r:example.org"));
         assertEquals(SyncProcessor.MAX_PENDING, room.pending.values().stream().mapToInt(List::size).sum());
         assertTrue(room.pending.containsKey("$gone" + (n - 1)), "the newest stay");
         assertFalse(room.pending.containsKey("$gone0"), "the oldest go");

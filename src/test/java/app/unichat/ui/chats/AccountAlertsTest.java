@@ -4,10 +4,12 @@ import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Network;
 import org.junit.jupiter.api.Test;
+import app.unichat.Present;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -21,10 +23,10 @@ class AccountAlertsTest {
     /** The disk filled and nothing new arrived for hours with not a word: the top bar says so, before anything else. */
     @Test
     void aFullDiskOrAWriteThatFailedIsSaid() {
-        assertEquals(null, AccountAlerts.storageLine(false, 50L << 30, false));
+        assertNull(AccountAlerts.storageLine(false, 50L << 30, false));
         assertEquals("Queda poco espacio en el disco (512.0 MB libres): los mensajes nuevos pueden no llegar hasta que liberes espacio.",
                 AccountAlerts.storageLine(true, 512L << 20, false));
-        assertTrue(AccountAlerts.storageLine(true, 0, true).contains("(0 B libres)"), "a full one, failing too: the disk is what to fix");
+        assertTrue(Present.of(AccountAlerts.storageLine(true, 0, true)).contains("(0 B libres)"), "a full one, failing too: the disk is what to fix");
         assertEquals("El servidor no pudo guardar en el disco; reiniciándolo…", AccountAlerts.storageLine(false, 50L << 30, true));
     }
 
@@ -80,7 +82,7 @@ class AccountAlertsTest {
                 acc(Network.DISCORD, "yo", AccountStatus.CONNECTING),
                 acc(Network.WHATSAPP, "+57", AccountStatus.NEEDS_LOGIN)), ALL);
         assertEquals("Sincronizando Telegram y Discord…", AccountAlerts.syncingLine(a));
-        assertEquals(null, AccountAlerts.syncingLine(AccountAlerts.of(List.of(
+        assertNull(AccountAlerts.syncingLine(AccountAlerts.of(List.of(
                 acc(Network.TELEGRAM, "yo", AccountStatus.CONNECTED),
                 acc(Network.WHATSAPP, "+57", AccountStatus.NEEDS_LOGIN)), ALL)), "a closed session isn't syncing");
     }

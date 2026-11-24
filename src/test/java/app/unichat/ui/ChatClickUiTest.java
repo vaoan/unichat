@@ -15,9 +15,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 
@@ -30,8 +30,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ChatClickUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private MainView view;
     private final List<Throwable> failures = new CopyOnWriteArrayList<>();
 
@@ -51,9 +54,8 @@ class ChatClickUiTest {
     @AfterEach
     void close() throws Exception {
         svc.stop();
-        fx(() -> {
+        FxWait.onFx(() -> {
             stage.close();
-            return null;
         });
     }
 
@@ -68,7 +70,7 @@ class ChatClickUiTest {
         clickChats(true);
     }
 
-    private void clickChats(boolean unreadOnly) throws Exception {
+    private void clickChats(boolean unreadOnly) throws InterruptedException {
         svc = new MockChatService();
         Scene scene = fx(() -> {
             Thread.currentThread().setUncaughtExceptionHandler((t, e) -> failures.add(e));
@@ -91,10 +93,9 @@ class ChatClickUiTest {
         });
         assertTrue(focused, "the list has the focus");
         if (unreadOnly) {
-            fx(() -> {
+            FxWait.onFx(() -> {
                 ChatListPane pane = (ChatListPane) scene.getRoot().lookup(".chat-list-pane");
                 pane.filterProperty().set(pane.filterProperty().get().withUnreadOnly(true));
-                return null;
             });
             FxWait.settled();
         }
@@ -113,7 +114,7 @@ class ChatClickUiTest {
                 return id;
             });
             FxWait.until("the clicked chat " + clicked + " opens", () -> clicked.equals(view.currentChatId()));
-            assertEquals(clicked, fx(() -> view.currentChatId()), "the clicked chat opens");
+            assertEquals(clicked, fx(view::currentChatId), "the clicked chat opens");
         }
         FxWait.settled(); // whatever the clicks set off has run: an error would be in by now
         assertTrue(failures.isEmpty(), "no errors on the UI thread: " + failures);
@@ -130,7 +131,7 @@ class ChatClickUiTest {
                 true, false, false, true, false, true, null);
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

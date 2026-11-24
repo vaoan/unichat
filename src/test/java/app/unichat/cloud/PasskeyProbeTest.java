@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,6 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,7 +58,7 @@ class PasskeyProbeTest {
     void withTheFlagItOpensThePage() throws Exception {
         System.setProperty(PasskeyProbe.FLAG, "true");
         URI[] opened = {null};
-        CompletableFuture<Void> probe = PasskeyProbe.onStart(u -> opened[0] = u, 0, dir.resolve("probe.txt"), log::add);
+        CompletableFuture<Void> probe = Present.of(PasskeyProbe.onStart(u -> opened[0] = u, 0, dir.resolve("probe.txt"), log::add));
         assertEquals("/passkey", opened[0].getPath());
         assertFalse(probe.isDone());
         assertTrue(log.stream().anyMatch(l -> l.contains(opened[0].toString())), "the address is in the log, for no browser: " + log);
@@ -71,7 +73,7 @@ class PasskeyProbeTest {
         var taken = Loopback.server(0);
         try {
             int port = taken.getAddress().getPort();
-            CompletableFuture<Void> probe = PasskeyProbe.onStart(u -> { }, port, dir.resolve("probe.txt"), log::add);
+            CompletableFuture<Void> probe = Present.of(PasskeyProbe.onStart(u -> { }, port, dir.resolve("probe.txt"), log::add));
             org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class, probe::get);
             assertTrue(log.stream().anyMatch(l -> l.contains(app.unichat.support.I18n.t("settings.cloud.portBusy", port))),
                     "the port busy is told, not swallowed: " + log);
@@ -83,9 +85,8 @@ class PasskeyProbeTest {
     @Test
     void aProbeLeftToItsDeadlineAtLaunchSaysNothingMore() throws Exception {
         System.setProperty(PasskeyProbe.FLAG, "true");
-        CompletableFuture<Void> probe = PasskeyProbe.onStart(u -> { }, 0, dir.resolve("probe.txt"), log::add, java.time.Duration.ZERO);
-        assertTrue(org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class, probe::get).getCause()
-                instanceof Loopback.Expired);
+        CompletableFuture<Void> probe = Present.of(PasskeyProbe.onStart(u -> { }, 0, dir.resolve("probe.txt"), log::add, java.time.Duration.ZERO));
+        assertInstanceOf(Loopback.Expired.class, org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class, probe::get).getCause());
         assertEquals(1, log.size(), "only the address: " + log);
     }
 
@@ -94,7 +95,7 @@ class PasskeyProbeTest {
         Path file = dir.resolve("logs").resolve("passkey-probe.txt");
         URI[] opened = {null};
         List<PasskeyPage.Finding> told = new CopyOnWriteArrayList<>();
-        PasskeyProbe.run(u -> opened[0] = u, told::add, 0, file);
+        var _ = PasskeyProbe.run(u -> opened[0] = u, told::add, 0, file);
         URI base = URI.create("http://127.0.0.1:" + opened[0].getPort());
         String page = HTTP.send(HttpRequest.newBuilder(base.resolve("/passkey")).build(), HttpResponse.BodyHandlers.ofString()).body();
         var m = Pattern.compile("const STATE = \"([0-9a-f]+)\"").matcher(page);
@@ -118,7 +119,7 @@ class PasskeyProbeTest {
         URI[] opened = {null};
         CompletableFuture<Void> first = PasskeyProbe.run(u -> opened[0] = u, f -> { }, 0, dir.resolve("probe.txt"));
         URI firstAddress = opened[0];
-        PasskeyProbe.run(u -> opened[0] = u, f -> { }, 0, dir.resolve("probe.txt"));
+        var _ = PasskeyProbe.run(u -> opened[0] = u, f -> { }, 0, dir.resolve("probe.txt"));
         assertTrue(first.isCancelled(), "the port 43117 is one: the one before gives it back");
         PCloudTest.portIsFree(firstAddress.toString());
     }

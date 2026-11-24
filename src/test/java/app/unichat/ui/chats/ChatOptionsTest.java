@@ -2,6 +2,7 @@ package app.unichat.ui.chats;
 
 import app.unichat.autosave.AutoSave;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -12,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ChatOptionsTest {
     private static final java.time.Instant NOV_3 = LocalDate.of(2026, 11, 3).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant();
 
-    private static AutoSave.Exploring running(AutoSave.Doing doing, String what) {
+    private static AutoSave.Exploring running(AutoSave.Doing doing, @Nullable String what) {
         return new AutoSave.Exploring(true, NOV_3, false, 8, 2, 120, new AutoSave.Now(doing, NOV_3, what));
     }
 

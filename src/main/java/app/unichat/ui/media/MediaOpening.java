@@ -7,6 +7,7 @@ import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
@@ -22,7 +23,7 @@ public final class MediaOpening {
             toast.accept(I18n.t("media.downloadFailed"));
             return;
         }
-        svc.media(m.mediaUrl(), 0, 0).whenComplete((p, err) -> {
+        var _ = svc.media(m.mediaUrl(), 0, 0).whenComplete((p, err) -> {
             if (err != null) Platform.runLater(() -> toast.accept(I18n.t("media.downloadFailed")));
             else Browser.openFile(p, () -> toast.accept(I18n.t("media.openFailed")));
         });
@@ -32,7 +33,7 @@ public final class MediaOpening {
      * In the video player. The window's audio ({@code audio}, null where there's none) pauses first: a video from the
      * info panel played over the voice note. FX thread.
      */
-    public static void video(Window owner, MediaSource svc, Message m, String title, AudioPlayback audio, Consumer<String> toast) {
+    public static void video(Window owner, MediaSource svc, Message m, @Nullable String title, @Nullable AudioPlayback audio, Consumer<String> toast) {
         if (audio != null) audio.pause();
         VideoViewer.show(owner, svc.media(m.mediaUrl(), 0, 0), title, () -> MediaSaver.save(owner, svc, m, toast),
                 p -> Browser.openFile(p, () -> toast.accept(I18n.t("video.openFailed"))));
@@ -43,12 +44,12 @@ public final class MediaOpening {
      * links (`autosave/LinkVideo`, once, into the media cache) while the player waits. It opened Instagram before; it
      * still does when the video can't be had (a private reel, no cookies), and the player closes. FX thread.
      */
-    public static void reel(Window owner, String url, AudioPlayback audio, Consumer<String> openLink) {
+    public static void reel(Window owner, String url, @Nullable AudioPlayback audio, Consumer<String> openLink) {
         if (audio != null) audio.pause();
         CompletableFuture<Path> video = app.unichat.autosave.LinkVideo.of(url);
         Stage player = VideoViewer.show(owner, video, I18n.t("media.reelTitle"), null,
                 p -> Browser.openFile(p, () -> openLink.accept(url)));
-        video.whenComplete((p, failed) -> {
+        var _ = video.whenComplete((p, failed) -> {
             if (failed == null) return;
             System.err.println("Reel not playable here, opening its page: " + failed);
             Platform.runLater(() -> {

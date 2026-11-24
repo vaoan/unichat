@@ -1,5 +1,8 @@
 package app.unichat.cloud;
 
+import app.unichat.support.PathParts;
+
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -14,7 +17,7 @@ final class StorageDownloads {
     private StorageDownloads() {}
 
     /** {@code path} (holding {@code expected}) comes down whole over an older copy, and one that isn't there changes nothing. */
-    static void check(Storage storage, String path, byte[] expected, Path dir) throws Exception {
+    static void check(Storage storage, String path, byte[] expected, Path dir) throws IOException {
         Path target = Files.writeString(dir.resolve("video.mp4"), "una copia cortada");
         assertTrue(storage.get(path, target));
         assertArrayEquals(expected, Files.readAllBytes(target), "whole, in place of the older copy");
@@ -23,7 +26,7 @@ final class StorageDownloads {
         assertFalse(storage.get("Unichat/nada.mp4", absent), "not there");
         assertFalse(Files.exists(absent), "and nothing written");
         try (var left = Files.list(dir)) {
-            assertEquals(List.of("video.mp4"), left.map(p -> p.getFileName().toString()).toList(), "no .part left behind");
+            assertEquals(List.of("video.mp4"), left.map(PathParts::name).toList(), "no .part left behind");
         }
     }
 }

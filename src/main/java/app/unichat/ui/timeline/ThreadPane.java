@@ -40,11 +40,13 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
-import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
+import java.time.Instant;
 
 /** Right side: chat header, message timeline, typing line and composer. */
 public final class ThreadPane extends BorderPane {
@@ -63,7 +65,7 @@ public final class ThreadPane extends BorderPane {
 
     SendQueue sendQueue() { return sendQueue; }
 
-    CaptureSheet captureSheet() { return captureSheet; }
+    @Nullable CaptureSheet captureSheet() { return captureSheet; }
     private final Label typing = new Label();
     private final TimelineScroll scroll;
     private final MessageRowView messageRows;
@@ -79,7 +81,7 @@ public final class ThreadPane extends BorderPane {
     private final Button archiveButton;
     private final VBox emptyState;
     private final BorderPane content = new BorderPane();
-    private Chat chat;
+    private @Nullable Chat chat;
     private boolean loadingOlder;
     private boolean reachedStart;
     /** What waits for the older messages being loaded (going to a pinned message). */
@@ -91,14 +93,16 @@ public final class ThreadPane extends BorderPane {
     private final FolderDialogs folderDialogs;
     /** Picking messages to forward several at once. */
     private final MessageSelection selection;
-    private ForwardSheet forwardSheet;
-    private DeleteSheet deleteSheet;
-    private SavedTextSheet savedTextSheet;
-    private MessageFixer messageFixer;
-    private SendQueue sendQueue;
-    private SendQueueView sendQueueView;
-    private final MessageSelection.Purpose forwarding, deleting, capturing;
-    private CaptureSheet captureSheet;
+    private @Nullable ForwardSheet forwardSheet;
+    private @Nullable DeleteSheet deleteSheet;
+    private @Nullable SavedTextSheet savedTextSheet;
+    private final MessageFixer messageFixer;
+    private final SendQueue sendQueue;
+    private final SendQueueView sendQueueView;
+    private final MessageSelection.Purpose forwarding;
+    private final MessageSelection.Purpose deleting;
+    private final MessageSelection.Purpose capturing;
+    private @Nullable CaptureSheet captureSheet;
     private final Consumer<String> toast;
 
     public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast, AudioPlayback audio,
@@ -114,10 +118,14 @@ public final class ThreadPane extends BorderPane {
         media = new MessageMedia(svc, openLink, toast, library, this::getScene, audio);
         messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, library, this::getScene, this::member,
                 this::jumpTo);
-
-        favButton = Icons.iconButton(Icons.STAR, I18n.t("thread.favorite"), () -> svc.setFavorite(chat.id(), !chat.favorite()));
-        archiveButton = Icons.iconButton(Icons.ARCHIVE, I18n.t("thread.archive", Shortcuts.key("E")),
-                () -> svc.setArchived(chat.id(), !chat.archived()));
+        favButton = Icons.iconButton(Icons.STAR, I18n.t("thread.favorite"), () -> {
+            Chat c = chat; // the header's buttons show only with a chat open
+            if (c != null) { var _ = svc.setFavorite(c.id(), !c.favorite()); }
+        });
+        archiveButton = Icons.iconButton(Icons.ARCHIVE, I18n.t("thread.archive", Shortcuts.key("E")), () -> {
+            Chat c = chat;
+            if (c != null) { var _ = svc.setArchived(c.id(), !c.archived()); }
+        });
         configureTimeline();
         selection = new MessageSelection(list, this::showSelectionBar);
         forwarding = new MessageSelection.Purpose("select.forward", "primary-button",
@@ -160,7 +168,8 @@ public final class ThreadPane extends BorderPane {
             if (savedTextSheet != null) savedTextSheet.show(app.unichat.autosave.AutoSave.of(svc).said(m));
         });
         scroll = new TimelineScroll(list, rows, this, () -> chat != null, this::loadOlder);
-        Node header = buildHeader();
+        headerButtons = headerButtons();
+        header = buildHeader(headerButtons);
         messageRows = new MessageRowView(svc, media, messageActions, openLink, () -> chat, this::member, scroll::jumpTo);
         redrawOnTranscriptProgress();
         StackPane.setAlignment(scroll.indicator(), Pos.BOTTOM_RIGHT);
@@ -192,15 +201,16 @@ public final class ThreadPane extends BorderPane {
         FxCoalescer rewrap = new FxCoalescer(list::refresh);
         list.widthProperty().addListener((o, a, w) -> {
             double now = MessageRowView.bubbleWidth(w.doubleValue());
-            if (now == built[0]) return;
+            if (Double.compare(now, built[0]) == 0) return; // a width, never -0 nor NaN once built
             built[0] = now;
             rewrap.request();
         });
     }
 
-    private HBox header, headerButtons;
+    private final HBox header;
+    private final HBox headerButtons;
 
-    private Node buildHeader() {
+    private HBox buildHeader(HBox buttons) {
         headerTitle.getStyleClass().add("thread-title");
         headerSubtitle.getStyleClass().add("thread-subtitle");
         serverLink.getStyleClass().add("thread-server");
@@ -217,20 +227,28 @@ public final class ThreadPane extends BorderPane {
         titles.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(titles, Priority.ALWAYS);
         titles.setMinWidth(0);
+        HBox row = new HBox(10, headerAvatar, titles, buttons);
+        row.getStyleClass().add("thread-header");
+        row.setAlignment(Pos.CENTER_LEFT);
+        titles.setOnMouseClicked(e -> toggleInfo.run());
+        return row;
+    }
+
+    /** The header's buttons: following, favourite, archive, the info panel and the chat's menu. */
+    private HBox headerButtons() {
         infoButton.setGraphic(Icons.icon(Icons.INFO, 18));
         infoButton.getStyleClass().add("icon-button");
         infoButton.setTooltip(new javafx.scene.control.Tooltip(I18n.t("thread.chatInfo")));
         infoButton.setOnAction(e -> toggleInfo.run());
         infoButton.setAccessibleText(I18n.t("thread.chatInfo"));
         Button more = Icons.iconButton(Icons.MORE, I18n.t("thread.moreOptions"), null);
-        more.setOnAction(e -> ChatMenus.forChat(chat, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4));
-        headerButtons = new HBox(10, scroll.following(), favButton, archiveButton, infoButton, more);
-        headerButtons.setAlignment(Pos.CENTER_LEFT);
-        header = new HBox(10, headerAvatar, titles, headerButtons);
-        header.getStyleClass().add("thread-header");
-        header.setAlignment(Pos.CENTER_LEFT);
-        titles.setOnMouseClicked(e -> toggleInfo.run());
-        return header;
+        more.setOnAction(e -> {
+            Chat c = chat;
+            if (c != null) ChatMenus.forChat(c, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4);
+        });
+        HBox buttons = new HBox(10, scroll.following(), favButton, archiveButton, infoButton, more);
+        buttons.setAlignment(Pos.CENTER_LEFT);
+        return buttons;
     }
 
     private void configureTimeline() {
@@ -299,7 +317,7 @@ public final class ThreadPane extends BorderPane {
         list.requestFocus();
     }
 
-    public Chat chat() { return chat; }
+    public @Nullable Chat chat() { return chat; }
 
     /** Where forwarding asks which chats (the window's overlay). */
     public void setForwardSheet(ForwardSheet sheet) { this.forwardSheet = sheet; }
@@ -375,14 +393,19 @@ public final class ThreadPane extends BorderPane {
             for (Message m : messages) {
                 failed = failed.thenCompose(n -> svc.deleteMessage(chatId, m.id()).handle((v, e) -> e == null ? n : n + 1));
             }
-            failed.thenAccept(n -> Platform.runLater(() -> toast.accept(n == 0 ? I18n.n("delete.done", messages.size())
+            var _ = failed.thenAccept(n -> Platform.runLater(() -> toast.accept(n == 0 ? I18n.n("delete.done", messages.size())
                     : I18n.n("delete.failed", n))));
         });
     }
 
+    /** The open chat's id, for the snapshot's diagnostics below: the snapshot opens a chat before it asks for one. */
+    private String shownChatId() {
+        return java.util.Objects.requireNonNull(chat, "the snapshot opens a chat before it shows this").id();
+    }
+
     /** Snapshot diagnostics: the question before deleting the newest three of mine that can be deleted for everyone. */
     public void showDeleting() {
-        List<Message> mine = svc.messages(chat.id()).stream().filter(deleting.pickable()).toList();
+        List<Message> mine = svc.messages(shownChatId()).stream().filter(deleting.pickable()).toList();
         delete(mine.subList(Math.max(0, mine.size() - 3), mine.size()));
     }
 
@@ -391,7 +414,7 @@ public final class ThreadPane extends BorderPane {
      * sheet, as phone pieces.
      */
     public void showCapture(boolean sheet) {
-        List<Message> all = svc.messages(chat.id());
+        List<Message> all = svc.messages(shownChatId());
         if (all.size() < 2) return;
         List<Message> six = all.subList(Math.max(0, all.size() - 6), all.size());
         selection.start(six.getFirst(), capturing);
@@ -409,7 +432,7 @@ public final class ThreadPane extends BorderPane {
             }
             return prompt;
         });
-        for (String t : snapshotDrafts()) sendQueue.submit(chat.id(), t, null);
+        for (String t : snapshotDrafts()) sendQueue.submit(shownChatId(), t, null);
     }
 
     /** The four texts {@link #showQueue} puts in the queue, as the person would write them, in the UI language. */
@@ -419,7 +442,7 @@ public final class ThreadPane extends BorderPane {
 
     /** Snapshot diagnostics: my newest message being corrected with AI (an answer that never comes). */
     public void showFixing() {
-        List<Message> mine = svc.messages(chat.id()).stream().filter(Message::outgoing).toList();
+        List<Message> mine = svc.messages(shownChatId()).stream().filter(Message::outgoing).toList();
         if (mine.isEmpty()) return;
         messageFixer.useWriter(() -> prompt -> {
             try {
@@ -429,7 +452,7 @@ public final class ThreadPane extends BorderPane {
             }
             return prompt;
         });
-        messageFixer.fix(mine.getLast());
+        var _ = messageFixer.fix(mine.getLast());
     }
 
     /**
@@ -437,19 +460,19 @@ public final class ThreadPane extends BorderPane {
      * sheet for a message there's no copy of.
      */
     public void showSavedText(boolean none) {
-        if (savedTextSheet == null || svc.messages(chat.id()).isEmpty()) return;
-        Message m = svc.messages(chat.id()).getLast();
-        java.time.Instant at = m.timestamp() == null ? java.time.Instant.now() : m.timestamp();
+        if (savedTextSheet == null || svc.messages(shownChatId()).isEmpty()) return;
+        Message m = svc.messages(shownChatId()).getLast();
+        Instant at = m.timestamp() == null ? Instant.now() : m.timestamp();
         List<app.unichat.autosave.SavedText> versions = none ? List.of() : List.of(
-                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at, m.senderName(), m.senderId(), m.outgoing(), m.body().toLowerCase(), true),
-                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at.plusSeconds(5), m.senderName(), m.senderId(), m.outgoing(), m.body() + "…", false),
-                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at.plusSeconds(90), m.senderName(), m.senderId(), m.outgoing(), m.body(), false));
+                new app.unichat.autosave.SavedText(m.id(), shownChatId(), at, at, m.senderName(), m.senderId(), m.outgoing(), m.body().toLowerCase(Locale.ROOT), true),
+                new app.unichat.autosave.SavedText(m.id(), shownChatId(), at, at.plusSeconds(5), m.senderName(), m.senderId(), m.outgoing(), m.body() + "…", false),
+                new app.unichat.autosave.SavedText(m.id(), shownChatId(), at, at.plusSeconds(90), m.senderName(), m.senderId(), m.outgoing(), m.body(), false));
         savedTextSheet.show(java.util.concurrent.CompletableFuture.completedFuture(versions));
     }
 
     /** Snapshot diagnostics: the sheet for the newest message, or ({@code several}) the newest three picked. */
     public void showForwarding(boolean several) {
-        List<Message> last = svc.messages(chat.id()).stream().filter(m -> messageActions.allows(m, MessageActions.Action.FORWARD)).toList();
+        List<Message> last = svc.messages(shownChatId()).stream().filter(m -> messageActions.allows(m, MessageActions.Action.FORWARD)).toList();
         if (last.isEmpty()) return;
         if (!several) {
             forward(List.of(last.getLast()));
@@ -469,7 +492,7 @@ public final class ThreadPane extends BorderPane {
 
     public void setInfoSelected(boolean selected) { infoButton.setSelected(selected); }
 
-    public void open(Chat c) {
+    public void open(@Nullable Chat c) {
         selection.end();
         chat = c;
         reachedStart = false;
@@ -506,12 +529,12 @@ public final class ThreadPane extends BorderPane {
             serverLink.setAccessibleText(I18n.t("thread.viewChannels", server.title()));
             serverLink.setTooltip(new javafx.scene.control.Tooltip(I18n.t("thread.viewChannels", server.title())));
         }
-        String sub = chat.network().displayName();
+        StringBuilder sub = new StringBuilder(chat.network().displayName());
         String account = Accounts.forChat(svc, chat);
-        if (account != null) sub += " · " + account;
-        if (chat.group()) sub += " · " + I18n.t("thread.participants", chat.members().size());
-        if (chat.muted()) sub += " · " + I18n.t("thread.muted");
-        headerSubtitle.setText(sub);
+        if (account != null) sub.append(" · ").append(account);
+        if (chat.group()) sub.append(" · ").append(I18n.t("thread.participants", chat.members().size()));
+        if (chat.muted()) sub.append(" · ").append(I18n.t("thread.muted"));
+        headerSubtitle.setText(sub.toString());
         Nodes.style(favButton, "active", chat.favorite());
         Nodes.style(archiveButton, "active", chat.archived());
         TypingDots.show(typing, chat.typing().isEmpty() ? null : Formats.typing(chat.typing()));
@@ -530,9 +553,10 @@ public final class ThreadPane extends BorderPane {
         composer.hearAhead(); // a voice note that just arrived is ready when a draft answers it
         messageRows.index(msgs);
         List<ThreadRows.Row> next = ThreadRows.build(msgs, ZoneId.systemDefault());
-        if (forceBottom) rows.setAll(next); else ThreadRows.update(rows, next);
+        if (forceBottom) rows.setAll(next);
+        else ThreadRows.update(rows, next);
         // Drawn from elsewhere than the messages: photos of who's in the chat, what it allows, and "Hoy" on the day separators.
-        int surroundings = java.util.Objects.hash(chat.id(), chat.members(), chat.features(), java.time.LocalDate.now());
+        int surroundings = java.util.Objects.hash(chat.id(), chat.members(), chat.features(), java.time.LocalDate.now(ZoneId.systemDefault()));
         if (surroundings != drawnWith && !forceBottom) list.refresh();
         drawnWith = surroundings;
         if (selected != null && !forceBottom) select(selected);
@@ -558,7 +582,7 @@ public final class ThreadPane extends BorderPane {
         String id = chat.id();
         // Loaded because the chat is short (not because you scrolled to the top): keep showing the newest.
         boolean followBottom = scroll.pinned();
-        svc.loadOlder(id).whenComplete((more, err) -> Platform.runLater(() -> {
+        var _ = svc.loadOlder(id).whenComplete((more, err) -> Platform.runLater(() -> {
             loadingOlder = false;
             if (chat == null || !chat.id().equals(id)) return;
             if (err != null || Boolean.FALSE.equals(more)) reachedStart = true;
@@ -572,7 +596,7 @@ public final class ThreadPane extends BorderPane {
         }));
     }
 
-    private Member member(String userId) {
+    private @Nullable Member member(String userId) {
         if (chat == null) return null;
         for (Member m : chat.members()) if (m.id().equals(userId)) return m;
         return null;
@@ -582,7 +606,7 @@ public final class ThreadPane extends BorderPane {
 
     private final class RowCell extends ListCell<ThreadRows.Row> implements MessageSelection.Shows {
         /** The message's own row, before the range's markers (if any) go around it. */
-        private Node drawn;
+        private @Nullable Node drawn;
 
         RowCell() {
             getStyleClass().add("row-cell");
@@ -620,7 +644,8 @@ public final class ThreadPane extends BorderPane {
             pseudoClassStateChanged(MessageSelection.PICKED, picked);
             showActions(isSelected());
             if (getItem() instanceof ThreadRows.MessageRow mr && drawn != null) {
-                boolean start = selection.rangeStart(mr.message()), end = selection.rangeEnd(mr.message());
+                boolean start = selection.rangeStart(mr.message());
+                boolean end = selection.rangeEnd(mr.message());
                 Node shown = RangeMarkers.around(drawn, start, end, () -> selection.removeRangeEnd(true), () -> selection.removeRangeEnd(false));
                 if (getGraphic() != shown) setGraphic(shown);
             }
@@ -641,7 +666,7 @@ public final class ThreadPane extends BorderPane {
     }
 
     /** The message selected in the timeline (the keyboard's, or one gone to), or null. */
-    public Message selectedMessage() {
+    public @Nullable Message selectedMessage() {
         return list.getSelectionModel().getSelectedItem() instanceof ThreadRows.MessageRow mr ? mr.message() : null;
     }
 
@@ -654,13 +679,13 @@ public final class ThreadPane extends BorderPane {
         }
     }
 
-    /** Keyboard control of the focused timeline. Arrow keys move the selection (ListView default). */
     /** A message's actions a plain key does, under the same rules as its menu ({@link MessageActionsUi#run}). */
     private static final java.util.Map<javafx.scene.input.KeyCode, MessageActions.Action> KEY_ACTIONS = java.util.Map.of(
             javafx.scene.input.KeyCode.R, MessageActions.Action.REPLY,
             javafx.scene.input.KeyCode.T, MessageActions.Action.TRANSCRIBE,
             javafx.scene.input.KeyCode.E, MessageActions.Action.EDIT);
 
+    /** Keyboard control of the focused timeline. Arrow keys move the selection (ListView default). */
     private void onTimelineKey(javafx.scene.input.KeyEvent e) {
         Message m = selectedMessage();
         if (selection.key(e, m)) return;
@@ -677,8 +702,8 @@ public final class ThreadPane extends BorderPane {
             audio.toggle(m, chat);
         } else if (code == javafx.scene.input.KeyCode.C && e.isShortcutDown() && !m.isMedia()) {
             Clipboards.copy(m.body());
-        } else if ((code == javafx.scene.input.KeyCode.ENTER || code == javafx.scene.input.KeyCode.SPACE
-                || code == javafx.scene.input.KeyCode.CONTEXT_MENU)) { // a deleted one's too: what it said
+        } else if (code == javafx.scene.input.KeyCode.ENTER || code == javafx.scene.input.KeyCode.SPACE
+                || code == javafx.scene.input.KeyCode.CONTEXT_MENU) { // a deleted one's too: what it said
             var cell = list.lookupAll(".row-cell").stream()
                     .filter(n -> n instanceof RowCell rc && rc.isSelected()).findFirst().orElse(list);
             messageActions.messageMenu(m).show(cell, Side.BOTTOM, 40, -10);
@@ -698,7 +723,7 @@ public final class ThreadPane extends BorderPane {
     }
 
     /** The reply a sticker or GIF sent now answers: {@link Composer#takeReply}. */
-    public String takeReply() {
+    public @Nullable String takeReply() {
         return composer.takeReply();
     }
 }

@@ -1,5 +1,7 @@
 package app.unichat.matrix;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Duration;
 import java.time.Instant;
 
@@ -12,7 +14,7 @@ record Retry(int failures, Instant at) {
     static final Duration LAST = Duration.ofHours(1);
 
     /** After one more failure at {@code now}; {@code previous} is null for the first. */
-    static Retry after(Retry previous, Instant now) {
+    static Retry after(@Nullable Retry previous, Instant now) {
         int failures = previous == null ? 1 : previous.failures + 1;
         Duration wait = FIRST.multipliedBy(1L << Math.min(failures - 1, 10));
         return new Retry(failures, now.plus(wait.compareTo(LAST) > 0 ? LAST : wait));

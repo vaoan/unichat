@@ -3,6 +3,7 @@ package app.unichat.server;
 import app.unichat.support.Downloads;
 import app.unichat.support.Processes;
 import app.unichat.support.SafeFile;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,8 +19,8 @@ import java.util.function.Function;
 public final class BinaryStore {
     private final Path bin;
     private final Platform platform;
-    private final Function<Manifest.Component, String> releaseBase;
-    private final Function<Manifest.Component, String> pinned;
+    private final Function<Manifest.Component, @Nullable String> releaseBase;
+    private final Function<Manifest.Component, @Nullable String> pinned;
     private final Function<Manifest.Component, String> version;
 
     /** Downloads from {@code manifest}'s releases, checked against its pinned hashes. */
@@ -29,14 +30,14 @@ public final class BinaryStore {
     }
 
     /** {@code releaseBase}: where a component's files are; {@code pinned}: its SHA-256, null when not pinned (tests). */
-    BinaryStore(Path bin, Platform platform, Function<Manifest.Component, String> releaseBase,
-                Function<Manifest.Component, String> pinned) {
+    BinaryStore(Path bin, Platform platform, Function<Manifest.Component, @Nullable String> releaseBase,
+                Function<Manifest.Component, @Nullable String> pinned) {
         this(bin, platform, releaseBase, pinned, Manifest.Component::tag);
     }
 
     /** {@code version}: what an installed component is recorded as ({@link Manifest#version}). */
-    BinaryStore(Path bin, Platform platform, Function<Manifest.Component, String> releaseBase,
-                Function<Manifest.Component, String> pinned, Function<Manifest.Component, String> version) {
+    BinaryStore(Path bin, Platform platform, Function<Manifest.Component, @Nullable String> releaseBase,
+                Function<Manifest.Component, @Nullable String> pinned, Function<Manifest.Component, String> version) {
         this.bin = bin;
         this.platform = platform;
         this.releaseBase = releaseBase;
@@ -57,7 +58,8 @@ public final class BinaryStore {
         Path target = path(c.name());
         if (isInstalled(c)) return target;
         Files.createDirectories(bin);
-        String asset = c.asset(platform), want = pinned.apply(c);
+        String asset = c.asset(platform);
+        String want = pinned.apply(c);
         if (want == null) throw new IOException(asset + " " + c.tag() + " has no pinned SHA-256 (native/pin-hashes.sh)");
 
         Downloads.fetch(releaseBase.apply(c) + "/" + asset, 0, want, target, asset, p -> { }, part -> part.toFile().setExecutable(true, true));
@@ -67,18 +69,18 @@ public final class BinaryStore {
     }
 
     /** Copies the homeserver shipped inside the app when it's missing or another version. */
-    public Path installBundled(String name, Path source, String version) throws IOException {
+    public Path installBundled(String name, Path source, String bundledVersion) throws IOException {
         Path target = path(name);
-        if (Files.isExecutable(target) && version.equals(installedVersion(name))) return target;
+        if (Files.isExecutable(target) && bundledVersion.equals(installedVersion(name))) return target;
         Files.createDirectories(bin);
         try (var in = Files.newInputStream(source)) {
             SafeFile.at(target, ".part").beforeMove(part -> part.toFile().setExecutable(true, true)).copy(in);
         }
-        Files.writeString(bin.resolve(name + ".version"), version);
+        Files.writeString(bin.resolve(name + ".version"), bundledVersion);
         return target;
     }
 
-    private String installedVersion(String name) {
+    private @Nullable String installedVersion(String name) {
         try {
             return Files.readString(bin.resolve(name + ".version")).strip();
         } catch (IOException e) {

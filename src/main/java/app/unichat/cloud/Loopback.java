@@ -3,6 +3,8 @@ package app.unichat.cloud;
 import app.unichat.support.I18n;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -37,6 +39,9 @@ final class Loopback {
 
     /** The browser left past the deadline: nothing went wrong, the person didn't finish. */
     static final class Expired extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         Expired(String message) {
             super(message);
         }
@@ -53,7 +58,7 @@ final class Loopback {
 
     /** As above, the deadline told with {@code expiredKey}'s words. */
     static void until(HttpServer server, CompletableFuture<?> result, Duration deadline, String expiredKey) {
-        result.whenComplete((a, e) -> server.stop(0));
+        var _ = result.whenComplete((a, e) -> server.stop(0));
         CompletableFuture.delayedExecutor(deadline.toNanos(), TimeUnit.NANOSECONDS).execute(() -> {
             if (result.isDone()) return;
             server.stop(0);
@@ -62,17 +67,18 @@ final class Loopback {
     }
 
     /** Whether the {@code state} that came back is ours, in constant time: how long it takes says nothing of ours. */
-    static boolean ours(String state, String back) {
+    static boolean ours(String state, @Nullable String back) {
         return back != null && MessageDigest.isEqual(state.getBytes(StandardCharsets.UTF_8), back.getBytes(StandardCharsets.UTF_8));
     }
 
+    @SuppressFBWarnings(value = "DMI_RANDOM_USED_ONLY_ONCE", justification = "a SecureRandom made for one state: its strength doesn't come from reuse")
     static String random(int bytes) {
         byte[] b = new byte[bytes];
         new SecureRandom().nextBytes(b);
         return HexFormat.of().formatHex(b);
     }
 
-    static Map<String, String> query(String raw) {
+    static Map<String, String> query(@Nullable String raw) {
         Map<String, String> q = new HashMap<>();
         if (raw == null) return q;
         for (String pair : raw.split("&")) {

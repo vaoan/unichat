@@ -1,5 +1,8 @@
 package app.unichat.model;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -24,46 +27,50 @@ public final class Markup {
     private Markup() {}
 
     /** The HTML for {@code text}, or null when it has no marks (it then goes as plain text, as always). */
-    public static String html(String text) {
+    public static @Nullable String html(@Nullable String text) {
         if (text == null || text.isEmpty()) return null;
         String[] lines = text.split("\n", -1);
         List<String[]> parts = new ArrayList<>(); // {kind, html}: kind "line" or "block"
         boolean any = false;
-        for (int i = 0; i < lines.length; i++) {
+        int i = 0;
+        while (i < lines.length) {
             if (FENCE.matcher(lines[i].strip()).matches()) {
                 int end = i + 1;
                 while (end < lines.length && !lines[end].strip().equals("```")) end++;
                 if (end < lines.length) {
                     parts.add(new String[]{"block", "<pre><code>" + escape(String.join("\n", java.util.Arrays.copyOfRange(lines, i + 1, end))) + "</code></pre>"});
                     any = true;
-                    i = end;
+                    i = end + 1; // past the closing fence
                     continue;
                 }
             }
             if (lines[i].startsWith("> ")) {
                 StringBuilder q = new StringBuilder();
-                for (; i < lines.length && lines[i].startsWith("> "); i++) {
+                int next = i;
+                for (; next < lines.length && lines[next].startsWith("> "); next++) {
                     if (!q.isEmpty()) q.append("<br>");
-                    q.append(inline(lines[i].substring(2)));
+                    q.append(inline(lines[next].substring(2)));
                 }
-                i--;
                 parts.add(new String[]{"block", "<blockquote>" + q + "</blockquote>"});
                 any = true;
+                i = next; // the first line past the quote
                 continue;
             }
             String html = inline(lines[i]);
             any |= !html.equals(escape(lines[i]));
             parts.add(new String[]{"line", html});
+            i++;
         }
         if (!any) return null;
         StringBuilder out = new StringBuilder();
-        for (int i = 0; i < parts.size(); i++) {
-            if (i > 0 && parts.get(i - 1)[0].equals("line") && parts.get(i)[0].equals("line")) out.append("<br>");
-            out.append(parts.get(i)[1]);
+        for (int k = 0; k < parts.size(); k++) {
+            if (k > 0 && parts.get(k - 1)[0].equals("line") && parts.get(k)[0].equals("line")) out.append("<br>");
+            out.append(parts.get(k)[1]);
         }
         return out.toString();
     }
 
+    @SuppressFBWarnings(value = "POTENTIAL_XML_INJECTION", justification = "every piece of the message's text goes through escape() before it's appended; only our own tags are added as they are")
     private static String inline(String s) {
         StringBuilder out = new StringBuilder();
         Matcher m = INLINE.matcher(s);

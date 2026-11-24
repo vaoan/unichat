@@ -1,5 +1,7 @@
 package app.unichat.server;
 
+import java.sql.SQLException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -20,9 +22,11 @@ class MediaPruneTest {
     @TempDir Path dir;
     private final Instant now = Instant.parse("2026-11-20T12:00:00Z");
 
-    private Path bridgeDb() throws Exception {
+    @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
+    private Path bridgeDb() throws SQLException {
         Path db = dir.resolve("discord.db");
-        long old = now.minus(Duration.ofDays(30)).toEpochMilli(), recent = now.minus(Duration.ofDays(1)).toEpochMilli();
+        long old = now.minus(Duration.ofDays(30)).toEpochMilli();
+        long recent = now.minus(Duration.ofDays(1)).toEpochMilli();
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db); Statement s = c.createStatement()) {
             s.execute("CREATE TABLE discord_file (url TEXT, encrypted BOOLEAN, mxc TEXT NOT NULL, id TEXT, emoji_name TEXT,"
                     + " size BIGINT NOT NULL, mime_type TEXT NOT NULL, timestamp BIGINT NOT NULL)");
@@ -40,7 +44,7 @@ class MediaPruneTest {
         return db;
     }
 
-    private static List<String> cached(Path db) throws Exception {
+    private static List<String> cached(Path db) throws SQLException {
         List<String> out = new ArrayList<>();
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db); Statement s = c.createStatement();
              ResultSet rs = s.executeQuery("SELECT mxc FROM discord_file ORDER BY mxc")) {

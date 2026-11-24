@@ -1,6 +1,7 @@
 package app.unichat.service;
 
 import app.unichat.model.Message;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -36,8 +37,8 @@ public final class Forwarding {
         private final java.util.concurrent.atomic.AtomicInteger failed = new java.util.concurrent.atomic.AtomicInteger();
         private final CompletableFuture<Void> done = new CompletableFuture<>();
         private final List<Runnable> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
-        private volatile Message current;
-        private volatile String currentChat;
+        private volatile @Nullable Message current;
+        private volatile @Nullable String currentChat;
         private volatile boolean cancelled;
 
         Job(int total, List<String> chatIds) {
@@ -50,8 +51,8 @@ public final class Forwarding {
         public int failed() { return failed.get(); }
         public List<String> chatIds() { return chatIds; }
         /** The message going now (null when none). */
-        public Message current() { return current; }
-        public String currentChat() { return currentChat; }
+        public @Nullable Message current() { return current; }
+        public @Nullable String currentChat() { return currentChat; }
         public boolean cancelled() { return cancelled; }
         public boolean finished() { return done.isDone(); }
         /** Completes when the last one went (or failed), or after a cancel when the one going ends. */
@@ -77,14 +78,15 @@ public final class Forwarding {
      * so a run from the same person carries one. One that fails is counted and the rest still go. {@code gifs}: as
      * {@link ChatMessaging#forward}.
      */
-    public static Job send(ChatMessaging svc, List<Message> messages, List<String> chatIds, Function<Message, String> note, boolean gifs) {
+    public static Job send(ChatMessaging svc, List<Message> messages, List<String> chatIds, Function<Message, @Nullable String> note,
+                           boolean gifs) {
         Job job = new Job(messages.size() * chatIds.size(), chatIds);
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (String chatId : chatIds) {
-            String[] last = {null};
+            @Nullable String[] last = {null};
             for (Message m : messages) {
                 String line = note.apply(m);
-                boolean noted = line != null && !line.equals(last[0]);
+                String noted = line != null && !line.equals(last[0]) ? line : null; // said only when it changes
                 last[0] = line;
                 chain = chain.thenCompose(v -> {
                     if (job.cancelled) return CompletableFuture.completedFuture(null);
@@ -92,7 +94,7 @@ public final class Forwarding {
                     job.currentChat = chatId;
                     job.changed();
                     // The line as plain text, like a forward: it holds names strangers chose ("*Ana*" isn't bold), and pings no one.
-                    return (noted ? svc.forward(chatId, plain(chatId, line), false) : CompletableFuture.<Void>completedFuture(null))
+                    return (noted != null ? svc.forward(chatId, plain(chatId, noted), false) : CompletableFuture.<Void>completedFuture(null))
                             .handle((x, err) -> logged(err))
                             .thenCompose(x -> svc.forward(chatId, m, gifs))
                             .handle((x, err) -> {
@@ -103,7 +105,7 @@ public final class Forwarding {
                 });
             }
         }
-        chain.whenComplete((v, err) -> {
+        var _ = chain.whenComplete((v, err) -> {
             job.current = null;
             job.done.complete(null);
             job.changed();
@@ -118,7 +120,7 @@ public final class Forwarding {
     }
 
     /** A line that couldn't go is logged: the messages still go, and only they count. */
-    private static Void logged(Throwable err) {
+    private static @Nullable Void logged(@Nullable Throwable err) {
         if (err != null) System.err.println("Forward note failed: " + err);
         return null;
     }

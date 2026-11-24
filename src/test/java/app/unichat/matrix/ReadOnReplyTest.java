@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -30,12 +31,13 @@ class ReadOnReplyTest {
     /** The messages each public read receipt went for, in order. */
     private final List<String> receipts = new CopyOnWriteArrayList<>();
     private Settings.ReadReceipts was;
+    @SuppressWarnings("NullAway.Init") // each test makes it before use; @AfterEach stops it only if made
     private MatrixChatService svc;
 
     @BeforeEach
     void fakeHomeserver() throws Exception {
         was = Settings.get().readReceipts();
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String p = ex.getRequestURI().getPath();
             ex.getRequestBody().readAllBytes();
@@ -60,7 +62,7 @@ class ReadOnReplyTest {
         Settings.get().setReadReceipts(was);
     }
 
-    private void open(Settings.ReadReceipts when) throws Exception {
+    private void open(Settings.ReadReceipts when) throws InterruptedException {
         Settings.get().setReadReceipts(when);
         svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "read-on-reply-" + when);
         Changes changes = new Changes();

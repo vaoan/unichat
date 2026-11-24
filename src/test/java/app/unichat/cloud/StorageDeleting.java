@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
@@ -13,7 +14,7 @@ final class StorageDeleting {
     private StorageDeleting() {}
 
     /** A file goes; a folder goes with all in it; what isn't there is fine; the neighbours stay. */
-    static void check(Storage storage) throws Exception {
+    static void check(Storage storage) throws IOException {
         storage.mkdirs("Unichat/Vault/slots/a b");
         storage.put("Unichat/Vault/slots/a b/one.json", "{}".getBytes(StandardCharsets.UTF_8));
         storage.put("Unichat/Vault/slots/two.json", "{}".getBytes(StandardCharsets.UTF_8));
@@ -29,7 +30,7 @@ final class StorageDeleting {
         assertEquals(Set.of("keep.json"), Set.copyOf(storage.list("Unichat/Vault")), "the folder's neighbours stay");
 
         for (String bad : new String[] {"", "/", "//", "a/../b", "./x", "Unichat/Vault/.."}) {
-            assertThrows(java.io.IOException.class, () -> storage.delete(bad), "refused: '" + bad + "'");
+            assertThrows(IOException.class, () -> storage.delete(bad), "refused: '" + bad + "'");
         }
         assertTrue(storage.exists("Unichat/Vault/keep.json"), "a refused path deletes nothing");
         assertEquals(Set.of("keep.json"), Set.copyOf(storage.list("Unichat/Vault")));

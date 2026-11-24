@@ -26,7 +26,7 @@ Each package may only depend on the ones below it. `ArchitectureTest` checks thi
 | `login` | Logging in to the bridges and browser cookies | `model`, `support` |
 | `update` | Asks GitHub whether there is a new version of Unichat (`UpdateChecker`; the rules without network in `UpdatePolicy`) | `settings`, `support` |
 | `settings` | Preferences | `support` |
-| `model`, `support`, `bridge` | Domain data; utilities (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Urls`, `Errors`, `Folders`, `Processes`, `Threads`, `ConvertedFiles`, `AppVersion`, `ErrorReport`); what `matrix` and `server` share about the bridges (`BridgeStates`, `BridgePorts`, `LoginsCache`) | nothing in the project |
+| `model`, `support`, `bridge` | Domain data; utilities (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Urls`, `Errors`, `Folders`, `Processes`, `Threads`, `ConvertedFiles`, `AppVersion`, `ErrorReport`, `PathParts`, `BoundedMap`); what `matrix` and `server` share about the bridges (`BridgeStates`, `BridgePorts`, `LoginsCache`) | nothing in the project |
 
 Accepted exceptions:
 
@@ -97,6 +97,7 @@ and checks it on every build:
 |---|---|---|
 | Lines per Java file | 800 | Checkstyle (`checkstyle.xml`) |
 | Lines per method | 100 (goal: 60) | Checkstyle |
+| Naming, imports, `equals`/`hashCode`, `switch`, modifiers, hidden fields | no finding | Checkstyle (no layout rule) |
 | Copied code | 100 tokens | PMD CPD (`./mvnw verify`) |
 
 The limit isn't the goal. A file is split by responsibility, not to get under a number.
@@ -128,4 +129,3 @@ Left alone because fixing it changes behaviour or needs tests that don't exist. 
 3. **`catch` blocks that ignore errors:** they have to be reviewed one by one; some are intentional.
 4. **Global state:** `Settings.get()`, `LocalServer.get()` and the static `provisioner` of `BridgeAccounts` force
    the tests to share state.
-5. **CI:** the GitHub actions are pinned by tag, not by SHA.

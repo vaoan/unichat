@@ -1,11 +1,13 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgeStates;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +27,7 @@ class WatchdogInternetTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        everyoneAnswers = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        everyoneAnswers = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         everyoneAnswers.createContext("/", ex -> {
             ex.sendResponseHeaders(200, -1);
             ex.close();
@@ -51,7 +53,7 @@ class WatchdogInternetTest {
 
     @Test
     void whenInternetReturnsEveryBridgeStartsAgainAtOnceButNotTheServer() {
-        online = false;
+        online = false; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         dog.check();
         assertEquals(List.of(), restarted);
 
@@ -65,7 +67,7 @@ class WatchdogInternetTest {
     }
 
     /** A keeper where facebook is fragile, and {@code safe} says whether it may be restarted. */
-    private Watchdog withFragileFacebook(boolean[] safe) throws Exception {
+    private Watchdog withFragileFacebook(boolean[] safe) throws JsonProcessingException {
         int port = everyoneAnswers.getAddress().getPort();
         BridgeStates states = new BridgeStates();
         for (int i = 0; i < Watchdog.FLAPS; i++) {
@@ -78,7 +80,7 @@ class WatchdogInternetTest {
                 (name, why) -> restarted.add(name + ": " + why), () -> online, new Watchdog.SessionKeeper() {
                     @Override public boolean fragile(String bridge) { return bridge.equals("facebook"); }
                     @Override public boolean safeToRestart(String bridge) { return !bridge.equals("facebook") || safe[0]; }
-                    @Override public void tick(boolean on, long now) { }
+                    @Override public void tick(boolean on, long now) { /* the fake ignores it */ }
                 });
     }
 
@@ -86,7 +88,7 @@ class WatchdogInternetTest {
     void returningInternetDoesNotRestartWhatCouldLoseItsSession() throws Exception {
         boolean[] safe = {false};
         Watchdog d = withFragileFacebook(safe);
-        online = false;
+        online = false; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         d.check();
         online = true;
         d.check();
@@ -103,11 +105,11 @@ class WatchdogInternetTest {
 
     @Test
     void returningInternetDoesNotWaitForTheCooldown() {
-        online = false;
+        online = false; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         dog.check();
-        online = true;
+        online = true; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         dog.check();
-        online = false;
+        online = false; // NOPMD: UnusedAssignment, read by the fake the next step reaches
         dog.check();
         restarted.clear();
         online = true;

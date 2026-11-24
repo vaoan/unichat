@@ -32,7 +32,12 @@ final class BridgeDemand {
     private final Duration limit;
     private final Set<String> meant = ConcurrentHashMap.newKeySet();
 
-    /** @param pause between unanswered probes; @param limit how long a sign-in waits for its bridge in all */
+    /**
+     * Which bridges to start, probing them with {@code probe}.
+     *
+     * @param pause between unanswered probes
+     * @param limit how long a sign-in waits for its bridge in all
+     */
     BridgeDemand(Predicate<String> hasAccount, Probe probe, Duration pause, Duration limit) {
         this.hasAccount = hasAccount;
         this.probe = probe;

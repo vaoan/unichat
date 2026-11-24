@@ -30,6 +30,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
+import app.unichat.login.BridgeLogin;
 
 import java.time.Instant;
 import java.util.List;
@@ -47,8 +49,8 @@ public final class AccountsPane extends VBox {
     private final StackPane body = new StackPane();
     private final Label title = new Label();
     private final Button back;
-    private Runnable onBack;
-    private LoginWizard wizard;
+    private @Nullable Runnable onBack;
+    private @Nullable LoginWizard wizard;
     private final LoginChoosers choosers;
     private final LoginWizard.Navigation navigation = new LoginWizard.Navigation() {
         @Override public void openBotChat(String chatId) {
@@ -70,33 +72,38 @@ public final class AccountsPane extends VBox {
         setSpacing(14);
 
         title.getStyleClass().add("sheet-title");
-        back = Icons.iconButton(Icons.BACK, I18n.t("common.back"), () -> { if (onBack != null) onBack.run(); });
+        back = Icons.iconButton(Icons.BACK, I18n.t("common.back"), () -> {
+            Runnable action = onBack;
+            if (action != null) action.run();
+        });
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.ALWAYS);
         HBox head = new HBox(6, back, title, grow);
         head.setAlignment(Pos.CENTER_LEFT);
-        VBox.setVgrow(body, Priority.ALWAYS);
+        setVgrow(body, Priority.ALWAYS);
         getChildren().addAll(head, body);
         showList();
     }
 
     /** Stops listening to the service; called when the sheet closes. */
     public void dispose() {
-        if (wizard != null) wizard.dispose();
+        LoginWizard w = wizard;
+        if (w != null) w.dispose();
         wizard = null;
-        if (bridgeLogin != null) bridgeLogin.dispose();
+        BridgeLoginPane pane = bridgeLogin;
+        if (pane != null) pane.dispose();
         bridgeLogin = null;
     }
 
     /** The dynamic login on screen (local server), if any. */
-    private BridgeLoginPane bridgeLogin;
+    private @Nullable BridgeLoginPane bridgeLogin;
 
     /** Re-reads accounts if the list is showing (accountsChanged). The wizard updates itself. */
     public void refresh() {
         if (wizard == null && onBack == null) showList();
     }
 
-    private void setView(String heading, Node content, Runnable backAction) {
+    private void setView(String heading, Node content, @Nullable Runnable backAction) {
         title.setText(heading);
         onBack = backAction;
         Nodes.show(back, backAction != null);
@@ -110,7 +117,7 @@ public final class AccountsPane extends VBox {
         VBox rows = new VBox(0);
         rows.getStyleClass().add("settings-group");
         List<Account> accounts = svc.accounts().stream().filter(a -> a.status() != AccountStatus.NEEDS_LOGIN)
-                .sorted(java.util.Comparator.comparing((Account a) -> a.network().ordinal()).thenComparing(Accounts::name))
+                .sorted(java.util.Comparator.comparing((Account a) -> a.network()).thenComparing(Accounts::name))
                 .toList();
         if (accounts.isEmpty()) {
             Label empty = Labels.help(I18n.t("accounts.empty"));
@@ -126,7 +133,7 @@ public final class AccountsPane extends VBox {
         ScrollPane scroll = new ScrollPane(rows);
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("sheet-scroll");
-        VBox.setVgrow(scroll, Priority.ALWAYS);
+        setVgrow(scroll, Priority.ALWAYS);
         Label sub = new Label(I18n.n("accounts.count", accounts.size()));
         sub.getStyleClass().add("sheet-subtitle");
         VBox content = new VBox(12, sub, scroll, add);
@@ -150,7 +157,7 @@ public final class AccountsPane extends VBox {
             // Discord bridges no server by default: choosing them is part of connecting Discord.
             Button servers = new Button(I18n.t("accounts.servers"));
             servers.getStyleClass().add("secondary-button");
-            servers.setMinWidth(Region.USE_PREF_SIZE);
+            servers.setMinWidth(USE_PREF_SIZE);
             servers.setAccessibleText(I18n.t("accounts.serversA11y"));
             servers.setOnAction(e -> showDiscordServers(m));
             row.getChildren().add(2, servers);
@@ -159,12 +166,12 @@ public final class AccountsPane extends VBox {
             // Telegram lists your chats only once, at login: this goes through the list again.
             Button sync = new Button(I18n.t("accounts.syncChats"));
             sync.getStyleClass().add("secondary-button");
-            sync.setMinWidth(Region.USE_PREF_SIZE);
+            sync.setMinWidth(USE_PREF_SIZE);
             sync.setAccessibleText(I18n.t("accounts.syncChatsA11y"));
             sync.setOnAction(e -> {
                 sync.setDisable(true);
                 toast.accept(I18n.t("accounts.syncing"));
-                svc.syncChats(Network.TELEGRAM).whenComplete((r, err) -> Platform.runLater(() -> {
+                var _ = svc.syncChats(Network.TELEGRAM).whenComplete((r, err) -> Platform.runLater(() -> {
                     sync.setDisable(false);
                     toast.accept(err == null ? I18n.t("accounts.synced") : I18n.t("accounts.syncFailed"));
                 }));
@@ -183,12 +190,11 @@ public final class AccountsPane extends VBox {
     }
 
     private ContextMenu accountMenu(Account a) {
-        ContextMenu m = new ContextMenu(
+        return new ContextMenu(
                 ChatMenus.item(I18n.t("accounts.rename"), () -> showRename(a)),
                 ChatMenus.item(I18n.t("accounts.addAnotherOf", a.network().displayName()), () -> startLogin(a.network())),
                 new SeparatorMenuItem(),
                 ChatMenus.danger(ChatMenus.item(I18n.t("accounts.disconnectMenu"), () -> showDisconnect(a))));
-        return m;
     }
 
     /** Disconnecting logs the account out on the bridge, so it always asks first. */
@@ -206,7 +212,7 @@ public final class AccountsPane extends VBox {
         confirm.getStyleClass().add("danger-button");
         confirm.setOnAction(e -> {
             confirm.setDisable(true);
-            svc.disconnectAccount(a).whenComplete((v, err) -> Platform.runLater(() -> {
+            var _ = svc.disconnectAccount(a).whenComplete((v, err) -> Platform.runLater(() -> {
                 toast.accept(err == null ? I18n.t("accounts.disconnected", Accounts.name(a)) : I18n.t("accounts.disconnectFailed", LoginTexts.rootMessage(err)));
                 showList();
             }));
@@ -256,7 +262,7 @@ public final class AccountsPane extends VBox {
             if (count > 0) {
                 Label c = new Label(I18n.n("accounts.connectedCount", count));
                 c.getStyleClass().addAll("status-pill", "ok");
-                c.setMinWidth(Region.USE_PREF_SIZE);
+                c.setMinWidth(USE_PREF_SIZE);
                 row.getChildren().add(c);
             }
             row.getChildren().add(Icons.icon(Icons.BACK, 14));
@@ -275,15 +281,15 @@ public final class AccountsPane extends VBox {
         ScrollPane scroll = new ScrollPane(rows);
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("sheet-scroll");
-        VBox.setVgrow(scroll, Priority.ALWAYS);
+        setVgrow(scroll, Priority.ALWAYS);
         Label sub = new Label(I18n.t("accounts.pickNetwork"));
         sub.setWrapText(true);
         sub.getStyleClass().add("sheet-subtitle");
-        sub.setMinHeight(Region.USE_PREF_SIZE);
+        sub.setMinHeight(USE_PREF_SIZE);
         // Unofficial bridges: said once, calmly, before the person picks a network (the same text is in Acerca de).
         Label risk = Labels.help(I18n.t("accounts.riskNotice"));
         risk.getStyleClass().add("risk-notice");
-        risk.setMinHeight(Region.USE_PREF_SIZE);
+        risk.setMinHeight(USE_PREF_SIZE);
         setView(I18n.t("accounts.add"), new VBox(12, sub, risk, scroll), this::showList);
     }
 
@@ -313,7 +319,12 @@ public final class AccountsPane extends VBox {
                 m.prepareBridge(n);
                 Platform.runLater(() -> {
                     if (getScene() == null) return;
-                    bridgeLogin = new BridgeLoginPane(n, m.bridgeLogin(n), () -> getScene() == null ? null : getScene().getWindow(),
+                    BridgeLogin api = m.bridgeLogin(n);
+                    if (api == null) { // gone once prepared: said as a failed login step says it
+                        loading.fail(I18n.t("login.pane.failed", n.displayName()));
+                        return;
+                    }
+                    BridgeLoginPane pane = new BridgeLoginPane(n, api, () -> Nodes.window(this),
                             () -> {
                                 m.loginFinished(n);
                                 dispose();
@@ -324,7 +335,8 @@ public final class AccountsPane extends VBox {
                                 dispose();
                                 startBotLogin(n);
                             });
-                    setView(I18n.t("login.connectTitle", n.displayName()), bridgeLogin, () -> {
+                    bridgeLogin = pane;
+                    setView(I18n.t("login.connectTitle", n.displayName()), pane, () -> {
                         dispose();
                         showPicker();
                     });
@@ -339,14 +351,15 @@ public final class AccountsPane extends VBox {
         LoadingView loading = new LoadingView(I18n.t("accounts.preparingLogin", n.displayName()));
         setView(I18n.t("login.connectTitle", n.displayName()), loading, this::showPicker);
         Instant since = Instant.now().minusSeconds(2);
-        svc.addAccount(n).whenComplete((botChatId, err) -> Platform.runLater(() -> {
+        var _ = svc.addAccount(n).whenComplete((botChatId, err) -> Platform.runLater(() -> {
             if (err != null) {
                 loading.fail(I18n.t("accounts.startFailed", LoginTexts.rootMessage(err)));
                 return;
             }
-            wizard = new LoginWizard(svc, toast, navigation, n, botChatId, since);
+            LoginWizard w = new LoginWizard(svc, toast, navigation, n, botChatId, since);
+            wizard = w;
             Runnable cancel = () -> {
-                wizard.cancel();
+                w.cancel();
                 showPicker();
             };
             if (CookieLogin.isCookieNetwork(n)) {
@@ -354,7 +367,7 @@ public final class AccountsPane extends VBox {
             } else if (n == Network.DISCORD) {
                 choosers.showDiscordChoice(n, botChatId, cancel);
             } else {
-                setView(I18n.t("login.connectTitle", n.displayName()), wizard.root, cancel);
+                setView(I18n.t("login.connectTitle", n.displayName()), w.root, cancel);
             }
         }));
     }
@@ -372,7 +385,7 @@ public final class AccountsPane extends VBox {
             case NOT_AVAILABLE -> I18n.t("accounts.status.unavailable");
         });
         l.getStyleClass().addAll("status-pill", s == AccountStatus.CONNECTED ? "ok" : "warn");
-        l.setMinWidth(Region.USE_PREF_SIZE);
+        l.setMinWidth(USE_PREF_SIZE);
         return l;
     }
 }

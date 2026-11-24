@@ -6,6 +6,7 @@ import app.unichat.model.Network;
 import app.unichat.service.BridgeAccess.DiscordGuild;
 import app.unichat.service.ChatService.GroupOffer;
 import app.unichat.settings.Settings;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -17,7 +18,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 
-import static app.unichat.matrix.BridgeProtocol.*;
+import static app.unichat.matrix.BridgeProtocol.Login;
+import static app.unichat.matrix.BridgeProtocol.offers;
+import static app.unichat.matrix.BridgeProtocol.parseGuilds;
+import static app.unichat.matrix.BridgeProtocol.requireSuccess;
 import static app.unichat.matrix.MatrixLogin.userMessage;
 
 /** Discord servers: which are bridged, offering the rest, and archived servers bringing nothing. */
@@ -38,7 +42,7 @@ final class DiscordServers {
     static final String PAUSED_GUILDS_KEY = "discord.guilds.paused";
 
     /** The Discord server id behind a server's space (not a category inside it, not the bridge's own folder), or null. */
-    String guildOf(String chatId) {
+    @Nullable String guildOf(String chatId) {
         MatrixRoom r = proc.room(chatId);
         if (r == null || !r.space || r.chat.network() != Network.DISCORD || r.bridgeChannelId == null || r.chat.personalSpace()) {
             return null;
@@ -69,7 +73,7 @@ final class DiscordServers {
         return out;
     }
 
-    private String serverSpace(String id, Map<String, Set<String>> parents, Set<String> seen) {
+    private @Nullable String serverSpace(String id, Map<String, Set<String>> parents, Set<String> seen) {
         if (!seen.add(id)) return null;
         if (guildOf(id) != null) return id;
         for (String p : parents.getOrDefault(id, Set.of())) {
@@ -102,18 +106,18 @@ final class DiscordServers {
                 runs.add(CompletableFuture.runAsync(() -> setGuildPausedNow(guild, r.paused(), r.retry()), core.io));
             }
         }
-        return CompletableFuture.allOf(runs.toArray(new CompletableFuture[0]));
+        return CompletableFuture.allOf(runs.toArray(new CompletableFuture<?>[0]));
     }
 
     /** Never throws: a failure is logged and tried again later; {@code failedBefore} is null for a first try. */
-    private void setGuildPausedNow(String guildId, boolean paused, Retry failedBefore) {
+    private void setGuildPausedNow(String guildId, boolean paused, @Nullable Retry failedBefore) {
         try {
             String reply = bots.query(Network.DISCORD, "guilds bridging-mode " + guildId + " " + (paused ? "nothing" : "create-on-message"));
             if (!reply.startsWith("Set guild bridging mode")) throw new MatrixException(0, null, reply);
             if (paused) Settings.get().addToSet(PAUSED_GUILDS_KEY, guildId);
             else Settings.get().removeFromSet(PAUSED_GUILDS_KEY, guildId);
-        } catch (Exception e) {
-            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+        } catch (Exception e) { // NOPMD: ExceptionAsFlowControl, one failure path for a refusal and an error: both retried
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt(); // NOPMD: AvoidInstanceofChecksInCatchClause, the same handling; an interrupt is kept
             System.err.println("Discord server " + (paused ? "pause" : "resume") + " failed, will retry: " + e);
             synchronized (pauseRetries) {
                 // A newer choice made meanwhile stays the one to retry.
@@ -168,7 +172,7 @@ final class DiscordServers {
     }
 
     /** The bridge's guild list, asked at most every few minutes (each ask is a message in the bot chat). */
-    private volatile List<DiscordGuild> guildCache;
+    private volatile @Nullable List<DiscordGuild> guildCache;
 
     private volatile long guildCacheAt;
 

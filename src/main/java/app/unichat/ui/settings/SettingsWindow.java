@@ -14,6 +14,7 @@ import app.unichat.gif.GifProviders;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -29,6 +30,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -40,17 +42,17 @@ import static app.unichat.ui.settings.SettingsForm.toggle;
 
 /** Preferences window (⌘, / Ctrl+,). Every control writes through to {@link Settings} immediately. */
 public final class SettingsWindow {
-    private static Stage open;
+    private static @Nullable Stage open;
 
     private SettingsWindow() {}
 
-    private static AccountsPane accounts;
+    private static @Nullable AccountsPane accounts;
 
     /** The open settings window, if any (used by the snapshot diagnostics). */
-    public static Stage current() { return open; }
+    public static @Nullable Stage current() { return open; }
 
     /** The accounts page while it is showing, else null. */
-    public static AccountsPane accountsPage() { return accounts; }
+    public static @Nullable AccountsPane accountsPage() { return accounts; }
 
     /** The pages, in order: an id and the key of its title. */
     private record Page(String id, String key) {
@@ -73,19 +75,22 @@ public final class SettingsWindow {
             new Page("about", "settings.nav.about"));
 
     /** The id of the page showing ("appearance"), or null when the window is closed. */
-    @SuppressWarnings("unchecked")
-    public static String currentPage() {
-        if (open == null) return null;
-        Node nav = open.getScene().getRoot().lookup(".settings-nav");
+    @SuppressWarnings("unchecked") // lookup() gives a Node: ".settings-nav" is the ListView<String> built above
+    public static @Nullable String currentPage() {
+        Stage shown = open;
+        if (shown == null) return null;
+        Node nav = shown.getScene().getRoot().lookup(".settings-nav");
         int i = nav instanceof ListView<?> lv ? ((ListView<String>) lv).getSelectionModel().getSelectedIndex() : -1;
         return i < 0 ? null : PAGES.get(i).id();
     }
 
     /** Selects the page named {@code page}: its id ("accessibility") or the start of its shown title. */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // as above
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a page id of ours, asked by our own code")
     public static void select(String page) {
-        if (open == null) return;
-        Node nav = open.getScene().getRoot().lookup(".settings-nav");
+        Stage shown = open;
+        if (shown == null) return;
+        Node nav = shown.getScene().getRoot().lookup(".settings-nav");
         if (nav instanceof ListView<?> lv) {
             ListView<String> l = (ListView<String>) lv;
             for (int i = 0; i < PAGES.size(); i++) {
@@ -100,8 +105,9 @@ public final class SettingsWindow {
 
     public static void show(Window owner, ChatService svc, Runnable onAppearanceChanged, Runnable onLogout,
                             Consumer<String> openChatId, Consumer<String> toast) {
-        if (open != null) {
-            open.toFront();
+        Stage shown = open;
+        if (shown != null) {
+            shown.toFront();
             return;
         }
         Stage stage = new Stage();
@@ -114,16 +120,18 @@ public final class SettingsWindow {
         PAGES.forEach(p -> nav.getItems().add(p.title()));
         nav.getStyleClass().add("settings-nav");
         nav.getSelectionModel().selectedIndexProperty().addListener((o, a, idx) -> {
-            if (accounts != null) accounts.dispose();
-            accounts = null;
+            AccountsPane old = accounts;
+            if (old != null) old.dispose();
+            accounts = null; // NOPMD: UnusedAssignment, stays null when another page is chosen
             String s = idx.intValue() < 0 ? null : PAGES.get(idx.intValue()).id();
             if ("accounts".equals(s) || s == null) {
-                accounts = new AccountsPane(svc, toast, id -> {
+                AccountsPane pane = new AccountsPane(svc, toast, id -> {
                     stage.close();
                     openChatId.accept(id);
                 });
-                accounts.getStyleClass().add("settings-page");
-                content.setCenter(accounts);
+                accounts = pane;
+                pane.getStyleClass().add("settings-page");
+                content.setCenter(pane);
                 return;
             }
             Node page = switch (s) {
@@ -138,7 +146,10 @@ public final class SettingsWindow {
                 case "gifs" -> gifsPage();
                 case "shortcuts" -> shortcutsPage();
                 case "about" -> AboutPage.build();
-                default -> accountPage(svc, () -> { stage.close(); onLogout.run(); });
+                default -> accountPage(svc, () -> {
+                    stage.close();
+                    onLogout.run();
+                });
             };
             ScrollPane sp = new ScrollPane(page);
             sp.setFitToWidth(true);
@@ -152,7 +163,8 @@ public final class SettingsWindow {
         Theme.register(scene);
         stage.setScene(scene);
         stage.setOnHidden(e -> {
-            if (accounts != null) accounts.dispose();
+            AccountsPane old = accounts;
+            if (old != null) old.dispose();
             accounts = null;
             open = null;
         });
@@ -182,7 +194,7 @@ public final class SettingsWindow {
 
     private static Node notificationsPage() {
         Settings s = Settings.get();
-        Node[] rows = {
+        @Nullable Node[] rows = {
                 row(I18n.t("settings.nav.notifications"), I18n.t("settings.notifications.help"),
                         toggle(s.notificationsEnabled(), v -> {
                             s.setNotificationsEnabled(v);
@@ -206,7 +218,7 @@ public final class SettingsWindow {
     }
 
     /** Without a Dock icon a Mac app isn't in ⌘Tab; null elsewhere. */
-    private static Node shortcutRow(Settings s) {
+    private static @Nullable Node shortcutRow(Settings s) {
         if (!MainView.MAC) return null;
         return row(I18n.t("settings.notifications.globalShortcut"), I18n.t("settings.notifications.globalShortcutHelp"),
                 toggle(s.globalShortcut(), v -> {
@@ -216,7 +228,7 @@ public final class SettingsWindow {
     }
 
     /** Only a Mac has one; null elsewhere. */
-    private static Node dockRow(Settings s) {
+    private static @Nullable Node dockRow(Settings s) {
         if (!MainView.MAC) return null;
         return row(I18n.t("settings.notifications.dock"), I18n.t("settings.notifications.dockHelp"),
                         toggle(s.showInDock(), v -> {
@@ -231,11 +243,12 @@ public final class SettingsWindow {
      */
     private static Node gifsPage() {
         Settings s = Settings.get();
-        java.util.List<Node> groups = new java.util.ArrayList<>();
+        List<Node> groups = new java.util.ArrayList<>();
         Label intro = Labels.help(I18n.t("settings.gifs.intro"));
         groups.add(intro);
         for (GifProviders.Known k : GifProviders.known()) {
-            String enabledKey = "gif." + k.id() + ".enabled", keyKey = "gif." + k.id() + ".key";
+            String enabledKey = "gif." + k.id() + ".enabled";
+            String keyKey = "gif." + k.id() + ".key";
             PasswordField key = new PasswordField();
             key.setText(s.getString(keyKey, ""));
             key.setPromptText(I18n.t("settings.gifs.keyPrompt"));

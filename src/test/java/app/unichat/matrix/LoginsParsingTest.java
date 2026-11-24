@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.CountedReads;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Message;
 import app.unichat.model.Network;
@@ -9,6 +10,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -63,7 +65,7 @@ class LoginsParsingTest {
         assertTrue(BridgeProtocol.parseLogins("You're not logged in").isEmpty());
         List<BridgeProtocol.Login> l = BridgeProtocol.parseLogins("- `abc`");
         assertEquals(1, l.size());
-        assertEquals(null, l.get(0).name());
+        assertNull(l.get(0).name());
         assertEquals(AccountStatus.CONNECTED, BridgeProtocol.loginStatus(null));
         assertEquals(AccountStatus.NEEDS_LOGIN, BridgeProtocol.loginStatus("BAD_CREDENTIALS"));
     }
@@ -79,11 +81,19 @@ class LoginsParsingTest {
     @Test
     void liveStatesGiveABriefDropTimeToHeal() {
         long t = 1_000_000;
-        assertEquals(app.unichat.model.AccountStatus.CONNECTED, BridgeProtocol.liveStatus("TRANSIENT_DISCONNECT", t - 30_000, t));
-        assertEquals(app.unichat.model.AccountStatus.CONNECTING, BridgeProtocol.liveStatus("TRANSIENT_DISCONNECT", t - 90_000, t));
-        assertEquals(app.unichat.model.AccountStatus.ERROR, BridgeProtocol.liveStatus("UNKNOWN_ERROR", t - 90_000, t));
-        assertEquals(app.unichat.model.AccountStatus.NEEDS_LOGIN, BridgeProtocol.liveStatus("LOGGED_OUT", t, t),
+        assertEquals(AccountStatus.CONNECTED, BridgeProtocol.liveStatus("TRANSIENT_DISCONNECT", t - 30_000, t));
+        assertEquals(AccountStatus.CONNECTING, BridgeProtocol.liveStatus("TRANSIENT_DISCONNECT", t - 90_000, t));
+        assertEquals(AccountStatus.ERROR, BridgeProtocol.liveStatus("UNKNOWN_ERROR", t - 90_000, t));
+        assertEquals(AccountStatus.NEEDS_LOGIN, BridgeProtocol.liveStatus("LOGGED_OUT", t, t),
                 "a closed session shows at once");
-        assertEquals(app.unichat.model.AccountStatus.CONNECTED, BridgeProtocol.liveStatus("BACKFILLING", t - 999_999, t));
+        assertEquals(AccountStatus.CONNECTED, BridgeProtocol.liveStatus("BACKFILLING", t - 999_999, t));
+    }
+
+    @Test
+    void aBotAnswerIsReadInLinearTimeWhateverItsBlankLines() {
+        // "^\\s*" crossed line ends, so every blank line began a scan over all the blank lines after it.
+        CountedReads reply = new CountedReads("\n".repeat(20_000) + "no logins");
+        assertFalse(BridgeProtocol.LOGIN_LINE.matcher(reply).find());
+        assertTrue(reply.perChar() < 20, "each char read a few times: " + reply.perChar());
     }
 }

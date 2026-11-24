@@ -1,9 +1,11 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.ui.chats.ChatFilter;
 import app.unichat.ui.chats.Rail;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -33,6 +36,7 @@ class HiddenWindowUiTest {
     private static final String FAMILIA = "!family:demo";
 
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
     private Scene scene;
 
@@ -69,15 +73,14 @@ class HiddenWindowUiTest {
     @AfterEach
     void closeWindow() throws Exception {
         svc.stop();
-        fx(() -> {
+        FxWait.onFx(() -> {
             stage.close();
-            return null;
         });
     }
 
-    private int changedNodes() throws Exception {
+    private int changedNodes() throws InterruptedException, NoSuchFieldException {
         Field f = Scene.class.getDeclaredField("dirtyNodesSize");
-        f.setAccessible(true);
+        f.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
         return fx(() -> {
             try {
                 return f.getInt(scene);
@@ -87,10 +90,10 @@ class HiddenWindowUiTest {
         });
     }
 
-    private void changeChatsAndMessages(int rounds) throws Exception {
+    private void changeChatsAndMessages(int rounds) throws InterruptedException, ExecutionException {
         for (int i = 0; i < rounds; i++) {
-            svc.setPinned(FAMILIA, i % 2 == 0);
-            svc.setFavorite(FAMILIA, i % 2 == 0);
+            var _ = svc.setPinned(FAMILIA, i % 2 == 0);
+            var _ = svc.setFavorite(FAMILIA, i % 2 == 0);
             svc.sendText(FAMILIA, "hola " + i, null).get();
             FxWait.settled(); // every refresh asked for has run
         }
@@ -98,9 +101,8 @@ class HiddenWindowUiTest {
 
     @Test
     void aClosedWindowDoesNotPileUpNodes() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             stage.hide();
-            return null;
         });
         FxWait.settled();
         changeChatsAndMessages(3); // the nodes that already exist are listed once, whatever changes them
@@ -112,18 +114,16 @@ class HiddenWindowUiTest {
 
     @Test
     void openingTheWindowShowsWhatChangedMeanwhile() throws Exception {
-        boolean was = svc.chat(FAMILIA).favorite();
-        fx(() -> {
+        boolean was = Present.of(svc.chat(FAMILIA)).favorite();
+        FxWait.onFx(() -> {
             stage.hide();
-            return null;
         });
         FxWait.settled();
         svc.setFavorite(FAMILIA, !was).get();
         FxWait.settled();
         int tiles = fx(() -> scene.getRoot().lookupAll(".favorite-tile").size());
-        fx(() -> {
+        FxWait.onFx(() -> {
             stage.show();
-            return null;
         });
         int expected = tiles + (was ? -1 : 1);
         FxWait.until("the favorites row brought up to date on opening",
@@ -132,12 +132,11 @@ class HiddenWindowUiTest {
 
     @Test
     void theMenuBarCountStaysCurrentWithTheWindowClosed() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             stage.hide();
-            return null;
         });
         FxWait.settled();
-        svc.setMarkedUnread(FAMILIA, false);
+        var _ = svc.setMarkedUnread(FAMILIA, false);
         svc.markRead(FAMILIA);
         long unread = svc.chats().stream().filter(ChatFilter::inboxUnread).count();
         String expected = unread > 0 ? "Unichat (" + unread + ")" : "Unichat";
@@ -157,11 +156,10 @@ class HiddenWindowUiTest {
 
     @Test
     void aReusedRailButtonStillShowsItsUnread() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             Button whatsapp = railButtons().stream().map(Button.class::cast)
                     .filter(b -> b.getTooltip().getText().startsWith("WhatsApp")).findFirst().orElseThrow();
             assertTrue(whatsapp.getAccessibleText().startsWith("WhatsApp"));
-            return null;
         });
     }
 
@@ -178,7 +176,7 @@ class HiddenWindowUiTest {
         return false;
     }
 
-    private static <T> T fx(java.util.concurrent.Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

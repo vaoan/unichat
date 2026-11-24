@@ -1,5 +1,8 @@
 package app.unichat.server;
 
+import java.sql.SQLException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -26,7 +29,8 @@ class AccountCheckTest {
     private int dbs;
 
     /** A new database each call. */
-    private Path db(String... sql) throws Exception {
+    @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
+    private Path db(String... sql) throws SQLException {
         Path db = dir.resolve("bridge" + dbs++ + ".db");
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db); Statement s = c.createStatement()) {
             for (String q : sql) s.execute(q);
@@ -34,13 +38,13 @@ class AccountCheckTest {
         return db;
     }
 
-    private Path bridgev2(boolean withLogin) throws Exception {
+    private Path bridgev2(boolean withLogin) throws SQLException {
         return withLogin
                 ? db("CREATE TABLE \"user\" (mxid TEXT)", "CREATE TABLE user_login (id TEXT)", "INSERT INTO user_login VALUES ('1')")
                 : db("CREATE TABLE \"user\" (mxid TEXT)", "CREATE TABLE user_login (id TEXT)", "INSERT INTO \"user\" VALUES ('@yo:localhost')");
     }
 
-    private Path legacyDiscord(String token) throws Exception {
+    private Path legacyDiscord(@Nullable String token) throws SQLException {
         return db("CREATE TABLE \"user\" (mxid TEXT PRIMARY KEY, dcid TEXT, discord_token TEXT)",
                 "INSERT INTO \"user\" VALUES ('@yo:localhost', null, " + (token == null ? "null" : "'" + token + "'") + ")");
     }

@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -29,11 +30,10 @@ import java.util.Set;
  * meanwhile (another one's round) finds every slot and file where it was.
  */
 final class VaultNames {
-    /**
-     * Tests: each runs once, on the migrating thread holding what it holds: right before {@link Vault#INFO} is written
-     * (every file and slot copied), and right after the old one is deleted (before the old files go).
-     */
-    static volatile Runnable beforeSwitch, afterSwitch;
+    // Tests: each runs once, on the migrating thread holding what it holds: right before Vault#INFO is written (every
+    // file and slot copied), and right after the old one is deleted (before the old files go).
+    static volatile @Nullable Runnable beforeSwitch; // NOPMD: MutableStaticState, a seam tests swap
+    static volatile @Nullable Runnable afterSwitch; // NOPMD: MutableStaticState, a seam tests swap
 
     private VaultNames() {}
 
@@ -62,7 +62,7 @@ final class VaultNames {
      */
     static boolean left(Storage dav) throws IOException {
         if (!dav.exists(CloudNames.OLD_VAULT)) return false;
-        String known = Settings.get().getString(LEFT, null);
+        String known = Settings.get().getString(LEFT);
         if (known == null) return true;
         for (String line : known.split("\n")) {
             String[] f = line.split("\t", 2);
@@ -102,7 +102,7 @@ final class VaultNames {
         }
         StringBuilder known = new StringBuilder();
         unopened.forEach((path, stamp) -> known.append(known.isEmpty() ? "" : "\n").append(path).append('\t').append(stamp));
-        if (!known.toString().equals(Settings.get().getString(LEFT, null))) {
+        if (!known.toString().equals(Settings.get().getString(LEFT))) {
             System.err.println("Cloud: " + unopened.size() + " file(s) of the vault don't open with its key: left under the old names");
             Settings.get().set(LEFT, known.toString());
         }
@@ -143,7 +143,8 @@ final class VaultNames {
      * switch, written only while the old names are still the vault's (another computer may have switched them).
      */
     private static boolean file(Storage dav, byte[] vk, String stored, boolean before, Set<String> made) throws IOException {
-        String old = CloudAccount.ROOT + stored.substring(CloudNames.OLD_VAULT.length()), logical = CloudNames.renamed(old);
+        String old = CloudAccount.ROOT + stored.substring(CloudNames.OLD_VAULT.length());
+        String logical = CloudNames.renamed(old);
         String target = CloudNames.newStored(stored);
         byte[] plain;
         try {
@@ -181,7 +182,8 @@ final class VaultNames {
     private static void slots(Storage dav, boolean finishing, Map<String, String> copied) throws IOException {
         for (String name : dav.list(CloudNames.OLD_SLOTS)) {
             if (!name.endsWith(".json") || !Ids.ours(name.substring(0, name.length() - ".json".length()))) continue;
-            String from = CloudNames.OLD_SLOTS + "/" + name, to = Vault.SLOTS + "/" + name;
+            String from = CloudNames.OLD_SLOTS + "/" + name;
+            String to = Vault.SLOTS + "/" + name;
             String stamp = dav.stamp(from);
             if (stamp == null) continue;
             boolean again = copied.containsKey(from) && !stamp.equals(copied.get(from));

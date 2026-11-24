@@ -54,7 +54,8 @@ final class PhotoZoom {
 
     /** Double click: the whole picture, or its real size around the click. */
     void toggle(double x, double y) {
-        if (fitted) actualSize(x, y); else fit();
+        if (fitted) actualSize(x, y);
+        else fit();
     }
 
     void zoomBy(double factor) {
@@ -86,7 +87,8 @@ final class PhotoZoom {
         double x = offsetX;
         offsetX = -offsetY;
         offsetY = x;
-        if (fitted) fit(); else keepInside();
+        if (fitted) fit();
+        else keepInside();
     }
 
     boolean canPan() {

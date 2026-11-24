@@ -5,15 +5,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -81,7 +84,7 @@ final class RestServer implements AutoCloseable {
     private final ExecutorService botThread = Executors.newSingleThreadExecutor();
 
     RestServer() throws IOException {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.setExecutor(Executors.newCachedThreadPool());
         server.createContext("/", this::handle);
         server.start();
@@ -100,8 +103,8 @@ final class RestServer implements AutoCloseable {
     }
 
     /** The filters posted that leave rooms out, in order. */
-    List<TreeSet<String>> notRoomsPosted() {
-        List<TreeSet<String>> out = new ArrayList<>();
+    List<SortedSet<String>> notRoomsPosted() {
+        List<SortedSet<String>> out = new ArrayList<>();
         for (String line : log) {
             if (line.startsWith("filter not_rooms=")) out.add(rooms(line.substring("filter not_rooms=".length())));
         }
@@ -109,14 +112,14 @@ final class RestServer implements AutoCloseable {
     }
 
     /** The rooms each catch-up sync asked for, in order. */
-    List<TreeSet<String>> catchUps() {
-        List<TreeSet<String>> out = new ArrayList<>();
+    List<SortedSet<String>> catchUps() {
+        List<SortedSet<String>> out = new ArrayList<>();
         for (String line : log) if (line.startsWith("catch-up ")) out.add(rooms(line.substring("catch-up ".length())));
         return out;
     }
 
-    private static TreeSet<String> rooms(String list) {
-        TreeSet<String> out = new TreeSet<>();
+    private static SortedSet<String> rooms(String list) {
+        SortedSet<String> out = new TreeSet<>();
         for (String r : list.replace("[", "").replace("]", "").split(",")) if (!r.isBlank()) out.add(r.strip());
         return out;
     }
@@ -166,7 +169,7 @@ final class RestServer implements AutoCloseable {
     }
 
     private static String names(JsonNode list) {
-        TreeSet<String> out = new TreeSet<>();
+        SortedSet<String> out = new TreeSet<>();
         for (JsonNode r : list) out.add(r.asText());
         return out.toString();
     }
@@ -218,7 +221,7 @@ final class RestServer implements AutoCloseable {
     }
 
     /** Resting rooms' account data, as {@link #tags} has it. */
-    private void tags(HttpExchange ex, JsonNode rooms, String since) throws IOException {
+    private void tags(HttpExchange ex, JsonNode rooms, @Nullable String since) throws IOException {
         log.add("tags " + names(rooms) + (since == null ? "" : " since=" + since));
         changes.changed();
         try {
@@ -293,17 +296,17 @@ final class RestServer implements AutoCloseable {
 
     /** A Discord server's space ({@code guild}) listing its channels. */
     static String server(String id, String guild, String... channels) {
-        StringBuilder s = new StringBuilder(member(ME) + "," + state("m.room.create", "", "{\"type\":\"m.space\"}") + ","
-                + bridge("discord", guild));
-        for (String c : channels) s.append(",").append(state("m.space.child", c, "{\"via\":[\"example.org\"]}"));
+        StringBuilder s = new StringBuilder(member(ME)).append(',').append(state("m.room.create", "", "{\"type\":\"m.space\"}"))
+                .append(',').append(bridge("discord", guild));
+        for (String c : channels) s.append(',').append(state("m.space.child", c, "{\"via\":[\"example.org\"]}"));
         return room(id, s.toString());
     }
 
     /** A category: a space inside server {@code parent}, which it names as its parent, listing its channels. */
     static String category(String id, String channelId, String parent, String... channels) {
-        StringBuilder s = new StringBuilder(member(ME) + "," + state("m.room.create", "", "{\"type\":\"m.space\"}") + ","
-                + bridge("discord", channelId) + "," + state("m.space.parent", parent, "{\"via\":[\"example.org\"]}"));
-        for (String c : channels) s.append(",").append(state("m.space.child", c, "{\"via\":[\"example.org\"]}"));
+        StringBuilder s = new StringBuilder(member(ME)).append(',').append(state("m.room.create", "", "{\"type\":\"m.space\"}"))
+                .append(',').append(bridge("discord", channelId)).append(',').append(state("m.space.parent", parent, "{\"via\":[\"example.org\"]}"));
+        for (String c : channels) s.append(',').append(state("m.space.child", c, "{\"via\":[\"example.org\"]}"));
         return room(id, s.toString());
     }
 
@@ -355,11 +358,11 @@ final class RestServer implements AutoCloseable {
 
     private static String member(String user) {
         return "{\"type\":\"m.room.member\",\"state_key\":\"" + user + "\",\"sender\":\"" + user + "\",\"event_id\":\"$m"
-                + Math.abs(user.hashCode()) + "\",\"origin_server_ts\":1,\"content\":{\"membership\":\"join\"}}";
+                + Math.abs((long) user.hashCode()) + "\",\"origin_server_ts\":1,\"content\":{\"membership\":\"join\"}}";
     }
 
     private static String state(String type, String key, String content) {
         return "{\"type\":\"" + type + "\",\"state_key\":\"" + key + "\",\"sender\":\"" + ME + "\",\"event_id\":\"$s"
-                + Math.abs((type + key).hashCode()) + "\",\"origin_server_ts\":1,\"content\":" + content + "}";
+                + Math.abs((long) (type + key).hashCode()) + "\",\"origin_server_ts\":1,\"content\":" + content + "}";
     }
 }

@@ -20,6 +20,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -45,7 +46,7 @@ final class ChatRowCell extends ListCell<Chat> implements ListRows.Redrawable {
     private final Node mutedFlag = Icons.icon(Icons.BELL_OFF, 13);
     private final Node pinnedFlag = Icons.icon(Icons.PIN, 13);
     /** The account tag shown now: drawn again only when it changes, and always the first time (or an empty one shows). */
-    private String shownAccount;
+    private @Nullable String shownAccount;
     private boolean accountDrawn;
     private final HBox root;
 
@@ -56,11 +57,11 @@ final class ChatRowCell extends ListCell<Chat> implements ListRows.Redrawable {
         getStyleClass().add("chat-cell");
         name.getStyleClass().add("chat-name");
         stamp.getStyleClass().add("chat-stamp");
-        stamp.setMinWidth(Region.USE_PREF_SIZE);
+        stamp.setMinWidth(USE_PREF_SIZE);
         preview.getStyleClass().add("chat-preview");
         badge.getStyleClass().add("unread-badge");
-        badge.setMinWidth(Region.USE_PREF_SIZE);
-        flags.setMinWidth(Region.USE_PREF_SIZE);
+        badge.setMinWidth(USE_PREF_SIZE);
+        flags.setMinWidth(USE_PREF_SIZE);
         flags.setAlignment(Pos.CENTER_RIGHT);
         flags.getStyleClass().add("chat-flags");
         flags.getChildren().addAll(reminderFlag, mutedFlag, pinnedFlag);
@@ -68,7 +69,7 @@ final class ChatRowCell extends ListCell<Chat> implements ListRows.Redrawable {
         HBox.setHgrow(grow, Priority.ALWAYS);
         name.setMinWidth(0);
         accountTag.getStyleClass().add("account-tag");
-        accountTag.setMinWidth(Region.USE_PREF_SIZE);
+        accountTag.setMinWidth(USE_PREF_SIZE);
         HBox top = new HBox(6, name, grow, accountTag, stamp);
         top.setAlignment(Pos.CENTER_LEFT);
         Region grow2 = new Region();
@@ -81,7 +82,7 @@ final class ChatRowCell extends ListCell<Chat> implements ListRows.Redrawable {
         HBox.setHgrow(text, Priority.ALWAYS);
         text.setMinWidth(0);
         disclosure.getStyleClass().add("disclosure");
-        disclosure.setMinWidth(Region.USE_PREF_SIZE);
+        disclosure.setMinWidth(USE_PREF_SIZE);
         root = new HBox(12, avatar, text, disclosure);
         root.setAlignment(Pos.CENTER_LEFT);
         root.setMinWidth(0);
@@ -135,7 +136,7 @@ final class ChatRowCell extends ListCell<Chat> implements ListRows.Redrawable {
         name.setText(c.title());
         String account = pane.filterProperty().get().accountId() == null ? Accounts.forChat(pane.accounts(), c) : null;
         // Several accounts on this network: a tiny avatar says which one (full name on hover / screen reader).
-        if (!accountDrawn || !java.util.Objects.equals(account, shownAccount)) {
+        if (!accountDrawn || !Objects.equals(account, shownAccount)) {
             accountDrawn = true;
             shownAccount = account;
             accountTag.setText(account == null ? "" : Formats.accountShort(account));
@@ -151,8 +152,9 @@ final class ChatRowCell extends ListCell<Chat> implements ListRows.Redrawable {
         if (!c.typing().isEmpty()) {
             TypingDots.show(preview, c.group() ? Formats.typing(c.typing()) : I18n.t("chatRow.typing"));
         } else {
-            String who = c.lastOutgoing() ? I18n.t("chatRow.you") : c.group() && c.lastSenderName() != null
-                    ? c.lastSenderName().split(" ")[0] + ": " : "";
+            String sender = c.lastSenderName();
+            String who = c.lastOutgoing() ? I18n.t("chatRow.you") : c.group() && sender != null
+                    ? sender.split(" ")[0] + ": " : "";
             TypingDots.show(preview, null); // cells are recycled: this one may have been someone typing
             preview.setText(who + c.lastPreview());
         }

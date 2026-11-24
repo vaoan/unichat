@@ -1,5 +1,8 @@
 package app.unichat.service;
 
+import app.unichat.support.PathParts;
+
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -26,7 +29,7 @@ class UploadQueueTest {
         final List<DoubleConsumer> progress = new ArrayList<>();
 
         ChatMessaging messaging() {
-            return (ChatMessaging) java.lang.reflect.Proxy.newProxyInstance(ChatMessaging.class.getClassLoader(),
+            return (ChatMessaging) java.lang.reflect.Proxy.newProxyInstance(ChatMessaging.class.getClassLoader(), // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                     new Class<?>[]{ChatMessaging.class}, (proxy, method, args) -> {
                         if (method.getDeclaringClass() == Object.class) {
                             return switch (method.getName()) {
@@ -49,7 +52,7 @@ class UploadQueueTest {
     private record Wait(long ms, Runnable r) {}
 
     /** The files exist: a file that's gone is the one case given up. */
-    private UploadQueue.Upload up(String name) throws Exception {
+    private UploadQueue.Upload up(String name) throws IOException {
         Path f = dir.resolve(name);
         if (!Files.exists(f)) Files.writeString(f, name);
         return new UploadQueue.Upload("!chat", f, null, SendAs.AS_IS);
@@ -93,7 +96,7 @@ class UploadQueueTest {
             waits.remove(waits.size() - 1).r().run();
         }
         assertEquals(7, fake.calls.size());
-        assertTrue(fake.calls.stream().allMatch(c -> c.file().getFileName().toString().equals("a.jpg")), "b waits for a");
+        assertTrue(fake.calls.stream().allMatch(c -> PathParts.name(c.file()).equals("a.jpg")), "b waits for a");
         fake.futures.get(6).complete(null);
         assertEquals(1, q.status().sent());
         assertEquals(0, q.status().retries());

@@ -6,7 +6,9 @@ import app.unichat.support.Downloads;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
 import app.unichat.support.Os;
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * What protecting a picture needs, installed on first use into {@code <data>/tools/cloak/}: uv (pinned), which brings
@@ -47,6 +50,7 @@ public final class CloakTool {
     private static final long PACKAGES_SECONDS = 45 * 60;
 
     /** Where installing is at: a text key ({@code cloak.install.*}) and 0..1, or -1 when it can't tell. */
+    @FunctionalInterface
     public interface Progress {
         void at(String stepKey, double fraction);
     }
@@ -89,7 +93,7 @@ public final class CloakTool {
         try {
             Downloads.fetch(uvBuild.url(), uvBuild.size(), uvBuild.sha256(), archive, I18n.t("download.what.cloak"),
                     f -> progress.at("cloak.install.tools", f));
-            if (!Archives.extractOne(archive, uv.getFileName().toString(), uv)) throw new IOException(I18n.t("cloak.error.install"));
+            if (!Archives.extractOne(archive, PathParts.name(uv), uv)) throw new IOException(I18n.t("cloak.error.install"));
         } finally {
             Files.deleteIfExists(archive);
         }
@@ -139,6 +143,7 @@ public final class CloakTool {
     }
 
     /** uv with its downloads, cache and settings inside this folder, never the person's own. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "uv inside its own folder with fixed arguments, as a list, no shell")
     private void run(List<String> command, long seconds) throws IOException, InterruptedException {
         ProcessBuilder b = new ProcessBuilder(command).redirectErrorStream(true);
         b.environment().put("UV_PYTHON_INSTALL_DIR", dir.resolve("python").toString());
@@ -163,7 +168,7 @@ public final class CloakTool {
         return target;
     }
 
-    private static Pinned uvBuild() {
+    private static @Nullable Pinned uvBuild() {
         return Os.pick(UV_MAC_ARM64, null, UV_WINDOWS_AMD64); // PyTorch has no Intel Mac build
     }
 }

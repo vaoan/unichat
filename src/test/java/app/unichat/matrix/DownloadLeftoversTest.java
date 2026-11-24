@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ class DownloadLeftoversTest {
     private ServerSocket server;
 
     @BeforeEach
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void serverThatHangsUpHalfway() throws Exception {
         // Promises 100 kB, sends 10 and closes the connection: what a network that goes away does. A raw socket,
         // since HttpServer keeps the connection open after a short body and the client would wait for the rest.
@@ -36,7 +38,7 @@ class DownloadLeftoversTest {
         Thread.ofPlatform().daemon().start(() -> {
             while (!server.isClosed()) {
                 try (Socket s = server.accept()) {
-                    s.getInputStream().read(new byte[8192]);
+                    var _ = s.getInputStream().read(new byte[8192]); // the request: read, never looked at
                     OutputStream out = s.getOutputStream();
                     out.write("HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
                     out.write(new byte[10_000]);
@@ -65,6 +67,7 @@ class DownloadLeftoversTest {
     }
 
     @Test
+    @SuppressWarnings("NullAway") // no homeserver: what this checks never reaches it
     void nobodyIsLeftWatchingAFinishedDownload() throws Exception {
         try (ExecutorService io = Executors.newSingleThreadExecutor()) {
             var media = new MediaDownloader(null, io);

@@ -9,7 +9,9 @@ import java.nio.charset.StandardCharsets;
 
 /** Opus packets into an Ogg file (RFC 7845), the format of voice notes on every network. Mono. */
 final class OggOpusWriter {
-    private static final int HEADER_TYPE_CONTINUATION_NONE = 0, FIRST_PAGE = 2, LAST_PAGE = 4;
+    private static final int HEADER_TYPE_CONTINUATION_NONE = 0;
+    private static final int FIRST_PAGE = 2;
+    private static final int LAST_PAGE = 4;
     private static final int PACKETS_PER_PAGE = 50;
     private static final int[] CRC = crcTable();
 

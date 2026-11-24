@@ -13,6 +13,7 @@ import java.util.Properties;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.jspecify.annotations.Nullable;
 
 /**
  * What the person reads, in their language. Every text lives in {@code app/unichat/i18n/messages_<lang>.properties}
@@ -34,7 +35,7 @@ public final class I18n {
     private I18n() {}
 
     /** The text of {@code key} in the current language, with {@code {0}}… filled in. A missing key shows as itself. */
-    public static String t(String key, Object... args) {
+    public static String t(String key, @Nullable Object... args) {
         String s = lookup(locale.getLanguage(), key);
         if (s == null) s = lookup("", key);
         if (s == null) return key;
@@ -43,8 +44,8 @@ public final class I18n {
     }
 
     /** {@code key.one} when {@code count} is 1, else {@code key.other}; {@code {0}} is the count. */
-    public static String n(String key, long count, Object... more) {
-        Object[] args = new Object[more.length + 1];
+    public static String n(String key, long count, @Nullable Object... more) {
+        @Nullable Object[] args = new Object[more.length + 1];
         args[0] = count;
         System.arraycopy(more, 0, args, 1, more.length);
         return t(key + (count == 1 ? ".one" : ".other"), args);
@@ -102,7 +103,11 @@ public final class I18n {
             Properties p = new Properties();
             String name = DIR + (l.isEmpty() ? "messages.properties" : "messages_" + l + ".properties");
             try (InputStream in = I18n.class.getResourceAsStream(name)) {
-                if (in != null) p.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+                if (in != null) {
+                    try (InputStreamReader text = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+                        p.load(text);
+                    }
+                }
             } catch (IOException e) {
                 System.err.println("Can't read " + name + ": " + e.getClass().getSimpleName());
             }

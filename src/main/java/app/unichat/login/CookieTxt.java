@@ -23,7 +23,7 @@ public final class CookieTxt {
         long nowSec = now.getEpochSecond();
         Map<String, String> byName = new HashMap<>();
         for (String raw : Files.readAllLines(file, StandardCharsets.UTF_8)) {
-            String line = raw.strip().isEmpty() ? "" : raw.replaceAll("[\\r\\n]+$", "");
+            String line = raw.isBlank() ? "" : raw.replaceAll("[\\r\\n]+$", "");
             if (line.isEmpty()) continue;
             if (line.startsWith(HTTP_ONLY)) line = line.substring(HTTP_ONLY.length());
             else if (line.startsWith("#")) continue;
@@ -33,7 +33,11 @@ public final class CookieTxt {
             String expiryText = f[4].strip();
             long expiry = 0;
             if (!expiryText.isEmpty()) {
-                try { expiry = Long.parseLong(expiryText); } catch (NumberFormatException e) { continue; }
+                try {
+                    expiry = Long.parseLong(expiryText);
+                } catch (NumberFormatException e) {
+                    continue;
+                }
             }
             if (expiry > 0 && expiry < nowSec) continue;
             if (!spec.isForNetwork(domain)) continue;

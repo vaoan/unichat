@@ -3,14 +3,15 @@ package app.unichat.ui.chats;
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
 import org.junit.jupiter.api.Test;
+import app.unichat.Present;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Servers/groups live in the inbox too: a row ordered by their channels' activity, opened in place. */
@@ -33,7 +34,7 @@ class InboxRowsTest {
         return s;
     }
 
-    private void setUp() {
+    private void fill() {
         space("!srv", Network.DISCORD, "!general", "!memes", "!unjoined");
         chat("!general", Network.DISCORD, 50).setUnreadCount(2);
         chat("!memes", Network.DISCORD, 10);
@@ -47,22 +48,22 @@ class InboxRowsTest {
 
     @Test
     void aServerIsOneRowAndItsChannelsLiveInsideIt() {
-        setUp();
+        fill();
         InboxRows.Rows r = InboxRows.build(chats, ChatFilter.DEFAULT, Map.of());
         assertEquals(List.of("!pedro", "!srv", "!mama"), ids(r), "like a Telegram forum: the server sums up its channels");
         assertEquals(2, r.unread().get("!srv"));
-        assertEquals("!general", r.latest().get("!srv").id());
+        assertEquals("!general", Present.of(r.latest().get("!srv")).id());
     }
 
     @Test
     void searchingStillFindsChannels() {
-        setUp();
+        fill();
         assertEquals(List.of("!general"), ids(InboxRows.build(chats, ChatFilter.DEFAULT.withQuery("gener"), Map.of())));
     }
 
     @Test
     void aServerOpensOnItsChannelsWithTheOnesToJoin() {
-        setUp();
+        fill();
         InboxRows.Rows r = InboxRows.channels(chats, "!srv", null, Map.of("!unjoined", "#anuncios"));
         assertEquals(List.of("!general", "!memes", "!unjoined"), ids(r));
         assertTrue(r.unjoined().contains("!unjoined"));
@@ -71,32 +72,32 @@ class InboxRowsTest {
 
     @Test
     void anArchivedChannelLeavesItsServerAndGoesToTheArchive() {
-        setUp();
+        fill();
         chats.stream().filter(c -> c.id().equals("!memes")).findFirst().orElseThrow().setArchived(true);
         assertTrue(ids(InboxRows.build(chats, ChatFilter.DEFAULT.withView(ChatFilter.View.ARCHIVE), Map.of())).contains("!memes"));
-        assertTrue(!ids(InboxRows.channels(chats, "!srv", null, Map.of())).contains("!memes"));
+        assertFalse(ids(InboxRows.channels(chats, "!srv", null, Map.of())).contains("!memes"));
         assertTrue(ids(InboxRows.build(chats, ChatFilter.DEFAULT, Map.of())).contains("!srv"), "the server stays out");
     }
 
     @Test
     void filtersApplyToServersToo() {
-        setUp();
+        fill();
         chats.get(0).setFavorite(true);
         assertEquals(List.of("!srv"), ids(InboxRows.build(chats, ChatFilter.DEFAULT.withView(ChatFilter.View.FAVORITES), Map.of())));
-        assertTrue(ids(InboxRows.build(chats, ChatFilter.DEFAULT.withNetwork(Network.WHATSAPP), Map.of())).equals(List.of("!mama")));
+        assertEquals(List.of("!mama"), ids(InboxRows.build(chats, ChatFilter.DEFAULT.withNetwork(Network.WHATSAPP), Map.of())));
         List<String> unread = ids(InboxRows.build(chats, ChatFilter.DEFAULT.withUnreadOnly(true), Map.of()));
         assertEquals(List.of("!srv"), unread, "a server with unread channels counts as unread");
         assertEquals(List.of("!srv"), ids(InboxRows.build(chats, ChatFilter.DEFAULT.withQuery("sr"), Map.of())));
         chats.get(0).setArchived(true);
-        assertTrue(!ids(InboxRows.build(chats, ChatFilter.DEFAULT, Map.of())).contains("!srv"));
+        assertFalse(ids(InboxRows.build(chats, ChatFilter.DEFAULT, Map.of())).contains("!srv"));
         assertTrue(ids(InboxRows.build(chats, ChatFilter.DEFAULT.withView(ChatFilter.View.ARCHIVE), Map.of())).contains("!srv"));
     }
 
     @Test
     void theBridgesPersonalFolderIsNotAServer() {
-        setUp();
+        fill();
         Chat folder = space("!folder", Network.TELEGRAM, "!pedro");
         folder.setPersonalSpace(true);
-        assertTrue(!ids(InboxRows.build(chats, ChatFilter.DEFAULT, Map.of())).contains("!folder"));
+        assertFalse(ids(InboxRows.build(chats, ChatFilter.DEFAULT, Map.of())).contains("!folder"));
     }
 }

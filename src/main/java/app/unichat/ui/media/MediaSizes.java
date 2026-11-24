@@ -12,14 +12,16 @@ final class MediaSizes {
 
     /** Photos and videos, scaled down to fit; 240 x 180 when unknown. */
     static Size media(int width, int height) {
-        double w = width > 0 ? width : 240, h = height > 0 ? height : 180;
+        double w = width > 0 ? width : 240;
+        double h = height > 0 ? height : 180;
         double s = Math.min(1, Math.min(MAX_MEDIA / w, MAX_MEDIA / h));
         return new Size(Math.max(80, w * s), Math.max(60, h * s));
     }
 
     /** Stickers are small and shown without a bubble, like on the phone; square when unknown. */
     static Size sticker(int width, int height) {
-        double w = width > 0 ? width : MAX_STICKER, h = height > 0 ? height : MAX_STICKER;
+        double w = width > 0 ? width : MAX_STICKER;
+        double h = height > 0 ? height : MAX_STICKER;
         double s = Math.min(1, Math.min(MAX_STICKER / w, MAX_STICKER / h));
         return new Size(Math.max(MIN_STICKER, w * s), Math.max(MIN_STICKER, h * s));
     }

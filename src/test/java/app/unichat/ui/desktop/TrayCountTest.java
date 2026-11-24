@@ -1,10 +1,12 @@
 package app.unichat.ui.desktop;
 
 import app.unichat.ui.Formats;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
+import app.unichat.Present;
 
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
@@ -27,12 +29,14 @@ class TrayCountTest {
         BufferedImage one = Notifier.withCount(icon, 3);
         BufferedImage many = Notifier.withCount(icon, 12345);
         assertTrue((one.getRGB(one.getWidth() - 3, one.getHeight() - 10) >>> 24) > 0, "a badge in the corner");
-        assertTrue((many.getRGB(0, 0) >>> 24) == 0, "the rest stays the icon");
+        assertEquals(0, many.getRGB(0, 0) >>> 24, "the rest stays the icon");
         assertEquals("99+", Formats.badge(12345));
     }
 
+    @SuppressWarnings("NullAway") // headless: no AWT menu can be made, and this helper is never asked for one
     @Test
     @DisabledOnOs(OS.WINDOWS)
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void theHelperIsToldTheCountAndWhenThereIsNone() throws Exception {
         // A pipe, not a file: each line is read the moment the helper passes it on, and its end says it has no more.
         Path told = dir.resolve("recibido");
@@ -40,7 +44,7 @@ class TrayCountTest {
         Path helper = Files.writeString(dir.resolve("helper"),
                 "#!/bin/sh\nexec 3>'" + told + "'\nwhile IFS= read -r a; do echo \"$a\" >&3; done\n");
         assertTrue(helper.toFile().setExecutable(true));
-        NativeBar bar = NativeBar.start(helper, null, () -> { }, id -> { }, () -> { });
+        NativeBar bar = Present.of(NativeBar.start(helper, null, () -> { }, id -> { }, () -> { }));
         try (BufferedReader received = Files.newBufferedReader(told)) {
             bar.setCount(3);
             bar.setCount(150);

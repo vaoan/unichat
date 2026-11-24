@@ -16,7 +16,8 @@ import javafx.scene.layout.Region;
 final class SettingsRow extends Pane {
     /** The narrowest the text may get beside a control, in letters (em). */
     static final double TEXT_EM = 14;
-    private static final double GAP = 12, UNDER = 8;
+    private static final double GAP = 12;
+    private static final double UNDER = 8;
 
     private final Region text;
     private final Node control;
@@ -67,15 +68,21 @@ final class SettingsRow extends Pane {
     }
 
     @Override protected void layoutChildren() {
-        double w = inner(getWidth()), x = snappedLeftInset(), y = snappedTopInset();
-        double cw = Math.min(control.prefWidth(-1), w), ch = control.prefHeight(cw);
+        double w = inner(getWidth());
+        double x = snappedLeftInset();
+        double y = snappedTopInset();
+        double cw = Math.min(control.prefWidth(-1), w);
+        double ch = control.prefHeight(cw);
         if (beside(w)) {
-            double tw = w - cw - GAP, th = text.prefHeight(tw), h = Math.max(th, ch);
+            double tw = w - cw - GAP;
+            double th = text.prefHeight(tw);
+            double h = Math.max(th, ch);
             layoutInArea(text, x, y, tw, h, 0, HPos.LEFT, VPos.CENTER);
             layoutInArea(control, x + w - cw, y, cw, h, 0, HPos.RIGHT, VPos.CENTER);
         } else {
             // Under the text it has the whole row: a row of choices then wraps only when the row is full.
-            double uw = underWidth(w), th = text.prefHeight(w);
+            double uw = underWidth(w);
+            double th = text.prefHeight(w);
             layoutInArea(text, x, y, w, th, 0, HPos.LEFT, VPos.TOP);
             layoutInArea(control, x, y + th + UNDER, uw, control.prefHeight(uw), 0, HPos.LEFT, VPos.TOP);
         }

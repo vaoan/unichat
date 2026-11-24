@@ -1,8 +1,15 @@
 package app.unichat.login;
 
 import app.unichat.model.Network;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-import java.util.*;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /** Which cookies a "cookie network" needs, and on which domains they live. */
 public final class CookieSpec {
@@ -44,11 +51,18 @@ public final class CookieSpec {
         return new CookieSpec(network, Set.copyOf(required), Set.copyOf(optional), Set.copyOf(domains));
     }
 
-    /** @throws IllegalArgumentException if the network does not log in with cookies */
+    /**
+     * The cookies {@code network} logs in with.
+     *
+     * @throws IllegalArgumentException if the network does not log in with cookies
+     */
     public static CookieSpec forNetwork(Network network) {
-        CookieSpec s = SPECS.get(network);
-        if (s == null) throw new IllegalArgumentException("Not a cookie network: " + network);
-        return s;
+        return find(network).orElseThrow(() -> new IllegalArgumentException("Not a cookie network: " + network));
+    }
+
+    /** The cookies {@code network} logs in with, if we know them (a bridge may ask for others in its own step). */
+    public static java.util.Optional<CookieSpec> find(Network network) {
+        return java.util.Optional.ofNullable(SPECS.get(network));
     }
 
     public Set<String> required() { return required; }
@@ -56,7 +70,8 @@ public final class CookieSpec {
     public Set<String> domains() { return domains; }
 
     /** True if a cookie domain (e.g. {@code .facebook.com}) belongs to this network. */
-    public boolean isForNetwork(String cookieDomain) {
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "cookie domains come from the person's own browser, which stores them as ASCII (punycode)")
+    public boolean isForNetwork(@Nullable String cookieDomain) {
         if (cookieDomain == null) return false;
         String d = cookieDomain.toLowerCase(Locale.ROOT);
         while (d.startsWith(".")) d = d.substring(1);

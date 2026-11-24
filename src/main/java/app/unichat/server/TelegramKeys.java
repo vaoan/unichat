@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Each person's own Telegram API keys (my.telegram.org): Telegram requires them, and they aren't shareable, so
@@ -9,13 +10,15 @@ import app.unichat.support.I18n;
  */
 public final class TelegramKeys {
     public static final String URL = "https://my.telegram.org";
-    private static final String ID = app.unichat.settings.TelegramKeyFormat.ID, HASH = app.unichat.settings.TelegramKeyFormat.HASH;
+    private static final String ID = app.unichat.settings.TelegramKeyFormat.ID;
+    private static final String HASH = app.unichat.settings.TelegramKeyFormat.HASH;
 
     private TelegramKeys() {}
 
     /** What's wrong with these values, for the person to read; null when they look right. */
-    public static String problem(String apiId, String apiHash) {
-        String id = apiId == null ? "" : apiId.strip(), hash = apiHash == null ? "" : apiHash.strip();
+    public static @Nullable String problem(@Nullable String apiId, @Nullable String apiHash) {
+        String id = apiId == null ? "" : apiId.strip();
+        String hash = apiHash == null ? "" : apiHash.strip();
         if (id.isEmpty()) return I18n.t("telegramKeys.noId");
         if (!app.unichat.settings.TelegramKeyFormat.id(id)) return I18n.t("telegramKeys.badId");
         if (hash.isEmpty()) return I18n.t("telegramKeys.noHash");

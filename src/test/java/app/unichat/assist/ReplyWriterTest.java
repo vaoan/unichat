@@ -1,5 +1,8 @@
 package app.unichat.assist;
 
+import app.unichat.Present;
+import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -9,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -20,13 +24,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ReplyWriterTest {
     @TempDir Path dir;
 
-    private Path script(String body) throws Exception {
+    private Path script(String body) throws IOException {
         Path f = Files.writeString(dir.resolve("cli"), "#!/bin/sh\n" + body + "\n");
         assertTrue(f.toFile().setExecutable(true));
         return f;
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void theToolsAreOnlyWhatEachProgramAllowsAtTheLeast() {
         Path bin = Path.of("/x/claude");
         List<String> none = AiEngine.CLAUDE.command(bin, null, dir, dir.resolve("r"));
@@ -48,6 +53,7 @@ class ReplyWriterTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void gapsToLookUpAddWebSearchAndNothingElse() {
         Path bin = Path.of("/x/claude");
         assertFalse(String.join(" ", AiEngine.CLAUDE.command(bin, null, dir, dir.resolve("r"))).contains("Web"), "no web unless asked");
@@ -64,6 +70,7 @@ class ReplyWriterTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void permissionRulesWriteAbsolutePathsTheirWay() {
         assertEquals("//Users/ana/CV", AiEngine.claudePath(Path.of("/Users/ana/CV/")));
     }
@@ -80,7 +87,7 @@ class ReplyWriterTest {
     @DisabledOnOs(OS.WINDOWS)
     void aBigPromptDoesntBlockAProgramThatTalksFirst() throws Exception {
         Path bin = script("head -c 300000 /dev/zero | tr '\\0' 'x'\ncat > /dev/null");
-        assertEquals(300_000, new ReplyWriter().run(AiEngine.CLAUDE, bin, null, "y".repeat(2_000_000)).length());
+        assertEquals(300_000, Present.of(new ReplyWriter().run(AiEngine.CLAUDE, bin, null, "y".repeat(2_000_000))).length());
     }
 
     @Test
@@ -88,7 +95,7 @@ class ReplyWriterTest {
     void itSaysWhyWhenItFails() throws Exception {
         Path bin = script("echo 'Not logged in' >&2\nexit 1");
         ReplyWriter.Failure f = assertThrows(ReplyWriter.Failure.class, () -> new ReplyWriter().run(AiEngine.CLAUDE, bin, null, "x"));
-        assertTrue(f.getMessage().contains("Not logged in"));
+        assertTrue(Present.of(f.getMessage()).contains("Not logged in"));
         Path empty = script("cat > /dev/null");
         assertThrows(ReplyWriter.Failure.class, () -> new ReplyWriter().run(AiEngine.CLAUDE, empty, null, "x"));
     }
@@ -97,14 +104,15 @@ class ReplyWriterTest {
     @DisabledOnOs(OS.WINDOWS)
     void cancellingStopsItAtOnce() throws Exception {
         // Two pipes: the program says it's running through one, then waits for ever on the other, which nobody opens.
-        Path started = fifo("started"), never = fifo("never");
+        Path started = fifo("started");
+        Path never = fifo("never");
         Path bin = script("printf x > '" + started + "'\nexec cat '" + never + "'");
         // Its own limit is a day: only cancelling can end it while the test runs.
         ReplyWriter w = new ReplyWriter(java.time.Duration.ofDays(1));
         Thread.ofVirtual().start(() -> {
             try (var in = Files.newInputStream(started)) {
                 in.read();
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 throw new java.io.UncheckedIOException(e);
             }
             w.cancel();
@@ -116,10 +124,11 @@ class ReplyWriterTest {
     @Test
     @DisabledOnOs(OS.WINDOWS)
     void interruptingStopsTheProgram() throws Exception {
-        Path started = fifo("started"), never = fifo("never");
+        Path started = fifo("started");
+        Path never = fifo("never");
         // It says its own process id, then waits for ever on a pipe nobody opens: only being stopped ends it.
         Path bin = script("echo $$ > '" + started + "'\nexec cat '" + never + "'");
-        java.util.concurrent.atomic.AtomicReference<String> got = new java.util.concurrent.atomic.AtomicReference<>("not returned");
+        java.util.concurrent.atomic.AtomicReference<@Nullable String> got = new java.util.concurrent.atomic.AtomicReference<>("not returned");
         Thread t = Thread.ofPlatform().start(() -> {
             try {
                 got.set(new ReplyWriter(java.time.Duration.ofDays(1)).run(AiEngine.CLAUDE, bin, null, "x"));
@@ -134,7 +143,8 @@ class ReplyWriterTest {
         assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false), "the program was left running");
     }
 
-    private Path fifo(String name) throws Exception {
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
+    private Path fifo(String name) throws IOException, InterruptedException {
         Path f = dir.resolve(name);
         assertEquals(0, new ProcessBuilder("mkfifo", f.toString()).inheritIO().start().waitFor());
         return f;
@@ -156,14 +166,15 @@ class ReplyWriterTest {
     }
 
     /** The real text a program answers with; null when it isn't signed in here, so there's nothing to learn from it. */
-    private static String corrected(AiEngine engine, String text) throws Exception {
+    private static @Nullable String corrected(AiEngine engine, String text) throws ReplyWriter.Failure {
         if (engine.find() == null) return null;
         try {
             String reply = new ReplyWriter().write(engine, null, FixPrompt.build(text));
             System.out.println(engine + " -> " + reply);
             return reply;
         } catch (ReplyWriter.Failure e) {
-            if (e.getMessage().contains("401") || e.getMessage().contains("Not logged in")) return null;
+            String why = Present.of(e.getMessage());
+            if (why.contains("401") || why.contains("Not logged in")) return null;
             throw e;
         }
     }
@@ -193,10 +204,10 @@ class ReplyWriterTest {
             String english = corrected(engine, "i dont no if their coming tomorow");
             if (english == null) continue;
             assertTrue(english.contains("don't know") && english.contains("they're") && english.contains("tomorrow"), english);
-            String french = corrected(engine, "je suis alle a la plage avec ma soeur");
+            String french = Present.of(corrected(engine, "je suis alle a la plage avec ma soeur"));
             assertTrue(french.contains("allé") && french.contains("à la plage"), french);
-            String mixed = corrected(engine, "mañana tengo el meeting, see you their");
-            assertTrue(mixed.contains("meeting") && mixed.contains("see you there") || mixed.contains("See you there"), mixed);
+            String mixed = Present.of(corrected(engine, "mañana tengo el meeting, see you their"));
+            assertTrue((mixed.contains("meeting") && mixed.contains("see you there")) || mixed.contains("See you there"), mixed);
             assertTrue(mixed.contains("añana"), mixed);
         }
     }

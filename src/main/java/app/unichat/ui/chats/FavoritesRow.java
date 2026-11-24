@@ -66,7 +66,8 @@ final class FavoritesRow extends Pane {
             more.setVisible(false);
             return;
         }
-        double pref = tiles.get(0).prefWidth(-1), min = tiles.get(0).minWidth(-1);
+        double pref = tiles.get(0).prefWidth(-1);
+        double min = tiles.get(0).minWidth(-1);
         int shown = n;
         double w = pref;
         if (n * pref + (n - 1) * GAP > avail) {

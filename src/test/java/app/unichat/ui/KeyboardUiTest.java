@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.ui.chats.ChatListPane;
 import app.unichat.ui.chats.Rail;
 import app.unichat.ui.desktop.Notifier;
@@ -18,9 +19,10 @@ import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.concurrent.Callable;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -85,7 +87,7 @@ class KeyboardUiTest {
         List<Message> msgs = svc.messages("!family:demo");
         Message last = msgs.get(msgs.size() - 1);
         press(scene, KeyCode.DIGIT1, false, false);
-        assertFalse(last.reactions().containsKey(EmojiPicker.QUICK[0]), "1 doesn't react to the selected message");
+        assertFalse(last.reactions().containsKey(EmojiPicker.QUICK.getFirst()), "1 doesn't react to the selected message");
 
         press(scene, KeyCode.R, false, false);
         assertEquals("composer", fx(() -> zone(scene)), "R moves to the composer");
@@ -119,7 +121,7 @@ class KeyboardUiTest {
             // another UI test started the toolkit
         }
         MockChatService svc = new MockChatService();
-        svc.chat("!family:demo").setFeatures(app.unichat.model.RoomFeatures.parse(
+        Present.of(svc.chat("!family:demo")).setFeatures(app.unichat.model.RoomFeatures.parse(
                 new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"reply\":0,\"edit\":0,\"reaction\":0}")));
         Scene scene = fx(() -> {
             Stage stage = new Stage();
@@ -154,39 +156,37 @@ class KeyboardUiTest {
     }
 
     /** As the system sends a letter: pressed, then typed, each to whatever has the focus at that moment. */
-    private static void typeLetter(Scene scene, String letter) throws Exception {
-        KeyCode code = KeyCode.getKeyCode(letter.toUpperCase());
+    private static void typeLetter(Scene scene, String letter) throws InterruptedException {
+        KeyCode code = KeyCode.getKeyCode(letter.toUpperCase(Locale.ROOT));
         for (var type : List.of(KeyEvent.KEY_PRESSED, KeyEvent.KEY_TYPED)) {
-            fx(() -> {
+            FxWait.onFx(() -> {
                 Node target = scene.getFocusOwner() != null ? scene.getFocusOwner() : scene.getRoot();
                 boolean typed = type == KeyEvent.KEY_TYPED;
                 Event.fireEvent(target, new KeyEvent(type, typed ? letter : "", typed ? "" : letter,
                         typed ? KeyCode.UNDEFINED : code, false, false, false, false));
-                return null;
             });
         }
         FxWait.settled(); // what the key started (focus moves, redraws) has run
     }
 
-    private static void press(Scene scene, KeyCode code, boolean shift, boolean shortcut) throws Exception {
-        fx(() -> {
+    private static void press(Scene scene, KeyCode code, boolean shift, boolean shortcut) throws InterruptedException {
+        FxWait.onFx(() -> {
             Node target = scene.getFocusOwner() != null ? scene.getFocusOwner() : scene.getRoot();
             boolean mac = MainView.MAC;
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, shift,
                     shortcut && !mac, false, shortcut && mac));
-            return null;
         });
         FxWait.settled(); // what the key started (focus moves, redraws) has run
     }
 
     /** The chat list and the open chat are drawn, and the focus has landed. */
-    private static void untilOpen(Scene scene) throws Exception {
+    private static void untilOpen(Scene scene) throws InterruptedException {
         FxWait.until("the chat list and the open chat show", () -> !scene.getRoot().lookupAll(".chat-cell").isEmpty()
                 && !scene.getRoot().lookupAll(".row-cell").isEmpty());
         FxWait.settled();
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

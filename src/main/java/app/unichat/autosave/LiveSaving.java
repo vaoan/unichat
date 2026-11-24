@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Saving as messages arrive: each change to a chat saves, in order, what was sent since the last one saved
@@ -31,7 +32,7 @@ final class LiveSaving {
     private int total;
     private int done;
     private int savedInRound;
-    private Chat lastChat;
+    private @Nullable Chat lastChat;
 
     LiveSaving(ChatPreferences prefs, ChatReader chats, SavedUpTo savedUpTo, AutoSave.Saver saver,
             AutoSave.Progress progress, Duration retryAfter, Executor worker) {
@@ -95,7 +96,7 @@ final class LiveSaving {
      * Saves {@code url} of {@code m} into its chat's folder because the person asked: one more in the round going on,
      * and its failure told every time (they're waiting for it), never held. Null when saved; otherwise why not.
      */
-    Failure saveAsked(Message m, String url) {
+    @Nullable Failure saveAsked(Message m, String url) {
         Chat chat = chats.chat(m.chatId());
         if (chat == null) throw new IllegalArgumentException("No chat " + m.chatId());
         total++;
@@ -112,7 +113,7 @@ final class LiveSaving {
     }
 
     /** One thing done, saved or not; the round ends when nothing's left. False: it failed, and may work next time. */
-    private boolean step(Chat chat, Failure failure) {
+    private boolean step(Chat chat, @Nullable Failure failure) {
         done++;
         if (failure == null) {
             savedInRound++;
@@ -125,21 +126,24 @@ final class LiveSaving {
 
     private void endRoundIfDone() {
         if (total == 0 || done < total) return; // nothing going on, or not over yet
-        if (savedInRound > 0) progress.finished(savedInRound, lastChat);
-        total = done = savedInRound = 0;
+        // Set with each file saved, so there's one whenever any was.
+        if (savedInRound > 0) progress.finished(savedInRound, java.util.Objects.requireNonNull(lastChat, "a file saved"));
+        total = 0;
+        done = 0;
+        savedInRound = 0;
         lastChat = null;
         progress.changed(0, 0);
     }
 
     /** Null when saved (or there already); otherwise why not. */
-    private Failure saveMedia(Message m, Chat chat, Path dir) {
+    private @Nullable Failure saveMedia(Message m, Chat chat, Path dir) {
         String name = FileNames.forMessage(m, ZoneId.systemDefault()); // what a notice says: the name as sent
-        Path[] file = {null};
+        @Nullable Path[] file = {null};
         try {
             SavedFile.copyInto(saver, m, dir, file, arrived -> { });
             return null;
         } catch (IOException | RuntimeException e) {
-            return failed(name, chat, m, new Failure(AutoSave.why(e, dir, file[0]), e instanceof AutoSave.Gone), false);
+            return failed(name, chat, m, new Failure(AutoSave.why(e, dir, file[0]), e instanceof AutoSave.Gone), false); // NOPMD: AvoidInstanceofChecksInCatchClause, the same handling; whether it is gone is a flag of it
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Failure.forNow(e.toString());
@@ -147,7 +151,7 @@ final class LiveSaving {
     }
 
     /** Null when saved; otherwise why not. {@code asked}: the person asked for it, so a failure is told every time. */
-    private Failure saveLink(String url, Message m, Chat chat, Path dir, boolean asked) {
+    private @Nullable Failure saveLink(String url, Message m, Chat chat, Path dir, boolean asked) {
         try {
             Failure f = saver.link(url, dir, FileNames.tag(m), arrived -> { });
             return f == null ? null : failed(url, chat, m, f, asked);

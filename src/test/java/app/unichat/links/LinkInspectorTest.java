@@ -1,7 +1,10 @@
 package app.unichat.links;
 
+import app.unichat.Present;
 import app.unichat.model.LinkMedia;
 import com.sun.net.httpserver.HttpServer;
+import java.util.concurrent.ExecutionException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,7 +39,7 @@ class LinkInspectorTest {
     private final CountDownLatch over = new CountDownLatch(1);
     private final ExecutorService handlers = Executors.newCachedThreadPool();
 
-    private void answer(String path, int code, String type, String body, String location) {
+    private void answer(String path, int code, @Nullable String type, String body, @Nullable String location) {
         server.createContext(path, ex -> {
             hits.incrementAndGet();
             if (type != null) ex.getResponseHeaders().add("Content-Type", type);
@@ -49,7 +53,7 @@ class LinkInspectorTest {
 
     @BeforeEach
     void start() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.setExecutor(handlers);
         server.start();
         base = "http://127.0.0.1:" + server.getAddress().getPort();
@@ -62,7 +66,7 @@ class LinkInspectorTest {
         handlers.shutdown();
     }
 
-    private Optional<LinkMedia> inspect(LinkInspector i, String path) throws Exception {
+    private Optional<LinkMedia> inspect(LinkInspector i, String path) throws InterruptedException, ExecutionException {
         return i.inspect(base + path).get();
     }
 
@@ -137,6 +141,7 @@ class LinkInspectorTest {
     }
 
     @Test
+    @SuppressWarnings("PMD.AvoidUsingHardCodedIP") // the addresses are what it classifies
     void onlyTheOpenInternetIsPublic() throws Exception {
         for (String a : List.of("127.0.0.1", "10.0.0.1", "192.168.1.1", "172.16.0.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "::1", "fe80::1", "fd00::1", "224.0.0.1",
                 "198.18.0.1", "198.19.255.254", "240.0.0.1", "255.255.255.255", "192.0.0.8",
@@ -171,13 +176,14 @@ class LinkInspectorTest {
         assertEquals("Un GIF", p.title());
         assertEquals("Sitio", p.site());
         assertEquals(base + "/quieto.jpg", p.image());
-        assertEquals(base + "/gif.mp4", p.video().url(), "checked by what its server answers");
+        assertEquals(base + "/gif.mp4", Present.of(p.video()).url(), "checked by what its server answers");
         assertEquals(base + "/gif.mp4", inspect(open, "/pagina").orElseThrow().url(), "the same answer for its video");
         assertEquals(base + "/foto", open.preview(base + "/foto").get().orElseThrow().image(), "a link to a picture is its picture");
     }
 
     /** Each address a page names is a request from this computer: a page of thousands held a worker for hours. */
     @Test
+    @SuppressFBWarnings(value = "POTENTIAL_XML_INJECTION", justification = "a fake server's page built from the test's own names")
     void aPageThatNamesManyVideosHasOnlyItsFirstFewAsked() throws Exception {
         StringBuilder page = new StringBuilder();
         for (int i = 0; i < 50; i++) page.append("<video src=\"").append(base).append("/v").append(i).append("\"></video>");

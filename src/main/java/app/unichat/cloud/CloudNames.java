@@ -1,6 +1,8 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -18,10 +20,13 @@ import java.util.TreeMap;
  * file) are moved or deleted, and nothing else in an old folder is touched.
  */
 final class CloudNames {
-    static final String OLD_MEDIA = CloudAccount.ROOT + "/Multimedia", OLD_SETTINGS = CloudAccount.ROOT + "/Ajustes",
-        OLD_TEXTS = CloudAccount.ROOT + "/Textos", OLD_VAULT = CloudAccount.ROOT + "/Bóveda";
+    static final String OLD_MEDIA = CloudAccount.ROOT + "/Multimedia";
+    static final String OLD_SETTINGS = CloudAccount.ROOT + "/Ajustes";
+    static final String OLD_TEXTS = CloudAccount.ROOT + "/Textos";
+    static final String OLD_VAULT = CloudAccount.ROOT + "/Bóveda";
     static final String OLD_OFF = OLD_SETTINGS + "/boveda-apagada.json";
-    static final String OLD_INFO = OLD_VAULT + "/boveda.json", OLD_SLOTS = OLD_VAULT + "/llaves";
+    static final String OLD_INFO = OLD_VAULT + "/boveda.json";
+    static final String OLD_SLOTS = OLD_VAULT + "/llaves";
     /** Machine-only: this computer found every plain old folder moved and deleted, so it never looks for them again. */
     static final String DONE = "cloud.names.done";
     /**
@@ -70,13 +75,13 @@ final class CloudNames {
     }
 
     /** What's after {@code root + "/"} in {@code path} ("" for the root itself), or null when it isn't under it. */
-    private static String under(String path, String root) {
+    private static @Nullable String under(String path, String root) {
         if (path.equals(root)) return "";
         return path.startsWith(root + "/") ? path.substring(root.length() + 1) : null;
     }
 
     /** The first entry of {@code table} whose {@code from} name {@code path}'s rest is, or starts as, swapped for its {@code to}. */
-    private static String swap(String path, String root, String toRoot, String[][] table, int from, int to) {
+    private static String swap(String path, @Nullable String root, @Nullable String toRoot, String[][] table, int from, int to) {
         String rest = root == null ? path : under(path, root);
         if (rest == null) return path;
         for (String[] names : table) {
@@ -95,7 +100,7 @@ final class CloudNames {
      * whose two copies differ the newer one ({@link Bundle#savedAt}); anything else the old one when {@code oldLive} (the
      * old names are still the ones in use), else the new one.
      */
-    static byte[] winner(String path, byte[] old, byte[] now, boolean oldLive) throws IOException {
+    static byte @Nullable [] winner(String path, byte[] old, byte @Nullable [] now, boolean oldLive) throws IOException {
         if (now == null) return old;
         if (Arrays.equals(old, now)) return null;
         String name = path.substring(path.lastIndexOf('/') + 1);
@@ -105,7 +110,8 @@ final class CloudNames {
             return merged.equals(TextIndex.read(now)) ? null : TextIndex.write(merged);
         }
         if (TextIndex.FILE.matcher(name).matches()) return old.length > now.length ? old : null;
-        Bundle a = Bundle.parse(old), b = Bundle.parse(now);
+        Bundle a = Bundle.parse(old);
+        Bundle b = Bundle.parse(now);
         if (a != null && b != null) return a.hash().equals(b.hash()) || !a.savedAt().isAfter(b.savedAt()) ? null : old;
         return oldLive ? old : null;
     }
@@ -145,7 +151,8 @@ final class CloudNames {
             String path = OLD_SETTINGS + "/" + name;
             if (!path.equals(OLD_OFF) && Cloud.Part.of(name) == null) continue; // not ours: left, and the folder kept
             String target = renamed(path);
-            byte[] old = dav.get(path), now = dav.get(target);
+            byte[] old = dav.get(path);
+            byte[] now = dav.get(target);
             if (old == null) continue;
             if (now == null) {
                 moveInto(dav, path, target);
@@ -169,7 +176,8 @@ final class CloudNames {
         }
         for (String machine : dav.list(OLD_TEXTS)) {
             if (!Ids.ours(machine)) continue;
-            String from = OLD_TEXTS + "/" + machine, to = TextSync.ROOT + "/" + machine;
+            String from = OLD_TEXTS + "/" + machine;
+            String to = TextSync.ROOT + "/" + machine;
             if (!dav.exists(to)) {
                 dav.move(from, to);
                 continue;
@@ -183,7 +191,8 @@ final class CloudNames {
 
     /** One text file or index under both names: the new name holds what wins (the old one whole is moved, not sent again). */
     private static void text(Storage dav, String from, String to) throws IOException {
-        byte[] old = dav.get(from), now = dav.get(to);
+        byte[] old = dav.get(from);
+        byte[] now = dav.get(to);
         if (old == null) return;
         if (now == null) {
             dav.move(from, to);
@@ -205,14 +214,15 @@ final class CloudNames {
      */
     private static boolean media(Storage dav) throws IOException {
         if (!dav.exists(OLD_MEDIA)) return true;
-        if (still(dav, Settings.get().getString(KEPT, null))) return false;
+        if (still(dav, Settings.get().getString(KEPT))) return false;
         if (!dav.exists(CloudAccount.MEDIA)) {
             moveInto(dav, OLD_MEDIA, CloudAccount.MEDIA);
             return true;
         }
         for (String folder : dav.list(OLD_MEDIA)) {
             if (!Storage.plainName(folder)) continue;
-            String from = OLD_MEDIA + "/" + folder, to = CloudAccount.MEDIA + "/" + folder;
+            String from = OLD_MEDIA + "/" + folder;
+            String to = CloudAccount.MEDIA + "/" + folder;
             if (!dav.exists(to)) {
                 dav.move(from, to);
                 continue;
@@ -227,7 +237,7 @@ final class CloudNames {
     }
 
     /** Whether the file {@link #KEPT} says and its new copy have the stamps they had then. */
-    private static boolean still(Storage dav, String kept) throws IOException {
+    private static boolean still(Storage dav, @Nullable String kept) throws IOException {
         String[] parts = kept == null ? new String[0] : kept.split("\n", 3);
         return parts.length == 3 && parts[1].equals(String.valueOf(dav.stamp(parts[0])))
             && parts[2].equals(String.valueOf(dav.stamp(renamed(parts[0]))));
@@ -239,7 +249,7 @@ final class CloudNames {
      * there ({@link #winner}). One that isn't is kept with its folder, and said in the log. Null once it's gone, else the
      * first path there that isn't held.
      */
-    private static String confirmed(Storage dav, String dir, int depth) throws IOException {
+    private static @Nullable String confirmed(Storage dav, String dir, int depth) throws IOException {
         if (!dav.exists(dir)) return null;
         String kept = unconfirmed(dav, dir, depth);
         if (kept != null) {
@@ -251,7 +261,7 @@ final class CloudNames {
     }
 
     /** The first path under {@code dir} that isn't held under its new name (a name not ours: its folder), or null. */
-    private static String unconfirmed(Storage dav, String dir, int depth) throws IOException {
+    private static @Nullable String unconfirmed(Storage dav, String dir, int depth) throws IOException {
         for (String name : dav.list(dir)) {
             if (!Storage.plainName(name)) return dir;
             String path = dir + "/" + name;
@@ -265,17 +275,22 @@ final class CloudNames {
     private static boolean held(Storage dav, String path) throws IOException {
         String target = renamed(path);
         if (path.startsWith(OLD_MEDIA + "/")) {
-            Storage.RemoteFile old = dav.info(path), now = dav.info(target);
+            Storage.RemoteFile old = dav.info(path);
+            Storage.RemoteFile now = dav.info(target);
             return old != null && now != null && same(old, now);
         }
-        byte[] old = dav.get(path), now = dav.get(target);
+        byte[] old = dav.get(path);
+        byte[] now = dav.get(target);
         return old != null && now != null && winner(target, old, now, false) == null;
     }
 
     /** The same file, as far as the account can say: its size, and its checksum where both have one of a kind. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "compares two hex checksums the services give; hex is ASCII")
     private static boolean same(Storage.RemoteFile a, Storage.RemoteFile b) {
         if (a.size() < 0 || a.size() != b.size()) return false;
-        return a.kind() == null || b.kind() == null || !a.kind().equals(b.kind()) || a.hash().equalsIgnoreCase(b.hash());
+        String kind = a.kind();
+        if (kind == null || !kind.equals(b.kind())) return true;
+        return java.util.Objects.requireNonNull(a.hash(), "a checksum's kind comes with it").equalsIgnoreCase(b.hash());
     }
 
     /** {@code from} moved to {@code to}, the folder above it made first. */

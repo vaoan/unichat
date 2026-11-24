@@ -2,6 +2,7 @@ package app.unichat.autosave;
 
 import app.unichat.model.Chat;
 import app.unichat.support.Lines;
+import app.unichat.support.PathParts;
 import app.unichat.support.SafeFile;
 
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.nio.file.Path;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * A chat's texts as a person reads them, in its folder beside what auto-save keeps: made again from every computer's
@@ -19,7 +21,7 @@ import java.util.List;
  * A file kept on disk, not UI: English in every UI language.
  */
 final class TextCopy {
-    private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT);
 
     private static final String HEADER = "What was said in this chat, copied by Unichat: each message, and each version if it was edited.";
 
@@ -32,7 +34,7 @@ final class TextCopy {
 
     /** Whether {@code file} is a copy this makes: the cloud has its source, so it doesn't go up as media. */
     static boolean isCopy(Path file) {
-        return file.getFileName().toString().matches("Chat \\([^()/\\\\]+\\) [0-9a-f]{12}\\.txt");
+        return PathParts.name(file).matches("Chat \\([^()/\\\\]+\\) [0-9a-f]{12}\\.txt");
     }
 
     /** Writes it whole, in place of the one before. */

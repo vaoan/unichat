@@ -1,7 +1,6 @@
 package app.unichat.service;
 
 import app.unichat.model.Account;
-import app.unichat.model.AccountStatus;
 import app.unichat.model.Chat;
 import app.unichat.model.ConnectionState;
 import app.unichat.model.Contact;
@@ -14,6 +13,8 @@ import app.unichat.model.MimeTypes;
 import app.unichat.model.Network;
 import app.unichat.model.VoiceNote;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -39,8 +41,9 @@ import java.util.function.Consumer;
  * Offline demo backend: a believable multi-network inbox that lives in memory. Incoming messages,
  * typing and read receipts are simulated so every UI state can be exercised without a server.
  */
+@SuppressWarnings("PMD.TooManyMethods") // ChatService's whole interface, as the demo answers it
 public class MockChatService implements ChatService, FolderForwarding {
-    private final Map<String, app.unichat.model.LinkPreview> demoLinks = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, app.unichat.model.LinkPreview> demoLinks = new ConcurrentHashMap<>();
     static final String ME = "@me:demo.unichat";
     static final String WA_PERSONAL = "whatsapp:personal";
     static final String WA_WORK = "whatsapp:work";
@@ -56,11 +59,12 @@ public class MockChatService implements ChatService, FolderForwarding {
     /** Account id -> account, in connection order. */
     final Map<String, Account> accounts = new LinkedHashMap<>();
     private final Random random = new Random(7);
-    private ScheduledExecutorService scheduler;
+    private volatile @Nullable ScheduledExecutorService scheduler; // made under the lock (start), read by scheduler() from any thread
     private volatile ConnectionState state = ConnectionState.CONNECTING;
 
     private final PreferencesFile prefs;
     private final FolderActions folders;
+    private final DemoAccounts demoAccounts = new DemoAccounts(this);
 
     /** Demo mode with nothing kept on disk (tests, snapshots). */
     public MockChatService() {
@@ -68,6 +72,8 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     /** Demo mode whose choices and folders live in {@code prefs}, like the real service. */
+    @SuppressWarnings("this-escape") // the demo seeds its own chats; subclasses (tests) only change how it answers
+    @SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "the demo's made-up chat (random, a field), the same on every run on purpose; nothing secret")
     public MockChatService(PreferencesFile prefs) {
         this.prefs = prefs;
         this.folders = new FolderActions(prefs, this::fireChats);
@@ -92,8 +98,8 @@ public class MockChatService implements ChatService, FolderForwarding {
             return t;
         });
         after(400, () -> setState(ConnectionState.ONLINE));
-        scheduler.scheduleWithFixedDelay(this::simulateIncoming, 25, 40, TimeUnit.SECONDS);
-        scheduler.scheduleWithFixedDelay(this::checkReminders, 5, 5, TimeUnit.SECONDS);
+        var _ = scheduler.scheduleWithFixedDelay(this::simulateIncoming, 25, 40, TimeUnit.SECONDS);
+        var _ = scheduler.scheduleWithFixedDelay(this::checkReminders, 5, 5, TimeUnit.SECONDS);
     }
 
     @Override
@@ -184,7 +190,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         });
     }
 
-    private final List<String> channelLoads = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<String> channelLoads = new CopyOnWriteArrayList<>();
 
     @Override
     public CompletableFuture<Void> loadAllChannels(String spaceId) {
@@ -225,7 +231,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     private void viaBridge(Runnable r) {
         CompletableFuture<Void> gate = bridgeGate;
         if (gate.isDone()) r.run();
-        else gate.thenRunAsync(r);
+        else { var _ = gate.thenRunAsync(r); }
     }
 
     private <T> CompletableFuture<T> later(java.util.function.Supplier<T> s) {
@@ -258,7 +264,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     @Override
-    public CompletableFuture<Contact> resolveContact(Account account, String identifier) {
+    public CompletableFuture<@Nullable Contact> resolveContact(Account account, String identifier) {
         String digits = identifier.replaceAll("[^0-9]", "");
         return CompletableFuture.completedFuture(digits.length() >= 7
                 ? new Contact("c-" + digits, identifier.strip(), List.of("tel:+" + digits), null, null) : null);
@@ -279,7 +285,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     @Override public List<Chat> chats() { return new ArrayList<>(chats.values()); }
-    @Override public Chat chat(String chatId) { return chats.get(chatId); }
+    @Override public @Nullable Chat chat(String chatId) { return chats.get(chatId); }
 
     @Override
     public List<Message> messages(String chatId) {
@@ -298,7 +304,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     // ---------------------------------------------------------------- sending
 
     @Override
-    public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) {
+    public CompletableFuture<Void> sendText(String chatId, String text, @Nullable String replyToId) {
         CompletableFuture<Void> sent = sendLocal(chatId, replyToId, m -> {
             m.setBody(Message.withoutEmoteCommand(text));
             m.setHtml(app.unichat.model.Markup.html(m.body()));
@@ -306,7 +312,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         });
         Chat chat = chats.get(chatId);
         if (chat != null) {
-            if (chat.bridgeBot()) answerBridgeBot(chat, text.trim());
+            if (chat.bridgeBot()) demoAccounts.answer(chat, text.trim());
             else if (autoReplies && random.nextInt(3) == 0) replyLater(chat, 3 + random.nextInt(4));
         }
         return sent;
@@ -314,8 +320,7 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     /** Whether someone answers now and then what's sent (the demo's life); tests turn it off and play the others. */
     private volatile boolean autoReplies = true;
-
-    public void noAutoReplies() { autoReplies = false; }
+    public final void noAutoReplies() { autoReplies = false; }
 
     @Override
     public CompletableFuture<List<app.unichat.model.StickerPack.Ref>> stickerPacks() { return DemoStickers.packs(); }
@@ -324,7 +329,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     public CompletableFuture<app.unichat.model.StickerPack> stickerPack(String url) { return DemoStickers.pack(url); }
 
     @Override
-    public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) {
+    public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, @Nullable String replyToId) {
         return sendLocal(chatId, replyToId, m -> {
             m.setType(MessageType.STICKER);
             m.setMediaUrl(item.url());
@@ -335,10 +340,10 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     @Override
-    public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) {
+    public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, @Nullable String replyToId) {
         return sendLocal(chatId, replyToId, m -> {
             m.setType(MessageType.AUDIO);
-            m.setFileName(note.file().getFileName().toString());
+            m.setFileName(app.unichat.support.PathParts.name(note.file()));
             m.setMimeType("audio/ogg");
             m.setMediaUrl(note.file().toUri().toString());
             m.setMediaInfo(com.fasterxml.jackson.databind.json.JsonMapper.builder().build().createObjectNode().put("duration", note.durationMs()));
@@ -352,10 +357,10 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     /** Shows at once like the real one; the "upload" takes half a second, so the upload bar can be seen. */
     @Override
-    public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, SendAs as,
+    public CompletableFuture<Void> sendFile(String chatId, Path file, @Nullable String replyToId, SendAs as,
                                             java.util.function.DoubleConsumer progress) {
         CompletableFuture<Void> shown = sendLocal(chatId, replyToId, m -> {
-            String name = file.getFileName().toString();
+            String name = app.unichat.support.PathParts.name(file);
             m.setFileName(name);
             m.setBody(name);
             m.setMediaUrl(file.toUri().toString());
@@ -382,7 +387,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     /** What sending anything has in common: a new outgoing message that {@code fill} completes, then its delivery. */
-    private CompletableFuture<Void> sendLocal(String chatId, String replyToId, Consumer<Message> fill) {
+    private CompletableFuture<Void> sendLocal(String chatId, @Nullable String replyToId, Consumer<Message> fill) {
         Chat chat = chats.get(chatId);
         if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException(I18n.t("error.chatNotFound")));
         Message m = outgoing(chatId);
@@ -399,7 +404,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         if (m != null && m.outgoing()) {
             m.setBody(newText);
             m.setEdited(true);
-            refreshPreview(chats.get(chatId));
+            refreshPreview(Objects.requireNonNull(chats.get(chatId), chatId)); // its messages were found
             fireMessages(chatId);
         }
         return CompletableFuture.completedFuture(null);
@@ -410,7 +415,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         Message m = find(chatId, messageId);
         if (m != null) {
             m.markDeleted();
-            refreshPreview(chats.get(chatId));
+            refreshPreview(Objects.requireNonNull(chats.get(chatId), chatId)); // its messages were found
             fireMessages(chatId);
         }
         return CompletableFuture.completedFuture(null);
@@ -447,16 +452,24 @@ public class MockChatService implements ChatService, FolderForwarding {
     @Override public CompletableFuture<Void> setFavorite(String id, boolean v) { return choose(id, PreferencesFile.Flag.FAVORITE, v, c -> c.setFavorite(v)); }
     @Override public CompletableFuture<Void> setLowPriority(String id, boolean v) { return choose(id, PreferencesFile.Flag.LOW_PRIORITY, v, c -> c.setLowPriority(v)); }
     @Override public CompletableFuture<Void> setAutoSave(String id, boolean mine, java.util.Set<app.unichat.model.SaveKind> kinds) {
-        return update(id, c -> { if (c.prefKey() != null) prefs.chooseSaveKinds(c.prefKey(), mine, kinds); });
+        return update(id, c -> {
+            String key = c.prefKey();
+            if (key != null) prefs.chooseSaveKinds(key, mine, kinds);
+        });
     }
     @Override public CompletableFuture<Void> setMediaHidden(String id, boolean v) { return choose(id, PreferencesFile.Flag.MEDIA_HIDDEN, v, c -> { }); }
     @Override public boolean mediaHidden(String id) {
-        Chat c = chat(id);
-        return c != null && c.prefKey() != null && prefs.isOn(c.prefKey(), PreferencesFile.Flag.MEDIA_HIDDEN);
+        String key = prefKey(id);
+        return key != null && prefs.isOn(key, PreferencesFile.Flag.MEDIA_HIDDEN);
     }
     @Override public java.util.Set<app.unichat.model.SaveKind> autoSaves(String id, boolean mine) {
-        Chat c = chat(id);
-        return c == null || c.prefKey() == null ? java.util.Set.of() : prefs.saveKinds(c.prefKey(), mine);
+        String key = prefKey(id);
+        return key == null ? java.util.Set.of() : prefs.saveKinds(key, mine);
+    }
+
+    private @Nullable String prefKey(String chatId) {
+        Chat c = chat(chatId);
+        return c == null ? null : c.prefKey();
     }
     @Override public CompletableFuture<Void> setArchived(String id, boolean v) { return quiet(id, v); }
     @Override public CompletableFuture<Void> setMuted(String id, boolean v) { return quiet(id, v); }
@@ -466,7 +479,8 @@ public class MockChatService implements ChatService, FolderForwarding {
         for (String t : QuietRule.targets(this, id)) {
             Chat c = chats.get(t);
             if (c == null) continue;
-            if (c.prefKey() != null) prefs.chooseQuiet(c.prefKey(), v);
+            String key = c.prefKey();
+            if (key != null) prefs.chooseQuiet(key, v);
             c.setArchived(v);
             c.setMuted(v);
         }
@@ -474,8 +488,9 @@ public class MockChatService implements ChatService, FolderForwarding {
         return CompletableFuture.completedFuture(null);
     }
     @Override public CompletableFuture<Void> setPinned(String id, boolean v) { return choose(id, PreferencesFile.Flag.PINNED, v, c -> c.setPinned(v)); }
-    @Override public CompletableFuture<Void> setReminder(String id, Instant at) { return update(id, c -> {
-        if (c.prefKey() != null) prefs.chooseReminder(c.prefKey(), at);
+    @Override public CompletableFuture<Void> setReminder(String id, @Nullable Instant at) { return update(id, c -> {
+        String key = c.prefKey();
+        if (key != null) prefs.chooseReminder(key, at);
         c.setReminderAt(at);
     }); }
 
@@ -490,7 +505,8 @@ public class MockChatService implements ChatService, FolderForwarding {
     private CompletableFuture<Void> choose(String id, PreferencesFile.Flag flag, boolean v,
                                            Consumer<Chat> change) {
         return update(id, c -> {
-            if (c.prefKey() != null) prefs.choose(c.prefKey(), flag, v);
+            String key = c.prefKey();
+            if (key != null) prefs.choose(key, flag, v);
             change.accept(c);
         });
     }
@@ -525,7 +541,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     public void addLinkMedia(String url, app.unichat.model.LinkMedia media) { addLinkPreview(url, app.unichat.model.LinkPreview.of(url, media, null)); }
 
     @Override
-    public CompletableFuture<Path> media(String url, int width, int height) {
+    public CompletableFuture<Path> media(@Nullable String url, int width, int height) {
         if (url == null) return CompletableFuture.failedFuture(new IllegalArgumentException(I18n.t("error.noUrl")));
         if (url.startsWith("file:")) return CompletableFuture.completedFuture(Path.of(java.net.URI.create(url)));
         if (url.startsWith("demo://") || url.startsWith("mxc://demo/")) {
@@ -543,142 +559,30 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     // ---------------------------------------------------------------- accounts
 
-    @Override
-    public List<Account> accounts() {
-        List<Account> out;
-        synchronized (accounts) {
-            out = new ArrayList<>(accounts.values());
-        }
-        // Snapshots of the "not working" strip: -Dunichat.demoAccounts=WHATSAPP:NEEDS_LOGIN,DISCORD:CONNECTING
-        String broken = System.getProperty("unichat.demoAccounts", "");
-        for (String part : broken.split(",")) {
-            String[] nv = part.split(":");
-            if (nv.length != 2) continue;
-            Network n = Network.valueOf(nv[0].strip());
-            AccountStatus st = AccountStatus.valueOf(nv[1].strip());
-            out.replaceAll(acc -> acc.network() == n ? new Account(acc.id(), n, acc.label(), st, null) : acc);
-        }
-        return out;
-    }
+    @Override public List<Account> accounts() { return demoAccounts.list(); }
 
     @Override public List<Network> availableNetworks() { return AVAILABLE; }
 
-    @Override
-    public CompletableFuture<String> connectNetwork(Network network) {
-        boolean hasAccount;
-        synchronized (accounts) {
-            hasAccount = accounts.values().stream().anyMatch(a -> a.network() == network);
-        }
-        return hasAccount ? CompletableFuture.completedFuture(botChat(network).id()) : addAccount(network);
-    }
+    @Override public CompletableFuture<String> connectNetwork(Network network) { return demoAccounts.connect(network); }
 
-    @Override
-    public CompletableFuture<String> addAccount(Network network) {
-        Chat chat = botChat(network);
-        synchronized (accounts) {
-            accounts.put(pendingId(network), new Account(pendingId(network), network, I18n.t("demo.newAccount"), AccountStatus.NEEDS_LOGIN, null));
-        }
-        answerBridgeBot(chat, "login");
-        listeners.forEach(Listener::accountsChanged);
-        return CompletableFuture.completedFuture(chat.id());
-    }
+    @Override public CompletableFuture<String> addAccount(Network network) { return demoAccounts.add(network); }
 
-    @Override
-    public CompletableFuture<Void> disconnectNetwork(Network network) {
-        synchronized (accounts) {
-            accounts.values().removeIf(a -> a.network() == network);
-        }
-        chats.values().removeIf(c -> c.network() == network);
-        listeners.forEach(Listener::accountsChanged);
-        fireChats();
-        return CompletableFuture.completedFuture(null);
-    }
+    @Override public CompletableFuture<Void> disconnectNetwork(Network network) { return demoAccounts.disconnect(network); }
 
-    @Override
-    public CompletableFuture<Void> disconnectAccount(Account account) {
-        boolean last;
-        synchronized (accounts) {
-            accounts.remove(account.id());
-            last = accounts.values().stream().noneMatch(a -> a.network() == account.network());
-        }
-        chats.values().removeIf(c -> account.id().equals(c.accountId()) || (last && c.network() == account.network() && !c.bridgeBot()));
-        listeners.forEach(Listener::accountsChanged);
-        fireChats();
-        return CompletableFuture.completedFuture(null);
-    }
+    @Override public CompletableFuture<Void> disconnectAccount(Account account) { return demoAccounts.disconnect(account); }
 
     @Override
     public CompletableFuture<Void> cancelLogin(Network network, String botChatId) {
-        synchronized (accounts) {
-            accounts.remove(pendingId(network));
-        }
-        Chat chat = chats.get(botChatId);
-        if (chat != null) incoming(chat, botMember(network), "Login cancelled.", false);
-        listeners.forEach(Listener::accountsChanged);
-        return CompletableFuture.completedFuture(null);
+        return demoAccounts.cancelLogin(network, botChatId);
     }
 
-    private static String pendingId(Network n) {
-        return n.protocolId() + ":pending";
-    }
-
-    private Chat botChat(Network network) {
-        String id = "!bot-" + network.name().toLowerCase() + ":demo";
-        return chats.computeIfAbsent(id, k -> {
-            Chat bot = new Chat(k);
-            bot.setNetwork(network);
-            bot.setTitle(network.displayName() + " bridge bot");
-            bot.setBridgeBot(true);
-            bot.setMembers(List.of(botMember(network)));
-            adopt(bot);
-            messages.put(k, new ArrayList<>());
-            return bot;
-        });
-    }
-
-    private Member botMember(Network n) {
-        return new Member("@" + n.botLocalpart() + ":demo.unichat", n.displayName() + " bridge bot", null);
-    }
-
-    private void answerBridgeBot(Chat chat, String command) {
-        Network n = chat.network();
-        Member bot = botMember(n);
-        scheduler().schedule(() -> {
-            if (command.equalsIgnoreCase("login")) {
-                Message qr = new Message(UUID.randomUUID().toString(), chat.id(), bot.id(), bot.name(), false, Instant.now());
-                qr.setType(MessageType.IMAGE);
-                qr.setMediaUrl("demo://" + I18n.t("demo.image.qr") + "-" + n.protocolId());
-                qr.setFileName("qr.png");
-                qr.setSize(640, 420);
-                append(chat, qr);
-                incoming(chat, bot, "Scan the QR code with the " + n.displayName() + " mobile app to log in.", false);
-                scheduler().schedule(() -> answerBridgeBot(chat, "ok"), 6, TimeUnit.SECONDS); // demo: simulated scan
-            } else if (command.equalsIgnoreCase("ok")) {
-                incoming(chat, bot, "Successfully logged in as demo_" + n.protocolId(), false);
-                synchronized (accounts) {
-                    accounts.remove(pendingId(n));
-                    long k = accounts.values().stream().filter(a -> a.network() == n).count() + 1;
-                    String id = n.protocolId() + ":demo" + k;
-                    accounts.put(id, new Account(id, n, "demo_" + n.protocolId() + "_" + k, AccountStatus.CONNECTED, null));
-                }
-                listeners.forEach(Listener::accountsChanged);
-            } else if (command.equalsIgnoreCase("logout")) {
-                incoming(chat, bot, I18n.t("demo.loggedOut"), false);
-                synchronized (accounts) {
-                    accounts.values().removeIf(a -> a.network() == n);
-                }
-                listeners.forEach(Listener::accountsChanged);
-            } else {
-                incoming(chat, bot, I18n.t("demo.unknownCommand"), false);
-            }
-        }, 900, TimeUnit.MILLISECONDS);
-    }
+    final void fireAccounts() { listeners.forEach(Listener::accountsChanged); }
 
     // ---------------------------------------------------------------- simulation
 
-    private ScheduledExecutorService scheduler() {
+    final ScheduledExecutorService scheduler() {
         if (scheduler == null) start();
-        return scheduler;
+        return Objects.requireNonNull(scheduler, "stopped meanwhile");
     }
 
     private Message outgoing(String chatId) {
@@ -690,11 +594,11 @@ public class MockChatService implements ChatService, FolderForwarding {
     /** Demo pauses run at once (in the same order): tests wait for what they bring, not for them. */
     private volatile boolean noPauses;
 
-    public void skipDemoPauses() { noPauses = true; }
+    public final void skipDemoPauses() { noPauses = true; }
 
     /** {@code r} after the demo's pause of {@code ms}, or right away (queued in order) with {@link #skipDemoPauses}. */
     private void after(long ms, Runnable r) {
-        scheduler().schedule(r, noPauses ? 0 : ms, TimeUnit.MILLISECONDS);
+        var _ = scheduler().schedule(r, noPauses ? 0 : ms, TimeUnit.MILLISECONDS);
     }
 
     /** SENDING -> SENT -> DELIVERED -> READ, like a real network. */
@@ -715,9 +619,9 @@ public class MockChatService implements ChatService, FolderForwarding {
         List<Member> others = chat.members().stream().filter(mb -> !mb.id().equals(ME)).toList();
         if (others.isEmpty()) return;
         Member who = others.get(random.nextInt(others.size()));
-        ScheduledExecutorService s = scheduler();
-        s.schedule(() -> setTyping(chat, who, true), 1, TimeUnit.SECONDS);
-        s.schedule(() -> {
+        ScheduledExecutorService s = scheduler(); // NOPMD: CloseResource, the demo's one scheduler, shut down with it
+        var _ = s.schedule(() -> setTyping(chat, who, true), 1, TimeUnit.SECONDS);
+        var _ = s.schedule(() -> {
             setTyping(chat, who, false);
             incoming(chat, who, autoReply(random.nextInt(AUTO_REPLY_COUNT)), true);
         }, seconds, TimeUnit.SECONDS);
@@ -725,7 +629,8 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     protected void setTyping(Chat chat, Member who, boolean typing) {
         java.util.Set<String> names = new java.util.LinkedHashSet<>(chat.typing());
-        if (typing) names.add(who.displayName()); else names.remove(who.displayName());
+        if (typing) names.add(who.displayName());
+        else names.remove(who.displayName());
         chat.setTyping(names);
         fireChats();
         fireMessages(chat.id());
@@ -741,7 +646,8 @@ public class MockChatService implements ChatService, FolderForwarding {
     private void checkReminders() {
         Instant now = Instant.now();
         for (Chat c : chats.values()) {
-            if (c.reminderAt() != null && !c.reminderAt().isAfter(now)) {
+            Instant at = c.reminderAt();
+            if (at != null && !at.isAfter(now)) {
                 c.setReminderAt(null);
                 c.setMarkedUnread(true);
                 listeners.forEach(l -> l.reminderDue(c));
@@ -780,12 +686,12 @@ public class MockChatService implements ChatService, FolderForwarding {
         fireChats();
     }
 
-    private Message find(String chatId, String messageId) {
+    private @Nullable Message find(String chatId, String messageId) {
         for (Message m : messages(chatId)) if (m.id().equals(messageId)) return m;
         return null;
     }
 
-    private void fireChats() { listeners.forEach(Listener::chatsChanged); }
+    final void fireChats() { listeners.forEach(Listener::chatsChanged); }
 
     @Override public byte[] preferencesJson() { return prefs.json(); }
 

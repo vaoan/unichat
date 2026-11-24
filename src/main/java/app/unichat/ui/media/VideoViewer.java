@@ -21,6 +21,7 @@ import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -39,9 +40,9 @@ final class VideoViewer {
     private final Stage stage = new Stage();
     private final StackPane screen = new StackPane();
     private final Consumer<Path> openElsewhere;
-    private MediaPlayer player;
-    private VideoControls controls;
-    private Runnable onSave;
+    private @Nullable MediaPlayer player;
+    private @Nullable VideoControls controls;
+    private @Nullable Runnable onSave;
 
     private VideoViewer(Consumer<Path> openElsewhere) {
         this.openElsewhere = openElsewhere;
@@ -51,10 +52,10 @@ final class VideoViewer {
      * @param onSave        "Guardar como…" button (null: none)
      * @param openElsewhere opens the file in the system's player when this one can't
      */
-    static Stage show(Window owner, CompletableFuture<Path> file, String title, Runnable onSave, Consumer<Path> openElsewhere) {
+    static Stage show(Window owner, CompletableFuture<Path> file, @Nullable String title, @Nullable Runnable onSave, Consumer<Path> openElsewhere) {
         VideoViewer v = new VideoViewer(openElsewhere);
         v.open(owner, title, onSave);
-        file.whenComplete((p, err) -> Platform.runLater(() -> {
+        var _ = file.whenComplete((p, err) -> Platform.runLater(() -> {
             if (!v.stage.isShowing()) return;
             if (err != null || p == null) v.fail(I18n.t("video.downloadFailed"), null);
             else v.play(p);
@@ -62,8 +63,8 @@ final class VideoViewer {
         return v.stage;
     }
 
-    private void open(Window owner, String title, Runnable onSave) {
-        this.onSave = onSave;
+    private void open(Window owner, @Nullable String title, @Nullable Runnable save) {
+        this.onSave = save;
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(40, 40);
         screen.getChildren().add(spin);
@@ -118,23 +119,25 @@ final class VideoViewer {
 
     /** @param mayConvert on failure, try once more through ffmpeg */
     private void playVideo(Path file, boolean mayConvert) {
-        player = MediaPlayers.open(file, () -> {
+        MediaPlayer p = MediaPlayers.open(file, () -> {
             if (!stage.isShowing()) return;
             release();
             if (mayConvert) convertAndPlay(file);
             else fail(I18n.t("video.unsupported"), file);
         });
-        if (player == null) return;
-        stage.getProperties().put(PLAYER, player);
-        MediaView view = new MediaView(player);
+        player = p;
+        if (p == null) return;
+        stage.getProperties().put(PLAYER, p);
+        MediaView view = new MediaView(p);
         view.setPreserveRatio(true);
         view.fitWidthProperty().bind(screen.widthProperty());
         view.fitHeightProperty().bind(screen.heightProperty());
         view.setAccessibleText(I18n.t("video.title"));
         screen.getChildren().setAll(view);
-        controls = new VideoControls(player, stage, view, screen, onSave, () -> openElsewhere.accept(file));
-        ((BorderPane) stage.getScene().getRoot()).setBottom(controls);
-        player.setAutoPlay(true);
+        VideoControls bar = new VideoControls(p, stage, view, screen, onSave, () -> openElsewhere.accept(file));
+        controls = bar;
+        ((BorderPane) stage.getScene().getRoot()).setBottom(bar);
+        p.setAutoPlay(true);
     }
 
     private void convertAndPlay(Path file) {
@@ -172,7 +175,7 @@ final class VideoViewer {
         }
     }
 
-    private void fail(String message, Path file) {
+    private void fail(String message, @Nullable Path file) {
         if (!Platform.isFxApplicationThread()) {
             Platform.runLater(() -> fail(message, file));
             return;
@@ -198,8 +201,9 @@ final class VideoViewer {
 
     private void release() {
         controls = null;
-        if (player == null) return;
-        player.dispose();
+        MediaPlayer p = player;
+        if (p == null) return;
+        p.dispose();
         player = null;
     }
 }

@@ -1,5 +1,9 @@
 package app.unichat.server;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
+import java.io.IOException;
+
 /**
  * Child process for SupervisorTest: "run" stays up until its input closes (it's stopped, or the JVM that started it
  * is gone), "crash" exits with an error at once; a second argument is printed. "chatty &lt;port&gt;" writes 1 MB to
@@ -7,7 +11,8 @@ package app.unichat.server;
  * up and prints "after". "bridge ..." and "broken-bridge ..." are a bridge's setup commands, for BridgeInstallerTest.
  */
 public final class FakeService {
-    public static void main(String[] args) throws Exception {
+    @SuppressFBWarnings(value = "UNENCRYPTED_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
+    public static void main(String[] args) throws IOException {
         if (args.length > 0 && args[0].endsWith("bridge")) {
             bridgeSetup(args);
             return;
@@ -21,30 +26,27 @@ public final class FakeService {
             for (int i = 0; i < 1024; i++) System.out.println(line);
             System.out.flush();
             try (java.net.Socket test = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), Integer.parseInt(args[1]))) {
-                while (test.getInputStream().read() >= 0) {
-                    // until the test hangs up
-                }
+                test.getInputStream().transferTo(java.io.OutputStream.nullOutputStream()); // until the test hangs up
                 System.out.println("after");
                 System.out.flush();
                 if (System.out.checkError()) System.exit(5);
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 System.exit(4);
             }
         }
-        while (System.in.read() >= 0) {
-            // nobody writes to it: this ends when the input closes
-        }
+        System.in.transferTo(java.io.OutputStream.nullOutputStream()); // nobody writes to it: this ends when the input closes
     }
 
     /** Works in its current folder, like a bridge: writes what it's asked for and leaves a line per call in calls.txt. */
-    private static void bridgeSetup(String[] args) throws java.io.IOException {
+    @SuppressFBWarnings(value = "DM_EXIT", justification = "a fake service process that exits as a real one would (as its NOPMD says)")
+    private static void bridgeSetup(String[] args) throws IOException {
         java.nio.file.Path here = java.nio.file.Path.of("").toAbsolutePath();
         java.nio.file.Files.writeString(here.resolve("calls.txt"), String.join(" ", args).substring(args[0].length()).strip() + "\n",
                 java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
         if (args[0].equals("broken-bridge")) {
             System.out.println("first line");
             System.out.println("no database here");
-            System.exit(7);
+            System.exit(7); // NOPMD: DoNotTerminateVM, a fake service process that exits as a real one would
         }
         String flag = args[1];
         if (flag.equals("-e")) {
@@ -79,7 +81,7 @@ public final class FakeService {
                     """);
             java.nio.file.Files.createDirectories(here.resolve("logs"));
             java.nio.file.Files.writeString(here.resolve("logs/first.log"), "unfiltered");
-            System.exit(1);
+            System.exit(1); // NOPMD: DoNotTerminateVM, as above
         }
     }
 }

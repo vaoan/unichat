@@ -18,7 +18,7 @@ class DecodeBudgetTest {
     @Test
     void whatDoesntFitWaitsForTheOneBeforeToEnd() throws Exception {
         DecodeBudget budget = new DecodeBudget(100);
-        DecodeBudget.Lease first = budget.take(80);
+        DecodeBudget.Lease first = budget.take(80); // NOPMD: CloseResource, closed below, to let the second in
         CountDownLatch started = new CountDownLatch(1);
         CompletableFuture<DecodeBudget.Lease> second = CompletableFuture.supplyAsync(() -> {
             started.countDown();
@@ -39,10 +39,10 @@ class DecodeBudgetTest {
     @Test
     void oneBiggerThanItAllGoesAlone() throws Exception {
         DecodeBudget budget = new DecodeBudget(100);
-        try (DecodeBudget.Lease big = budget.take(500)) {
+        try (DecodeBudget.Lease _ = budget.take(500)) {
             assertTrue(budget.used() >= 100, "it holds the whole budget while it decodes");
         }
-        try (DecodeBudget.Lease a = budget.take(40); DecodeBudget.Lease b = budget.take(40)) {
+        try (DecodeBudget.Lease _ = budget.take(40); DecodeBudget.Lease _ = budget.take(40)) {
             assertEquals(80, budget.used(), "small ones go together");
         }
     }

@@ -10,7 +10,10 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
+import org.jspecify.annotations.Nullable;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -35,7 +38,7 @@ class LoginCaptureUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private static volatile String agent;
+    private static volatile @Nullable String agent;
 
     private static void page(HttpServer server, String path, String html) {
         server.createContext(path, ex -> {
@@ -55,7 +58,7 @@ class LoginCaptureUiTest {
 
     @Test
     void itTakesTheHeadersThePageSendsAndTheHttpOnlyCookie() throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         page(server, "/login", "<script>setTimeout(function () { location.href = '/feed'; }, 300);</script>");
         // Keeps making requests, as a real page does: the window's script arrives after the page has loaded.
         page(server, "/feed", """
@@ -88,7 +91,7 @@ class LoginCaptureUiTest {
         });
         try {
             Map<String, String> v = done.get();
-            assertTrue(v.get("cookie_header").contains("JSESSIONID=ajax123"), "an HttpOnly cookie too");
+            assertTrue(Present.of(v.get("cookie_header")).contains("JSESSIONID=ajax123"), "an HttpOnly cookie too");
             assertEquals("UA", agent, "the browser the bridge asked for");
             assertEquals("{\"clientVersion\":\"1.2.3\"}", v.get("track"));
             assertEquals("urn:li:page:d_flagship3_feed", v.get("page"));
@@ -101,7 +104,7 @@ class LoginCaptureUiTest {
 
     @Test
     void aPageThatShowsNoHeadersStillFinishes() throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         page(server, "/login", "<script>setTimeout(function () { location.href = '/feed'; }, 300);</script>");
         page(server, "/feed", "<p>sin peticiones</p>");
         server.start();
@@ -121,8 +124,8 @@ class LoginCaptureUiTest {
         });
         try {
             Map<String, String> v = done.get();
-            assertTrue(v.get("cookie_header").contains("JSESSIONID=ajax123"));
-            assertTrue(v.get("track").contains("clientVersion"));
+            assertTrue(Present.of(v.get("cookie_header")).contains("JSESSIONID=ajax123"));
+            assertTrue(Present.of(v.get("track")).contains("clientVersion"));
         } finally {
             server.stop(0);
             Platform.runLater(() -> { if (owner[0] != null) owner[0].close(); });

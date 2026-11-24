@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.function.DoubleConsumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Cleans a voice note before it goes out, on this computer: no rumble, background noise off (RNNoise, a small neural
@@ -32,7 +33,8 @@ public final class VoiceEnhancer {
     private static final int OUTPUT_RATE = 48_000;
     /** Each pass: this much, plus twice the note's length. Two minutes for every note left the person waiting with no word. */
     private static final long BASE_TIMEOUT_SECONDS = 15;
-    private static final String RUMBLE = "highpass=f=80", VOLUME = "speechnorm=e=2:r=0.0001:l=1";
+    private static final String RUMBLE = "highpass=f=80";
+    private static final String VOLUME = "speechnorm=e=2:r=0.0001:l=1";
 
     private VoiceEnhancer() {}
 
@@ -50,7 +52,11 @@ public final class VoiceEnhancer {
         return improve(note, raw, rate, installing, () -> { });
     }
 
-    /** @param failed told when the filter failed or ran out of time, so the note goes as recorded */
+    /**
+     * The note with its voice made clearer.
+     *
+     * @param failed told when the filter failed or ran out of time, so the note goes as recorded
+     */
     public static VoiceNote improve(VoiceNote note, Path raw, int rate, DoubleConsumer installing, Runnable failed)
             throws InterruptedException {
         if (!enabled()) return note;
@@ -96,12 +102,12 @@ public final class VoiceEnhancer {
 
     private static List<String> pass(Path ffmpeg, Path in, int rate, String filters, Path out) {
         return List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error", "-protocol_whitelist", "file",
-                "-f", "s16le", "-ar", Integer.toString(rate), "-ac", "1", "-i", in.toString(),
+                "-f", "s16le", "-ar", Integer.toString(rate), "-ac", "1", "-i", in.toString(), // lesson-ok: ffmpeg-raw-input (-f forced)
                 "-af", filters, "-f", "s16le", "-ar", Integer.toString(OUTPUT_RATE), "-ac", "1", out.toString());
     }
 
     /** The model, downloaded if allowed; null means ffmpeg's plain noise filter, which needs none. */
-    private static Path model(DoubleConsumer installing) throws InterruptedException {
+    private static @Nullable Path model(DoubleConsumer installing) throws InterruptedException {
         Path f = Settings.get().dir().resolve("tools").resolve("rnnoise").resolve(MODEL);
         if (Files.isRegularFile(f)) return f;
         if (!Ffmpeg.autoInstall()) return null;
@@ -119,7 +125,8 @@ public final class VoiceEnhancer {
              InputStream in = new BufferedInputStream(Files.newInputStream(pcm))) {
             byte[] bytes = new byte[8192];
             short[] samples = new short[bytes.length / 2];
-            for (int n; (n = in.readNBytes(bytes, 0, bytes.length)) > 1; ) {
+            int n;
+            while ((n = in.readNBytes(bytes, 0, bytes.length)) > 1) {
                 ByteBuffer.wrap(bytes, 0, n & ~1).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(samples, 0, n / 2);
                 encoder.feed(samples, n / 2);
             }

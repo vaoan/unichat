@@ -4,6 +4,7 @@ import app.unichat.ui.Browser;
 import app.unichat.ui.Clipboards;
 import app.unichat.ui.Labels;
 import app.unichat.ui.Nodes;
+import app.unichat.update.Release;
 import app.unichat.settings.Settings;
 import app.unichat.support.AppVersion;
 import app.unichat.support.ErrorReport;
@@ -18,6 +19,7 @@ import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.layout.VBox;
 
+import java.util.Objects;
 import java.nio.file.Path;
 
 import static app.unichat.ui.settings.SettingsForm.group;
@@ -54,15 +56,16 @@ final class AboutPage {
             say(status, I18n.t("settings.about.checking"));
             Nodes.show(result, true);
             Nodes.show(download, false);
-            UpdateChecker.get().checkNow().thenAccept(r -> Platform.runLater(() -> {
+            var _ = UpdateChecker.get().checkNow().thenAccept(r -> Platform.runLater(() -> {
                 check.setDisable(false);
                 switch (r.outcome()) {
                     case UP_TO_DATE -> say(status, I18n.t("settings.about.upToDate", AppVersion.current()));
                     case FAILED -> say(status, I18n.t("settings.about.checkFailed"));
                     case NEWER -> {
-                        say(status, I18n.t("update.available", r.release().shown()));
-                        download.setText(I18n.t("settings.about.downloadLink", r.release().shown()));
-                        download.setOnAction(ev -> Browser.open(r.release().url()));
+                        Release newer = Objects.requireNonNull(r.release(), "UpdateChecker gives NEWER with the release it found");
+                        say(status, I18n.t("update.available", newer.shown()));
+                        download.setText(I18n.t("settings.about.downloadLink", newer.shown()));
+                        download.setOnAction(ev -> Browser.open(newer.url()));
                         Nodes.show(download, true);
                     }
                 }

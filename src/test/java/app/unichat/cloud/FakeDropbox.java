@@ -4,16 +4,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /** Dropbox's API in memory, on this machine only: its token endpoint, files and upload sessions, answered as Dropbox does. */
 final class FakeDropbox implements AutoCloseable {
@@ -22,17 +25,19 @@ final class FakeDropbox implements AutoCloseable {
     final Map<String, Integer> revs = new ConcurrentHashMap<>();
     final Set<String> folders = ConcurrentHashMap.newKeySet();
     final Map<String, ByteArrayOutputStream> sessions = new ConcurrentHashMap<>();
-    final AtomicInteger tokensMade = new AtomicInteger(), sessionCalls = new AtomicInteger();
+    final AtomicInteger tokensMade = new AtomicInteger();
+    final AtomicInteger sessionCalls = new AtomicInteger();
     /** The PKCE challenge the browser was sent with, and the code Dropbox gives back for it. */
-    volatile String challenge;
+    volatile @Nullable String challenge;
     private final HttpServer server;
-    private final String appKey, refresh;
+    private final String appKey;
+    private final String refresh;
     private volatile String access = "none";
 
     FakeDropbox(String appKey, String refresh) throws IOException {
         this.appKey = appKey;
         this.refresh = refresh;
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", this::handle);
         server.start();
     }
@@ -42,6 +47,7 @@ final class FakeDropbox implements AutoCloseable {
     }
 
     /** The short-lived token stops working (as after four hours). */
+    @SuppressWarnings("NonAtomicVolatileUpdate") // only the test calls it, between requests
     void expire() {
         access = "expired-" + access;
     }
@@ -51,15 +57,19 @@ final class FakeDropbox implements AutoCloseable {
      * the folder here), so taking only the first page loses names.
      */
     private void list(HttpExchange x, String dir, boolean rest) throws IOException {
-        java.util.Set<String> names = new java.util.TreeSet<>();
+        Set<String> names = new java.util.TreeSet<>();
         boolean there = folders.contains(dir);
-        for (String f : files.keySet()) if (f.startsWith(dir + "/")) { names.add(f.substring(dir.length() + 1).split("/")[0]); there = true; }
+        for (String f : files.keySet()) if (f.startsWith(dir + "/")) {
+            names.add(f.substring(dir.length() + 1).split("/")[0]);
+            there = true;
+        }
         for (String d : folders) if (d.startsWith(dir + "/")) names.add(d.substring(dir.length() + 1).split("/")[0]);
         if (!there) {
             reply(x, 409, "{\"error_summary\": \"path/not_found/..\"}");
             return;
         }
-        List<String> all = List.copyOf(names), page = rest ? all.subList(Math.min(1, all.size()), all.size()) : all.subList(0, Math.min(1, all.size()));
+        List<String> all = List.copyOf(names);
+        List<String> page = rest ? all.subList(Math.min(1, all.size()), all.size()) : all.subList(0, Math.min(1, all.size()));
         com.fasterxml.jackson.databind.node.ObjectNode out = JSON.createObjectNode();
         com.fasterxml.jackson.databind.node.ArrayNode entries = out.putArray("entries");
         for (String n : page) entries.addObject().put("name", n);
@@ -108,7 +118,7 @@ final class FakeDropbox implements AutoCloseable {
             String path = x.getRequestURI().getPath();
             byte[] body = x.getRequestBody().readAllBytes();
             if (path.equals("/oauth2/token")) {
-                token(x, Loopback.query(new String(body, StandardCharsets.UTF_8)));
+                token(x, Loopback.query(new String(body, UTF_8)));
                 return;
             }
             if (!("Bearer " + access).equals(x.getRequestHeaders().getFirst("Authorization"))) {
@@ -120,7 +130,7 @@ final class FakeDropbox implements AutoCloseable {
                 reply(x, 400, "{\"error_summary\": \"header not ASCII\"}");
                 return;
             }
-            JsonNode arg = argHeader != null ? JSON.readTree(argHeader) : body.length == 0 || new String(body).equals("null")
+            JsonNode arg = argHeader != null ? JSON.readTree(argHeader) : body.length == 0 || new String(body, UTF_8).equals("null")
                     ? JSON.nullNode() : JSON.readTree(body);
             switch (path) {
                 case "/2/users/get_current_account" -> reply(x, 200, "{\"email\": \"yo@correo.com\"}");
@@ -221,7 +231,7 @@ final class FakeDropbox implements AutoCloseable {
     }
 
     private static void reply(HttpExchange x, int code, String body) throws IOException {
-        byte[] b = body.getBytes(StandardCharsets.UTF_8);
+        byte[] b = body.getBytes(UTF_8);
         x.sendResponseHeaders(code, b.length);
         x.getResponseBody().write(b);
     }

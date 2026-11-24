@@ -5,13 +5,14 @@ import app.unichat.model.Account;
 import app.unichat.model.Contact;
 import app.unichat.service.ChatService.ContactSupport;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 
-import static app.unichat.matrix.BridgeProtocol.*;
+import static app.unichat.matrix.BridgeProtocol.loginIdOf;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Contacts and new chats through the bridges' own API. */
 final class ContactActions {
@@ -24,10 +25,10 @@ final class ContactActions {
     }
 
     /** Accounts whose bridge answered that it has no user search. */
-    private final Set<String> noSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<String> noSearch = ConcurrentHashMap.newKeySet();
 
     /** The bridge's contacts API for {@code a}, or null when there's no bridge API (external server). */
-    private BridgeContacts bridgeContacts(Account a) {
+    private @Nullable BridgeContacts bridgeContacts(Account a) {
         BridgeProvisioner p = BridgeAccounts.provisioner;
         String url = p == null ? null : p.provisioningUrl(a.network());
         return url == null ? null : new BridgeContacts(url, core.accessToken, userId, loginIdOf(a));
@@ -58,11 +59,11 @@ final class ContactActions {
                 noSearch.add(a.id());
                 throw new UnsupportedOperationException("search");
             }
-            return r.get();
+            return r.orElseThrow();
         });
     }
 
-    CompletableFuture<Contact> resolveContact(Account a, String identifier) {
+    CompletableFuture<@Nullable Contact> resolveContact(Account a, String identifier) {
         return core.call(() -> {
             BridgeContacts b = bridgeContacts(a);
             return b == null ? null : b.resolve(identifier);

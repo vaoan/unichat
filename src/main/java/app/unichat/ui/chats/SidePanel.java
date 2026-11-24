@@ -12,9 +12,11 @@ import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * The panel on the right of every chat, like Telegram's: one place for the person's profile and the emoji, sticker
@@ -40,7 +42,7 @@ public final class SidePanel extends VBox {
     private final Map<Tab, ToggleButton> buttons = new EnumMap<>(Tab.class);
     private final Map<Tab, Node> content = new EnumMap<>(Tab.class);
     private Tab current = Tab.PROFILE;
-    private Chat chat;
+    private @Nullable Chat chat;
 
     public SidePanel(InfoPane info) {
         this.info = info;
@@ -59,7 +61,7 @@ public final class SidePanel extends VBox {
         content.put(Tab.STICKERS, placeholder(I18n.t("sidePanel.stickersEmpty")));
         content.put(Tab.GIFS, placeholder(I18n.t("sidePanel.gifsEmpty")));
         content.put(Tab.FAVORITES, placeholder(I18n.t("sidePanel.favoritesEmpty")));
-        VBox.setVgrow(body, Priority.ALWAYS);
+        setVgrow(body, Priority.ALWAYS);
         getChildren().addAll(tabs, body);
         try {
             current = Tab.valueOf(Settings.get().getString("panel.tab", Tab.PROFILE.name()));
@@ -71,16 +73,16 @@ public final class SidePanel extends VBox {
     private final Map<Tab, Runnable> onShow = new EnumMap<>(Tab.class);
 
     /** Replaces the content of a tab; {@code refresh} runs every time the tab is shown (may be null). */
-    public void setContent(Tab t, Node n, Runnable refresh) {
+    public void setContent(Tab t, Node n, @Nullable Runnable refresh) {
         content.put(t, n);
         if (refresh != null) onShow.put(t, refresh);
         if (t == current) body.getChildren().setAll(n);
     }
 
-    public void show(Chat c, Tab t) {
+    public void show(@Nullable Chat c, Tab t) {
         chat = c;
         current = t;
-        buttons.get(t).setSelected(true);
+        Objects.requireNonNull(buttons.get(t), "the constructor makes one per tab").setSelected(true);
         if (t == Tab.PROFILE && c != null) info.show(c);
         Runnable r = onShow.get(t);
         if (r != null) r.run();

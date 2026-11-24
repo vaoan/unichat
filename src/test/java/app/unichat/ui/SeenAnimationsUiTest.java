@@ -42,10 +42,10 @@ class SeenAnimationsUiTest {
     @AfterEach
     void close() throws Exception {
         Seen.reset(true);
-        FxWait.fx(() -> { stages.forEach(Stage::close); return null; });
+        FxWait.onFx(() -> stages.forEach(Stage::close));
     }
 
-    private Stage window(StackPane root) throws Exception {
+    private Stage window(StackPane root) throws InterruptedException {
         return FxWait.fx(() -> {
             Stage s = new Stage();
             s.setOpacity(0);
@@ -60,23 +60,23 @@ class SeenAnimationsUiTest {
     void everyTimelineStopsWhenUnseenAndStartsWhenSeen() throws Exception {
         WorkingLine line = FxWait.fx(WorkingLine::new);
         Stage stage = window(FxWait.fx(() -> new StackPane(line.node())));
-        FxWait.fx(() -> { line.start("Limpiando la nota"); return null; });
+        FxWait.onFx(() -> line.start("Limpiando la nota"));
         java.util.concurrent.Callable<Boolean> spinning = () -> line.node().lookupAll(".progress-indicator").stream()
                 .anyMatch(n -> ((javafx.scene.control.ProgressIndicator) n).isIndeterminate());
         assertTrue(FxWait.fx(() -> Showing.animating(line.node())), "counting while seen");
-        assertTrue(FxWait.fx(spinning), "its wheel turns while seen");
+        assertTrue(FxWait.fx(spinning::call), "its wheel turns while seen");
 
         Seen.reset(false); // from another thread, as the screen's source does
         FxWait.until("resting while nobody can see it", () -> !Showing.animating(line.node()) && !spinning.call());
         Seen.reset(true);
         FxWait.until("counting again once seen", () -> Showing.animating(line.node()) && spinning.call());
 
-        FxWait.fx(() -> { stage.setIconified(true); return null; });
+        FxWait.onFx(() -> stage.setIconified(true));
         FxWait.until("resting while its window is minimised", () -> !Showing.animating(line.node()) && !spinning.call());
-        FxWait.fx(() -> { stage.setIconified(false); return null; });
+        FxWait.onFx(() -> stage.setIconified(false));
         FxWait.until("counting again once restored", () -> Showing.animating(line.node()) && spinning.call());
 
-        FxWait.fx(() -> { line.stop(); return null; });
+        FxWait.onFx(line::stop);
         Seen.reset(false);
         Seen.reset(true);
         FxWait.fx(() -> null); // the change reached the FX thread
@@ -87,30 +87,29 @@ class SeenAnimationsUiTest {
     void aTaskBarsBarRestsWhileUnseenAndKeepsWhatItSays() throws Exception {
         TaskBar task = FxWait.fx(() -> new TaskBar("test-bar") { });
         Stage stage = window(FxWait.fx(() -> new StackPane(task)));
-        java.util.concurrent.Callable<Boolean> spinning = () -> task.bar.isIndeterminate();
-        FxWait.fx(() -> { task.bar.setProgress(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS); return null; });
-        assertTrue(FxWait.fx(spinning), "it moves while seen");
+        java.util.concurrent.Callable<Boolean> spinning = task.bar::isIndeterminate;
+        FxWait.onFx(() -> task.bar.setProgress(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS));
+        assertTrue(FxWait.fx(spinning::call), "it moves while seen");
 
         Seen.reset(false);
         FxWait.until("resting while nobody can see it", () -> !spinning.call());
         Seen.reset(true);
         FxWait.until("moving again once seen", spinning);
 
-        FxWait.fx(() -> { stage.setIconified(true); return null; });
+        FxWait.onFx(() -> stage.setIconified(true));
         FxWait.until("resting while its window is minimised", () -> !spinning.call());
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             task.bar.setProgress(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS); // told again meanwhile
-            return null;
         });
-        assertFalse(FxWait.fx(spinning), "told to move while minimised, it still rests");
-        FxWait.fx(() -> { stage.setIconified(false); return null; });
+        assertFalse(FxWait.fx(spinning::call), "told to move while minimised, it still rests");
+        FxWait.onFx(() -> stage.setIconified(false));
         FxWait.until("moving again once restored", spinning);
 
-        FxWait.fx(() -> { task.bar.setProgress(0.4); return null; });
+        FxWait.onFx(() -> task.bar.setProgress(0.4));
         Seen.reset(false);
         Seen.reset(true);
         FxWait.fx(() -> null); // both changes reached the FX thread
-        assertEquals(0.4, FxWait.fx(() -> task.bar.getProgress()), "a count it showed stays as it was");
+        assertEquals(0.4, FxWait.fx(task.bar::getProgress), "a count it showed stays as it was");
     }
 
     /** Seen's listeners run under its lock: Showing's work is handed to the FX thread, even when set from there. */
@@ -120,13 +119,12 @@ class SeenAnimationsUiTest {
         List<Boolean> underSeensLock = new ArrayList<>();
         window(FxWait.fx(() -> new StackPane(node)));
         Runnable look = () -> underSeensLock.add(Thread.holdsLock(Seen.get()));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Showing.whileShowing(node, look, look);
             underSeensLock.clear(); // the first start, from whileShowing itself
             Seen.reset(false);
-            return null;
         });
-        FxWait.fx(() -> { Seen.reset(true); return null; }); // after the stop handed on by the first has run
+        FxWait.onFx(() -> Seen.reset(true));  // after the stop handed on by the first has run
         FxWait.fx(() -> null); // and the start
         assertEquals(List.of(false, false), FxWait.fx(() -> List.copyOf(underSeensLock)), "stop and start, outside Seen's call");
     }
@@ -140,16 +138,16 @@ class SeenAnimationsUiTest {
         Showing.Watch watch = FxWait.fx(() -> Showing.whileShowing(node, () -> heard.add("start"), () -> heard.add("stop")));
         assertEquals(before + 1, FxWait.fx(Showing::followingSeen), "its window shows");
 
-        FxWait.fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
         assertEquals(before, FxWait.fx(Showing::followingSeen), "a closed window's node isn't held by Seen");
         Seen.reset(false);
         Seen.reset(true);
         FxWait.fx(() -> null);
         assertEquals(List.of("start", "stop"), FxWait.fx(() -> List.copyOf(heard)), "seen again doesn't start a closed window's work");
 
-        FxWait.fx(() -> { stage.show(); return null; });
+        FxWait.onFx(stage::show);
         assertEquals(before + 1, FxWait.fx(Showing::followingSeen), "shown again");
-        FxWait.fx(() -> { watch.cancel(); return null; });
+        FxWait.onFx(watch::cancel);
         assertEquals(before, FxWait.fx(Showing::followingSeen), "cancelled: Seen no longer reaches it");
     }
 }

@@ -1,6 +1,10 @@
 package app.unichat.server;
 
+import app.unichat.Present;
 import com.sun.net.httpserver.HttpServer;
+import java.security.NoSuchAlgorithmException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -30,16 +35,17 @@ class BinaryStoreTest {
     private HttpServer server;
     private final AtomicInteger downloads = new AtomicInteger();
     /** What the fake release serves as the binary, and the sum its own sha256sums.txt gives for it. */
+    @SuppressFBWarnings(value = "VO_VOLATILE_REFERENCE_TO_ARRAY", justification = "the array is replaced whole, never changed: the volatile hands the new one to the fake server's thread")
     private volatile byte[] served = BINARY;
     private volatile String publishedSum;
     /** The SHA-256 the app ships pinned for the asset (null: not pinned). */
-    private volatile String pinnedSum;
+    private volatile @Nullable String pinnedSum;
 
     @BeforeEach
     void fakeReleases() throws Exception {
         publishedSum = sha(BINARY);
         pinnedSum = sha(BINARY);
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String path = ex.getRequestURI().getPath();
             byte[] body;
@@ -104,9 +110,9 @@ class BinaryStoreTest {
         Files.write(store.path("discord"), BINARY);
         assertTrue(store.path("discord").toFile().setExecutable(true, true));
         Files.writeString(dir.resolve("discord.version"), "v0.7.7");
-        assertFalse(store.isInstalled(m.bridge("discord")), "the official v0.7.7 is not Unichat's build");
+        assertFalse(store.isInstalled(Present.of(m.bridge("discord"))), "the official v0.7.7 is not Unichat's build");
         Files.writeString(dir.resolve("discord.version"), "v0.7.7+natives-2");
-        assertTrue(store.isInstalled(m.bridge("discord")));
+        assertTrue(store.isInstalled(Present.of(m.bridge("discord"))));
     }
 
     @Test
@@ -144,7 +150,7 @@ class BinaryStoreTest {
     void checksumMismatchInstallsNothing() {
         pinnedSum = "0".repeat(64);
         IOException e = assertThrows(IOException.class, () -> store().install(WA));
-        assertTrue(e.getMessage().contains("dañado"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("dañado"), e.getMessage());
         assertNothingInstalled();
     }
 
@@ -154,7 +160,7 @@ class BinaryStoreTest {
         served = "#!/bin/sh\necho tampered\n".getBytes(StandardCharsets.UTF_8);
         publishedSum = sha(served);
         IOException e = assertThrows(IOException.class, () -> store().install(WA));
-        assertTrue(e.getMessage().contains("dañado"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("dañado"), e.getMessage());
         assertNothingInstalled();
     }
 
@@ -162,7 +168,7 @@ class BinaryStoreTest {
     void anAssetWithNoPinnedHashIsNeverDownloaded() {
         pinnedSum = null;
         IOException e = assertThrows(IOException.class, () -> store().install(WA));
-        assertTrue(e.getMessage().contains("mautrix-whatsapp-darwin-arm64"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("mautrix-whatsapp-darwin-arm64"), e.getMessage());
         assertEquals(0, downloads.get());
         assertNothingInstalled();
     }
@@ -173,7 +179,7 @@ class BinaryStoreTest {
         assertFalse(Files.exists(dir.resolve("whatsapp.version")));
     }
 
-    private static String sha(byte[] b) throws Exception {
+    private static String sha(byte[] b) throws NoSuchAlgorithmException {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(b));
     }
 }

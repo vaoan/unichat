@@ -2,6 +2,7 @@ package app.unichat.matrix;
 
 import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Set;
 
@@ -13,8 +14,20 @@ import java.util.Set;
 final class NetworkFormats {
     private NetworkFormats() {}
 
-    static final String WEBP = "image/webp", PNG = "image/png", JPEG = "image/jpeg", GIF = "image/gif", WEBM = "video/webm",
-            LOTTIE = "video/lottie+json";
+    static final String WEBP = "image/webp";
+    static final String PNG = "image/png";
+    static final String JPEG = "image/jpeg";
+    static final String GIF = "image/gif";
+    static final String WEBM = "video/webm";
+    static final String LOTTIE = "video/lottie+json";
+
+    /**
+     * Whether a sticker that couldn't be made what {@code n} should get (no tool) goes as it is rather than as a still
+     * picture: an animated one where that format still plays; never by room_features alone (null network).
+     */
+    static boolean asIsIfUnmade(@Nullable Network n, @Nullable String mime, boolean animated) {
+        return n != null && animated && of(n).takesIfUnmade(mime);
+    }
 
     /**
      * {@code asIs}: the sticker formats its bridge sends on (the chat's room_features may still refuse one); {@code animated}
@@ -22,18 +35,10 @@ final class NetworkFormats {
      * MP4 (marked {@code fi.mau.gif}) on as a GIF; {@code ifUnmade}: what it still shows as it is when the conversion
      * can't be made.
      */
-    /**
-     * Whether a sticker that couldn't be made what {@code n} should get (no tool) goes as it is rather than as a still
-     * picture: an animated one where that format still plays; never by room_features alone (null network).
-     */
-    static boolean asIsIfUnmade(Network n, String mime, boolean animated) {
-        return n != null && animated && of(n).takesIfUnmade(mime);
-    }
-
     record Rule(Set<String> asIs, String animated, String still, boolean gifVideosAsIs, Set<String> ifUnmade) {
         /** Whether a {@code mime} sticker still goes as it is when it can't be made what it should be (no tool). */
-        boolean takesIfUnmade(String mime) {
-            return ifUnmade.contains(mime);
+        boolean takesIfUnmade(@Nullable String mime) {
+            return mime != null && ifUnmade.contains(mime);
         }
     }
 
@@ -56,22 +61,23 @@ final class NetworkFormats {
     /**
      * The format a {@code mime} sticker goes to {@code network} as, null for as it is. {@code animated}: whether it moves
      * (null when the file isn't read yet: then "might it change" is answered). {@code own}: one of that network's own
-     * packs, which its bridge sends from the pack (only the chat's room_features can refuse it).
+     * packs, which its bridge sends from the pack (only the chat's room_features can refuse it). A {@code mime} that's
+     * null (a sticker whose event didn't say) is none its bridge sends on.
      */
-    static String sticker(Network network, String mime, Boolean animated, boolean own, RoomFeatures f) {
+    static @Nullable String sticker(Network network, @Nullable String mime, @Nullable Boolean animated, boolean own, RoomFeatures f) {
         Rule r = of(network);
         String want = mime;
-        if (!own && !r.asIs().contains(mime)) {
+        if (!own && (mime == null || !r.asIs().contains(mime))) {
             if (animated == null) return r.animated(); // to be decided with the file: it changes either way
             want = animated ? r.animated() : r.still();
         }
         String refused = byFeatures(want, f);
         if (refused != null) want = refused;
-        return want.equals(mime) ? null : want;
+        return want == null || want.equals(mime) ? null : want; // null: its own, of a type unknown, as it is
     }
 
     /** What the chat's room_features ask for instead of {@code mime}, null when they take it (or say nothing). */
-    static String byFeatures(String mime, RoomFeatures f) {
+    static @Nullable String byFeatures(@Nullable String mime, RoomFeatures f) {
         if (f.isUnknown() || !f.accepts(RoomFeatures.STICKER) || f.acceptsMime(RoomFeatures.STICKER, mime)) return null;
         if (f.acceptsMime(RoomFeatures.STICKER, WEBP)) return WEBP;
         if (f.acceptsMime(RoomFeatures.STICKER, PNG)) return PNG;

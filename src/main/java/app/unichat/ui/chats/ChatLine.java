@@ -23,7 +23,7 @@ public final class ChatLine extends HBox {
         name.setMnemonicParsing(false); // a name from a network: "_" isn't a shortcut mark
         hint.getStyleClass().add("command-hint");
         Region grow = new Region();
-        HBox.setHgrow(grow, Priority.ALWAYS);
+        setHgrow(grow, Priority.ALWAYS);
         getChildren().addAll(avatar, name, grow, hint);
         setAlignment(Pos.CENTER_LEFT);
     }

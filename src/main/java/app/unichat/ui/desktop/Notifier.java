@@ -7,6 +7,8 @@ import app.unichat.model.Message;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import app.unichat.support.Os;
+import app.unichat.support.PathParts;
+import org.jspecify.annotations.Nullable;
 
 import javax.imageio.ImageIO;
 import java.awt.EventQueue;
@@ -20,6 +22,7 @@ import java.awt.TrayIcon;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
 import java.util.function.Consumer;
+import java.util.Objects;
 
 /**
  * Desktop notifications and unread badge through AWT: a tray icon (Windows notification area /
@@ -28,12 +31,13 @@ import java.util.function.Consumer;
 public final class Notifier {
     private static final boolean MAC = Os.mac();
 
-    private volatile TrayIcon tray;
-    private volatile String lastChatId;
-    private final DesktopToast toast;
+    private volatile @Nullable TrayIcon tray;
+    private volatile @Nullable String lastChatId;
+    private final @Nullable DesktopToast toast;
 
     /**
-     * {@code onOpen} receives a chat id (or null) when the user clicks the tray icon or a notification; {@code onHide}
+     * {@code onOpen} receives a chat id when the user clicks a notification, or the tray icon after one ({@code onShow}
+     * before any); {@code onHide}
      * puts the window away in the tray. The menu, as Telegram's: the window (open or put away), notifications on or off, quit.
      */
     public Notifier(Runnable onShow, Runnable onHide, Consumer<String> onOpen, Runnable onQuit) {
@@ -69,7 +73,7 @@ public final class Notifier {
         current = this;
         labelNow();
         // macOS: the native item (narrow, real menu, like Apple's own); the AWT TrayIcon if it's missing or dies.
-        if (!MAC || !startNativeBar()) addAwtTray();
+        if (!MAC || !startNativeBar(popup)) addAwtTray();
         ready.complete(hasTray());
     }
 
@@ -89,9 +93,12 @@ public final class Notifier {
 
     private final java.util.concurrent.CompletableFuture<Boolean> ready = new java.util.concurrent.CompletableFuture<>();
     /** Null until built, and without a display. AWT thread. */
-    private PopupMenu menu;
-    /** The menu's own items, by name: the cloud's lines go above them, so their places change. AWT thread. */
-    private MenuItem windowItem, notificationsItem, quitItem;
+    private @Nullable PopupMenu menu;
+    // The menu's own items, by name: the cloud's lines go above them, so their places change. AWT thread.
+    private @Nullable MenuItem windowItem;
+    private @Nullable MenuItem notificationsItem;
+    private @Nullable MenuItem quitItem;
+
     /** The cloud's lines shown at the menu's top (and their separator), and what they say. AWT thread. */
     private final java.util.List<MenuItem> cloudItems = new java.util.ArrayList<>();
     private java.util.List<String> cloudLines = java.util.List.of();
@@ -99,15 +106,15 @@ public final class Notifier {
     private double upload = Double.NaN;
     private final Consumer<String> onOpen;
     private final Runnable onShow;
-    private volatile NativeBar bar;
+    private volatile @Nullable NativeBar bar;
     private volatile String tooltip = "Unichat";
     private volatile int unread;
-    private BufferedImage trayIcon;
+    private @Nullable BufferedImage trayIcon;
     private volatile boolean disposed;
     private volatile boolean windowShown;
     private volatile boolean windowFocused;
     /** The one in use, for Ajustes to reach; null in tests without a display. */
-    private static volatile Notifier current;
+    private static volatile @Nullable Notifier current;
 
     /** The tray and menu-bar menu in the current language and state. Any thread. */
     public void relabel() {
@@ -126,9 +133,13 @@ public final class Notifier {
     }
 
     private void labelNow() {
-        windowItem.setLabel(I18n.t(windowShown ? "notifier.hide" : "notifier.open"));
-        notificationsItem.setLabel(I18n.t(Settings.get().notificationsEnabled() ? "notifier.mute" : "notifier.unmute"));
-        quitItem.setLabel(I18n.t("notifier.quit"));
+        MenuItem window = windowItem;
+        MenuItem notifications = notificationsItem;
+        MenuItem quit = quitItem;
+        if (window == null || notifications == null || quit == null) return; // built with the menu, before any call
+        window.setLabel(I18n.t(windowShown ? "notifier.hide" : "notifier.open"));
+        notifications.setLabel(I18n.t(Settings.get().notificationsEnabled() ? "notifier.mute" : "notifier.unmute"));
+        quit.setLabel(I18n.t("notifier.quit"));
     }
 
     /**
@@ -154,14 +165,14 @@ public final class Notifier {
         if (b != null) b.setLeftClickMenu(windowShown && windowFocused);
     }
 
-    private boolean startNativeBar() {
-        NativeBar b = NativeBar.start(barHelper(), menu, () -> EventQueue.invokeLater(() -> {
+    private boolean startNativeBar(PopupMenu popup) {
+        NativeBar b = NativeBar.start(barHelper(), popup, () -> EventQueue.invokeLater(() -> {
             bar = null;
             if (tray == null && !disposed) addAwtTray(); // the helper died: keep a tray icon
         }), onOpen, onShow);
         if (b == null) return false;
         bar = b;
-        b.setGlobalShortcut(app.unichat.settings.Settings.get().globalShortcut());
+        b.setGlobalShortcut(Settings.get().globalShortcut());
         b.setLeftClickMenu(windowShown && windowFocused);
         EventQueue.invokeLater(() -> {
             b.setTooltip(tooltip);
@@ -175,12 +186,12 @@ public final class Notifier {
      * The helper's executable: -Dunichat.barHelper (development) or Contents/app/native/UnichatBar.app in the packaged
      * app (run from inside its bundle, which notifications need).
      */
-    private static java.nio.file.Path barHelper() {
+    private static java.nio.file.@Nullable Path barHelper() {
         String o = System.getProperty("unichat.barHelper");
         if (o != null) return java.nio.file.Path.of(o);
         String launcher = System.getProperty("jpackage.app-path");
         if (launcher == null) return null;
-        return java.nio.file.Path.of(launcher).getParent().resolveSibling("app").resolve("native")
+        return PathParts.parent(java.nio.file.Path.of(launcher)).resolveSibling("app").resolve("native")
                 .resolve("UnichatBar.app").resolve("Contents").resolve("MacOS").resolve("UnichatBar");
     }
 
@@ -189,16 +200,17 @@ public final class Notifier {
         try (InputStream in = Notifier.class.getResourceAsStream("/app/unichat/icons/tray.png")) {
             BufferedImage img = in == null ? new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB) : ImageIO.read(in);
             trayIcon = img;
-            tray = new TrayIcon(withCount(img, unread), tooltip, menu);
-            tray.setImageAutoSize(true);
-            tray.addActionListener(e -> onOpen.accept(lastChatId));
-            tray.addMouseListener(new java.awt.event.MouseAdapter() {
+            TrayIcon t = new TrayIcon(withCount(img, unread), tooltip, menu);
+            tray = t;
+            t.setImageAutoSize(true);
+            t.addActionListener(e -> openLast());
+            t.addMouseListener(new java.awt.event.MouseAdapter() {
                 @Override public void mouseClicked(java.awt.event.MouseEvent e) {
                     // Windows opens the menu with the right button, and on a plain click would do nothing.
                     if (e.getButton() == java.awt.event.MouseEvent.BUTTON1 && e.getClickCount() == 1) onShow.run();
                 }
             });
-            SystemTray.getSystemTray().add(tray);
+            SystemTray.getSystemTray().add(t);
         } catch (Exception e) {
             tray = null;
             System.err.println("Tray not available: " + e);
@@ -207,8 +219,15 @@ public final class Notifier {
 
     public boolean hasTray() { return tray != null || bar != null; }
 
+    /** A click on the tray icon: the chat of the last notice, or the window alone while there was none. */
+    void openLast() {
+        String id = lastChatId;
+        if (id == null) onShow.run();
+        else onOpen.accept(id);
+    }
+
     /** The chat of the last message or reminder posted: where a click on the tray goes. */
-    String lastChatId() { return lastChatId; }
+    @Nullable String lastChatId() { return lastChatId; }
 
     public void notify(Chat chat, Message m) {
         Settings s = Settings.get();
@@ -237,19 +256,21 @@ public final class Notifier {
     }
 
     /** {@code chatId} was read: its notifications leave Notification Center (macOS). */
-    public void clear(String chatId) {
+    public void clear(@Nullable String chatId) {
         NativeBar b = bar;
         if (b != null && chatId != null) b.clear(chatId);
     }
 
     /** Call on the FX thread. Windows: native balloon (clicking it fires the tray action). macOS: own card. */
     private void show(String title, String body, String chatId, TrayIcon.MessageType type) {
-        if (toast != null) {
-            toast.show(title, body, chatId);
+        DesktopToast card = toast;
+        if (card != null) {
+            card.show(title, body, chatId);
             return;
         }
         awt(() -> {
-            if (tray != null) tray.displayMessage(title, body, type);
+            TrayIcon t = tray;
+            if (t != null) t.displayMessage(title, body, type);
         });
     }
 
@@ -261,9 +282,10 @@ public final class Notifier {
         boolean changed = count != unread;
         unread = count;
         tooltip = count > 0 ? I18n.t("notifier.tooltipUnread", count) : "Unichat";
-        if (tray != null) {
-            tray.setToolTip(tooltip);
-            if (changed) tray.setImage(icon());
+        TrayIcon t = tray;
+        if (t != null) {
+            t.setToolTip(tooltip);
+            if (changed) t.setImage(icon());
         }
         NativeBar b = bar;
         if (b != null) {
@@ -280,20 +302,17 @@ public final class Notifier {
     }
 
     /**
-     * Saving what chats receive: {@code done} of {@code total}, a ring that fills on the icon's corner (spinning until
-     * the first is done); total 0 puts the icon back. Off in Ajustes, the icon stays as it is. Any thread.
-     */
-    /**
      * What the cloud is doing: its lines at the top of the menu (what, how fast, how far, how many left; informative,
      * not clickable), and the icon's ring while files go up and nothing is being saved. AWT thread ({@code ui/CloudShown}
      * reads the status there: one read before posting could land after a newer one).
      */
     public void setCloud(app.unichat.cloud.Cloud.Status s) {
-        if (menu == null) return;
+        PopupMenu m = menu;
+        if (m == null) return;
         java.util.List<String> lines = CloudTexts.menuLines(s, java.time.Instant.now());
         double ring = Settings.get().getBool(TRAY_PROGRESS, true) ? CloudTexts.ring(s) : Double.NaN;
         if (!lines.equals(cloudLines)) {
-            cloudItems.forEach(menu::remove);
+            cloudItems.forEach(m::remove);
             cloudItems.clear();
             for (String line : lines) {
                 MenuItem info = new MenuItem(line);
@@ -301,7 +320,7 @@ public final class Notifier {
                 cloudItems.add(info);
             }
             if (!lines.isEmpty()) cloudItems.add(new MenuItem("-"));
-            for (int i = 0; i < cloudItems.size(); i++) menu.insert(cloudItems.get(i), i);
+            for (int i = 0; i < cloudItems.size(); i++) m.insert(cloudItems.get(i), i);
             cloudLines = lines;
             NativeBar b = bar;
             if (b != null) b.syncMenu();
@@ -318,11 +337,16 @@ public final class Notifier {
     }
 
     private void showProgress() {
-        if (tray != null) tray.setImage(icon());
+        TrayIcon t = tray;
+        if (t != null) t.setImage(icon());
         NativeBar b = bar;
         if (b != null) b.setProgress(progress());
     }
 
+    /**
+     * Saving what chats receive: {@code done} of {@code total}, a ring that fills on the icon's corner (spinning until
+     * the first is done); total 0 puts the icon back. Off in Ajustes, the icon stays as it is. Any thread.
+     */
     public void setDownloadProgress(int done, int total) {
         double f = total <= 0 || !Settings.get().getBool(TRAY_PROGRESS, true) ? Double.NaN : done == 0 ? -1 : (double) done / total;
         awt(() -> {
@@ -339,9 +363,11 @@ public final class Notifier {
         system(chat.id(), I18n.t("notifier.downloadsDone"), I18n.n("notifier.downloadsSaved", saved, chat.title()), TrayIcon.MessageType.INFO);
     }
 
-    /** Something couldn't be saved: always told, with what, why and from where, whatever the other notices. Any thread. */
-    /** {@code messageId}: where the click goes (null: the chat). */
-    public void downloadFailed(String what, Chat chat, String messageId, String why) {
+    /**
+     * Something couldn't be saved: always told, with what, why and from where, whatever the other notices. Any thread.
+     * {@code messageId}: where the click goes (null: the chat).
+     */
+    public void downloadFailed(String what, Chat chat, @Nullable String messageId, String why) {
         system(NotificationTarget.of(chat.id(), messageId), I18n.t("notifier.downloadFailed", what), why + " · " + chat.title(),
                 TrayIcon.MessageType.ERROR);
     }
@@ -357,7 +383,7 @@ public final class Notifier {
     }
 
     private BufferedImage icon() {
-        return withProgress(withCount(trayIcon, unread), progress());
+        return withProgress(withCount(Objects.requireNonNull(trayIcon, "set before the tray icon that asks for it"), unread), progress());
     }
 
     /** The tray icon with a ring on its lower left corner, filled {@code f} (a quarter while unknown); NaN: as it is. */
@@ -368,7 +394,9 @@ public final class Notifier {
         g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         g.drawImage(icon, 0, 0, BADGED_SIZE, BADGED_SIZE, null);
-        int d = 14, x = 1, y = BADGED_SIZE - d - 1;
+        int d = 14;
+        int x = 1;
+        int y = BADGED_SIZE - d - 1;
         g.setColor(new java.awt.Color(0, 0, 0, 150));
         g.fillOval(x - 1, y - 1, d + 2, d + 2);
         g.setStroke(new java.awt.BasicStroke(3f, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));

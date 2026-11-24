@@ -1,22 +1,31 @@
 package app.unichat.login;
 
+import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Stream;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Reads the user's own Chrome/Edge/Brave session cookies on macOS. Only runs on an explicit user
@@ -40,14 +49,14 @@ public final class ChromiumCookies {
             new Browser("Brave", "BraveSoftware/Brave-Browser", "Brave Safe Storage"));
 
     /** Windows and app-bound encryption ({@code v20}) cannot be read; the UI falls back to in-app login. */
-    public static Support classify(String osName, byte[] encryptedValuePrefix) {
+    public static Support classify(@Nullable String osName, byte @Nullable [] encryptedValuePrefix) {
         String os = osName == null ? "" : osName.toLowerCase(Locale.ROOT);
         if (os.contains("win")) return Support.NEEDS_IN_APP_LOGIN;
         if (hasPrefix(encryptedValuePrefix, "v20")) return Support.NEEDS_IN_APP_LOGIN;
         return Support.SUPPORTED;
     }
 
-    private static boolean hasPrefix(byte[] data, String prefix) {
+    private static boolean hasPrefix(byte @Nullable [] data, String prefix) {
         if (data == null || data.length < prefix.length()) return false;
         for (int i = 0; i < prefix.length(); i++) {
             if (data[i] != (byte) prefix.charAt(i)) return false;
@@ -61,6 +70,7 @@ public final class ChromiumCookies {
      * plaintext; it is stripped when those bytes are not plain printable ASCII (a real cookie value
      * is, the hash is effectively random).
      */
+    @SuppressFBWarnings(value = {"CIPHER_INTEGRITY", "PADDING_ORACLE"}, justification = "reads the person's own cookies the way Chromium stores them (v10: AES-128-CBC, fixed IV); the format is Chromium's, not a choice of ours; decrypts the person's own browser database here; nobody else can send it values and watch the answer")
     public static String decryptValue(byte[] encrypted, byte[] key) {
         if (!hasPrefix(encrypted, "v10")) throw new IllegalArgumentException("Not a v10 value");
         try {
@@ -71,7 +81,7 @@ public final class ChromiumCookies {
             byte[] plain = cipher.doFinal(encrypted, 3, encrypted.length - 3);
             int start = plain.length > 32 && !printableAscii(plain, 32) ? 32 : 0;
             return new String(plain, start, plain.length - start, StandardCharsets.UTF_8);
-        } catch (java.security.GeneralSecurityException e) {
+        } catch (java.security.GeneralSecurityException _) {
             // Deliberately no data in the message.
             throw new IllegalStateException("Could not decrypt cookie value");
         }
@@ -91,7 +101,7 @@ public final class ChromiumCookies {
                     "saltysalt".getBytes(StandardCharsets.US_ASCII), 1003, 16 * 8);
             return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1").generateSecret(spec).getEncoded();
         } catch (java.security.GeneralSecurityException e) {
-            throw new IllegalStateException("Key derivation unavailable");
+            throw new IllegalStateException("Key derivation unavailable", e);
         }
     }
 
@@ -119,7 +129,7 @@ public final class ChromiumCookies {
                     byte[] k = key;
                     SessionCookies cookies = CookieDbCopy.read(db, copy -> read(copy, spec, k));
                     if (cookies != null) {
-                        out.add(new BrowserSession(b.name(), profile.getFileName().toString(), cookies));
+                        out.add(new BrowserSession(b.name(), PathParts.name(profile), cookies));
                     }
                 }
             }
@@ -128,11 +138,11 @@ public final class ChromiumCookies {
     }
 
     private static Path defaultRoot(Browser b) {
-        return Paths.get(System.getProperty("user.home", "."), "Library", "Application Support")
+        return Path.of(System.getProperty("user.home", "."), "Library", "Application Support")
                 .resolve(b.relativeRoot());
     }
 
-    private static List<Path> overrideRoots() {
+    private static @Nullable List<Path> overrideRoots() {
         return FirefoxCookies.rootsOverride();
     }
 
@@ -141,7 +151,7 @@ public final class ChromiumCookies {
         try (Stream<Path> s = Files.list(root)) {
             return s.filter(Files::isDirectory)
                     .filter(p -> {
-                        String n = p.getFileName().toString();
+                        String n = PathParts.name(p);
                         return n.equals("Default") || n.startsWith("Profile ");
                     })
                     .sorted().toList();
@@ -151,7 +161,7 @@ public final class ChromiumCookies {
     }
 
     /** Newer Chromium keeps the DB in {@code Network/Cookies}, older versions directly in the profile. */
-    private static Path cookiesFile(Path profile) {
+    private static @Nullable Path cookiesFile(Path profile) {
         Path network = profile.resolve("Network").resolve("Cookies");
         if (Files.isRegularFile(network)) return network;
         Path legacy = profile.resolve("Cookies");
@@ -159,7 +169,7 @@ public final class ChromiumCookies {
     }
 
     /** Asks the macOS keychain (native prompt) for the Safe Storage password; null if denied/absent. */
-    private static byte[] keychainKey(String service) {
+    private static byte @Nullable [] keychainKey(String service) {
         try {
             // The person may need time to answer the native prompt, or to find their password.
             Processes.Result r = Processes.capture(List.of("security", "find-generic-password", "-wa", service), 600);
@@ -197,17 +207,9 @@ public final class ChromiumCookies {
                 }
             }
         } catch (SQLException e) {
-            throw new IllegalStateException("Could not read Chromium cookies database");
+            throw new IllegalStateException("Could not read Chromium cookies database", e);
         }
         return spec.select(all);
     }
 
-    private static void deleteQuietly(Path p) {
-        if (p == null) return;
-        try {
-            Files.deleteIfExists(p);
-        } catch (IOException ignored) {
-            // best effort
-        }
-    }
 }

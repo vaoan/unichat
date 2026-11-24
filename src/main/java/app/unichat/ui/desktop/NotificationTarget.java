@@ -1,5 +1,7 @@
 package app.unichat.ui.desktop;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * What a notification's click opens: a chat, or one message in it ({@code <chat id>#<message id>}). A notice that a
  * file couldn't be saved led nowhere: its click now goes to that message. {@code #} is in no Matrix room or event id,
@@ -8,7 +10,7 @@ package app.unichat.ui.desktop;
 public final class NotificationTarget {
     private NotificationTarget() { }
 
-    public static String of(String chatId, String messageId) {
+    public static String of(String chatId, @Nullable String messageId) {
         return messageId == null ? chatId : chatId + "#" + messageId;
     }
 
@@ -18,7 +20,7 @@ public final class NotificationTarget {
     }
 
     /** The message to go to, or null for the chat alone. */
-    public static String message(String target) {
+    public static @Nullable String message(String target) {
         int at = target.indexOf('#');
         return at < 0 ? null : target.substring(at + 1);
     }

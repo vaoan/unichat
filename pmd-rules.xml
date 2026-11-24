@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="Unichat"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+  <description>
+    Every Java category of PMD, on main and test code; any finding fails the build (pom.xml, failurePriority 5,
+    and a file PMD can't process too: skipPmdError false). A rule is left out only when it is noise here, with its
+    reason on the line before (BuildRulesTest checks it). Rules that find defects stay on; a finding is fixed, or
+    suppressed on one line or member with its reason (SuppressionsHaveReasonsTest). Length rules follow Checkstyle's
+    limits (files under 800 lines, methods under 100); complexity has its own limits; a class's breadth (methods,
+    public members, types used, imports, fields) is held just above today's largest, measured and written below.
+  </description>
+
+  <rule ref="category/java/bestpractices.xml">
+    <!-- Assertion messages: the test's name and JUnit's expected/actual say what failed. -->
+    <exclude name="UnitTestAssertionsShouldIncludeMessage"/>
+    <!-- A test checks one behaviour with as many asserts as it takes. -->
+    <exclude name="UnitTestContainsTooManyAsserts"/>
+    <!-- Tests assert through helpers named for what they check (hidden, neverTakenIn); PMD only sees assert* calls. -->
+    <exclude name="UnitTestShouldIncludeAssert"/>
+    <!-- "int a, b;": a layout choice, as Error Prone's MultiVariableDeclaration (off). -->
+    <exclude name="OneDeclarationPerLine"/>
+    <!-- Yoda order ("x".equals(s)), as Error Prone's YodaCondition (off); null receivers are NullAway's (Task 7). -->
+    <exclude name="LiteralsFirstInComparisons"/>
+    <!-- stdout and stderr are the log (AppLog writes them to unichat.log), as Error Prone's SystemOut (off). -->
+    <exclude name="SystemPrintln"/>
+    <!-- Turns byte[] and String[] parameters into varargs: only changes how a caller may write the call. -->
+    <exclude name="UseVarargs"/>
+  </rule>
+
+  <rule ref="category/java/codestyle.xml">
+    <!-- Declarations at the top of the block: the code declares where a value is first needed. -->
+    <exclude name="LocalVariableDeclarationShouldBeAtStartOfBlock"/>
+    <!-- final on every local and parameter: not the code's style (Error Prone checks fields, FieldCanBeFinal). -->
+    <exclude name="LocalVariableCouldBeFinal"/>
+    <!-- final on every local and parameter: not the code's style. -->
+    <exclude name="MethodArgumentCouldBeFinal"/>
+    <!-- Name lengths (e, i, id, of, at; long descriptive names): naming taste, not defects. -->
+    <exclude name="ShortVariable"/>
+    <!-- Name lengths: naming taste. -->
+    <exclude name="LongVariable"/>
+    <!-- Name lengths: naming taste. -->
+    <exclude name="ShortMethodName"/>
+    <!-- Name lengths: naming taste. -->
+    <exclude name="ShortClassName"/>
+    <!-- setX returning whether it changed, or its future: naming taste. -->
+    <exclude name="LinguisticNaming"/>
+    <!-- Braces on one-line ifs and loops: a formatting style the code doesn't use, as Error Prone's MissingBraces. -->
+    <exclude name="ControlStatementBraces"/>
+    <!-- A comment on every package-private member: the code doesn't mark the default access. -->
+    <exclude name="CommentDefaultAccessModifier"/>
+    <!-- One return per method: the code returns early on purpose. -->
+    <exclude name="OnlyOneReturn"/>
+    <!-- Fields before everything: the code keeps a nested type or constant next to what uses it. -->
+    <exclude name="FieldDeclarationsShouldBeAtStartOfClass"/>
+    <!-- Explicit types instead of var: the code uses var where the type is plain from the right-hand side. -->
+    <exclude name="UseExplicitTypes"/>
+    <!-- A constructor in every class: the default one is enough. -->
+    <exclude name="AtLeastOneConstructor"/>
+    <!-- super() in every constructor: javac adds it. -->
+    <exclude name="CallSuperInConstructor"/>
+    <!-- 1_000_000: a digit grouping style; the literals here are sizes and times named by their constant. -->
+    <exclude name="UseUnderscoresInNumericLiterals"/>
+    <!-- A cap on static imports: tests import JUnit's assertions statically. -->
+    <exclude name="TooManyStaticImports"/>
+    <!-- "if (x != null) a else b": wanting the negation last is a reading taste. -->
+    <exclude name="ConfusingTernary"/>
+    <!-- Capturing state before the code that changes it (hadFocus, previous, generation) is why a declaration sits
+         early; moving it changes behaviour. -->
+    <exclude name="VariableDeclarationUsageDistance"/>
+  </rule>
+
+  <rule ref="category/java/design.xml">
+    <!-- Chained calls on JavaFX nodes, builders and records: every fluent API breaks it (3500 findings). -->
+    <exclude name="LawOfDemeter"/>
+    <!-- Needs the package rules configured; they are docs/ARCHITECTURE.md's, checked by ArchitectureTest. -->
+    <exclude name="LoosePackageCoupling"/>
+    <!-- Fixed metrics with no threshold to set; a class's size is Checkstyle's 800-line limit. -->
+    <exclude name="GodClass"/>
+    <!-- Fixed metrics with no threshold to set; records and JNA structures hold data on purpose. -->
+    <exclude name="DataClass"/>
+  </rule>
+  <rule ref="category/java/design.xml/SignatureDeclareThrowsException">
+    <properties>
+      <!-- A JUnit test "throws Exception" so a failure is the test's error. -->
+      <property name="IgnoreJUnitCompletely" value="true"/>
+    </properties>
+  </rule>
+  <rule ref="category/java/design.xml/NcssCount">
+    <properties>
+      <!-- Checkstyle's limits: methods under 100 lines, files under 800. -->
+      <property name="methodReportLevel" value="100"/>
+      <property name="classReportLevel" value="800"/>
+    </properties>
+  </rule>
+  <!-- Branching within a method: about what a method within Checkstyle's 100 lines reaches when it reads as one
+       sequence of cases; past it the method is doing several things and is split. A class's total is its size again,
+       which Checkstyle's 800 lines bound. -->
+  <rule ref="category/java/design.xml/CyclomaticComplexity">
+    <properties>
+      <property name="methodReportLevel" value="30"/>
+      <property name="classReportLevel" value="400"/>
+    </properties>
+  </rule>
+  <rule ref="category/java/design.xml/CognitiveComplexity">
+    <properties>
+      <property name="reportLevel" value="40"/>
+    </properties>
+  </rule>
+  <rule ref="category/java/design.xml/NPathComplexity">
+    <properties>
+      <property name="reportLevel" value="10000"/>
+    </properties>
+  </rule>
+  <!-- A class's breadth, counted five ways. Each limit sits just above today's largest (measured 2026-11-23, PMD's
+       own count): a class that grows past it is split, or says on its declaration why it can't be. Suppressed on
+       their declarations: Settings (TooManyMethods, ExcessivePublicCount: a getter and setter per preference),
+       MatrixChatService (TooManyMethods, ExcessivePublicCount) and MockChatService (TooManyMethods): ChatService's
+       whole interface. -->
+  <!-- Largest: MainView, PreferencesSyncTest and FoldersUiTest, 61 methods. -->
+  <rule ref="category/java/design.xml/TooManyMethods">
+    <properties>
+      <property name="maxmethods" value="62"/>
+    </properties>
+  </rule>
+  <!-- Largest: MockChatService, 70 public members (ChatService's interface); Message 64, Chat 61. -->
+  <rule ref="category/java/design.xml/ExcessivePublicCount">
+    <properties>
+      <property name="minimum" value="72"/>
+    </properties>
+  </rule>
+  <!-- Largest: MatrixChatService, 69 types used; MainView 59. -->
+  <rule ref="category/java/design.xml/CouplingBetweenObjects">
+    <properties>
+      <property name="threshold" value="70"/>
+    </properties>
+  </rule>
+  <!-- Largest: MainView, 57 imports; ThreadPane 45. -->
+  <rule ref="category/java/design.xml/ExcessiveImports">
+    <properties>
+      <property name="minimum" value="59"/>
+    </properties>
+  </rule>
+  <!-- Largest: Chat, 29 fields (the live fields of a chat); MatrixRoom and Message 21 to 25. -->
+  <rule ref="category/java/design.xml/TooManyFields">
+    <properties>
+      <property name="maxfields" value="30"/>
+    </properties>
+  </rule>
+  <rule ref="category/java/design.xml/AvoidDeeplyNestedIfStmts">
+    <properties>
+      <property name="problemDepth" value="4"/>
+    </properties>
+  </rule>
+
+  <rule ref="category/java/documentation.xml">
+    <!-- Comment sizes: a count, not a defect. -->
+    <exclude name="CommentSize"/>
+    <!-- Javadoc on every member: the code comments what isn't obvious (.claude/rules/java-comments.md). -->
+    <exclude name="CommentRequired"/>
+  </rule>
+
+  <rule ref="category/java/errorprone.xml">
+    <!-- Repeated literals are mostly JSON keys, CSS classes and test data; copied code is CPD's (cpd-check). -->
+    <exclude name="AvoidDuplicateLiterals"/>
+    <!-- Field x read by x(): the code's accessor style, as records do. -->
+    <exclude name="AvoidFieldNameMatchingMethodName"/>
+    <!-- null as "not known yet" is used on purpose; nullness is NullAway's (Task 7). -->
+    <exclude name="NullAssignment"/>
+    <!-- Null for "not known": nullness is NullAway's (Task 7), as Error Prone's ReturnsNullCollection (off). -->
+    <exclude name="ReturnEmptyCollectionRatherThanNull"/>
+    <!-- Numbers in conditions: magic-number taste; the meaningful ones are named constants already. -->
+    <exclude name="AvoidLiteralsInIfCondition"/>
+    <!-- JavaFX code compares nodes, windows and sentinels by identity on purpose, as Error Prone's ReferenceEquality. -->
+    <exclude name="CompareObjectsWithEquals"/>
+    <!-- Catch-alls at thread and UI boundaries are on purpose (207), as Error Prone's CatchingUnchecked (off). -->
+    <exclude name="AvoidCatchingGenericException"/>
+  </rule>
+  <rule ref="category/java/bestpractices.xml/AvoidReassigningLoopVariables">
+    <properties>
+      <!-- Tokenizers skip ahead past what they consumed (an escape, a "**/"); anything else is still refused. -->
+      <property name="forReassign" value="skip"/>
+    </properties>
+  </rule>
+  <rule ref="category/java/errorprone.xml/EmptyCatchBlock">
+    <properties>
+      <!-- A catch that says why it does nothing is a decision, not an oversight. -->
+      <property name="allowCommentedBlocks" value="true"/>
+    </properties>
+  </rule>
+  <rule ref="category/java/errorprone.xml/AssignmentInOperand">
+    <properties>
+      <!-- The idioms: for/while ((n = in.read(buf)) > 0) read loops, and ++generation to tell a stale answer. -->
+      <property name="allowWhile" value="true"/>
+      <property name="allowFor" value="true"/>
+      <property name="allowIncrementDecrement" value="true"/>
+    </properties>
+  </rule>
+
+  <rule ref="category/java/multithreading.xml">
+    <!-- A J2EE rule: this is a desktop app, threads are how it works. -->
+    <exclude name="DoNotUseThreads"/>
+    <!-- Flags every Map declared as HashMap; most maps here are confined to one thread. -->
+    <exclude name="UseConcurrentHashMap"/>
+    <!-- Virtual-thread pinning advice, obsolete since Java 24 (JEP 491); synchronized is how state is guarded here. -->
+    <exclude name="AvoidSynchronizedStatement"/>
+    <!-- Same as AvoidSynchronizedStatement. -->
+    <exclude name="AvoidSynchronizedAtMethodLevel"/>
+    <!-- volatile is used on purpose for flags read across threads. -->
+    <exclude name="AvoidUsingVolatile"/>
+  </rule>
+
+  <rule ref="category/java/performance.xml">
+    <!-- New objects in loops: allocation is cheap and the alternative is shared mutable state. -->
+    <exclude name="AvoidInstantiatingObjectsInLoops"/>
+    <!-- Guessing a StringBuilder's capacity: a micro-optimization, as Error Prone's speed checks (off). -->
+    <exclude name="InsufficientStringBufferDeclaration"/>
+    <!-- Merging appends of literals into one: a speed tweak; the AI prompts read better one piece at a time. -->
+    <exclude name="ConsecutiveLiteralAppends"/>
+  </rule>
+
+  <rule ref="category/java/security.xml"/>
+</ruleset>

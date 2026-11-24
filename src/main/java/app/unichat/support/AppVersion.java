@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,14 +14,17 @@ import java.util.Properties;
 public final class AppVersion {
     /** A run without Maven's resources (an IDE that skipped them): never offered an update, since it's no release. */
     static final String UNKNOWN = "dev";
-    private static volatile String current;
+    private static volatile @Nullable String current;
 
     private AppVersion() {}
 
     /** "1.0.0", or {@value #UNKNOWN} when the build didn't fill it in. */
     public static String current() {
         String v = current;
-        if (v == null) current = v = read();
+        if (v == null) {
+            v = read();
+            current = v;
+        }
         return v;
     }
 
@@ -36,21 +41,23 @@ public final class AppVersion {
     }
 
     /** True when {@code candidate} is a later version than {@code current}. Anything unreadable on either side: false. */
-    public static boolean isNewer(String candidate, String current) {
-        Parsed a = parse(candidate), b = parse(current);
+    public static boolean isNewer(@Nullable String candidate, @Nullable String than) {
+        Parsed a = parse(candidate);
+        Parsed b = parse(than);
         return a != null && b != null && compare(a, b) > 0;
     }
 
     /** True when both name the same version ("v1.2" and "1.2.0"). */
-    public static boolean same(String a, String b) {
-        Parsed x = parse(a), y = parse(b);
+    public static boolean same(@Nullable String a, @Nullable String b) {
+        Parsed x = parse(a);
+        Parsed y = parse(b);
         return x != null && y != null && compare(x, y) == 0;
     }
 
     /** The numbers before the first '-' and what follows it (empty for a release); build metadata after '+' is ignored. */
     private record Parsed(List<Integer> numbers, String pre) {}
 
-    private static Parsed parse(String v) {
+    private static @Nullable Parsed parse(@Nullable String v) {
         if (v == null) return null;
         String s = v.strip();
         if (s.startsWith("v") || s.startsWith("V")) s = s.substring(1);
@@ -58,13 +65,13 @@ public final class AppVersion {
         if (plus >= 0) s = s.substring(0, plus);
         int dash = s.indexOf('-');
         String core = dash < 0 ? s : s.substring(0, dash);
-        String pre = dash < 0 ? "" : s.substring(dash + 1);
         if (core.isEmpty()) return null;
         List<Integer> numbers = new ArrayList<>();
         for (String part : core.split("\\.", -1)) {
             if (part.isEmpty() || !part.chars().allMatch(Character::isDigit) || part.length() > 9) return null;
             numbers.add(Integer.parseInt(part));
         }
+        String pre = dash < 0 ? "" : s.substring(dash + 1);
         return new Parsed(numbers, pre);
     }
 
@@ -82,9 +89,11 @@ public final class AppVersion {
 
     /** As semver: dot by dot, numbers by value and below words; a longer list wins a tie ("beta.1" &gt; "beta"). */
     private static int comparePre(String a, String b) {
-        String[] x = a.split("\\."), y = b.split("\\.");
+        String[] x = a.split("\\.");
+        String[] y = b.split("\\.");
         for (int i = 0; i < Math.min(x.length, y.length); i++) {
-            boolean xn = x[i].matches("\\d{1,9}"), yn = y[i].matches("\\d{1,9}");
+            boolean xn = x[i].matches("\\d{1,9}");
+            boolean yn = y[i].matches("\\d{1,9}");
             int c = xn && yn ? Integer.compare(Integer.parseInt(x[i]), Integer.parseInt(y[i]))
                     : xn != yn ? (xn ? -1 : 1) : x[i].compareTo(y[i]);
             if (c != 0) return c;

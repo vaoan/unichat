@@ -33,6 +33,7 @@ import javafx.stage.FileChooser;
 import app.unichat.service.SendAs;
 import app.unichat.service.UploadQueue;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.util.HashMap;
@@ -68,7 +69,7 @@ public final class Composer extends VBox {
     private final PauseTransition typingStop = new PauseTransition(Duration.seconds(4));
     private final Consumer<String> onError;
     /** Where a file or a voice note goes in its chat's turn; by default at once. */
-    private InTurn inTurn = (chat, send) -> send.run();
+    private InTurn inTurn = (chat, go) -> go.run();
 
     /** Sending something in its chat's turn, behind what's waiting there (texts being corrected before they go). */
     @FunctionalInterface
@@ -83,11 +84,11 @@ public final class Composer extends VBox {
     @FunctionalInterface
     interface Sending {
         /** True when it took {@code text} (to send it later, corrected); false: it goes now. */
-        boolean before(String chatId, String text, String replyToId);
+        boolean before(String chatId, String text, @Nullable String replyToId);
     }
-    private String chatId;
-    private Message replyTo;
-    private Message editing;
+    private @Nullable String chatId;
+    private @Nullable Message replyTo;
+    private @Nullable Message editing;
     private boolean typingSent;
     private final HBox row;
     /** The rounded box: one line (row), or the text above the buttons when they would leave it too little room. */
@@ -95,7 +96,8 @@ public final class Composer extends VBox {
     private final Region rowGrow = new Region();
     private boolean stacked;
     /** Held here: the global properties only keep a weak reference, so a closed chat's composer can go. */
-    private final javafx.beans.InvalidationListener frameFit;
+    @SuppressWarnings("UnusedVariable") // held, never read: that's what keeps the weak listeners' target alive
+    private final javafx.beans.InvalidationListener frameFit; // NOPMD: UnusedPrivateField, as above
     /** Below this many characters' width the text goes on its own line (160 % text, a narrow window, the info panel). */
     private static final double MIN_INPUT_EM = 14;
     private final Button send;
@@ -143,28 +145,28 @@ public final class Composer extends VBox {
             if (onPanel != null) onPanel.accept(SidePanel.lastMediaTab());
             else EmojiPicker.show(emoji, this::insert);
         });
-        Button send = Icons.iconButton(Icons.SEND, I18n.t("composer.send"), this::send);
-        send.getStyleClass().add("send-button");
-        send.disableProperty().bind(input.textProperty().map(t -> t.isBlank()));
+        Button button = Icons.iconButton(Icons.SEND, I18n.t("composer.send"), this::send);
+        button.getStyleClass().add("send-button");
+        button.disableProperty().bind(input.textProperty().map(String::isBlank));
 
-        this.send = send;
+        this.send = button;
         voice = new VoiceRecording(svc, onError, new VoiceRecording.Box() {
-            @Override public String chatId() { return chatId; }
+            @Override public @Nullable String chatId() { return chatId; }
 
-            @Override public String replyId() { return replyTo == null ? null : replyTo.id(); }
+            @Override public @Nullable String replyId() { return replyTo == null ? null : replyTo.id(); }
 
             @Override public void cancelMode() { Composer.this.cancelMode(); }
 
             @Override public void focus() { Composer.this.focus(); }
 
-            @Override public void showInstead(Node bar) { Composer.this.showInstead(bar); }
+            @Override public void showInstead(@Nullable Node bar) { Composer.this.showInstead(bar); }
 
-            @Override public void inTurn(String chat, Runnable send) { inTurn.send(chat, send); }
+            @Override public void inTurn(String chat, Runnable go) { inTurn.send(chat, go); }
         });
         ai = new ComposerAi(svc, input, drafts, onError, new ComposerAi.Box() {
-            @Override public String chatId() { return chatId; }
+            @Override public @Nullable String chatId() { return chatId; }
 
-            @Override public Message replyTo() { return replyTo; }
+            @Override public @Nullable Message replyTo() { return replyTo; }
 
             @Override public void reply(Message m) { Composer.this.reply(m); }
 
@@ -208,13 +210,13 @@ public final class Composer extends VBox {
     }
 
     /** {@code bar} where the rounded box is (recording a voice note); null puts the box back. */
-    private void showInstead(Node bar) {
+    private void showInstead(@Nullable Node bar) {
         Node now = bar == null ? frame : bar;
         getChildren().set(getChildren().indexOf(boxShown), now);
         boxShown = now;
     }
 
-    public void setChat(String newChatId) {
+    public void setChat(@Nullable String newChatId) {
         if (chatId != null) {
             stopTyping();
             drafts.put(chatId, editing == null ? input.getText() : "");
@@ -253,7 +255,7 @@ public final class Composer extends VBox {
             input.minHeightProperty().bind(row.heightProperty());
         } else {
             input.minHeightProperty().unbind();
-            input.setMinHeight(Region.USE_COMPUTED_SIZE);
+            input.setMinHeight(USE_COMPUTED_SIZE);
             frame.getChildren().remove(input);
             row.getChildren().remove(rowGrow);
             row.getChildren().add(1, input);
@@ -308,7 +310,7 @@ public final class Composer extends VBox {
     }
 
     /** What a sticker or GIF sent now answers, and the composer leaves reply mode as a sent text would; null if none. */
-    String takeReply() {
+    @Nullable String takeReply() {
         if (replyTo == null) return null;
         String id = replyTo.id();
         cancelMode();
@@ -324,8 +326,8 @@ public final class Composer extends VBox {
         focus();
     }
 
-    private Consumer<SidePanel.Tab> onPanel;
-    private Runnable onProtect;
+    private @Nullable Consumer<SidePanel.Tab> onPanel;
+    private @Nullable Runnable onProtect;
 
     /** "Foto protegida contra IA" in the clip's menu: the window asks how hard ({@link CloakSend}). */
     public void setOnProtect(Runnable onProtect) {
@@ -374,7 +376,8 @@ public final class Composer extends VBox {
     /** {@code batch}: through the upload queue even if it's a single file. Only the first file answers the reply. */
     private void send(List<File> files, SendAs as, boolean batch) {
         if (chatId == null || files == null || files.isEmpty()) return;
-        String reply = replyTo == null ? null : replyTo.id(), chat = chatId;
+        String reply = replyTo == null ? null : replyTo.id();
+        String chat = chatId;
         // In its turn: behind texts still being corrected before they go, so a caption sent first arrives first.
         inTurn.send(chat, () -> {
             if (files.size() == 1 && !batch) {
@@ -436,7 +439,7 @@ public final class Composer extends VBox {
     public void aiKeyReleased(KeyCode key) { ai.keyReleased(key); }
 
     /** What the open chat's network supports; null with no chat. */
-    private app.unichat.model.RoomFeatures features() {
+    private app.unichat.model.@Nullable RoomFeatures features() {
         Chat c = chatId == null ? null : svc.chat(chatId);
         return c == null ? null : c.features();
     }
@@ -444,15 +447,7 @@ public final class Composer extends VBox {
     private void onKey(KeyEvent e) {
         if (FormatMenu.onKey(e, input, features())) return;
         if (e.getCode() == KeyCode.ENTER) {
-            boolean sendOnEnter = Settings.get().sendOnEnter();
-            boolean modifier = e.isShortcutDown();
-            if ((sendOnEnter && !e.isShiftDown() && !e.isAltDown()) || (!sendOnEnter && modifier)) {
-                e.consume();
-                send();
-            } else if (e.isShiftDown() || e.isAltDown() || modifier) {
-                e.consume();
-                input.insertText(input.getCaretPosition(), "\n");
-            }
+            onEnter(e);
         } else if ((e.getCode() == KeyCode.UP || e.getCode() == KeyCode.DOWN) && e.isShiftDown()
                 && !e.isShortcutDown() && !e.isAltDown()) {
             e.consume();
@@ -467,14 +462,32 @@ public final class Composer extends VBox {
             e.consume();
             cancelMode();
         } else if (e.getCode() == KeyCode.UP && input.getText().isEmpty() && chatId != null) {
-            List<Message> msgs = svc.messages(chatId);
-            for (int i = msgs.size() - 1; i >= 0; i--) {
-                Message m = msgs.get(i);
-                if (m.outgoing() && !m.deleted() && !m.isMedia()) {
-                    e.consume();
-                    edit(m);
-                    return;
-                }
+            editLastSent(e, chatId);
+        }
+    }
+
+    /** Enter sends or breaks the line, as the setting says; with a modifier, the other one. */
+    private void onEnter(KeyEvent e) {
+        boolean sendOnEnter = Settings.get().sendOnEnter();
+        boolean modifier = e.isShortcutDown();
+        if ((sendOnEnter && !e.isShiftDown() && !e.isAltDown()) || (!sendOnEnter && modifier)) {
+            e.consume();
+            send();
+        } else if (e.isShiftDown() || e.isAltDown() || modifier) {
+            e.consume();
+            input.insertText(input.getCaretPosition(), "\n");
+        }
+    }
+
+    /** ↑ in an empty box: the last text I sent, to edit. */
+    private void editLastSent(KeyEvent e, String open) {
+        List<Message> msgs = svc.messages(open);
+        for (int i = msgs.size() - 1; i >= 0; i--) {
+            Message m = msgs.get(i);
+            if (m.outgoing() && !m.deleted() && !m.isMedia()) {
+                e.consume();
+                edit(m);
+                return;
             }
         }
     }
@@ -516,7 +529,8 @@ public final class Composer extends VBox {
      * holding the same text, and not an edit; anything else typed or another chat open meanwhile stays.
      */
     public Runnable clearLater() {
-        String chat = chatId, text = input.getText();
+        String chat = chatId;
+        String text = input.getText();
         return () -> {
             if (editing == null && java.util.Objects.equals(chat, chatId) && text.equals(input.getText())) {
                 input.clear();
@@ -592,7 +606,7 @@ public final class Composer extends VBox {
     }
 
     /** The text the box draws, found after its first layout. */
-    private Text drawn;
+    private @Nullable Text drawn;
 
     /** Most of the window the box may take; past it, it scrolls. */
     private static final double MAX_SHARE = 0.4;
@@ -603,7 +617,7 @@ public final class Composer extends VBox {
      */
     private void autoGrow() {
         if (drawn == null) {
-            for (javafx.scene.Node n : input.lookupAll(".text")) { // the paragraph, inside a Group; the placeholder isn't
+            for (Node n : input.lookupAll(".text")) { // the paragraph, inside a Group; the placeholder isn't
                 if (n instanceof Text t && t.getParent() instanceof javafx.scene.Group) drawn = t;
             }
             // Wrapped to a new width after the box's own layout: its size changing is what says so.

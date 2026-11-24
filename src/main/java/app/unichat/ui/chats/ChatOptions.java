@@ -8,7 +8,6 @@ import app.unichat.ui.Showing;
 import app.unichat.autosave.AutoSave;
 import app.unichat.autosave.SaveFolders;
 import app.unichat.model.Chat;
-import app.unichat.model.SaveKind;
 import app.unichat.service.ChatService;
 import app.unichat.support.I18n;
 import javafx.application.Platform;
@@ -23,12 +22,9 @@ import javafx.scene.layout.VBox;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.function.Consumer;
+import java.util.Objects;
 
 /**
  * A chat's own options, from the gear in its header, in the window's overlay: what of what others send there is saved
@@ -55,9 +51,9 @@ public final class ChatOptions {
         title.getStyleClass().add("sheet-title");
         title.setWrapText(true);
         SaveChoice theirs = new SaveChoice(I18n.t("chatOptions.autoSave"), svc.autoSaves(chat.id(), false),
-                k -> svc.setAutoSave(chat.id(), false, k), () -> AutoSave.of(svc).startNow(chat.id()));
+                k -> { var _ = svc.setAutoSave(chat.id(), false, k); }, () -> AutoSave.of(svc).startNow(chat.id()));
         SaveChoice mine = new SaveChoice(I18n.t("chatOptions.autoSaveMine"), svc.autoSaves(chat.id(), true),
-                k -> svc.setAutoSave(chat.id(), true, k), () -> AutoSave.of(svc).startNow(chat.id()));
+                k -> { var _ = svc.setAutoSave(chat.id(), true, k); }, () -> AutoSave.of(svc).startNow(chat.id()));
         Label help = Labels.help(I18n.t("chatOptions.autoSaveHelp"));
         // What's sent saved and what I send not: one's own photos were left out without a word, and it looked broken.
         Label mineNote = Labels.help(I18n.t("chatOptions.autoSaveMineOff"));
@@ -78,7 +74,7 @@ public final class ChatOptions {
         CheckBox showMedia = new CheckBox(I18n.t("chatOptions.showMedia"));
         showMedia.setSelected(!svc.mediaHidden(chat.id()));
         showMedia.setWrapText(true);
-        showMedia.setOnAction(e -> svc.setMediaHidden(chat.id(), !showMedia.isSelected()));
+        showMedia.setOnAction(e -> { var _ = svc.setMediaHidden(chat.id(), !showMedia.isSelected()); });
         VBox general = new VBox(12, sectionTitle(I18n.t("chatOptions.profileTitle")), showMedia,
                 sectionTitle(I18n.t("chatOptions.autoSaveTitle")), theirs.node, mine.node, mineNote, help,
                 folderRow(chat), openFolder, sectionTitle(I18n.t("chatOptions.pastTitle")),
@@ -160,7 +156,7 @@ public final class ChatOptions {
         });
         yes.setOnAction(e -> {
             hide.run();
-            svc.leaveChat(chat.id()).thenRun(() -> Platform.runLater(() -> toast.accept(I18n.t("info.left", chat.title()))));
+            var _ = svc.leaveChat(chat.id()).thenRun(() -> Platform.runLater(() -> toast.accept(I18n.t("info.left", chat.title()))));
         });
         return new VBox(6, ask, confirm);
     }
@@ -168,8 +164,8 @@ public final class ChatOptions {
     /**
      * "Lo anterior": going back through the chat's history to its beginning, saving the kinds chosen of what's still
      * there ({@link AutoSave#explore}); how far it got, and a way to stop it. Only while saving is on.
+     * @param on whether the chat saves anything (the button needs something to look for)
      */
-    /** @param on whether the chat saves anything (the button needs something to look for) */
     private Node past(Chat chat, javafx.beans.binding.BooleanExpression on) {
         AutoSave save = AutoSave.of(svc);
         Label help = Labels.help(I18n.t("chatOptions.pastHelp"));
@@ -185,7 +181,8 @@ public final class ChatOptions {
         javafx.beans.property.BooleanProperty halting = new javafx.beans.property.SimpleBooleanProperty();
         Runnable redraw = () -> {
             AutoSave.Exploring e = save.exploring(chat.id());
-            boolean stoppingNow = e.running() && e.now() != null && e.now().doing() == AutoSave.Doing.STOPPING;
+            AutoSave.Now now = e.now();
+            boolean stoppingNow = e.running() && now != null && now.doing() == AutoSave.Doing.STOPPING;
             go.setText(I18n.t(stoppingNow ? "chatOptions.pastStopping" : e.running() ? "chatOptions.pastStop"
                     : e.start() ? "chatOptions.pastAgain" : "chatOptions.pastStart"));
             halting.set(stoppingNow);
@@ -218,21 +215,28 @@ public final class ChatOptions {
         String doing;
         if (e.running()) {
             AutoSave.Now now = e.now();
+            java.time.Instant at = now == null ? null : now.at();
             doing = now == null ? I18n.t("chatOptions.pastRunning") : switch (now.doing()) {
-                case LOOKING -> I18n.t("chatOptions.pastLooking", day(now.at()));
-                case DOWNLOADING -> I18n.t("chatOptions.pastDownloading", now.what(), day(now.at()))
+                case LOOKING -> I18n.t("chatOptions.pastLooking", day(Objects.requireNonNull(at, MESSAGE_TIME)));
+                case DOWNLOADING -> I18n.t("chatOptions.pastDownloading", now.what(), day(Objects.requireNonNull(at, MESSAGE_TIME)))
                         + (now.done() < 0 ? "" : " · " + Math.round(now.done() * 100) + " %");
-                case ASKING_OLDER -> now.at() == null ? I18n.t("chatOptions.pastRunning") : I18n.t("chatOptions.pastAsking", day(now.at()));
+                case ASKING_OLDER -> at == null ? I18n.t("chatOptions.pastRunning") : I18n.t("chatOptions.pastAsking", day(at));
                 case STOPPING -> I18n.t("chatOptions.pastStopping");
             };
-        } else if (e.start()) doing = I18n.t("chatOptions.pastAtStart");
-        else if (e.back() != null) doing = I18n.t("chatOptions.pastUntil", day(e.back()));
-        else doing = "";
+        } else if (e.start()) {
+            doing = I18n.t("chatOptions.pastAtStart");
+        } else {
+            java.time.Instant back = e.back();
+            doing = back == null ? "" : I18n.t("chatOptions.pastUntil", day(back));
+        }
         return counts.isEmpty() ? doing : doing.isEmpty() ? counts : doing + "\n" + counts;
     }
 
+    /** Why looking and downloading have a time: PastExplorer always gives the message's. */
+    private static final String MESSAGE_TIME = "looking and downloading always say the message's time";
+
     private static String day(java.time.Instant at) {
-        return java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy").withLocale(I18n.locale())
+        return java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", I18n.locale())
                 .format(at.atZone(java.time.ZoneId.systemDefault()));
     }
 

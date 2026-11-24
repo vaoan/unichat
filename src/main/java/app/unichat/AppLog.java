@@ -3,7 +3,6 @@ package app.unichat;
 import app.unichat.settings.Settings;
 import app.unichat.support.Redactor;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -11,7 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * Copies stdout/stderr to {@code <data dir>/logs/unichat.log}: a packaged app opened from Finder or the Start menu
@@ -31,15 +32,23 @@ final class AppLog {
             if (Files.exists(log) && Files.size(log) > MAX) {
                 Files.move(log, dir.resolve("unichat.log.1"), StandardCopyOption.REPLACE_EXISTING);
             }
-            OutputStream file = new FileOutputStream(log.toFile(), true);
-            String header = "\n=== Unichat " + LocalDateTime.now() + " ===\n";
+            OutputStream file = open(log); // NOPMD: CloseResource, the log stays open while the app runs
+            String header = "\n=== Unichat " + LocalDateTime.now(ZoneId.systemDefault()) + " ===\n";
             file.write(header.getBytes(StandardCharsets.UTF_8));
-            OutputStream redacted = new RedactingLines(file);
+            OutputStream redacted = new RedactingLines(file); // NOPMD: CloseResource, System.out and err write to it from now on
             System.setOut(new PrintStream(new Tee(System.out, redacted), true, StandardCharsets.UTF_8));
             System.setErr(new PrintStream(new Tee(System.err, redacted), true, StandardCharsets.UTF_8));
         } catch (IOException e) {
             System.err.println("No log file: " + e);
         }
+    }
+
+    /**
+     * The log, appended to. Any thread writes to it, interrupted ones too: the stream must stay open after such a write
+     * (an interruptible channel would close for good, and nothing more would be logged).
+     */
+    static OutputStream open(Path log) throws IOException {
+        return Files.newOutputStream(log, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
     }
 
     /** Buffers bytes into lines and writes each one through {@link Redactor}. Shared by stdout and stderr. */
@@ -69,7 +78,8 @@ final class AppLog {
     }
 
     private static final class Tee extends OutputStream {
-        private final OutputStream a, b;
+        private final OutputStream a;
+        private final OutputStream b;
 
         Tee(OutputStream a, OutputStream b) {
             this.a = a;

@@ -1,6 +1,7 @@
 package app.unichat.service;
 
 import app.unichat.service.PreferencesFile.Flag;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,7 +14,10 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /** A save that fails later on must reach the person: once, and once more only after one worked. */
@@ -30,6 +34,7 @@ class PreferencesSaveFailureTest {
         p = new PreferencesFile(dir.resolve("preferences.json"), dir.resolve("server-seen.json"));
     }
 
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     private void readOnly(boolean yes) throws IOException {
         Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString(yes ? "r-xr-xr-x" : "rwxr-xr-x"));
         if (yes) assumeTrue(!Files.isWritable(dir));
@@ -96,7 +101,8 @@ class PreferencesSaveFailureTest {
         try {
             readOnly(true);
             // Even with the caller back inside the monitor and waiting: a listener on this thread or needing the lock would hang here.
-            synchronized (p) {
+            PreferencesFile held = p;
+            synchronized (held) {
                 p.choose(K, Flag.MUTED, true);
                 p.flush();
                 assertTrue(Thread.holdsLock(p));

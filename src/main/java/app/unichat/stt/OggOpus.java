@@ -23,7 +23,8 @@ import java.util.List;
  */
 public final class OggOpus {
     public static final int RATE = 16_000;
-    private static final int DECODE_RATE = 48_000, FACTOR = DECODE_RATE / RATE;
+    private static final int DECODE_RATE = 48_000;
+    private static final int FACTOR = DECODE_RATE / RATE;
     /** Longest Opus frame: 120 ms. */
     private static final int MAX_FRAME = DECODE_RATE * 120 / 1000;
     /** Windowed-sinc low-pass at 7.2 kHz (below 16 kHz's Nyquist) for the 48 → 16 kHz decimation. */
@@ -44,6 +45,7 @@ public final class OggOpus {
     }
 
     /** The decoded samples at 48 kHz: {@code length} of {@code samples} are in use. */
+    @SuppressWarnings("ArrayRecordComponent") // a buffer handed on once, never compared
     private record Decoded(short[] samples, int length) {}
 
     /** Decodes {@code in} to a 16-bit 16 kHz mono WAV at {@code out}; returns the duration in seconds. */
@@ -105,7 +107,8 @@ public final class OggOpus {
 
     /** 48 kHz → 16 kHz: low-pass, then every third sample. 16-bit little-endian bytes. */
     static byte[] decimate(short[] in, int length) {
-        int half = LOW_PASS.length / 2, outLen = length / FACTOR;
+        int half = LOW_PASS.length / 2;
+        int outLen = length / FACTOR;
         byte[] out = new byte[outLen * 2];
         for (int o = 0; o < outLen; o++) {
             int c = o * FACTOR;

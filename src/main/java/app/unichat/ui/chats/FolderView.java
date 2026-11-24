@@ -28,6 +28,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.List;
@@ -56,10 +57,10 @@ final class FolderView extends VBox {
     private final Map<String, Chat> latest = new HashMap<>();
     private final Map<String, Integer> sizes = new HashMap<>();
     private final FolderDialogs dialogs;
-    private Runnable onLeave;
+    private @Nullable Runnable onLeave;
     /** The folder whose chats are showing, or null for the names. */
-    private String openId;
-    private String selectedChatId;
+    private @Nullable String openId;
+    private @Nullable String selectedChatId;
     private boolean updating;
     private List<Chat> all = List.of();
 
@@ -79,8 +80,9 @@ final class FolderView extends VBox {
         namesView.getStyleClass().add("folder-names");
         // A filter: the list would take Esc for itself. Left stays with the list, inside a folder it means back.
         namesView.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
-            if (e.getCode() == KeyCode.ESCAPE && onLeave != null) {
-                onLeave.run();
+            Runnable leave = onLeave;
+            if (e.getCode() == KeyCode.ESCAPE && leave != null) {
+                leave.run();
                 e.consume();
             }
         });
@@ -96,7 +98,7 @@ final class FolderView extends VBox {
         configureChats(cells);
         insideView = new VBox(6, header, chatList);
 
-        for (VBox v : List.of(namesView, insideView)) VBox.setVgrow(v, Priority.ALWAYS);
+        for (VBox v : List.of(namesView, insideView)) setVgrow(v, Priority.ALWAYS);
         getChildren().addAll(namesView, insideView);
         showCurrent();
     }
@@ -128,7 +130,7 @@ final class FolderView extends VBox {
             e.consume();
         });
         ChatMenus.onMenuKey(nameList, this::folderMenu);
-        VBox.setVgrow(nameList, Priority.ALWAYS);
+        setVgrow(nameList, Priority.ALWAYS);
     }
 
     private void configureChats(Supplier<ListCell<Chat>> cells) {
@@ -155,7 +157,7 @@ final class FolderView extends VBox {
                 if (chatList.getSelectionModel().getSelectedItem() == c) open.accept(c);
             });
         });
-        VBox.setVgrow(chatList, Priority.ALWAYS);
+        setVgrow(chatList, Priority.ALWAYS);
     }
 
     /** Back to the names, on the folder you came from. */
@@ -177,7 +179,7 @@ final class FolderView extends VBox {
     }
 
     /** Back from a server: on its row, though a channel of it is what's open. */
-    void focusOn(String chatId) {
+    void focusOn(@Nullable String chatId) {
         updating = true;
         try {
             selectChat(chats.stream().anyMatch(c -> c.id().equals(chatId)) ? chatId : selectedChatId);
@@ -249,7 +251,7 @@ final class FolderView extends VBox {
     }
 
     /** The open chat changed: mark it here too. */
-    void select(String chatId) {
+    void select(@Nullable String chatId) {
         selectedChatId = chatId;
         updating = true;
         try {
@@ -259,7 +261,7 @@ final class FolderView extends VBox {
         }
     }
 
-    private void selectChat(String id) {
+    private void selectChat(@Nullable String id) {
         for (int i = 0; i < chats.size(); i++) {
             if (chats.get(i).id().equals(id)) {
                 chatList.getSelectionModel().select(i);
@@ -269,7 +271,7 @@ final class FolderView extends VBox {
         chatList.getSelectionModel().clearSelection();
     }
 
-    private void selectFolder(String id) {
+    private void selectFolder(@Nullable String id) {
         for (int i = 0; i < names.size(); i++) {
             if (names.get(i).id().equals(id)) {
                 nameList.getSelectionModel().select(i);
@@ -286,7 +288,7 @@ final class FolderView extends VBox {
         ListView<?> shown = openId == null ? nameList : chatList;
         shown.requestFocus();
         if (shown.getSelectionModel().isEmpty() && !shown.getItems().isEmpty()) {
-            updating = true;
+            updating = true; // NOPMD: UnusedAssignment, read by the listeners the change below fires
             shown.getSelectionModel().select(0);
             updating = false;
         }
@@ -341,11 +343,11 @@ final class FolderView extends VBox {
             name.getStyleClass().add("chat-name");
             name.setMinWidth(0);
             stamp.getStyleClass().add("chat-stamp");
-            stamp.setMinWidth(Region.USE_PREF_SIZE);
+            stamp.setMinWidth(USE_PREF_SIZE);
             preview.getStyleClass().add("chat-preview");
             preview.setMinWidth(0);
             badge.getStyleClass().add("unread-badge");
-            badge.setMinWidth(Region.USE_PREF_SIZE);
+            badge.setMinWidth(USE_PREF_SIZE);
             tile.getStyleClass().add("folder-tile");
             tile.setMinSize(TILE, TILE);
             tile.setPrefSize(TILE, TILE);

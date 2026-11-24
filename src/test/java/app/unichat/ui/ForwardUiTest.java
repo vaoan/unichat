@@ -1,20 +1,16 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.ui.timeline.ThreadRows;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseButton;
-import javafx.scene.input.MouseEvent;
-import javafx.stage.Window;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -35,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ForwardUiTest {
     private static final String TO = "!family:demo";
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @BeforeAll
@@ -58,19 +55,17 @@ class ForwardUiTest {
         assertEquals("Reenviar 1 mensaje", FxWait.fx(() -> ((Label) sheet.lookup(".sheet-title")).getText()));
         assertEquals("Irá tal cual, sin decir de dónde viene.", FxWait.fx(() -> ((Label) sheet.lookup(".forward-preview")).getText()),
                 "by default a forward says nothing");
-        assertTrue(FxWait.fx(() -> ((Button) sheet.lookup(".primary-button")).isDisabled()), "no chat chosen yet");
+        assertTrue(FxWait.fx(() -> sheet.lookup(".primary-button").isDisabled()), "no chat chosen yet");
 
         choose(sheet, "Familia");
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             checkBox(sheet, "Quién lo escribió").setSelected(true);
-            return null;
         });
         String line = "↪ Forwarded from " + theirs.senderName(); // the label is the UI's, the line goes in English
         assertEquals("Antes irá: " + line, FxWait.fx(() -> ((Label) sheet.lookup(".forward-preview")).getText()));
         int before = w.svc.messages(TO).size();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ((Button) sheet.lookup(".primary-button")).fire();
-            return null;
         });
         FxWait.until("the copy arrives", () -> w.svc.messages(TO).size() == before + 2);
         List<Message> sent = w.svc.messages(TO).subList(before, before + 2);
@@ -82,29 +77,29 @@ class ForwardUiTest {
     void severalPickedInTheChatGoInItsOrder() throws Exception {
         w = TimelineWindow.open(5, "mensaje %d");
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("mensaje")).toList());
-        Message first = mine.get(1), third = mine.get(3), last = mine.get(4);
+        Message first = mine.get(1);
+        Message third = mine.get(3);
+        Message last = mine.get(4);
         FxWait.until("they're listed", () -> w.cellOf(first) != null && w.cellOf(last) != null);
         TimelineWindow.fire(w.menuItem(first, "Reenviar…"));
         assertTrue(FxWait.fx(() -> w.scene.getRoot().lookup(".thread-header .selection-bar") != null), "the bar is in the header");
         assertTrue(FxWait.fx(() -> w.scene.getRoot().lookup(".thread-header").lookupAll(".icon-button").isEmpty()),
                 "in the place of the star and the other buttons");
         assertNotNull(FxWait.fx(() -> w.scene.getRoot().lookup(".composer")), "the message box stays");
-        FxWait.fx(() -> {
-            TimelineWindow.press(w.cellOf(last), false);  // picks the newest
-            TimelineWindow.press(w.cellOf(third), true);  // and with Shift, what's between them
-            return null;
+        FxWait.onFx(() -> {
+            TimelineWindow.press(Present.of(w.cellOf(last)), false);  // picks the newest
+            TimelineWindow.press(Present.of(w.cellOf(third)), true);  // and with Shift, what's between them
         });
         assertEquals("3 seleccionados", FxWait.fx(() -> ((Label) w.scene.getRoot().lookup(".selection-count")).getText()));
-        assertTrue(FxWait.fx(() -> w.cellOf(third).getPseudoClassStates().stream().anyMatch(p -> p.getPseudoClassName().equals("picked"))),
+        assertTrue(FxWait.fx(() -> Present.of(w.cellOf(third)).getPseudoClassStates().stream().anyMatch(p -> p.getPseudoClassName().equals("picked"))),
                 "a picked message looks picked");
         forwardPicked();
         Node sheet = FxWait.fx(() -> w.scene.getRoot().lookup(".forward-sheet"));
         assertEquals("Reenviar 3 mensajes", FxWait.fx(() -> ((Label) sheet.lookup(".sheet-title")).getText()));
         choose(sheet, "Familia");
         int before = w.svc.messages(TO).size();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ((Button) sheet.lookup(".primary-button")).fire();
-            return null;
         });
         FxWait.until("all three arrive", () -> w.svc.messages(TO).size() == before + 3);
         FxWait.until("the bar on top says how it went", () -> {
@@ -115,7 +110,7 @@ class ForwardUiTest {
         assertEquals(List.of(first.body(), third.body(), last.body()),
                 w.svc.messages(TO).subList(before, before + 3).stream().map(Message::body).toList(), "in the chat's order, nothing added");
         FxWait.until("picking ended, the header's buttons are back", () -> w.scene.getRoot().lookup(".selection-bar") == null);
-        assertFalse(FxWait.fx(() -> w.cellOf(third).getPseudoClassStates().stream().anyMatch(p -> p.getPseudoClassName().equals("picked"))));
+        assertFalse(FxWait.fx(() -> Present.of(w.cellOf(third)).getPseudoClassStates().stream().anyMatch(p -> p.getPseudoClassName().equals("picked"))));
     }
 
     /**
@@ -126,23 +121,22 @@ class ForwardUiTest {
     void whilePickingKeysDontActOnMessagesAndADeletedOneDropsOut() throws Exception {
         w = TimelineWindow.open(4, "mensaje %d");
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("mensaje")).toList());
-        Message a = mine.get(2), b = mine.get(3);
+        Message a = mine.get(2);
+        Message b = mine.get(3);
         FxWait.until("they're listed", () -> w.cellOf(a) != null && w.cellOf(b) != null);
         TimelineWindow.fire(w.menuItem(a, "Reenviar…"));
-        FxWait.fx(() -> {
-            TimelineWindow.press(w.cellOf(b), false);
+        FxWait.onFx(() -> {
+            TimelineWindow.press(Present.of(w.cellOf(b)), false);
             for (KeyCode k : List.of(KeyCode.R, KeyCode.E, KeyCode.DIGIT1)) {
                 w.list().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", k, false, false, false, false));
             }
-            return null;
         });
         assertEquals("2 seleccionados", FxWait.fx(() -> ((Label) w.scene.getRoot().lookup(".selection-count")).getText()));
         assertTrue(FxWait.fx(() -> b.reactions().isEmpty()), "1 doesn't react while picking");
         w.svc.deleteMessage(CHAT, a.id()).get();
         FxWait.until("the deleted one drops out", () -> "1 seleccionado".equals(((Label) w.scene.getRoot().lookup(".selection-count")).getText()));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             w.list().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
-            return null;
         });
         FxWait.until("picking ended", () -> w.scene.getRoot().lookup(".selection-bar") == null);
         assertFalse(FxWait.fx(() -> w.scene.getRoot().lookup(".composer-banner").isVisible()), "R or E while picking started no answer or edit");
@@ -160,7 +154,7 @@ class ForwardUiTest {
         for (int i = 0; i < 6; i++) {
             w.wheel(400);
             FxWait.settled();
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 for (Node n : w.list().lookupAll(".row-cell")) {
                     if (n instanceof ListCell<?> c && c.isVisible() && c.getItem() instanceof ThreadRows.MessageRow mr
                             && mr.message().body().startsWith("Mensaje") && c.getIndex() % 3 == 0) {
@@ -168,15 +162,13 @@ class ForwardUiTest {
                         break;
                     }
                 }
-                return null;
             });
         }
         forwardPicked();
         Node sheet = FxWait.fx(() -> w.scene.getRoot().lookup(".forward-sheet"));
         choose(sheet, "Familia");
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ((Button) sheet.lookup(".primary-button")).fire();
-            return null;
         });
         FxWait.until("picking ended", () -> w.scene.getRoot().lookup(".selection-bar") == null);
         // Every row, drawn again wherever it is.
@@ -190,24 +182,21 @@ class ForwardUiTest {
         }
     }
 
-    /** {@code m}'s row on screen, or null. */
     /** The header's "Reenviar", which asks where the picked ones go. */
-    private void forwardPicked() throws Exception {
-        FxWait.fx(() -> {
+    private void forwardPicked() throws InterruptedException {
+        FxWait.onFx(() -> {
             ((Button) w.scene.getRoot().lookup(".thread-header .selection-bar .primary-button")).fire();
-            return null;
         });
     }
 
     /** Searches {@code name} in the sheet and picks the first chat found, with the keys. */
-    private static void choose(Node sheet, String name) throws Exception {
-        FxWait.fx(() -> {
+    private static void choose(Node sheet, String name) throws InterruptedException {
+        FxWait.onFx(() -> {
             TextField search = (TextField) sheet.lookup(".text-field");
             search.setText(name);
             search.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
-        assertFalse(FxWait.fx(() -> ((Button) sheet.lookup(".primary-button")).isDisabled()), "a chat is chosen");
+        assertFalse(FxWait.fx(() -> sheet.lookup(".primary-button").isDisabled()), "a chat is chosen");
     }
 
     private static CheckBox checkBox(Node sheet, String text) {

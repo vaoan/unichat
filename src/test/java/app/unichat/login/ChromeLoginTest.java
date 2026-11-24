@@ -1,13 +1,16 @@
 package app.unichat.login;
 
+import app.unichat.Present;
 import app.unichat.model.Network;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -27,6 +30,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 class ChromeLoginTest {
+    /**
+     * 2026-11-23: Chrome's socket failing kept its cause (Error Prone's UnusedException), and the login screen, which
+     * shows the deepest cause, said "Connection refused" instead of what went wrong in the person's words.
+     */
+    @Test
+    void aSocketThatFailsSaysSoInThePersonsWordsAndKeepsItsCauseForTheLog() {
+        java.net.ConnectException refused = new java.net.ConnectException("Connection refused");
+        for (String key : List.of("login.chrome.noConnect", "login.chrome.noAnswer")) {
+            java.io.IOException e = ChromeLogin.failure(key, refused);
+            assertEquals(app.unichat.support.I18n.t(key), app.unichat.support.Errors.shown(e));
+            assertEquals(refused, e.getCause(), "the cause stays, for the log");
+        }
+    }
+
     private static final Duration NO_LIMIT = Duration.ofMillis(Long.MAX_VALUE);
 
     @TempDir Path dir;
@@ -40,6 +57,7 @@ class ChromeLoginTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void chromeIsNeverToldItsAutomatedAndKeepsItsOwnIdentityForGoogle() {
         List<String> c = ChromeLogin.command(Path.of("/x/chrome"), Path.of("/p"), 9333, false);
         assertTrue(c.contains("--remote-debugging-port=9333"), "port 0 turns navigator.webdriver on");
@@ -80,13 +98,14 @@ class ChromeLoginTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void aGuestSessionIsNotASession() {
         ChromeLogin login = new ChromeLogin(Network.LINKEDIN, params("https://www.linkedin.com/login"), Path.of("/x"), dir);
         String feed = "https://www.linkedin.com/feed/";
         assertNull(login.values(feed, Map.of("JSESSIONID", "guest", "bcookie", "x")), "no li_at yet");
-        Map<String, String> v = login.values(feed, Map.of("JSESSIONID", "\"ajax:1\"", "li_at", "x", "bcookie", "b"));
-        assertTrue(v.get("cookie_header").contains("bcookie=b"), "every cookie the browser has");
-        assertTrue(v.get("cookie_header").contains("JSESSIONID=\"ajax:1\""));
+        Map<String, String> v = Present.of(login.values(feed, Map.of("JSESSIONID", "\"ajax:1\"", "li_at", "x", "bcookie", "b")));
+        assertTrue(Present.of(v.get("cookie_header")).contains("bcookie=b"), "every cookie the browser has");
+        assertTrue(Present.of(v.get("cookie_header")).contains("JSESSIONID=\"ajax:1\""));
     }
 
     /** Any program here can drive Chrome through its debugging port while it waits: no longer than a login takes. */
@@ -95,6 +114,7 @@ class ChromeLoginTest {
         assertTrue(ChromeLogin.MAX_WAIT.compareTo(Duration.ofMinutes(5)) <= 0, ChromeLogin.MAX_WAIT.toString());
     }
 
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     private ChromeLogin waiting(Duration maxWait) {
         return new ChromeLogin(Network.LINKEDIN, params("https://www.linkedin.com/login"), Path.of("/x"), dir, true, maxWait, NO_LIMIT);
     }
@@ -139,7 +159,7 @@ class ChromeLoginTest {
         assertNotNull(chrome);
         AtomicReference<String> agent = new AtomicReference<>();
         AtomicReference<String> popupAgent = new AtomicReference<>();
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/login", ex -> {
             agent.set(ex.getRequestHeaders().getFirst("User-Agent"));
             ex.getResponseHeaders().add("Set-Cookie", "JSESSIONID=\"ajax:1\"; Path=/");
@@ -169,8 +189,8 @@ class ChromeLoginTest {
             String base = "http://127.0.0.1:" + server.getAddress().getPort();
             Map<String, String> v = new ChromeLogin(Network.LINKEDIN, params(base + "/login"), chrome, profile, true).run();
             assertNotNull(v);
-            assertTrue(v.get("cookie_header").contains("li_at=secreto"), "an HttpOnly cookie too");
-            assertTrue(v.get("track").contains("clientVersion"));
+            assertTrue(Present.of(v.get("cookie_header")).contains("li_at=secreto"), "an HttpOnly cookie too");
+            assertTrue(Present.of(v.get("track")).contains("clientVersion"));
             assertEquals("Agente-Del-Puente/1.0", agent.get());
             assertNotNull(popupAgent.get(), "the window it opened");
             assertTrue(popupAgent.get().contains("Chrome/"), "a window it opens, like Google's, stays the real Chrome: " + popupAgent.get());

@@ -6,8 +6,8 @@ import app.unichat.ui.Theme;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.model.Chat;
 import app.unichat.service.MockChatService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
-import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
@@ -15,10 +15,11 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,11 +42,12 @@ class TypingDotsUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
     @Test
+    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY", justification = "waits for the value to change at all: the exact comparison is what's meant")
     void theDotsMoveOnlyWhileTheyreOnScreen() throws Exception {
         TypingDots dots = fx(TypingDots::new);
         assertFalse(fx(dots::isRunning), "not shown yet");
@@ -66,7 +68,7 @@ class TypingDotsUiTest {
         assertTrue(seen.size() > 1, "the first dot changes: " + seen);
         fx(() -> root.getChildren().remove(dots));
         assertFalse(fx(dots::isRunning), "nothing keeps ticking once it's gone");
-        fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
     @Test
@@ -92,23 +94,33 @@ class TypingDotsUiTest {
             v.openChatId("!family:demo");
             return v;
         });
-        Chat chat = svc.chat("!family:demo");
-        fx(() -> { chat.setTyping(java.util.Set.of("Laura")); view.thread().refreshHeader(); view.list().refresh(); return null; });
+        Chat chat = Present.of(svc.chat("!family:demo"));
+        FxWait.onFx(() -> {
+            chat.setTyping(Set.of("Laura"));
+            view.thread().refreshHeader();
+            view.list().refresh();
+        });
         FxWait.until("the chat's row shows the dots", () -> view.lookup(".chat-preview.typing .typing-dots") != null);
         assertNotNull(fx(() -> view.lookup(".chat-preview.typing .typing-dots")), "the chat's row in the list too");
         Label line = fx(() -> (Label) view.lookup(".typing-line"));
         assertNotNull(fx(line::getGraphic));
         assertEquals("Laura está escribiendo", fx(line::getText));
         assertTrue(fx(line::getAccessibleText).contains("escribiendo"));
-        fx(() -> {
+        FxWait.onFx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(view.getScene().snapshot(null), null), "png",
                     java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "unichat-typing.png").toFile());
-            return null;
         });
-        fx(() -> { chat.setTyping(java.util.Set.of()); view.thread().refreshHeader(); view.list().refresh(); return null; });
+        FxWait.onFx(() -> {
+            chat.setTyping(Set.of());
+            view.thread().refreshHeader();
+            view.list().refresh();
+        });
         FxWait.until("the dots go", () -> line.getGraphic() == null && view.lookup(".chat-list .typing-dots") == null);
         assertNull(fx(line::getGraphic));
         assertNull(fx(() -> view.lookup(".chat-list .typing-dots")), "a recycled row doesn't keep them");
-        fx(() -> { stage[0].close(); svc.stop(); return null; });
+        FxWait.onFx(() -> {
+            stage[0].close();
+            svc.stop();
+        });
     }
 }

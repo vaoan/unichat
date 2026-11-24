@@ -12,13 +12,15 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Three dots lighting up in turn while someone types. A few steps a second, not a smooth animation, and only while on
  * screen: this sits in list rows that come and go, and there can be several at once. Reduced motion: still dots.
  */
 public final class TypingDots extends HBox {
-    static final double BRIGHT = 1, DIM = 0.3;
+    static final double BRIGHT = 1;
+    static final double DIM = 0.3;
     private static final int DOTS = 3;
     /** One step per dot and one with all of them dim: a beat of rest before it starts over. */
     private static final int STEPS = DOTS + 1;
@@ -50,7 +52,7 @@ public final class TypingDots extends HBox {
      * Shows {@code text} in {@code label} with the dots after it, in place of its "…"; null clears both. A screen reader
      * still hears the sentence as it is.
      */
-    public static void show(Label label, String text) {
+    public static void show(Label label, @Nullable String text) {
         if (text == null) {
             label.setGraphic(null);
             label.setText("");

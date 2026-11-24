@@ -2,6 +2,8 @@ package app.unichat.cloud;
 
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -27,7 +29,8 @@ import java.util.function.Supplier;
  * Done files are remembered in {@code cloud-uploaded.txt}; nothing in the account is ever deleted.
  */
 final class MediaUpload {
-    static final Duration FIRST_WAIT = Duration.ofMinutes(1), LONGEST_WAIT = Duration.ofMinutes(60);
+    static final Duration FIRST_WAIT = Duration.ofMinutes(1);
+    static final Duration LONGEST_WAIT = Duration.ofMinutes(60);
 
     /** A file that failed: how many times, when it's tried again, and why. */
     record Retry(int attempts, Instant next, String why) {}
@@ -37,7 +40,7 @@ final class MediaUpload {
     interface Progress {
         void uploading(int done, int total, String name);
 
-        default void sent(long bytes, long size) { }
+        default void sent(long bytes, long size) { /* nothing by default */ }
     }
 
     private final Path record;
@@ -81,10 +84,11 @@ final class MediaUpload {
                 if (r == null || !now.isBefore(r.next())) due.put(key(folder, file), file);
             }
         }
-        int sent = 0, index = 0;
+        int sent = 0;
+        int index = 0;
         for (Map.Entry<String, Path> e : due.entrySet()) {
             if (!mayGoOn.getAsBoolean()) break;
-            progress.uploading(index++, due.size(), e.getValue().getFileName().toString());
+            progress.uploading(index++, due.size(), PathParts.name(e.getValue()));
             try {
                 if (settle(dav, e.getKey(), e.getValue(), progress)) sent++;
                 remember(e.getKey());
@@ -112,10 +116,11 @@ final class MediaUpload {
                 if (Files.isRegularFile(file) && !checked.contains(entry)) here.put(entry, file);
             }
         }
-        int repaired = 0, index = 0;
+        int repaired = 0;
+        int index = 0;
         for (Map.Entry<String, Path> e : here.entrySet()) {
             if (!mayGoOn.getAsBoolean()) return repaired;
-            progress.uploading(index++, here.size(), e.getValue().getFileName().toString());
+            progress.uploading(index++, here.size(), PathParts.name(e.getValue()));
             try {
                 if (settle(dav, e.getKey(), e.getValue(), progress)) repaired++;
             } catch (IOException ex) {
@@ -132,10 +137,10 @@ final class MediaUpload {
         String dir = CloudAccount.MEDIA + "/" + key.substring(0, key.indexOf('/'));
         String remote = CloudAccount.MEDIA + "/" + key;
         Storage.RemoteFile there = dav.info(remote);
-        switch (Checksums.decide(Files.size(file), there == null ? null : localHash(file, there), there)) {
+        return switch (Checksums.decide(Files.size(file), there == null ? null : localHash(file, there), there)) {
             case SAME -> {
                 conflicts.remove(key);
-                return false;
+                yield false;
             }
             case UPLOAD -> {
                 dav.mkdirs(dir);
@@ -146,22 +151,23 @@ final class MediaUpload {
                     throw new IOException(I18n.t("cloud.error.mismatch"));
                 }
                 conflicts.remove(key);
-                return true;
+                yield true;
             }
             case RESTORE_LOCAL -> {
                 restore(dav, remote, file);
                 conflicts.remove(key);
-                return false;
+                yield false;
             }
             default -> {
                 conflicts.add(key);
-                return false;
+                yield false;
             }
-        }
+        };
     }
 
-    private static String localHash(Path file, Storage.RemoteFile there) throws IOException {
-        return there.kind() == null ? null : Checksums.of(file, there.kind());
+    private static @Nullable String localHash(Path file, Storage.RemoteFile there) throws IOException {
+        String kind = there.kind();
+        return kind == null ? null : Checksums.of(file, kind);
     }
 
     /**
@@ -189,7 +195,7 @@ final class MediaUpload {
     /** Files waiting for another try, and the soonest one (null when none). */
     int retrying() { return retries.size(); }
 
-    Instant nextRetry() {
+    @Nullable Instant nextRetry() {
         return retries.values().stream().map(Retry::next).min(Instant::compareTo).orElse(null);
     }
 
@@ -205,7 +211,7 @@ final class MediaUpload {
         List<Path> out = new java.util.ArrayList<>();
         try (DirectoryStream<Path> in = Files.newDirectoryStream(folder)) {
             for (Path p : in) {
-                String name = p.getFileName().toString();
+                String name = PathParts.name(p);
                 if (!Files.isRegularFile(p) || name.startsWith(".") || name.endsWith(".part") || name.endsWith(".ytdl") || made.test(p)) continue;
                 if (!done.contains(key(folder, p))) out.add(p);
             }
@@ -222,7 +228,7 @@ final class MediaUpload {
 
     private void remember(String entry) throws IOException {
         if (!done.add(entry)) return;
-        Files.createDirectories(record.getParent());
+        Files.createDirectories(PathParts.parent(record));
         Files.writeString(record, entry + "\n", StandardCharsets.UTF_8,
                 java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
     }

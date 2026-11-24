@@ -2,6 +2,7 @@ package app.unichat.assist;
 
 import app.unichat.model.Message;
 import app.unichat.support.Seen;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /**
  * When learning runs (after a draft, and once a corrected draft is sent): in the background, one at a time; asked
@@ -29,7 +31,7 @@ public final class StyleLearning {
 
     private final Supplier<WritingStyle> store;
     private boolean running;
-    private Job next;
+    private @Nullable Job next;
     /** Released requests of other chats waiting their turn: none is folded into another. */
     private final Deque<Job> backlog = new ArrayDeque<>();
     private final Executor starter;
@@ -38,6 +40,7 @@ public final class StyleLearning {
 
     private record Job(String chatId, List<Message> chat, StyleLearner.Program program, CompletableFuture<Void> done) {}
 
+    @SuppressFBWarnings(value = "SING_SINGLETON_HAS_NONPRIVATE_CONSTRUCTOR", justification = "package-private for the tests, which each make their own")
     StyleLearning(Supplier<WritingStyle> store) {
         this(store, r -> Thread.ofVirtual().name("learn-style").start(r));
     }

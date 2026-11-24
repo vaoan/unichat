@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -19,14 +20,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SupervisorTest {
     @TempDir Path dir;
-    /** No wait before a restart: the tests follow the Supervisor's events, not its timing. */
-    private static final Duration FIRST_BACKOFF = Duration.ZERO, MAX_BACKOFF = Duration.ZERO;
+    // No wait before a restart: the tests follow the Supervisor's events, not its timing.
+    private static final Duration FIRST_BACKOFF = Duration.ZERO;
+    private static final Duration MAX_BACKOFF = Duration.ZERO;
+
     private final Supervisor sup = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF);
     private final app.unichat.service.Changes changes = new app.unichat.service.Changes();
     /** Each exit the Supervisor handled: "name:true" when it scheduled a restart. */
     private final List<String> exits = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-    {
+    SupervisorTest() {
         sup.listen(new Supervisor.Listener() {
             @Override public void logged(String name) { changes.changed(); }
             @Override public void exited(String name, boolean restarting) {
@@ -77,6 +80,7 @@ class SupervisorTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void aLogThatCantBeWrittenNeitherBlocksTheProcessNorEndsTheCopy() throws Exception {
         // The log path is a folder at first: every line fails, yet the output must keep being read (1 MB, far more
         // than a pipe holds) and, once the log can be written again, lines reach it.
@@ -85,9 +89,9 @@ class SupervisorTest {
         try (ServerSocket test = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             sup.start("chatty", dir, List.of(java, "-cp", System.getProperty("java.class.path"), FakeService.class.getName(),
                     "chatty", Integer.toString(test.getLocalPort())), log);
-            Socket wrote = test.accept(); // it calls once its 1 MB is out, which only a reader makes possible
-            Files.delete(log);
-            wrote.close(); // go on
+            try (Socket _ = test.accept()) { // it calls once its 1 MB is out, which only a reader makes possible
+                Files.delete(log);
+            } // closing it: go on
         }
         await(() -> contains(log, "after"));
         assertEquals(0, sup.restarts("chatty"), "the same process: its output was never closed under it");
@@ -116,7 +120,7 @@ class SupervisorTest {
         Supervisor next = new Supervisor(FIRST_BACKOFF, MAX_BACKOFF, run, app.unichat.support.Storage.SHARED);
         next.reapOrphans();
         var left = ProcessHandle.of(orphan);
-        if (left.isPresent()) left.get().onExit().get();
+        if (left.isPresent()) left.orElseThrow().onExit().get();
         assertFalse(Files.exists(run.resolve("svc.pid")));
     }
 

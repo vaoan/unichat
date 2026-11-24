@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -46,7 +47,7 @@ class LogoutWiringTest {
             proc.process(MatrixClient.JSON.readTree(("{'rooms':{'join':{'" + ROOM + "':{'state':{'events':["
                     + member(ME) + "," + member(BOT) + "]},'timeline':{'events':[]}}}}}").replace('\'', '"')), false);
         }
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             String out;
@@ -65,12 +66,12 @@ class LogoutWiringTest {
         server.start();
         String base = "http://127.0.0.1:" + server.getAddress().getPort();
         BridgeAccounts.provisioner = new BridgeProvisioner() {
-            @Override public void ensure(Network n) { }
+            @Override public void ensure(Network n) { /* the fake ignores it */ }
             @Override public String provisioningUrl(Network n) { return base + "/_matrix/provision"; }
             @Override public void loggedOut(Network n) { stopped.add(n); }
         };
         core = new MatrixCore(new MatrixClient(base, "tok"), proc, ME, "example.org", "tok");
-        BotChat bots = new BotChat(core, new MessageSender(core, null));
+        BotChat bots = new BotChat(core, new MessageSender(core, new MediaDownloader(core.client, core.io)));
         accounts = new BridgeAccounts(core, bots, new DiscordServers(core, bots, List::of));
     }
 

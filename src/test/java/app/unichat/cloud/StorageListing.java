@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
@@ -11,7 +12,7 @@ final class StorageListing {
     private StorageListing() {}
 
     /** A folder's files and folders by name, each once, nothing deeper; a folder that isn't there lists nothing. */
-    static void check(Storage storage) throws Exception {
+    static void check(Storage storage) throws IOException {
         storage.mkdirs("Unichat/Texts/9b1c d");
         storage.put("Unichat/Texts/9b1c d/a1b2 2026-11.jsonl", "{}".getBytes(StandardCharsets.UTF_8));
         storage.put("Unichat/Texts/9b1c d/index.json", "{}".getBytes(StandardCharsets.UTF_8));

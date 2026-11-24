@@ -1,6 +1,7 @@
 package app.unichat;
 
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +16,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -91,18 +95,18 @@ class EnglishFirstTest {
     }
 
     /** The entry that lets {@code text} in file {@code rel} be Spanish, or null. */
-    static Allowed allowedFor(String rel, String text) {
+    static @Nullable Allowed allowedFor(String rel, String text) {
         return ALLOWED.stream().filter(a -> a.allows(rel, text)).findFirst().orElse(null);
     }
 
     @Test
     void anExactEntryAllowsOnlyItsOwnLiteral() {
-        assertTrue(allowedFor("app/unichat/server/LocalServer.java", "yo") != null);
-        assertTrue(allowedFor("app/unichat/server/LocalServer.java", "yo no sé") == null, "more Spanish beside it");
-        assertTrue(allowedFor("app/unichat/stt/SttSettings.java", "Falta {archivo}") == null);
-        assertTrue(allowedFor("app/unichat/cloud/CloudNames.java", "/Bóveda/llaves nuevas") == null);
-        assertTrue(allowedFor("app/unichat/cloud/CloudNames.java", "Ajustes/boveda-apagada.json") != null, "a part entry");
-        assertTrue(allowedFor("app/unichat/ui/MainView.java", "yo") == null, "only in its own file");
+        assertNotNull(allowedFor("app/unichat/server/LocalServer.java", "yo"));
+        assertNull(allowedFor("app/unichat/server/LocalServer.java", "yo no sé"), "more Spanish beside it");
+        assertNull(allowedFor("app/unichat/stt/SttSettings.java", "Falta {archivo}"));
+        assertNull(allowedFor("app/unichat/cloud/CloudNames.java", "/Bóveda/llaves nuevas"));
+        assertNotNull(allowedFor("app/unichat/cloud/CloudNames.java", "Ajustes/boveda-apagada.json"), "a part entry");
+        assertNull(allowedFor("app/unichat/ui/MainView.java", "yo"), "only in its own file");
     }
 
     @Test
@@ -115,10 +119,10 @@ class EnglishFirstTest {
                 "copiar", "cerrar", "todos", "enviar")) {
             assertTrue(spanish("Boton " + verb), verb);
         }
-        assertTrue(!spanish("ver el la un se por"), "Spanish words that are English or code too are left out");
-        assertTrue(!spanish("no file"), "English words that are Spanish too");
-        assertTrue(!spanish("--no-config"));
-        assertTrue(!spanish("paragraph queue notary"), "a word inside another is no word");
+        assertFalse(spanish("ver el la un se por"), "Spanish words that are English or code too are left out");
+        assertFalse(spanish("no file"), "English words that are Spanish too");
+        assertFalse(spanish("--no-config"));
+        assertFalse(spanish("paragraph queue notary"), "a word inside another is no word");
     }
 
     @Test

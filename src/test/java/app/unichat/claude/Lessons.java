@@ -27,17 +27,17 @@ public final class Lessons {
     }
 
     private final Path root;
-    private final List<Lesson> lessons = new ArrayList<>();
+    private final List<Lesson> all = new ArrayList<>();
 
     Lessons(Path root) throws IOException {
         this.root = root;
         for (String[] row : HookInput.table(root.resolve(".claude/lessons.tsv"), 4)) {
-            lessons.add(new Lesson(row[0], glob(row[1]), Pattern.compile(row[2]), row[3]));
+            all.add(new Lesson(row[0], glob(row[1]), Pattern.compile(row[2]), row[3]));
         }
     }
 
     List<Lesson> all() {
-        return lessons;
+        return all;
     }
 
     /** What {@code file} breaks; nothing for a file outside the repository, missing, or that no lesson is about. */
@@ -45,7 +45,7 @@ public final class Lessons {
         Path abs = root.resolve(file).toAbsolutePath().normalize();
         if (!abs.startsWith(root) || !Files.isRegularFile(abs)) return List.of();
         String rel = root.relativize(abs).toString().replace('\\', '/');
-        var applying = lessons.stream().filter(l -> l.files.matcher(rel).matches()).toList();
+        var applying = all.stream().filter(l -> l.files.matcher(rel).matches()).toList();
         if (applying.isEmpty()) return List.of();
         var found = new ArrayList<Finding>();
         List<String> lines = Files.readAllLines(abs, StandardCharsets.UTF_8);
@@ -61,14 +61,16 @@ public final class Lessons {
     /** A glob over paths relative to the root, with `/`: `**` any folders, `*` within a name, `{a,b}` either. */
     static Pattern glob(String glob) {
         var re = new StringBuilder();
-        for (int i = 0; i < glob.length(); i++) {
+        int i = 0;
+        while (i < glob.length()) {
             char c = glob.charAt(i);
+            int used = 1;
             if (c == '*' && glob.startsWith("**/", i)) {
                 re.append("(?:.*/)?");
-                i += 2;
+                used = 3;
             } else if (c == '*' && glob.startsWith("**", i)) {
                 re.append(".*");
-                i++;
+                used = 2;
             } else if (c == '*') {
                 re.append("[^/]*");
             } else if (c == '?') {
@@ -82,6 +84,7 @@ public final class Lessons {
             } else {
                 re.append(Pattern.quote(String.valueOf(c)));
             }
+            i += used;
         }
         return Pattern.compile(re.toString());
     }

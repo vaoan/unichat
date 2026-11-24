@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.ui.FxWait;
 import app.unichat.model.RoomFeatures;
 import app.unichat.service.MockChatService;
@@ -54,7 +55,7 @@ class FormatMenuUiTest {
         }
         Platform.setImplicitExit(false);
         MockChatService svc = new MockChatService();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Composer c = new Composer(svc, x -> { });
             c.setChat(CHAT);
             Stage stage = new Stage();
@@ -62,11 +63,11 @@ class FormatMenuUiTest {
             stage.show();
             TextArea box = (TextArea) c.lookup(".text-area");
 
-            svc.chat(CHAT).setFeatures(RoomFeatures.UNKNOWN);
+            Present.of(svc.chat(CHAT)).setFeatures(RoomFeatures.UNKNOWN);
             assertEquals(8, shown(box).size(), "a chat whose bridge says nothing: all of them");
             assertTrue(shown(box).contains("Negrita"));
 
-            svc.chat(CHAT).setFeatures(RoomFeatures.parse(new com.fasterxml.jackson.databind.ObjectMapper().readTree(
+            Present.of(svc.chat(CHAT)).setFeatures(RoomFeatures.parse(new com.fasterxml.jackson.databind.ObjectMapper().readTree(
                     "{\"formatting\":{\"bold\":2,\"italic\":2,\"strikethrough\":2,\"underline\":-1,\"spoiler\":-1}}")));
             assertEquals(List.of("Negrita", "Cursiva", "Tachado"), shown(box), "WhatsApp-like: no underline or spoiler");
 
@@ -80,7 +81,6 @@ class FormatMenuUiTest {
             box.undo();
             assertEquals("hola mundo", box.getText(), "⌘Z takes it back");
             stage.close();
-            return null;
         });
     }
 }

@@ -4,6 +4,7 @@ import app.unichat.support.I18n;
 import app.unichat.support.Urls;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
@@ -53,14 +54,14 @@ public final class PCloudApi implements Storage {
     }
 
     @Override
-    public String stamp(String path) throws IOException {
+    public @Nullable String stamp(String path) throws IOException {
         JsonNode meta = stat(path);
         if (meta == null) return null;
         return meta.path("hash").asText("") + "/" + meta.path("modified").asText("");
     }
 
     /** The file's metadata, or null when there's none. */
-    private JsonNode stat(String path) throws IOException {
+    private @Nullable JsonNode stat(String path) throws IOException {
         try {
             return call("stat", "path=" + Urls.enc(abs(path))).path("metadata");
         } catch (Missing gone) {
@@ -70,7 +71,7 @@ public final class PCloudApi implements Storage {
 
     /** pCloud gives a file's SHA-1 (both regions; Europe adds SHA-256). */
     @Override
-    public RemoteFile info(String path) throws IOException {
+    public @Nullable RemoteFile info(String path) throws IOException {
         JsonNode meta = stat(path);
         if (meta == null) return null;
         JsonNode sums;
@@ -134,7 +135,7 @@ public final class PCloudApi implements Storage {
             call(meta.path("isfolder").asBoolean(false) ? "renamefolder" : "renamefile",
                 "path=" + Urls.enc(abs(from)) + "&topath=" + Urls.enc(abs(to)));
         } catch (Missing gone) {
-            throw new IOException(I18n.t("cloud.error.moveNothing", from));
+            throw new IOException(I18n.t("cloud.error.moveNothing", from), gone);
         }
     }
 
@@ -144,7 +145,7 @@ public final class PCloudApi implements Storage {
     }
 
     @Override
-    public void put(String path, Path file, java.util.function.LongConsumer sent) throws IOException {
+    public void put(String path, Path file, java.util.function.@Nullable LongConsumer sent) throws IOException {
         upload(path, CountingBody.of(HttpRequest.BodyPublishers.ofFile(file), sent));
     }
 
@@ -176,7 +177,7 @@ public final class PCloudApi implements Storage {
     }
 
     @Override
-    public byte[] get(String path) throws IOException {
+    public byte @Nullable [] get(String path) throws IOException {
         URI where = link(path);
         if (where == null) return null;
         HttpResponse<byte[]> r = download(where, HttpResponse.BodyHandlers.ofByteArray());
@@ -185,7 +186,7 @@ public final class PCloudApi implements Storage {
     }
 
     /** Where the file at {@code path} downloads from (a link pCloud makes for it), or null when there's none. */
-    private URI link(String path) throws IOException {
+    private @Nullable URI link(String path) throws IOException {
         JsonNode link;
         try {
             link = call("getfilelink", "path=" + Urls.enc(abs(path)) + "&forcedownload=1");
@@ -193,7 +194,8 @@ public final class PCloudApi implements Storage {
             return null;
         }
         String scheme = host.startsWith("http://") ? "http://" : "https://"; // the same as the API's (a test's is plain)
-        String hostPart = link.path("hosts").path(0).asText(), file = link.path("path").asText();
+        String hostPart = link.path("hosts").path(0).asText();
+        String file = link.path("path").asText();
         try {
             // Encoded already ("%20") it goes as it is; otherwise each character that needs it is encoded.
             return file.contains("%") ? URI.create(scheme + hostPart + file)
@@ -222,6 +224,9 @@ public final class PCloudApi implements Storage {
 
     /** A file or folder that isn't there: an answer, not a failure. */
     static final class Missing extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         Missing() {
             super("missing");
         }

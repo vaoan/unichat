@@ -1,5 +1,6 @@
 package app.unichat.update;
 
+import app.unichat.Present;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,9 +32,9 @@ class UpdatePolicyTest {
 
     @Test
     void onlyGitHubsOwnPageIsEverOpened() {
-        assertEquals(UpdatePolicy.RELEASES, UpdatePolicy.parse("{\"tag_name\":\"v2\",\"html_url\":\"javascript:alert(1)\"}").url());
-        assertEquals(UpdatePolicy.RELEASES, UpdatePolicy.parse("{\"tag_name\":\"v2\",\"html_url\":\"https://github.com.evil.test/x\"}").url());
-        assertEquals(UpdatePolicy.RELEASES, UpdatePolicy.parse("{\"tag_name\":\"v2\"}").url());
+        assertEquals(UpdatePolicy.RELEASES, Present.of(UpdatePolicy.parse("{\"tag_name\":\"v2\",\"html_url\":\"javascript:alert(1)\"}")).url());
+        assertEquals(UpdatePolicy.RELEASES, Present.of(UpdatePolicy.parse("{\"tag_name\":\"v2\",\"html_url\":\"https://github.com.evil.test/x\"}")).url());
+        assertEquals(UpdatePolicy.RELEASES, Present.of(UpdatePolicy.parse("{\"tag_name\":\"v2\"}")).url());
     }
 
     @Test

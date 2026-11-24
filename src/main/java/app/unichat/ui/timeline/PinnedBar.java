@@ -13,6 +13,7 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -28,11 +29,12 @@ final class PinnedBar {
     private final Label preview = new Label();
     private final Button go;
     private final Button unpin;
+    @SuppressWarnings("UnnecessaryLambda") // one instance: removeListener takes away what addListener added
     private final Consumer<String> onChange = chat -> {
         if (Platform.isFxApplicationThread()) changed(chat);
         else Platform.runLater(() -> changed(chat));
     };
-    private String chatId;
+    private @Nullable String chatId;
     private int index;
 
     /** {@code reveal}: goes to the message in the chat (loading its history if it must). */
@@ -62,7 +64,8 @@ final class PinnedBar {
         });
         unpin = Icons.iconButton(Icons.CLOSE, I18n.t("pinned.unpin"), () -> {
             List<PinnedMessage> pins = pins();
-            if (!pins.isEmpty()) PinnedMessages.get().unpin(chatId, pins.get(index % pins.size()).messageId());
+            String chat = chatId; // pins() has some only with a chat shown
+            if (chat != null && !pins.isEmpty()) PinnedMessages.get().unpin(chat, pins.get(index % pins.size()).messageId());
         });
         unpin.getStyleClass().add("pinned-unpin");
         box = new HBox(4, go, unpin);
@@ -75,8 +78,8 @@ final class PinnedBar {
     Node node() { return box; }
 
     /** The chat opened: its pins, from the newest. */
-    void show(String chatId) {
-        this.chatId = chatId;
+    void show(@Nullable String shown) {
+        this.chatId = shown;
         index = 0;
         redraw();
     }

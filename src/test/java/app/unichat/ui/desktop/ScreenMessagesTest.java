@@ -1,6 +1,7 @@
 package app.unichat.ui.desktop;
 
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import static app.unichat.ui.desktop.ScreenMessages.PBT_POWERSETTINGCHANGE;
 import static app.unichat.ui.desktop.ScreenMessages.WM_POWERBROADCAST;
@@ -12,11 +13,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 /** What each Windows message says about the screen: locked and display off count apart, either one is away. */
 class ScreenMessagesTest {
-    private static Boolean session(ScreenMessages m, int event) {
+    private static @Nullable Boolean session(ScreenMessages m, int event) {
         return m.away(WM_WTSSESSION_CHANGE, event, ScreenMessages.NO_DISPLAY_STATE);
     }
 
-    private static Boolean display(ScreenMessages m, int state) {
+    private static @Nullable Boolean display(ScreenMessages m, int state) {
         return m.away(WM_POWERBROADCAST, PBT_POWERSETTINGCHANGE, state);
     }
 

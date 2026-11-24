@@ -1,6 +1,9 @@
 package app.unichat.server;
 
+import app.unichat.support.PathParts;
 import app.unichat.support.Storage;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -10,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Runs the server's processes (tuwunel, one per bridge) and restarts any that exits on its own, waiting a bit
@@ -22,7 +26,7 @@ public final class Supervisor {
     private final Map<String, Service> services = new ConcurrentHashMap<>();
 
     /** Where each running process is noted as {@code <name>.pid} ("pid startMillis"), or null. */
-    private final Path runDir;
+    private final @Nullable Path runDir;
     /** Told of a process whose output says a write didn't fit ({@link Storage#writeFailed}). */
     private final Storage storage;
 
@@ -34,7 +38,7 @@ public final class Supervisor {
         this(firstBackoff, maxBackoff, null, Storage.SHARED);
     }
 
-    Supervisor(Duration firstBackoff, Duration maxBackoff, Path runDir, Storage storage) {
+    Supervisor(Duration firstBackoff, Duration maxBackoff, @Nullable Path runDir, Storage storage) {
         this.firstBackoff = firstBackoff;
         this.maxBackoff = maxBackoff;
         this.runDir = runDir;
@@ -48,11 +52,12 @@ public final class Supervisor {
     public void reapOrphans() {
         if (runDir == null || !Files.isDirectory(runDir)) return;
         try (var files = Files.list(runDir)) {
-            for (Path f : files.filter(x -> x.getFileName().toString().endsWith(".pid")).toList()) {
+            for (Path f : files.filter(x -> PathParts.name(x).endsWith(".pid")).toList()) {
                 String[] parts = Files.readString(f).strip().split("\\s+");
                 Files.deleteIfExists(f);
                 if (parts.length != 2) continue;
-                long pid = Long.parseLong(parts[0]), started = Long.parseLong(parts[1]);
+                long pid = Long.parseLong(parts[0]);
+                long started = Long.parseLong(parts[1]);
                 ProcessHandle.of(pid).filter(ProcessHandle::isAlive)
                         .filter(h -> h.info().startInstant().map(i -> i.toEpochMilli() == started).orElse(false))
                         .ifPresent(h -> {
@@ -95,11 +100,11 @@ public final class Supervisor {
          * A line of {@code name}'s output was handed to its log. Only an urgent one (warn, error, fatal, or not JSON) is
          * on disk by now; the others wait in the buffer for the next flush.
          */
-        default void logged(String name) {}
+        default void logged(String name) { /* nothing by default */ }
         /** {@code name}'s process ended; {@code restarting} says whether a restart was scheduled for it. */
-        default void exited(String name, boolean restarting) {}
+        default void exited(String name, boolean restarting) { /* nothing by default */ }
         /** {@code name} was started again after an exit. */
-        default void restarted(String name) {}
+        default void restarted(String name) { /* nothing by default */ }
     }
 
     private volatile Listener listener = new Listener() { };
@@ -111,11 +116,11 @@ public final class Supervisor {
         final Path workDir;
         final List<String> command;
         final Path log;
-        volatile Process process;
+        volatile @Nullable Process process;
         volatile boolean wanted = true;
-        volatile int restarts;
+        final AtomicInteger restarts = new AtomicInteger();
         /** Crashes in a row without a stable run in between; sets the wait before the next restart. */
-        volatile int streak;
+        final AtomicInteger streak = new AtomicInteger();
         volatile long launchedAt;
 
         Service(String name, Path workDir, List<String> command, Path log) {
@@ -125,8 +130,9 @@ public final class Supervisor {
             this.log = log;
         }
 
+        @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the server or a bridge from our install folder with fixed arguments, as a list, no shell")
         void launch() throws IOException {
-            Files.createDirectories(log.getParent());
+            Files.createDirectories(PathParts.parent(log));
             process = new ProcessBuilder(command).directory(workDir.toFile()).redirectErrorStream(true).start();
             launchedAt = System.currentTimeMillis();
             Process p = process;
@@ -137,7 +143,7 @@ public final class Supervisor {
             }, () -> listener.logged(name)), "log-" + name);
             pump.setDaemon(true);
             pump.start();
-            p.onExit().thenRun(() -> onExit(this, p));
+            var _ = p.onExit().thenRun(() -> onExit(this, p));
         }
     }
 
@@ -165,19 +171,19 @@ public final class Supervisor {
             return;
         }
         // A process that ran fine for a while starts over with short waits (days-old crashes don't count).
-        if (System.currentTimeMillis() - s.launchedAt > STABLE_MS) s.streak = 0;
+        if (System.currentTimeMillis() - s.launchedAt > STABLE_MS) s.streak.set(0);
         scheduleRestart(s);
         listener.exited(s.name, true);
     }
 
     private void scheduleRestart(Service s) {
-        long delay = Math.min(maxBackoff.toMillis(), firstBackoff.toMillis() << Math.min(s.streak, 10));
+        long delay = Math.min(maxBackoff.toMillis(), firstBackoff.toMillis() << Math.min(s.streak.get(), 10));
         Thread t = new Thread(() -> {
             try {
                 Thread.sleep(delay);
                 if (!s.wanted || services.get(s.name) != s) return;
-                s.restarts++;
-                s.streak++;
+                s.restarts.incrementAndGet();
+                s.streak.incrementAndGet();
                 s.launch();
                 listener.restarted(s.name);
             } catch (InterruptedException e) {
@@ -199,13 +205,14 @@ public final class Supervisor {
 
     public int restarts(String name) {
         Service s = services.get(name);
-        return s == null ? 0 : s.restarts;
+        return s == null ? 0 : s.restarts.get();
     }
 
     /**
      * Kills {@code name} at once (it's hung or broken): it's restarted like after a crash. Unlike {@link #stop},
      * it stays wanted.
      */
+    @SuppressFBWarnings(value = "RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT", justification = "Process.destroyForcibly kills the process; the Process it returns is the same one")
     public void kill(String name) {
         Service s = services.get(name);
         Process p = s == null ? null : s.process;

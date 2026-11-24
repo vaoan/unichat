@@ -40,7 +40,7 @@ class RestBarUiTest {
     private final List<Runnable> later = new CopyOnWriteArrayList<>();
     private final SimpleBooleanProperty archiveOpen = new SimpleBooleanProperty(false);
 
-    private static void toolkit() throws Exception {
+    private static void toolkit() throws InterruptedException {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
@@ -51,11 +51,11 @@ class RestBarUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private RestBar show(double px) throws Exception {
+    private RestBar show(double px) throws InterruptedException {
         return show(px, false);
     }
 
-    private RestBar show(double px, boolean contrast) throws Exception {
+    private RestBar show(double px, boolean contrast) throws InterruptedException {
         return FxWait.fx(() -> {
             RestBar b = new RestBar(state::get, listeners::add, listeners::remove, told::add, opened::add, shown::add, archiveOpen, later::add);
             VBox root = new VBox(b);
@@ -77,11 +77,10 @@ class RestBarUiTest {
         listeners.forEach(Runnable::run);
     }
 
-    private static void close(RestBar bar) throws Exception {
-        FxWait.fx(() -> {
+    private static void close(RestBar bar) throws InterruptedException {
+        FxWait.onFx(() -> {
             bar.dispose();
             bar.getScene().getWindow().hide();
-            return null;
         });
     }
 
@@ -90,11 +89,11 @@ class RestBarUiTest {
         toolkit();
         RestBar bar = show(13);
         assertEquals(List.of(false), told, "where the window starts");
-        FxWait.fx(() -> { archiveOpen.set(true); return null; });
-        FxWait.fx(() -> { archiveOpen.set(false); return null; });
+        FxWait.onFx(() -> archiveOpen.set(true));
+        FxWait.onFx(() -> archiveOpen.set(false));
         assertEquals(List.of(false, true, false), told);
         close(bar);
-        FxWait.fx(() -> { archiveOpen.set(true); return null; });
+        FxWait.onFx(() -> archiveOpen.set(true));
         assertEquals(3, told.size(), "a bar gone tells nothing");
         assertTrue(listeners.isEmpty(), "and stops listening");
     }
@@ -120,7 +119,7 @@ class RestBarUiTest {
         assertTrue(FxWait.fx(bar::isVisible), "said for a moment");
         assertTrue(FxWait.fx(() -> bar.getAccessibleText().contains("Al día")));
         assertEquals(1, later.size());
-        FxWait.fx(() -> { later.getFirst().run(); return null; });
+        FxWait.onFx(() -> later.getFirst().run());
         assertFalse(FxWait.fx(bar::isVisible), "then it goes");
         close(bar);
     }
@@ -147,10 +146,15 @@ class RestBarUiTest {
         app.unichat.model.Chat archived = new app.unichat.model.Chat("!c1:x");
         archived.setArchived(true);
         app.unichat.model.Chat inbox = new app.unichat.model.Chat("!n:x");
-        FxWait.fx(() -> { bar.chatOpened(archived); return null; });
+        FxWait.onFx(() -> bar.chatOpened(archived));
         assertTrue(opened.isEmpty(), "outside the archive: no server comes back");
         assertEquals(List.of("!c1:x"), shown, "but the chat shown never rests, however it was opened");
-        FxWait.fx(() -> { archiveOpen.set(true); bar.chatOpened(inbox); bar.chatOpened(archived); bar.serverOpened(archived); return null; });
+        FxWait.onFx(() -> {
+            archiveOpen.set(true);
+            bar.chatOpened(inbox);
+            bar.chatOpened(archived);
+            bar.serverOpened(archived);
+        });
         assertEquals(List.of("!c1:x", "!c1:x"), opened, "only the archived one, in the archive, as a chat or a server");
         assertEquals(List.of("!c1:x", "!n:x", "!c1:x"), shown, "a server's channels showing isn't a chat shown");
         close(bar);
@@ -171,7 +175,7 @@ class RestBarUiTest {
         for (boolean contrast : List.of(false, true)) cutNothing(contrast);
     }
 
-    private void cutNothing(boolean contrast) throws Exception {
+    private void cutNothing(boolean contrast) throws InterruptedException {
         state.set(new Waking(Step.CHATS, 3699, 3699));
         RestBar bar = show(21, contrast);
         FxWait.settled();

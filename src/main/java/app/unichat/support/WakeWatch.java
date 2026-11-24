@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -16,7 +18,7 @@ public final class WakeWatch {
     static final long GAP_MS = 15_000;
 
     private static final List<Runnable> LISTENERS = new CopyOnWriteArrayList<>();
-    private static Thread ticker;
+    private static @Nullable Thread ticker;
 
     private WakeWatch() {}
 
@@ -37,14 +39,16 @@ public final class WakeWatch {
     }
 
     private static void tick() {
-        long wall = System.currentTimeMillis(), awake = System.nanoTime();
+        long wall = System.currentTimeMillis();
+        long awake = System.nanoTime();
         while (true) {
             try {
                 Thread.sleep(TICK_MS);
             } catch (InterruptedException e) {
                 return;
             }
-            long w = System.currentTimeMillis(), a = System.nanoTime();
+            long w = System.currentTimeMillis();
+            long a = System.nanoTime();
             if (slept(w - wall, (a - awake) / 1_000_000)) {
                 for (Runnable r : LISTENERS) {
                     try {

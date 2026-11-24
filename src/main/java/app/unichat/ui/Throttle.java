@@ -30,7 +30,7 @@ final class Throttle {
             if (wait <= 0) {
                 run(key, job);
             } else {
-                PauseTransition later = new PauseTransition(Duration.millis(wait));
+                PauseTransition later = new PauseTransition(Duration.millis((double) wait));
                 later.setOnFinished(e -> run(key, job));
                 later.play();
             }

@@ -68,7 +68,7 @@ class AnimationShowingUiTest {
         assertEquals(before, FxWait.fx(AnimationBudget.SHARED::used), "its budget given back");
         Seen.reset(true);
         FxWait.until("moving again once seen", () -> AnimatedImage.moving(view));
-        FxWait.fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
     @Test
@@ -76,22 +76,21 @@ class AnimationShowingUiTest {
         AnimatedImage.Frames frames = frames();
         long before = FxWait.fx(AnimationBudget.SHARED::used);
         Stage[] stage = new Stage[1];
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ImageView view = new ImageView();
             stage[0] = new Stage();
             stage[0].setOpacity(0);
             stage[0].setScene(new Scene(new StackPane(view), 100, 100));
             stage[0].show();
             AnimatedImage.play(view, frames);
-            return null;
         });
         assertEquals(before + frames.bytes(), FxWait.fx(AnimationBudget.SHARED::used), "playing while it shows");
 
-        FxWait.fx(() -> { stage[0].close(); return null; });
+        FxWait.onFx(stage[0]::close);
         assertEquals(before, FxWait.fx(AnimationBudget.SHARED::used), "stopped once its window closed");
 
-        FxWait.fx(() -> { stage[0].show(); return null; });
+        FxWait.onFx(stage[0]::show);
         assertEquals(before + frames.bytes(), FxWait.fx(AnimationBudget.SHARED::used), "playing again when shown again");
-        FxWait.fx(() -> { stage[0].close(); return null; });
+        FxWait.onFx(stage[0]::close);
     }
 }

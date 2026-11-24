@@ -1,10 +1,12 @@
 package app.unichat.matrix;
 
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -13,7 +15,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Marking a bot chat as direct rewrites the whole {@code m.direct}: written from the cache after a failed read, it
@@ -22,10 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BotChatDirectTest {
     private static final String ME = "@me:example.org";
     private final List<String> calls = Collections.synchronizedList(new ArrayList<>());
+    @SuppressWarnings("NullAway.Init") // bots() sets it, and every test calls it first
     private HttpServer server;
 
-    private BotChat bots(int getStatus, String getBody) throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    private BotChat bots(int getStatus, String getBody) throws IOException {
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             calls.add(ex.getRequestMethod());
             boolean get = "GET".equals(ex.getRequestMethod());
@@ -38,7 +40,7 @@ class BotChatDirectTest {
         server.start();
         MatrixClient client = new MatrixClient("http://127.0.0.1:" + server.getAddress().getPort(), "tok");
         MatrixCore core = new MatrixCore(client, new SyncProcessor(ME), ME, "example.org", "tok");
-        return new BotChat(core, new MessageSender(core, null));
+        return new BotChat(core, new MessageSender(core, new MediaDownloader(core.client, core.io)));
     }
 
     @AfterEach
@@ -57,6 +59,6 @@ class BotChatDirectTest {
     void noMDirectYetIsWrittenFromTheCache() throws Exception {
         BotChat bots = bots(404, "{\"errcode\":\"M_NOT_FOUND\",\"error\":\"none\"}");
         bots.addDirect("@whatsappbot:example.org", "!bot:example.org");
-        assertTrue(calls.equals(List.of("GET", "PUT")), calls.toString());
+        assertEquals(List.of("GET", "PUT"), calls, calls.toString());
     }
 }

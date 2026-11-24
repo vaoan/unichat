@@ -2,23 +2,18 @@ package app.unichat.ui.settings;
 
 import app.unichat.cloud.Cloud;
 import app.unichat.cloud.VaultFixture;
-import app.unichat.gif.GifProviders;
-import app.unichat.service.MockChatService;
-import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import app.unichat.ui.FxWait;
-import app.unichat.ui.Theme;
+import java.util.concurrent.ExecutionException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
-import javafx.event.ActionEvent;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.Labeled;
-import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -26,38 +21,35 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.BiPredicate;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** What the vault page's tests share: the page alone in a window over an account in memory, and how they look and click. */
-abstract class VaultPageTestBase {
-    protected static final String PASSWORD = "una contraseña larga", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
-        LATE = "5f0e7d7c-4b5a-4a4c-9e95-0d6b1a5c6f88";
+abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod, a base for the vault page's tests, never run alone
+    protected static final String PASSWORD = "una contraseña larga";
+    protected static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    protected static final String LATE = "5f0e7d7c-4b5a-4a4c-9e95-0d6b1a5c6f88";
 
     @TempDir
     Path dir;
     protected VaultFixture account;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     protected Stage stage;
-    protected Function<javafx.stage.Window, File> saveWas;
-    protected BiPredicate<javafx.stage.Window, String> printWas;
+    protected Function<javafx.stage.@Nullable Window, @Nullable File> saveWas;
+    protected BiPredicate<javafx.stage.@Nullable Window, String> printWas;
     protected RecoveryCodeSheet.Clip clipboardWas;
     /** What the system's clipboard holds now, as the sheet put it there or the person copied over it. */
-    protected String clip;
-    protected final List<String> copied = new ArrayList<>(), printed = new ArrayList<>();
+    protected @Nullable String clip;
+    protected final List<String> copied = new ArrayList<>();
+    protected final List<String> printed = new ArrayList<>();
 
     @BeforeAll
     static void toolkit() throws Exception {
@@ -85,7 +77,7 @@ abstract class VaultPageTestBase {
                 clip = text;
             }
 
-            @Override public String now() {
+            @Override public @Nullable String now() {
                 return clip;
             }
 
@@ -98,7 +90,7 @@ abstract class VaultPageTestBase {
     @AfterEach
     void stop() throws Exception {
         app.unichat.support.Seen.reset(true);
-        if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
+        if (stage != null) FxWait.onFx(stage::close);
         RecoveryCodeSheet.saveTo = saveWas;
         RecoveryCodeSheet.printer = printWas;
         RecoveryCodeSheet.clipboard = clipboardWas;
@@ -107,8 +99,8 @@ abstract class VaultPageTestBase {
     }
 
     /** The section alone in a window of its own (a new one each time: the page as it's opened again). */
-    protected void page() throws Exception {
-        if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
+    protected void page() throws InterruptedException {
+        if (stage != null) FxWait.onFx(stage::close);
         stage = FxWait.fx(() -> {
             Stage s = new Stage();
             s.setOpacity(0);
@@ -118,6 +110,7 @@ abstract class VaultPageTestBase {
         });
     }
 
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     protected Parent root() {
         return stage.getScene().getRoot();
     }
@@ -153,30 +146,30 @@ abstract class VaultPageTestBase {
         return showing().stream().anyMatch(n -> n instanceof Labeled l && l.getText() != null && l.getText().contains(text));
     }
 
-    protected void waitFor(String what) throws Exception {
+    protected void waitFor(String what) {
         FxWait.until("the page to say \"" + what + "\"", () -> says(what));
     }
 
-    protected void click(String text) throws Exception {
-        FxWait.fx(() -> { button(text).fire(); return null; });
+    protected void click(String text) throws InterruptedException {
+        FxWait.onFx(() -> button(text).fire());
     }
 
-    protected void type(String accessible, String text) throws Exception {
-        FxWait.fx(() -> { field(accessible).setText(text); return null; });
+    protected void type(String accessible, String text) throws InterruptedException {
+        FxWait.onFx(() -> field(accessible).setText(text));
     }
 
     /** The code on screen, as one would copy it from there (two lines, read as one). */
-    protected String codeShown() throws Exception {
+    protected String codeShown() throws InterruptedException {
         FxWait.until("a code shown", () -> root().lookup(".text-area.vault-code") instanceof TextArea t && !t.isEditable());
         return FxWait.fx(() -> ((TextArea) root().lookup(".text-area.vault-code")).getText().replace("\n", ""));
     }
 
-    protected RecoveryCodeSheet sheet() throws Exception {
+    protected RecoveryCodeSheet sheet() throws InterruptedException {
         return FxWait.fx(() -> (RecoveryCodeSheet) root().lookup(".recovery-code-sheet"));
     }
 
     /** Groups asked back typed from {@code code}, or wrong ones. */
-    protected void typeGroups(String code, boolean right) throws Exception {
+    protected void typeGroups(String code, boolean right) throws InterruptedException {
         click(I18n.t("settings.vault.code.keptIt"));
         int[] asked = sheet().asked();
         String[] groups = code.split("-");
@@ -185,11 +178,11 @@ abstract class VaultPageTestBase {
         click(I18n.t("settings.vault.code.check"));
     }
 
-    protected void waitOpen() throws Exception {
+    protected void waitOpen() {
         waitFor(I18n.t("settings.vault.open"));
     }
 
-    protected Cloud.VaultState round() throws Exception {
+    protected Cloud.VaultState round() throws InterruptedException, ExecutionException {
         return account.cloud().syncNow().get().vault();
     }
 }

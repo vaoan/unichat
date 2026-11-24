@@ -1,5 +1,8 @@
 package app.unichat.stt;
 
+import app.unichat.Present;
+import app.unichat.support.PathParts;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -12,10 +15,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TranscriptsTest {
-    private static void await(Transcripts t, String url) throws Exception {
+    private static void await(Transcripts t, String url) throws InterruptedException {
         CountDownLatch done = new CountDownLatch(1);
         t.addListener(() -> {
             Transcripts.State s = t.state(url);
@@ -36,12 +38,12 @@ class TranscriptsTest {
         assertNull(t.state("mxc://s/a"));
         t.request("mxc://s/a", () -> CompletableFuture.completedFuture(dir.resolve("a.ogg")));
         await(t, "mxc://s/a");
-        assertEquals("llego a las doce", ((Transcripts.Done) t.state("mxc://s/a")).text());
+        assertEquals("llego a las doce", ((Transcripts.Done) Present.of(t.state("mxc://s/a"))).text());
 
         t.request("mxc://s/a", () -> CompletableFuture.completedFuture(dir.resolve("a.ogg")));
         assertEquals(1, runs.get(), "done notes aren't transcribed again");
         Transcripts later = new Transcripts(dir, (audio, status) -> { throw new AssertionError("not needed"); });
-        assertEquals("llego a las doce", ((Transcripts.Done) later.state("mxc://s/a")).text(), "kept on disk");
+        assertEquals("llego a las doce", ((Transcripts.Done) Present.of(later.state("mxc://s/a"))).text(), "kept on disk");
     }
 
     @Test
@@ -74,7 +76,7 @@ class TranscriptsTest {
         });
         t.requestAhead("mxc://s/ok", () -> CompletableFuture.completedFuture(dir.resolve("ok.ogg")));
         await(t, "mxc://s/ok");
-        assertEquals("ya voy", ((Transcripts.Done) t.state("mxc://s/ok")).text(), "ready before anyone asks");
+        assertEquals("ya voy", ((Transcripts.Done) Present.of(t.state("mxc://s/ok"))).text(), "ready before anyone asks");
         t.requestAhead("mxc://s/bad", () -> CompletableFuture.completedFuture(dir.resolve("bad.ogg")));
         await(t, "mxc://s/bad");
         int before = runs.get();
@@ -82,7 +84,7 @@ class TranscriptsTest {
         t.requestAhead("mxc://s/bad", () -> CompletableFuture.completedFuture(dir.resolve("bad.ogg")));
         t.requestAhead("mxc://s/ok", () -> CompletableFuture.completedFuture(dir.resolve("ok.ogg")));
         assertEquals(before, runs.get());
-        assertTrue(t.state("mxc://s/bad") instanceof Transcripts.Failed);
+        assertInstanceOf(Transcripts.Failed.class, t.state("mxc://s/bad"));
     }
 
     @Test
@@ -106,7 +108,7 @@ class TranscriptsTest {
     void askedAtOnceFromSeveralThreadsItsTranscribedOnce(@TempDir Path dir) throws Exception {
         java.util.Map<String, AtomicInteger> runs = new java.util.concurrent.ConcurrentHashMap<>();
         Transcripts t = new Transcripts(dir, (audio, status) -> {
-            runs.computeIfAbsent(audio.getFileName().toString(), k -> new AtomicInteger()).incrementAndGet();
+            runs.computeIfAbsent(PathParts.name(audio), k -> new AtomicInteger()).incrementAndGet();
             return "hola";
         });
         int askers = 8;
@@ -129,7 +131,10 @@ class TranscriptsTest {
             await(t, url);
         }
         CountDownLatch idle = new CountDownLatch(1);
-        t.request("mxc://s/last", () -> { idle.countDown(); return CompletableFuture.completedFuture(dir.resolve("last.ogg")); });
+        t.request("mxc://s/last", () -> {
+            idle.countDown();
+            return CompletableFuture.completedFuture(dir.resolve("last.ogg"));
+        });
         idle.await(); // one worker in order: everything asked before has run
         await(t, "mxc://s/last");
         runs.forEach((note, n) -> assertEquals(1, n.get(), note + " transcribed " + n.get() + " times"));

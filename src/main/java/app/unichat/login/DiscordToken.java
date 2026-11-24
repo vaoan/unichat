@@ -1,6 +1,7 @@
 package app.unichat.login;
 
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Discord's account token, taken from discord.com after the user logs in inside Unichat's window (where they can
@@ -29,7 +30,7 @@ public final class DiscordToken {
     /** user-id.timestamp.hmac (base64url parts), or the older "mfa." form. */
     private static final Pattern TOKEN = Pattern.compile("[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{4,}\\.[A-Za-z0-9_-]{20,}|mfa\\.[A-Za-z0-9_-]{40,}");
 
-    public static boolean isToken(String s) {
+    public static boolean isToken(@Nullable String s) {
         return s != null && TOKEN.matcher(s).matches();
     }
 

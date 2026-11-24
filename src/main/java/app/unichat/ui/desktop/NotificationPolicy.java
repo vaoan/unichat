@@ -5,6 +5,8 @@ public final class NotificationPolicy {
     private NotificationPolicy() {}
 
     /**
+     * Whether a message in a chat shows a notification.
+     *
      * @param archived       the chat is archived in Unichat
      * @param notifyArchived Ajustes → Notificaciones → "Chats archivados"
      * @param viewing        the user is reading that chat in a focused window

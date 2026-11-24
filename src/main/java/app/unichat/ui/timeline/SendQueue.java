@@ -6,12 +6,12 @@ import app.unichat.model.Message;
 import app.unichat.service.ChatService;
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -36,25 +36,35 @@ public final class SendQueue {
      * A text waiting: which chat, what it says, what it answers (the person's choice, or null), and what it would answer
      * if the chat moves on meanwhile ("Ana: «¿vienes?»"; null when it won't).
      */
-    record Pending(long n, String chatId, String text, String replyToId, String wouldAnswer) {}
+    record Pending(long n, String chatId, String text, @Nullable String replyToId, @Nullable String wouldAnswer) {}
 
-    /** Something to send in its turn: a text (being corrected until {@code ready}) or another send ({@code action}). */
-    private static final class Entry {
+    /** Something to send in its turn: a text being corrected ({@link Text}) or another send ({@link Action}). */
+    private sealed interface Entry permits Text, Action {
+        boolean isReady();
+    }
+
+    /** A text, being corrected until {@code ready}; {@code lastSaid}: what others said last when it was written, if any. */
+    private static final class Text implements Entry {
         final Pending p;
         final AiReplyButton.Writer writer;
-        final Message lastSaid;
-        final Runnable action;
-        String ready;
+        final @Nullable Message lastSaid;
+        @Nullable String ready;
 
-        Entry(Pending p, AiReplyButton.Writer writer, Message lastSaid, Runnable action) {
+        Text(Pending p, AiReplyButton.Writer writer, @Nullable Message lastSaid) {
             this.p = p;
             this.writer = writer;
             this.lastSaid = lastSaid;
-            this.action = action;
         }
 
-        boolean isReady() {
-            return action != null || ready != null;
+        @Override public boolean isReady() {
+            return ready != null;
+        }
+    }
+
+    /** Another send (a file, a voice note), ready as soon as what's before it has gone. */
+    private record Action(Runnable send) implements Entry {
+        @Override public boolean isReady() {
+            return true;
         }
     }
 
@@ -71,7 +81,7 @@ public final class SendQueue {
     private volatile Supplier<AiReplyButton.Writer> writers;
     private volatile Consumer<String> tell;
     private final Executor runner;
-    private final Map<String, LinkedList<Entry>> byChat = new HashMap<>();
+    private final Map<String, Deque<Entry>> byChat = new HashMap<>();
     /** What's ready and taken out of its queue, in the order it goes; sent outside the queue's lock, one at a time. */
     private final Deque<Entry> outbox = new ArrayDeque<>();
     private final Object sending = new Object();
@@ -109,8 +119,8 @@ public final class SendQueue {
     }
 
     /** Where what came of it is told: the window showing the queue now. */
-    void tellTo(Consumer<String> tell) {
-        this.tell = tell;
+    void tellTo(Consumer<String> to) {
+        this.tell = to;
     }
 
     /** Tests: a stand-in for the AI program. */
@@ -133,19 +143,19 @@ public final class SendQueue {
 
     /** The texts waiting in {@code chatId}, in the order they'll go. Any thread. */
     synchronized List<Pending> waiting(String chatId) {
-        LinkedList<Entry> q = byChat.get(chatId);
-        return q == null ? List.of() : q.stream().filter(e -> e.p != null).map(e -> e.p).toList();
+        Deque<Entry> q = byChat.get(chatId);
+        return q == null ? List.of() : q.stream().filter(Text.class::isInstance).map(e -> ((Text) e).p).toList();
     }
 
     /** {@code text} waits in {@code chatId}'s queue while it's corrected; returns at once. */
-    Pending submit(String chatId, String text, String replyToId) {
+    Pending submit(String chatId, String text, @Nullable String replyToId) {
         Message last = lastSaid(chatId);
         String would = replyToId == null && last != null && AiSettings.keepThread()
                 ? last.senderName() + ": «" + preview(last.body()) + "»" : null;
         Pending p = new Pending(next.getAndIncrement(), chatId, text, replyToId, would);
-        Entry e = new Entry(p, writers.get(), last, null);
+        Text e = new Text(p, writers.get(), last);
         synchronized (this) {
-            byChat.computeIfAbsent(chatId, c -> new LinkedList<>()).add(e);
+            byChat.computeIfAbsent(chatId, c -> new ArrayDeque<>()).add(e);
         }
         changed();
         runner.execute(() -> corrected(e, correct(e)));
@@ -155,9 +165,9 @@ public final class SendQueue {
     /** Sends with {@code send} in {@code chatId}'s turn: at once with nothing waiting, else after what's waiting. */
     void inOrder(String chatId, Runnable send) {
         synchronized (this) {
-            LinkedList<Entry> q = byChat.get(chatId);
+            Deque<Entry> q = byChat.get(chatId);
             if (q != null && !q.isEmpty()) {
-                q.add(new Entry(null, null, null, send));
+                q.add(new Action(send));
                 return;
             }
         }
@@ -166,10 +176,11 @@ public final class SendQueue {
 
     /** Stops {@code p}'s correction and takes it out: nothing of it goes. */
     void cancel(Pending p) {
-        Entry e;
+        Text e;
         synchronized (this) {
             e = find(p);
-            if (e != null) byChat.get(p.chatId()).remove(e);
+            Deque<Entry> q = byChat.get(p.chatId()); // there whenever find() found it
+            if (e != null && q != null) q.remove(e);
         }
         if (e == null) return;
         e.writer.cancel();
@@ -178,7 +189,7 @@ public final class SendQueue {
 
     /** Sends {@code p} as written, as soon as what came before it in its chat has gone, whatever its correction said. */
     void sendNow(Pending p) {
-        Entry e;
+        Text e;
         synchronized (this) {
             e = find(p);
             if (e == null) return;
@@ -194,14 +205,14 @@ public final class SendQueue {
      */
     public CompletableFuture<Void> drain() {
         List<String> chats;
-        List<Entry> stopping = new ArrayList<>();
+        List<Text> stopping = new ArrayList<>();
         synchronized (this) {
             chats = new ArrayList<>(byChat.keySet());
-            for (LinkedList<Entry> q : byChat.values()) {
+            for (Deque<Entry> q : byChat.values()) {
                 for (Entry e : q) {
-                    if (e.p != null && e.ready == null) {
-                        e.ready = e.p.text();
-                        stopping.add(e);
+                    if (e instanceof Text t && t.ready == null) {
+                        t.ready = t.p.text();
+                        stopping.add(t);
                     }
                 }
             }
@@ -213,7 +224,7 @@ public final class SendQueue {
     }
 
     /** The corrected text to send (with "/me " back if it had it), or what was written, said why. */
-    private String correct(Entry e) {
+    private String correct(Text e) {
         String text = e.p.text();
         String said = Message.withoutEmoteCommand(text);
         String command = text.substring(0, text.length() - said.length());
@@ -227,7 +238,7 @@ public final class SendQueue {
         return text;
     }
 
-    private void corrected(Entry e, String text) {
+    private void corrected(Text e, String text) {
         synchronized (this) {
             if (e.ready == null) e.ready = text; // "send as written", or quitting, may have come first
         }
@@ -241,7 +252,7 @@ public final class SendQueue {
      */
     private List<CompletableFuture<?>> flush(String chatId) {
         synchronized (this) {
-            LinkedList<Entry> q = byChat.get(chatId);
+            Deque<Entry> q = byChat.get(chatId);
             while (q != null && !q.isEmpty() && q.getFirst().isReady()) outbox.add(q.removeFirst());
         }
         changed();
@@ -253,18 +264,19 @@ public final class SendQueue {
         return sent;
     }
 
-    private synchronized Entry nextOut() {
+    private synchronized @Nullable Entry nextOut() {
         return outbox.poll();
     }
 
-    private CompletableFuture<?> send(Entry e) {
-        if (e.action != null) {
-            e.action.run();
+    private CompletableFuture<?> send(Entry entry) {
+        if (!(entry instanceof Text e)) {
+            ((Action) entry).send().run();
             return CompletableFuture.completedFuture(null);
         }
         String chatId = e.p.chatId();
-        if (!e.ready.equals(e.p.text())) corrected.went(chatId, Message.withoutEmoteCommand(e.ready), Message.withoutEmoteCommand(e.p.text()));
-        return svc.sendText(chatId, e.ready, replyTo(e)).exceptionally(t -> {
+        String ready = java.util.Objects.requireNonNull(e.ready, "only what's ready leaves its queue");
+        if (!ready.equals(e.p.text())) corrected.went(chatId, Message.withoutEmoteCommand(ready), Message.withoutEmoteCommand(e.p.text()));
+        return svc.sendText(chatId, ready, replyTo(e)).exceptionally(t -> {
             tell.accept(I18n.t("sendQueue.sendFailed", Errors.message(t)));
             return null;
         });
@@ -274,21 +286,23 @@ public final class SendQueue {
      * What {@code e} answers: the person's choice; else, if someone else wrote after what was last said when it was
      * written (and that's still there), that; else nothing.
      */
-    private String replyTo(Entry e) {
-        if (e.p.replyToId() != null) return e.p.replyToId();
-        if (e.lastSaid == null || !AiSettings.keepThread()) return null;
+    private @Nullable String replyTo(Text e) {
+        String chosen = e.p.replyToId();
+        if (chosen != null) return chosen;
+        Message lastSaid = e.lastSaid;
+        if (lastSaid == null || !AiSettings.keepThread()) return null;
         Chat chat = svc.chat(e.p.chatId());
         if (chat == null || !(chat.features().replies() || chat.features().isUnknown())) return null;
         List<Message> all = svc.messages(e.p.chatId());
         int at = -1;
-        for (int i = 0; i < all.size(); i++) if (all.get(i).id().equals(e.lastSaid.id())) at = i;
+        for (int i = 0; i < all.size(); i++) if (all.get(i).id().equals(lastSaid.id())) at = i;
         if (at < 0 || all.get(at).deleted()) return null;
-        for (Message m : all.subList(at + 1, all.size())) if (saidByOthers(m)) return e.lastSaid.id();
+        for (Message m : all.subList(at + 1, all.size())) if (saidByOthers(m)) return lastSaid.id();
         return null;
     }
 
     /** The newest message someone else wrote in {@code chatId}; null with none. */
-    private Message lastSaid(String chatId) {
+    private @Nullable Message lastSaid(String chatId) {
         List<Message> all = svc.messages(chatId);
         for (int i = all.size() - 1; i >= 0; i--) if (saidByOthers(all.get(i))) return all.get(i);
         return null;
@@ -303,10 +317,10 @@ public final class SendQueue {
         return one.length() > ANSWER_PREVIEW ? one.substring(0, ANSWER_PREVIEW) + "…" : one;
     }
 
-    private synchronized Entry find(Pending p) {
-        LinkedList<Entry> q = byChat.get(p.chatId());
+    private synchronized @Nullable Text find(Pending p) {
+        Deque<Entry> q = byChat.get(p.chatId());
         if (q == null) return null;
-        for (Entry e : q) if (p.equals(e.p)) return e;
+        for (Entry e : q) if (e instanceof Text t && p.equals(t.p)) return t;
         return null;
     }
 

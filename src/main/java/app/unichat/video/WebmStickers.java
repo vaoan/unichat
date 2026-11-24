@@ -19,16 +19,20 @@ public final class WebmStickers {
     /** Conversions and the first install, one at a time: never on the FX thread. */
     public static final ExecutorService WORKER = Executors.newSingleThreadExecutor(Threads.daemon("video-convert"));
     static final long TIMEOUT_SECONDS = 60;
-    /** A sticker is seconds long and small: a file claiming more isn't one, and it shouldn't cost more than one. */
-    private static final String MAX_SECONDS = "30";
+    /** A sticker is small: a file claiming more isn't one, and it shouldn't cost more than one. */
     private static final String MAX_SIDE = "512";
-    /** Telegram's video stickers: VP9 with transparency, 512 px on the long side, at most 3 s and 30 fps, no sound. */
-    private static final String TELEGRAM_SIDE = "512", TELEGRAM_SECONDS = "3", TELEGRAM_FPS = "30";
+    // Telegram's video stickers: VP9 with transparency, 512 px on the long side, at most 3 s and 30 fps, no sound.
+    private static final String TELEGRAM_SIDE = "512";
+    private static final String TELEGRAM_SECONDS = "3";
+    private static final String TELEGRAM_FPS = "30";
 
     private WebmStickers() {}
 
     /** Thrown when there's no ffmpeg to convert with (none installed, and installing isn't possible or is off). */
     public static final class NoConverter extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         NoConverter() { super(I18n.t("video.noConverter")); }
     }
 
@@ -60,7 +64,7 @@ public final class WebmStickers {
     static List<String> fromGifCommand(Path ffmpeg, Path gif, Path out) {
         return List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
                 // The file comes from other people: only itself may be read, as what it claims to be.
-                "-protocol_whitelist", "file", "-f", "gif", "-i", gif.toString(), "-t", TELEGRAM_SECONDS, "-an",
+                "-protocol_whitelist", "file", "-f", "gif", "-i", gif.toString(), "-t", TELEGRAM_SECONDS, "-an", // lesson-ok: ffmpeg-raw-input (-f forced)
                 "-vf", "scale=" + TELEGRAM_SIDE + ":" + TELEGRAM_SIDE + ":force_original_aspect_ratio=decrease,fps=" + TELEGRAM_FPS,
                 "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "40", "-f", "webm", out.toString());
     }

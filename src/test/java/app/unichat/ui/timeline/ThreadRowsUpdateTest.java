@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 class ThreadRowsUpdateTest {
@@ -57,7 +58,7 @@ class ThreadRowsUpdateTest {
         List<ThreadRows.Row> next = ThreadRows.build(msgs, ZONE);
         ThreadRows.update(rows, next);
         assertEquals(next, rows);
-        assertEquals(false, ((ThreadRows.MessageRow) rows.get(3)).last());
+        assertFalse(((ThreadRows.MessageRow) rows.get(3)).last());
         assertEquals(List.of("3-3-1", "3-5+2"), changes);
     }
 

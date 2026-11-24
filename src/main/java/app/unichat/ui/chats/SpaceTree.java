@@ -3,6 +3,7 @@ package app.unichat.ui.chats;
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -29,10 +30,13 @@ public final class SpaceTree {
     private SpaceTree() {}
 
     /** {@code chat} null: a child you haven't joined yet (its name comes from the space hierarchy), or the loose group. */
-    public record Node(String id, Chat chat, String name, List<Node> children) {
+    public record Node(String id, @Nullable Chat chat, String name, List<Node> children) {
         public boolean loose() { return LOOSE_ID.equals(id); }
         public boolean joined() { return chat != null; }
-        public boolean container() { return loose() || (chat != null && chat.space()); }
+        public boolean container() {
+            Chat c = chat;
+            return loose() || (c != null && c.space());
+        }
     }
 
     public static List<Node> build(List<Chat> all, Network network, Map<String, String> names) {
@@ -43,7 +47,7 @@ public final class SpaceTree {
      * {@code accountId}: only that account's chats (the account chips), and only groups that still have one of
      * them; null = every account. {@code names}: room id → name for children not joined yet (from {@code /hierarchy}).
      */
-    public static List<Node> build(List<Chat> all, Network network, String accountId, Map<String, String> names) {
+    public static List<Node> build(List<Chat> all, Network network, @Nullable String accountId, Map<String, String> names) {
         Map<String, Chat> byId = new HashMap<>();
         Map<String, List<String>> declaredChildren = new HashMap<>();
         for (Chat c : all) {
@@ -82,7 +86,7 @@ public final class SpaceTree {
      * {@code chat} belongs to, or null: either side may declare it (the space lists the chat, or the chat names its
      * parent). The closest one when they nest.
      */
-    public static Chat serverOf(Chat chat, java.util.Collection<Chat> all) {
+    public static @Nullable Chat serverOf(@Nullable Chat chat, java.util.Collection<Chat> all) {
         if (chat == null || chat.space()) return null;
         for (Chat s : all) {
             if (!s.space() || s.personalSpace() || s.network() != chat.network()) continue;
@@ -118,7 +122,8 @@ public final class SpaceTree {
     }
 
     private static boolean hasJoinedChat(Node n) {
-        if (n.chat() != null && !n.chat().space()) return true;
+        Chat own = n.chat();
+        if (own != null && !own.space()) return true;
         for (Node c : n.children()) if (hasJoinedChat(c)) return true;
         return false;
     }
@@ -126,7 +131,8 @@ public final class SpaceTree {
     /** Unread messages in a node: the same "demands attention" rule as the inbox (no muted/archived/low priority). */
     public static int unread(Node n) {
         int sum = 0;
-        if (n.chat() != null && !n.chat().space() && ChatFilter.inboxUnread(n.chat())) sum += Math.max(1, n.chat().unreadCount());
+        Chat own = n.chat();
+        if (own != null && !own.space() && ChatFilter.inboxUnread(own)) sum += Math.max(1, own.unreadCount());
         for (Node c : n.children()) sum += unread(c);
         return sum;
     }

@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import javafx.scene.Scene;
+import org.jspecify.annotations.Nullable;
 import java.util.function.Supplier;
 import java.util.function.Function;
 
@@ -45,24 +46,27 @@ final class MessageActionsUi {
     private final Consumer<String> toast;
     private final Composer composer;
     private final MessageMedia media;
-    private final Supplier<Chat> chat;
+    private final Supplier<@Nullable Chat> chat;
     private final MediaLibrary library;
     private final Supplier<Scene> scene;
-    private final Function<String, Member> member;
+    private final Function<String, @Nullable Member> member;
     private final Consumer<Message> jumpTo;
     private Consumer<String> onShowStickerSet = url -> { };
     /** Links offered in a message's menu: the keyboard has no other way to them. */
     private static final int MENU_LINKS = 5;
 
-    private Consumer<Message> onForward = m -> { }, onDelete = m -> { }, onDeleteSeveral = m -> { }, onSavedText = m -> { },
-            onCapture = m -> { };
+    private Consumer<Message> onForward = m -> { };
+    private Consumer<Message> onDelete = m -> { };
+    private Consumer<Message> onDeleteSeveral = m -> { };
+    private Consumer<Message> onSavedText = m -> { };
+    private Consumer<Message> onCapture = m -> { };
 
     /** "Capturar conversación…": picking the stretch to capture starts with {@code m}. */
     void setOnCapture(Consumer<Message> capture) {
         this.onCapture = capture;
     }
 
-    private MessageFixer fixer;
+    private @Nullable MessageFixer fixer;
 
     /** "Corregir con IA": corrects a message already sent, apart from the message box. */
     void setFixer(MessageFixer fixer) {
@@ -93,8 +97,8 @@ final class MessageActionsUi {
     /** Where "see this sticker's set" opens it (the side panel's Stickers tab). */
     void setOnShowStickerSet(Consumer<String> c) { this.onShowStickerSet = c; }
 
-    MessageActionsUi(ChatService svc, Consumer<String> toast, Composer composer, MessageMedia media, Supplier<Chat> chat,
-                     MediaLibrary library, Supplier<Scene> scene, Function<String, Member> member, Consumer<Message> jumpTo) {
+    MessageActionsUi(ChatService svc, Consumer<String> toast, Composer composer, MessageMedia media, Supplier<@Nullable Chat> chat,
+                     MediaLibrary library, Supplier<Scene> scene, Function<String, @Nullable Member> member, Consumer<Message> jumpTo) {
         this.jumpTo = jumpTo;
         this.svc = svc;
         this.toast = toast;
@@ -125,7 +129,7 @@ final class MessageActionsUi {
             if (r.getValue().contains(svc.myUserId())) b.getStyleClass().add("mine");
             b.setTooltip(new javafx.scene.control.Tooltip((Message.isCustomReaction(r.getKey()) ? m.reactionLabel(r.getKey()) + ": " : "")
                     + String.join(", ", r.getValue().stream().map(this::nameOf).toList())));
-            b.setOnAction(e -> svc.toggleReaction(chat.get().id(), m.id(), r.getKey()));
+            b.setOnAction(e -> { var _ = svc.toggleReaction(chat.get().id(), m.id(), r.getKey()); });
             b.setFocusTraversable(false);
             boolean mine = r.getValue().contains(svc.myUserId());
             b.setAccessibleText(I18n.t(mine ? "message.reactionMine" : "message.reactionOther",
@@ -197,15 +201,15 @@ final class MessageActionsUi {
     }
 
     /** The quick reactions: the ones the person reacts with most (the usual six until there's history), as this chat allows. */
-    java.util.List<String> quick() {
-        return chat.get().features().reactionsOffered(library.mostReacted(EmojiPicker.QUICK.length, java.util.List.of(EmojiPicker.QUICK)));
+    List<String> quick() {
+        return chat.get().features().reactionsOffered(library.mostReacted(EmojiPicker.QUICK.size(), EmojiPicker.QUICK));
     }
 
     /** Adds or takes away the person's {@code e} on {@code m}; an added one counts towards the quick ones. */
     void react(Message m, String e) {
-        java.util.Set<String> who = m.reactions().get(e);
+        Set<String> who = m.reactions().get(e);
         if (who == null || !who.contains(svc.myUserId())) library.reacted(e);
-        svc.toggleReaction(chat.get().id(), m.id(), e);
+        var _ = svc.toggleReaction(chat.get().id(), m.id(), e);
     }
 
     /** Same rules as the message menu, for the shortcuts and hover buttons. */
@@ -221,9 +225,10 @@ final class MessageActionsUi {
     }
 
     /** The message {@code m} answers, if it's in the timeline to go to. */
-    private Message replied(Message m) {
-        if (m.replyToId() == null) return null;
-        for (Message x : svc.messages(m.chatId())) if (x.id().equals(m.replyToId())) return x;
+    private @Nullable Message replied(Message m) {
+        String id = m.replyToId();
+        if (id == null) return null;
+        for (Message x : svc.messages(m.chatId())) if (x.id().equals(id)) return x;
         return null;
     }
 
@@ -234,7 +239,7 @@ final class MessageActionsUi {
     private void saveLink(Message m, String url) {
         AutoSave save = AutoSave.of(svc);
         toast.accept(I18n.t("message.savingLink", SaveFolders.shown(save.folder(chat.get()))));
-        save.saveLink(m, url);
+        var _ = save.saveLink(m, url);
     }
 
     /** The menu's order for what a message allows; the quick reactions and "delete for everyone" come after, set apart. */
@@ -283,6 +288,7 @@ final class MessageActionsUi {
 
     /** The menu's items for {@code act}, which {@code m} allows. */
     private List<MenuItem> itemsFor(MessageActions.Action act, Message m) {
+        MessageFixer fix = fixer; // optional (setFixer): the item is offered only with one
         return switch (act) {
             case SAVE_LINK -> AutoSave.links(m).stream().limit(MENU_LINKS)
                     .map(url -> ChatMenus.item(I18n.t("message.saveLink", RichText.shown(url, 40)), () -> saveLink(m, url))).toList();
@@ -307,8 +313,8 @@ final class MessageActionsUi {
             case EDIT -> List.of(item("message.edit", act, m));
             case CAPTURE -> List.of(ChatMenus.item(I18n.t("message.capture"), () -> onCapture.accept(m)));
             // With the AI turned on, and not twice: its row already says it's being corrected.
-            case FIX -> fixer == null || !AiReplyButton.SHOWN.get() || fixer.fixing(m.id()) ? List.of()
-                    : List.of(ChatMenus.item(I18n.t("message.fix"), () -> fixer.fix(m)));
+            case FIX -> fix == null || !AiReplyButton.SHOWN.get() || fix.fixing(m.id()) ? List.of()
+                    : List.of(ChatMenus.item(I18n.t("message.fix"), () -> { var _ = fix.fix(m); }));
             case SAVED_TEXT -> List.of(ChatMenus.item(I18n.t(m.deleted() ? "message.savedText" : "message.versions"), () -> onSavedText.accept(m)));
             case DELETE_FOR_EVERYONE, DELETE_FOR_ME -> List.of();
         };

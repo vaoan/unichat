@@ -20,6 +20,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
@@ -50,7 +51,7 @@ final class LoginWizard implements ChatService.Listener {
     final Button send = new Button(I18n.t("login.wizard.send"));
     final HBox inputRow;
     final VBox done = new VBox(12);
-    String shownQr;
+    @Nullable String shownQr;
     boolean finished;
     boolean sent;
     Instant sentAt = Instant.EPOCH;
@@ -136,7 +137,7 @@ final class LoginWizard implements ChatService.Listener {
 
     void cancel() {
         dispose();
-        if (!finished) svc.cancelLogin(network, botChatId);
+        if (!finished) { var _ = svc.cancelLogin(network, botChatId); }
     }
 
     @Override
@@ -159,11 +160,12 @@ final class LoginWizard implements ChatService.Listener {
         if (finished || chooserActive) return;
         List<Message> msgs = svc.messages(botChatId).stream()
                 .filter(m -> !m.outgoing() && !m.timestamp().isBefore(since)).toList();
-        Message lastImage = null;
+        String lastQr = null;
         Message lastText = null;
         for (Message m : msgs) {
             if (m.deleted()) continue;
-            if (m.type() == MessageType.IMAGE && m.mediaUrl() != null) lastImage = m;
+            String image = m.mediaUrl();
+            if (m.type() == MessageType.IMAGE && image != null) lastQr = image;
             else if (!m.body().isBlank()) lastText = m;
         }
         if (lastText != null) {
@@ -181,10 +183,10 @@ final class LoginWizard implements ChatService.Listener {
             boolean showInput = asksInput && (!sent || lastText.timestamp().isAfter(sentAt));
             Nodes.show(inputRow, showInput);
         }
-        if (lastImage != null && !lastImage.mediaUrl().equals(shownQr)) {
-            String url = lastImage.mediaUrl();
+        if (lastQr != null && !lastQr.equals(shownQr)) {
+            String url = lastQr;
             shownQr = url;
-            svc.media(url, 0, 0).thenAccept(p -> Platform.runLater(() -> {
+            var _ = svc.media(url, 0, 0).thenAccept(p -> Platform.runLater(() -> {
                 if (!url.equals(shownQr)) return;
                 qr.setImage(new Image(p.toUri().toString()));
                 Nodes.show(qrBox, true);

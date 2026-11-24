@@ -1,12 +1,17 @@
 package app.unichat.service;
 
+import app.unichat.support.PathParts;
 import app.unichat.support.SafeFile;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+import java.util.Objects;
 
 /**
  * The way back for {@code preferences.json}: the {@code .bak} each save keeps of the version it replaces, and a damaged
@@ -14,15 +19,16 @@ import java.time.format.DateTimeFormatter;
  * lock guards it.
  */
 final class PreferencesRecovery {
-    private final Path file;
-    private String setAside;
+    /** Null in memory, where nothing is ever damaged: nothing here reads it then. */
+    private final @Nullable Path file;
+    private @Nullable String setAside;
     private boolean recovered;
     /** The damaged file couldn't be kept apart yet: nothing may write over it. */
     private boolean blocked;
     /** The main file is still the damaged one, and memory holds what came from the backup: it must not become the backup. */
     private boolean damagedInPlace;
 
-    PreferencesRecovery(Path file) { this.file = file; }
+    PreferencesRecovery(@Nullable Path file) { this.file = file; }
 
     static Path backupOf(Path target) { return target.resolveSibling(target.getFileName() + ".bak"); }
 
@@ -47,7 +53,7 @@ final class PreferencesRecovery {
     boolean recovered() { return recovered; }
 
     /** The name the damaged file was kept under, or null. */
-    String setAside() { return setAside; }
+    @Nullable String setAside() { return setAside; }
 
     /** Whether the next save keeps the file it replaces as the backup: not while that file is the damaged one. */
     boolean keepsPrevious() { return !damagedInPlace; }
@@ -69,13 +75,14 @@ final class PreferencesRecovery {
      * it's copied, and stays until the recovered content replaces it: if that never happens, the next start recovers again.
      */
     private void setAsideBadFile() {
+        Path damaged = Objects.requireNonNull(file); // only a file read from disk is damaged
         try {
             if (recovered) {
-                setAside = copyBadFile();
+                setAside = copyBadFile(damaged);
                 damagedInPlace = true;
             } else {
-                String name = freeAsideName();
-                Files.move(file, file.resolveSibling(name));
+                String name = freeAsideName(damaged);
+                Files.move(damaged, damaged.resolveSibling(name));
                 setAside = name;
             }
             blocked = false;
@@ -85,19 +92,19 @@ final class PreferencesRecovery {
     }
 
     /** The name of the copy on disk; repeated failed recoveries of the same damage share one. */
-    private String copyBadFile() throws IOException {
+    private static String copyBadFile(Path file) throws IOException {
         try (var copies = Files.newDirectoryStream(file.resolveSibling(""), file.getFileName() + ".bad-*")) {
             for (Path copy : copies) {
-                if (Files.isRegularFile(copy) && Files.mismatch(file, copy) == -1) return copy.getFileName().toString();
+                if (Files.isRegularFile(copy) && Files.mismatch(file, copy) == -1) return PathParts.name(copy);
             }
         }
-        String name = freeAsideName();
+        String name = freeAsideName(file);
         SafeFile.at(file.resolveSibling(name)).write(Files.readAllBytes(file));
         return name;
     }
 
-    private String freeAsideName() {
-        String stamp = file.getFileName() + ".bad-" + DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS").format(LocalDateTime.now());
+    private static String freeAsideName(Path file) {
+        String stamp = file.getFileName() + ".bad-" + DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS", Locale.ROOT).format(LocalDateTime.now(ZoneId.systemDefault()));
         String name = stamp;
         for (int n = 2; Files.exists(file.resolveSibling(name)); n++) name = stamp + "-" + n;
         return name;

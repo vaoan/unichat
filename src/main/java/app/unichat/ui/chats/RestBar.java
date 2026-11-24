@@ -13,6 +13,7 @@ import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.scene.AccessibleRole;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -27,7 +28,7 @@ public final class RestBar extends TaskBar {
     /** How long "Al día" stays. */
     private static final Duration UP_TO_DATE = Duration.seconds(4);
 
-    private final Supplier<Waking> state;
+    private final Supplier<@Nullable Waking> state;
     private final Consumer<Runnable> unlisten;
     private final Consumer<Runnable> later;
     private final ObservableValue<Boolean> archiveOpen;
@@ -40,7 +41,7 @@ public final class RestBar extends TaskBar {
     /** This bar saw something wake, so its end is worth saying. */
     private boolean sawWaking;
     /** The end being said ("Al día"), until a moment has passed. */
-    private Waking saying;
+    private @Nullable Waking saying;
     private boolean disposed;
 
     /** {@code archiveOpen}: the archive showing in the window; kept here, so a binding passed in lives as long as the bar. */
@@ -62,7 +63,7 @@ public final class RestBar extends TaskBar {
     }
 
     /** What it shows and tells, as functions; {@code later} runs a job once "Al día" has been seen long enough. */
-    RestBar(Supplier<Waking> state, Consumer<Runnable> listen, Consumer<Runnable> unlisten, Consumer<Boolean> tellOpen,
+    RestBar(Supplier<@Nullable Waking> state, Consumer<Runnable> listen, Consumer<Runnable> unlisten, Consumer<Boolean> tellOpen,
             Consumer<String> tellOpened, Consumer<String> tellShown, ObservableValue<Boolean> archiveOpen, Consumer<Runnable> later) {
         super("rest-bar");
         this.state = state;
@@ -125,7 +126,11 @@ public final class RestBar extends TaskBar {
         }
         boolean upToDate = w != null && w == saying;
         Nodes.show(this, waking || upToDate);
-        if (!waking && !upToDate) return;
+        if (w != null && (waking || upToDate)) show(w, upToDate);
+    }
+
+    /** What {@code w} says, or that all is up to date. */
+    private void show(Waking w, boolean upToDate) {
         boolean server = !upToDate && w.step() == Step.SERVER;
         boolean counts = !upToDate && !server;
         what.setText(upToDate ? I18n.t("restBar.done") : server ? I18n.t("restBar.server", w.server())

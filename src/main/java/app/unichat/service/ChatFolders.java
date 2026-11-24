@@ -1,6 +1,7 @@
 package app.unichat.service;
 
 import app.unichat.model.Chat;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -15,10 +16,10 @@ public interface ChatFolders {
     void setFolderFavorite(String id, boolean favorite);
     void setInFolder(String folderId, Chat chat, boolean in);
     /** Message for the person if the preferences file was unreadable; else null. */
-    String preferencesWarning();
+    @Nullable String preferencesWarning();
     /**
      * {@code warn} gets a message for the person when saves start failing (again only after one worked), on a thread of
      * its own; null stops it.
      */
-    void onSaveFailure(Consumer<String> warn);
+    void onSaveFailure(@Nullable Consumer<String> warn);
 }

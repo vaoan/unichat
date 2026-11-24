@@ -29,7 +29,8 @@ class MergedPartTest {
     void transcriptsAreTheUnionOfEveryComputers() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             Storage dav = new WebDav(cloud.url(), "u", "p");
-            Computer a = new Computer(), b = new Computer();
+            Computer a = new Computer();
+            Computer b = new Computer();
             a.entries.put("a1", "hola");
             b.entries.put("b1", "adiós");
             a.part.sync(dav);
@@ -45,7 +46,8 @@ class MergedPartTest {
             b.part.sync(dav);
             assertEquals(Map.of("a1", "hola", "a2", "otra", "b1", "adiós"), b.entries);
 
-            int puts = cloud.puts.get(), gets = cloud.gets.get();
+            int puts = cloud.puts.get();
+            int gets = cloud.gets.get();
             a.part.sync(dav);
             a.part.sync(dav);
             b.part.sync(dav);
@@ -58,7 +60,8 @@ class MergedPartTest {
     void anEntryGoneBetweenItsListingAndItsReadNeverGoesUpEmpty() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             Storage dav = new WebDav(cloud.url(), "u", "p");
-            Computer a = new Computer(), b = new Computer();
+            Computer a = new Computer();
+            Computer b = new Computer();
             a.entries.put("a1", "hola");
             a.entries.put("a2", ""); // listed, then gone: read as nothing
             a.part.sync(dav);
@@ -71,7 +74,8 @@ class MergedPartTest {
     void twoComputersWritingAtOnceLoseNothing() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             Storage dav = new WebDav(cloud.url(), "u", "p");
-            Computer a = new Computer(), b = new Computer();
+            Computer a = new Computer();
+            Computer b = new Computer();
             a.entries.put("a1", "x");
             a.part.sync(dav);
             b.entries.put("b1", "y");
@@ -102,7 +106,8 @@ class MergedPartTest {
     void onlyWhatGoesUpIsReadWhole() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             Storage dav = new WebDav(cloud.url(), "u", "p");
-            Computer a = new Computer(), b = new Computer();
+            Computer a = new Computer();
+            Computer b = new Computer();
             a.entries.put("a1", "x");
             a.part.sync(dav);
             assertEquals(List.of("a1"), a.read);

@@ -9,22 +9,19 @@ import app.unichat.ui.media.ProfileMedia;
 import app.unichat.model.Chat;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
-import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
 import app.unichat.support.I18n;
-import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
+import app.unichat.ui.Nodes;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -38,13 +35,13 @@ public final class InfoPane extends ScrollPane {
     private final Runnable close;
     private final Consumer<String> toast;
     private final ProfileMedia media;
-    private Consumer<Chat> onOptions;
-    private Chat chat;
+    private @Nullable Consumer<Chat> onOptions;
+    private @Nullable Chat chat;
     /** What the panel was last built from ({@link #shown}): unchanged, it isn't built again. */
-    private String built;
+    private @Nullable String built;
 
     public InfoPane(ChatService svc, Runnable close, Consumer<String> toast) {
-        this.media = new ProfileMedia(svc, () -> getScene() == null ? null : getScene().getWindow(), toast);
+        this.media = new ProfileMedia(svc, () -> Nodes.window(this), toast);
         this.svc = svc;
         this.close = close;
         this.toast = toast;
@@ -67,12 +64,12 @@ public final class InfoPane extends ScrollPane {
      * change, and building it anew blanked the photo and the pictures until they loaded again (a flash each time).
      */
     public void refresh() {
-        String now = chat == null ? null : shown(chat);
+        Chat c = chat;
+        String now = c == null ? null : shown(c);
         if (now != null && now.equals(built)) return;
         built = now;
         box.getChildren().clear();
-        if (chat == null) return;
-        Chat c = chat;
+        if (c == null) return;
 
         Button x = Icons.iconButton(Icons.CLOSE, I18n.t("info.close"), close);
         Region grow = new Region();
@@ -93,8 +90,9 @@ public final class InfoPane extends ScrollPane {
         net.getStyleClass().add("info-subtitle");
         VBox ident = new VBox(8, a, title, net);
         ident.setAlignment(Pos.CENTER);
-        if (c.topic() != null && !c.topic().isBlank()) {
-            Label topic = new Label(c.topic());
+        String about = c.topic();
+        if (about != null && !about.isBlank()) {
+            Label topic = new Label(about);
             topic.setWrapText(true);
             topic.getStyleClass().add("info-topic");
             ident.getChildren().add(topic);
@@ -104,25 +102,27 @@ public final class InfoPane extends ScrollPane {
         // three (ActionGrid decides from the width it gets).
         ActionGrid actions = new ActionGrid(8);
         actions.getChildren().addAll(
-                action(Icons.BELL_OFF, c.muted() ? I18n.t("info.unmute") : I18n.t("info.mute"), c.muted(), () -> svc.setMuted(c.id(), !c.muted())),
-                action(Icons.STAR, I18n.t("info.favorite"), c.favorite(), () -> svc.setFavorite(c.id(), !c.favorite())),
-                action(Icons.PIN, I18n.t("info.pin"), c.pinned(), () -> svc.setPinned(c.id(), !c.pinned())),
-                action(Icons.ARCHIVE, c.archived() ? I18n.t("info.archived") : I18n.t("info.archive"), c.archived(), () -> svc.setArchived(c.id(), !c.archived())),
+                action(Icons.BELL_OFF, c.muted() ? I18n.t("info.unmute") : I18n.t("info.mute"), c.muted(), () -> { var _ = svc.setMuted(c.id(), !c.muted()); }),
+                action(Icons.STAR, I18n.t("info.favorite"), c.favorite(), () -> { var _ = svc.setFavorite(c.id(), !c.favorite()); }),
+                action(Icons.PIN, I18n.t("info.pin"), c.pinned(), () -> { var _ = svc.setPinned(c.id(), !c.pinned()); }),
+                action(Icons.ARCHIVE, c.archived() ? I18n.t("info.archived") : I18n.t("info.archive"), c.archived(), () -> { var _ = svc.setArchived(c.id(), !c.archived()); }),
                 action(Icons.LOW, c.lowPriority() ? I18n.t("info.toInbox") : I18n.t("info.toLowPriority"), c.lowPriority(),
-                        () -> svc.setLowPriority(c.id(), !c.lowPriority())),
+                        () -> { var _ = svc.setLowPriority(c.id(), !c.lowPriority()); }),
                 action(Icons.SETTINGS, I18n.t("thread.chatOptions"), false, () -> {
-                    if (onOptions != null) onOptions.accept(c);
+                    Consumer<Chat> options = onOptions;
+                    if (options != null) options.accept(c);
                 }));
         box.getChildren().addAll(top, ident, actions);
 
-        if (c.reminderAt() != null) {
-            Label rem = new Label(I18n.t("info.reminder", Formats.listStamp(c.reminderAt(), Instant.now(), ZoneId.systemDefault()),
-                    Formats.time(c.reminderAt(), ZoneId.systemDefault())));
+        Instant reminder = c.reminderAt();
+        if (reminder != null) {
+            Label rem = new Label(I18n.t("info.reminder", Formats.listStamp(reminder, Instant.now(), ZoneId.systemDefault()),
+                    Formats.time(reminder, ZoneId.systemDefault())));
             rem.getStyleClass().add("info-reminder");
             box.getChildren().add(rem);
         }
 
-        List<javafx.scene.Node> shared = media.section(c);
+        List<Node> shared = media.section(c);
         if (!shared.isEmpty()) {
             box.getChildren().add(section(I18n.t("info.mediaTitle")));
             box.getChildren().addAll(shared);
@@ -167,7 +167,7 @@ public final class InfoPane extends ScrollPane {
      * A photo opens large in the chat's photo viewer (same controls: zoom, turn, full screen, save), by click, Enter or
      * Space. Initials alone have nothing to show.
      */
-    private void enlargeable(Avatar a, String url, String name) {
+    private void enlargeable(Avatar a, @Nullable String url, String name) {
         if (url == null || url.isBlank()) return;
         a.getStyleClass().add("avatar-enlargeable");
         a.setCursor(javafx.scene.Cursor.HAND);
@@ -175,8 +175,8 @@ public final class InfoPane extends ScrollPane {
         a.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
         a.setAccessibleText(I18n.t("info.avatarOpen", name));
         Runnable open = () -> {
-            if (getScene() == null) return;
-            javafx.stage.Window owner = getScene().getWindow();
+            javafx.stage.Window owner = Nodes.window(this);
+            if (owner == null) return; // not on screen: nothing to open it over
             MediaViewer.show(owner, svc.media(url, 0, 0), name, () -> MediaSaver.save(owner, svc, url, name, toast));
         };
         a.setOnMouseClicked(e -> {

@@ -1,5 +1,9 @@
 package app.unichat.server;
 
+import java.io.IOException;
+import java.sql.SQLException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -11,6 +15,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
@@ -21,7 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 class BridgeCapabilitiesTest {
     @TempDir Path dir;
 
-    private Path db(String bridge, String value) throws Exception {
+    @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
+    private Path db(String bridge, @Nullable String value) throws IOException, SQLException {
         Path d = dir.resolve(bridge);
         Files.createDirectories(d);
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + d.resolve(bridge + ".db")); Statement s = c.createStatement()) {
@@ -32,7 +38,8 @@ class BridgeCapabilitiesTest {
         return d;
     }
 
-    private static String value(Path bridgeDir, String bridge, String key) throws Exception {
+    @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
+    private static @Nullable String value(Path bridgeDir, String bridge, String key) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + bridgeDir.resolve(bridge + ".db"));
              Statement s = c.createStatement(); ResultSet r = s.executeQuery("SELECT value FROM kv_store WHERE key = '" + key + "'")) {
             return r.next() ? r.getString(1) : null;
@@ -62,7 +69,7 @@ class BridgeCapabilitiesTest {
         assertFalse(Files.exists(dir.resolve("twitter").resolve("twitter.db")), "none made");
         Path none = db("twitter", null);
         BridgeCapabilities.beforeStart("twitter", none); // started once, but never said it
-        assertEquals(null, value(none, "twitter", "bridge_info_version"), "nothing invented: the bridge says them all then anyway");
+        assertNull(value(none, "twitter", "bridge_info_version"), "nothing invented: the bridge says them all then anyway");
         Files.delete(none.resolve("twitter.db"));
         Path odd = db("twitter", "uno,ocho");
         BridgeCapabilities.beforeStart("twitter", odd);

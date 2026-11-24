@@ -1,7 +1,9 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
 import app.unichat.support.Seen;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,13 +29,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the settings, what the AI learned, the texts and the vault. Seen again, a round sends what waited.
  */
 class CloudUnseenTest {
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", TEXT = "3f2a9c1b2d4e 2026-11.jsonl";
-    private static final String PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg", SECOND = CloudAccount.MEDIA + "/Ana/b.jpg";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl";
+    private static final String PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg";
+    private static final String SECOND = CloudAccount.MEDIA + "/Ana/b.jpg";
 
     @TempDir
     Path dir;
     private FakeDav account;
-    private Map<String, String> portableWere, keysWere;
+    private Map<String, String> portableWere;
+    private Map<String, String> keysWere;
     private final List<CountDownLatch> held = new java.util.ArrayList<>();
     private VaultComputer desk;
 
@@ -75,7 +81,7 @@ class CloudUnseenTest {
     }
 
     /** Started as Unichat starts it, and its first round (the timer's, at once) over. */
-    private void started() throws Exception {
+    private void started() throws InterruptedException, ExecutionException {
         desk.cloud.start(Duration.ofDays(1));
         while (rounds() == 0) Thread.onSpinWait(); // the timer's round began; one asked now runs after it
         desk.cloud.syncNow().get();
@@ -128,7 +134,7 @@ class CloudUnseenTest {
         assertTrue(account.files.containsKey(PHOTO));
         assertFalse(account.files.containsKey(SECOND));
         assertEquals(1, s.waiting(), "the second still waits");
-        assertNull(Settings.get().getString("cloud.lastVerify", null), "the day's check, due, waits too");
+        assertNull(Settings.get().getString("cloud.lastVerify"), "the day's check, due, waits too");
         Seen.reset(true);
         assertNull(desk.cloud.syncNow().get().error());
         assertTrue(account.files.containsKey(SECOND), "seen again, it went");
@@ -184,7 +190,7 @@ class CloudUnseenTest {
         try {
             Cloud.Status s = desk.cloud.syncNow().get(); // the photo goes up, then the day's check, due, fails
             assertTrue(failed.get(), "the check began");
-            assertTrue(s.error() != null, "and its failure is told");
+            assertNotNull(s.error(), "and its failure is told");
             assertEquals(List.of("PUT " + PHOTO), mediaPuts());
             assertEquals(1, s.uploaded(), "what went up before it still counts");
         } finally {
@@ -201,11 +207,11 @@ class CloudUnseenTest {
         Seen.reset(false);
         Cloud.Status unseen = desk.cloud.syncNow().get();
         assertEquals(old, unseen.lastVerified(), "due, and still due");
-        assertEquals(old.toString(), Settings.get().getString("cloud.lastVerify", null));
+        assertEquals(old.toString(), Settings.get().getString("cloud.lastVerify"));
         assertEquals("fo", new String(account.files.get(PHOTO), StandardCharsets.UTF_8), "nothing checked while unseen");
         Seen.reset(true);
         Cloud.Status seen = desk.cloud.syncNow().get();
-        assertTrue(seen.lastVerified().isAfter(old), "the check ran once seen");
+        assertTrue(Present.of(seen.lastVerified()).isAfter(old), "the check ran once seen");
         assertEquals("foto", new String(account.files.get(PHOTO), StandardCharsets.UTF_8), "and repaired it");
     }
 
@@ -227,7 +233,7 @@ class CloudUnseenTest {
         assertEquals("otra", new String(account.files.get(SECOND), StandardCharsets.UTF_8), "the next file waited");
         Seen.reset(true);
         int from = account.asked.size();
-        assertTrue(desk.cloud.syncNow().get().lastVerified().isAfter(old));
+        assertTrue(Present.of(desk.cloud.syncNow().get().lastVerified()).isAfter(old));
         List<String> again = account.asked.subList(from, account.asked.size());
         assertFalse(again.contains("PROPFIND " + PHOTO), "it went on from where it stopped: " + again);
         assertTrue(again.contains("PROPFIND " + SECOND), "with the next: " + again);
@@ -261,7 +267,7 @@ class CloudUnseenTest {
         account.failReadOnce.add(Vault.INFO);
         Cloud.Status s = desk.cloud.syncNow().get();
         assertFalse(account.failReadOnce.contains(Vault.INFO), "the round failed reading the vault");
-        assertTrue(s.error() != null, "told");
+        assertNotNull(s.error(), "told");
         assertTrue(s.mediaPaused(), "and the photo still waits for being seen");
     }
 

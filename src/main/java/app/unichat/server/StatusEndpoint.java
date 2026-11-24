@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,10 +27,10 @@ final class StatusEndpoint {
 
     private final BridgeStates states;
     /** bridge → its as_token (null when unknown: then nothing from it is accepted). */
-    private final Function<String, String> tokens;
-    private HttpServer server;
+    private final Function<String, @Nullable String> tokens;
+    private @Nullable HttpServer server;
 
-    StatusEndpoint(BridgeStates states, Function<String, String> tokens) {
+    StatusEndpoint(BridgeStates states, Function<String, @Nullable String> tokens) {
         this.states = states;
         this.tokens = tokens;
     }

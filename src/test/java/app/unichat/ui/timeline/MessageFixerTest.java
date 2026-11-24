@@ -1,11 +1,14 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.assist.ReplyWriter;
 import app.unichat.model.Message;
 import app.unichat.service.MockChatService;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -23,7 +26,7 @@ class MessageFixerTest {
     private final List<String> prompts = new CopyOnWriteArrayList<>();
     /** What the AI answers for a text it's given: by default each "q" becomes "que". */
     private volatile java.util.function.UnaryOperator<String> answer = t -> t.replace(" q ", " que ");
-    private volatile ReplyWriter.Failure failure;
+    private volatile ReplyWriter.@Nullable Failure failure;
     private MessageFixer fixer;
 
     @BeforeEach
@@ -44,7 +47,7 @@ class MessageFixerTest {
         svc.stop();
     }
 
-    private Message sent(String text) throws Exception {
+    private Message sent(String text) throws InterruptedException, ExecutionException {
         svc.sendText(CHAT, text, null).get();
         List<Message> all = svc.messages(CHAT);
         return all.getLast();
@@ -108,8 +111,10 @@ class MessageFixerTest {
         }, told::add, queued::add);
         List<Integer> changes = new CopyOnWriteArrayList<>();
         held.addListener(() -> changes.add(1));
-        Message a = sent("creo q sí"), b = sent("dijo q no");
-        CompletableFuture<Void> fa = held.fix(a), fb = held.fix(b);
+        Message a = sent("creo q sí");
+        Message b = sent("dijo q no");
+        CompletableFuture<Void> fa = held.fix(a);
+        CompletableFuture<Void> fb = held.fix(b);
         assertTrue(held.fixing(a.id()) && held.fixing(b.id()), "both going on, each its own");
         CompletableFuture<Void> again = held.fix(a);
         assertEquals(2, queued.size(), "asking again for one going on starts nothing");
@@ -207,7 +212,7 @@ class MessageFixerTest {
     void aMessageTheNetworkNoLongerLetsEditIsntEdited() throws Exception {
         Message m = sent("creo q sí");
         answer = t -> {
-            svc.chat(CHAT).setFeatures(app.unichat.model.RoomFeatures.parse(
+            Present.of(svc.chat(CHAT)).setFeatures(app.unichat.model.RoomFeatures.parse(
                     new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("id", "x").put("edit", 0)));
             return t.replace(" q ", " que ");
         };

@@ -1,5 +1,7 @@
 package app.unichat.server;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -38,7 +40,7 @@ final class MediaPrune {
      * must not be running) and returns their mxc:// URIs for {@link #command}. Empty when there's no bridge database,
      * nothing old, or {@code keep} is null (keep them forever).
      */
-    static List<String> takeOldDiscordAttachments(Path discordDb, Duration keep, Instant now) {
+    static List<String> takeOldDiscordAttachments(Path discordDb, @Nullable Duration keep, Instant now) {
         List<String> out = new ArrayList<>();
         if (keep == null || !Files.isRegularFile(discordDb)) return out;
         long cutoff = now.minus(keep).toEpochMilli();

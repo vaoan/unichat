@@ -1,15 +1,18 @@
 package app.unichat.gif;
 
+import app.unichat.Present;
 import app.unichat.model.MediaLibrary;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -23,15 +26,19 @@ class GifFilesTest {
         assertEquals("https://m/giphy.mp4", i.url());
         assertEquals("video/mp4", i.mime());
         assertEquals("https://m/200w.gif", GifFiles.preview(i), "an mp4 can't be shown as an Image: keep the GIF preview");
-        assertEquals("Gato", i.info().path("title").asText());
+        assertEquals("Gato", Present.of(i.info()).path("title").asText());
     }
 
     @Test
     void aHangingDownloadGivesUp() throws Exception {
         CountDownLatch hang = new CountDownLatch(1); // the server answers only once the test is over
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
-            try { hang.await(); } catch (InterruptedException ignored) { }
+            try {
+                hang.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             ex.sendResponseHeaders(200, -1);
             ex.close();
         });
@@ -51,7 +58,7 @@ class GifFilesTest {
     @Test
     void onlyHttpsGifsAreFetched() throws Exception {
         java.util.concurrent.atomic.AtomicInteger hits = new java.util.concurrent.atomic.AtomicInteger();
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             hits.incrementAndGet();
             ex.sendResponseHeaders(200, -1);
@@ -70,9 +77,9 @@ class GifFilesTest {
 
     @Test
     void aGifPastTheLimitStopsAndLeavesNothingBehind() throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
-            byte[] b = "GIF89a-and-much-more".getBytes();
+            byte[] b = "GIF89a-and-much-more".getBytes(UTF_8);
             ex.sendResponseHeaders(200, 0); // no length announced: only counting what arrives can stop it
             ex.getResponseBody().write(b);
             ex.close();
@@ -100,9 +107,9 @@ class GifFilesTest {
 
     @Test
     void downloadedFileLivesInTheGifCacheFolder() throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
-            byte[] b = "GIF89a".getBytes();
+            byte[] b = "GIF89a".getBytes(UTF_8);
             ex.sendResponseHeaders(200, b.length);
             ex.getResponseBody().write(b);
             ex.close();
@@ -112,7 +119,7 @@ class GifFilesTest {
             Path f = GifFiles.fetch(java.net.URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/g"), ".gif", GifFiles.TIMEOUT,
                     GifFiles.MAX_BYTES);
             assertTrue(Files.exists(f));
-            assertEquals("gif-cache", f.getParent().getFileName().toString());
+            assertEquals("gif-cache", Present.of(f.getParent()).getFileName().toString());
             assertFalse(f.getFileName().toString().contains("/"));
         } finally {
             server.stop(0);

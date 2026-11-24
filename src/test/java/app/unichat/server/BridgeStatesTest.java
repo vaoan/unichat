@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgeStates;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +14,7 @@ class BridgeStatesTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private final BridgeStates s = new BridgeStates();
 
-    private void report(String bridge, String json, long at) throws Exception {
+    private void report(String bridge, String json, long at) throws JsonProcessingException {
         s.record(bridge, JSON.readTree(json), at);
     }
 

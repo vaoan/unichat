@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Keeping what chats say ({@link SaveKind#TEXTS}), to read later what was deleted. What a chat says is taken the moment
@@ -83,27 +84,27 @@ final class TextKeeping {
      * {@code written}: runs after this computer wrote something (so it goes up now); {@code fetch}: brings what the other
      * computers kept, asked before looking at a message.
      */
-    void setSync(Runnable written, Supplier<CompletableFuture<?>> fetch) {
-        this.written = written;
-        this.fetch = fetch;
+    void setSync(Runnable onWritten, Supplier<CompletableFuture<?>> fetcher) {
+        this.written = onWritten;
+        this.fetch = fetcher;
     }
 
     /**
      * {@code sent} went in {@code chatId} in place of {@code written}, which the AI corrected before it went: kept as
      * that message's first version once it's here, so every version of what was said can be seen.
      */
-    void wroteBefore(String chatId, String sent, String written) {
+    void wroteBefore(String chatId, String sent, String drafted) {
         if (!prefs.autoSaves(chatId, true).contains(SaveKind.TEXTS)) return; // not kept: nothing to hold for later
         Set<String> before = new HashSet<>();
         for (Message m : chats.messages(chatId)) if (m.outgoing()) before.add(m.id());
         synchronized (wrote) {
-            wrote.addLast(new Written(chatId, sent.strip(), written, Instant.now(), before));
+            wrote.addLast(new Written(chatId, sent.strip(), drafted, Instant.now(), before));
             if (wrote.size() > WROTE) wrote.removeFirst();
         }
     }
 
     /** The first written text waiting for {@code m} (mine, new since it was written, saying what went); taken. */
-    private Written takeWritten(Message m) {
+    private @Nullable Written takeWritten(Message m) {
         synchronized (wrote) {
             for (java.util.Iterator<Written> it = wrote.iterator(); it.hasNext(); ) {
                 Written w = it.next();
@@ -172,17 +173,19 @@ final class TextKeeping {
             if (!log.record(chatId, said)) return;
             failing.remove(chatId);
             copySoon(chatId);
-            if (sendDue.compareAndSet(false, true)) worker.schedule(() -> {
-                sendDue.set(false);
-                written.run();
-            }, settle.toMillis(), TimeUnit.MILLISECONDS);
+            if (sendDue.compareAndSet(false, true)) {
+                var _ = worker.schedule(() -> {
+                    sendDue.set(false);
+                    written.run();
+                }, settle.toMillis(), TimeUnit.MILLISECONDS);
+            }
         } catch (IOException e) {
             tellFailed(chatId, e, AutoSave.textsDir());
         }
     }
 
     private void copySoon(String chatId) {
-        if (copyDue.add(chatId)) worker.schedule(() -> copy(chatId), settle.toMillis(), TimeUnit.MILLISECONDS);
+        if (copyDue.add(chatId)) { var _ = worker.schedule(() -> copy(chatId), settle.toMillis(), TimeUnit.MILLISECONDS); }
     }
 
     private void copy(String chatId) {

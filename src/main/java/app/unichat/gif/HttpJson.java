@@ -9,6 +9,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import org.jspecify.annotations.Nullable;
 
 /** GET + JSON for the provider adapters. */
 final class HttpJson {
@@ -26,7 +27,7 @@ final class HttpJson {
     }
 
 
-    static String text(JsonNode n) {
+    static @Nullable String text(@Nullable JsonNode n) {
         return n == null || n.isMissingNode() || n.isNull() || n.asText().isEmpty() ? null : n.asText();
     }
 }

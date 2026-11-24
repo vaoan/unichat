@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.TestPictures;
 import app.unichat.model.MediaLibrary;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.geometry.Bounds;
 import javafx.scene.Node;
 import javafx.scene.layout.VBox;
@@ -23,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ReplyAlignUiTest {
     @TempDir Path dir;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     private TimelineWindow w;
 
     @BeforeAll
@@ -32,6 +34,7 @@ class ReplyAlignUiTest {
     void close() throws Exception { if (w != null) w.close(); }
 
     @Test
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     void aStickerAnsweringALongerMessageSitsAtTheBubblesEdge() throws Exception {
         w = TimelineWindow.open(5);
         w.svc.receive(CHAT, "un mensaje bastante más largo que el sticker que lo va a responder");
@@ -44,8 +47,9 @@ class ReplyAlignUiTest {
             VBox bubble = (VBox) w.list().lookup(".bubble.out.sticker");
             Node quote = bubble.lookup(".reply-quote");
             Node sticker = bubble.getChildren().get(bubble.getChildren().indexOf(quote) + 1);
-            Bounds b = bubble.localToScene(bubble.getLayoutBounds()), s = sticker.localToScene(sticker.getLayoutBounds()),
-                    q = quote.localToScene(quote.getLayoutBounds());
+            Bounds b = bubble.localToScene(bubble.getLayoutBounds());
+            Bounds s = sticker.localToScene(sticker.getLayoutBounds());
+            Bounds q = quote.localToScene(quote.getLayoutBounds());
             return new double[] {b.getMaxX() - bubble.getInsets().getRight(), s.getMaxX(), s.getWidth(), q.getWidth()};
         });
         org.junit.jupiter.api.Assertions.assertTrue(edges[3] > edges[2] + 20, "the quote is wider than the sticker: " + edges[3] + " vs " + edges[2]);

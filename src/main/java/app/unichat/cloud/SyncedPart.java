@@ -1,6 +1,8 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -21,8 +23,8 @@ final class SyncedPart {
     private final Function<Instant, Bundle> local;
     private final java.util.function.Predicate<Bundle> adopt;
     /** The account's version when last seen: while it's the same, nothing is downloaded. */
-    private volatile String seenStamp;
-    private String lastLocal;
+    private volatile @Nullable String seenStamp;
+    private @Nullable String lastLocal;
     private Instant localChangedAt = Instant.EPOCH;
 
     /**
@@ -52,7 +54,7 @@ final class SyncedPart {
     }
 
     /** What to do, from the three versions' hashes; {@code remote} null when the account has none. Pure. */
-    static Action decide(String local, String remote, String base, Instant localAt, Instant remoteAt) {
+    static Action decide(String local, @Nullable String remote, @Nullable String base, Instant localAt, Instant remoteAt) {
         if (remote == null) return Action.UPLOAD;
         if (remote.equals(local)) return Action.NOTHING;
         if (base == null || local.equals(base)) return Action.ADOPT; // new here, or only the account changed
@@ -61,6 +63,7 @@ final class SyncedPart {
     }
 
     /** One round with the account; what it did. */
+    @SuppressFBWarnings(value = "UNSAFE_HASH_EQUALS", justification = "SHA-256 of the person's own settings, compared to tell whether they changed: nothing secret to find by timing")
     Action sync(Storage dav, Instant now) throws IOException {
         Bundle mine = local.apply(now);
         String mineHash = mine.hash();
@@ -68,7 +71,7 @@ final class SyncedPart {
             if (lastLocal != null) localChangedAt = now;
             lastLocal = mineHash;
         }
-        String base = Settings.get().getString(baseKey, null);
+        String base = Settings.get().getString(baseKey);
         String stamp = dav.stamp(remotePath);
         if (stamp != null && stamp.equals(seenStamp)) {
             // The account's is the one already agreed on: only this computer can have changed.
@@ -98,8 +101,8 @@ final class SyncedPart {
     boolean holds(String path, byte[] plain) {
         if (!path.equals(remotePath)) return false;
         Bundle b = Bundle.parse(plain);
-        String base = Settings.get().getString(baseKey, null);
-        return b != null && base != null && b.hash().equals(base);
+        String base = Settings.get().getString(baseKey);
+        return b != null && base != null && base.equals(b.hash());
     }
 
     /**
@@ -116,7 +119,7 @@ final class SyncedPart {
         agreed(hash, dav.stamp(remotePath));
     }
 
-    private void agreed(String hash, String stamp) {
+    private void agreed(@Nullable String hash, @Nullable String stamp) {
         Settings.get().set(baseKey, hash);
         seenStamp = stamp;
     }

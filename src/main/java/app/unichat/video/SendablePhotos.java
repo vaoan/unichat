@@ -1,11 +1,15 @@
 package app.unichat.video;
 
+import app.unichat.support.PathParts;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Pictures sent "as a photo" (SendAs.PHOTO): what a network shows as a photo rather than a file. Telegram's bridge sends
@@ -23,12 +27,14 @@ public final class SendablePhotos {
     private SendablePhotos() {}
 
     /** Whether a picture of {@code mime} can be made a photo: GIFs stay animated, and an SVG is a drawing. */
-    public static boolean convertible(String mime) {
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a MIME type compared to our own ASCII ones: a look-alike only means the photo is converted")
+    public static boolean convertible(@Nullable String mime) {
         String m = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
         return m.startsWith("image/") && !m.equals("image/gif") && !m.contains("svg");
     }
 
     /** Whether it already goes as a photo as it is: a JPEG or PNG within those limits ({@code width} 0: unknown). */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a MIME type compared to our own ASCII ones: a look-alike only means the photo is converted")
     public static boolean alreadyPhoto(String mime, int width, int height, long bytes) {
         boolean format = "image/jpeg".equalsIgnoreCase(mime) || "image/png".equalsIgnoreCase(mime);
         return format && width > 0 && height > 0 && (long) width * height <= MAX_PIXELS && width + height <= 10_000
@@ -46,7 +52,7 @@ public final class SendablePhotos {
     /** {@code ffmpeg}: asked for only when sips can't (there's none, or it failed). */
     static Path jpeg(Path picture, int width, int height, Path dir, Ffmpeg.Source ffmpeg) throws IOException, InterruptedException {
         Files.createDirectories(dir);
-        String name = picture.getFileName().toString();
+        String name = PathParts.name(picture);
         int dot = name.lastIndexOf('.');
         Path out = dir.resolve((dot > 0 ? name.substring(0, dot) : name) + ".jpg");
         boolean shrink = width <= 0 || Math.max(width, height) > SIDE;
@@ -65,7 +71,7 @@ public final class SendablePhotos {
     }
 
     static List<String> ffmpeg(Path ffmpeg, Path in, Path out) throws IOException {
-        List<String> c = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error"));
+        List<String> c = new ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error"));
         c.addAll(Ffmpeg.input(in)); // the person's own, but it may have been downloaded from anywhere
         c.addAll(List.of("-vf", "scale='min(" + SIDE + ",iw)':'min(" + SIDE + ",ih)':force_original_aspect_ratio=decrease",
                 "-q:v", "3", "-frames:v", "1", out.toString()));

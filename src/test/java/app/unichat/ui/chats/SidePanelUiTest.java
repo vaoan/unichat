@@ -13,11 +13,13 @@ import javafx.scene.control.TextArea;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
+import org.jspecify.annotations.Nullable;
 
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,39 +52,40 @@ class SidePanelUiTest {
         FxWait.settled();
         assertFalse(fx(() -> panel(scene) != null), "closed at first");
 
-        fx(() -> { view[0].togglePanel(SidePanel.Tab.PROFILE); return null; });
-        assertEquals(SidePanel.Tab.PROFILE, fx(() -> panel(scene).current()));
-        assertTrue(fx(() -> panel(scene).lookup(".info-pane") != null), "Perfil shows the chat info");
+        FxWait.onFx(() -> view[0].togglePanel(SidePanel.Tab.PROFILE));
+        assertEquals(SidePanel.Tab.PROFILE, fx(() -> shown(scene).current()));
+        assertTrue(fx(() -> shown(scene).lookup(".info-pane") != null), "Perfil shows the chat info");
 
-        fx(() -> { view[0].showPanel(SidePanel.Tab.EMOJIS); return null; });
-        assertEquals(SidePanel.Tab.EMOJIS, fx(() -> panel(scene).current()), "switches tab without closing");
-        FxWait.until("the list builds its emojis", () -> panel(scene).lookupAll(".emoji-button").stream()
+        FxWait.onFx(() -> view[0].showPanel(SidePanel.Tab.EMOJIS));
+        assertEquals(SidePanel.Tab.EMOJIS, fx(() -> shown(scene).current()), "switches tab without closing");
+        FxWait.until("the list builds its emojis", () -> shown(scene).lookupAll(".emoji-button").stream()
                 .anyMatch(n -> n.isVisible() && n.getProperties().containsKey("emoji")));
 
-        fx(() -> {
+        FxWait.onFx(() -> {
             // A real one: the list also holds a hidden button that only measures the size.
-            Button smile = (Button) panel(scene).lookupAll(".emoji-button").stream()
+            Button smile = (Button) shown(scene).lookupAll(".emoji-button").stream()
                     .filter(n -> n.isVisible() && n.getProperties().containsKey("emoji")).findFirst().orElseThrow();
             smile.fire();
-            return null;
         });
         String typed = fx(() -> ((TextArea) scene.getRoot().lookup(".composer-input")).getText());
         assertFalse(typed.isEmpty(), "the emoji went into the message box");
 
-        fx(() -> { view[0].togglePanel(SidePanel.Tab.EMOJIS); return null; });
+        FxWait.onFx(() -> view[0].togglePanel(SidePanel.Tab.EMOJIS));
         assertFalse(fx(() -> panel(scene) != null), "same button closes it");
 
         // The composer's one button (the face) opens the media tab used last; Perfil doesn't count.
-        fx(() -> { view[0].showPanel(SidePanel.Tab.STICKERS); view[0].showPanel(SidePanel.Tab.PROFILE); return null; });
-        fx(() -> { view[0].togglePanel(SidePanel.Tab.PROFILE); return null; });
+        FxWait.onFx(() -> {
+            view[0].showPanel(SidePanel.Tab.STICKERS);
+            view[0].showPanel(SidePanel.Tab.PROFILE);
+        });
+        FxWait.onFx(() -> view[0].togglePanel(SidePanel.Tab.PROFILE));
         assertEquals(SidePanel.Tab.STICKERS, SidePanel.lastMediaTab());
-        fx(() -> {
+        FxWait.onFx(() -> {
             scene.getRoot().lookupAll(".icon-button").stream()
                     .filter(n -> "Emojis, stickers y GIFs".equals(n.getAccessibleText())).findFirst()
                     .map(Button.class::cast).orElseThrow().fire();
-            return null;
         });
-        assertEquals(SidePanel.Tab.STICKERS, fx(() -> panel(scene).current()), "opens where it was left");
+        assertEquals(SidePanel.Tab.STICKERS, fx(() -> shown(scene).current()), "opens where it was left");
         assertTrue(fx(() -> scene.getRoot().lookupAll(".gif-button").isEmpty()), "no separate GIF button any more");
     }
 
@@ -113,55 +116,55 @@ class SidePanelUiTest {
             return sc;
         });
         FxWait.until("the chat opens", () -> scene.getRoot().lookup(".composer-input") != null);
-        fx(() -> { view[0].showPanel(SidePanel.Tab.STICKERS); return null; });
-        FxWait.until("the stickers tab lists its tiles", () -> panel(scene).lookup(".sticker-tile") != null);
-        int before = fx(() -> svc.chat("!family:demo").lastPreview().length());
-        fx(() -> {
-            Node tile = panel(scene).lookup(".sticker-tile");
-            assertTrue(tile != null, "the favourite is listed");
+        FxWait.onFx(() -> view[0].showPanel(SidePanel.Tab.STICKERS));
+        FxWait.until("the stickers tab lists its tiles", () -> shown(scene).lookup(".sticker-tile") != null);
+        int before = fx(() -> Present.of(svc.chat("!family:demo")).lastPreview().length());
+        FxWait.onFx(() -> {
+            Node tile = shown(scene).lookup(".sticker-tile");
+            assertNotNull(tile, "the favourite is listed");
             assertEquals("Sticker favorito, enviar", tile.getAccessibleText());
             tile.fireEvent(new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "",
                     javafx.scene.input.KeyCode.ENTER, false, false, false, false));
-            return null;
         });
-        FxWait.until("the sticker is sent", () -> "Sticker".equals(svc.chat("!family:demo").lastPreview()));
-        assertEquals("Sticker", fx(() -> svc.chat("!family:demo").lastPreview()), "sent to the open chat");
+        FxWait.until("the sticker is sent", () -> "Sticker".equals(Present.of(svc.chat("!family:demo")).lastPreview()));
+        assertEquals("Sticker", fx(() -> Present.of(svc.chat("!family:demo")).lastPreview()), "sent to the open chat");
         assertTrue(before >= 0);
 
         // Right-click offers to see it big, and that opens it in its own window.
-        fx(() -> {
-            Node tile = panel(scene).lookup(".sticker-tile");
+        FxWait.onFx(() -> {
+            Node tile = shown(scene).lookup(".sticker-tile");
             var b = tile.localToScreen(tile.getBoundsInLocal());
             tile.fireEvent(new javafx.scene.input.ContextMenuEvent(javafx.scene.input.ContextMenuEvent.CONTEXT_MENU_REQUESTED,
                     5, 5, b.getMinX() + 5, b.getMinY() + 5, false, null));
-            return null;
         });
         FxWait.until("the context menu shows", () -> javafx.stage.Window.getWindows().stream()
                 .anyMatch(w -> w instanceof javafx.scene.control.ContextMenu));
         javafx.scene.control.MenuItem enlarge = fx(() -> javafx.stage.Window.getWindows().stream()
                 .filter(w -> w instanceof javafx.scene.control.ContextMenu).map(w -> (javafx.scene.control.ContextMenu) w)
                 .flatMap(m -> m.getItems().stream()).filter(i -> "Ver en grande".equals(i.getText())).findFirst().orElse(null));
-        assertTrue(enlarge != null, "the menu offers Ver en grande");
+        assertNotNull(enlarge, "the menu offers Ver en grande");
         long windows = fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage).count());
-        fx(() -> { enlarge.fire(); enlarge.getParentPopup().hide(); return null; }); // as a real click on it does
+        FxWait.onFx(() -> {
+            enlarge.fire();
+            enlarge.getParentPopup().hide();
+        });  // as a real click on it does
         FxWait.until("the sticker's window opens", () -> javafx.stage.Window.getWindows().stream()
                 .anyMatch(w -> w instanceof Stage s && "Sticker".equals(s.getTitle())));
         Stage big = fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage s && "Sticker".equals(s.getTitle()))
                 .map(Stage.class::cast).findFirst().orElse(null));
         assertTrue(big != null && fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage).count()) > windows,
                 "a window shows the sticker");
-        fx(() -> { big.close(); return null; });
+        FxWait.onFx(Present.of(big)::close);
 
         // A network that rejects stickers: shown dimmed, with the reason, and nothing is sent.
-        fx(() -> {
-            svc.chat("!family:demo").setFeatures(app.unichat.model.RoomFeatures.parse(
+        FxWait.onFx(() -> {
+            Present.of(svc.chat("!family:demo")).setFeatures(app.unichat.model.RoomFeatures.parse(
                     new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"id\":\"gm\",\"file\":{\"m.image\":{\"mime_types\":{\"image/*\":2}}}}")));
             view[0].showPanel(SidePanel.Tab.STICKERS);
-            return null;
         });
         FxWait.until("the tile tells why it's dimmed",
-                () -> panel(scene).lookup(".sticker-tile").getAccessibleText().contains("no acepta stickers"));
-        String text = fx(() -> panel(scene).lookup(".sticker-tile").getAccessibleText());
+                () -> shown(scene).lookup(".sticker-tile").getAccessibleText().contains("no acepta stickers"));
+        String text = fx(() -> shown(scene).lookup(".sticker-tile").getAccessibleText());
         assertTrue(text.contains("no acepta stickers"), text);
     }
 
@@ -190,22 +193,27 @@ class SidePanelUiTest {
             return sc;
         });
         FxWait.until("the chat opens", () -> scene.getRoot().lookup(".composer-input") != null);
-        fx(() -> { view[0].showPanel(SidePanel.Tab.GIFS); return null; });
-        FxWait.until("the GIFs tab explains how to turn on a provider", () -> panel(scene).lookupAll(".label").stream()
+        FxWait.onFx(() -> view[0].showPanel(SidePanel.Tab.GIFS));
+        FxWait.until("the GIFs tab explains how to turn on a provider", () -> shown(scene).lookupAll(".label").stream()
                 .anyMatch(n -> ((javafx.scene.control.Label) n).getText() != null
                         && ((javafx.scene.control.Label) n).getText().contains("Ajustes → GIFs")));
-        String text = fx(() -> panel(scene).lookupAll(".label").stream()
+        String text = fx(() -> shown(scene).lookupAll(".label").stream()
                 .map(n -> ((javafx.scene.control.Label) n).getText()).reduce("", (a, b) -> a + "\n" + b));
         assertTrue(text.contains("Ajustes → GIFs"), text);
-        assertTrue(fx(() -> panel(scene).lookup(".gif-search") != null), "search box is there");
+        assertTrue(fx(() -> shown(scene).lookup(".gif-search") != null), "search box is there");
     }
 
-    private static SidePanel panel(Scene s) {
+    private static @Nullable SidePanel panel(Scene s) {
         for (Node n : s.getRoot().lookupAll("*")) if (n instanceof SidePanel p && p.getScene() != null) return p;
         return null;
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    /** The panel, which the test has opened. */
+    private static SidePanel shown(Scene s) {
+        return Present.of(panel(s));
+    }
+
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

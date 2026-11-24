@@ -12,6 +12,7 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import app.unichat.Present;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,8 +45,8 @@ class ProfileMediaTabsUiTest {
         for (int i = 0; i < 48; i++) links.append(" https://example.org/receta").append(i);
         svc.sendText(id, links.toString(), null).get();
         for (int i = 0; i < 37; i++) {
-            svc.sendFile(id, Files.writeString(dir.resolve("contrato" + i + ".pdf"), "%PDF"), null, SendAs.DOCUMENT, null).get();
-            svc.sendFile(id, Files.write(dir.resolve("paseo" + i + ".mp4"), new byte[16]), null, SendAs.AS_IS, null).get();
+            svc.sendFile(id, Files.writeString(dir.resolve("contrato" + i + ".pdf"), "%PDF"), null, SendAs.DOCUMENT, p -> { }).get();
+            svc.sendFile(id, Files.write(dir.resolve("paseo" + i + ".mp4"), new byte[16]), null, SendAs.AS_IS, p -> { }).get();
         }
         List<String> bad = new ArrayList<>();
         for (int px : new int[] {13, 16, 21}) {
@@ -60,7 +61,7 @@ class ProfileMediaTabsUiTest {
                     scene.getRoot().setStyle("-fx-font-size: " + px + "px;");
                     stage[0].setScene(scene);
                     stage[0].show();
-                    p.show(svc.chat(id));
+                    p.show(Present.of(svc.chat(id)));
                     return p;
                 });
                 FxWait.until("the tabs show", () -> pane.lookupAll(".media-tab").size() == 5);
@@ -69,7 +70,8 @@ class ProfileMediaTabsUiTest {
                     List<String> out = new ArrayList<>();
                     Node bar = pane.lookup(".media-tabs");
                     var barBounds = bar.localToScene(bar.getBoundsInLocal());
-                    double widest = 0, narrowest = Double.MAX_VALUE;
+                    double widest = 0;
+                    double narrowest = Double.MAX_VALUE;
                     for (Node n : pane.lookupAll(".media-tab")) {
                         widest = Math.max(widest, n.getLayoutBounds().getWidth());
                         narrowest = Math.min(narrowest, n.getLayoutBounds().getWidth());
@@ -81,7 +83,7 @@ class ProfileMediaTabsUiTest {
                     if (widest - narrowest > 1) out.add(px + "px in " + width + ": uneven, " + Math.round(narrowest) + " to " + Math.round(widest) + " px");
                     return out;
                 }));
-                FxWait.fx(() -> { stage[0].close(); return null; });
+                FxWait.onFx(stage[0]::close);
             }
         }
         svc.stop();

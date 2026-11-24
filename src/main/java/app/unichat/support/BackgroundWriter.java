@@ -11,7 +11,8 @@ public final class BackgroundWriter {
     private final String name;
     private final Object lock;
     private final Runnable round;
-    private boolean pending, running;
+    private boolean pending;
+    private boolean running;
 
     /** @param lock the owner's: what {@code round} takes to copy what it writes */
     public BackgroundWriter(String name, Object lock, Runnable round) {

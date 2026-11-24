@@ -8,6 +8,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.layout.VBox;
 import javafx.stage.Popup;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,7 +22,7 @@ import java.util.function.Consumer;
 public final class EmojiPicker {
     private EmojiPicker() {}
 
-    public static final String[] QUICK = {"❤️", "👍", "😂", "😮", "😢", "🙏"};
+    public static final List<String> QUICK = List.of("❤️", "👍", "😂", "😮", "😢", "🙏");
 
     /**
      * Unicode's emoji by group ({@code emoji.group.<key>}), from {@code emoji/emoji.txt} (made by native/emoji-list.py):
@@ -32,18 +33,19 @@ public final class EmojiPicker {
     private static Map<String, List<String>> load() {
         Map<String, List<String>> out = new LinkedHashMap<>();
         try (InputStream in = EmojiPicker.class.getResourceAsStream("/app/unichat/emoji/emoji.txt")) {
+            if (in == null) throw new IllegalStateException("emoji list missing");
             for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
                 int tab = line.indexOf('\t');
                 if (tab > 0) out.put("emoji.group." + line.substring(0, tab), List.of(line.substring(tab + 1).strip().split(" ")));
             }
-        } catch (IOException | NullPointerException e) {
+        } catch (IOException e) {
             throw new IllegalStateException("emoji list missing", e);
         }
         return out;
     }
 
     /** One emoji; {@code library} may be null (no menu, no recents). */
-    static Button button(String e, Consumer<String> onPick, MediaLibrary library, Consumer<String> toast) {
+    static Button button(String e, Consumer<String> onPick, @Nullable MediaLibrary library, Consumer<String> toast) {
         Button b = new Button(e);
         b.getStyleClass().add("emoji-button");
         b.setAccessibleText(I18n.t("emoji.named", e));
@@ -82,7 +84,7 @@ public final class EmojiPicker {
         popup(anchor, library, EmojiGrid.Mode.REACTIONS, onPick);
     }
 
-    private static void popup(Node anchor, MediaLibrary library, EmojiGrid.Mode mode, Consumer<String> onPick) {
+    private static void popup(Node anchor, @Nullable MediaLibrary library, EmojiGrid.Mode mode, Consumer<String> onPick) {
         Popup popup = new Popup();
         popup.setAutoHide(true);
         EmojiGrid grid = new EmojiGrid(library, mode, e -> {

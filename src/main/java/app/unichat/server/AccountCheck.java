@@ -1,6 +1,8 @@
 package app.unichat.server;
 
 import app.unichat.bridge.LoginsCache;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,15 +21,20 @@ import java.sql.Statement;
 final class AccountCheck {
     private AccountCheck() {}
 
-    /** @param cached the logins kept, null when none were ever read; @param db the bridge's SQLite database */
-    static boolean hasAccount(String cached, Path db) {
+    /**
+     * Whether the bridge has an account, kept or in its database.
+     *
+     * @param cached the logins kept, null when none were ever read
+     * @param db the bridge's SQLite database
+     */
+    static boolean hasAccount(@Nullable String cached, Path db) {
         if (LoginsCache.hasLogin(cached)) return true;
         Boolean inDb = inDatabase(db);
         return inDb == null || inDb;
     }
 
     /** A login in the bridge's database: a {@code user_login} row (bridgev2) or a user with a token (legacy Discord); null when it can't tell. */
-    private static Boolean inDatabase(Path db) {
+    private static @Nullable Boolean inDatabase(Path db) {
         if (!Files.isRegularFile(db)) return null;
         org.sqlite.SQLiteConfig ro = new org.sqlite.SQLiteConfig();
         ro.setReadOnly(true);
@@ -47,6 +54,7 @@ final class AccountCheck {
         }
     }
 
+    @SuppressFBWarnings(value = "SQL_INJECTION_JDBC", justification = "the queries are constants of this class; nothing from outside reaches them")
     private static boolean anyRow(Connection c, String query) throws SQLException {
         try (Statement s = c.createStatement(); ResultSet r = s.executeQuery(query)) {
             return r.next();

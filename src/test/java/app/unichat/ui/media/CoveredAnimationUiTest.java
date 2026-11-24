@@ -43,7 +43,8 @@ class CoveredAnimationUiTest {
     void behindASheetTheyStandStillAndMoveAgainWhenItCloses() throws Exception {
         AnimatedImage.Frames a = AnimatedImage.decode(TestPictures.gif(dir.resolve("a.gif"), 32, 32, 4), 32, 32);
         AnimatedImage.Frames b = AnimatedImage.decode(TestPictures.gif(dir.resolve("b.gif"), 32, 32, 4), 32, 32);
-        ImageView behind = new ImageView(), inSheet = new ImageView();
+        ImageView behind = new ImageView();
+        ImageView inSheet = new ImageView();
         StackPane overlay = new StackPane(inSheet);
         Stage stage = FxWait.fx(() -> {
             Stage s = new Stage();
@@ -56,22 +57,23 @@ class CoveredAnimationUiTest {
         });
         try {
             FxWait.until("both move", () -> AnimatedImage.moving(behind) && AnimatedImage.moving(inSheet));
-            FxWait.fx(() -> { AnimatedImage.cover(stage.getScene(), overlay); return null; });
+            FxWait.onFx(() -> AnimatedImage.cover(stage.getScene(), overlay));
             FxWait.until("the one behind stands still", () -> !AnimatedImage.moving(behind));
             assertTrue(FxWait.fx(() -> AnimatedImage.moving(inSheet)), "the sheet's own still moves");
             assertTrue(FxWait.fx(() -> behind.getImage() != null), "showing the picture it had");
-            FxWait.fx(() -> { AnimatedImage.cover(stage.getScene(), null); return null; });
+            FxWait.onFx(() -> AnimatedImage.cover(stage.getScene(), null));
             FxWait.until("it moves again", () -> AnimatedImage.moving(behind));
             assertFalse(FxWait.fx(() -> behind.getImage() == null));
         } finally {
-            FxWait.fx(() -> { stage.close(); return null; });
+            FxWait.onFx(stage::close);
         }
     }
 
     /** The inline videos (Telegram's GIFs are MP4s that play by themselves) follow the same rule, at once. */
     @Test
     void whatPlaysBehindASheetIsNotSeenAndIsToldAtOnce() throws Exception {
-        javafx.scene.layout.Region behind = new javafx.scene.layout.Region(), inSheet = new javafx.scene.layout.Region();
+        javafx.scene.layout.Region behind = new javafx.scene.layout.Region();
+        javafx.scene.layout.Region inSheet = new javafx.scene.layout.Region();
         behind.setPrefSize(20, 20);
         inSheet.setPrefSize(20, 20);
         StackPane overlay = new StackPane(inSheet);
@@ -87,14 +89,17 @@ class CoveredAnimationUiTest {
         });
         try {
             assertTrue(FxWait.fx(() -> AnimatedImage.seen(behind)));
-            FxWait.fx(() -> { AnimatedImage.cover(stage.getScene(), overlay); return null; });
+            FxWait.onFx(() -> AnimatedImage.cover(stage.getScene(), overlay));
             assertFalse(FxWait.fx(() -> AnimatedImage.seen(behind)), "behind the sheet");
             assertTrue(FxWait.fx(() -> AnimatedImage.seen(inSheet)), "in it");
             assertEquals(1, told[0], "the players hear it as it happens, not at their next second's look");
-            FxWait.fx(() -> { AnimatedImage.cover(stage.getScene(), null); return null; });
+            FxWait.onFx(() -> AnimatedImage.cover(stage.getScene(), null));
             assertTrue(FxWait.fx(() -> AnimatedImage.seen(behind)));
         } finally {
-            FxWait.fx(() -> { AnimatedImage.unwatchCover(watcher); stage.close(); return null; });
+            FxWait.onFx(() -> {
+                AnimatedImage.unwatchCover(watcher);
+                stage.close();
+            });
         }
     }
 }

@@ -55,6 +55,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -79,7 +80,7 @@ public final class MainView extends StackPane {
     private final Label connection = new Label();
     private ConnectionState state = ConnectionState.CONNECTING;
     /** What the top bar says once the server is connected, while networks reconnect (null: nothing). */
-    private String syncingNetworks;
+    private @Nullable String syncingNetworks;
     private final AccountAlertBar accountAlerts = new AccountAlertBar(this::addAccount);
     /** A newer Unichat, above the account alerts. */
     private final UpdateBar updateBar;
@@ -91,12 +92,11 @@ public final class MainView extends StackPane {
     private final app.unichat.ui.timeline.ForwardBar forwards;
     private final ExploreBar exploring;
     private final app.unichat.ui.chats.RestBar resting;
-    private final Consumer<String> openLink;
-    private String pendingOpenId;
+    private @Nullable String pendingOpenId;
     private long pendingOpenUntil;
     private boolean infoVisible;
-    private SidePanel panel;
-    private StickerGrid stickers;
+    private final SidePanel panel;
+    private final StickerGrid stickers;
     private StickerSuggestions suggestions;
     /** Favourite and recent stickers/GIFs, shared by every chat. */
     private final MediaLibrary library =
@@ -105,7 +105,10 @@ public final class MainView extends StackPane {
     public MediaLibrary library() { return library; }
 
     /** The chat open on the right, or null. */
-    public String currentChatId() { return thread.chat() == null ? null : thread.chat().id(); }
+    public @Nullable String currentChatId() {
+        Chat open = thread.chat();
+        return open == null ? null : open.id();
+    }
     /**
      * A busy account (big Discord servers) changes chats many times a second: rebuild at most every REFRESH_GAP_MS, so the UI
      * thread isn't redrawing the whole inbox nonstop. Same for a chat where many people write: a few updates a second at most.
@@ -120,7 +123,8 @@ public final class MainView extends StackPane {
         @Override public void accountsChanged() {
             scheduleChats();
             Platform.runLater(() -> {
-                if (SettingsWindow.accountsPage() != null) SettingsWindow.accountsPage().refresh();
+                AccountsPane accounts = SettingsWindow.accountsPage();
+                if (accounts != null) accounts.refresh();
                 if (stage.isShowing()) showAccountAlerts();
                 stickers.rebuildOnce(svc.accounts());
             });
@@ -144,7 +148,6 @@ public final class MainView extends StackPane {
             audio.stop();
             onLogout.run();
         };
-        this.openLink = openLink;
         getStyleClass().add("main-root");
 
         folderDialogs = new FolderDialogs(svc, this::showOverlay, this::hideOverlay);
@@ -160,7 +163,7 @@ public final class MainView extends StackPane {
         panel = new SidePanel(info);
         thread.setOnShowServer(id -> {
             listPane.showSpace(id);
-            listPane.setSelected(thread.chat() == null ? null : thread.chat().id());
+            listPane.setSelected(currentChatId());
         });
         stickers = new StickerGrid(svc, library, thread::chat, thread::takeReply, this::toast);
         MediaItems.keepCached(svc, library);
@@ -213,7 +216,7 @@ public final class MainView extends StackPane {
         toast.setMaxWidth(560);
         toast.setVisible(false);
         toast.setMouseTransparent(true);
-        StackPane.setAlignment(toast, Pos.BOTTOM_CENTER);
+        setAlignment(toast, Pos.BOTTOM_CENTER);
         toast.setTranslateY(-90);
         // Above the message box, whatever its height: at a fixed place it covered a box grown to several lines.
         thread.composer().layoutBoundsProperty().addListener((o, a, b) -> { if (toast.isVisible()) placeToast(); });
@@ -243,14 +246,15 @@ public final class MainView extends StackPane {
     private final javafx.beans.value.ChangeListener<Boolean> onShowing = this::showingChanged;
     private final javafx.beans.value.ChangeListener<Boolean> onFocused = this::focusChanged;
 
-    private void showingChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean showing) {
+    private void showingChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean showing) { // NOPMD: UnusedFormalParameter, a ChangeListener by method reference
         if (showing) catchingUp.request(); // the window shown again is brought up to date: a redraw to come
     }
 
     private final FxCoalescer catchingUp = new FxCoalescer(this::catchUp);
 
-    private void focusChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean focused) {
-        if (focused && thread.chat() != null) svc.markRead(thread.chat().id());
+    private void focusChanged(javafx.beans.value.ObservableValue<? extends Boolean> o, Boolean was, Boolean focused) { // NOPMD: UnusedFormalParameter, a ChangeListener by method reference
+        String open = currentChatId();
+        if (focused && open != null) svc.markRead(open);
     }
 
     public void dispose() {
@@ -268,6 +272,7 @@ public final class MainView extends StackPane {
     }
 
     /** The disk ran low or had room again, or a process of the server couldn't write: told on another thread. */
+    @SuppressWarnings("UnnecessaryLambda") // one instance: removeListener takes away what addListener added
     private final Runnable onStorage = () -> Platform.runLater(() -> showConnection(state));
 
     // ------------------------------------------------------------------ updates (coalesced)
@@ -303,11 +308,14 @@ public final class MainView extends StackPane {
     /** Warms the photo cache with the most recent chats, so even the first open of a chat shows no initials. */
     private void preloadAvatars() {
         if (avatarsPreloaded) return;
-        java.util.List<Chat> recent = svc.chats().stream().filter(c -> !c.bridgeBot() && c.avatarUrl() != null)
+        List<Chat> recent = svc.chats().stream().filter(c -> !c.bridgeBot() && c.avatarUrl() != null)
                 .sorted(ChatFilter.ORDER).limit(150).toList();
         if (recent.isEmpty()) return;
         avatarsPreloaded = true;
-        for (Chat c : recent) ImageCache.load(c.avatarUrl(), svc);
+        for (Chat c : recent) {
+            String url = c.avatarUrl();
+            if (url != null) { var _ = ImageCache.load(url, svc); }
+        }
     }
 
     /**
@@ -371,7 +379,7 @@ public final class MainView extends StackPane {
     }
 
     private void onIncoming(Chat chat, Message m) {
-        boolean viewing = stage.isFocused() && stage.isShowing() && thread.chat() != null && thread.chat().id().equals(chat.id());
+        boolean viewing = stage.isFocused() && stage.isShowing() && chat.id().equals(currentChatId());
         var settings = Settings.get();
         if (NotificationPolicy.shouldNotify(chat.archived(), settings.notifyArchived(), viewing)) notifier.notify(chat, m);
         if (settings.speakMessages() && (!chat.archived() || settings.notifyArchived())) Speaker.say(A11yText.spoken(chat, m, settings.notificationPreview()));
@@ -459,7 +467,7 @@ public final class MainView extends StackPane {
     }
 
     /** As if dropped on the open chat. */
-    public void sendFiles(java.util.List<java.io.File> files, app.unichat.service.SendAs as) {
+    public void sendFiles(List<java.io.File> files, app.unichat.service.SendAs as) {
         thread.composer().sendFiles(files, as);
     }
 
@@ -480,7 +488,7 @@ public final class MainView extends StackPane {
 
     /** Goes to message {@code messageId} of the open chat {@code chatId}, if it's loaded (a notice about it was clicked). */
     public void showMessage(String chatId, String messageId) {
-        if (thread.chat() == null || !thread.chat().id().equals(chatId)) return;
+        if (!chatId.equals(currentChatId())) return;
         svc.messages(chatId).stream().filter(m -> messageId.equals(m.id())).findFirst().ifPresent(thread::jumpToMessage);
     }
 
@@ -553,8 +561,8 @@ public final class MainView extends StackPane {
     }
 
     /** The gear among the profile's actions: the chat's own options, what it saves of what arrives among them. */
-    private void offerChatOptions(ChatService svc) {
-        ChatOptions options = new ChatOptions(svc, this::showOverlay, this::hideOverlay, this::toast);
+    private void offerChatOptions(ChatService service) {
+        ChatOptions options = new ChatOptions(service, this::showOverlay, this::hideOverlay, this::toast);
         chatOptions = chat -> options.open(chat, () -> thread.composer().focus());
         info.setOnOptions(chatOptions);
         info.setOnJump(thread::jumpToMessage);
@@ -566,10 +574,11 @@ public final class MainView extends StackPane {
     }
 
     /** The clip's "Foto protegida contra IA": asks how hard, then protects and sends ({@link CloakSend}). */
-    private void offerProtectedPhotos(ChatService svc) {
-        CloakSend cloak = new CloakSend(svc, this::showOverlay, this::hideOverlay, this::toast);
+    private void offerProtectedPhotos(ChatService service) {
+        CloakSend cloak = new CloakSend(service, this::showOverlay, this::hideOverlay, this::toast);
         protectPhoto = () -> {
-            if (thread.chat() != null) cloak.open(thread.chat().id(), () -> thread.composer().focus());
+            String open = currentChatId();
+            if (open != null) cloak.open(open, () -> thread.composer().focus());
         };
         thread.composer().setOnProtect(protectPhoto);
     }
@@ -600,10 +609,10 @@ public final class MainView extends StackPane {
     }
 
     /** The chat's questions and sheets, in the window's overlay: forwarding, deleting, capturing, what a message said. */
-    private void sheets(ChatService svc) {
-        thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(svc, this::showOverlay, this::hideOverlay, forwards::show));
+    private void sheets(ChatService service) {
+        thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(service, this::showOverlay, this::hideOverlay, forwards::show));
         thread.setDeleteSheet(new app.unichat.ui.timeline.DeleteSheet(this::showOverlay, this::hideOverlay));
-        thread.setCaptureSheet(new app.unichat.ui.timeline.CaptureSheet(svc, this::showOverlay, this::hideOverlay, this::toast));
+        thread.setCaptureSheet(new app.unichat.ui.timeline.CaptureSheet(service, this::showOverlay, this::hideOverlay, this::toast));
         thread.setSavedTextSheet(new app.unichat.ui.timeline.SavedTextSheet(this::showOverlay, this::hideOverlay, this::toast));
     }
 
@@ -633,7 +642,7 @@ public final class MainView extends StackPane {
     private void showOverlay(Node card) {
         if (card instanceof javafx.scene.layout.Region r) r.maxHeightProperty().bind(overlay.heightProperty().subtract(130));
         overlay.getChildren().setAll(card);
-        StackPane.setAlignment(card, Pos.TOP_CENTER);
+        setAlignment(card, Pos.TOP_CENTER);
         card.setTranslateY(90);
         overlay.setVisible(true);
         app.unichat.ui.media.AnimatedImage.cover(getScene(), overlay);
@@ -681,11 +690,11 @@ public final class MainView extends StackPane {
     public AccountsPane showAccounts() {
         showSettings();
         SettingsWindow.select("accounts");
-        return SettingsWindow.accountsPage();
+        return java.util.Objects.requireNonNull(SettingsWindow.accountsPage(), "selecting the accounts page builds it");
     }
 
     /** Filters the inbox to one network (all its accounts). */
-    public void showNetwork(Network n) {
+    public void showNetwork(@Nullable Network n) {
         listPane.goTo(listPane.filterProperty().get().switchTo(n, null));
     }
 
@@ -698,7 +707,6 @@ public final class MainView extends StackPane {
         SettingsWindow.show(stage, svc, this::appearanceChanged, onLogout, this::openChatId, this::toast);
     }
 
-    /** What Ajustes does after a change: the theme, the lists and the open chat drawn again. */
     /** The stickers of the one emoji typed, above the message box. */
     private void suggestStickers() {
         Composer box = thread.composer();
@@ -707,6 +715,7 @@ public final class MainView extends StackPane {
         box.showJustAbove(suggestions.node());
     }
 
+    /** What Ajustes does after a change: the theme, the lists and the open chat drawn again. */
     private void appearanceChanged() {
         Theme.applyAll();
         suggestions.refresh();
@@ -726,7 +735,7 @@ public final class MainView extends StackPane {
     }
 
     /** The person's cloud for Ajustes → Nube; null: none (the demo). */
-    public void useCloud(app.unichat.cloud.Cloud cloud) {
+    public void useCloud(app.unichat.cloud.@Nullable Cloud cloud) {
         CloudPage.use(cloud);
     }
 

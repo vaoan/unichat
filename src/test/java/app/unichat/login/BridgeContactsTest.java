@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.Present;
 import app.unichat.model.Contact;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -7,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -26,7 +28,7 @@ class BridgeContactsTest {
 
     @BeforeEach
     void fakeBridge() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String path = ex.getRequestURI().getPath();
             uris.add(ex.getRequestMethod() + " " + ex.getRequestURI());
@@ -44,7 +46,10 @@ class BridgeContactsTest {
                 out = "{\"results\":[{\"id\":\"333\",\"name\":\"Ana María\",\"identifiers\":[],\"mxid\":\"@telegram_333:x\"}]}";
             } else if (path.contains("/v3/resolve_identifier/")) {
                 out = path.endsWith("nadie") ? "{}" : "{\"id\":\"444\",\"name\":\"Carla\",\"mxid\":\"@telegram_444:x\"}";
-                if (path.endsWith("nadie")) { status = 404; out = "{\"errcode\":\"M_NOT_FOUND\",\"error\":\"not found\"}"; }
+                if (path.endsWith("nadie")) {
+                    status = 404;
+                    out = "{\"errcode\":\"M_NOT_FOUND\",\"error\":\"not found\"}";
+                }
             } else if (path.contains("/v3/create_dm/")) {
                 out = "{\"id\":\"222\",\"dm_room_mxid\":\"!nuevo:x\"}";
             } else {
@@ -95,7 +100,7 @@ class BridgeContactsTest {
 
     @Test
     void resolveFindsOrReturnsNull() throws Exception {
-        assertEquals("Carla", client("L1").resolve("+573009998877").name());
+        assertEquals("Carla", Present.of(client("L1").resolve("+573009998877")).name());
         assertNull(client("L1").resolve("nadie"));
         assertTrue(uris.get(0).contains("/v3/resolve_identifier/%2B573009998877"), uris.get(0));
     }

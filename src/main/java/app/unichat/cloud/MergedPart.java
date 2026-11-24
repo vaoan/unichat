@@ -3,6 +3,7 @@ package app.unichat.cloud;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Map;
@@ -24,10 +25,10 @@ final class MergedPart {
 
     private final String remotePath;
     private final Supplier<Set<String>> names;
-    private final Function<String, String> read;
+    private final Function<String, @Nullable String> read;
     private final Consumer<Map<String, String>> add;
     /** The account's file when last seen, and the names it held: while it's the same and nothing new is here, nothing is read. */
-    private String seenStamp;
+    private @Nullable String seenStamp;
     private Set<String> seenNames = Set.of();
 
     /**
@@ -35,7 +36,7 @@ final class MergedPart {
      * @param read one entry's text, only for what goes up
      * @param add takes the account's entries this computer lacks
      */
-    MergedPart(String remotePath, Supplier<Set<String>> names, Function<String, String> read, Consumer<Map<String, String>> add) {
+    MergedPart(String remotePath, Supplier<Set<String>> names, Function<String, @Nullable String> read, Consumer<Map<String, String>> add) {
         this.remotePath = remotePath;
         this.names = names;
         this.read = read;
@@ -81,7 +82,7 @@ final class MergedPart {
     }
 
     /** The entries, or null when {@code data} isn't this part's file: an object of texts under "entries". */
-    private static Map<String, String> strict(byte[] data) {
+    private static @Nullable Map<String, String> strict(byte[] data) {
         try {
             JsonNode entries = JSON.readTree(data).path("entries");
             if (!entries.isObject()) return null;
@@ -97,7 +98,7 @@ final class MergedPart {
     }
 
     /** What isn't an object of texts reads as nothing. */
-    private static Map<String, String> parse(byte[] data) {
+    private static Map<String, String> parse(byte @Nullable [] data) {
         Map<String, String> out = new TreeMap<>();
         if (data == null) return out;
         try {

@@ -39,7 +39,10 @@ class ReplyPromptTest {
 
     @Test
     void theVoiceNotesSinceMyLastMessageAreHeardAndReadAsTheirText() {
-        Message old = voice("Ana", false, "$old"), mine = msg("Yo", true, "ok"), a = voice("Ana", false, "$a"), b = voice("Ana", false, "$b");
+        Message old = voice("Ana", false, "$old");
+        Message mine = msg("Yo", true, "ok");
+        Message a = voice("Ana", false, "$a");
+        Message b = voice("Ana", false, "$b");
         List<Message> chat = List.of(old, mine, a, msg("Ana", false, "¿y?"), b);
         assertEquals(List.of(b, a), ReplyPrompt.voiceNotesToHear(chat, null));
         assertEquals(List.of(old), ReplyPrompt.voiceNotesToHear(List.of(old, mine), null), "with nothing after mine, the last one");
@@ -134,7 +137,10 @@ class ReplyPromptTest {
         Message first = msg("Ana", false, "¿A qué hora es el partido?");
         String p = ReplyPrompt.build("", false, List.of(first, msg("Ana", false, "Otra cosa")), first, "es a las [hora del partido]");
         String ask = p.substring(p.lastIndexOf("</chat-"));
-        int gaps = ask.indexOf("1. "), intention = ask.indexOf("2. "), answered = ask.indexOf("3. "), reply = ask.indexOf("4. ");
+        int gaps = ask.indexOf("1. ");
+        int intention = ask.indexOf("2. ");
+        int answered = ask.indexOf("3. ");
+        int reply = ask.indexOf("4. ");
         assertTrue(0 < gaps && gaps < intention && intention < answered && answered < reply, ask);
         assertTrue(ask.substring(gaps, intention).contains("[hora del partido]"), "1: the gaps");
         assertTrue(ask.substring(intention, answered).contains("intention") && ask.substring(intention, answered).contains("es a las"),
@@ -192,7 +198,7 @@ class ReplyPromptTest {
 
     @Test
     void howLongAgoReadsLikeAPersonWouldSayIt() {
-        java.time.Instant t = Instant.parse("2026-01-02T03:04:05Z");
+        Instant t = Instant.parse("2026-01-02T03:04:05Z");
         assertEquals("a moment ago", ReplyPrompt.ago(t, t.plusSeconds(30)));
         assertEquals("1 minute ago", ReplyPrompt.ago(t, t.plusSeconds(90)));
         assertEquals("45 minutes ago", ReplyPrompt.ago(t, t.plusSeconds(45 * 60)));
@@ -215,7 +221,8 @@ class ReplyPromptTest {
         var c = new StylePrompt.Correction("Siii me parece! 👀", "Siii me parece! Solo no el sábado", "¿Qué día puedes?", "!ana");
         String p = ReplyPrompt.build("", false, List.of(msg("Ana", false, "hola")), null, "", java.util.Map.of(), "", List.of(c));
         String mark = p.substring(p.indexOf("<corrections-") + 1, p.indexOf('>', p.indexOf("<corrections-")));
-        int open = p.indexOf("<" + mark + ">"), close = p.indexOf("</" + mark + ">");
+        int open = p.indexOf("<" + mark + ">");
+        int close = p.indexOf("</" + mark + ">");
         assertTrue(open < p.indexOf("You proposed: Siii me parece! 👀") && p.indexOf("They sent: Siii me parece! Solo no el sábado") < close, p);
         assertTrue(p.indexOf("Written to them: ¿Qué día puedes?") > open);
         assertFalse(ReplyPrompt.build("", false, List.of(msg("Ana", false, "hola")), null, "", java.util.Map.of(), "", List.of())

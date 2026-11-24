@@ -1,5 +1,8 @@
 package app.unichat.stt;
 
+import app.unichat.support.PathParts;
+
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -8,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -16,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PlayableAudioTest {
     @TempDir Path dir;
 
-    private Path voiceNote() throws Exception {
+    private Path voiceNote() throws IOException {
         Path f = dir.resolve("nota.ogg");
         try (InputStream in = PlayableAudioTest.class.getResourceAsStream("/app/unichat/demo/voice-note.ogg")) {
             Files.copy(in, f);
@@ -42,7 +46,9 @@ class PlayableAudioTest {
         Files.copy(PlayableAudioTest.class.getResourceAsStream("/app/unichat/demo/voice-note.ogg"), ogg);
         assertEquals(wav, PlayableAudio.of(ogg));
         assertTrue(Files.getLastModifiedTime(wav).toMillis() >= written);
-        assertTrue(Files.list(dir).noneMatch(f -> f.getFileName().toString().endsWith(".part")));
+        try (Stream<Path> stream = Files.list(dir)) {
+            assertTrue(stream.noneMatch(f -> PathParts.name(f).endsWith(".part")));
+        }
     }
 
     @Test

@@ -4,7 +4,6 @@ import app.unichat.ui.SearchFields;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatReader;
 import app.unichat.service.MediaSource;
-import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -18,19 +17,20 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.Objects;
 
 /** ⌘K / Ctrl+K palette: jump to any chat (including archived) or run an app command. */
 public final class CommandBar extends VBox {
     public record Command(String label, String hint, Runnable action) {}
 
-    private record Item(String label, String hint, Chat chat, Runnable action) {}
+    private record Item(String label, String hint, @Nullable Chat chat, @Nullable Runnable action) {}
 
     private final ChatReader chats;
-    private final MediaSource media;
     private final TextField field = new TextField();
     private final ObservableList<Item> items = FXCollections.observableArrayList();
     private final ListView<Item> list = new ListView<>(items);
@@ -40,7 +40,6 @@ public final class CommandBar extends VBox {
 
     public CommandBar(ChatReader chats, MediaSource media, List<Command> commands, Consumer<Chat> openChat, Runnable close) {
         this.chats = chats;
-        this.media = media;
         this.commands = commands;
         this.openChat = openChat;
         this.close = close;
@@ -57,9 +56,10 @@ public final class CommandBar extends VBox {
                     setGraphic(null);
                     return;
                 }
-                if (it.chat() != null) {
+                Chat chat = it.chat();
+                if (chat != null) {
                     ChatLine line = new ChatLine(media);
-                    line.show(it.chat(), it.hint());
+                    line.show(chat, it.hint());
                     setGraphic(line);
                     return;
                 }
@@ -79,14 +79,26 @@ public final class CommandBar extends VBox {
         field.textProperty().addListener((o, a, q) -> filter(q));
         field.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
             switch (e.getCode()) {
-                case DOWN -> { list.getSelectionModel().selectNext(); e.consume(); }
-                case UP -> { list.getSelectionModel().selectPrevious(); e.consume(); }
-                case ENTER -> { run(list.getSelectionModel().getSelectedItem()); e.consume(); }
-                case ESCAPE -> { close.run(); e.consume(); }
+                case DOWN -> {
+                    list.getSelectionModel().selectNext();
+                    e.consume();
+                }
+                case UP -> {
+                    list.getSelectionModel().selectPrevious();
+                    e.consume();
+                }
+                case ENTER -> {
+                    run(list.getSelectionModel().getSelectedItem());
+                    e.consume();
+                }
+                case ESCAPE -> {
+                    close.run();
+                    e.consume();
+                }
                 default -> { }
             }
         });
-        VBox.setVgrow(list, Priority.ALWAYS);
+        setVgrow(list, Priority.ALWAYS);
         getChildren().addAll(SearchFields.clearable(field), list);
         filter("");
     }
@@ -114,10 +126,11 @@ public final class CommandBar extends VBox {
         if (!items.isEmpty()) list.getSelectionModel().select(0);
     }
 
-    private void run(Item it) {
+    private void run(@Nullable Item it) {
         if (it == null) return;
         close.run();
-        if (it.chat() != null) openChat.accept(it.chat());
-        else it.action().run();
+        Chat chat = it.chat();
+        if (chat != null) openChat.accept(chat);
+        else Objects.requireNonNull(it.action(), "an item without a chat is a command").run();
     }
 }

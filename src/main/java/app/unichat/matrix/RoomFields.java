@@ -7,26 +7,27 @@ import app.unichat.model.MessageType;
 import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 
-import static app.unichat.matrix.SyncEvents.*;
+import static app.unichat.matrix.SyncEvents.blankToNull;
+import static app.unichat.matrix.SyncEvents.cleanName;
+import static app.unichat.matrix.SyncEvents.fallbackName;
+import static app.unichat.matrix.SyncEvents.isBot;
 
 /** What a chat shows, worked out from its room's state: title, network, group or not, members. */
 final class RoomFields {
     private final String me;
     private final Map<String, String> directRoomUser;
-    private final Function<String, MatrixRoom> room;
 
-    RoomFields(String me, Map<String, String> directRoomUser, Function<String, MatrixRoom> room) {
+    RoomFields(String me, Map<String, String> directRoomUser) {
         this.me = me;
         this.directRoomUser = directRoomUser;
-        this.room = room;
     }
 
     /** Recomputes title, avatar, network, group, members and preview of a room's chat. */
@@ -57,7 +58,7 @@ final class RoomFields {
     }
 
     /** The room's name, else the person's on the other side, its members', its address, or what it is. */
-    private String title(MatrixRoom room, String counterpart) {
+    private String title(MatrixRoom room, @Nullable String counterpart) {
         String title = cleanName(blankToNull(room.name));
         if (title == null && counterpart != null) title = nameOf(room, counterpart);
         if (title == null) title = heroesTitle(room);
@@ -67,7 +68,7 @@ final class RoomFields {
     }
 
     /** The room's picture, else the other person's. */
-    private static String avatar(MatrixRoom room, String counterpart) {
+    private static @Nullable String avatar(MatrixRoom room, @Nullable String counterpart) {
         if (room.avatar != null || counterpart == null) return room.avatar;
         Member m = room.members.get(counterpart);
         return m == null ? null : m.avatarUrl();
@@ -85,7 +86,7 @@ final class RoomFields {
     }
 
     /** The newest message that isn't a room change, else the newest change. */
-    private static Message last(MatrixRoom room) {
+    private static @Nullable Message last(MatrixRoom room) {
         for (int i = room.timeline.size() - 1; i >= 0; i--) {
             if (room.timeline.get(i).type() != MessageType.SYSTEM) return room.timeline.get(i);
         }
@@ -115,7 +116,8 @@ final class RoomFields {
 
     /** Children with an {@code order} first (lexicographic, as the spec says), then the rest in arrival order. */
     private static List<String> orderedChildren(MatrixRoom room) {
-        List<String> ordered = new ArrayList<>(), rest = new ArrayList<>();
+        List<String> ordered = new ArrayList<>();
+        List<String> rest = new ArrayList<>();
         room.spaceChildOrder.forEach((id, order) -> (order.isEmpty() ? rest : ordered).add(id));
         ordered.sort(java.util.Comparator.comparing(room.spaceChildOrder::get));
         ordered.addAll(rest);
@@ -177,7 +179,7 @@ final class RoomFields {
         return new ArrayList<>(out);
     }
 
-    private String counterpart(MatrixRoom room) {
+    private @Nullable String counterpart(MatrixRoom room) {
         String direct = directRoomUser.get(room.id);
         if (direct != null && !direct.equals(me)) return direct;
         List<String> others = otherUsers(room);
@@ -185,7 +187,7 @@ final class RoomFields {
         return others.isEmpty() ? null : others.get(0);
     }
 
-    private String heroesTitle(MatrixRoom room) {
+    private @Nullable String heroesTitle(MatrixRoom room) {
         List<String> names = new ArrayList<>();
         for (String u : otherUsers(room)) {
             if (isBot(u)) continue;
@@ -196,8 +198,9 @@ final class RoomFields {
     }
 
     String nameOf(MatrixRoom room, String userId) {
-        Member m = room.members.get(userId);
-        if (m != null && m.name() != null && !m.name().isBlank()) return m.name();
+        Member m = userId.isBlank() ? null : room.members.get(userId); // a blank id (a sender-less event) names nobody
+        String name = m == null ? null : m.name();
+        if (name != null && !name.isBlank()) return name;
         return fallbackName(userId);
     }
 }

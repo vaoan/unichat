@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.TestPictures;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
@@ -8,11 +9,15 @@ import app.unichat.settings.Settings;
 import app.unichat.video.Ffmpeg;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.scene.image.ImageView;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,6 +36,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class TimelineMediaUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
     private Path dir;
 
@@ -48,11 +54,12 @@ class TimelineMediaUiTest {
     // ---------------------------------------------------------------- files to send
 
     /** A still picture, its own file each time (pictures are cached by address). */
-    private String still(String format, int width, int height) throws Exception {
+    @SuppressFBWarnings(value = "PATH_TRAVERSAL_IN", justification = "a temp file in the test's own folder, with its own prefix and suffix")
+    private String still(String format, int width, int height) throws IOException {
         return TestPictures.still(Files.createTempFile(dir, "foto", "." + format), format, width, height).toUri().toString();
     }
 
-    private String gif(int width, int height) throws Exception {
+    private String gif(int width, int height) throws IOException {
         return TestPictures.gif(Files.createTempFile(dir, "anim", ".gif"), width, height, 12).toUri().toString();
     }
 
@@ -66,7 +73,7 @@ class TimelineMediaUiTest {
         };
     }
 
-    private static Consumer<Message> file(MessageType type, String url, String mime, String name, long size, ObjectNode info) {
+    private static Consumer<Message> file(MessageType type, String url, String mime, String name, long size, @Nullable ObjectNode info) {
         return m -> {
             m.setType(type);
             m.setMediaUrl(url);
@@ -90,7 +97,7 @@ class TimelineMediaUiTest {
      * Opens the chat at its newest message, holds downloads, and watches every frame while {@code arrive} brings messages
      * and their files then come in (or fail): the newest message never leaves the bottom edge.
      */
-    private void arrivesAtTheNewest(String what, boolean fails, Runnable arrive) throws Exception {
+    private void arrivesAtTheNewest(String what, boolean fails, Runnable arrive) throws InterruptedException, ExecutionException {
         if (w == null) w = TimelineWindow.open(20);
         double gap = w.untilAtBottom();
         int before = FxWait.fx(this::picturesShown);
@@ -110,12 +117,12 @@ class TimelineMediaUiTest {
         frames.stop(what);
     }
 
-    private void arrives(String what, Consumer<Message> message) throws Exception {
+    private void arrives(String what, Consumer<Message> message) throws InterruptedException, ExecutionException {
         arrivesAtTheNewest(what, false, () -> w.svc.receive(CHAT, message));
     }
 
     /** A message with no picture to wait for (a voice note, a document). */
-    private void arrivesWithoutPicture(String what, Consumer<Message> message) throws Exception {
+    private void arrivesWithoutPicture(String what, Consumer<Message> message) throws InterruptedException, ExecutionException {
         pictures = false;
         arrives(what, message);
     }
@@ -244,9 +251,9 @@ class TimelineMediaUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aShortVideoThatPlaysInTheChat() throws Exception {
-        Path ffmpeg = Ffmpeg.find();
-        assumeTrue(ffmpeg != null, "no ffmpeg to make a video");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "no ffmpeg to make a video");
         Path gif = Path.of(java.net.URI.create(gif(320, 240)));
         Path mp4 = dir.resolve("corto.mp4");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-i", gif.toString(), "-pix_fmt", "yuv420p",
@@ -266,7 +273,7 @@ class TimelineMediaUiTest {
         Path photo = Path.of(java.net.URI.create(still("png", 1000, 750)));
         int before = FxWait.fx(this::picturesShown);
         TimelineWindow.Frames frames = w.watch(w.atBottom(gap));
-        FxWait.fx(() -> { w.composer().sendFiles(List.of(photo.toFile())); return null; });
+        FxWait.onFx(() -> w.composer().sendFiles(List.of(photo.toFile())));
         FxWait.until("it's sent and drawn", () -> w.showsNewest() && picturesShown() > before);
         frames.stop("sending a photo: its bar, its bubble, its picture");
     }
@@ -274,7 +281,7 @@ class TimelineMediaUiTest {
     @Test
     void openingAChatWhoseNewestPhotoIsStillDownloading() throws Exception {
         w = TimelineWindow.open(20);
-        FxWait.fx(() -> { w.view.openChatId("!family:demo"); return null; });
+        FxWait.onFx(() -> w.view.openChatId("!family:demo"));
         FxWait.settled();
         ScriptedChatService.Gate downloads = w.svc.holdDownloads();
         w.svc.receive(CHAT, media(MessageType.IMAGE, still("png", 900, 600), "image/png", 0, 0));
@@ -289,7 +296,7 @@ class TimelineMediaUiTest {
     // ---------------------------------------------------------------- reading older messages
 
     /** A chat with a photo every few messages, none downloaded yet, read from further up. */
-    private ScriptedChatService.Gate readingAmongPhotos(boolean sizesKnown) throws Exception {
+    private ScriptedChatService.Gate readingAmongPhotos(boolean sizesKnown) throws IOException, InterruptedException, ExecutionException {
         List<String> urls = new java.util.ArrayList<>();
         for (int i = 0; i < 8; i++) urls.add(i % 2 == 0 ? still("png", 800, 600) : gif(300, 300));
         ScriptedChatService.Gate[] downloads = new ScriptedChatService.Gate[1];

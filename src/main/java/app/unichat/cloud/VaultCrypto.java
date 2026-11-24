@@ -21,13 +21,21 @@ final class VaultCrypto {
     /** Sealed form: version | nonce | ciphertext and tag. */
     private static final byte VERSION = 1;
     private static final String AAD_PREFIX = "unichat-vault/" + VERSION + ":";
-    private static final int KEY = 32, SALT = 16, NONCE = 12, TAG_BITS = 128, ARGON_KIB = 64 * 1024, ARGON_ITERATIONS = 3;
+    private static final int KEY = 32;
+    private static final int SALT = 16;
+    private static final int NONCE = 12;
+    private static final int TAG_BITS = 128;
+    private static final int ARGON_KIB = 64 * 1024;
+    private static final int ARGON_ITERATIONS = 3;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private VaultCrypto() {}
 
     /** Wrong key, another path, a changed byte or a version we don't know: the same answer, so nothing tells which. */
     static final class Broken extends Exception {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         Broken() {
             super("The vault's data could not be opened");
         }
@@ -66,7 +74,7 @@ final class VaultCrypto {
             c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(TAG_BITS, Arrays.copyOfRange(sealed, 1, 1 + NONCE)));
             c.updateAAD(aad(path));
             return c.doFinal(sealed, 1 + NONCE, sealed.length - 1 - NONCE);
-        } catch (GeneralSecurityException e) {
+        } catch (GeneralSecurityException _) {
             throw new Broken();
         }
     }
@@ -79,8 +87,8 @@ final class VaultCrypto {
     /** The same with {@code info} as bytes (one that carries keys, not only a label). */
     static byte[] hkdf(byte[] secret, byte[] info) {
         try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(new byte[KEY], "HmacSHA256"));
+            Mac mac = Mac.getInstance("HmacSHA256"); // NOPMD: HardCodedCryptoKey, see below
+            mac.init(new SecretKeySpec(new byte[KEY], "HmacSHA256")); // NOPMD: HardCodedCryptoKey, HKDF's zero salt (RFC 5869), not a key
             byte[] prk = mac.doFinal(secret);
             try {
                 mac.init(new SecretKeySpec(prk, "HmacSHA256"));
@@ -96,6 +104,7 @@ final class VaultCrypto {
     }
 
     /** 64 MiB, 3 iterations, parallelism 1: heavy for a guesser, about a second for the person. */
+    @SuppressWarnings("ByteBufferBackingArray") // the whole array is wiped, wherever the bytes start in it
     static byte[] argon2id(char[] password, byte[] salt) {
         if (salt.length != SALT) throw new IllegalArgumentException("The vault's salt must be 16 bytes");
         Argon2Parameters params = new Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)

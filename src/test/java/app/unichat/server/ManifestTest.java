@@ -1,10 +1,13 @@
 package app.unichat.server;
 
+import app.unichat.Present;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -20,12 +23,12 @@ class ManifestTest {
                 instagram=mautrix/meta@v0.2607.0:mautrix-instagram
                 TUWUNEL_VERSION=v1.9.4
                 """);
-        Manifest.Component wa = m.bridge("whatsapp");
+        Manifest.Component wa = Present.of(m.bridge("whatsapp"));
         assertEquals("mautrix/whatsapp", wa.repo());
         assertEquals("v0.2610.0", wa.tag());
         assertEquals("mautrix-whatsapp-darwin-arm64", wa.asset(Platform.MAC_ARM64));
-        assertEquals("https://github.com/mautrix/meta/releases/download/v0.2607.0", m.bridge("instagram").releaseUrl());
-        assertEquals("mautrix-instagram-darwin-arm64", m.bridge("instagram").asset(Platform.MAC_ARM64));
+        assertEquals("https://github.com/mautrix/meta/releases/download/v0.2607.0", Present.of(m.bridge("instagram")).releaseUrl());
+        assertEquals("mautrix-instagram-darwin-arm64", Present.of(m.bridge("instagram")).asset(Platform.MAC_ARM64));
         assertEquals("v1.9.4", m.tuwunelVersion());
         assertNull(m.bridge("signal"));
         assertEquals(2, m.bridges().size());
@@ -39,7 +42,7 @@ class ManifestTest {
                 NATIVES=vaoan/unichat@natives-3
                 NATIVES_UNBUILT=signal
                 """);
-        Manifest.Component wa = m.bridge("whatsapp");
+        Manifest.Component wa = Present.of(m.bridge("whatsapp"));
         assertEquals("https://github.com/mautrix/whatsapp/releases/download/v0.2610.0", m.releaseUrl(wa, Platform.MAC_ARM64));
         assertEquals("https://github.com/vaoan/unichat/releases/download/natives-3", m.releaseUrl(wa, Platform.WINDOWS_AMD64));
         assertEquals("mautrix-whatsapp-windows-amd64", wa.asset(Platform.WINDOWS_AMD64));
@@ -61,15 +64,15 @@ class ManifestTest {
         String natives = "https://github.com/vaoan/unichat/releases/download/natives-3";
         for (String b : new String[]{"twitter", "discord"}) {
             for (Platform p : Platform.values()) {
-                assertEquals(natives, m.releaseUrl(m.bridge(b), p), b + " on " + p);
+                assertEquals(natives, m.releaseUrl(Present.of(m.bridge(b)), p), b + " on " + p);
                 assertTrue(m.builds(b, p), b + " on " + p);
             }
         }
-        Manifest.Component wa = m.bridge("whatsapp");
+        Manifest.Component wa = Present.of(m.bridge("whatsapp"));
         assertEquals("https://github.com/mautrix/whatsapp/releases/download/v0.2610.0", m.releaseUrl(wa, Platform.MAC_ARM64));
         assertEquals(natives, m.releaseUrl(wa, Platform.WINDOWS_AMD64));
         assertEquals("vaoan/unichat@natives-3/mautrix-discord-darwin-arm64",
-                m.pinKey(m.bridge("discord"), Platform.MAC_ARM64));
+                m.pinKey(Present.of(m.bridge("discord")), Platform.MAC_ARM64));
     }
 
     @Test
@@ -77,7 +80,7 @@ class ManifestTest {
         String sha = "8d47b077e0e943d94e2c2c2fcda62f864ef781c1";
         Manifest m = Manifest.parse("twitter=mautrix/twitter@" + sha + ":mautrix-twitter\nNATIVES=vaoan/unichat@natives-3\n"
                 + "NATIVES_ALL=twitter\n");
-        Manifest.Component x = m.bridge("twitter");
+        Manifest.Component x = Present.of(m.bridge("twitter"));
         assertEquals("mautrix/twitter", x.repo());
         assertEquals(sha, x.tag());
         assertEquals("mautrix-twitter-darwin-arm64", x.asset(Platform.MAC_ARM64));
@@ -94,15 +97,15 @@ class ManifestTest {
                 NATIVES_ALL=discord
                 """;
         Manifest m = Manifest.parse(versions);
-        assertEquals("v0.7.7+natives-2", m.version(m.bridge("discord"), Platform.MAC_ARM64));
-        assertEquals("v0.7.7+natives-2", m.version(m.bridge("discord"), Platform.WINDOWS_AMD64));
-        assertEquals("v0.2610.0", m.version(m.bridge("whatsapp"), Platform.MAC_ARM64), "an official build keeps its tag");
-        assertEquals("v0.2610.0+natives-2", m.version(m.bridge("whatsapp"), Platform.WINDOWS_AMD64));
+        assertEquals("v0.7.7+natives-2", m.version(Present.of(m.bridge("discord")), Platform.MAC_ARM64));
+        assertEquals("v0.7.7+natives-2", m.version(Present.of(m.bridge("discord")), Platform.WINDOWS_AMD64));
+        assertEquals("v0.2610.0", m.version(Present.of(m.bridge("whatsapp")), Platform.MAC_ARM64), "an official build keeps its tag");
+        assertEquals("v0.2610.0+natives-2", m.version(Present.of(m.bridge("whatsapp")), Platform.WINDOWS_AMD64));
         Manifest next = Manifest.parse(versions.replace("natives-2", "natives-3"));
-        assertFalse(next.version(next.bridge("discord"), Platform.MAC_ARM64).equals(m.version(m.bridge("discord"), Platform.MAC_ARM64)));
+        assertNotEquals(m.version(Present.of(m.bridge("discord")), Platform.MAC_ARM64), next.version(Present.of(next.bridge("discord")), Platform.MAC_ARM64));
         Manifest none = Manifest.parse("discord=mautrix/discord@v0.7.7:mautrix-discord\nNATIVES_ALL=discord\n");
-        assertEquals("v0.7.7", none.version(none.bridge("discord"), Platform.MAC_ARM64), "no natives release: no \"v0.7.7+\"");
-        assertNull(none.releaseUrl(none.bridge("discord"), Platform.MAC_ARM64));
+        assertEquals("v0.7.7", none.version(Present.of(none.bridge("discord")), Platform.MAC_ARM64), "no natives release: no \"v0.7.7+\"");
+        assertNull(none.releaseUrl(Present.of(none.bridge("discord")), Platform.MAC_ARM64));
         Manifest server = Manifest.parse("TUWUNEL_VERSION=v1.9.4\nNATIVES=vaoan/unichat@natives-2\n");
         assertEquals("v1.9.4", server.version(server.tuwunel(), Platform.MAC_ARM64),
                 "the homeserver keeps its version, as the copy from the package writes it");
@@ -110,7 +113,7 @@ class ManifestTest {
 
     @Test
     void theBundledManifestNamesUnichatsOwnRelease() {
-        assertTrue(Manifest.bundled().nativesUrl().startsWith("https://github.com/vaoan/unichat/releases/download/natives-"));
+        assertTrue(Present.of(Manifest.bundled().nativesUrl()).startsWith("https://github.com/vaoan/unichat/releases/download/natives-"));
     }
 
     @Test
@@ -131,7 +134,7 @@ class ManifestTest {
         Manifest m = Manifest.bundled();
         for (String b : new String[]{"whatsapp", "telegram", "signal", "instagram", "facebook", "discord", "slack",
                 "gmessages", "twitter", "linkedin"}) {
-            assertTrue(m.bridge(b) != null, b);
+            assertNotNull(m.bridge(b), b);
         }
     }
 
@@ -149,14 +152,14 @@ class ManifestTest {
                 ccc333  vaoan/unichat@natives-3/tuwunel-darwin-arm64
                 """;
         Manifest m = Manifest.parse(versions, sums);
-        Manifest.Component wa = m.bridge("whatsapp");
+        Manifest.Component wa = Present.of(m.bridge("whatsapp"));
         assertEquals("mautrix/whatsapp@v0.2610.0/mautrix-whatsapp-darwin-arm64", m.pinKey(wa, Platform.MAC_ARM64));
         assertEquals("aaa111", m.sha256(wa, Platform.MAC_ARM64));
         assertEquals("bbb222", m.sha256(wa, Platform.WINDOWS_AMD64));
         assertEquals("ccc333", m.sha256(m.tuwunel(), Platform.MAC_ARM64));
         assertNull(m.sha256(m.tuwunel(), Platform.WINDOWS_AMD64));
         Manifest bumped = Manifest.parse(versions.replace("v0.2610.0", "v0.2611.0"), sums);
-        assertNull(bumped.sha256(bumped.bridge("whatsapp"), Platform.MAC_ARM64), "the old version's pin doesn't count");
+        assertNull(bumped.sha256(Present.of(bumped.bridge("whatsapp")), Platform.MAC_ARM64), "the old version's pin doesn't count");
         assertNull(Manifest.parse(versions).sha256(wa, Platform.MAC_ARM64), "nothing pinned");
     }
 

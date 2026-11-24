@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.support.PathParts;
 import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,7 +25,8 @@ import java.util.stream.Stream;
  */
 final class TextSync {
     static final String ROOT = CloudAccount.ROOT + "/Texts";
-    private static final String HERE = "here", INDEX = TextIndex.NAME;
+    private static final String HERE = "here";
+    private static final String INDEX = TextIndex.NAME;
     /** Names of ours only (machines are {@link Ids}): anything else in the account never becomes a path here. */
     private static final Pattern FILE = TextIndex.FILE;
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -50,10 +52,6 @@ final class TextSync {
         this.machine = machine;
     }
 
-    /**
-     * Sends what grew here, then brings what grew on the other computers; the chats (their keys) that something came
-     * for. A failure stops the round where it was: what was done is remembered, the rest is tried at the next.
-     */
     /** The account itself, as {@link #run}'s {@code to} says where the texts go: plain, or a vault ("vault:" and its id). */
     static final String PLAIN = "plain";
 
@@ -63,6 +61,8 @@ final class TextSync {
     }
 
     /**
+     * Sends what grew here, then brings what grew on the other computers; the chats (their keys) that something came
+     * for. A failure stops the round where it was: what was done is remembered, the rest is tried at the next.
      * {@code to} names where {@code storage} keeps them (plain, or which vault): what was sent is of one of them, so when
      * it's another this computer's own files all go again (it's the only one to write them); a launch to the same one
      * sends nothing again.
@@ -97,7 +97,7 @@ final class TextSync {
         if (!Files.isDirectory(own)) return;
         Map<String, Path> files = new java.util.TreeMap<>();
         try (Stream<Path> s = Files.list(own)) {
-            s.filter(p -> FILE.matcher(p.getFileName().toString()).matches()).forEach(p -> files.put(p.getFileName().toString(), p));
+            s.filter(p -> FILE.matcher(PathParts.name(p)).matches()).forEach(p -> files.put(PathParts.name(p), p));
         }
         String folder = ROOT + "/" + machine;
         boolean made = false;

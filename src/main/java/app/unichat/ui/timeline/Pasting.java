@@ -11,9 +11,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import javax.imageio.ImageIO;
+import org.jspecify.annotations.Nullable;
 
 /**
  * What pasting in the message box sends when it isn't text: files copied in Finder or Explorer, or a picture copied from
@@ -21,7 +24,7 @@ import javax.imageio.ImageIO;
  */
 final class Pasting {
     /** What was copied: files, plain text and a picture, each possibly missing. */
-    record Copied(List<File> files, String text, Image image) {
+    record Copied(List<File> files, @Nullable String text, @Nullable Image image) {
         static Copied from(Clipboard c) {
             return new Copied(c.hasFiles() ? c.getFiles() : List.of(), c.hasString() ? c.getString() : null,
                     c.hasImage() ? c.getImage() : null);
@@ -42,12 +45,14 @@ final class Pasting {
      * What to send, or null to paste as text. Files win (Finder also copies their names and icon); text wins over a
      * picture (Office copies a picture of the text along with it).
      */
-    static Send toSend(Copied c, Path dir) throws IOException {
+    static @Nullable Send toSend(Copied c, Path dir) throws IOException {
         if (c.files() != null && !c.files().isEmpty()) return new Send(List.copyOf(c.files()), SendAs.AS_IS);
-        if (c.image() == null || c.image().isError() || (c.text() != null && !c.text().isEmpty())) return null;
+        Image image = c.image();
+        String text = c.text();
+        if (image == null || image.isError() || (text != null && !text.isEmpty())) return null;
         Files.createDirectories(dir);
-        Path png = dir.resolve("image-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".png");
-        if (!ImageIO.write(SwingFXUtils.fromFXImage(c.image(), null), "png", png.toFile())) throw new IOException("no PNG writer");
+        Path png = dir.resolve("image-" + LocalDateTime.now(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT)) + ".png");
+        if (!ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", png.toFile())) throw new IOException("no PNG writer");
         return new Send(List.of(png.toFile()), SendAs.PHOTO);
     }
 }

@@ -5,6 +5,7 @@ import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.Network;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -14,7 +15,7 @@ public final class A11yText {
     private A11yText() { }
 
     /** A message row. {@code replied} is the message it answers if loaded, {@code transcript} its voice note's text if done. */
-    public static String message(Message m, Message replied, String transcript, ZoneId zone) {
+    public static String message(Message m, @Nullable Message replied, @Nullable String transcript, ZoneId zone) {
         StringBuilder sb = new StringBuilder(m.outgoing() ? I18n.t("common.you") : m.senderName());
         sb.append(", ").append(Formats.time(m.timestamp(), zone)).append(": ");
         if (m.type() == MessageType.SYSTEM) return m.body();
@@ -44,7 +45,7 @@ public final class A11yText {
     }
 
     /** A chat; {@code account} names the login when the network has several. */
-    public static String chat(Chat c, String account, Instant now, ZoneId zone) {
+    public static String chat(Chat c, @Nullable String account, Instant now, ZoneId zone) {
         StringBuilder sb = new StringBuilder(c.title()).append(", ").append(c.network().displayName());
         if (account != null) sb.append(" (").append(account).append(')');
         if (c.group()) sb.append(", ").append(I18n.t("a11y.group"));
@@ -54,9 +55,10 @@ public final class A11yText {
         if (c.pinned()) sb.append(", ").append(I18n.t("a11y.pinned"));
         if (c.muted()) sb.append(", ").append(I18n.t("a11y.muted"));
         if (c.reminderAt() != null) sb.append(", ").append(I18n.t("a11y.reminder"));
+        String sender = c.lastSenderName();
         if (!c.typing().isEmpty()) sb.append(". ").append(Formats.typing(c.typing()));
-        else if (!c.lastPreview().isEmpty()) sb.append(". ").append(c.lastOutgoing() ? I18n.t("common.you") + ": " : c.group() && c.lastSenderName() != null
-                ? c.lastSenderName() + ": " : "").append(c.lastPreview());
+        else if (!c.lastPreview().isEmpty()) sb.append(". ").append(c.lastOutgoing() ? I18n.t("common.you") + ": " : c.group() && sender != null
+                ? sender + ": " : "").append(c.lastPreview());
         String stamp = Formats.listStamp(c.lastActivity(), now, zone);
         if (!stamp.isEmpty()) sb.append(". ").append(stamp);
         return sb.toString();
@@ -68,7 +70,7 @@ public final class A11yText {
     }
 
     /** A server's row: {@code unread} sums its channels, {@code latest} is the channel that spoke last, if any. */
-    public static String server(Chat c, int unread, Chat latest) {
+    public static String server(Chat c, int unread, @Nullable Chat latest) {
         return I18n.t(c.network() == Network.DISCORD ? "a11y.serverDiscord" : "a11y.serverGroup", c.title(), c.network().displayName())
                 + (unread > 0 ? ", " + I18n.t("a11y.unreadCount", unread) : "") + (c.muted() ? ", " + I18n.t("a11y.muted") : "")
                 + (latest == null ? "" : ". " + latest.title() + ": " + latest.lastPreview()) + ". " + I18n.t("a11y.opensChannels");

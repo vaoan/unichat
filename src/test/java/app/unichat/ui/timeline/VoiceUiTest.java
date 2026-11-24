@@ -1,11 +1,13 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.support.PathParts;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.Theme;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.service.MockChatService;
 import app.unichat.voice.PcmSource;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +38,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VoiceUiTest {
     private static final String CHAT = "!family:demo";
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     private Composer composer;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     private Stage stage;
     private final List<String> toasts = new ArrayList<>();
     private volatile short amplitude = 8_000;
@@ -49,11 +54,11 @@ class VoiceUiTest {
         @Override public int rate() { return RATE; }
 
         @Override
-        public int read(short[] into) throws java.io.IOException {
+        public int read(short[] into) throws IOException {
             try {
                 reads.acquire();
             } catch (InterruptedException e) {
-                throw new java.io.IOException(e);
+                throw new IOException(e);
             }
             if (closed) return -1;
             for (int i = 0; i < into.length; i++) into[i] = i % 2 == 0 ? amplitude : (short) -amplitude;
@@ -101,7 +106,7 @@ class VoiceUiTest {
     void open() throws Exception {
         app.unichat.voice.VoiceEnhancer.setEnabled(false); // its own test covers it; nothing to download here
         svc = new MockChatService();
-        fx(() -> {
+        FxWait.onFx(() -> {
             composer = new Composer(svc, toasts::add);
             composer.setMicrophone(Mic::new);
             stage = new Stage();
@@ -111,40 +116,39 @@ class VoiceUiTest {
             stage.show();
             composer.setChat(CHAT);
             composer.refreshVoice();
-            return null;
         });
     }
 
     @AfterEach
     void close() throws Exception {
-        fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
         svc.stop();
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
-    private static void await(Callable<Boolean> c, String what) throws Exception {
+    private static void await(Callable<Boolean> c, String what) {
         FxWait.until(what, c);
     }
 
     private Node mic() { return composer.lookup(".mic-button"); }
 
-    private void startRecording() throws Exception {
-        fx(() -> { ((Button) mic()).fire(); return null; });
+    private void startRecording() throws InterruptedException {
+        FxWait.onFx(() -> ((Button) mic()).fire());
         await(() -> composer.lookup(".voice-bar") != null, "the recording bar shows");
     }
 
     private List<Message> voiceNotes() {
-        return svc.messages(CHAT).stream().filter(m -> m.type() == MessageType.AUDIO && m.fileName() != null && m.fileName().startsWith("voice-")).toList();
+        return svc.messages(CHAT).stream().filter(m -> m.type() == MessageType.AUDIO && String.valueOf(m.fileName()).startsWith("voice-")).toList();
     }
 
     @Test
     void theMicIsThereUntilSomethingIsWritten() throws Exception {
         assertTrue(fx(() -> mic().isVisible()));
         assertFalse(fx(() -> composer.lookup(".send-button").isVisible()));
-        fx(() -> { composer.insert("hola"); return null; });
+        FxWait.onFx(() -> composer.insert("hola"));
         assertFalse(fx(() -> mic().isVisible()));
         assertTrue(fx(() -> composer.lookup(".send-button").isVisible()));
     }
@@ -153,11 +157,10 @@ class VoiceUiTest {
     void recordingAndSendingLeavesAVoiceNoteWithItsLength() throws Exception {
         startRecording();
         speak(1200);
-        fx(() -> {
+        FxWait.onFx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(stage.getScene().snapshot(null), null), "png",
-                    java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "unichat-voice-bar.png").toFile());
+                    Path.of(System.getProperty("java.io.tmpdir"), "unichat-voice-bar.png").toFile());
             ((Button) composer.lookup(".voice-bar .send-button")).fire();
-            return null;
         });
         await(() -> voiceNotes().size() == 1, "sent");
         assertTrue(voiceNotes().get(0).durationMs() >= 800, "lasts " + voiceNotes().get(0).durationMs());
@@ -167,10 +170,10 @@ class VoiceUiTest {
     @Test
     void aVoiceNoteGoesInItsChatsTurn() throws Exception {
         List<Runnable> held = new java.util.concurrent.CopyOnWriteArrayList<>();
-        fx(() -> { composer.setInTurn((chat, send) -> held.add(send)); return null; }); // texts still being corrected
+        FxWait.onFx(() -> composer.setInTurn((chat, send) -> held.add(send))); // texts still being corrected
         startRecording();
         speak(1200);
-        fx(() -> { ((Button) composer.lookup(".voice-bar .send-button")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) composer.lookup(".voice-bar .send-button")).fire());
         await(() -> held.size() == 1, "it waits its turn");
         assertEquals(0, voiceNotes().size());
         held.getFirst().run();
@@ -180,10 +183,10 @@ class VoiceUiTest {
     @Test
     void aReplyStaysAReply() throws Exception {
         Message first = svc.messages(CHAT).get(0);
-        fx(() -> { composer.reply(first); return null; });
+        FxWait.onFx(() -> composer.reply(first));
         startRecording();
         speak(1500); // well over the shortest note
-        fx(() -> { ((Button) composer.lookup(".voice-bar .send-button")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) composer.lookup(".voice-bar .send-button")).fire());
         await(() -> voiceNotes().size() == 1, "sent");
         assertEquals(first.id(), voiceNotes().get(0).replyToId());
     }
@@ -197,18 +200,18 @@ class VoiceUiTest {
         assertEquals(1, recording.size(), "the recording's file");
         Path file = recording.iterator().next();
         speak(300);
-        fx(() -> { composer.lookup(".voice-bar").lookupAll(".icon-button").stream().findFirst().map(n -> (Button) n).orElseThrow().fire(); return null; });
+        FxWait.onFx(() -> composer.lookup(".voice-bar").lookupAll(".icon-button").stream().findFirst().map(n -> (Button) n).orElseThrow().fire());
         assertTrue(fx(() -> composer.lookup(".voice-bar") == null));
         await(() -> !Files.exists(file), "the discarded recording's file deleted"); // discarding is done
         assertTrue(voiceNotes().isEmpty());
     }
 
     /** The recordings' files there are now. */
-    private static java.util.Set<Path> recordings() throws java.io.IOException {
+    private static java.util.Set<Path> recordings() throws IOException {
         Path media = app.unichat.settings.Settings.get().cacheDir().resolve("media");
         if (!Files.isDirectory(media)) return new java.util.HashSet<>();
         try (var files = Files.list(media)) {
-            return files.filter(f -> f.getFileName().toString().matches("voice-.*\\.ogg"))
+            return files.filter(f -> PathParts.name(f).matches("voice-.*\\.ogg"))
                     .collect(java.util.stream.Collectors.toCollection(java.util.HashSet::new));
         }
     }
@@ -216,7 +219,7 @@ class VoiceUiTest {
     @Test
     void tooShortIsNotSent() throws Exception {
         startRecording();
-        fx(() -> { ((Button) composer.lookup(".voice-bar .send-button")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) composer.lookup(".voice-bar .send-button")).fire());
         await(() -> toasts.contains("La nota de voz es demasiado corta"), "says so");
         assertTrue(voiceNotes().isEmpty());
     }
@@ -224,7 +227,7 @@ class VoiceUiTest {
     @Test
     void changingChatDiscardsIt() throws Exception {
         startRecording();
-        fx(() -> { composer.setChat("!andres:demo"); return null; });
+        FxWait.onFx(() -> composer.setChat("!andres:demo"));
         assertTrue(fx(() -> composer.lookup(".voice-bar") == null));
         assertTrue(toasts.contains("Grabación descartada al cambiar de chat"));
     }
@@ -242,12 +245,11 @@ class VoiceUiTest {
 
     @Test
     void noMicSaysSo() throws Exception {
-        fx(() -> {
-            composer.setMicrophone(() -> { throw new java.io.IOException("No se encontró un micrófono disponible"); });
+        FxWait.onFx(() -> {
+            composer.setMicrophone(() -> { throw new IOException("No se encontró un micrófono disponible"); });
             ((Button) mic()).fire();
-            return null;
         });
         await(() -> toasts.contains("No se encontró un micrófono disponible"), "says so");
-        assertFalse(fx(() -> ((Button) mic()).isDisabled()));
+        assertFalse(fx(() -> mic().isDisabled()));
     }
 }

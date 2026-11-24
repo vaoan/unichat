@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.function.DoubleConsumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Saves what a link in a chat leads to, with InstaTray's engine ({@code instatray.core}: its sites, gallery-dl for
@@ -47,7 +48,7 @@ final class LinkSaver {
     }
 
     /** Null when saved; otherwise why not, and whether that's for good. Interrupted: stopped (nothing half-written stays). */
-    static Failure save(String url, Path dir, String tag, DoubleConsumer progress, Tools tools, Path cookiesDir)
+    static @Nullable Failure save(String url, Path dir, String tag, DoubleConsumer progress, Tools tools, Path cookiesDir)
             throws IOException, InterruptedException {
         // Only a web address reaches a tool: the engine ends its options before the link too ("--"), but what a chat
         // says should never get that far.
@@ -59,15 +60,16 @@ final class LinkSaver {
                         if (fraction >= 0) progress.accept(fraction);
                     }
 
-                    @Override public void title(String title) { }
+                    @Override public void title(String title) { /* not needed here */ }
 
-                    @Override public void line(String rawOutputLine) { }
+                    @Override public void line(String rawOutputLine) { /* not needed here */ }
                 });
         return switch (r.outcome()) {
             case DONE -> {
                 for (Path f : r.files()) {
                     if (!Files.isRegularFile(f)) continue;
-                    if (tools.ffmpeg() != null) VideoTranscoder.makePlayable(Path.of(tools.ffmpeg()), f);
+                    String ffmpeg = tools.ffmpeg();
+                    if (ffmpeg != null) VideoTranscoder.makePlayable(Path.of(ffmpeg), f);
                     MarkOfTheWeb.mark(f); // from the internet, as a file received in the chat is (SavedFile)
                 }
                 yield null;
@@ -77,7 +79,6 @@ final class LinkSaver {
         };
     }
 
-    /** A failed run in the person's words, and whether it's for good. */
     /**
      * A page no site knows (yt-dlp's {@code [generic]}) that refuses or isn't there (4xx): nothing to save there, ever (a
      * Linktree profile answered 403 each time and, tried again, held its chat's later files). A known site refusing may
@@ -87,6 +88,7 @@ final class LinkSaver {
     private static final java.util.regex.Pattern NOTHING_THERE =
             java.util.regex.Pattern.compile("^\\[generic\\].*HTTP Error 4\\d\\d|^(ERROR: )?Unsupported URL: ");
 
+    /** A failed run in the person's words, and whether it's for good. */
     static Failure failure(Fetch.Result r) {
         // Tried again at each change of the chat, a run that took the whole LIMIT would hold all saving that long each
         // time, and a missing tool is still missing at the next change: neither is worth holding the chat's later files.
@@ -104,11 +106,13 @@ final class LinkSaver {
 
     /** The tools this computer has: yt-dlp and ffmpeg (Unichat's own, downloaded when first needed), gallery-dl if any. */
     static Tools tools() throws IOException, InterruptedException {
-        Path ytDlp = YtDlp.whenNeeded(p -> { }), ffmpeg = Ffmpeg.whenNeeded(p -> { }), gallery = GalleryDl.find();
+        Path ytDlp = YtDlp.whenNeeded(p -> { });
+        Path ffmpeg = Ffmpeg.whenNeeded(p -> { });
+        Path gallery = GalleryDl.find();
         return new Tools() {
-            @Override public String ytDlp() { return ytDlp == null ? null : ytDlp.toString(); }
-            @Override public String galleryDl() { return gallery == null ? null : gallery.toString(); }
-            @Override public String ffmpeg() { return ffmpeg == null ? null : ffmpeg.toString(); }
+            @Override public @Nullable String ytDlp() { return ytDlp == null ? null : ytDlp.toString(); }
+            @Override public @Nullable String galleryDl() { return gallery == null ? null : gallery.toString(); }
+            @Override public @Nullable String ffmpeg() { return ffmpeg == null ? null : ffmpeg.toString(); }
         };
     }
 }

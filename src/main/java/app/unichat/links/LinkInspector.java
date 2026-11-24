@@ -1,10 +1,12 @@
 package app.unichat.links;
 
 import app.unichat.support.BoundedBody;
+import app.unichat.support.BoundedMap;
 import app.unichat.support.I18n;
 import app.unichat.support.Threads;
 import app.unichat.model.LinkMedia;
 import app.unichat.model.LinkPreview;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -22,7 +24,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -31,6 +32,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Predicate;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Opens the links in messages, as a browser would, to learn whether they hold video or audio: by what the server
@@ -58,11 +60,7 @@ public final class LinkInspector {
     private final ExecutorService workers = Executors.newFixedThreadPool(AT_ONCE, Threads.daemon("link-inspector"));
     private final Predicate<InetAddress> allowed;
     private final Duration bodyDeadline;
-    private final Map<String, CompletableFuture<Optional<LinkPreview>>> seen = new LinkedHashMap<>(64, 0.75f, true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String, CompletableFuture<Optional<LinkPreview>>> eldest) {
-            return size() > REMEMBERED;
-        }
-    };
+    private final Map<String, CompletableFuture<Optional<LinkPreview>>> seen = BoundedMap.byUse(REMEMBERED);
 
     public LinkInspector() {
         this(LinkInspector::isPublic);
@@ -102,7 +100,7 @@ public final class LinkInspector {
     }
 
     /** Saves the file to {@code target} under the same rules; returns its content type. */
-    public String download(String url, Path target) throws IOException {
+    public @Nullable String download(String url, Path target) throws IOException {
         try {
             Answer a = open(url);
             try (InputStream in = new BoundedBody(a.response().body(), MAX_DOWNLOAD_BYTES, DOWNLOAD_DEADLINE)) {
@@ -117,7 +115,7 @@ public final class LinkInspector {
         }
     }
 
-    private LinkPreview read(String url) throws IOException, InterruptedException {
+    private @Nullable LinkPreview read(String url) throws IOException, InterruptedException {
         String api = TweetPreview.api(url);
         if (api != null) {
             Answer a = open(api);
@@ -131,7 +129,7 @@ public final class LinkInspector {
             if (a.response().statusCode() != 200) return null;
             String mime = mimeOf(a);
             Optional<LinkMedia> media = mediaOf(a, mime);
-            if (media.isPresent()) return LinkPreview.of(url, media.get(), null);
+            if (media.isPresent()) return LinkPreview.of(url, media.orElseThrow(), null);
             if (mime.startsWith("image/")) return LinkPreview.of(url, null, a.uri().toString());
             if (!(mime.equals("text/html") || mime.equals("application/xhtml+xml"))) return null;
             String page = new String(in.readNBytes(MAX_PAGE_BYTES), StandardCharsets.UTF_8);
@@ -141,7 +139,7 @@ public final class LinkInspector {
             // A page can name thousands, each a request from this computer: the first few are the page's own.
             for (String candidate : pageMedia(page, a.uri().toString()).stream().limit(MAX_PAGE_MEDIA).toList()) {
                 Optional<LinkMedia> video = media(candidate);
-                if (video.isPresent()) return preview.withVideo(video.get(), false);
+                if (video.isPresent()) return preview.withVideo(video.orElseThrow(), false);
             }
             return preview;
         }
@@ -150,7 +148,7 @@ public final class LinkInspector {
     /** A page's video or audio, if its address really is one. */
     private Optional<LinkMedia> media(String url) throws IOException, InterruptedException {
         Answer a = open(url);
-        try (InputStream ignored = a.response().body()) {
+        try (InputStream _ = a.response().body()) {
             return a.response().statusCode() == 200 ? mediaOf(a, mimeOf(a)) : Optional.empty();
         }
     }
@@ -183,7 +181,8 @@ public final class LinkInspector {
     }
 
     /** By what the server says; a generic answer falls back on the file's extension. */
-    static LinkMedia.Kind kindOf(String mime, String path) {
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "only guesses video or audio from an extension, to label a link; nothing is allowed by it")
+    static LinkMedia.@Nullable Kind kindOf(String mime, @Nullable String path) {
         if (mime.startsWith("video/")) return LinkMedia.Kind.VIDEO;
         if (mime.startsWith("audio/") || mime.equals("application/ogg")) return LinkMedia.Kind.AUDIO;
         if (!mime.isEmpty() && !mime.equals("application/octet-stream") && !mime.equals("binary/octet-stream")) return null;
@@ -206,11 +205,12 @@ public final class LinkInspector {
             Optional<String> next = response.headers().firstValue("Location");
             if (code < 300 || code >= 400 || next.isEmpty()) return new Answer(uri, response);
             response.body().close();
-            uri = uri.resolve(next.get());
+            uri = uri.resolve(next.orElseThrow());
         }
         throw new IOException(I18n.t("link.tooManyRedirects"));
     }
 
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a java.net.URI scheme is ASCII letters only, so lowercasing can't turn a look-alike into http; the host is then checked by its resolved addresses")
     private void check(URI uri) throws IOException {
         String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
         if (!(scheme.equals("http") || scheme.equals("https")) || uri.getHost() == null || uri.getUserInfo() != null) {
@@ -252,7 +252,7 @@ public final class LinkInspector {
         }
     }
 
-    private static byte[] carriedV4(byte[] b) {
+    private static byte @Nullable [] carriedV4(byte[] b) {
         boolean sixToFour = (b[0] & 0xFF) == 0x20 && b[1] == 0x02; // 2002::/16, the IPv4 in bytes 2 to 5
         if (sixToFour) return java.util.Arrays.copyOfRange(b, 2, 6);
         byte[] nat64 = {0, 0x64, (byte) 0xFF, (byte) 0x9B, 0, 0, 0, 0, 0, 0, 0, 0}; // 64:ff9b::/96

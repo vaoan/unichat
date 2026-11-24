@@ -1,7 +1,11 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.io.IOException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -30,15 +35,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * with the key changed, and what the page is shown of it.
  */
 class VaultActionsTest {
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
-        OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
     private static final String PASSWORD = "una contraseña larga";
 
     @TempDir
     Path dir;
     private FakeDav cloud;
-    private Map<String, String> portableWere, keysWere;
-    private VaultComputer desk, laptop;
+    private Map<String, String> portableWere;
+    private Map<String, String> keysWere;
+    private VaultComputer desk;
+    private VaultComputer laptop;
 
     @BeforeEach
     void start() throws Exception {
@@ -60,20 +68,20 @@ class VaultActionsTest {
         return new WebDav(cloud.url(), "u", "p");
     }
 
-    private VaultView view(VaultComputer c) throws Exception {
+    private VaultView view(VaultComputer c) throws InterruptedException, ExecutionException {
         return c.as(c.cloud.vault()::vaultView);
     }
 
-    private String create(VaultComputer c) throws Exception {
+    private String create(VaultComputer c) throws InterruptedException, ExecutionException {
         return c.as(c.cloud.vault()::createVault);
     }
 
-    private <T> T as(VaultComputer c, java.util.concurrent.Callable<CompletableFuture<T>> call) throws Exception {
-        return c.as(call::call);
+    private <T extends @Nullable Object> T as(VaultComputer c, java.util.function.Supplier<CompletableFuture<T>> call) throws InterruptedException, ExecutionException {
+        return c.as(call::get);
     }
 
     private static String message(ExecutionException e) {
-        return e.getCause().getMessage();
+        return Present.message(e);
     }
 
     @Test
@@ -149,7 +157,7 @@ class VaultActionsTest {
         String old = create(desk);
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
         String oldSlot = cloud.files.keySet().stream().filter(p -> p.startsWith(Vault.SLOTS + "/") && !p.contains(DESK)).findFirst().orElseThrow();
-        byte[] stale = cloud.files.get(oldSlot);
+        byte[] stale = Present.of(cloud.files.get(oldSlot));
         Cloud.KeyChanged changed = as(desk, desk.cloud.vault()::rotateKey);
         cloud.put(oldSlot, stale); // put back by someone who kept it
         ExecutionException e = assertThrows(ExecutionException.class,
@@ -165,7 +173,7 @@ class VaultActionsTest {
      * account she puts it back in place of the new password's, its generation as {@code claims} (null: as it was), and
      * strips {@code vault.json}'s vouch.
      */
-    private void oldPasswordSlotPutBack(Long claims) throws Exception {
+    private void oldPasswordSlotPutBack(@Nullable Long claims) throws JsonProcessingException, IOException, InterruptedException, ExecutionException {
         create(desk);
         as(desk, () -> desk.cloud.vault().addPassword(PASSWORD.toCharArray()));
         String slotPath = passwordSlot();
@@ -183,7 +191,7 @@ class VaultActionsTest {
         cloud.put(Vault.INFO, json.writeValueAsBytes(info));
     }
 
-    private String passwordSlot() throws Exception {
+    private String passwordSlot() throws IOException {
         return Vault.slots(dav()).stream().filter(s -> s.method() == VaultSlot.Method.PASSWORD).map(s -> Vault.SLOTS + "/" + s.id() + ".json")
             .findFirst().orElseThrow();
     }
@@ -236,7 +244,7 @@ class VaultActionsTest {
         String old = create(desk);
         as(desk, desk.cloud.vault()::codeKept);
         String code = as(desk, desk.cloud.vault()::newRecoveryCode);
-        assertFalse(code.equals(old));
+        assertNotEquals(old, code);
         assertTrue(view(desk).codeUnconfirmed());
         assertThrows(ExecutionException.class, () -> as(laptop, () -> laptop.cloud.vault().openVault(VaultView.Way.RECOVERY, old.toCharArray())));
         as(laptop, () -> laptop.cloud.vault().openVault(VaultView.Way.RECOVERY, code.toCharArray()));
@@ -253,7 +261,7 @@ class VaultActionsTest {
         Cloud.KeyChanged changed = as(desk, () -> desk.cloud.vault().removeAndChangeKey(LAPTOP, Set.of(DESK, LAPTOP)));
         assertNotNull(RecoveryCode.parse(changed.code()));
         assertEquals(Set.of("PASSWORD"), changed.dropped(), "said, to add again");
-        assertEquals(1, Vault.info(dav()).generation(), "the key changed");
+        assertEquals(1, Present.of(Vault.info(dav())).generation(), "the key changed");
         assertEquals(Cloud.VaultState.REMOVED, laptop.round().vault());
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
         assertEquals(List.of(DESK), view(desk).computers().stream().map(VaultView.Computer::machine).toList());
@@ -280,9 +288,9 @@ class VaultActionsTest {
 
         Map<String, VaultView.Computer> listed = new HashMap<>();
         view(desk).computers().forEach(c -> listed.put(c.machine(), c));
-        assertTrue(listed.get(third.get("cloud.machine")).newSinceRemoval(), "came after the last removal");
-        assertFalse(listed.get(LAPTOP).newSinceRemoval(), "seen before it");
-        assertTrue(listed.get(LAPTOP).keyChanged(), "its key isn't the one first seen");
+        assertTrue(Present.of(listed.get(third.get("cloud.machine"))).newSinceRemoval(), "came after the last removal");
+        assertFalse(Present.of(listed.get(LAPTOP)).newSinceRemoval(), "seen before it");
+        assertTrue(Present.of(listed.get(LAPTOP)).keyChanged(), "its key isn't the one first seen");
         as(desk, () -> desk.cloud.vault().acceptKey(LAPTOP));
         assertFalse(view(desk).computers().stream().filter(c -> c.machine().equals(LAPTOP)).findFirst().orElseThrow().keyChanged(),
             "accepted by the person");
@@ -295,7 +303,7 @@ class VaultActionsTest {
         try (var r = desk.as(() -> CompletableFuture.completedFuture(VaultParts.open(dav(), (p, b) -> false, () -> { })))) {
             vk = r.key();
         }
-        Vault.addComputer(dav(), vk, OTHER, "Mal\nvado‮txt.exe" + "x".repeat(100));
+        Vault.addComputer(dav(), vk, OTHER, "Mal\nvado\u202etxt.exe" + "x".repeat(100));
         Arrays.fill(vk, (byte) 0);
         String label = view(desk).computers().stream().filter(c -> c.machine().equals(OTHER)).findFirst().orElseThrow().label();
         assertTrue(label.startsWith("Mal vado txt.exe"), label);
@@ -329,7 +337,7 @@ class VaultActionsTest {
         String said = I18n.t("cloud.error.vaultRemovedKeyKept", "");
         assertTrue(message(e).startsWith(said.substring(0, said.indexOf('('))), message(e));
         assertFalse(Vault.computers(dav()).containsKey(LAPTOP), "removed all the same");
-        assertEquals(0, Vault.info(dav()).generation(), "the key didn't change");
+        assertEquals(0, Present.of(Vault.info(dav())).generation(), "the key didn't change");
     }
 
     @Test

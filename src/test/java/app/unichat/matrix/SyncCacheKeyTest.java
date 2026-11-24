@@ -1,5 +1,7 @@
 package app.unichat.matrix;
 
+import app.unichat.support.PathParts;
+
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
@@ -28,7 +30,7 @@ class SyncCacheKeyTest {
     void signingInDropsOtherSessionsCaches() throws Exception {
         MatrixChatService old = new MatrixChatService("http://localhost:8008", "@yo:localhost", "syt_old");
         Path stale = old.syncCacheFile();
-        Files.createDirectories(stale.getParent());
+        Files.createDirectories(PathParts.parent(stale));
         Files.writeString(stale, "{}");
         Path unrelated = stale.resolveSibling("avatar-123.png");
         Files.writeString(unrelated, "x");

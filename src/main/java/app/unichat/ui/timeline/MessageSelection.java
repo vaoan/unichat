@@ -16,6 +16,7 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -55,15 +56,16 @@ final class MessageSelection {
 
     private final ListView<ThreadRows.Row> list;
     private final Consumer<Boolean> showBar;
-    private Purpose purpose;
+    private @Nullable Purpose purpose;
     private final Set<String> picked = new LinkedHashSet<>();
     private final Label count = new Label();
     private final Button send = new Button();
     private final HBox bar;
-    private String last;
+    private @Nullable String last;
     private boolean on;
 
     /** A row of the list that shows whether its message is picked (its look and what a screen reader says). */
+    @FunctionalInterface
     interface Shows {
         void showPicked();
     }
@@ -77,7 +79,10 @@ final class MessageSelection {
         this.list = list;
         this.showBar = showBar;
         count.getStyleClass().add("selection-count");
-        send.setOnAction(e -> purpose.act().accept(messages()));
+        send.setOnAction(e -> {
+            Purpose p = purpose; // the bar shows only while picking, after start()
+            if (p != null) p.act().accept(messages());
+        });
         Button cancel = new Button(I18n.t("select.cancel"));
         cancel.getStyleClass().add("secondary-button");
         cancel.setOnAction(e -> end());
@@ -113,13 +118,13 @@ final class MessageSelection {
 
     boolean picked(Message m) {
         if (!on) return false;
-        return purpose.range() ? inRange().contains(m.id()) : picked.contains(m.id());
+        return purpose().range() ? inRange().contains(m.id()) : picked.contains(m.id());
     }
 
     /** Whether {@code m} is the range's start (true) or end, as its row shows a marker. */
-    boolean rangeStart(Message m) { return on && purpose.range() && m.id().equals(range.start()); }
+    boolean rangeStart(Message m) { return on && purpose().range() && m.id().equals(range.start()); }
 
-    boolean rangeEnd(Message m) { return on && purpose.range() && m.id().equals(range.end()); }
+    boolean rangeEnd(Message m) { return on && purpose().range() && m.id().equals(range.end()); }
 
     /** Takes the range's start (or end) away: the range is the other alone, and the next click puts it back. */
     void removeRangeEnd(boolean start) {
@@ -141,6 +146,11 @@ final class MessageSelection {
         showBar.accept(true);
         toggle(first, false);
         list.requestFocus();
+    }
+
+    /** What picking is for: set by {@link #start}, the only way picking begins. */
+    private Purpose purpose() {
+        return java.util.Objects.requireNonNull(purpose, "picking begins only with start(), which says what for");
     }
 
     /** Picks or unpicks {@code m}, as a click does. */
@@ -172,12 +182,12 @@ final class MessageSelection {
                 .map(r -> ((ThreadRows.MessageRow) r).message().id()).toList();
     }
 
-    private java.util.Set<String> inRange() {
+    private Set<String> inRange() {
         return new java.util.HashSet<>(range.of(ids()));
     }
 
     /** The timeline's keys while picking: true when it took {@code e} (all but the ones that move). */
-    boolean key(KeyEvent e, Message selected) {
+    boolean key(KeyEvent e, @Nullable Message selected) {
         if (!on || MOVING.contains(e.getCode())) return false;
         if (e.getCode() == KeyCode.ESCAPE) end();
         else if ((e.getCode() == KeyCode.SPACE || e.getCode() == KeyCode.ENTER) && selected != null) toggle(selected, e.isShiftDown());
@@ -203,15 +213,16 @@ final class MessageSelection {
         return false;
     }
 
-    private static ListCell<?> cellOf(Node n) {
+    private static @Nullable ListCell<?> cellOf(Node n) {
         for (Node at = n; at != null; at = at.getParent()) if (at instanceof ListCell<?> c) return c;
         return null;
     }
 
-    /** Picks or unpicks {@code m}; {@code range}: picks every message from the last one picked to it. */
-    private void toggle(Message m, boolean range) {
-        if (!purpose.pickable().test(m)) return;
-        if (purpose.range()) { // a stretch: the click moves an end (or puts one back), never leaves one out
+    /** Picks or unpicks {@code m}; {@code extend}: picks every message from the last one picked to it. */
+    private void toggle(Message m, boolean extend) {
+        Purpose why = purpose();
+        if (!why.pickable().test(m)) return;
+        if (why.range()) { // a stretch: the click moves an end (or puts one back), never leaves one out
             this.range.click(m.id(), ids());
             last = m.id();
             sync();
@@ -219,9 +230,10 @@ final class MessageSelection {
         }
         List<Message> all = list.getItems().stream().filter(r -> r instanceof ThreadRows.MessageRow)
                 .map(r -> ((ThreadRows.MessageRow) r).message()).toList();
-        int from = last == null ? -1 : indexOf(all, last), to = indexOf(all, m.id());
-        if (range && from >= 0 && to >= 0) {
-            for (int i = Math.min(from, to); i <= Math.max(from, to); i++) if (purpose.pickable().test(all.get(i))) picked.add(all.get(i).id());
+        int from = last == null ? -1 : indexOf(all, last);
+        int to = indexOf(all, m.id());
+        if (extend && from >= 0 && to >= 0) {
+            for (int i = Math.min(from, to); i <= Math.max(from, to); i++) if (why.pickable().test(all.get(i))) picked.add(all.get(i).id());
         } else if (!picked.remove(m.id())) {
             picked.add(m.id());
         }
@@ -255,7 +267,7 @@ final class MessageSelection {
         }
     }
 
-    private Message message(String id) {
+    private @Nullable Message message(@Nullable String id) {
         if (id == null) return null;
         for (ThreadRows.Row r : list.getItems()) if (r instanceof ThreadRows.MessageRow mr && mr.message().id().equals(id)) return mr.message();
         return null;

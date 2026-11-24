@@ -3,16 +3,24 @@ package app.unichat.login;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 class ChromiumCookiesTest {
-    private static final byte[] KEY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] KEY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII); // NOPMD: HardCodedCryptoKey, a fixture's
 
-    private static byte[] encryptV10(byte[] plain) throws Exception {
+    @SuppressFBWarnings(value = {"CIPHER_INTEGRITY", "PADDING_ORACLE", "STATIC_IV"}, justification = "makes a fixture the way Chromium stores cookies (v10), to test reading them; Chromium's v10 format uses a fixed IV of spaces; the fixture must too")
+    private static byte[] encryptV10(byte[] plain) throws InvalidKeyException, NoSuchAlgorithmException, IllegalBlockSizeException, InvalidAlgorithmParameterException, BadPaddingException, NoSuchPaddingException {
         byte[] iv = new byte[16];
         java.util.Arrays.fill(iv, (byte) 0x20);
         Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");

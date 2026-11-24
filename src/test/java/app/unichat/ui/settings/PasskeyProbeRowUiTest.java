@@ -24,7 +24,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** "Probar llave de acceso (prueba)": there only when asked for, it opens the probe and says what it found. */
@@ -58,7 +59,7 @@ class PasskeyProbeRowUiTest {
         return session;
     }
 
-    private Stage show(Node row) throws Exception {
+    private Stage show(Node row) throws InterruptedException {
         return FxWait.fx(() -> {
             Stage s = new Stage();
             s.setOpacity(0);
@@ -91,33 +92,33 @@ class PasskeyProbeRowUiTest {
         Button run = button(row);
         assertEquals(I18n.t("settings.vault.probe.title"), run.getAccessibleText(), "a screen reader names it");
         assertTrue(run.isFocusTraversable(), "reachable by keyboard");
-        FxWait.fx(() -> { run.fire(); return null; });
-        assertTrue(told.get() != null, "the probe started");
+        FxWait.onFx(run::fire);
+        assertNotNull(told.get(), "the probe started");
         FxWait.until("says it's open, at which address", () -> says(row, I18n.t("settings.vault.probe.opened", ADDRESS)));
         assertTrue(I18n.t("settings.vault.probe.opened", ADDRESS).contains(ADDRESS.toString()), "on screen, for no browser");
         told.get().accept(new PasskeyPage.Finding(PasskeyPage.Step.GET, null, 32, "0123456789abcdef", "id", "platform", "UA", ""));
         FxWait.until("says what it found", () -> says(row, I18n.t("cloud.passkey.gotPrf")));
-        FxWait.fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
     @Test
     void aProbeThatCantStartSaysWhy() throws Exception {
         Node row = FxWait.fx(() -> PasskeyProbeRow.build(this::start));
         Stage stage = show(row);
-        FxWait.fx(() -> { button(row).fire(); return null; });
+        FxWait.onFx(() -> button(row).fire());
         session.completeExceptionally(new IOException("puerto ocupado"));
         FxWait.until("says why", () -> says(row, "puerto ocupado"));
-        FxWait.fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
     @Test
     void aProbeLeftToItsDeadlineSaysSoInItsOwnWords() throws Exception {
         Node row = FxWait.fx(() -> PasskeyProbeRow.build(this::start));
         Stage stage = show(row);
-        FxWait.fx(() -> { button(row).fire(); return null; });
+        FxWait.onFx(() -> button(row).fire());
         session.completeExceptionally(new IOException(I18n.t("cloud.passkey.expired")));
         FxWait.until("says the test stopped", () -> says(row, I18n.t("cloud.passkey.expired")));
-        assertFalse(I18n.t("cloud.passkey.expired").equals(I18n.t("cloud.signIn.expired")), "a probe, not a sign-in");
-        FxWait.fx(() -> { stage.close(); return null; });
+        assertNotEquals(I18n.t("cloud.signIn.expired"), I18n.t("cloud.passkey.expired"), "a probe, not a sign-in");
+        FxWait.onFx(stage::close);
     }
 }

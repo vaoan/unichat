@@ -10,7 +10,7 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 
 /** The package rules of docs/ARCHITECTURE.md. A failure here means a new dependency broke a layer, not a flaky test. */
 class ArchitectureTest {
-    private static final JavaClasses APP = new ClassFileImporter()
+    private static final JavaClasses APP = new ClassFileImporter() // NOPMD: LooseCoupling, ArchUnit's own type for what it imported
             .withImportOption(new ImportOption.DoNotIncludeTests())
             .importPackages("app.unichat");
 

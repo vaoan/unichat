@@ -2,6 +2,7 @@ package app.unichat.ui.timeline;
 
 import app.unichat.model.Message;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -39,11 +40,12 @@ import java.util.function.Function;
 final class ConversationShot {
     /** How wide it's drawn, in points: a phone's screen, so it reads there as the chat does (its messages fit it). */
     static final double WIDTH = 420;
-    /**
-     * The most it draws: a stretch longer is refused, said, before it's made. One picture of a thousand messages (or one
-     * stranger's message of 60 000 lines) at 2x is gigabytes: the window's heap would run out (`ui/media/CLAUDE.md`).
-     */
-    static final int MAX_MESSAGES = 400, MAX_HEIGHT_PX = 16_000;
+    // The most it draws: a stretch longer is refused, said, before it's made. One picture of a thousand messages (or
+    // one stranger's message of 60 000 lines) at 2x is gigabytes: the window's heap would run out
+    // (`ui/media/CLAUDE.md`).
+    static final int MAX_MESSAGES = 400;
+    static final int MAX_HEIGHT_PX = 16_000;
+
     /** Pixels a point: sharp on a phone's screen and a retina one. */
     static final double SCALE = 2;
     /** How often it looks whether its pictures arrived. */
@@ -69,12 +71,12 @@ final class ConversationShot {
             HBox cell = new HBox(n);
             HBox.setHgrow(n, javafx.scene.layout.Priority.ALWAYS);
             cell.getStyleClass().add("shot-row");
-            if (r instanceof ThreadRows.MessageRow) cell.setUserData(Boolean.TRUE); // a piece may end after it, not after a day's line
+            if (r instanceof ThreadRows.MessageRow) cell.setUserData(true); // a piece may end after it, not after a day's line
             rows.getChildren().add(cell);
         }
         VBox root = new VBox(top, rows);
         if (footer) {
-            Label f = new Label(I18n.t("capture.footer", DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withLocale(I18n.locale())
+            Label f = new Label(I18n.t("capture.footer", DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", I18n.locale())
                     .format(Instant.now().atZone(ZoneId.systemDefault()))));
             f.getStyleClass().add("shot-footer");
             HBox line = new HBox(f);
@@ -110,6 +112,7 @@ final class ConversationShot {
         CompletableFuture.delayedExecutor(LOOK_MS, TimeUnit.MILLISECONDS).execute(() -> Platform.runLater(() -> whenLoaded(root, until, then)));
     }
 
+    @SuppressFBWarnings(value = "RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN", justification = "user data set to Boolean.TRUE by our own code as a mark: identity is the check")
     private static Shot snap(VBox root, Node header, VBox rows) {
         laidOut(root);
         if (px(root.getHeight()) > MAX_HEIGHT_PX) throw new TooLong(); // measured before a pixel is made
@@ -135,6 +138,9 @@ final class ConversationShot {
 
     /** Too long a stretch to draw, said in the person's words. */
     static final class TooLong extends RuntimeException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         TooLong() {
             super(I18n.t("capture.tooLong", MAX_MESSAGES));
         }
@@ -160,7 +166,8 @@ final class ConversationShot {
     /** {@code shot} cut into pieces {@code height} pixels tall, between messages; the last one filled up with its background. */
     static List<Image> pieces(Shot shot, int height) {
         Image whole = shot.whole();
-        int w = (int) whole.getWidth(), total = (int) whole.getHeight();
+        int w = (int) whole.getWidth();
+        int total = (int) whole.getHeight();
         PixelReader in = whole.getPixelReader();
         Color background = in.getColor(0, total - 1);
         List<Image> out = new ArrayList<>();

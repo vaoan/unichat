@@ -31,7 +31,8 @@ public final class SafeFile {
 
     private final Path target;
     private final String suffix;
-    private final boolean hidden, ownerOnly;
+    private final boolean hidden;
+    private final boolean ownerOnly;
     private final Check beforeMove;
 
     private SafeFile(Path target, String suffix, boolean hidden, boolean ownerOnly, Check beforeMove) {
@@ -76,8 +77,8 @@ public final class SafeFile {
         Path part = part();
         try {
             Files.deleteIfExists(part);
-            try (FileChannel channel = FileChannel.open(part, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE), attributes())) {
-                OutputStream out = new KeptOpen(Channels.newOutputStream(channel));
+            try (FileChannel channel = FileChannel.open(part, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE), attributes());
+                 OutputStream out = new KeptOpen(Channels.newOutputStream(channel))) {
                 content.writeTo(out);
                 out.flush();
                 channel.force(true);

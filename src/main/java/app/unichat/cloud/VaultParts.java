@@ -1,6 +1,8 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +13,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
@@ -25,8 +28,11 @@ import java.util.stream.Stream;
  * which {@link SealedStorage} keeps inside the vault; they never go up plain.
  */
 final class VaultParts {
-    /** This computer's hold on the vault (machine-only, as every {@code cloud.} key): its id, its slot's key, its X25519 key. */
-    static final String ID = "cloud.vault.id", KEY = "cloud.vault.key", PRIVATE = "cloud.vault.private";
+    // This computer's hold on the vault (machine-only, as every cloud. key): its id, its slot's key, its X25519 key.
+    static final String ID = "cloud.vault.id";
+    static final String KEY = "cloud.vault.key";
+    static final String PRIVATE = "cloud.vault.private";
+
     /** "Seguir sin la bóveda en este equipo": never asked again, nothing personal sent, everything entered by hand. */
     static final String DECLINED = "cloud.vault.declined";
     /**
@@ -34,8 +40,9 @@ final class VaultParts {
      * (declined, or never opened) is no sign it was turned off either, so nothing goes plain until the person says.
      */
     static final String SEEN = "cloud.vault.seen";
-    static final String SECRETS_FILE = Cloud.Part.SECRETS.path(), PINNED_FILE = Cloud.Part.PINNED.path(),
-        TRANSCRIPTS_FILE = Cloud.Part.TRANSCRIPTS.path();
+    static final String SECRETS_FILE = Cloud.Part.SECRETS.path();
+    static final String PINNED_FILE = Cloud.Part.PINNED.path();
+    static final String TRANSCRIPTS_FILE = Cloud.Part.TRANSCRIPTS.path();
     private static final String PINNED = "pinned-messages.json";
     /** A transcript's file as {@code stt.Transcripts} names it (the audio's SHA-256): no other name from the account becomes a path. */
     private static final Pattern TRANSCRIPT = Pattern.compile("[0-9a-f]{64}\\.txt");
@@ -83,7 +90,7 @@ final class VaultParts {
     private static Set<String> transcriptsIn(Path dir) {
         if (!Files.isDirectory(dir)) return Set.of();
         try (Stream<Path> files = Files.list(dir)) {
-            return files.map(p -> p.getFileName().toString()).filter(n -> TRANSCRIPT.matcher(n).matches()).collect(Collectors.toSet());
+            return files.map(PathParts::name).filter(n -> TRANSCRIPT.matcher(n).matches()).collect(Collectors.toSet());
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
@@ -95,17 +102,19 @@ final class VaultParts {
      */
     static final class Round implements AutoCloseable {
         private final Cloud.VaultState state;
-        private final byte[] vk;
-        private final Vault.Info vault;
-        /** The vault's parts that didn't open this round (their logical paths), and those of them that went up anew from here. */
-        private final Set<String> damaged = new java.util.concurrent.CopyOnWriteArraySet<>(),
-            replaced = new java.util.concurrent.CopyOnWriteArraySet<>();
+        /** Both null unless {@link Cloud.VaultState#OPEN}. */
+        private final byte @Nullable [] vk;
+        private final Vault.@Nullable Info vault;
+        // The vault's parts that didn't open this round (their logical paths), and those of them that went up anew
+        // from here.
+        private final Set<String> damaged = new java.util.concurrent.CopyOnWriteArraySet<>();
+        private final Set<String> replaced = new java.util.concurrent.CopyOnWriteArraySet<>();
 
-        private Round(Cloud.VaultState state, byte[] vk) {
+        private Round(Cloud.VaultState state, byte @Nullable [] vk) {
             this(state, vk, null);
         }
 
-        private Round(Cloud.VaultState state, byte[] vk, Vault.Info vault) {
+        private Round(Cloud.VaultState state, byte @Nullable [] vk, Vault.@Nullable Info vault) {
             this.state = state;
             this.vk = vk;
             this.vault = vault;
@@ -122,16 +131,16 @@ final class VaultParts {
         }
 
         /** Where the texts go this round, for {@link TextSync#run(Storage, String)}: this vault, or the plain account. */
-        String textsTo() { return open() ? "vault:" + vault.id() : TextSync.PLAIN; }
+        String textsTo() { return open() ? "vault:" + info().id() : TextSync.PLAIN; }
 
-        /** The vault open this round; null when it isn't. */
-        Vault.Info info() { return vault; }
+        /** The vault open this round: asked only while {@link #open}. */
+        Vault.Info info() { return Objects.requireNonNull(vault, "the vault isn't open"); }
 
         /** Where the personal parts go this round: the account itself without a vault, the vault when open, nowhere otherwise. */
-        Storage personal(Storage plain) {
+        @Nullable Storage personal(Storage plain) {
             return switch (state) {
                 case NONE -> plain;
-                case OPEN -> new SealedStorage(plain, () -> vk.clone(), path -> replaceable(plain, path),
+                case OPEN -> new SealedStorage(plain, Objects.requireNonNull(vk)::clone, path -> replaceable(plain, path),
                     path -> { if (damaged.contains(path)) replaced.add(path); });
                 case LOCKED, DECLINED, REMOVED, UNRECOGNIZED, MISSING -> null;
             };
@@ -144,7 +153,7 @@ final class VaultParts {
          * writer, which isn't this computer for another's.
          */
         private boolean replaceable(Storage plain, String path) {
-            if (!path.startsWith(CloudAccount.SETTINGS_DIR + "/") || !Vault.at(plain, vault)) return false;
+            if (!path.startsWith(CloudAccount.SETTINGS_DIR + "/") || !Vault.at(plain, info())) return false;
             damaged.add(path);
             return true;
         }
@@ -190,20 +199,20 @@ final class VaultParts {
         Settings s = Settings.get();
         byte[] file = plain.get(Vault.INFO);
         Vault.Info info = Vault.parse(file);
-        String held = s.getString(ID, null);
+        String held = s.getString(ID);
         // A vault file that doesn't read (damaged, half written, another's) is no sign of no vault: nothing goes up plain,
         // and a key held here isn't forgotten over it.
         if (info == null && file != null) return closed(s);
         if (info == null) {
             // Its file deleted is no sign it was turned off: only the mark that opens with this computer's key is, and a
             // computer that saw the vault without holding it has no key to believe a mark with.
-            if (held != null ? !VaultOff.says(plain, held) : s.getString(SEEN, null) != null) return new Round(Cloud.VaultState.MISSING, null);
+            if (held != null ? !VaultOff.says(plain, held) : s.getString(SEEN) != null) return new Round(Cloud.VaultState.MISSING, null);
             if (held != null || s.getBool(DECLINED, false)) gone();
             return new Round(Cloud.VaultState.NONE, null);
         }
         seen(info);
         if (!info.id().equals(held)) VaultMove.forget(); // another vault than the one moved into: it's moved into afresh
-        String key = s.getString(KEY, null);
+        String key = s.getString(KEY);
         if (key == null || !info.id().equals(held)) return closed(s);
         VaultSlot slot = Vault.slot(plain, info, Cloud.machine());
         if (slot == null || slot.method() != VaultSlot.Method.COMPUTER) return new Round(Cloud.VaultState.REMOVED, null);
@@ -239,7 +248,7 @@ final class VaultParts {
     /** {@code vault} found in the account (or made here): kept as the one seen, in place of any other. */
     static void seen(Vault.Info vault) {
         Settings s = Settings.get();
-        if (!vault.id().equals(s.getString(SEEN, null))) s.set(SEEN, vault.id());
+        if (!vault.id().equals(s.getString(SEEN))) s.set(SEEN, vault.id());
     }
 
     /**
@@ -268,7 +277,7 @@ final class VaultParts {
     }
 
     /** The public half of {@link #PRIVATE}; null when there's none here or it isn't one. */
-    private static byte[] ownPublicKey(Settings s) {
+    private static byte @Nullable [] ownPublicKey(Settings s) {
         byte[] privateKey = privateKey(s);
         if (privateKey == null) return null;
         try {
@@ -279,8 +288,8 @@ final class VaultParts {
     }
 
     /** {@link #PRIVATE} as kept here, for its holder to clear; null when there's none or it isn't base64. */
-    private static byte[] privateKey(Settings s) {
-        String saved = s.getString(PRIVATE, null);
+    private static byte @Nullable [] privateKey(Settings s) {
+        String saved = s.getString(PRIVATE);
         try {
             return saved == null ? null : Base64.getDecoder().decode(saved);
         } catch (IllegalArgumentException e) {
@@ -324,7 +333,7 @@ final class VaultParts {
     }
 
     /** The key offered in this computer's slot, vouched for with {@code held}; null when there's none it can take. */
-    private static byte[] offered(VaultSlot slot, Vault.Info info, Settings s, byte[] held) {
+    private static byte @Nullable [] offered(VaultSlot slot, Vault.Info info, Settings s, byte[] held) {
         byte[] privateKey = privateKey(s);
         if (privateKey == null) return null;
         try {

@@ -8,7 +8,9 @@ import app.unichat.support.Hashes;
 import app.unichat.model.MimeTypes;
 import app.unichat.model.Mxc;
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 import app.unichat.support.Urls;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
@@ -33,7 +35,8 @@ final class MediaDownloader {
     private final Map<String, CompletableFuture<Path>> mediaInFlight = new ConcurrentHashMap<>();
     /** When each folder was last trimmed. */
     private final Map<String, java.util.concurrent.atomic.AtomicLong> lastTrim = new ConcurrentHashMap<>();
-    private static final String MEDIA = "media", STICKERS = "sticker-cache";
+    private static final String MEDIA = "media";
+    private static final String STICKERS = "sticker-cache";
 
     private volatile java.util.Set<String> pinned = java.util.Set.of();
     private final SavedMedia saved;
@@ -91,12 +94,12 @@ final class MediaDownloader {
     int watched() { return watching.size(); }
 
     /** {@link #media(String, int, int)}, telling {@code progress} how much has arrived while it downloads. */
-    CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer progress) {
+    CompletableFuture<Path> media(@Nullable String url, int width, int height, java.util.function.DoubleConsumer progress) {
         return watched(key(MEDIA, url, width, height), progress, () -> media(url, width, height));
     }
 
     /** A sticker's original, in the stickers' own folder, telling {@code progress} how much has arrived. */
-    CompletableFuture<Path> sticker(String url, java.util.function.DoubleConsumer progress) {
+    CompletableFuture<Path> sticker(@Nullable String url, java.util.function.DoubleConsumer progress) {
         return watched(key(STICKERS, url, 0, 0), progress, () -> fetch(url, 0, 0, STICKERS));
     }
 
@@ -111,17 +114,17 @@ final class MediaDownloader {
     }
 
     /** A download's key in flight: the media folder's as it always was, another folder's apart. */
-    private static String key(String folder, String url, int width, int height) {
+    private static String key(String folder, @Nullable String url, int width, int height) {
         String k = cacheKey(url, width, height);
         return folder.equals(MEDIA) ? k : folder + ":" + k;
     }
 
     /** The local file of {@code url}: from the cache, or downloaded once however many ask at the same time. */
-    CompletableFuture<Path> media(String url, int width, int height) {
+    CompletableFuture<Path> media(@Nullable String url, int width, int height) {
         return fetch(url, width, height, MEDIA);
     }
 
-    private CompletableFuture<Path> fetch(String url, int width, int height, String folder) {
+    private CompletableFuture<Path> fetch(@Nullable String url, int width, int height, String folder) {
         if (url == null || url.isBlank()) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
         if (url.startsWith("file:")) {
             return ownFiles.contains(url) ? CompletableFuture.completedFuture(Path.of(URI.create(url)))
@@ -160,7 +163,7 @@ final class MediaDownloader {
     }
 
     /** A sticker the media folder holds from before it had its own: moved into the stickers' folder, not downloaded again. */
-    private Path adopt(String hash, Path stickers) {
+    private @Nullable Path adopt(String hash, Path stickers) {
         Path old = findCached(Settings.get().cacheDir().resolve(MEDIA), hash);
         if (old == null) return null;
         try {
@@ -215,7 +218,7 @@ final class MediaDownloader {
      * A bridge's direct media and web addresses only come as the original, whatever the size asked: one file for all of them.
      * Each size used to be a whole copy (a GIF of several MB, twice or more).
      */
-    static String cacheKey(String url, int width, int height) {
+    static String cacheKey(@Nullable String url, int width, int height) {
         Mxc mxc = Mxc.parse(url);
         boolean scalable = mxc != null && BridgePorts.directMediaBase(mxc.server()) == null;
         return url + "|" + (scalable ? Math.max(0, width) + "x" + Math.max(0, height) : "0x0");
@@ -224,7 +227,8 @@ final class MediaDownloader {
     /** At most once a minute per folder: listing thousands of files after every thumbnail would cost more than it saves. */
     private void trim(String folder, Path dir) {
         var at = lastTrim.computeIfAbsent(folder, f -> new java.util.concurrent.atomic.AtomicLong());
-        long now = System.currentTimeMillis(), last = at.get();
+        long now = System.currentTimeMillis();
+        long last = at.get();
         if (now - last < 60_000 || !at.compareAndSet(last, now)) return;
         Settings s = Settings.get();
         if (folder.equals(STICKERS)) {
@@ -234,10 +238,11 @@ final class MediaDownloader {
         }
     }
 
-    private Path download(String url, int w, int h, Path dir, String hash, java.util.function.DoubleConsumer progress) throws IOException {
+    private Path download(String url, int w, int h, Path dir, String hash, java.util.function.@Nullable DoubleConsumer progress)
+            throws IOException {
         Path tmp = dir.resolve(hash + ".download");
         Files.deleteIfExists(tmp);
-        String contentType;
+        @Nullable String contentType;
         if (url.startsWith(Mxc.SCHEME)) {
             Mxc mxc = Mxc.parse(url);
             if (mxc == null) throw new MatrixException(0, null, I18n.t("media.badUrl"));
@@ -268,7 +273,8 @@ final class MediaDownloader {
     }
 
     /** Authenticated media (Matrix 1.11) with fallback to the legacy unauthenticated endpoints. */
-    private String fetchMedia(String suffix, Path tmp, java.util.function.DoubleConsumer progress) throws IOException {
+    private @Nullable String fetchMedia(String suffix, Path tmp, java.util.function.@Nullable DoubleConsumer progress)
+            throws IOException {
         try {
             return client.download("/_matrix/client/v1/media" + suffix, true, tmp, progress);
         } catch (MatrixException e) {
@@ -277,11 +283,11 @@ final class MediaDownloader {
         }
     }
 
-    static Path findCached(Path dir, String hash) {
+    static @Nullable Path findCached(Path dir, String hash) {
         if (!Files.isDirectory(dir)) return null;
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, hash + "*")) {
             for (Path p : ds) {
-                String n = p.getFileName().toString();
+                String n = PathParts.name(p);
                 if (!n.endsWith(".download") && !n.contains(".part")) return p;
             }
         } catch (IOException ignored) {
@@ -290,7 +296,7 @@ final class MediaDownloader {
         return null;
     }
 
-    static String extension(String contentType) {
+    static String extension(@Nullable String contentType) {
         String ext = MimeTypes.extension(contentType);
         // JavaFX refuses a ".mov" by its name, but plays the same file as ".mp4".
         return ext.equals(".mov") ? ".mp4" : ext;

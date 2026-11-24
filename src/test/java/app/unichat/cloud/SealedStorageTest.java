@@ -1,7 +1,9 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.cloud.SyncedPart.Action;
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,9 +29,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SealedStorageTest {
-    private static final String PATH = "Unichat/Settings/prueba.json", STORED = Vault.ROOT + "/Settings/prueba.json";
+    private static final String PATH = "Unichat/Settings/prueba.json";
+    private static final String STORED = Vault.ROOT + "/Settings/prueba.json";
     private static final Instant T = Instant.parse("2026-11-10T08:00:00Z");
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
     private final byte[] vk = VaultCrypto.randomKey();
 
     @TempDir
@@ -41,7 +45,7 @@ class SealedStorageTest {
     }
 
     private SealedStorage over(Storage s) {
-        return new SealedStorage(s, () -> vk.clone());
+        return new SealedStorage(s, vk::clone);
     }
 
     @Test
@@ -53,19 +57,20 @@ class SealedStorageTest {
             sealed.mkdirs("Unichat/Settings");
             sealed.put(PATH, secret);
 
-            byte[] there = cloud.files.get(STORED);
+            byte[] there = Present.of(cloud.files.get(STORED));
             assertFalse(new String(there, StandardCharsets.ISO_8859_1).contains("DARK"), "unreadable in the account");
             assertFalse(cloud.files.containsKey(PATH), "kept under the vault's folder");
             assertArrayEquals(secret, sealed.get(PATH));
             assertTrue(sealed.exists(PATH));
             assertEquals(List.of("prueba.json"), sealed.list("Unichat/Settings"));
-            assertEquals(-1, sealed.info(PATH).size());
+            assertEquals(-1, Present.of(sealed.info(PATH)).size());
             assertNull(sealed.info("Unichat/Settings/otra.json"));
             assertNull(sealed.get("Unichat/Settings/otra.json"));
             assertFalse(sealed.get("Unichat/Settings/otra.json", dir.resolve("x")));
             assertFalse(Files.exists(dir.resolve("x")));
 
-            Path file = Files.write(dir.resolve("in"), secret), out = dir.resolve("out");
+            Path file = Files.write(dir.resolve("in"), secret);
+            Path out = dir.resolve("out");
             AtomicLong reported = new AtomicLong();
             sealed.put("Unichat/Settings/dos.json", file, reported::set);
             assertEquals(there.length, reported.get(), "the sealed size, once");
@@ -93,7 +98,7 @@ class SealedStorageTest {
                 assertThrows(IllegalArgumentException.class, () -> sealed.stamp(path), path);
             }
             sealed.put("Unichat/VaultVieja/x", new byte[1]); // only the vault's own folder is the vault's
-            assertEquals(java.util.Set.of(Vault.ROOT + "/VaultVieja/x"), cloud.files.keySet(), "only that one landed");
+            assertEquals(Set.of(Vault.ROOT + "/VaultVieja/x"), cloud.files.keySet(), "only that one landed");
         }
     }
 
@@ -113,7 +118,7 @@ class SealedStorageTest {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             SealedStorage sealed = over(new WebDav(cloud.url(), "u", "p"));
             sealed.put(PATH, "hello".getBytes(StandardCharsets.UTF_8));
-            byte[] bad = cloud.files.get(STORED).clone();
+            byte[] bad = Present.of(cloud.files.get(STORED)).clone();
             bad[bad.length - 1] ^= 1;
             cloud.files.put(STORED, bad);
 
@@ -122,7 +127,7 @@ class SealedStorageTest {
             Path target = dir.resolve("target");
             assertThrows(IOException.class, () -> sealed.get(PATH, target));
             try (var files = Files.list(dir)) {
-                assertEquals(List.of(), files.filter(p -> p.getFileName().toString().startsWith("target") || p.getFileName().toString().startsWith(".target")).toList());
+                assertEquals(List.of(), files.filter(p -> PathParts.name(p).startsWith("target") || PathParts.name(p).startsWith(".target")).toList());
             }
             byte[] otherKey = VaultCrypto.randomKey();
             assertThrows(IOException.class, () -> new SealedStorage(new WebDav(cloud.url(), "u", "p"), () -> otherKey).get(PATH), "another key opens nothing");
@@ -133,9 +138,16 @@ class SealedStorageTest {
     void syncedPartRunsOverItUnchanged() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             SealedStorage sealed = over(new WebDav(cloud.url(), "u", "p"));
-            Map<String, String> sa = new TreeMap<>(), sb = new TreeMap<>();
-            SyncedPart a = new SyncedPart(PATH, "test-sealed-a", now -> Bundle.of("a", now, sa, null), t -> { sa.clear(); sa.putAll(t.settings()); });
-            SyncedPart b = new SyncedPart(PATH, "test-sealed-b", now -> Bundle.of("b", now, sb, null), t -> { sb.clear(); sb.putAll(t.settings()); });
+            Map<String, String> sa = new TreeMap<>();
+            Map<String, String> sb = new TreeMap<>();
+            SyncedPart a = new SyncedPart(PATH, "test-sealed-a", now -> Bundle.of("a", now, sa, null), t -> {
+                sa.clear();
+                sa.putAll(t.settings());
+            });
+            SyncedPart b = new SyncedPart(PATH, "test-sealed-b", now -> Bundle.of("b", now, sb, null), t -> {
+                sb.clear();
+                sb.putAll(t.settings());
+            });
             sa.put("ui.theme", "DARK");
             assertEquals(Action.UPLOAD, a.sync(sealed, T));
             assertEquals(Action.ADOPT, b.sync(sealed, T));
@@ -146,7 +158,7 @@ class SealedStorageTest {
             assertEquals("#FF0000", sa.get("ui.accent"));
 
             String before = sealed.stamp(PATH);
-            sealed.put(PATH, sealed.get(PATH)); // sealed again: a new nonce, a new stamp, the same content
+            sealed.put(PATH, Present.of(sealed.get(PATH))); // sealed again: a new nonce, a new stamp, the same content
             assertNotEquals(before, sealed.stamp(PATH));
             int puts = cloud.puts.get();
             assertEquals(Action.NOTHING, a.sync(sealed, T.plusSeconds(120)));

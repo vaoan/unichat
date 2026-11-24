@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
@@ -10,6 +11,7 @@ import java.awt.Color;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
@@ -26,7 +28,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
 import javafx.event.Event;
@@ -37,6 +41,7 @@ import javafx.stage.Stage;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Not a check but a measurement, for before and after a change: a giant chat of stickers, GIFs, videos, photos and embeds
@@ -49,13 +54,18 @@ class ScrollPerfUiTest {
     private static final int SENDERS = 400;
     private static final String[] WORDS = ("jajaja dale qué más parce mira ese gol increíble no puedo creerlo alguien vio el partido ayer "
             + "estaba buenísimo voy saliendo ahora nos vemos luego").split(" ");
-    private final Random random = new Random(42);
+    private final Random random = seeded();
     private final List<Path> stickers = new ArrayList<>();
     private final List<Path> gifs = new ArrayList<>();
     private final List<Path> photos = new ArrayList<>();
     private final List<Path> videos = new ArrayList<>();
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    @SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "seeded test data, the same on every run on purpose; nothing secret")
+    private static Random seeded() {
+        return new Random(42);
+    }
+
+    private static <T> T fx(Callable<T> c) throws InterruptedException, ExecutionException {
         CompletableFuture<T> f = new CompletableFuture<>();
         Platform.runLater(() -> {
             try {
@@ -67,6 +77,7 @@ class ScrollPerfUiTest {
         return f.get();
     }
 
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     private static void paint(Graphics2D g, int w, int h, int frame, int seed) {
         Random r = new Random(seed);
         g.setPaint(new GradientPaint(0, 0, new Color(r.nextInt(0xffffff)), w, h, new Color(r.nextInt(0xffffff))));
@@ -78,11 +89,11 @@ class ScrollPerfUiTest {
         }
     }
 
-    private static Path gif(Path dir, String name, int w, int h, int frames, int seed) throws Exception {
+    private static Path gif(Path dir, String name, int w, int h, int frames, int seed) throws IOException {
         return app.unichat.TestPictures.gif(dir.resolve(name), w, h, frames, (g, f) -> paint(g, w, h, f, seed));
     }
 
-    private static Path photo(Path dir, String name, int seed) throws Exception {
+    private static Path photo(Path dir, String name, int seed) throws IOException {
         BufferedImage b = new BufferedImage(1600, 1200, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = b.createGraphics();
         paint(g, 1600, 1200, 0, seed);
@@ -92,7 +103,8 @@ class ScrollPerfUiTest {
         return p;
     }
 
-    private static Path video(Path gif) throws Exception {
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
+    private static Path video(Path gif) throws IOException, InterruptedException {
         Path out = Path.of(gif + ".mp4");
         new ProcessBuilder("ffmpeg", "-y", "-loglevel", "error", "-i", gif.toString(), "-pix_fmt", "yuv420p", "-c:v", "libx264",
                 "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", out.toString())
@@ -206,8 +218,9 @@ class ScrollPerfUiTest {
         return ManagementFactory.getGarbageCollectorMXBeans().stream().mapToLong(GarbageCollectorMXBean::getCollectionTime).sum();
     }
 
+    @SuppressFBWarnings(value = "DM_GC", justification = "it measures what is kept after a collection (as its NOPMD says)")
     private static long liveMegabytes() {
-        System.gc();
+        System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection
         return ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed() >> 20;
     }
 
@@ -215,7 +228,7 @@ class ScrollPerfUiTest {
      * Scrolls one step per frame for {@code seconds} worth of frames (at 60 a second) and, with {@code live}, brings a
      * message every 6 frames: the load is counted in frames, not in time, so a slower machine does the same work.
      */
-    private static void run(String name, Node target, double delta, int seconds, Thread ui, Runnable live) throws Exception {
+    private static void run(String name, Node target, double delta, int seconds, Thread ui, @Nullable Runnable live) throws InterruptedException, ExecutionException {
         List<Long> gaps = Collections.synchronizedList(new ArrayList<>());
         long[] last = {0};
         int[] direction = {-1};
@@ -238,9 +251,8 @@ class ScrollPerfUiTest {
         };
         long gcBefore = gcMillis();
         try (Sampler sampler = new Sampler(ui)) {
-            fx(() -> {
+            FxWait.onFx(() -> {
                 timer.start();
-                return null;
             });
             if (live == null) {
                 over.await();
@@ -250,12 +262,11 @@ class ScrollPerfUiTest {
                     live.run();
                 }
             }
-            fx(() -> {
+            FxWait.onFx(() -> {
                 timer.stop();
-                return null;
             });
             List<Long> s = new ArrayList<>(gaps);
-            Collections.sort(s);
+            s.sort(java.util.Comparator.naturalOrder());
             long total = s.stream().mapToLong(x -> x).sum();
             System.out.printf("PERF %s: fps=%.0f p50=%.1f p95=%.1f p99=%.1f max=%.0f over25ms=%d%% over100ms=%d gc=%dms busy=%d%% live=%dMB%n   %s%n",
                     name, s.size() * 1e9 / Math.max(1, total), s.get(s.size() / 2) / 1e6, s.get(s.size() * 95 / 100) / 1e6,
@@ -265,7 +276,7 @@ class ScrollPerfUiTest {
         }
     }
 
-    private static void histogram() throws Exception {
+    private static void histogram() throws IOException {
         Process p = new ProcessBuilder("jcmd", Long.toString(ProcessHandle.current().pid()), "GC.class_histogram").redirectErrorStream(true).start();
         List<String> lines = new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).lines().skip(2).limit(14).toList();
         lines.forEach(l -> System.out.println("PERF heap " + l));
@@ -288,10 +299,10 @@ class ScrollPerfUiTest {
         Platform.setImplicitExit(false);
         MockChatService svc = new MockChatService();
         Field field = MockChatService.class.getDeclaredField("messages");
-        field.setAccessible(true);
-        @SuppressWarnings("unchecked") List<Message> list = ((Map<String, List<Message>>) field.get(svc)).get(CHAT);
+        field.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
+        @SuppressWarnings("unchecked") List<Message> list = Present.of(((Map<String, List<Message>>) field.get(svc)).get(CHAT)); // the field is that map
         Method fire = MockChatService.class.getDeclaredMethod("fireMessages", String.class);
-        fire.setAccessible(true);
+        fire.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
         Instant start = Instant.now().minusSeconds(MESSAGES * 30L);
         synchronized (list) {
             for (int i = 0; i < MESSAGES; i++) list.add(message(i, start.plusSeconds(i * 30L)));
@@ -299,20 +310,18 @@ class ScrollPerfUiTest {
         Scene[] scene = new Scene[1];
         MainView[] view = new MainView[1];
         Thread ui = fx(Thread::currentThread);
-        fx(() -> {
+        FxWait.onFx(() -> {
             Stage stage = new Stage();
             view[0] = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, u -> { });
             scene[0] = new Scene(view[0], 1280, 860);
             Theme.register(scene[0]);
             stage.setScene(scene[0]);
             stage.show();
-            return null;
         });
         FxWait.settled();
         long opening = System.nanoTime();
-        fx(() -> {
+        FxWait.onFx(() -> {
             view[0].openChatId(CHAT);
-            return null;
         });
         fx(() -> null);
         System.out.printf("PERF open the giant chat: %.0f ms%n", (System.nanoTime() - opening) / 1e6);
@@ -342,17 +351,15 @@ class ScrollPerfUiTest {
         run("chat list scroll", fx(() -> chats.lookup(".virtual-flow")), 60, 8, ui, null);
         for (String id : List.of("!mom:demo", CHAT, "!mom:demo", CHAT)) {
             long at = System.nanoTime();
-            fx(() -> {
+            FxWait.onFx(() -> {
                 view[0].openChatId(id);
-                return null;
             });
             fx(() -> null);
             System.out.printf("PERF switch to %s: %.0f ms%n", id.equals(CHAT) ? "giant" : "small", (System.nanoTime() - at) / 1e6);
             FxWait.settled();
         }
-        fx(() -> {
+        FxWait.onFx(() -> {
             scene[0].getWindow().hide();
-            return null;
         });
     }
 }

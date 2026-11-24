@@ -15,7 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-import java.util.IdentityHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -29,8 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ListRepaintUiTest {
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // open() (@BeforeEach) sets it on the FX thread
     private Stage stage;
     private Scene scene;
+    @SuppressWarnings("NullAway.Init") // open() (@BeforeEach) sets it on the FX thread
     private MainView view;
 
     @BeforeAll
@@ -64,16 +66,15 @@ class ListRepaintUiTest {
     @AfterEach
     void close() throws Exception {
         svc.stop();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             stage.close();
-            return null;
         });
     }
 
     /** Each row (cell) → the chat it shows and its network icon node. A cell may show another chat after a scroll. */
-    private Map<Node, Object[]> badgeIcons() throws Exception {
+    private Map<Node, Object[]> badgeIcons() throws InterruptedException {
         return FxWait.fx(() -> {
-            Map<Node, Object[]> m = new IdentityHashMap<>();
+            Map<Node, Object[]> m = new HashMap<>(); // cells: Node keeps Object's identity equals
             for (Node n : scene.getRoot().lookupAll(".chat-list .list-cell")) {
                 if (!(n instanceof ChatRowCell cell) || cell.getItem() == null) continue;
                 Node badge = cell.lookup(".network-badge");
@@ -87,7 +88,7 @@ class ListRepaintUiTest {
         return cells.entrySet().stream().map(e -> Integer.toHexString(System.identityHashCode(e.getKey())) + "=" + e.getValue()[0]).sorted().toList();
     }
 
-    private List<Node> favoriteTiles() throws Exception {
+    private List<Node> favoriteTiles() throws InterruptedException {
         return FxWait.fx(() -> List.copyOf(scene.getRoot().lookupAll(".favorite-tile")));
     }
 
@@ -108,9 +109,8 @@ class ListRepaintUiTest {
                 .map(n -> ((ChatRowCell) n).getItem().id()).distinct().limit(2).toList());
         assertEquals(2, onScreen.size(), "two chats on screen: " + onScreen);
         svc.setMarkedUnread(onScreen.get(1), true).get();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.openChatId(onScreen.get(0));
-            return null;
         });
         FxWait.settled();
         Map<Node, Object[]> before = badgeIcons();
@@ -118,9 +118,8 @@ class ListRepaintUiTest {
         List<Node> favorites = favoriteTiles();
         assertFalse(before.isEmpty());
 
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.openChatId(onScreen.get(1)); // unread: opening it marks it read, a change to the list
-            return null;
         });
         FxWait.settled();
 

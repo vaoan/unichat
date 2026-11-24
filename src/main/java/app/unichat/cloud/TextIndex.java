@@ -3,6 +3,7 @@ package app.unichat.cloud;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Map;
@@ -25,7 +26,7 @@ final class TextIndex {
      * The sizes {@code index} says, of files of ours; empty for none. A file that isn't JSON fails (it's told, and what it
      * stands for is tried again next round), rather than reading as an index of nothing.
      */
-    static Map<String, Long> read(byte[] index) throws IOException {
+    static Map<String, Long> read(byte @Nullable [] index) throws IOException {
         Map<String, Long> out = new TreeMap<>();
         if (index == null) return out;
         JsonNode n = JSON.readTree(index);

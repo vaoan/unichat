@@ -1,8 +1,10 @@
 package app.unichat.autosave;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
+import app.unichat.support.PathParts;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -13,6 +15,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,7 +40,7 @@ class TextLogTest {
     }
 
     private SavedText seen(Message m) {
-        return SavedText.of(m, now);
+        return Present.of(SavedText.of(m, now));
     }
 
     @Test
@@ -52,7 +55,7 @@ class TextLogTest {
         assertEquals(List.of(), log.versions(CHAT, "$2"), "never kept: no copy");
         assertFalse(log().record(CHAT, List.of(seen(text("$1", "mañana sí puedo")))), "known again after a restart, from the file");
         try (var files = Files.list(dir.resolve(TextLog.HERE))) {
-            assertEquals(List.of(TextLog.key(CHAT) + " 2026-11.jsonl"), files.map(p -> p.getFileName().toString()).toList(),
+            assertEquals(List.of(TextLog.key(CHAT) + " 2026-11.jsonl"), files.map(PathParts::name).toList(),
                     "this computer's file of the chat for the month");
         }
     }
@@ -63,11 +66,11 @@ class TextLogTest {
         log.record(CHAT, List.of(seen(text("$1", "hola"))));
         Path other = Files.createDirectories(dir.resolve("0b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44"));
         Files.writeString(other.resolve(TextLog.key(CHAT) + " 2026-10.jsonl"),
-                SavedText.of(text("$0", "lo que la laptop vio"), SENT.minusSeconds(86_400 * 30)).json() + "\n"
-                        + SavedText.of(text("$1", "hola"), SENT.minusSeconds(5)).json() + "\n"
+                Present.of(SavedText.of(text("$0", "lo que la laptop vio"), SENT.minusSeconds(86_400 * 30))).json() + "\n"
+                        + Present.of(SavedText.of(text("$1", "hola"), SENT.minusSeconds(5))).json() + "\n"
                         + "{esto no es json\n"
                         + "{\"id\": \"$9\"}\n"
-                        + SavedText.of(text("$2", "cortado"), SENT).json().substring(0, 20), StandardCharsets.UTF_8);
+                        + Present.of(SavedText.of(text("$2", "cortado"), SENT)).json().substring(0, 20), StandardCharsets.UTF_8);
         assertEquals(List.of("lo que la laptop vio"), log.versions(CHAT, "$0").stream().map(SavedText::text).toList());
         List<SavedText> hello = log.versions(CHAT, "$1");
         assertEquals(1, hello.size(), "seen by both: once");
@@ -99,13 +102,13 @@ class TextLogTest {
         assertNull(SavedText.of(sending, SENT), "its id isn't the one it will have");
         Message emote = text("$4", "saluda");
         emote.setType(MessageType.EMOTE);
-        assertEquals("saluda", SavedText.of(emote, SENT).text());
+        assertEquals("saluda", Present.of(SavedText.of(emote, SENT)).text());
     }
 
     @Test
     void theKeyIsTheSameOnEveryComputerAndSaysNothingOfTheChat() {
         assertEquals(TextLog.key(CHAT), TextLog.key(CHAT));
         assertTrue(TextLog.key(CHAT).matches("[0-9a-f]{12}"), TextLog.key(CHAT));
-        assertFalse(TextLog.key(CHAT).equals(TextLog.key("!otro:demo")));
+        assertNotEquals(TextLog.key("!otro:demo"), TextLog.key(CHAT));
     }
 }

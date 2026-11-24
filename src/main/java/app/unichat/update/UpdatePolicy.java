@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
+import org.jspecify.annotations.Nullable;
 
 /** The rules of the update check, with no network or settings: what GitHub said, when to ask again, what to show. */
 public final class UpdatePolicy {
@@ -17,7 +18,7 @@ public final class UpdatePolicy {
     private UpdatePolicy() {}
 
     /** The newest release in GitHub's "latest release" answer, or null when it isn't one (no tag, not JSON). */
-    public static Release parse(String json) {
+    public static @Nullable Release parse(String json) {
         try {
             JsonNode root = JSON.readTree(json);
             String tag = root == null ? "" : root.path("tag_name").asText("").strip();
@@ -37,7 +38,7 @@ public final class UpdatePolicy {
     }
 
     /** Whether to tell the person about {@code latest}: newer than what runs, and not the version they dismissed. */
-    public static boolean shouldShow(Release latest, String current, String dismissed) {
+    public static boolean shouldShow(@Nullable Release latest, String current, @Nullable String dismissed) {
         return latest != null && AppVersion.isNewer(latest.version(), current) && !AppVersion.same(latest.version(), dismissed);
     }
 }

@@ -1,11 +1,13 @@
 package app.unichat.service;
 
 import app.unichat.support.BackgroundWriter;
+import app.unichat.support.PathParts;
 import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -19,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -59,9 +62,10 @@ public final class PreferencesFile {
     }
 
     /** What the server says; null = nothing heard about it yet. */
-    public record ServerValues(Boolean archived, Boolean muted, Boolean favorite, Boolean lowPriority, Boolean pinned,
-                               Instant reminder, boolean reminderKnown) {
-        Boolean of(Flag f) {
+    public record ServerValues(@Nullable Boolean archived, @Nullable Boolean muted, @Nullable Boolean favorite,
+                               @Nullable Boolean lowPriority, @Nullable Boolean pinned, @Nullable Instant reminder,
+                               boolean reminderKnown) {
+        @Nullable Boolean of(Flag f) {
             return switch (f) {
                 case ARCHIVED -> archived;
                 case MUTED -> muted;
@@ -74,7 +78,7 @@ public final class PreferencesFile {
     }
 
     public record Effective(boolean archived, boolean muted, boolean favorite, boolean lowPriority, boolean pinned,
-                            Instant reminder, boolean muteChosenHere) {}
+                            @Nullable Instant reminder, boolean muteChosenHere) {}
 
     static final int VERSION = 1;
     static final ObjectMapper JSON = new ObjectMapper();
@@ -84,7 +88,7 @@ public final class PreferencesFile {
         final Map<Flag, Boolean> values = new EnumMap<>(Flag.class);
         final Set<Flag> fromServer = EnumSet.noneOf(Flag.class);
         boolean reminderSet;
-        Instant reminder;
+        @Nullable Instant reminder;
         /** Fields written by a newer Unichat: kept as they came. */
         final ObjectNode extra = JSON.createObjectNode();
 
@@ -98,35 +102,45 @@ public final class PreferencesFile {
         final ObjectNode extra = JSON.createObjectNode();
         boolean favorite;
 
-        MutableFolder(String id, String name) { this.id = id; this.name = name; }
+        MutableFolder(String id, String name) {
+            this.id = id;
+            this.name = name;
+        }
     }
 
-    private final Path file, seenFile;
+    /** Both null in memory: nothing is ever read or written. */
+    private final @Nullable Path file;
+    private final @Nullable Path seenFile;
     private final Map<String, Entry> chats = new LinkedHashMap<>();
     private final List<MutableFolder> folders = new ArrayList<>();
     private final ServerSeen seen;
     private final PreferencesRecovery recovery;
     private final ObjectNode extraRoot = JSON.createObjectNode();
     private final BackgroundWriter writer = new BackgroundWriter("preferences-save", this, this::writeOnce);
-    private boolean dirty, saveFailing;
-    private Runnable onSaveFailure;
+    private boolean dirty;
+    private boolean saveFailing;
+    private @Nullable Runnable onSaveFailure;
     private int announcements;
     private int batching;
     /** Times the main file was replaced since this object was created. */
     private int mainWrites;
 
-    public PreferencesFile(Path preferences, Path serverSeen) {
+    /** Both paths, or both null ({@link #inMemory}). */
+    public PreferencesFile(@Nullable Path preferences, @Nullable Path serverSeen) {
         this.file = preferences;
         this.seenFile = serverSeen;
         this.recovery = new PreferencesRecovery(preferences);
         this.seen = ServerSeen.load(seenFile);
-        if (file != null) load();
+        if (file != null) {
+            Path main = file;
+            synchronized (this) { load(main); } // its fields are guarded by this lock everywhere else
+        }
     }
 
     public static PreferencesFile inMemory() { return new PreferencesFile(null, null); }
 
     /** The name the unreadable file was set aside under, or null. */
-    public synchronized String setAside() { return recovery.setAside(); }
+    public synchronized @Nullable String setAside() { return recovery.setAside(); }
 
     /**
      * True while an unreadable file could not be moved aside: nothing is written to it until the move works (every
@@ -141,7 +155,7 @@ public final class PreferencesFile {
      * Called when saves start failing, again only after one worked in between; right away if they already are. On a
      * thread of its own: callers change preferences holding their own locks, and this lock is a leaf.
      */
-    public synchronized void onSaveFailure(Runnable listener) {
+    public synchronized void onSaveFailure(@Nullable Runnable listener) {
         onSaveFailure = listener;
         if (saveFailing && listener != null) announce(listener);
     }
@@ -166,7 +180,9 @@ public final class PreferencesFile {
             if (e != null && e.touched(f)) continue;
             if (said) {
                 Entry target = entry(key);
-                if (!Boolean.TRUE.equals(target.values.put(f, true)) | target.fromServer.add(f)) dirty = true;
+                boolean changed = !Boolean.TRUE.equals(target.values.put(f, true));
+                boolean fromServerNow = target.fromServer.add(f); // recorded whether or not the value changed
+                if (changed || fromServerNow) dirty = true;
             } else if (seen.saidTrueBefore(key, f)) {
                 Entry target = entry(key);
                 target.values.put(f, false);
@@ -203,8 +219,8 @@ public final class PreferencesFile {
                 e != null && e.reminderSet ? e.reminder : cached.reminder(), e != null && e.touched(Flag.MUTED));
     }
 
-    private static boolean shown(Entry e, Flag f, ServerValues cached) {
-        return e != null && e.values.containsKey(f) ? is(e, f) : Boolean.TRUE.equals(cached.of(f));
+    private static boolean shown(@Nullable Entry e, Flag f, ServerValues cached) {
+        return (e != null && e.values.containsKey(f)) ? is(e, f) : Boolean.TRUE.equals(cached.of(f));
     }
 
     /** What memory holds, as the file is written. */
@@ -262,7 +278,7 @@ public final class PreferencesFile {
         changed();
     }
 
-    public synchronized void chooseReminder(String key, Instant at) {
+    public synchronized void chooseReminder(String key, @Nullable Instant at) {
         Entry e = entry(key);
         e.reminderSet = true;
         e.reminder = at;
@@ -390,16 +406,16 @@ public final class PreferencesFile {
     }
 
     /** What the chat with this key saves of what it receives ({@code mine}: of what I send); empty when nothing. */
-    public synchronized java.util.Set<app.unichat.model.SaveKind> saveKinds(String key, boolean mine) {
+    public synchronized Set<app.unichat.model.SaveKind> saveKinds(String key, boolean mine) {
         Entry e = chats.get(key);
-        java.util.Set<app.unichat.model.SaveKind> out = EnumSet.noneOf(app.unichat.model.SaveKind.class);
+        Set<app.unichat.model.SaveKind> out = EnumSet.noneOf(app.unichat.model.SaveKind.class);
         if (e == null || !is(e, mine ? Flag.AUTO_SAVE_MINE : Flag.AUTO_SAVE)) return out;
         for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) if (is(e, flag(k, mine)) == chosen(k)) out.add(k);
         return out;
     }
 
     /** The person chose what this chat saves of what it receives ({@code mine}: of what they send); nothing turns it off. */
-    public synchronized void chooseSaveKinds(String key, boolean mine, java.util.Set<app.unichat.model.SaveKind> kinds) {
+    public synchronized void chooseSaveKinds(String key, boolean mine, Set<app.unichat.model.SaveKind> kinds) {
         Entry e = entry(key);
         e.values.put(mine ? Flag.AUTO_SAVE_MINE : Flag.AUTO_SAVE, !kinds.isEmpty());
         for (app.unichat.model.SaveKind k : app.unichat.model.SaveKind.values()) e.values.put(flag(k, mine), kinds.contains(k) == chosen(k));
@@ -425,7 +441,7 @@ public final class PreferencesFile {
 
     private Entry entry(String key) { return chats.computeIfAbsent(key, k -> new Entry()); }
 
-    private MutableFolder folder(String id) {
+    private @Nullable MutableFolder folder(String id) {
         return folders.stream().filter(f -> f.id.equals(id)).findFirst().orElse(null);
     }
 
@@ -434,16 +450,16 @@ public final class PreferencesFile {
         if (batching == 0) saveLater();
     }
 
-    private void load() {
-        if (!Files.exists(file)) return;
-        if (readFrom(file)) return;
-        Path backup = PreferencesRecovery.backupOf(file);
+    private void load(Path at) {
+        if (!Files.exists(at)) return;
+        if (readFrom(at)) return;
+        Path backup = PreferencesRecovery.backupOf(at);
         boolean recovered = Files.exists(backup) && readFrom(backup);
         recovery.damaged(recovered);
         if (!recovered) return;
         dirty = true; // what came back isn't in the main file yet
         if (recovery.blocked()) return; // the warning says so; nothing touches the file until its copy exists
-        writeMain();
+        writeMain(at);
         saveFailing = dirty;
     }
 
@@ -456,7 +472,7 @@ public final class PreferencesFile {
             }
             readRoot(root);
             return true;
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException e) { // NOPMD: ExceptionAsFlowControl, one failure path for a foreign file and a broken one
             chats.clear();
             folders.clear();
             extraRoot.removeAll();
@@ -519,7 +535,8 @@ public final class PreferencesFile {
 
     /** A copy under the lock, the disk outside it, the outcome under it again. A change made meanwhile asks for another round. */
     private void writeOnce() {
-        ObjectNode main = null, seenNow = null;
+        ObjectNode main = null;
+        ObjectNode seenNow = null;
         boolean keepPrevious = false;
         synchronized (this) {
             recovery.retry();
@@ -530,8 +547,9 @@ public final class PreferencesFile {
             }
             if (seen.dirty()) seenNow = seen.take();
         }
-        boolean mainSaved = main == null || write(file, main, keepPrevious);
-        boolean seenSaved = seenNow == null || write(seenFile, seenNow, false);
+        // Only a file on disk asks the writer for a round (saveLater): neither is null here.
+        boolean mainSaved = main == null || write(Objects.requireNonNull(file), main, keepPrevious);
+        boolean seenSaved = seenNow == null || write(Objects.requireNonNull(seenFile), seenNow, false);
         synchronized (this) {
             if (main != null && mainSaved) {
                 recovery.replaced();
@@ -545,8 +563,8 @@ public final class PreferencesFile {
         }
     }
 
-    private void writeMain() {
-        if (!write(file, tree(), recovery.keepsPrevious())) return;
+    private void writeMain(Path at) {
+        if (!write(at, tree(), recovery.keepsPrevious())) return;
         dirty = false;
         recovery.replaced();
     }
@@ -582,7 +600,7 @@ public final class PreferencesFile {
     /** A failure or a power cut leaves the old file whole. */
     private static boolean write(Path target, ObjectNode content, boolean keepPrevious) {
         try {
-            Files.createDirectories(target.getParent());
+            Files.createDirectories(PathParts.parent(target));
             byte[] bytes = JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(content);
             if (keepPrevious) PreferencesRecovery.keepPrevious(target);
             SafeFile.replace(target, bytes, false);

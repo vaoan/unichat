@@ -1,12 +1,17 @@
 package app.unichat.video;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SendablePhotosTest {
@@ -49,9 +54,24 @@ class SendablePhotosTest {
 
     @Test
     void sipsOnlyShrinksNeverEnlarges() {
-        Path in = Path.of("a.webp"), out = Path.of("a.jpg");
+        Path in = Path.of("a.webp");
+        Path out = Path.of("a.jpg");
         assertTrue(SendablePhotos.sips(in, out, true).contains("-Z"));
         assertFalse(SendablePhotos.sips(in, out, false).contains("-Z"));
         assertEquals(List.of("a.webp", "--out", "a.jpg"), SendablePhotos.sips(in, out, false).subList(7, 10));
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void aPictureWithANumberPatternInItsNameIsNeverGivenToFfmpeg(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
+        Path ran = dir.resolve("ran");
+        Path ffmpeg = Files.writeString(dir.resolve("ffmpeg"), "#!/bin/sh\ntouch '" + ran + "'\n");
+        assertTrue(ffmpeg.toFile().setExecutable(true));
+        Files.writeString(dir.resolve("IMG_0001.JPG"), "the person's own");
+        // Not a picture sips can read, so ffmpeg's turn would come.
+        Path stranger = Files.writeString(dir.resolve("IMG_%04d.JPG"), "a stranger's");
+        assertThrows(IOException.class, () -> SendablePhotos.jpeg(stranger, 0, 0, dir.resolve("out"), () -> ffmpeg),
+                "no photo made: OutgoingPhotos.prepare sends the file as it is");
+        assertFalse(Files.exists(ran), "ffmpeg never ran on it");
     }
 }

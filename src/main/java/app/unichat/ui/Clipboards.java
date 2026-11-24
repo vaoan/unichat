@@ -8,7 +8,7 @@ public final class Clipboards {
     private Clipboards() {}
 
     public static void copy(String text) {
-        ClipboardContent cc = new ClipboardContent();
+        var cc = new ClipboardContent();
         cc.putString(text);
         Clipboard.getSystemClipboard().setContent(cc);
     }

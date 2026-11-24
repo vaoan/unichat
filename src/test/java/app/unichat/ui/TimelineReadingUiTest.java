@@ -1,7 +1,9 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.service.ScriptedChatService;
+import java.util.concurrent.ExecutionException;
 import javafx.scene.input.KeyCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class TimelineReadingUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @AfterEach
@@ -30,13 +33,13 @@ class TimelineReadingUiTest {
         if (w != null) w.close();
     }
 
-    private TimelineWindow.Frames readingOlder() throws Exception {
+    private TimelineWindow.Frames readingOlder() throws InterruptedException, ExecutionException {
         w = TimelineWindow.open(30);
         return w.readingOlder();
     }
 
     /** The messages in view now, but not the newest: one above the one read and one below it. */
-    private Message[] around() throws Exception {
+    private Message[] around() throws InterruptedException {
         String read = FxWait.fx(w::readMessage);
         List<Message> all = FxWait.fx(() -> w.svc.messages(CHAT));
         for (int i = 1; i < all.size() - 1; i++) {
@@ -132,7 +135,7 @@ class TimelineReadingUiTest {
         assertTrue(w.svc.historyAsked(CHAT), "precondition: at the top, the history is asked for");
         FxWait.settled();
         String read = FxWait.fx(w::readMessage);
-        TimelineWindow.Frames frames = w.watch(w.stays(read, FxWait.fx(() -> w.yOf(read))));
+        TimelineWindow.Frames frames = w.watch(w.stays(read, Present.of(FxWait.fx(() -> w.yOf(read)))));
         history.release();
         FxWait.until("the older messages arrived", () -> w.svc.messages(CHAT).getFirst().body().startsWith("Antiguo"));
         FxWait.until("and are listed", () -> w.list().getItems().size() > 40);
@@ -145,7 +148,7 @@ class TimelineReadingUiTest {
     void writingInTheBox() throws Exception {
         TimelineWindow.Frames frames = readingOlder();
         w.type("pensando\nqué\nresponder");
-        FxWait.fx(() -> { w.input().clear(); return null; });
+        FxWait.onFx(() -> w.input().clear());
         frames.stop("the box growing and shrinking while reading older ones");
         assertTrue(FxWait.fx(w::jumpDownShown), "still reading older ones");
     }
@@ -155,7 +158,7 @@ class TimelineReadingUiTest {
         TimelineWindow.Frames frames = readingOlder();
         String read = FxWait.fx(w::readMessage);
         Message m = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(x -> x.id().equals(read)).findFirst().orElseThrow());
-        FxWait.fx(() -> { w.composer().reply(m); return null; });
+        FxWait.onFx(() -> w.composer().reply(m));
         FxWait.settled();
         w.key(KeyCode.ESCAPE, false);
         frames.stop("the reply banner opening and closing while reading older ones");
@@ -165,7 +168,7 @@ class TimelineReadingUiTest {
     void theWindowGetsShorterAndTaller() throws Exception {
         TimelineWindow.Frames frames = readingOlder();
         for (double h : new double[] {480, 620, 560}) {
-            FxWait.fx(() -> { w.stage.setHeight(h); return null; });
+            FxWait.onFx(() -> w.stage.setHeight(h));
             FxWait.settled();
         }
         frames.stop("the window resized while reading older ones");
@@ -174,9 +177,9 @@ class TimelineReadingUiTest {
     @Test
     void theSidePanelOpensAndCloses() throws Exception {
         TimelineWindow.Frames frames = readingOlder();
-        FxWait.fx(() -> { w.view.toggleInfo(); return null; });
+        FxWait.onFx(w.view::toggleInfo);
         FxWait.settled();
-        FxWait.fx(() -> { w.view.toggleInfo(); return null; });
+        FxWait.onFx(w.view::toggleInfo);
         frames.stop("the side panel opening and closing while reading older ones");
     }
 
@@ -206,7 +209,7 @@ class TimelineReadingUiTest {
         w.wheel(30);
         FxWait.settled();
         String read = FxWait.fx(w::readMessage);
-        TimelineWindow.Frames frames = w.watch(w.stays(read, FxWait.fx(() -> w.yOf(read))));
+        TimelineWindow.Frames frames = w.watch(w.stays(read, Present.of(FxWait.fx(() -> w.yOf(read)))));
         FxWait.pulses(10); // the frames in which it used to be pulled back
         frames.stop("a small turn of the wheel up");
         assertTrue(FxWait.fx(w::jumpDownShown), "and the way back down is offered");
@@ -245,9 +248,12 @@ class TimelineReadingUiTest {
         }
     }
 
-    private void tinyTrackpadUpAndDown() throws Exception {
+    private void tinyTrackpadUpAndDown() throws InterruptedException {
         for (int i = 0; i < 6; i++) w.wheel(3);
-        assertTrue(FxWait.fx(() -> w.newestGap() == null || w.newestGap() > 1), "precondition: moved up a little");
+        assertTrue(FxWait.fx(() -> {
+            Double gap = w.newestGap();
+            return gap == null || gap > 1;
+        }), "precondition: moved up a little");
         for (int i = 0; i < 6; i++) w.wheel(-3);
         double gap = w.untilAtBottom();
         assertFalse(FxWait.fx(w::jumpDownShown), "down at the newest: following it");
@@ -290,7 +296,7 @@ class TimelineReadingUiTest {
         w.svc.sendText(CHAT, "y el mío", null).get();
         FxWait.until("three new below", () -> "3 nuevos".equals(w.jumpDown().getText()));
         assertTrue(FxWait.fx(() -> w.jumpDown().getAccessibleText()).contains("3"), "a screen reader hears how many");
-        FxWait.fx(() -> { w.jumpDown().fire(); return null; });
+        FxWait.onFx(() -> w.jumpDown().fire());
         w.untilAtBottom();
         assertTrue(FxWait.fx(w::followingShown), "down at the newest: up to date again");
     }
@@ -299,7 +305,7 @@ class TimelineReadingUiTest {
     void theJumpDownButton() throws Exception {
         w = TimelineWindow.open(30);
         w.scrollUp();
-        FxWait.fx(() -> { w.scene.getRoot().lookup(".jump-down").fireEvent(new javafx.event.ActionEvent()); return null; });
+        FxWait.onFx(() -> w.scene.getRoot().lookup(".jump-down").fireEvent(new javafx.event.ActionEvent()));
         double gap = w.untilAtBottom();
         assertFalse(FxWait.fx(w::jumpDownShown));
         followsFromHere(gap);
@@ -309,10 +315,9 @@ class TimelineReadingUiTest {
     void theJumpDownButtonWhileMessagesKeepArriving() throws Exception {
         w = TimelineWindow.open(30);
         w.scrollUp();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             w.scene.getRoot().lookup(".jump-down").fireEvent(new javafx.event.ActionEvent());
             w.svc.receive(CHAT, "llega en el mismo instante");
-            return null;
         });
         w.svc.receive(CHAT, "y otro después");
         FxWait.until("both show", () -> "y otro después".equals(w.newest().body()) && w.showsNewest());
@@ -354,7 +359,7 @@ class TimelineReadingUiTest {
         w.dragScrollbar(0.3);
         assertTrue(FxWait.fx(w::jumpDownShown), "dragged up: reading older ones");
         String read = FxWait.fx(w::readMessage);
-        TimelineWindow.Frames frames = w.watch(w.stays(read, FxWait.fx(() -> w.yOf(read))));
+        TimelineWindow.Frames frames = w.watch(w.stays(read, Present.of(FxWait.fx(() -> w.yOf(read)))));
         w.svc.receive(CHAT, "mientras arrastraba");
         FxWait.until("it's listed", w::showsNewest);
         frames.stop("a message arriving after dragging up");
@@ -368,7 +373,7 @@ class TimelineReadingUiTest {
     void leavingTheChatAndComingBack() throws Exception {
         w = TimelineWindow.open(30);
         w.scrollUp();
-        FxWait.fx(() -> { w.view.openChatId("!family:demo"); return null; });
+        FxWait.onFx(() -> w.view.openChatId("!family:demo"));
         FxWait.settled();
         w.svc.receive(CHAT, "mientras no mirabas");
         w.openChat();
@@ -380,11 +385,10 @@ class TimelineReadingUiTest {
     void switchingChatsQuickly() throws Exception {
         w = TimelineWindow.open(30);
         w.scrollUp();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             w.view.openChatId("!family:demo");
             w.view.openChatId(CHAT);
             w.view.openChatId("!family:demo");
-            return null;
         });
         w.openChat();
         assertFalse(FxWait.fx(w::jumpDownShown), "each chat opens at its newest");
@@ -392,7 +396,7 @@ class TimelineReadingUiTest {
     }
 
     /** At the newest message again, the next one to arrive is followed without a frame out of place. */
-    private void followsFromHere(double gap) throws Exception {
+    private void followsFromHere(double gap) throws InterruptedException {
         TimelineWindow.Frames frames = w.watch(w.atBottom(gap));
         w.svc.receive(CHAT, "y otro más");
         FxWait.until("it shows", () -> "y otro más".equals(w.newest().body()) && w.showsNewest());

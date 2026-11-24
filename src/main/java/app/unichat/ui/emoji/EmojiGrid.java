@@ -15,11 +15,13 @@ import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.Objects;
 
 /**
  * Every emoji, by group, in a virtual list: only the rows on screen exist and are reused while scrolling (1870
@@ -42,7 +44,7 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
     /** The Emojis tab: what goes on screen, and what to run each time it's shown. */
     public record Tab(javafx.scene.Parent node, Runnable refresh) {}
 
-    private final MediaLibrary library;
+    private final @Nullable MediaLibrary library;
     private final Mode mode;
     private final javafx.scene.control.TextField search = new javafx.scene.control.TextField();
     private final EmojiSearch names = EmojiSearch.forLanguage(I18n.locale().getLanguage());
@@ -56,7 +58,7 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
     private int columns;
 
     /** {@code library}: null only in {@link Mode#PLAIN}. */
-    EmojiGrid(MediaLibrary library, Mode mode, Consumer<String> onPick, Consumer<String> toast) {
+    EmojiGrid(@Nullable MediaLibrary library, Mode mode, Consumer<String> onPick, Consumer<String> toast) {
         super(6);
         this.library = library;
         this.mode = library == null ? Mode.PLAIN : mode;
@@ -75,7 +77,7 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
                 e.consume();
             }
         });
-        javafx.scene.layout.StackPane searchBox = SearchFields.clearable(search);
+        StackPane searchBox = SearchFields.clearable(search);
         searchBox.getStyleClass().add("emoji-search-box");
         getStyleClass().add("emoji-picker");
         list.getStyleClass().add("emoji-list");
@@ -91,12 +93,12 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
         probeBox.setManaged(false);
         probeBox.setVisible(false);
         StackPane body = new StackPane(probeBox, list);
-        javafx.scene.layout.VBox.setVgrow(body, javafx.scene.layout.Priority.ALWAYS);
+        setVgrow(body, javafx.scene.layout.Priority.ALWAYS);
         getChildren().addAll(searchBox, body);
         list.widthProperty().addListener(o -> fit());
         probe.widthProperty().addListener(o -> fit());
         if (library != null) library.addListener(() -> Platform.runLater(this::show));
-        EmojiArt.pictures().thenAccept(p -> Platform.runLater(() -> {
+        var _ = EmojiArt.pictures().thenAccept(p -> Platform.runLater(() -> {
             pictures = p;
             show();
         }));
@@ -114,7 +116,7 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
     /** When the tab is shown: recents catch up. */
     void refresh() {
         if (mode == Mode.PANEL) {
-            List<String> now = urls(library.recents(MediaLibrary.Kind.EMOJI));
+            List<String> now = urls(library().recents(MediaLibrary.Kind.EMOJI));
             shownRecents = now.subList(0, Math.min(RECENTS, now.size()));
         }
         show();
@@ -154,11 +156,11 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
             case PANEL -> {
                 // With none yet, it stays as a hint: favourites existed only behind a right-click nobody found.
                 out.add(new EmojiRows.Section("favorites", I18n.t("library.favorites"),
-                        urls(library.favorites(MediaLibrary.Kind.EMOJI)), I18n.t("emoji.favoritesHint")));
+                        urls(library().favorites(MediaLibrary.Kind.EMOJI)), I18n.t("emoji.favoritesHint")));
                 out.add(new EmojiRows.Section("recents", I18n.t("library.recents"), shownRecents, null));
             }
             case REACTIONS -> out.add(new EmojiRows.Section("frequent", I18n.t("emoji.frequent"),
-                    shown(library.mostReacted(FREQUENT, List.of())), null));
+                    shown(library().mostReacted(FREQUENT, List.of())), null));
             case PLAIN -> { }
         }
         for (Map.Entry<String, List<String>> g : EmojiPicker.CATEGORIES.entrySet()) {
@@ -182,13 +184,19 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
 
     private void use(String e) {
         onPick.accept(e);
-        if (mode == Mode.PANEL) library.addRecent(MediaLibrary.emoji(e));
+        if (mode == Mode.PANEL) library().addRecent(MediaLibrary.emoji(e));
+    }
+
+    /** The library, in the modes that have one: only {@link Mode#PLAIN} goes without, and it never asks. */
+    private MediaLibrary library() {
+        return Objects.requireNonNull(library, "only the plain picker has no library");
     }
 
     /** ← → along the emoji, ↑ ↓ between rows: to the emoji there, scrolling it into view first if needed. */
     private void move(int row, int col, KeyCode key) {
         List<EmojiRows.Row> rows = list.getItems();
-        int r = row, c = col;
+        int r = row;
+        int c = col;
         switch (key) {
             case LEFT -> {
                 if (--c < 0) {
@@ -209,7 +217,8 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
             }
         }
         if (r < 0) return;
-        int target = r, at = Math.min(c, ((EmojiRows.Emojis) rows.get(r)).emoji().size() - 1);
+        int target = r;
+        int at = Math.min(c, ((EmojiRows.Emojis) rows.get(r)).emoji().size() - 1);
         if (!focus(target, at)) {
             list.scrollTo(target);
             Platform.runLater(() -> focus(target, at));
@@ -248,7 +257,7 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
             label.setWrapText(true);
             // A row's graphic isn't told the list's width: without a bound, a long hint ran past the edge.
             label.maxWidthProperty().bind(list.widthProperty().subtract(2 * 10 + 16));
-            label.setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+            label.setMinHeight(USE_PREF_SIZE);
         }
 
         @Override
@@ -282,7 +291,9 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
             view.setSmooth(true);
             view.fitHeightProperty().bind(b.fontProperty().map(f -> f.getSize() * EmojiArt.FIT));
             b.setUserData(view);
-            b.setOnAction(ev -> use((String) b.getProperties().get("emoji")));
+            b.setOnAction(ev -> {
+                if (b.getProperties().get("emoji") instanceof String e) use(e); // put there when drawn
+            });
             b.setOnKeyPressed(ev -> {
                 move(getIndex(), col, ev.getCode());
                 if (ev.getCode().isArrowKey()) ev.consume();
@@ -298,7 +309,7 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
             b.setGraphic(picture == null ? null : view);
             b.setText(picture == null ? e : null);
             b.setAccessibleText(I18n.t("emoji.named", e));
-            if (mode == Mode.PANEL) LibraryMenu.attach(b, library, MediaLibrary.emoji(e), () -> use(e), toast, null);
+            if (mode == Mode.PANEL) LibraryMenu.attach(b, library(), MediaLibrary.emoji(e), () -> use(e), toast, null);
         }
     }
 }

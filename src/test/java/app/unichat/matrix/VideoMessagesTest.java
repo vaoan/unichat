@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.model.Message;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
 
@@ -10,14 +11,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** How bridges say what a video or reel is. */
 class VideoMessagesTest {
-    private static Message parse(String msgtype, String json) throws Exception {
+    private static Message parse(String msgtype, String json) throws JsonProcessingException {
         Message m = new Message("$1", "!c", "@a:s", "A", false, java.time.Instant.EPOCH);
         JsonNode content = MatrixClient.JSON.readTree(json);
         SyncEvents.applyContent(m, msgtype, content.path("body").asText(), content);
         return m;
     }
 
-    private static Message video(String info) throws Exception {
+    private static Message video(String info) throws JsonProcessingException {
         return parse("m.video", "{\"body\":\"a.mp4\",\"url\":\"mxc://s/1\",\"info\":{\"mimetype\":\"video/mp4\"" + info + "}}");
     }
 

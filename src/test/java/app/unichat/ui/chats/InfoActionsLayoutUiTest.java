@@ -2,12 +2,14 @@ package app.unichat.ui.chats;
 
 import app.unichat.ui.FxWait;
 import app.unichat.service.MockChatService;
+import java.util.SortedMap;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,13 +45,13 @@ class InfoActionsLayoutUiTest {
                     scene.getRoot().setStyle("-fx-font-size: " + px + "px;");
                     stage[0].setScene(scene);
                     stage[0].show();
-                    p.show(svc.chat("!family:demo"));
+                    p.show(Present.of(svc.chat("!family:demo")));
                     return p;
                 });
                 FxWait.until("the actions show", () -> pane.lookupAll(".info-action").size() == 6);
                 FxWait.settled();
                 List<Integer> rows = FxWait.fx(() -> {
-                    TreeMap<Long, Integer> byRow = new TreeMap<>();
+                    SortedMap<Long, Integer> byRow = new TreeMap<>();
                     for (Node n : pane.lookupAll(".info-action")) {
                         long y = Math.round(n.localToScene(n.getBoundsInLocal()).getMinY());
                         byRow.merge(y, 1, Integer::sum);
@@ -69,7 +71,7 @@ class InfoActionsLayoutUiTest {
                     return next.localToScene(next.getBoundsInLocal()).getMinY() < lastIcon - 0.5;
                 });
                 if (overlaps) wrong.add(px + "px in " + width + ": the next section overlaps the icons");
-                FxWait.fx(() -> { stage[0].close(); return null; });
+                FxWait.onFx(stage[0]::close);
             }
         }
         svc.stop();

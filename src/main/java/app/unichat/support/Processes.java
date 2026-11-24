@@ -1,5 +1,8 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,14 +44,20 @@ public final class Processes {
         public static Limit whileTalking(long silentSeconds) { return new Limit(Long.MAX_VALUE, silentSeconds); }
     }
 
-    /** Runs {@code cmd} with its output discarded. @param dir where it runs; null: wherever Unichat does */
-    public static Result quiet(List<String> cmd, Path dir, long seconds) throws IOException, InterruptedException {
+    /**
+     * Runs {@code cmd} with its output discarded.
+     *
+     * @param dir where it runs; null: wherever Unichat does
+     */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the one place programs start: callers pass argument lists, never a shell, so each value is one argument whatever it holds; a file from other people reaches ffmpeg only through Ffmpeg.input (only that file, only Unichat's formats)")
+    public static Result quiet(List<String> cmd, @Nullable Path dir, long seconds) throws IOException, InterruptedException {
         ProcessBuilder b = new ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
         if (dir != null) b.directory(dir.toFile());
         return capture(b, seconds);
     }
 
     /** Runs {@code cmd} and keeps its standard output; errors are left out, so they can't pass for the answer. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the one place programs start: callers pass argument lists, never a shell, so each value is one argument whatever it holds; a file from other people reaches ffmpeg only through Ffmpeg.input (only that file, only Unichat's formats)")
     public static Result capture(List<String> cmd, long seconds) throws IOException, InterruptedException {
         return capture(new ProcessBuilder(cmd).redirectError(ProcessBuilder.Redirect.DISCARD), seconds);
     }
@@ -59,7 +68,7 @@ public final class Processes {
     }
 
     /** The same, handing {@code eachLine} every line of output as it comes (a download's progress); null: none. */
-    public static Result capture(ProcessBuilder command, long seconds, Consumer<String> eachLine)
+    public static Result capture(ProcessBuilder command, long seconds, @Nullable Consumer<String> eachLine)
             throws IOException, InterruptedException {
         return capture(command, Limit.of(seconds), null, eachLine);
     }
@@ -69,8 +78,8 @@ public final class Processes {
      * comes, and past {@code limit} it's stopped with its children. Interrupting the waiting thread stops it the same
      * way, and this throws {@link InterruptedException}.
      */
-    public static Result capture(ProcessBuilder command, Limit limit, String input, Consumer<String> eachLine)
-            throws IOException, InterruptedException {
+    public static Result capture(ProcessBuilder command, Limit limit, @Nullable String input,
+                                 @Nullable Consumer<String> eachLine) throws IOException, InterruptedException {
         Ran r = run(command, limit, input, eachLine);
         return new Result(r.finished(), r.exit(), r.out().toString(StandardCharsets.UTF_8));
     }
@@ -86,6 +95,7 @@ public final class Processes {
      * filled the memory), within {@code seconds}. Stopped with its children past the limit, when the reader is done or
      * fails, or when this thread is interrupted. Whether it ended well.
      */
+    @SuppressFBWarnings(value = "RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT", justification = "Process.destroyForcibly kills the process; the Process it returns is the same one")
     public static boolean read(ProcessBuilder command, long seconds, Reader reader) throws IOException, InterruptedException {
         Process p = command.start();
         closeInput(p);
@@ -107,7 +117,7 @@ public final class Processes {
 
     private record Ran(boolean finished, int exit, ByteArrayOutputStream out) {}
 
-    private static Ran run(ProcessBuilder command, Limit limit, String input, Consumer<String> eachLine)
+    private static Ran run(ProcessBuilder command, Limit limit, @Nullable String input, @Nullable Consumer<String> eachLine)
             throws IOException, InterruptedException {
         Process p = command.start();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -137,7 +147,8 @@ public final class Processes {
     /** Whether it ended within {@code limit}. */
     private static boolean waitFor(Process p, Limit limit, AtomicLong heard) throws InterruptedException {
         long start = System.nanoTime();
-        long all = TimeUnit.SECONDS.toNanos(limit.seconds()), silence = TimeUnit.SECONDS.toNanos(limit.silentSeconds());
+        long all = TimeUnit.SECONDS.toNanos(limit.seconds());
+        long silence = TimeUnit.SECONDS.toNanos(limit.silentSeconds());
         while (true) {
             long now = System.nanoTime();
             long left = Math.min(all - (now - start), silence - (now - heard.get()));
@@ -147,11 +158,12 @@ public final class Processes {
     }
 
     /** Reads to the end whatever happens to the rest: a process nobody reads from stops in write(). */
-    private static void read(Process p, ByteArrayOutputStream out, Consumer<String> eachLine, AtomicLong heard) {
+    private static void read(Process p, ByteArrayOutputStream out, @Nullable Consumer<String> eachLine, AtomicLong heard) {
         try (InputStream in = p.getInputStream()) {
             ByteArrayOutputStream line = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];
-            for (int n; (n = in.read(buf)) >= 0; ) {
+            int n;
+            while ((n = in.read(buf)) >= 0) {
                 heard.set(System.nanoTime());
                 out.write(buf, 0, n);
                 if (eachLine != null) split(buf, n, line, eachLine);
@@ -192,6 +204,7 @@ public final class Processes {
     }
 
     /** It and its children (a shell's, a node script's): one left behind keeps running and holding its files. */
+    @SuppressFBWarnings(value = "RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT", justification = "Process.destroyForcibly kills the process; the Process it returns is the same one")
     private static void stop(Process p) throws InterruptedException {
         p.descendants().forEach(ProcessHandle::destroyForcibly);
         p.destroyForcibly();

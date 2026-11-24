@@ -1,6 +1,7 @@
 package app.unichat.autosave;
 
 import app.unichat.support.Hashes;
+import app.unichat.support.PathParts;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +17,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -30,7 +32,7 @@ import java.util.stream.Stream;
 final class TextLog {
     /** This computer's own folder; the others are named after their machine. */
     static final String HERE = "here";
-    private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("yyyy-MM").withZone(ZoneOffset.UTC);
+    private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("yyyy-MM", Locale.ROOT).withZone(ZoneOffset.UTC);
 
     private final Path dir;
     private final Supplier<Instant> clock;
@@ -118,12 +120,12 @@ final class TextLog {
         if (!Files.isDirectory(dir)) return out;
         List<Path> folders;
         try (Stream<Path> s = Files.list(dir)) {
-            folders = s.filter(Files::isDirectory).filter(f -> !ownOnly || f.getFileName().toString().equals(HERE)).toList();
+            folders = s.filter(Files::isDirectory).filter(f -> !ownOnly || PathParts.name(f).equals(HERE)).toList();
         }
         for (Path folder : folders) {
             List<Path> files;
             try (Stream<Path> s = Files.list(folder)) {
-                files = s.filter(f -> f.getFileName().toString().startsWith(key + " ") && f.getFileName().toString().endsWith(".jsonl")).toList();
+                files = s.filter(f -> PathParts.name(f).startsWith(key + " ") && PathParts.name(f).endsWith(".jsonl")).toList();
             }
             for (Path f : files) {
                 for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {

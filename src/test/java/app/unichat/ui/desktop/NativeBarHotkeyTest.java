@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
+import app.unichat.Present;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class NativeBarHotkeyTest {
     @TempDir Path dir;
 
+    @SuppressWarnings("NullAway") // headless: no AWT menu can be made, and this helper is never asked for one
     @Test
     void theHelpersShortcutBringsTheWindowAndItIsToldWhetherItsOn() throws Exception {
         Path told = dir.resolve("recibido.txt");
@@ -23,7 +25,7 @@ class NativeBarHotkeyTest {
         Path helper = Files.writeString(dir.resolve("helper"), "#!/bin/sh\nread a; echo \"$a\" > '" + told + "'\necho hotkey\ncat >/dev/null\n");
         assertTrue(helper.toFile().setExecutable(true));
         CountDownLatch pressed = new CountDownLatch(1);
-        NativeBar bar = NativeBar.start(helper, null, () -> { }, id -> { }, pressed::countDown);
+        NativeBar bar = Present.of(NativeBar.start(helper, null, () -> { }, id -> { }, pressed::countDown));
         try {
             bar.setGlobalShortcut(true);
             pressed.await();
@@ -33,12 +35,13 @@ class NativeBarHotkeyTest {
         }
     }
 
+    @SuppressWarnings("NullAway") // headless: no AWT menu can be made, and this helper is never asked for one
     @Test
     void aLeftClickOnTheIconBringsTheWindow() throws Exception {
         Path helper = Files.writeString(dir.resolve("helper"), "#!/bin/sh\necho show\ncat >/dev/null\n");
         assertTrue(helper.toFile().setExecutable(true));
         CountDownLatch shown = new CountDownLatch(1);
-        NativeBar bar = NativeBar.start(helper, null, () -> { }, id -> { }, shown::countDown);
+        NativeBar bar = Present.of(NativeBar.start(helper, null, () -> { }, id -> { }, shown::countDown));
         try {
             shown.await();
         } finally {

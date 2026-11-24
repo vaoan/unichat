@@ -10,9 +10,9 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 
@@ -55,13 +55,13 @@ class AccountsSyncUiTest {
                 .filter(b -> "Sincronizar chats".equals(b.getText())).toList());
         assertEquals(1, sync.size(), "only Telegram has it");
         assertTrue(fx(() -> sync.get(0).getAccessibleText()).contains("Telegram"));
-        fx(() -> { sync.get(0).fire(); return null; });
+        FxWait.onFx(() -> sync.get(0).fire());
         FxWait.until("a toast about Telegram", () -> toasts.stream().anyMatch(t -> t.contains("Telegram")));
         assertTrue(toasts.stream().anyMatch(t -> t.contains("Telegram")), toasts.toString());
         svc.stop();
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

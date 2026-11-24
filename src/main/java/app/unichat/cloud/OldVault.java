@@ -1,5 +1,7 @@
 package app.unichat.cloud;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -31,16 +33,16 @@ final class OldVault implements Storage {
 
     @Override public void check() throws IOException { plain.check(); }
     @Override public boolean exists(String path) throws IOException { return plain.exists(at(path)); }
-    @Override public String stamp(String path) throws IOException { return plain.stamp(at(path)); }
+    @Override public @Nullable String stamp(String path) throws IOException { return plain.stamp(at(path)); }
     @Override public void mkdirs(String dir) throws IOException { plain.mkdirs(at(dir)); }
     @Override public void delete(String path) throws IOException { plain.delete(at(path)); }
     @Override public void move(String from, String to) throws IOException { plain.move(at(from), at(to)); }
     @Override public void put(String path, Path file) throws IOException { plain.put(at(path), file); }
-    @Override public void put(String path, Path file, LongConsumer sent) throws IOException { plain.put(at(path), file, sent); }
+    @Override public void put(String path, Path file, @Nullable LongConsumer sent) throws IOException { plain.put(at(path), file, sent); }
     @Override public void put(String path, byte[] data) throws IOException { plain.put(at(path), data); }
-    @Override public byte[] get(String path) throws IOException { return plain.get(at(path)); }
+    @Override public byte @Nullable [] get(String path) throws IOException { return plain.get(at(path)); }
     @Override public boolean get(String path, Path target) throws IOException { return plain.get(at(path), target); }
-    @Override public RemoteFile info(String path) throws IOException { return plain.info(at(path)); }
+    @Override public @Nullable RemoteFile info(String path) throws IOException { return plain.info(at(path)); }
 
     /** A folder of the vault's names as they are now: "llaves" says "keys", "Ajustes" says "Settings". */
     @Override

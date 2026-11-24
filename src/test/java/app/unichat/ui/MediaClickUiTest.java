@@ -12,11 +12,12 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -49,12 +50,11 @@ class MediaClickUiTest {
         FxWait.until("the photo renders", () -> scene.getRoot().lookup(".media-box") != null);
         // Count only viewer windows: the demo's simulated incoming messages open notification cards too.
         int before = fx(MediaClickUiTest::viewers);
-        fx(() -> {
+        FxWait.onFx(() -> {
             Node media = scene.getRoot().lookup(".media-box");
-            assertTrue(media != null, "the demo chat has a photo");
-            Event.fireEvent(media, mouse(MouseEvent.MOUSE_PRESSED, media, true));
-            Event.fireEvent(media, mouse(MouseEvent.MOUSE_RELEASED, media, true));
-            return null;
+            assertNotNull(media, "the demo chat has a photo");
+            Event.fireEvent(media, mouse(MouseEvent.MOUSE_PRESSED, true));
+            Event.fireEvent(media, mouse(MouseEvent.MOUSE_RELEASED, true));
         });
         FxWait.until("a viewer opens", () -> viewers() > before);
         FxWait.settled(); // and only one
@@ -62,10 +62,9 @@ class MediaClickUiTest {
         boolean viewer = fx(() -> Window.getWindows().stream().anyMatch(w -> w.getScene() != null
                 && w.getScene().getRoot().getStyleClass().contains("media-viewer")));
         assertTrue(viewer);
-        fx(() -> {
+        FxWait.onFx(() -> {
             Window.getWindows().stream().filter(w -> w.getScene() != null && w.getScene().getRoot().getStyleClass().contains("media-viewer"))
                     .toList().forEach(Window::hide);
-            return null;
         });
     }
 
@@ -74,12 +73,12 @@ class MediaClickUiTest {
                 .filter(w -> w.getScene() != null && w.getScene().getRoot().getStyleClass().contains("media-viewer")).count();
     }
 
-    private static MouseEvent mouse(javafx.event.EventType<MouseEvent> type, Node n, boolean still) {
+    private static MouseEvent mouse(javafx.event.EventType<MouseEvent> type, boolean still) {
         return new MouseEvent(type, 10, 10, 10, 10, MouseButton.PRIMARY, 1, false, false, false, false,
                 true, false, false, true, false, still, null);
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import java.util.concurrent.ExecutionException;
 import javafx.application.Platform;
 import javafx.scene.control.ContextMenu;
 import javafx.stage.Stage;
@@ -7,6 +8,7 @@ import javafx.stage.Window;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -35,7 +37,7 @@ public final class LeftoverWindows implements BeforeEachCallback, AfterEachCallb
     }
 
     @Override
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked") // the store holds what beforeEach put there: a Set<Window>
     public void afterEach(ExtensionContext context) throws Exception {
         Set<Window> before = (Set<Window>) context.getStore(HERE).get("before");
         List<String> left = onFx(() -> {
@@ -62,7 +64,7 @@ public final class LeftoverWindows implements BeforeEachCallback, AfterEachCallb
      * exited (a test's last window closed with implicit exit on), when {@code runLater} drops the task silently and a
      * wait for it would never end.
      */
-    private static <T> T onFx(Callable<T> c) throws Exception {
+    private static <T> @Nullable T onFx(Callable<T> c) throws InterruptedException, ExecutionException {
         boolean fxThread = Thread.getAllStackTraces().keySet().stream()
                 .anyMatch(t -> t.isAlive() && "JavaFX Application Thread".equals(t.getName()));
         if (!fxThread) return null;

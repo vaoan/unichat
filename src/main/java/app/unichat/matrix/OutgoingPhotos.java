@@ -5,6 +5,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.Folders;
 import app.unichat.support.Hashes;
 import app.unichat.support.ImageHeaders;
+import app.unichat.support.PathParts;
 import app.unichat.video.MovingPictures;
 import app.unichat.video.SendablePhotos;
 
@@ -54,12 +55,12 @@ final class OutgoingPhotos {
         Path root = Settings.dataDir().resolve("cache").resolve("sending");
         prune(root);
         Path dir = Files.createDirectories(root.resolve(Hashes.sha256(file.toAbsolutePath() + "|moving").substring(0, 16)));
-        String name = file.getFileName().toString().replaceFirst("\\.[^.]*$", "") + ".webp";
+        String name = PathParts.name(file).replaceFirst("\\.[^.]*$", "") + ".webp";
         Path webp;
         try {
             webp = MovingPictures.toWebp(file, dir.resolve(name), p -> { });
         } catch (IOException e) { // too long, not a video, no ffmpeg: trying again won't change it
-            throw new CantSend(e.getMessage());
+            throw new CantSend(e.getMessage(), e);
         }
         int[] size = ImageHeaders.size(webp);
         return new Photo(webp, "image/webp", size[0], size[1]);

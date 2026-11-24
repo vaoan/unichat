@@ -1,10 +1,11 @@
 package app.unichat.ui.media;
 
 import app.unichat.service.MediaSource;
+import app.unichat.support.BoundedMap;
 import javafx.scene.image.Image;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,18 +22,13 @@ public final class ImageCache {
     static final int PX = 168;
     private static final int MAX = 500;
 
-    private static final Map<String, Image> CACHE = Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Image> e) {
-            return size() > MAX;
-        }
-    });
+    private static final Map<String, Image> CACHE = Collections.synchronizedMap(BoundedMap.byUse(MAX));
     private static final Map<String, CompletableFuture<Image>> LOADING = new ConcurrentHashMap<>();
     /** URLs that failed (e.g. bridge-bot avatars on remote servers a "localhost" Synapse can't fetch). */
     private static final Map<String, Long> FAILED = new ConcurrentHashMap<>();
     private static final long RETRY_AFTER_MS = 10 * 60 * 1000;
 
-    public static Image get(String url) {
+    public static @Nullable Image get(String url) {
         return CACHE.get(url);
     }
 
@@ -55,7 +51,7 @@ public final class ImageCache {
         CompletableFuture<Image> mine = new CompletableFuture<>();
         CompletableFuture<Image> running = LOADING.putIfAbsent(url, mine);
         if (running != null) return running;
-        svc.media(url, PX, PX).thenApplyAsync(path -> {
+        var _ = svc.media(url, PX, PX).thenApplyAsync(path -> {
             // Decoded completely here, so a view never shows a half-loaded (blank) image.
             // Animated avatars (Discord) stay still: JavaFX's own GIF animation never lets the image go.
             Image img;

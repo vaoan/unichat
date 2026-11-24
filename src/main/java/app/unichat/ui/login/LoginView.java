@@ -60,7 +60,7 @@ public final class LoginView extends StackPane {
             login.setDisable(true);
             spin.setVisible(true);
             Nodes.show(error, false);
-            MatrixLogin.login(server.getText().trim(), user.getText().trim(), pass.getText())
+            var _ = MatrixLogin.login(server.getText().trim(), user.getText().trim(), pass.getText())
                     .whenComplete((svc, err) -> Platform.runLater(() -> {
                         login.setDisable(false);
                         spin.setVisible(false);
@@ -77,8 +77,8 @@ public final class LoginView extends StackPane {
         Label localStatus = new Label(I18n.t("login.localInfo"));
         localStatus.getStyleClass().add("login-subtitle");
         localStatus.setWrapText(true);
-        useLocal.setOnAction(e -> startLocalServer(local, useLocal, login, localStatus, error, onLoggedIn));
-        if (local != null) {
+        if (local != null) { // without it the button isn't shown
+            useLocal.setOnAction(e -> startLocalServer(local, useLocal, login, localStatus, error, onLoggedIn));
             login.getStyleClass().setAll("button", "secondary-button");
             login.setDefaultButton(false);
             useLocal.setDefaultButton(true);
@@ -88,13 +88,13 @@ public final class LoginView extends StackPane {
         Hyperlink help = helpLink(openLink);
 
         StackPane loginRow = new StackPane(login, spin);
-        StackPane.setAlignment(spin, Pos.CENTER_RIGHT);
+        setAlignment(spin, Pos.CENTER_RIGHT);
         VBox card = new VBox(12, logo, title, sub);
         if (local != null) card.getChildren().addAll(useLocal, localStatus, new Label(I18n.t("login.orOwnServer")));
         card.getChildren().addAll(server, user, pass, error, loginRow, new Label(I18n.t("login.or")), demo, help);
         card.setAlignment(Pos.CENTER);
         card.getStyleClass().addAll("login-card", "card");
-        card.setMaxSize(420, VBox.USE_PREF_SIZE);
+        card.setMaxSize(420, USE_PREF_SIZE);
         getChildren().add(card);
     }
 

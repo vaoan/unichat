@@ -26,7 +26,7 @@ public final class MessageActions {
         // What it said, from the texts' copy (or that there's none): all a deleted message has left, and an edited one's past.
         if (m.deleted()) return EnumSet.of(Action.SAVED_TEXT);
         // An edited one's past; mine where kept: what I wrote before the AI corrected it.
-        if (m.edited() || myTextsKept && m.outgoing() && !m.isMedia()) out.add(Action.SAVED_TEXT);
+        if (m.edited() || (myTextsKept && m.outgoing() && !m.isMedia())) out.add(Action.SAVED_TEXT);
         out.add(Action.CAPTURE); // a picture of the chat from here to there: any message can be an end
         if (f.replies() || f.isUnknown()) out.add(Action.REPLY);
         if (!m.isMedia()) out.add(Action.COPY);
@@ -35,9 +35,16 @@ public final class MessageActions {
             out.add(Action.SAVE_AS);
             if (m.type() == MessageType.AUDIO) out.add(Action.TRANSCRIBE);
         }
+        passingOn(m, out);
+        if (m.outgoing()) mine(m, f, now, out);
+        return out;
+    }
+
+    /** Taking it elsewhere: its link saved, forwarded, pinned, kept as a favorite. */
+    private static void passingOn(Message m, Set<Action> out) {
         // What a link leads to, saved into the chat's folder as auto-save would: the links auto-save takes. Not while mine
         // has only its temporary id (sending, failed): the name would carry that one, and auto-save save it again.
-        boolean onServer = m.status() != MessageStatus.SENDING && m.status() != MessageStatus.FAILED;
+        boolean onServer = onServer(m);
         if (onServer && !AutoSave.links(m).isEmpty()) out.add(Action.SAVE_LINK);
         // A copy goes, so only what the server has (a file at a media address: the sender chose any other); a join or a
         // new name isn't a message to pass on.
@@ -46,17 +53,24 @@ public final class MessageActions {
         }
         // Pinned in Unichat (no bridge carries pins): what the server has, so the id stays; never a join or a new name.
         if (onServer && m.type() != MessageType.SYSTEM) out.add(Action.PIN);
-        if (isStickerOrGif(m)) out.add(Action.FAVORITE);
-        if (m.outgoing()) {
-            if (!m.isMedia() && f.canEdit(m.timestamp(), now)) {
-                out.add(Action.EDIT);
-                // Corrected and edited by itself, the message box left alone; once the server has it (its id is final).
-                if (onServer) out.add(Action.FIX);
-            }
-            if (f.canDeleteForEveryone(m.timestamp(), now)) out.add(Action.DELETE_FOR_EVERYONE);
-            else if (f.deleteForMe()) out.add(Action.DELETE_FOR_ME);
+        // Kept by its address: one without (a stranger's) would be a favourite of nothing, and break the library.
+        if (isStickerOrGif(m) && m.mediaUrl() != null) out.add(Action.FAVORITE);
+    }
+
+    /** What only mine can have done: an edit, a correction, a deletion. */
+    private static void mine(Message m, RoomFeatures f, Instant now, Set<Action> out) {
+        if (!m.isMedia() && f.canEdit(m.timestamp(), now)) {
+            out.add(Action.EDIT);
+            // Corrected and edited by itself, the message box left alone; once the server has it (its id is final).
+            if (onServer(m)) out.add(Action.FIX);
         }
-        return out;
+        if (f.canDeleteForEveryone(m.timestamp(), now)) out.add(Action.DELETE_FOR_EVERYONE);
+        else if (f.deleteForMe()) out.add(Action.DELETE_FOR_ME);
+    }
+
+    /** Not while mine has only its temporary id (sending, failed). */
+    private static boolean onServer(Message m) {
+        return m.status() != MessageStatus.SENDING && m.status() != MessageStatus.FAILED;
     }
 
     public static boolean isStickerOrGif(Message m) {

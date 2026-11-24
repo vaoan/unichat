@@ -1,11 +1,15 @@
 package app.unichat.autosave;
 
+import app.unichat.Present;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.SaveKind;
 import app.unichat.service.ChatReader;
 import app.unichat.service.MockChatService;
+import app.unichat.support.PathParts;
+import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,8 +25,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,17 +45,24 @@ class AutoSaveTest {
     /** Where each link went and the name tag it got: "folder tag". */
     private final List<String> linkedInto = new CopyOnWriteArrayList<>();
     /** The message each failure told came in. */
-    private final List<String> failedIn = new CopyOnWriteArrayList<>();
-    /** A link that has no video, and a file that can't be downloaded. */
-    private static final String NO_VIDEO = "https://example.org/sin-video", BROKEN = "mxc://s/roto.jpg", ENDLESS = "mxc://s/enorme.mov";
-    /** A file and a link that fail for {@link #flaky}'s reason while it's set, and are saved once it isn't. */
-    private static final String FLAKY = "mxc://s/a-veces.jpg", FLAKY_LINK = "https://example.org/a-veces";
-    private volatile String flaky;
+    private final List<@Nullable String> failedIn = new CopyOnWriteArrayList<>();
+    // A link that has no video, and a file that can't be downloaded.
+    private static final String NO_VIDEO = "https://example.org/sin-video";
+    private static final String BROKEN = "mxc://s/roto.jpg";
+    private static final String ENDLESS = "mxc://s/enorme.mov";
+
+    // A file and a link that fail for flaky's reason while it's set, and are saved once it isn't.
+    private static final String FLAKY = "mxc://s/a-veces.jpg";
+    private static final String FLAKY_LINK = "https://example.org/a-veces";
+
+    private volatile @Nullable String flaky;
     /** Every file asked for, in order. */
     private final List<String> asked = new CopyOnWriteArrayList<>();
     /** Counted down when a download of {@link #ENDLESS} starts: it never ends by itself (a huge video). */
     private final CountDownLatch endlessStarted = new CountDownLatch(1);
     private AutoSave save;
+    /** Every AutoSave the test made, the one it ends with and any it started again: {@link #stop} waits for each. */
+    private final List<AutoSave> made = new ArrayList<>();
     /** Counted down when a round ends having saved something. */
     private final CountDownLatch roundFinished = new CountDownLatch(1);
 
@@ -57,7 +70,7 @@ class AutoSaveTest {
     private ChatReader reader() {
         return new ChatReader() {
             @Override public List<Chat> chats() { return List.of(chat); }
-            @Override public Chat chat(String id) { return id.equals(chat.id()) ? chat : null; }
+            @Override public @Nullable Chat chat(String id) { return id.equals(chat.id()) ? chat : null; }
             @Override public List<Message> messages(String id) { return new ArrayList<>(timeline); }
             @Override public CompletableFuture<Boolean> loadOlder(String id) {
                 List<Message> page = older.poll();
@@ -65,14 +78,14 @@ class AutoSaveTest {
                 timeline.addAll(0, page);
                 return CompletableFuture.completedFuture(true);
             }
-            @Override public CompletableFuture<Message> message(String c, String m) { return CompletableFuture.completedFuture(null); }
+            @Override public CompletableFuture<@Nullable Message> message(String c, String m) { return CompletableFuture.completedFuture(null); }
         };
     }
 
     @BeforeEach
     void start() throws Exception {
         svc = new MockChatService();
-        chat = svc.chat("!family:demo");
+        chat = Present.of(svc.chat("!family:demo"));
         SaveFolders.setOwn(chat.id(), dir.resolve("out"));
         save = create(NO_RETRY);
     }
@@ -80,10 +93,10 @@ class AutoSaveTest {
     /** Tried again only when the chat changes, as the tests below that count tries need: the timer never comes. */
     private static final java.time.Duration NO_RETRY = java.time.temporal.ChronoUnit.FOREVER.getDuration();
 
-    private AutoSave create(java.time.Duration retryAfter) throws Exception {
+    private AutoSave create(java.time.Duration retryAfter) throws IOException {
         Path cached = Files.writeString(dir.resolve("cached.bin"), "contenido");
         AutoSave a = new AutoSave(svc, reader(), new SavedUpTo(dir.resolve("autosave.json")), retryAfter, new AutoSave.Saver() {
-            @Override public Path media(String mediaUrl, java.util.function.DoubleConsumer progress) throws java.io.IOException, InterruptedException {
+            @Override public Path media(String mediaUrl, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
                 if (mediaUrl.endsWith("/grande.mov")) {
                     progress.accept(0.25);
                     progress.accept(0.5);
@@ -91,7 +104,7 @@ class AutoSaveTest {
                 asked.add(mediaUrl);
                 if (mediaUrl.equals(BROKEN)) throw new AutoSave.Gone("el puente no respondió", null);
                 String why = flaky;
-                if (mediaUrl.equals(FLAKY) && why != null) throw new java.io.IOException(why);
+                if (mediaUrl.equals(FLAKY) && why != null) throw new IOException(why);
                 if (mediaUrl.equals(ENDLESS)) {
                     endlessStarted.countDown();
                     new CountDownLatch(1).await(); // until interrupted
@@ -99,7 +112,7 @@ class AutoSaveTest {
                 return cached;
             }
 
-            @Override public Failure link(String url, Path folder, String tag, java.util.function.DoubleConsumer progress) {
+            @Override public @Nullable Failure link(String url, Path folder, String tag, java.util.function.DoubleConsumer progress) {
                 if (url.equals(NO_VIDEO)) return Failure.forGood("Unsupported URL");
                 String why = flaky;
                 if (url.equals(FLAKY_LINK) && why != null) return Failure.forNow(why);
@@ -108,13 +121,14 @@ class AutoSaveTest {
                 return null;
             }
         }, new TextLog(dir.resolve("texts"), Instant::now), java.time.Duration.ZERO);
+        made.add(a);
         a.setProgress(new AutoSave.Progress() {
             @Override public void changed(int done, int total) { told.add("progress " + done + "/" + total); }
             @Override public void finished(int saved, Chat c) {
                 told.add("finished " + saved + " " + c.id());
                 roundFinished.countDown();
             }
-            @Override public void failed(String what, Chat c, String messageId, String why) {
+            @Override public void failed(String what, Chat c, @Nullable String messageId, String why) {
                 told.add("failed " + what + ": " + why);
                 failedIn.add(messageId);
             }
@@ -123,7 +137,18 @@ class AutoSaveTest {
     }
 
     @AfterEach
-    void stop() {
+    void stop() throws InterruptedException {
+        // The texts thread writes into the temp folder (texts/, the chat's readable copy) after a round has ended: done
+        // before JUnit deletes the folder, or that failed now and then ("Failed to delete temp directory").
+        for (AutoSave a : made) { // a test may have started it again (closed and opened): each has its own threads
+            a.stopExploring(chat.id()); // a test that failed mid-explore ends now, not at JUnit's limit
+            CountDownLatch saving = new CountDownLatch(1);
+            a.afterPending(saving::countDown); // the round may hand the texts thread more
+            saving.await();
+            CountDownLatch writing = new CountDownLatch(1);
+            a.afterTexts(writing::countDown);
+            writing.await();
+        }
         SaveFolders.setOwn(chat.id(), null);
         svc.stop();
     }
@@ -176,13 +201,13 @@ class AutoSaveTest {
         done.await();
     }
 
-    private List<String> saved() throws Exception {
+    private List<String> saved() throws IOException {
         Path folder = save.folder(chat);
         if (!Files.isDirectory(folder)) return List.of();
         try (Stream<Path> s = Files.list(folder)) {
             // The names carry the message's id ("hoy [id].jpg"): what's compared here is the name it had.
             // The texts' readable copy (every kind includes the texts) is made on a thread of its own: not a file saved.
-            return s.filter(p -> !AutoSave.isTextCopy(p)).map(p -> p.getFileName().toString()).filter(n -> !n.startsWith("."))
+            return s.filter(p -> !AutoSave.isTextCopy(p)).map(PathParts::name).filter(n -> !n.startsWith("."))
                     .map(n -> n.replaceFirst(" \\[[^\\]]+\\](\\.[^.]+)?$", "$1")).sorted().toList();
         }
     }
@@ -277,7 +302,7 @@ class AutoSaveTest {
         assertEquals(List.of("failed " + FLAKY_LINK + ": sin red", "failed " + FLAKY_LINK + ": sin red"),
                 told.stream().filter(t -> t.startsWith("failed")).toList(), "asked again, told again: the person is waiting for it");
         assertEquals(List.of("$t2", "$t2"), failedIn, "the notice goes to its message");
-        assertTrue(told.getLast().equals("progress 0/0"), "the ring ends: " + told);
+        assertEquals("progress 0/0", told.getLast(), "the ring ends: " + told);
     }
 
     @Test
@@ -398,7 +423,7 @@ class AutoSaveTest {
         assertTrue(steps.contains("ASKING_OLDER"), "asking the server for older messages: " + steps);
         AutoSave.Exploring e = save.exploring(chat.id());
         assertEquals(3, e.looked(), "ayer, contrato and the video looked at (the video not saved: not chosen)");
-        assertEquals(null, e.now(), "nothing going on once over");
+        assertNull(e.now(), "nothing going on once over");
     }
 
     @Test
@@ -425,6 +450,7 @@ class AutoSaveTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY", justification = "waits for the value to change at all: the exact comparison is what's meant")
     void exploringSaysHowMuchOfTheFileHasArrived() throws Exception {
         svc.setAutoSave(chat.id(), EnumSet.allOf(SaveKind.class)).get();
         timeline.add(media(MessageType.VIDEO, "grande.mov", false, Instant.now().minusSeconds(100)));
@@ -480,7 +506,7 @@ class AutoSaveTest {
         arrive(real);
         assertEquals(List.of("nutricion.pdf"), saved(), "once, with its real id");
         try (var s = Files.list(save.folder(chat))) {
-            assertTrue(s.anyMatch(p -> p.getFileName().toString().contains("[B3WbWcGB4mXOsHJyxwCtzO38Ao2fy]")), "the real id in the name");
+            assertTrue(s.anyMatch(p -> PathParts.name(p).contains("[B3WbWcGB4mXOsHJyxwCtzO38Ao2fy]")), "the real id in the name");
         }
     }
 
@@ -502,10 +528,11 @@ class AutoSaveTest {
 
     @Test
     void aFileTheServerSaysIsGoneIsGoneForGood() {
-        RuntimeException notThere = new RuntimeException("HTTP 404"), later = new RuntimeException("HTTP 502");
+        RuntimeException notThere = new RuntimeException("HTTP 404");
+        RuntimeException later = new RuntimeException("HTTP 502");
         app.unichat.service.MediaSource source = new app.unichat.service.MediaSource() {
-            @Override public CompletableFuture<Path> media(String url, int w, int h) {
-                return CompletableFuture.failedFuture(url.endsWith("gone") ? notThere : later);
+            @Override public CompletableFuture<Path> media(@Nullable String url, int w, int h) {
+                return CompletableFuture.failedFuture(url != null && url.endsWith("gone") ? notThere : later);
             }
 
             @Override public boolean gone(Throwable error) {
@@ -514,7 +541,7 @@ class AutoSaveTest {
         };
         AutoSave.Saver saver = AutoSave.downloading(source);
         org.junit.jupiter.api.Assertions.assertThrows(AutoSave.Gone.class, () -> saver.media("mxc://s/gone", p -> { }));
-        java.io.IOException e = org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, () -> saver.media("mxc://s/x", p -> { }));
+        IOException e = org.junit.jupiter.api.Assertions.assertThrows(IOException.class, () -> saver.media("mxc://s/x", p -> { }));
         assertFalse(e instanceof AutoSave.Gone, "a 502 may work next time");
     }
 

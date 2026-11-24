@@ -1,5 +1,6 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -9,6 +10,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -69,6 +71,7 @@ class ArchivesTest {
 
     /** An archive cut short replaces nothing and leaves no temp file behind. */
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aCutShortArchiveKeepsTheOldProgramAndLeavesNoTemp() throws IOException {
         byte[] noise = new byte[200_000];
         new java.util.Random(7).nextBytes(noise);
@@ -89,7 +92,7 @@ class ArchivesTest {
         byte[] h = new byte[512];
         byte[] n = name.getBytes(StandardCharsets.US_ASCII);
         System.arraycopy(n, 0, h, 0, n.length);
-        byte[] size = String.format("%011o", data.length).getBytes(StandardCharsets.US_ASCII);
+        byte[] size = String.format(Locale.ROOT, "%011o", data.length).getBytes(StandardCharsets.US_ASCII);
         System.arraycopy(size, 0, h, 124, size.length);
         h[156] = (byte) type;
         System.arraycopy("ustar".getBytes(StandardCharsets.US_ASCII), 0, h, 257, 5);

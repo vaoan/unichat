@@ -17,6 +17,7 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -64,11 +65,11 @@ class LinkPreviewUiTest {
         return true;
     }
 
-    private static Node cardIn(Scene scene, String text) {
+    private static @Nullable Node cardIn(Scene scene, String text) {
         return scene.getRoot().lookupAll(".link-preview").stream().filter(n -> shown(n) && texts(n).contains(text)).findFirst().orElse(null);
     }
 
-    private static Scene open(MockChatService svc) throws Exception {
+    private static Scene open(MockChatService svc) throws InterruptedException {
         return FxWait.fx(() -> {
             Stage stage = new Stage();
             stage.setOpacity(0);
@@ -108,11 +109,10 @@ class LinkPreviewUiTest {
     void aBridgesPreviewIsTheSameCardWithItsPicture() throws Exception {
         MockChatService svc = new MockChatService();
         svc.sendText(CHAT, "https://a.example/nota", null).get();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             var ms = svc.messages(CHAT);
             ms.get(ms.size() - 1).setLinkPreviews(List.of(new LinkPreview("https://a.example/nota", "Ejemplo", "Una nota", "Su texto",
                     "mxc://demo/foto", 1200, 630, null, false)));
-            return null;
         });
         Scene scene = open(svc);
         String[] seen = new String[1];

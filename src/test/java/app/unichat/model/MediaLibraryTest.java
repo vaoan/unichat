@@ -1,5 +1,6 @@
 package app.unichat.model;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -118,7 +119,7 @@ class MediaLibraryTest {
         assertEquals(1, new MediaLibrary(f).favorites(MediaLibrary.Kind.STICKER).size());
     }
 
-    private static MediaLibrary.Item telegram(String url, String id, int size) {
+    private static MediaLibrary.Item telegram(String url, @Nullable String id, int size) {
         var info = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("size", size);
         if (id != null) info.putObject("fi.mau.bridged_sticker").put("network", "telegram").put("id", id);
         return new MediaLibrary.Item(MediaLibrary.Kind.STICKER, url, "image/webp", 256, 256, info);
@@ -235,18 +236,18 @@ class MediaLibraryTest {
     }
 
     @Test
-    void theQuickReactionsAreTheOnesUsedMostAndTravelInTheFile(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) {
-        java.nio.file.Path f = dir.resolve("media-library.json");
+    void theQuickReactionsAreTheOnesUsedMostAndTravelInTheFile(@TempDir Path temp) {
+        Path f = temp.resolve("media-library.json");
         MediaLibrary lib = new MediaLibrary(f);
-        java.util.List<String> usual = java.util.List.of("❤️", "👍", "😂", "😮", "😢", "🙏");
+        List<String> usual = List.of("❤️", "👍", "😂", "😮", "😢", "🙏");
         assertEquals(usual, lib.mostReacted(6, usual), "no history: the usual ones");
         for (int i = 0; i < 3; i++) lib.reacted("🔥");
         lib.reacted("🫠");
         lib.reacted("👍");
         lib.reacted("👍");
-        assertEquals(java.util.List.of("🔥", "👍", "🫠", "❤️", "😂", "😮"), lib.mostReacted(6, usual),
+        assertEquals(List.of("🔥", "👍", "🫠", "❤️", "😂", "😮"), lib.mostReacted(6, usual),
                 "most used first, ties newest first, then the usual ones not already there");
-        assertEquals(java.util.List.of("🔥", "👍", "🫠", "❤️", "😂", "😮"), new MediaLibrary(f).mostReacted(6, usual), "kept in the file");
-        assertEquals(java.util.List.of("🔥"), lib.mostReacted(1, usual));
+        assertEquals(List.of("🔥", "👍", "🫠", "❤️", "😂", "😮"), new MediaLibrary(f).mostReacted(6, usual), "kept in the file");
+        assertEquals(List.of("🔥"), lib.mostReacted(1, usual));
     }
 }

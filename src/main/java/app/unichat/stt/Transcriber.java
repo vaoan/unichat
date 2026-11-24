@@ -7,6 +7,7 @@ import app.unichat.support.Os;
 import app.unichat.support.Processes;
 import app.unichat.settings.Settings;
 import app.unichat.video.Ffmpeg;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,6 +17,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Speech to text with what the user already has, no paid service: whisper.cpp shipped with the app (model
@@ -31,7 +33,7 @@ public final class Transcriber {
     private Transcriber() {}
 
     /** whisper-cli: -Dunichat.whisper (development), app/server/whisper/ inside the app, or the PATH. */
-    public static Path whisperBinary() {
+    public static @Nullable Path whisperBinary() {
         return BundledTools.find("unichat.whisper", "whisper", "whisper-cli");
     }
 
@@ -59,7 +61,9 @@ public final class Transcriber {
                 int[] shown = {-1};
                 Path m = model.ensure(modelsDir(), p -> {
                     int pct = (int) Math.round(p * 100);
-                    if (pct != shown[0]) status.accept(I18n.t("stt.downloadingPct", shown[0] = pct));
+                    if (pct == shown[0]) return;
+                    shown[0] = pct;
+                    status.accept(I18n.t("stt.downloadingPct", pct));
                 });
                 int threads = Math.max(1, Math.min(8, Runtime.getRuntime().availableProcessors() / 2));
                 cmd = List.of(bin.toString(), "-m", m.toString(), "-f", input.toString(), "-l", lang,
@@ -88,7 +92,7 @@ public final class Transcriber {
         List<String> cmd;
         if (ffmpeg != null) {
             List<String> c = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-loglevel", "error", "-y"));
-            c.addAll(app.unichat.video.Ffmpeg.input(audio)); // the file comes from other people
+            c.addAll(Ffmpeg.input(audio)); // the file comes from other people
             c.addAll(List.of("-ar", "16000", "-ac", "1", wav.toString()));
             cmd = c;
         } else if (Os.mac()) {
@@ -117,13 +121,14 @@ public final class Transcriber {
      * Runs {@code cmd}; stdout on success, the last error line otherwise. Out of time or its thread interrupted (the
      * note's transcript no longer wanted), it's stopped with its children.
      */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "whisper or ffmpeg with our own paths, the voice note through Ffmpeg.input (only that file, read only as one of Unichat's formats), as a list, no shell")
     static String run(List<String> cmd, Path work) throws IOException, InterruptedException {
         Path err = work.resolve("stderr.txt");
         Processes.Result r;
         try {
             r = Processes.capture(new ProcessBuilder(cmd).directory(work.toFile()).redirectError(err.toFile()), TIMEOUT_SECONDS);
         } catch (IOException e) {
-            throw new IOException(I18n.t("stt.runFailed", Path.of(cmd.get(0)).getFileName(), e.getMessage()));
+            throw new IOException(I18n.t("stt.runFailed", Path.of(cmd.get(0)).getFileName(), e.getMessage()), e);
         }
         if (!r.finished()) throw new IOException(I18n.t("stt.tooLong"));
         if (r.exit() != 0) {

@@ -1,5 +1,8 @@
 package app.unichat.ui.emoji;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -41,12 +44,13 @@ final class EmojiSearch {
     }
 
     /** The emoji's name, for a screen reader or a tooltip; null when there's none. */
-    String name(String emoji) {
+    @Nullable String name(String emoji) {
         String w = words.get(emoji);
         return w == null ? null : w.split("\\|", 2)[0];
     }
 
     /** Lower case, without accents, cut at anything that isn't a letter or digit. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "folds a search for emoji names; nothing is allowed by it")
     static List<String> split(String s) {
         String plain = Normalizer.normalize(s.toLowerCase(Locale.ROOT), Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         List<String> out = new ArrayList<>();

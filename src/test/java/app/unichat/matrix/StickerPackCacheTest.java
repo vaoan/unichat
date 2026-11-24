@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -22,11 +23,11 @@ class StickerPackCacheTest {
         String url = "https://t.me/addstickers/gatitos";
         assertNull(cache.fresh(url));
         cache.put(url, new ObjectMapper().readTree("{\"images\":{}}"));
-        assertEquals("{\"images\":{}}", cache.fresh(url).toString());
+        assertEquals("{\"images\":{}}", Present.of(cache.fresh(url)).toString());
         Path f = dir.resolve("gatitos.json");
         Files.setLastModifiedTime(f, FileTime.from(Instant.now().minus(StickerPackCache.FRESH).minusSeconds(60)));
         assertNull(cache.fresh(url), "stale: ask the bridge again");
-        assertEquals("{\"images\":{}}", cache.any(url).toString(), "but it serves when the bridge can't");
+        assertEquals("{\"images\":{}}", Present.of(cache.any(url)).toString(), "but it serves when the bridge can't");
         assertNull(cache.any("https://t.me/addstickers/otro"));
     }
 }

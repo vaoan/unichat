@@ -13,7 +13,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.util.List;
 
 import static app.unichat.ui.TimelineWindow.CHAT;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class PinnedMessagesUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @BeforeAll
@@ -35,23 +35,22 @@ class PinnedMessagesUiTest {
         if (w != null) w.close();
     }
 
-    private Node bar() throws Exception {
+    private Node bar() throws InterruptedException {
         return FxWait.fx(() -> w.scene.getRoot().lookup(".pinned-bar"));
     }
 
-    private String barText() throws Exception {
+    private String barText() throws InterruptedException {
         return FxWait.fx(() -> ((Label) bar().lookup(".pinned-preview")).getText());
     }
 
-    private void clickBar() throws Exception {
-        FxWait.fx(() -> {
+    private void clickBar() throws InterruptedException {
+        FxWait.onFx(() -> {
             ((Button) bar().lookup(".pinned-go")).fire();
-            return null;
         });
     }
 
     /** Whether {@code m} is the selected row and drawn in the list. */
-    private boolean shown(Message m) throws Exception {
+    private boolean shown(Message m) throws InterruptedException {
         return FxWait.fx(() -> w.cellOf(m) != null && w.list().getSelectionModel().getSelectedItem() instanceof app.unichat.ui.timeline.ThreadRows.MessageRow mr
                 && mr.message().id().equals(m.id()));
     }
@@ -79,9 +78,8 @@ class PinnedMessagesUiTest {
     void oneFromLongAgoIsFoundLoadingTheHistory() throws Exception {
         w = TimelineWindow.open(60, "mensaje %d");
         Message first = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> "mensaje 0".equals(m.body())).findFirst().orElseThrow());
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             PinnedMessages.get().pin(CHAT, first);
-            return null;
         });
         int loaded = FxWait.fx(() -> w.svc.messages(CHAT).size());
         w.svc.holdBack(CHAT, loaded - 15); // only the newest 15 are loaded: the pinned one is ~5 pages back
@@ -97,11 +95,12 @@ class PinnedMessagesUiTest {
     void severalPinsSayHowManyAndTheClickGoesFromOneToTheNext() throws Exception {
         w = TimelineWindow.open(20, "mensaje %d");
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("mensaje 1")).toList());
-        Message a = mine.get(1), b = mine.get(4); // "mensaje 10", "mensaje 13"
-        FxWait.fx(() -> {
+        // "mensaje 10", "mensaje 13"
+        Message a = mine.get(1);
+        Message b = mine.get(4);
+        FxWait.onFx(() -> {
             PinnedMessages.get().pin(CHAT, a);
             PinnedMessages.get().pin(CHAT, b);
-            return null;
         });
         FxWait.until("the newest pin first, and how many", () -> barText().contains("mensaje 13")
                 && ((Label) bar().lookup(".pinned-count")).getText().equals("1 de 2"));
@@ -112,9 +111,8 @@ class PinnedMessagesUiTest {
         clickBar();
         FxWait.until("to the next", () -> shown(a));
         FxWait.until("and round again to the first", () -> barText().contains("mensaje 13"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ((Button) bar().lookup(".pinned-unpin")).fire(); // the one on the bar
-            return null;
         });
         assertFalse(FxWait.fx(() -> PinnedMessages.get().isPinned(CHAT, b.id())), "the ✕ unpins the one shown");
         assertTrue(FxWait.fx(() -> PinnedMessages.get().isPinned(CHAT, a.id())));

@@ -16,6 +16,7 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A composer button that asks the AI program for text: a draft of a reply, or what's written, corrected. It only ever lands
@@ -60,13 +61,14 @@ public final class AiReplyButton {
     }
 
     /** Writes a draft, or null if cancelled. Tests put their own in place of the real program. */
+    @FunctionalInterface
     interface Writer {
-        String write(String prompt) throws ReplyWriter.Failure;
+        @Nullable String write(String prompt) throws ReplyWriter.Failure;
 
         /** The same writer, allowed to search the web; the ones that can't search stay as they are. */
         default Writer searching() { return this; }
 
-        default void cancel() { }
+        default void cancel() { /* nothing by default */ }
     }
 
     /** Ajustes turns it on or off for the open window. */
@@ -81,7 +83,7 @@ public final class AiReplyButton {
     private final Consumer<String> onError;
     private final Consumer<String> onDone;
     private final Supplier<Writer> writers;
-    private Writer working;
+    private @Nullable Writer working;
     /** What else the request runs (learning how the person writes), stopped with it. */
     private Runnable cancelRequest = () -> { };
 
@@ -174,15 +176,15 @@ public final class AiReplyButton {
         return realWriter(null);
     }
 
-    private static Writer realWriter(java.nio.file.Path folder) {
+    private static Writer realWriter(java.nio.file.@Nullable Path folder) {
         return realWriter(folder, false);
     }
 
-    private static Writer realWriter(java.nio.file.Path folder, boolean web) {
+    private static Writer realWriter(java.nio.file.@Nullable Path folder, boolean web) {
         ReplyWriter writer = new ReplyWriter();
         AiEngine engine = AiSettings.engine();
         return new Writer() {
-            @Override public String write(String prompt) throws ReplyWriter.Failure { return writer.write(engine, folder, prompt, web); }
+            @Override public @Nullable String write(String prompt) throws ReplyWriter.Failure { return writer.write(engine, folder, prompt, web); }
 
             @Override public void cancel() { writer.cancel(); }
 
@@ -191,23 +193,23 @@ public final class AiReplyButton {
     }
 
     /** The prompt for this chat; pure enough for the composer to call it with what it has. */
-    static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.Message target, String idea) {
+    static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.@Nullable Message target, String idea) {
         return prompt(chat, target, idea, java.util.Map.of());
     }
 
-    static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.Message target, String idea,
+    static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.@Nullable Message target, String idea,
                          java.util.Map<String, String> heard) {
         return prompt(chat, target, idea, heard, "");
     }
 
     /** {@code style}: how the person writes ({@code writing-style.md}). */
-    static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.Message target, String idea,
+    static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.@Nullable Message target, String idea,
                          java.util.Map<String, String> heard, String style) {
         return prompt(chat, target, idea, heard, style, java.util.List.of());
     }
 
     /** {@code examples}: how earlier drafts were corrected, the chat's own first. */
-    static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.Message target, String idea,
+    static String prompt(java.util.List<app.unichat.model.Message> chat, app.unichat.model.@Nullable Message target, String idea,
                          java.util.Map<String, String> heard, String style, java.util.List<app.unichat.assist.StylePrompt.Correction> examples) {
         return ReplyPrompt.build(AiSettings.instructions(), AiSettings.folder() != null, chat, target, idea, heard, style, examples);
     }
@@ -233,7 +235,8 @@ public final class AiReplyButton {
                 if (out.containsKey(m.id())) continue;
                 java.time.Duration left = java.time.Duration.ofNanos(deadline - System.nanoTime());
                 if (left.isNegative()) break;
-                String text = transcripts.await(m.mediaUrl(), () -> svc.media(m.mediaUrl(), 0, 0), left);
+                String url = java.util.Objects.requireNonNull(m.mediaUrl(), "voiceNotesToHear gives only notes with an address");
+                String text = transcripts.await(url, () -> svc.media(url, 0, 0), left);
                 if (text != null) out.put(m.id(), text);
             }
         } catch (InterruptedException e) {

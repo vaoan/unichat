@@ -1,5 +1,9 @@
 package app.unichat;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
+import org.jspecify.annotations.Nullable;
+
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryNotificationInfo;
 import java.lang.management.MemoryPoolMXBean;
@@ -8,6 +12,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.NotificationEmitter;
@@ -34,6 +39,7 @@ final class Recovery {
     private Recovery() { }
 
     /** How this run was started: after which process ({@code -1}: none), the restarts in a row, and the app's arguments. */
+    @SuppressWarnings("ArrayRecordComponent") // the arguments as main gets them, never compared
     record Start(long waitFor, int restarts, String[] args) {
         static Start of(String[] args) {
             long after = -1;
@@ -66,10 +72,11 @@ final class Recovery {
     }
 
     /** What a thread's error does: said, and a start again when it's fatal. */
+    @SuppressFBWarnings(value = "INFORMATION_EXPOSURE_THROUGH_AN_ERROR_MESSAGE", justification = "the trace goes to stderr, which is the person's own log (AppLog, through Redactor), never to anyone else")
     static void uncaught(Thread t, Throwable e, java.util.function.Consumer<String> restart) {
         try {
             System.err.println("Uncaught in " + t.getName() + ": " + e);
-            e.printStackTrace();
+            e.printStackTrace(System.err); // the log (AppLog): what printStackTrace() wrote to as well
         } catch (Throwable unsaid) {
             // Out of memory, saying it can run out too: the restart mustn't depend on it.
         }
@@ -105,6 +112,7 @@ final class Recovery {
     }
 
     /** Logs why with every thread's stack, starts the next run when allowed, and ends this one. Once. */
+    @SuppressFBWarnings(value = {"COMMAND_INJECTION", "DM_EXIT"}, justification = "starts this same program again: its own command and arguments from ProcessHandle.info() plus two of ours, as a list, no shell; starting over means this JVM ends (as its NOPMD says)")
     static void restart(String why) {
         if (!RESTARTING.compareAndSet(false, true)) return;
         try {
@@ -118,7 +126,7 @@ final class Recovery {
         if (mayRestart(restartsSoFar, uptime) && info.command().isPresent()) {
             List<String> args = info.arguments().map(Arrays::asList).orElse(List.of());
             try {
-                new ProcessBuilder(command(info.command().get(), args, ProcessHandle.current().pid(),
+                new ProcessBuilder(command(info.command().orElseThrow(), args, ProcessHandle.current().pid(),
                         nextCount(restartsSoFar, uptime))).inheritIO().start();
             } catch (Exception e) {
                 System.err.println("Recovery: could not start again: " + e);
@@ -127,7 +135,7 @@ final class Recovery {
             System.err.println("Recovery: " + MAX_IN_A_ROW + " restarts in a row, not starting again.");
         }
         // Ending can hang where things are broken: a shutdown hook flushes what was chosen, then it's cut short.
-        Thread end = new Thread(() -> System.exit(3), "recovery-exit");
+        Thread end = new Thread(() -> System.exit(3), "recovery-exit"); // NOPMD: DoNotTerminateVM, starting over means this JVM ends
         end.setDaemon(true);
         end.start();
         Thread halt = new Thread(() -> {
@@ -136,7 +144,7 @@ final class Recovery {
             } catch (InterruptedException ignored) {
                 // halting anyway
             }
-            Runtime.getRuntime().halt(3);
+            Runtime.getRuntime().halt(3); // NOPMD: DoNotTerminateVM, when exit itself hangs
         }, "recovery-halt");
         halt.start();
     }
@@ -155,7 +163,7 @@ final class Recovery {
                     new javax.management.ObjectName("com.sun.management:type=DiagnosticCommand"), "gcClassHistogram",
                     new Object[] {new String[0]}, new String[] {String[].class.getName()});
             String[] lines = String.valueOf(out).split("\n");
-            return "Memory: what fills it\n" + String.join("\n", java.util.Arrays.copyOf(lines, Math.min(lines.length, count + 3)));
+            return "Memory: what fills it\n" + String.join("\n", Arrays.copyOf(lines, Math.min(lines.length, count + 3)));
         } catch (Exception e) {
             return "Memory: no class histogram (" + e + ")";
         }
@@ -166,7 +174,7 @@ final class Recovery {
         for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
             long max = pool.getUsage().getMax();
             if (pool.getType() != MemoryType.HEAP || !pool.isCollectionUsageThresholdSupported() || max <= 0) continue;
-            if (!pool.getName().toLowerCase().contains("old")) continue;
+            if (!pool.getName().toLowerCase(Locale.ROOT).contains("old")) continue;
             pool.setCollectionUsageThreshold((long) (max * NEARLY_FULL));
         }
         ((NotificationEmitter) ManagementFactory.getMemoryMXBean()).addNotificationListener((n, h) -> {
@@ -198,10 +206,10 @@ final class Recovery {
         return usedAfter.getAsLong() >= limit;
     }
 
-    private static MemoryPoolMXBean oldGeneration() {
+    private static @Nullable MemoryPoolMXBean oldGeneration() {
         for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
             if (pool.getType() == MemoryType.HEAP && pool.isCollectionUsageThresholdSupported()
-                    && pool.getName().toLowerCase().contains("old") && pool.getCollectionUsageThreshold() > 0) {
+                    && pool.getName().toLowerCase(Locale.ROOT).contains("old") && pool.getCollectionUsageThreshold() > 0) {
                 return pool;
             }
         }

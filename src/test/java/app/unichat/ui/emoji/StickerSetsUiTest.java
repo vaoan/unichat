@@ -7,6 +7,7 @@ import app.unichat.model.StickerPack;
 import app.unichat.service.ChatService;
 import app.unichat.service.MockChatService;
 import app.unichat.ui.FxWait;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.Node;
@@ -23,6 +24,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import org.jspecify.annotations.Nullable;
+import app.unichat.Present;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -33,6 +36,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -47,7 +52,9 @@ class StickerSetsUiTest {
     @TempDir Path dir;
     private final AtomicInteger fetched = new AtomicInteger();
     private final List<MediaLibrary.Item> sent = new CopyOnWriteArrayList<>();
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private StickerGrid grid;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
 
     @BeforeAll
@@ -62,7 +69,7 @@ class StickerSetsUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private StickerPack pack(String title, String url, String... names) throws Exception {
+    private StickerPack pack(String title, String url, String... names) throws IOException {
         List<MediaLibrary.Item> items = new java.util.ArrayList<>();
         for (String n : names) {
             Path f = dir.resolve(n + ".png");
@@ -79,7 +86,7 @@ class StickerSetsUiTest {
         MockChatService mock = new MockChatService();
         Chat chat = mock.chats().stream().filter(c -> c.features().accepts(RoomFeatures.STICKER)).findFirst().orElseThrow();
         ChatService svc = (ChatService) java.lang.reflect.Proxy.newProxyInstance(
-                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) {
+                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                     case "stickerPacks" -> CompletableFuture.completedFuture(List.of(new StickerPack.Ref("Gatitos", GATITOS)));
                     case "stickerPack" -> {
                         fetched.incrementAndGet();
@@ -92,32 +99,31 @@ class StickerSetsUiTest {
                     default -> m.invoke(mock, args);
                 });
         MediaLibrary library = new MediaLibrary(dir.resolve("lib.json"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             grid = new StickerGrid(svc, library, () -> chat, () -> null, t -> { });
             stage = new Stage();
             stage.setOpacity(0);
             stage.setScene(new Scene(grid, 400, 600));
             stage.show();
             grid.refresh();
-            return null;
         });
     }
 
     @AfterEach
     void close() throws Exception {
-        FxWait.fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
-    private List<Node> content() throws Exception {
+    private List<Node> content() throws InterruptedException {
         return FxWait.fx(() -> List.copyOf(((VBox) grid.getContent()).getChildren()));
     }
 
-    private Button set(String title) throws Exception {
+    private @Nullable Button set(String title) throws InterruptedException {
         return (Button) content().stream().filter(n -> n instanceof Button b && b.getText().equals(title)).findFirst().orElse(null);
     }
 
     /** The stickers shown under {@code title}'s header, if it's open. */
-    private List<Node> stickersOf(String title) throws Exception {
+    private List<Node> stickersOf(String title) throws InterruptedException {
         List<Node> c = content();
         int i = c.indexOf(set(title));
         return i >= 0 && i + 1 < c.size() && c.get(i + 1) instanceof FlowPane f ? FxWait.fx(() -> List.copyOf(f.getChildren())) : List.of();
@@ -128,29 +134,28 @@ class StickerSetsUiTest {
         FxWait.until("your set listed", () -> set("Gatitos") != null);
         assertEquals(0, fetched.get(), "closed: nothing fetched");
         assertTrue(stickersOf("Gatitos").isEmpty());
-        FxWait.fx(() -> { set("Gatitos").fire(); return null; });
+        FxWait.onFx(() -> Present.of(set("Gatitos")).fire());
         FxWait.until("its stickers", () -> stickersOf("Gatitos").size() == 2);
         Node first = stickersOf("Gatitos").get(0);
         assertTrue(FxWait.fx(first::getAccessibleText).contains("Gatitos"), FxWait.fx(first::getAccessibleText));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(first, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         FxWait.until("sent", () -> sent.size() == 1);
         assertTrue(sent.get(0).url().endsWith("g1.png"));
-        FxWait.fx(() -> { set("Gatitos").fire(); return null; });
+        FxWait.onFx(() -> Present.of(set("Gatitos")).fire());
         FxWait.until("closed again", () -> stickersOf("Gatitos").isEmpty());
-        FxWait.fx(() -> { set("Gatitos").fire(); return null; });
+        FxWait.onFx(() -> Present.of(set("Gatitos")).fire());
         FxWait.until("open again", () -> stickersOf("Gatitos").size() == 2);
         assertEquals(1, fetched.get(), "a set is fetched once");
     }
 
     @Test
     void aSetOpenedFromOneOfItsStickersShowsThoughItIsntYours() throws Exception {
-        FxWait.fx(() -> { grid.showPack(PERROS); return null; });
+        FxWait.onFx(() -> grid.showPack(PERROS));
         FxWait.until("that set, open, under its own name", () -> stickersOf("Perros_y_gatos").size() == 1);
-        Button head = set("Perros_y_gatos");
-        assertTrue(!FxWait.fx(head::isMnemonicParsing), "its underscores are shown, not taken as a shortcut");
-        assertTrue(set("Gatitos") != null, "yours are still there");
+        Button head = Present.of(set("Perros_y_gatos"));
+        assertFalse(FxWait.fx(head::isMnemonicParsing), "its underscores are shown, not taken as a shortcut");
+        assertNotNull(set("Gatitos"), "yours are still there");
     }
 }

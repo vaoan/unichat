@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,6 +36,7 @@ class SeenTimelineAnimationsUiTest {
     @TempDir Path dir;
     private final List<Stage> stages = new ArrayList<>();
     private final List<Runnable> after = new ArrayList<>();
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private UploadBar bar;
 
     @BeforeAll
@@ -53,27 +55,25 @@ class SeenTimelineAnimationsUiTest {
     void close() throws Exception {
         Seen.reset(true);
         after.forEach(Runnable::run);
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             if (bar != null) bar.dispose();
             stages.forEach(Stage::close);
             AiReplyButton.SHOWN.set(false);
-            return null;
         });
     }
 
-    private void window(Parent root) throws Exception {
-        FxWait.fx(() -> {
+    private void window(Parent root) throws InterruptedException {
+        FxWait.onFx(() -> {
             Stage s = new Stage();
             s.setOpacity(0);
             s.setScene(new Scene(root, 700, 160));
             s.show();
             stages.add(s);
-            return null;
         });
     }
 
     /** Hides Unichat, then shows it again, checking {@code animating} each time. */
-    private static void restsWhileUnseen(String what, java.util.concurrent.Callable<Boolean> animating) throws Exception {
+    private static void restsWhileUnseen(String what, java.util.concurrent.Callable<Boolean> animating) {
         FxWait.until(what + " counts while seen", animating);
         Seen.reset(false);
         FxWait.until(what + " rests while nobody can see it", () -> !animating.call());
@@ -92,7 +92,7 @@ class SeenTimelineAnimationsUiTest {
             return c;
         });
         window(composer);
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ((TextArea) composer.lookup(".text-area")).setText("ola");
             composer.useFixWriter(() -> p -> {
                 try {
@@ -103,7 +103,6 @@ class SeenTimelineAnimationsUiTest {
                 return null;
             });
             ((Button) composer.lookup(".ai-fix-button")).fire();
-            return null;
         });
         restsWhileUnseen("the AI's working line", () -> composer.lookupAll(".ai-status").stream().anyMatch(Showing::animating));
 
@@ -111,7 +110,7 @@ class SeenTimelineAnimationsUiTest {
         Path file = Files.writeString(dir.resolve("nota.txt"), "hola");
         MockChatService failing = new MockChatService() {
             @Override
-            public CompletableFuture<Void> sendFile(String chatId, Path f, String replyToId, SendAs as, DoubleConsumer progress) {
+            public CompletableFuture<Void> sendFile(String chatId, Path f, @Nullable String replyToId, SendAs as, DoubleConsumer progress) {
                 return CompletableFuture.failedFuture(new java.io.IOException("sin red"));
             }
         };
@@ -127,13 +126,13 @@ class SeenTimelineAnimationsUiTest {
     @Test
     void aTextWaitingToBeCorrectedHasAWheelThatRestsWhileUnseen() throws Exception {
         SendQueue queue = new SendQueue(new MockChatService(), () -> new AiReplyButton.Writer() {
-            @Override public String write(String prompt) { return null; }
-            @Override public void cancel() { }
+            @Override public @Nullable String write(String prompt) { return null; }
+            @Override public void cancel() { /* the fake ignores it */ }
         }, said -> { }, never -> { }); // its correction never runs: it waits for good
         SendQueueView view = FxWait.fx(() -> new SendQueueView(queue, () -> "!family:demo"));
         after.add(() -> Platform.runLater(view::dispose));
         window(view);
-        FxWait.fx(() -> { queue.submit("!family:demo", "ola", null); return null; });
+        FxWait.onFx(() -> queue.submit("!family:demo", "ola", null));
         restsWhileUnseen("the waiting text's wheel", () -> view.lookupAll(".message-fixing-wheel").stream()
                 .anyMatch(n -> ((javafx.scene.control.ProgressIndicator) n).isIndeterminate()));
     }

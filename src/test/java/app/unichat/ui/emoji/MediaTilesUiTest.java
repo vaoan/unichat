@@ -5,6 +5,7 @@ import app.unichat.ui.media.MessageMedia;
 import app.unichat.ui.FxWait;
 import app.unichat.model.MediaLibrary;
 import app.unichat.service.MockChatService;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -20,11 +21,11 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.imageio.ImageIO;
+import org.jspecify.annotations.Nullable;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -39,7 +40,9 @@ class MediaTilesUiTest {
     @TempDir Path dir;
     private final AtomicInteger asked = new AtomicInteger();
     private MediaLibrary library;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private StickerGrid grid;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
 
     @BeforeAll
@@ -54,7 +57,7 @@ class MediaTilesUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private MediaLibrary.Item sticker(String name) throws Exception {
+    private MediaLibrary.Item sticker(String name) throws IOException {
         Path f = dir.resolve(name + ".png");
         ImageIO.write(new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB), "png", f.toFile());
         return new MediaLibrary.Item(MediaLibrary.Kind.STICKER, f.toUri().toString(), "image/png", 8, 8, null);
@@ -67,26 +70,25 @@ class MediaTilesUiTest {
         library.toggleFavorite(sticker("dos"));
         MockChatService mock = new MockChatService();
         app.unichat.service.ChatService svc = (app.unichat.service.ChatService) java.lang.reflect.Proxy.newProxyInstance(
-                getClass().getClassLoader(), new Class<?>[]{app.unichat.service.ChatService.class}, (p, m, args) -> {
+                getClass().getClassLoader(), new Class<?>[]{app.unichat.service.ChatService.class}, (p, m, args) -> { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                     if (m.getName().equals("media")) asked.incrementAndGet();
                     return m.invoke(mock, args);
                 });
-        fx(() -> {
+        FxWait.onFx(() -> {
             grid = new StickerGrid(svc, library, () -> null, () -> null, t -> { });
             stage = new Stage();
             stage.setScene(new Scene(grid, 400, 400));
             stage.show();
             grid.refresh();
-            return null;
         });
     }
 
     @AfterEach
     void close() throws Exception {
-        fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
-    private List<Node> tiles() throws Exception {
+    private List<Node> tiles() throws InterruptedException {
         return fx(() -> ((VBox) grid.getContent()).getChildren().stream().filter(FlowPane.class::isInstance).findFirst()
                 .map(g -> List.copyOf(((FlowPane) g).getChildren())).orElseThrow());
     }
@@ -95,7 +97,7 @@ class MediaTilesUiTest {
     void refreshingKeepsTheTilesAndAsksForNothing() throws Exception {
         List<Node> before = tiles();
         int loads = asked.get();
-        fx(() -> { grid.refresh(); return null; });
+        FxWait.onFx(grid::refresh);
         assertEquals(loads, asked.get(), "nothing asked again");
         assertSame(before.get(0), tiles().get(0));
         assertSame(before.get(1), tiles().get(1));
@@ -106,7 +108,7 @@ class MediaTilesUiTest {
         List<Node> before = tiles();
         int loads = asked.get();
         MediaLibrary.Item tres = sticker("tres");
-        fx(() -> { library.toggleFavorite(tres); return null; });
+        FxWait.onFx(() -> library.toggleFavorite(tres));
         FxWait.until("a third tile", () -> tiles().size() >= 3);
         FxWait.settled(); // whatever the new favourite set off has run
         assertEquals(3, tiles().size());
@@ -123,14 +125,14 @@ class MediaTilesUiTest {
         MockChatService svc = new MockChatService();
         ImageView shown = fx(() -> {
             ImageView v = new ImageView();
-            MessageMedia.loadMedia(svc, v, MediaItems.message(item), 100, 100);
+            var _ = MessageMedia.loadMedia(svc, v, MediaItems.message(item), 100, 100);
             assertSame(frames.images().get(0), v.getImage(), "on this very call");
             return v;
         });
         assertNotNull(shown);
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

@@ -39,21 +39,18 @@ class DraftUndoUiTest {
             t.replaceText(0, 0, "dile que sí pero mañana");
             return t;
         });
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             composer[0].aiDraft("!family:demo", "¡Claro que sí! Nos vemos mañana.");
-            return null;
         });
         assertEquals("¡Claro que sí! Nos vemos mañana.", FxWait.fx(box::getText));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             box.undo();
-            return null;
         });
         assertEquals("dile que sí pero mañana", FxWait.fx(box::getText), "⌘Z: back to what was written");
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             box.redo();
-            return null;
         });
         assertEquals("¡Claro que sí! Nos vemos mañana.", FxWait.fx(box::getText), "and ⌘⇧Z: the draft again");
-        FxWait.fx(() -> { box.getScene().getWindow().hide(); return null; });
+        FxWait.onFx(() -> box.getScene().getWindow().hide());
     }
 }

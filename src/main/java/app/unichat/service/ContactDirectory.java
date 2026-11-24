@@ -2,6 +2,7 @@ package app.unichat.service;
 
 import app.unichat.model.Account;
 import app.unichat.model.Contact;
+import org.jspecify.annotations.Nullable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -12,7 +13,7 @@ public interface ContactDirectory {
     /** Fails with UnsupportedOperationException when the network has no user search. */
     CompletableFuture<List<Contact>> searchContacts(Account account, String query);
     /** A phone number, @username…; completes with null when nobody matches. */
-    CompletableFuture<Contact> resolveContact(Account account, String identifier);
+    CompletableFuture<@Nullable Contact> resolveContact(Account account, String identifier);
     /** The room of the DM with {@code contact}, creating it when there's none yet. */
     CompletableFuture<String> openDm(Account account, Contact contact);
 }

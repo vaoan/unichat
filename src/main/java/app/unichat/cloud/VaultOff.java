@@ -31,7 +31,7 @@ final class VaultOff {
         try {
             String kept = vault.id() + ":" + vault.generation() + ":" + Base64.getEncoder().encodeToString(key);
             Settings s = Settings.get();
-            if (!kept.equals(s.getString(KEY, null))) s.set(KEY, kept);
+            if (!kept.equals(s.getString(KEY))) s.set(KEY, kept);
         } finally {
             Arrays.fill(key, (byte) 0);
         }
@@ -52,7 +52,7 @@ final class VaultOff {
 
     /** Whether the account's mark says {@code vault} was turned off, sealed with the key kept here; false for anything else. */
     static boolean says(Storage plain, String vault) throws IOException {
-        String kept = Settings.get().getString(KEY, null);
+        String kept = Settings.get().getString(KEY);
         byte[] file = plain.get(FILE);
         if (kept == null || file == null) return false;
         String[] parts = kept.split(":", 3);

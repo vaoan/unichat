@@ -75,15 +75,14 @@ class FileOpenUiTest {
                 ((StackPane) stage[0].getScene().getRoot()).getChildren().add(n);
                 return n;
             });
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 Event.fireEvent(chip, new MouseEvent(MouseEvent.MOUSE_CLICKED, 5, 5, 5, 5, MouseButton.PRIMARY, 1,
                         false, false, false, false, true, false, false, true, false, false, null));
-                return null;
             });
             done.await();
             assertEquals(pdf, opened[0], "the downloaded file");
             assertTrue(onAwt[0], "opened on AWT's thread, not the download's");
-            FxWait.fx(() -> { stage[0].close(); return null; });
+            FxWait.onFx(stage[0]::close);
         } finally {
             Browser.opener = before;
         }

@@ -11,6 +11,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 class StyleLearningTest {
@@ -20,8 +21,10 @@ class StyleLearningTest {
     void requestsWhileOneRunsBecomeOneMoreRunAfterIt() throws Exception {
         WritingStyle style = new WritingStyle(dir);
         StyleLearning learning = new StyleLearning(() -> style);
-        AtomicInteger now = new AtomicInteger(), most = new AtomicInteger();
-        CountDownLatch inside = new CountDownLatch(1), release = new CountDownLatch(1);
+        AtomicInteger now = new AtomicInteger();
+        AtomicInteger most = new AtomicInteger();
+        CountDownLatch inside = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
         List<String> prompts = new CopyOnWriteArrayList<>();
         StyleLearner.Program program = p -> {
             most.accumulateAndGet(now.incrementAndGet(), Math::max);
@@ -48,7 +51,7 @@ class StyleLearningTest {
         third.get();
         assertEquals(2, prompts.size(), "the first run and one after it");
         assertEquals(1, most.get(), "one at a time");
-        assertEquals(true, prompts.get(1).contains("nos vemos!!"), "the run after it learns what came meanwhile");
+        assertTrue(prompts.get(1).contains("nos vemos!!"), "the run after it learns what came meanwhile");
         assertEquals(List.of(), style.pending());
     }
 
@@ -56,7 +59,10 @@ class StyleLearningTest {
     void withNothingNewTheProgramIsntCalled() throws Exception {
         WritingStyle style = new WritingStyle(dir);
         AtomicInteger calls = new AtomicInteger();
-        new StyleLearning(() -> style).request("!a", List.of(), p -> { calls.incrementAndGet(); return "- x"; }).get();
+        new StyleLearning(() -> style).request("!a", List.of(), p -> {
+            calls.incrementAndGet();
+            return "- x";
+        }).get();
         assertEquals(0, calls.get());
     }
 

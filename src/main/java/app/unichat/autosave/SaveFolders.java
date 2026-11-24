@@ -4,6 +4,7 @@ import app.unichat.model.Chat;
 import app.unichat.settings.Settings;
 
 import java.nio.file.Path;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Where saved things go: a base folder (Ajustes → Redes; {@code ~/Downloads/Unichat} unless chosen) with one folder per
@@ -22,7 +23,7 @@ public final class SaveFolders {
     public static Path base() {
         String forced = System.getProperty("unichat.autosaveDir");
         if (forced != null) return Path.of(forced);
-        String chosen = Settings.get().getString(BASE_KEY, null);
+        String chosen = Settings.get().getString(BASE_KEY);
         return chosen != null ? Path.of(chosen) : defaultBase();
     }
 
@@ -32,17 +33,17 @@ public final class SaveFolders {
     }
 
     /** Null: back to the default. */
-    public static void setBase(Path folder) {
+    public static void setBase(@Nullable Path folder) {
         Settings.get().set(BASE_KEY, folder == null ? null : folder.toString());
     }
 
     public static boolean baseChosen() {
-        return Settings.get().getString(BASE_KEY, null) != null;
+        return Settings.get().getString(BASE_KEY) != null;
     }
 
     /** Where {@code chat}'s things go: its own folder, or one named after it under the base. */
     public static Path of(Chat chat) {
-        String own = Settings.get().getString(CHAT_KEY + chat.id(), null);
+        String own = Settings.get().getString(CHAT_KEY + chat.id());
         return own != null ? Path.of(own) : base().resolve(name(chat));
     }
 
@@ -52,7 +53,7 @@ public final class SaveFolders {
      */
     static synchronized String name(Chat chat) {
         Settings s = Settings.get();
-        String kept = s.getString(NAME_KEY + chat.id(), null);
+        String kept = s.getString(NAME_KEY + chat.id());
         if (kept != null) return kept;
         String name = FileNames.folder(chat.title());
         s.set(NAME_KEY + chat.id(), name);
@@ -60,12 +61,12 @@ public final class SaveFolders {
     }
 
     /** Null: under the base again. */
-    public static void setOwn(String chatId, Path folder) {
+    public static void setOwn(String chatId, @Nullable Path folder) {
         Settings.get().set(CHAT_KEY + chatId, folder == null ? null : folder.toString());
     }
 
     public static boolean hasOwn(String chatId) {
-        return Settings.get().getString(CHAT_KEY + chatId, null) != null;
+        return Settings.get().getString(CHAT_KEY + chatId) != null;
     }
 
     /** {@code folder} as a person reads it: under their home, "~/…". */

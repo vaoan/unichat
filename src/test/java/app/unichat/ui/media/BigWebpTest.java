@@ -1,11 +1,13 @@
 package app.unichat.ui.media;
 
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -16,18 +18,19 @@ class BigWebpTest {
     @TempDir Path dir;
 
     /** RIFF + WEBP + one chunk header and {@code body} (the bytes after the chunk's size). */
-    private Path webp(String chunk, int... body) throws Exception {
+    private Path webp(String chunk, int... body) throws IOException {
         byte[] d = new byte[40];
-        System.arraycopy("RIFF".getBytes(), 0, d, 0, 4);
-        System.arraycopy("WEBP".getBytes(), 0, d, 8, 4);
-        System.arraycopy(chunk.getBytes(), 0, d, 12, 4);
+        System.arraycopy("RIFF".getBytes(UTF_8), 0, d, 0, 4);
+        System.arraycopy("WEBP".getBytes(UTF_8), 0, d, 8, 4);
+        System.arraycopy(chunk.getBytes(UTF_8), 0, d, 12, 4);
         for (int i = 0; i < body.length; i++) d[20 + i] = (byte) body[i];
         return Files.write(dir.resolve(chunk.trim() + body.length + ".webp"), d);
     }
 
     /** VP8X: flags, 3 reserved, then width-1 and height-1 in 24 bits each. */
-    private Path vp8x(int flags, int w, int h) throws Exception {
-        int a = w - 1, b = h - 1;
+    private Path vp8x(int flags, int w, int h) throws IOException {
+        int a = w - 1;
+        int b = h - 1;
         return webp("VP8X", flags, 0, 0, 0, a & 0xFF, (a >> 8) & 0xFF, (a >> 16) & 0xFF, b & 0xFF, (b >> 8) & 0xFF, (b >> 16) & 0xFF);
     }
 
@@ -46,23 +49,25 @@ class BigWebpTest {
         Path lossy = webp("VP8 ", 0, 0, 0, 0x9d, 0x01, 0x2a, 4032 & 0xFF, 4032 >> 8, 3024 & 0xFF, 3024 >> 8);
         assertArrayEquals(new int[]{4032, 3024}, AnimatedImage.webpSize(lossy));
         // VP8L: signature 0x2f, then 14 bits width-1 and 14 bits height-1.
-        int w = 1999, h = 2999;
+        int w = 1999;
+        int h = 2999;
         Path lossless = webp("VP8L", 0x2f, w & 0xFF, ((w >> 8) & 0x3F) | ((h & 0x03) << 6), (h >> 2) & 0xFF, (h >> 10) & 0x0F);
         assertArrayEquals(new int[]{2000, 3000}, AnimatedImage.webpSize(lossless));
         assertNull(AnimatedImage.webpSize(Files.write(dir.resolve("x.png"), new byte[40])));
     }
 
     /** An animated WebP of {@code frames} frames on a {@code w}x{@code h} canvas: the chunk headers, no picture data. */
-    private Path animated(int w, int h, int frames) throws Exception {
+    private Path animated(int w, int h, int frames) throws IOException {
         var out = new java.io.ByteArrayOutputStream();
-        out.writeBytes("RIFF".getBytes());
+        out.writeBytes("RIFF".getBytes(UTF_8));
         out.writeBytes(new byte[4]);
-        out.writeBytes("WEBPVP8X".getBytes());
+        out.writeBytes("WEBPVP8X".getBytes(UTF_8));
         out.writeBytes(new byte[] {10, 0, 0, 0, 0x02, 0, 0, 0});
-        int a = w - 1, b = h - 1;
+        int a = w - 1;
+        int b = h - 1;
         out.writeBytes(new byte[] {(byte) a, (byte) (a >> 8), (byte) (a >> 16), (byte) b, (byte) (b >> 8), (byte) (b >> 16)});
         for (int i = 0; i < frames; i++) {
-            out.writeBytes("ANMF".getBytes());
+            out.writeBytes("ANMF".getBytes(UTF_8));
             out.writeBytes(new byte[] {16, 0, 0, 0});
             out.writeBytes(new byte[] {0, 0, 0, 0, 0, 0, (byte) a, (byte) (a >> 8), (byte) (a >> 16), (byte) b, (byte) (b >> 8),
                 (byte) (b >> 16), 100, 0, 0, 0});

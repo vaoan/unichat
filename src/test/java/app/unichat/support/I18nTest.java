@@ -10,6 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class I18nTest {
@@ -17,6 +18,7 @@ class I18nTest {
     void everyLanguageHasEveryTextWithTheSamePlaceholders() {
         Map<String, Set<String>> keys = I18n.keysByLanguage();
         Set<String> english = keys.get("en");
+        assertNotNull(english, "English is there");
         for (var e : keys.entrySet()) {
             Set<String> missing = new TreeSet<>(english);
             missing.removeAll(e.getValue());
@@ -60,6 +62,8 @@ class I18nTest {
             I18n.use("en");
             assertEquals("English", I18n.t("language.name"));
             assertEquals("no.such.key", I18n.t("no.such.key"));
+            // A value that isn't there (a chat without a name) shows "null", in a count as in a text.
+            assertEquals("1 file from null", I18n.n("notifier.downloadsSaved", 1, (Object) null));
             I18n.use("es");
             assertEquals("Español", I18n.t("language.name"));
         } finally {

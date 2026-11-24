@@ -1,8 +1,10 @@
 package app.unichat.service;
 
+import app.unichat.Present;
 import app.unichat.model.Chat;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -22,6 +24,7 @@ public class ScriptedChatService extends MockChatService {
     private final Map<String, Integer> olderToLoad = new ConcurrentHashMap<>();
     private volatile CompletableFuture<Void> downloads = CompletableFuture.completedFuture(null);
 
+    @SuppressWarnings("this-escape") // turns the demo's own replies and pauses off, before any test drives it
     public ScriptedChatService() {
         noAutoReplies();
         skipDemoPauses();
@@ -29,7 +32,7 @@ public class ScriptedChatService extends MockChatService {
 
     /** Someone else in {@code chatId} writes {@code text}, as if it arrived from the network. */
     public void receive(String chatId, String text) {
-        incoming(chats.get(chatId), someoneElse(chatId), text, true);
+        incoming(Present.of(chats.get(chatId)), someoneElse(chatId), text, true);
     }
 
     /** Someone else in {@code chatId} sends a message {@code fill} makes (a photo, a sticker, a file…); its id. */
@@ -37,7 +40,7 @@ public class ScriptedChatService extends MockChatService {
         Member from = someoneElse(chatId);
         Message m = new Message(UUID.randomUUID().toString(), chatId, from.id(), from.displayName(), false, Instant.now());
         fill.accept(m);
-        append(chats.get(chatId), m);
+        append(Present.of(chats.get(chatId)), m);
         return m.id();
     }
 
@@ -57,30 +60,30 @@ public class ScriptedChatService extends MockChatService {
 
     /** Ends the downloads held by {@link #holdDownloads}, or says how far they got meanwhile. */
     public static final class Gate {
-        private final CompletableFuture<Void> gate;
+        private final CompletableFuture<Void> ends;
         private final List<java.util.function.DoubleConsumer> listeners;
 
         private Gate(CompletableFuture<Void> gate, List<java.util.function.DoubleConsumer> listeners) {
-            this.gate = gate;
+            this.ends = gate;
             this.listeners = listeners;
         }
 
-        public void release() { gate.complete(null); }
+        public void release() { ends.complete(null); }
 
-        public void fail() { gate.completeExceptionally(new java.io.IOException("download failed (test)")); }
+        public void fail() { ends.completeExceptionally(new java.io.IOException("download failed (test)")); }
 
         /** The held downloads have {@code fraction} of their file (0 to 1). */
         public void report(double fraction) { listeners.forEach(l -> l.accept(fraction)); }
     }
 
     @Override
-    public CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer listener) {
+    public CompletableFuture<Path> media(@Nullable String url, int width, int height, java.util.function.DoubleConsumer listener) {
         if (!downloads.isDone()) progress.add(listener);
         return media(url, width, height);
     }
 
     @Override
-    public CompletableFuture<Path> media(String url, int width, int height) {
+    public CompletableFuture<Path> media(@Nullable String url, int width, int height) {
         CompletableFuture<Void> gate = downloads;
         return gate.isDone() && !gate.isCompletedExceptionally() ? super.media(url, width, height)
                 : gate.thenCompose(x -> super.media(url, width, height));
@@ -88,7 +91,7 @@ public class ScriptedChatService extends MockChatService {
 
     /** Someone else in {@code chatId} starts or stops writing. */
     public void othersTyping(String chatId, boolean typing) {
-        setTyping(chats.get(chatId), someoneElse(chatId), typing);
+        setTyping(Present.of(chats.get(chatId)), someoneElse(chatId), typing);
     }
 
     /** Message {@code id} now says {@code text}, whoever wrote it (an answer streaming in). */
@@ -132,7 +135,7 @@ public class ScriptedChatService extends MockChatService {
      * {@link #PAGE} of them, as a server's history would. Their ids stay as they were.
      */
     public void holdBack(String chatId, int count) {
-        List<Message> list = messages.get(chatId);
+        List<Message> list = Present.of(messages.get(chatId));
         synchronized (list) {
             List<Message> oldest = new ArrayList<>(list.subList(0, count));
             list.subList(0, count).clear();
@@ -145,7 +148,7 @@ public class ScriptedChatService extends MockChatService {
     public CompletableFuture<Boolean> loadOlder(String chatId) {
         List<Message> held = heldBack.get(chatId);
         if (held != null && !held.isEmpty()) {
-            List<Message> list = messages.get(chatId);
+            List<Message> list = Present.of(messages.get(chatId));
             synchronized (list) {
                 List<Message> page = new ArrayList<>(held.subList(Math.max(0, held.size() - PAGE), held.size()));
                 held.subList(Math.max(0, held.size() - PAGE), held.size()).clear();
@@ -164,7 +167,7 @@ public class ScriptedChatService extends MockChatService {
     }
 
     private void prepend(String chatId, int count) {
-        List<Message> list = messages.get(chatId);
+        List<Message> list = Present.of(messages.get(chatId));
         Member from = someoneElse(chatId);
         synchronized (list) {
             Instant first = list.isEmpty() ? Instant.now() : list.getFirst().timestamp();
@@ -181,7 +184,7 @@ public class ScriptedChatService extends MockChatService {
     }
 
     private Member someoneElse(String chatId) {
-        Chat chat = chats.get(chatId);
+        Chat chat = Present.of(chats.get(chatId));
         return chat.members().stream().filter(mb -> !mb.id().equals(ME)).findFirst().orElseThrow();
     }
 }

@@ -25,9 +25,11 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextFlow;
+import org.jspecify.annotations.Nullable;
 
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -38,14 +40,14 @@ final class MessageRowView {
     private final MessageMedia media;
     private final MessageActionsUi actions;
     private final Consumer<String> openLink;
-    private final Supplier<Chat> chat;
-    private final Function<String, Member> member;
+    private final Supplier<@Nullable Chat> chat;
+    private final Function<String, @Nullable Member> member;
     private final Consumer<Message> jumpTo;
     private final java.util.Map<String, Message> loaded = new java.util.HashMap<>();
     private final java.util.Map<String, Integer> mediaAt = new java.util.HashMap<>();
 
-    MessageRowView(ChatService svc, MessageMedia media, MessageActionsUi actions, Consumer<String> openLink, Supplier<Chat> chat,
-                   Function<String, Member> member, Consumer<Message> jumpTo) {
+    MessageRowView(ChatService svc, MessageMedia media, MessageActionsUi actions, Consumer<String> openLink, Supplier<@Nullable Chat> chat,
+                   Function<String, @Nullable Member> member, Consumer<Message> jumpTo) {
         this.svc = svc;
         this.media = media;
         this.actions = actions;
@@ -73,19 +75,20 @@ final class MessageRowView {
         return m.timestamp() + "|" + m.senderId();
     }
 
-    private Message findLoaded(String id) {
+    private @Nullable Message findLoaded(@Nullable String id) {
         return id == null || chat.get() == null ? null : loaded.get(id);
     }
 
     /** What {@code m} answers: loaded, or already fetched on its own ({@link ChatService#message}); null otherwise. */
-    private Message replied(Message m) {
-        Message r = findLoaded(m.replyToId());
-        return r != null || m.replyToId() == null ? r : svc.message(m.chatId(), m.replyToId()).getNow(null);
+    private @Nullable Message replied(Message m) {
+        String id = m.replyToId();
+        Message r = findLoaded(id);
+        return r != null || id == null ? r : svc.message(m.chatId(), id).getNow(null);
     }
 
     /** The piece of the message {@code m} answers, above it. */
-    private VBox replyQuote(Message m, double maxWidth) {
-        Message replied = findLoaded(m.replyToId());
+    private VBox replyQuote(Message m, String replyToId, double maxWidth) {
+        Message replied = findLoaded(replyToId);
         VBox quote = new VBox(1);
         quote.getStyleClass().add("reply-quote");
         Label who = new Label(I18n.t("message.original"));
@@ -99,13 +102,13 @@ final class MessageRowView {
             quote.setOnMouseClicked(e -> jumpTo.accept(replied));
         } else {
             // Further back than what's loaded (a big chat): asked for on its own, shown when it comes.
-            java.util.concurrent.CompletableFuture<Message> asked = svc.message(m.chatId(), m.replyToId());
+            java.util.concurrent.CompletableFuture<@Nullable Message> asked = svc.message(m.chatId(), replyToId);
             Message known = asked.getNow(null);
             if (known != null) {
                 quote(who, text, known);
             } else if (!asked.isDone()) {
                 text.setText(I18n.t("message.loadingOriginal"));
-                asked.thenAccept(r -> javafx.application.Platform.runLater(() -> {
+                var _ = asked.thenAccept(r -> Platform.runLater(() -> {
                     if (r != null) quote(who, text, r);
                     else text.setText(I18n.t("message.notLoaded"));
                 }));
@@ -132,7 +135,7 @@ final class MessageRowView {
 
     /** A day's line between messages ("Hoy", "Ayer", a date), as the chat and a capture of it draw it. */
     static Node dayRow(ThreadRows.DayRow d) {
-        Label l = new Label(app.unichat.ui.Formats.daySeparator(d.day(), java.time.Instant.now(), java.time.ZoneId.systemDefault()));
+        Label l = new Label(Formats.daySeparator(d.day(), java.time.Instant.now(), ZoneId.systemDefault()));
         l.getStyleClass().add("day-separator");
         HBox box = new HBox(l);
         box.setAlignment(Pos.CENTER);
@@ -210,7 +213,8 @@ final class MessageRowView {
         // What's narrower than the bubble (a sticker under a longer quote) keeps to the chat's side, not the quote's text.
         if (out) bubble.setAlignment(Pos.TOP_RIGHT);
 
-        if (m.replyToId() != null) bubble.getChildren().add(replyQuote(m, maxWidth));
+        String replyToId = m.replyToId();
+        if (replyToId != null) bubble.getChildren().add(replyQuote(m, replyToId, maxWidth));
 
         content(m, bubble, maxWidth);
 
@@ -286,7 +290,7 @@ final class MessageRowView {
     private Node cardWithItsVideo(LinkPreview p, boolean ownMedia, double width) {
         VBox box = new VBox(LinkPreviewCard.of(p, width, media, openLink, chat.get()));
         if (ownMedia || p.url().isEmpty()) return box;
-        svc.linkMedia(p.url()).thenAcceptAsync(found -> found.ifPresent(v ->
+        var _ = svc.linkMedia(p.url()).thenAcceptAsync(found -> found.ifPresent(v ->
                 box.getChildren().setAll(LinkPreviewCard.of(p.withVideo(v, false), width, media, openLink, chat.get()))), Platform::runLater);
         return box;
     }
@@ -294,7 +298,7 @@ final class MessageRowView {
     /** A link no bridge described: Unichat reads the page, as Telegram's server does for its apps. */
     private Node fetchedCard(String link, double width) {
         VBox box = new VBox();
-        svc.linkPreview(link).thenAcceptAsync(found -> found.ifPresent(p ->
+        var _ = svc.linkPreview(link).thenAcceptAsync(found -> found.ifPresent(p ->
                 box.getChildren().setAll(LinkPreviewCard.of(p, width, media, openLink, chat.get()))), Platform::runLater);
         return box;
     }
@@ -323,15 +327,20 @@ final class MessageRowView {
         return l;
     }
 
-    private static java.util.List<String> links(Message m) {
+    private static List<String> links(Message m) {
         java.util.Set<String> out = new java.util.LinkedHashSet<>(m.html() != null ? HtmlView.links(m.html()) : RichText.addresses(m.body()));
         m.linkPreviews().stream().map(LinkPreview::url).filter(u -> !u.isEmpty()).forEach(out::add);
-        return java.util.List.copyOf(out);
+        return List.copyOf(out);
     }
 
     /** A bridge sends the video it could get as a message of its own right after, at the same moment: no second player. */
     private boolean followedByItsOwnMedia(Message m) {
         return mediaAt.getOrDefault(mediaKey(m), 0) > (isOwnMedia(m) ? 1 : 0);
+    }
+
+    /** The icon's style class, as app.css names it ("status-failed"), whatever the computer's language. */
+    static String statusClass(MessageStatus s) {
+        return "status-" + s.name().toLowerCase(Locale.ROOT);
     }
 
     private Node statusIcon(MessageStatus s) {
@@ -341,7 +350,7 @@ final class MessageRowView {
             case DELIVERED, READ -> Icons.icon(Icons.CHECK_DOUBLE, 14);
             case FAILED -> Icons.icon(Icons.ERROR, 13);
         };
-        icon.getStyleClass().add("status-" + s.name().toLowerCase());
+        icon.getStyleClass().add(statusClass(s));
         return icon;
     }
 

@@ -1,5 +1,10 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
+import app.unichat.support.PathParts;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -32,11 +37,11 @@ class MediaUploadTest {
         /** Each path whose copy was looked at ({@link #info}), in order. */
         final List<String> looked = new java.util.ArrayList<>();
 
-        @Override public void check() { }
+        @Override public void check() { /* the fake ignores it */ }
         @Override public boolean exists(String path) { return files.containsKey(path); }
         @Override public void delete(String path) { files.remove(path); }
-        @Override public String stamp(String path) { return null; }
-        @Override public void mkdirs(String d) { }
+        @Override public @Nullable String stamp(String path) { return null; }
+        @Override public void mkdirs(String d) { /* the fake ignores it */ }
 
         @Override public void move(String from, String to) throws IOException {
             if (files.keySet().stream().anyMatch(p -> p.equals(to) || p.startsWith(to + "/"))) throw new IOException("already there");
@@ -72,7 +77,7 @@ class MediaUploadTest {
             return true;
         }
 
-        @Override public RemoteFile info(String path) throws IOException {
+        @Override public @Nullable RemoteFile info(String path) throws IOException {
             looked.add(path);
             byte[] f = files.get(path);
             if (f == null) return null;
@@ -89,7 +94,7 @@ class MediaUploadTest {
     private Instant now = Instant.parse("2026-11-10T12:00:00Z");
 
     private MediaUpload uploader(Path chat) {
-        return new MediaUpload(dir.resolve("cloud-uploaded.txt"), () -> List.of(chat), p -> p.getFileName().toString().startsWith("Chat ("),
+        return new MediaUpload(dir.resolve("cloud-uploaded.txt"), () -> List.of(chat), p -> PathParts.name(p).startsWith("Chat ("),
                 () -> now);
     }
 
@@ -108,7 +113,7 @@ class MediaUploadTest {
         Account acc = new Account();
         Path c = chat("a.jpg", "Chat (WhatsApp) 3f2a9c1b2d4e.txt");
         assertEquals(1, uploader(c).run(acc, (d, t, n) -> { }, () -> true));
-        assertEquals(java.util.Set.of(remote("a.jpg")), acc.files.keySet(), "the texts' copy stays here: it grows, and its source goes up");
+        assertEquals(Set.of(remote("a.jpg")), acc.files.keySet(), "the texts' copy stays here: it grows, and its source goes up");
     }
 
     @Test
@@ -123,14 +128,14 @@ class MediaUploadTest {
 
         assertEquals(0, up.run(acc, (d, t, n) -> { }, () -> true), "not yet its turn");
         for (int i = 0; i < 10; i++) {
-            now = up.nextRetry();
+            now = Present.of(up.nextRetry());
             up.run(acc, (d, t, n) -> { }, () -> true);
         }
         assertEquals(1, up.retrying(), "still trying, never given up");
         assertEquals(now.plus(MediaUpload.LONGEST_WAIT), up.nextRetry(), "the wait stops growing at an hour");
 
         acc.failing.clear();
-        now = up.nextRetry();
+        now = Present.of(up.nextRetry());
         assertEquals(1, up.run(acc, (d, t, n) -> { }, () -> true));
         assertEquals(0, up.retrying());
         assertEquals(0, up.waiting(), "all of it is there");
@@ -149,7 +154,7 @@ class MediaUploadTest {
         MediaUpload up = uploader(c);
         assertEquals(0, up.run(acc, (d, t, n) -> { }, yes(0)), "no from the start: nothing goes");
         assertEquals(1, up.run(acc, (d, t, n) -> { }, yes(1)), "the first went, then no");
-        assertEquals(java.util.Set.of(remote("a.jpg")), acc.files.keySet());
+        assertEquals(Set.of(remote("a.jpg")), acc.files.keySet());
         assertEquals(2, up.waiting(), "the rest wait, nothing given up");
         assertEquals(0, up.retrying(), "and none counts as failed");
         assertEquals(2, up.run(acc, (d, t, n) -> { }, () -> true));
@@ -195,7 +200,7 @@ class MediaUploadTest {
         assertEquals(0, up.run(acc, (d, t, n) -> { }, () -> true));
         assertEquals(1, up.retrying(), "the copy there didn't match: not counted, tried again");
         acc.damaging.clear();
-        now = up.nextRetry();
+        now = Present.of(up.nextRetry());
         assertEquals(1, up.run(acc, (d, t, n) -> { }, () -> true));
         assertArrayEquals(Files.readAllBytes(c.resolve("video.mp4")), acc.files.get(remote("video.mp4")));
     }
@@ -206,7 +211,7 @@ class MediaUploadTest {
         Path c = chat("cortado-aqui.jpg", "cortado-alla.jpg", "distinto.jpg", "borrado.jpg");
         MediaUpload up = uploader(c);
         up.run(acc, (d, t, n) -> { }, () -> true);
-        byte[] whole = acc.files.get(remote("cortado-aqui.jpg")).clone();
+        byte[] whole = Present.of(acc.files.get(remote("cortado-aqui.jpg"))).clone();
 
         // Here cut short (damaged here): it comes back from there, which is never touched.
         Files.writeString(c.resolve("cortado-aqui.jpg"), "conte");
@@ -242,6 +247,7 @@ class MediaUploadTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void dropboxsContentHashIsTheHashOfEachBlocksHash(@TempDir Path tmp) throws Exception {
         byte[] data = new byte[5 * 1024 * 1024]; // two blocks: 4 MB and 1 MB
         new java.util.Random(3).nextBytes(data);

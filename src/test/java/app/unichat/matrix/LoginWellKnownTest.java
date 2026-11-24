@@ -4,6 +4,7 @@ import app.unichat.settings.Settings;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
@@ -18,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LoginWellKnownTest {
     @Test
     void anAddressTheLoginSuggestsIsTakenOnlyOverHttpsOrOnThisMachine() throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String path = ex.getRequestURI().getPath();
             String body = switch (path) {

@@ -15,7 +15,8 @@ import com.sun.jna.Pointer;
  * leaves the Windows taskbar. Call on the FX thread, which on macOS is AppKit's main thread.
  */
 public final class DockIcon {
-    private static final long POLICY_REGULAR = 0, POLICY_ACCESSORY = 1;
+    private static final long POLICY_REGULAR = 0;
+    private static final long POLICY_ACCESSORY = 1;
     private static final boolean MAC = Os.mac();
     private static volatile boolean broken;
     private static volatile boolean trayAvailable = true;
@@ -44,7 +45,7 @@ public final class DockIcon {
 
     /** Whether there's a Dock icon: with any window besides the main one, or with the main one if wanted. */
     static boolean regular(boolean main, boolean others, boolean setting, boolean tray) {
-        return others || main && wanted(setting, tray);
+        return others || (main && wanted(setting, tray));
     }
 
     /** Window about to be shown (or the setting changed while it is): the Dock icon if wanted, and the active app. */
@@ -76,7 +77,7 @@ public final class DockIcon {
         if (!MAC || broken) return false;
         try {
             NativeLibrary.getInstance("AppKit"); // where NSApplication lives, loaded by JavaFX in the app but not before
-            NativeLibrary objc = NativeLibrary.getInstance("objc");
+            NativeLibrary objc = NativeLibrary.getInstance("objc"); // NOPMD: CloseResource, JNA keeps one per process
             Function sel = objc.getFunction("sel_registerName");
             Pointer cls = objc.getFunction("objc_getClass").invokePointer(new Object[]{"NSApplication"});
             return objc.getFunction("objc_msgSend").invokeInt(new Object[]{cls,
@@ -109,7 +110,7 @@ public final class DockIcon {
     private static boolean send(String selector, long arg) {
         if (!MAC || broken) return false;
         try {
-            NativeLibrary objc = NativeLibrary.getInstance("objc");
+            NativeLibrary objc = NativeLibrary.getInstance("objc"); // NOPMD: CloseResource, JNA keeps one per process
             Function getClass = objc.getFunction("objc_getClass");
             Function sel = objc.getFunction("sel_registerName");
             Function msg = objc.getFunction("objc_msgSend");

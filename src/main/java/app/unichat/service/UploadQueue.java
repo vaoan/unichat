@@ -3,6 +3,7 @@ package app.unichat.service;
 import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -36,9 +37,10 @@ public final class UploadQueue {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     /** One file to send to one chat. */
-    public record Upload(String chatId, Path file, String replyToId, SendAs as) {}
+    public record Upload(String chatId, Path file, @Nullable String replyToId, SendAs as) {}
 
     /** Runs {@code r} after {@code ms} (tests run it at once, or keep it). */
+    @FunctionalInterface
     interface Later {
         void run(long ms, Runnable r);
     }
@@ -53,8 +55,8 @@ public final class UploadQueue {
      * (epoch ms, while {@link Phase#RETRYING}). {@code etaMs}: the time left, from how long the last files took; -1 unknown.
      * {@code refused}: why the last file given up couldn't go as asked ({@link CantSend}), null when none.
      */
-    public record Status(Upload current, int sent, int failed, int total, double progress, int retries, Phase phase,
-                         long retryAt, long etaMs, String refused) {
+    public record Status(@Nullable Upload current, int sent, int failed, int total, double progress, int retries,
+                         Phase phase, long retryAt, long etaMs, @Nullable String refused) {
         public static final Status IDLE = new Status(null, 0, 0, 0, 0, 0, Phase.UPLOADING, 0, -1, null);
 
         public boolean idle() {
@@ -91,14 +93,14 @@ public final class UploadQueue {
     private final ChatMessaging svc;
     private final Later later;
     /** Where the batch is kept; null: nowhere (tests). */
-    private final Path store;
+    private final @Nullable Path store;
     private final Deque<Upload> pending = new ArrayDeque<>();
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
-    private Upload current;
+    private @Nullable Upload current;
     /** The current file stops being tried (the batch was cancelled). */
     private boolean abandoned;
     /** Why the last file given up couldn't go as asked; null when none. */
-    private String refused;
+    private @Nullable String refused;
     /** The current file failed and waits to be tried again. */
     private boolean waiting;
     private int retries;
@@ -111,7 +113,7 @@ public final class UploadQueue {
     private int total;
     private double progress;
 
-    UploadQueue(ChatMessaging svc, Later later, Path store) {
+    UploadQueue(ChatMessaging svc, Later later, @Nullable Path store) {
         this.svc = svc;
         this.later = later;
         this.store = store;
@@ -120,9 +122,9 @@ public final class UploadQueue {
     }
 
     /** The queue for {@code svc}, kept in {@code store} (a file in the data folder; the demo has its own). */
-    public static synchronized UploadQueue of(ChatMessaging svc, Path store) {
+    public static synchronized UploadQueue of(ChatMessaging svc, @Nullable Path store) {
         return QUEUES.computeIfAbsent(svc, s -> new UploadQueue(s,
-                (ms, r) -> CompletableFuture.runAsync(r, CompletableFuture.delayedExecutor(ms, TimeUnit.MILLISECONDS)), store));
+                (ms, r) -> { var _ = CompletableFuture.runAsync(r, CompletableFuture.delayedExecutor(ms, TimeUnit.MILLISECONDS)); }, store));
     }
 
     /** The queue for {@code svc} if there's one already (the composer's and the bar's are the same). */
@@ -216,11 +218,13 @@ public final class UploadQueue {
         } catch (RuntimeException e) {
             sending = CompletableFuture.failedFuture(e);
         }
-        sending.whenComplete((v, err) -> {
+        var _ = sending.whenComplete((v, err) -> {
             long wait;
+            int tries;
             CantSend cant = cantSend(err);
             synchronized (this) {
                 wait = err == null || cant != null || abandoned || !Files.isReadable(u.file()) ? -1 : retryDelay(++retries);
+                tries = retries;
                 if (wait >= 0) progress = 0;
                 if (cant != null) refused = cant.getMessage();
             }
@@ -229,7 +233,7 @@ public final class UploadQueue {
                     waiting = true;
                     retryAt = System.currentTimeMillis() + wait;
                 }
-                System.err.println("Batch upload: a file didn't go up (try " + retries + "), again in " + wait / 1000 + " s: " + err);
+                System.err.println("Batch upload: a file didn't go up (try " + tries + "), again in " + wait / 1000 + " s: " + err);
                 fire();
                 later.run(wait, () -> retry(u));
             } else {
@@ -247,7 +251,7 @@ public final class UploadQueue {
     }
 
     /** The {@link CantSend} behind a failure (it comes wrapped by the futures it went through), or null. */
-    private static CantSend cantSend(Throwable err) {
+    private static @Nullable CantSend cantSend(@Nullable Throwable err) {
         for (Throwable t = err; t != null; t = t.getCause()) {
             if (t instanceof CantSend c) return c;
         }
@@ -318,7 +322,7 @@ public final class UploadQueue {
         }
     }
 
-    private static List<Upload> load(Path store) {
+    private static List<Upload> load(@Nullable Path store) {
         if (store == null || !Files.isRegularFile(store)) return List.of();
         try {
             List<Saved> saved = JSON.readValue(store.toFile(), new TypeReference<List<Saved>>() { });
@@ -334,7 +338,7 @@ public final class UploadQueue {
      * how a batch saved before {@link SendAs} said it; null in new files.
      */
     @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-    record Saved(String chatId, String file, String replyToId, SendAs as, Boolean asDocument) {
+    record Saved(String chatId, String file, @Nullable String replyToId, @Nullable SendAs as, @Nullable Boolean asDocument) {
         static Saved of(Upload u) {
             return new Saved(u.chatId(), u.file().toString(), u.replyToId(), u.as(), null);
         }

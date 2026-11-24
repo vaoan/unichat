@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -21,6 +22,7 @@ class HttpTest {
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void aServerThatNeverAnswersInTimeSaysSo() throws Exception {
         try (ServerSocket silent = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
             HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + silent.getLocalPort() + "/"))
@@ -31,6 +33,7 @@ class HttpTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void anInterruptedWaitFailsAndKeepsTheInterrupt() throws Exception {
         try (ServerSocket silent = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
             HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + silent.getLocalPort() + "/")).build();

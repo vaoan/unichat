@@ -47,12 +47,12 @@ final class VoiceBar extends HBox {
         dot.setMinSize(10, 10);
         dot.setMaxSize(10, 10);
         time.getStyleClass().add("voice-time");
-        time.setMinWidth(Region.USE_PREF_SIZE);
+        time.setMinWidth(USE_PREF_SIZE);
         time.setAccessibleText(I18n.t("voiceBar.recording"));
         level.getStyleClass().add("voice-level");
         level.setMaxWidth(Double.MAX_VALUE);
         level.setAccessibleText(I18n.t("voiceBar.level"));
-        HBox.setHgrow(level, Priority.ALWAYS);
+        setHgrow(level, Priority.ALWAYS);
         Button send = Icons.iconButton(Icons.SEND, I18n.t("voiceBar.send"), onSend);
         send.getStyleClass().add("send-button");
         getChildren().addAll(discard, dot, time, level, send);

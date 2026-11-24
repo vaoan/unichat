@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class FilePreviewTest {
@@ -46,7 +46,7 @@ class FilePreviewTest {
         local.setMediaUrl("file:///Users/x/IMG_0019.webp");
         Message server = file("IMG_0019.webp", "image/webp", 1_381_724);
         assertEquals(FilePreview.key(local), FilePreview.key(server), "no flash when the echo becomes the real message");
-        assertFalse(FilePreview.key(server).equals(FilePreview.key(file("IMG_0020.webp", "image/webp", 1_381_724))));
+        assertNotEquals(FilePreview.key(file("IMG_0020.webp", "image/webp", 1_381_724)), FilePreview.key(server));
     }
 
     @Test

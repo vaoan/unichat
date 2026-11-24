@@ -1,5 +1,6 @@
 package app.unichat.ui.media;
 
+import app.unichat.WithLocale;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,5 +38,11 @@ class VideoControlsTest {
         assertEquals("a_b-0m03s.png", VideoControls.frameName("a/b", 3));
         assertEquals("clipgnp-0m03s.png", VideoControls.frameName("clip\u202Egnp.mp4", 3), "cleaned as saved files are");
         assertEquals("video-0m03s.png", VideoControls.frameName(".mp4", 3), "never a hidden file");
+    }
+
+    /** A Persian computer formats numbers in its own digits by default: a file name keeps 0-9. */
+    @Test
+    void aFramesNameHasTheSameDigitsInAnyLanguage() {
+        assertEquals("clip-1m05s.png", WithLocale.get(WithLocale.PERSIAN, () -> VideoControls.frameName("clip.mp4", 65.4)));
     }
 }

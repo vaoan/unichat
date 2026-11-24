@@ -11,7 +11,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.util.List;
@@ -32,7 +31,7 @@ public final class AccountAlertBar extends VBox {
         this.relink = relink;
         getStyleClass().add("account-alerts");
         setAccessibleRole(AccessibleRole.TEXT);
-        setMinHeight(Region.USE_PREF_SIZE);
+        setMinHeight(USE_PREF_SIZE);
         setVisible(false);
         setManaged(false);
     }
@@ -56,7 +55,7 @@ public final class AccountAlertBar extends VBox {
         Label text = line(I18n.t("alerts.sessionClosed", a.who()), a.text());
         Button fix = new Button(I18n.t("alerts.link"));
         fix.getStyleClass().add("alert-action");
-        fix.setMinWidth(Region.USE_PREF_SIZE);
+        fix.setMinWidth(USE_PREF_SIZE);
         fix.setAccessibleText(I18n.t("alerts.relinkA11y", a.network().displayName()));
         fix.setOnAction(e -> relink.accept(a.network()));
         return row("relink", NetworkIcons.tile(a.network(), 16, "alert-network"), text, fix);
@@ -64,7 +63,7 @@ public final class AccountAlertBar extends VBox {
 
     private HBox recoveringRow(List<AccountAlerts.Alert> recovering) {
         HBox icons = new HBox(2);
-        icons.setMinWidth(Region.USE_PREF_SIZE);
+        icons.setMinWidth(USE_PREF_SIZE);
         recovering.stream().limit(MAX_ICONS).forEach(a -> icons.getChildren().add(NetworkIcons.tile(a.network(), 14, "alert-network")));
         String details = recovering.stream().map(AccountAlerts.Alert::text).collect(Collectors.joining("\n"));
         return row("recovering", icons, line(AccountAlerts.recoveringLine(recovering), details));
@@ -74,7 +73,7 @@ public final class AccountAlertBar extends VBox {
         Label l = new Label(text);
         l.setWrapText(true);
         l.setMinWidth(0);
-        l.setMinHeight(Region.USE_PREF_SIZE);
+        l.setMinHeight(USE_PREF_SIZE);
         l.setMaxWidth(Double.MAX_VALUE);
         l.setTooltip(new Tooltip(details));
         HBox.setHgrow(l, Priority.ALWAYS);

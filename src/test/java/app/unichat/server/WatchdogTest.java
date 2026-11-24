@@ -4,6 +4,7 @@ import app.unichat.bridge.BridgeStates;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -42,7 +43,7 @@ class WatchdogTest {
 
     @Test
     void theWatchdogLeavesABridgeWithoutAccountsAlone() throws Exception {
-        HttpServer whatsapp = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        HttpServer whatsapp = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         whatsapp.createContext("/", ex -> {
             ex.sendResponseHeaders(200, -1);
             ex.close();
@@ -50,15 +51,15 @@ class WatchdogTest {
         whatsapp.start();
         try {
             // gmessages has no account: not running, so nothing answers on its port.
-            HttpServer closed = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            HttpServer closed = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
             int nobody = closed.getAddress().getPort();
             closed.stop(0);
             BridgeLauncher launcher = new BridgeLauncher(new BridgeLauncher.Processes() {
                 @Override public boolean isRunning(String bridge) { return bridge.equals("whatsapp"); }
-                @Override public void prepare(String bridge, java.util.function.Consumer<String> progress) { }
-                @Override public void start(String bridge) { }
-                @Override public void stop(String bridge) { }
-                @Override public void restarting(String bridge) { }
+                @Override public void prepare(String bridge, java.util.function.Consumer<String> progress) { /* the fake ignores it */ }
+                @Override public void start(String bridge) { /* the fake ignores it */ }
+                @Override public void stop(String bridge) { /* the fake ignores it */ }
+                @Override public void restarting(String bridge) { /* the fake ignores it */ }
                 @Override public java.nio.file.Path log(String bridge) { return java.nio.file.Path.of(bridge); }
             }, new BridgeDemand(Set.of("whatsapp")::contains, b -> true, Duration.ZERO, Duration.ZERO),
                     () -> Set.of("whatsapp", "gmessages"));

@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.assist.AiSettings;
 import app.unichat.model.Message;
 import app.unichat.service.MockChatService;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -39,7 +41,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SendQueueUiTest {
     private static final String CHAT = "!family:demo";
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private MainView view;
     private ThreadPane thread;
     /** Each text's correction waits for its own gate. */
@@ -70,7 +74,7 @@ class SendQueueUiTest {
             stage.setScene(new Scene(view, 900, 700));
             stage.show();
             view.openChatId(CHAT);
-            return find(view);
+            return Present.of(find(view));
         });
         thread.sendQueue().useWriter(() -> prompt -> {
             String text = prompt.substring(prompt.indexOf(">\n") + 2, prompt.indexOf("\n</"));
@@ -89,15 +93,14 @@ class SendQueueUiTest {
         AiSettings.setFixMode(AiSettings.FixMode.OFF);
         AiReplyButton.SHOWN.set(false);
         svc.stop();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.dispose();
             stage.close();
             stage.getScene().setRoot(new javafx.scene.layout.Pane());
-            return null;
         });
     }
 
-    private static ThreadPane find(Node n) {
+    private static @Nullable ThreadPane find(Node n) {
         if (n instanceof ThreadPane t) return t;
         if (n instanceof Parent p) for (Node c : p.getChildrenUnmodifiable()) {
             ThreadPane t = find(c);
@@ -106,12 +109,11 @@ class SendQueueUiTest {
         return null;
     }
 
-    private void send(String text) throws Exception {
+    private void send(String text) throws InterruptedException {
         TextArea box = FxWait.fx(() -> (TextArea) thread.lookup(".composer .text-area"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             box.setText(text);
             box.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
     }
 
@@ -120,13 +122,13 @@ class SendQueueUiTest {
     }
 
     /** The texts of the rows waiting, as shown once the window is done. */
-    private List<String> rows() throws Exception {
+    private List<String> rows() throws InterruptedException {
         FxWait.settled();
         return rowsNow();
     }
 
     /** The same, as they are now: for an until's condition, which may only look. */
-    private List<String> rowsNow() throws Exception {
+    private List<String> rowsNow() throws InterruptedException {
         return FxWait.fx(() -> thread.lookupAll(".send-queue-text").stream().filter(Node::isVisible)
                 .map(n -> ((Label) n).getText()).toList());
     }
@@ -140,7 +142,7 @@ class SendQueueUiTest {
         return (int) svc.messages(CHAT).stream().filter(Message::outgoing).count();
     }
 
-    private Button button(String accessible) throws Exception {
+    private Button button(String accessible) throws InterruptedException {
         return FxWait.fx(() -> thread.lookupAll(".send-queue-row .button").stream().map(n -> (Button) n)
                 .filter(b -> accessible.equals(b.getAccessibleText())).findFirst().orElseThrow());
     }
@@ -166,9 +168,9 @@ class SendQueueUiTest {
         int before = sentSoFar();
         send("uno q sí");
         send("dos q no");
-        FxWait.fx(() -> { button("Cancelar el envío de «uno q sí»").fire(); return null; });
+        FxWait.onFx(() -> button("Cancelar el envío de «uno q sí»").fire());
         assertEquals(List.of("Corrigiendo antes de enviar: «dos q no»"), rows());
-        FxWait.fx(() -> { button("Enviar sin corregir «dos q no»").fire(); return null; });
+        FxWait.onFx(() -> button("Enviar sin corregir «dos q no»").fire());
         assertEquals(List.of("dos q no"), mine(before), "as written, at once; the cancelled one never");
         assertEquals(List.of(), rows());
     }
@@ -176,7 +178,7 @@ class SendQueueUiTest {
     @Test
     void eachChatShowsItsOwnQueueAndAnotherChatsKeepsGoing() throws Exception {
         send("uno q sí");
-        FxWait.fx(() -> { view.openChatId("!mom:demo"); return null; });
+        FxWait.onFx(() -> view.openChatId("!mom:demo"));
         assertEquals(List.of(), rows(), "not this chat's");
         release("uno q sí");
         FxWait.until("it went while another chat was open", () -> svc.messages(CHAT).getLast().body().equals("uno que sí"));
@@ -203,7 +205,7 @@ class SendQueueUiTest {
         app.unichat.autosave.AutoSave.of(svc).messagesChanged(CHAT); // the server's word on it: kept as it comes
         javafx.scene.control.MenuItem versions = FxWait.fx(() -> thread.actions().messageMenu(m).getItems().stream()
                 .filter(i -> "Ver versiones…".equals(i.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { versions.fire(); return null; });
+        FxWait.onFx(versions::fire);
         FxWait.until("both versions, each said what it is", () -> {
             List<String> texts = FxWait.fx(() -> {
                 Node sheet = stage.getScene().getRoot().lookup(".saved-text-sheet");
@@ -237,7 +239,7 @@ class SendQueueUiTest {
         send("uno q sí");
         send("dos q no");
         Button cancelSecond = button("Cancelar el envío de «dos q no»");
-        FxWait.fx(() -> { cancelSecond.requestFocus(); return null; });
+        FxWait.onFx(cancelSecond::requestFocus);
         release("uno q sí");
         FxWait.until("the first went", () -> rowsNow().size() == 1);
         FxWait.settled();
@@ -247,16 +249,16 @@ class SendQueueUiTest {
 
     @Test
     void aFileSentAfterATextGoesAfterIt() throws Exception {
-        int before = (int) svc.messages(CHAT).size();
+        int before = svc.messages(CHAT).size();
         send("mira esto q chévere");
         java.io.File photo = java.nio.file.Files.writeString(java.nio.file.Files.createTempFile("foto", ".txt"), "x").toFile();
-        FxWait.fx(() -> { thread.composer().sendFiles(List.of(photo)); return null; });
+        FxWait.onFx(() -> thread.composer().sendFiles(List.of(photo)));
         assertEquals(before, svc.messages(CHAT).size(), "the file waits its turn");
         release("mira esto q chévere");
         FxWait.until("both went", () -> svc.messages(CHAT).size() == before + 2);
         List<Message> last = svc.messages(CHAT).subList(before, before + 2);
         assertEquals("mira esto que chévere", last.get(0).body(), "the text first");
-        photo.delete();
+        java.nio.file.Files.deleteIfExists(photo.toPath());
     }
 
     @Test
@@ -272,15 +274,14 @@ class SendQueueUiTest {
             return v;
         });
         try {
-            assertTrue(FxWait.fx(() -> find(second).sendQueue() == thread.sendQueue()), "one per service: still controllable");
-            FxWait.until("its row shows there too", () -> FxWait.fx(() -> find(second).lookupAll(".send-queue-text").stream()
+            assertTrue(FxWait.fx(() -> Present.of(find(second)).sendQueue() == thread.sendQueue()), "one per service: still controllable");
+            FxWait.until("its row shows there too", () -> FxWait.fx(() -> Present.of(find(second)).lookupAll(".send-queue-text").stream()
                     .anyMatch(n -> ((Label) n).getText().contains("uno q sí"))));
         } finally {
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 second.dispose();
                 other.close();
                 other.getScene().setRoot(new javafx.scene.layout.Pane());
-                return null;
             });
         }
     }

@@ -1,10 +1,10 @@
 # .github — notes for Claude
 
-`workflows/build.yml` (tests, headless UI tests on Linux, LottieConverter cross-built for Windows (`lottie-windows`, MinGW-w64 on Linux, handed to the Windows job), packages, releases on a `v<version>` tag) and `workflows/natives.yml` (what has no official build). Packaging and signing: `packaging/CLAUDE.md`.
+`workflows/build.yml` (tests, headless UI tests on Linux, OWASP Dependency-Check (`dependency-check`: CVSS ≥ 7 fails, false positives in `dependency-check-suppressions.xml` each with its `<notes>`), LottieConverter cross-built for Windows (`lottie-windows`, MinGW-w64 on Linux, handed to the Windows job), packages, releases on a `v<version>` tag), `workflows/natives.yml` (what has no official build) and `workflows/codeql.yml` (CodeQL's `security-and-quality`, any result fails). Dependency-Check and CodeQL run in CI only, never locally (the NVD database fills the disk). Packaging and signing: `packaging/CLAUDE.md`.
 
 - Token permissions: `contents: read` at the top, `write` only in the job that publishes. Jobs that build third-party code (cargo, go) run their build scripts with the token, so they never get write, and checkouts use `persist-credentials: false`.
 - No `${{ … }}` inside `run:` with values that could come from outside (PR titles, branch names, matrix values from files): pass them through `env:`.
-- Actions are pinned by tag (known debt, `docs/ARCHITECTURE.md`); a new one is pinned by SHA.
+- Actions are pinned by their commit's full SHA with the tag in a comment (`uses: actions/checkout@<40 hex> # v5.1.0`), read with `git ls-remote --tags <repo>` (an annotated tag's commit is its `^{}` line). `WorkflowRulesTest` reads every workflow and fails on an action pinned otherwise, a `${{` inside a `run:`, a workflow without `contents: read` at the top, and a suppression without its reason.
 
 ## Lessons
 - `natives.yml` pasted `${{ matrix.bridge.* }}` (read from `versions.env`) and other matrix values into `run:` scripts: a crafted value became shell code. They go through `env:` and are used as `"$VAR"`; check with `grep -n '\${{' .github/workflows/*.yml` that none is left inside a `run:`.

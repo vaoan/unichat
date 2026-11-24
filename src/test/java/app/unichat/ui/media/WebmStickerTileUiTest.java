@@ -4,12 +4,14 @@ import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.ui.FxWait;
 import app.unichat.video.Ffmpeg;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.image.ImageView;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import app.unichat.Present;
 
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
@@ -39,9 +41,9 @@ class WebmStickerTileUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aWebmStickerLoadsAsAMovingPicture() throws Exception {
-        Path ffmpeg = Ffmpeg.find();
-        assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "no ffmpeg");
         Path webm = dir.resolve("s.webm");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
                 "-c:v", "libvpx-vp9", webm.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
@@ -57,10 +59,10 @@ class WebmStickerTileUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aFavouriteGifThatIsAnMp4LoadsAsAMovingPicture() throws Exception {
         // Telegram's and WhatsApp's GIFs are MP4s: saved as favourites, their tile is one too.
-        Path ffmpeg = Ffmpeg.find();
-        assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "no ffmpeg");
         Path mp4 = dir.resolve("g.mp4");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
                 "-pix_fmt", "yuv420p", "-an", mp4.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();

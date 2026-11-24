@@ -8,8 +8,8 @@ import app.unichat.support.ConvertedFiles;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.function.DoubleConsumer;
+import java.util.List;
 
 /**
  * GIFs that came as a video: Telegram (and WhatsApp) keep every GIF as a silent MP4, and their bridges send it so,
@@ -46,6 +46,9 @@ public final class GifVideos {
 
     /** Thrown by {@link #toWebp} for a video the size of a camera's ({@link #camera}): it stays a video. */
     public static final class RealVideo extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         RealVideo() { super("a real video"); }
     }
 
@@ -60,14 +63,21 @@ public final class GifVideos {
 
     /** Thrown by {@link #toWebp} for a video with sound: it stays a video. */
     public static final class HasSound extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         HasSound() { super("it has sound"); }
     }
 
     private static final String KEY = "video.gifVideosAsGif";
-    /** Ajustes → Redes' choices: the longest one made a picture, the most a forwarded one may weigh, its largest side. */
-    public static final java.util.List<Integer> LONGEST_CHOICES = java.util.List.of(NO_LIMIT, 10, 15, 30),
-            MB_CHOICES = java.util.List.of(8, 10, 25, 50), SIDE_CHOICES = java.util.List.of(320, 480, 640, 720);
-    private static final String LONGEST_KEY = "video.gifLongestSeconds", MB_KEY = "video.gifMaxMb", SIDE_KEY = "video.gifLargestSide";
+    // Ajustes → Redes' choices: the longest one made a picture, the most a forwarded one may weigh, its largest side.
+    public static final List<Integer> LONGEST_CHOICES = List.of(NO_LIMIT, 10, 15, 30);
+    public static final List<Integer> MB_CHOICES = List.of(8, 10, 25, 50);
+    public static final List<Integer> SIDE_CHOICES = List.of(320, 480, 640, 720);
+
+    private static final String LONGEST_KEY = "video.gifLongestSeconds";
+    private static final String MB_KEY = "video.gifMaxMb";
+    private static final String SIDE_KEY = "video.gifLargestSide";
 
     /** The largest a GIF's longest side may be; past it, a real video ({@link #camera}). 720 px by default: a GIF can be that big. */
     public static int largestSide() { return chosen(SIDE_KEY, SIDE_CHOICES, 720); }
@@ -89,7 +99,7 @@ public final class GifVideos {
     public static long maxBytes() { return (long) maxMb() << 20; }
 
     /** The setting when it's one of {@code choices} (it travels with the person: any other value is a stranger's), else {@code def}. */
-    private static int chosen(String key, java.util.List<Integer> choices, int def) {
+    private static int chosen(String key, List<Integer> choices, int def) {
         int v = Settings.get().getInt(key, def, 0);
         return choices.contains(v) ? v : def;
     }

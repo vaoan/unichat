@@ -4,10 +4,13 @@ import app.unichat.model.ConnectionState;
 import app.unichat.service.Changes;
 import app.unichat.service.ChatService;
 import com.sun.net.httpserver.HttpServer;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -20,7 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Waking up drops the long poll left open before sleeping and catches up at once. */
 class WakeSyncTest {
-    private HttpServer server;
+    private @Nullable HttpServer server;
+    @SuppressWarnings("NullAway.Init") // each test makes it before use; @AfterEach stops it only if made
     private MatrixChatService svc;
     private final List<String> syncs = new CopyOnWriteArrayList<>();
     private final Changes changes = new Changes();
@@ -35,8 +39,9 @@ class WakeSyncTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     void wakingUpAsksAgainAtOnceAndConnectingLastsUntilTheAnswer() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.setExecutor(Executors.newCachedThreadPool());
         server.createContext("/", ex -> {
             String q = ex.getRequestURI().getRawQuery();
@@ -77,9 +82,10 @@ class WakeSyncTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     void anErrorInsideTheSyncDoesNotEndIt() throws Exception {
         // After waking (2026-11-13) the heap ran out in the sync thread: it ended, and "Conectando…" stayed for good.
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.setExecutor(Executors.newCachedThreadPool());
         server.createContext("/", ex -> {
             boolean sync = ex.getRequestURI().getPath().endsWith("/sync");
@@ -106,10 +112,12 @@ class WakeSyncTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void aServerStillStartingIsConnectingNotOffline() throws Exception {
-        java.net.ServerSocket closed = new java.net.ServerSocket(0);
-        int port = closed.getLocalPort();
-        closed.close(); // nothing listens: refused, like the local server a second before it's up
+        int port;
+        try (java.net.ServerSocket closed = new java.net.ServerSocket(0)) {
+            port = closed.getLocalPort();
+        } // nothing listens: refused, like the local server a second before it's up
         svc = new MatrixChatService("http://127.0.0.1:" + port, "@starting:example.org", "t");
         // Each try says SYNCING first; what follows it is what the refusal left.
         List<ConnectionState> afterRefusals = new CopyOnWriteArrayList<>();

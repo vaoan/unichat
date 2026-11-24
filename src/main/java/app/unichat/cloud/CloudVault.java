@@ -3,6 +3,7 @@ package app.unichat.cloud;
 import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -21,7 +22,7 @@ public final class CloudVault {
     }
 
     /** A job that writes the vault's keys or files: never under its old names while another computer switches them. */
-    private <T> CompletableFuture<T> writing(Cloud.Job<T> job) {
+    private <T extends @Nullable Object> CompletableFuture<T> writing(Cloud.Job<T> job) {
         return cloud.onWorker(job, true);
     }
 
@@ -65,7 +66,7 @@ public final class CloudVault {
     private Cloud.KeyChanged rotate(Storage dav, java.util.function.Predicate<String> confirmed) throws IOException {
         Vault.Rotated r = withKey(dav, (vault, old) -> {
             VaultPeers peers = VaultPeers.load(vault.info().id());
-            String unconfirmed = Settings.get().getString(VaultActions.UNCONFIRMED, null);
+            String unconfirmed = Settings.get().getString(VaultActions.UNCONFIRMED);
             try {
                 // Before the generation rises: an answer lost after it never hides that a new code is to be kept.
                 return Vault.rotate(dav, old, Cloud.machine(), peers, confirmed,
@@ -97,7 +98,7 @@ public final class CloudVault {
      * place of what this computer saw, so the next change of key offers it one. Only with the vault open here, and only a
      * key the vault key sealed.
      */
-    public CompletableFuture<Void> acceptKey(String machine) {
+    public CompletableFuture<@Nullable Void> acceptKey(String machine) {
         return cloud.onWorker(dav -> {
             if (!Ids.ours(machine)) throw new IllegalArgumentException("Not a machine id");
             return withKey(dav, (vault, vk) -> {
@@ -113,7 +114,7 @@ public final class CloudVault {
     }
 
     /** Another computer's way into the vault taken away, on the vault's thread; this one's own goes by {@link #forgetHere}. */
-    public CompletableFuture<Void> removeComputer(String machine) {
+    public CompletableFuture<@Nullable Void> removeComputer(String machine) {
         return writing(dav -> {
             VaultActions.remove(dav, machine);
             return null;
@@ -125,7 +126,7 @@ public final class CloudVault {
      * turned off ({@link Cloud.VaultState#MISSING}), and the person says it was: its hold here forgotten, so the next round
      * is today's plain one. Only in that state: a vault there again is opened or locked as any other.
      */
-    public CompletableFuture<Void> leaveMissingVault() {
+    public CompletableFuture<@Nullable Void> leaveMissingVault() {
         return cloud.onWorker(dav -> {
             try (VaultParts.Round vault = cloud.stateOf(dav)) {
                 if (vault.state() != Cloud.VaultState.MISSING) throw new IOException(I18n.t("cloud.error.vaultStillThere"));
@@ -141,7 +142,7 @@ public final class CloudVault {
      * be opened again; no mark says it was turned off (that needs its key), so a computer that held it is asked, never
      * sent plain by itself ({@link Cloud.VaultState#MISSING}). Its file alone goes when its folder won't.
      */
-    public CompletableFuture<Void> deleteLockedVault() {
+    public CompletableFuture<@Nullable Void> deleteLockedVault() {
         return cloud.onWorker(dav -> {
             try (VaultParts.Round vault = cloud.stateOf(dav)) {
                 if (vault.state() != Cloud.VaultState.LOCKED) throw new IOException(I18n.t("cloud.error.vaultNotLocked"));
@@ -160,7 +161,7 @@ public final class CloudVault {
      * The vault forgotten on this computer, on the vault's thread: its slot deleted, then its hold on the vault here (whether
      * it declined is left as it is). The next round finds it locked; it can be opened again later.
      */
-    public CompletableFuture<Void> forgetHere() {
+    public CompletableFuture<@Nullable Void> forgetHere() {
         return writing(dav -> {
             Vault.removeSlot(dav, Cloud.machine());
             VaultParts.forget();
@@ -175,10 +176,10 @@ public final class CloudVault {
      * won't go once its file did is told apart ({@code vaultLeftovers}: off all the same, cleared by the next vault). The other
      * computers find it gone on their next round and go back to plain by themselves.
      */
-    public CompletableFuture<Void> turnOffVault() {
+    public CompletableFuture<@Nullable Void> turnOffVault() {
         return writing(dav -> withKey(dav, (vault, vk) -> {
             synchronized (cloud.texts()) { // TextSync.run's own lock: no text of this computer's goes up halfway through
-                boolean whole = VaultOut.run(dav, vault.personal(dav), vault.info(), vk);
+                boolean whole = VaultOut.run(dav, java.util.Objects.requireNonNull(vault.personal(dav)), vault.info(), vk); // open: the vault
                 VaultParts.gone();
                 cloud.texts().sentAt(TextSync.PLAIN);
                 if (!whole) throw new IOException(I18n.t("cloud.error.vaultLeftovers"));
@@ -205,19 +206,19 @@ public final class CloudVault {
      * The vault opened here with a way in ({@code secret}: the recovery code as typed, or the password). A
      * secret that opens nothing fails with "wrong" and writes nothing. {@code secret} is cleared once used.
      */
-    public CompletableFuture<Void> openVault(VaultView.Way way, char[] secret) {
-        CompletableFuture<Void> f = writing(dav -> {
+    public CompletableFuture<@Nullable Void> openVault(VaultView.Way way, char[] secret) {
+        CompletableFuture<@Nullable Void> f = writing(dav -> {
             try (VaultParts.Round here = cloud.stateOf(dav)) {
                 VaultActions.open(dav, way, secret, here.state());
             }
             return null;
         });
-        f.whenComplete((r, e) -> Arrays.fill(secret, '\0'));
+        var _ = f.whenComplete((r, e) -> Arrays.fill(secret, '\0'));
         return f;
     }
 
     /** "Seguir sin la bóveda en este equipo" ({@code true}), or taken back. */
-    public CompletableFuture<Void> declineVault(boolean declined) {
+    public CompletableFuture<@Nullable Void> declineVault(boolean declined) {
         return cloud.onWorker(dav -> {
             VaultActions.decline(declined);
             return null;
@@ -225,12 +226,12 @@ public final class CloudVault {
     }
 
     /** A password as one more way in, only with the vault open here; {@code password} is cleared once used. */
-    public CompletableFuture<Void> addPassword(char[] password) {
-        CompletableFuture<Void> f = writing(dav -> withKey(dav, (vault, vk) -> {
+    public CompletableFuture<@Nullable Void> addPassword(char[] password) {
+        CompletableFuture<@Nullable Void> f = writing(dav -> withKey(dav, (vault, vk) -> {
             VaultActions.addPassword(dav, vk, password);
             return null;
         }));
-        f.whenComplete((r, e) -> Arrays.fill(password, '\0'));
+        var _ = f.whenComplete((r, e) -> Arrays.fill(password, '\0'));
         return f;
     }
 
@@ -240,19 +241,20 @@ public final class CloudVault {
     }
 
     /** The person typed back the groups asked of the latest recovery code: kept. */
-    public CompletableFuture<Void> codeKept() {
+    public CompletableFuture<@Nullable Void> codeKept() {
         return cloud.onWorker(dav -> {
             VaultActions.codeKept();
             return null;
         });
     }
 
-    private interface KeyJob<T> {
+    @FunctionalInterface
+    private interface KeyJob<T extends @Nullable Object> {
         T run(VaultParts.Round vault, byte[] vk) throws IOException;
     }
 
     /** {@code job} with the vault open here and a copy of its key, cleared after; not open → "the vault isn't open". */
-    private <T> T withKey(Storage dav, KeyJob<T> job) throws IOException {
+    private <T extends @Nullable Object> T withKey(Storage dav, KeyJob<T> job) throws IOException {
         try (VaultParts.Round vault = cloud.openVault(dav)) {
             if (!vault.open()) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
             byte[] vk = vault.key();

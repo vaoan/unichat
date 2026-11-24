@@ -1,9 +1,11 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.model.Network;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -24,7 +26,7 @@ class ForwardNoteTest {
         return c;
     }
 
-    private static String note(boolean who, boolean where, boolean when) {
+    private static @Nullable String note(boolean who, boolean where, boolean when) {
         return new ForwardNote(who, where, when).of(M, FAMILIA, UTC);
     }
 
@@ -49,7 +51,7 @@ class ForwardNoteTest {
             for (String lang : java.util.List.of("es", "en")) {
                 app.unichat.support.I18n.use(lang);
                 assertEquals("↪ Forwarded from Ana · Familia (WhatsApp) · Nov 12 09:14", note(true, true, true), lang);
-                assertEquals("↪ Forwarded", note(false, true, false).substring(0, 11), lang);
+                assertEquals("↪ Forwarded", Present.of(note(false, true, false)).substring(0, 11), lang);
             }
         } finally {
             app.unichat.support.I18n.use(before);

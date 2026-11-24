@@ -31,15 +31,15 @@ class PinnedMessagesTest {
         PinnedMessages pins = new PinnedMessages(dir.resolve("pinned-messages.json"));
         List<String> changed = new ArrayList<>();
         pins.addListener(changed::add);
-        Instant long_ago = Instant.parse("2025-01-02T03:04:05Z");
-        pins.pin("!c", message("$old", "la dirección es Calle 5 #12", long_ago));
+        Instant longAgo = Instant.parse("2025-01-02T03:04:05Z");
+        pins.pin("!c", message("$old", "la dirección es Calle 5 #12", longAgo));
         pins.pin("!c", message("$new", "nos vemos el sábado", Instant.parse("2026-11-01T00:00:00Z")));
 
         List<PinnedMessage> list = pins.of("!c");
         assertEquals(List.of("$new", "$old"), list.stream().map(PinnedMessage::messageId).toList(), "newest pin first");
         assertEquals("la dirección es Calle 5 #12", list.get(1).preview());
         assertEquals("Ana", list.get(1).sender());
-        assertEquals(long_ago, list.get(1).sentAt());
+        assertEquals(longAgo, list.get(1).sentAt());
         assertTrue(pins.isPinned("!c", "$old"));
         assertEquals(List.of("!c", "!c"), changed, "each change is told, with its chat");
 

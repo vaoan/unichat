@@ -3,13 +3,27 @@ package app.unichat.ui.timeline;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.model.RoomFeatures;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.Set;
 
-import static app.unichat.ui.timeline.MessageActions.Action.*;
+import static app.unichat.ui.timeline.MessageActions.Action.COPY;
+import static app.unichat.ui.timeline.MessageActions.Action.DELETE_FOR_EVERYONE;
+import static app.unichat.ui.timeline.MessageActions.Action.DELETE_FOR_ME;
+import static app.unichat.ui.timeline.MessageActions.Action.EDIT;
+import static app.unichat.ui.timeline.MessageActions.Action.FAVORITE;
+import static app.unichat.ui.timeline.MessageActions.Action.FIX;
+import static app.unichat.ui.timeline.MessageActions.Action.FORWARD;
+import static app.unichat.ui.timeline.MessageActions.Action.OPEN_FILE;
+import static app.unichat.ui.timeline.MessageActions.Action.REPLY;
+import static app.unichat.ui.timeline.MessageActions.Action.SAVED_TEXT;
+import static app.unichat.ui.timeline.MessageActions.Action.SAVE_AS;
+import static app.unichat.ui.timeline.MessageActions.Action.SAVE_LINK;
+import static app.unichat.ui.timeline.MessageActions.Action.TRANSCRIBE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -17,13 +31,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MessageActionsTest {
     private static final Instant SENT = Instant.parse("2026-10-26T10:00:00Z");
 
-    private static RoomFeatures f(String json) throws Exception {
+    private static RoomFeatures f(String json) throws JsonProcessingException {
         return RoomFeatures.parse(new ObjectMapper().readTree(json));
     }
 
     private static final String WHATSAPP = "{\"id\":\"wa\",\"edit\":2,\"edit_max_age\":900,\"delete\":2,\"delete_max_age\":172800,\"reply\":2}";
 
-    private static Message msg(boolean outgoing, MessageType type, String mime) {
+    private static Message msg(boolean outgoing, MessageType type, @Nullable String mime) {
         Message m = new Message("$1", "!c", outgoing ? "@me" : "@ana", "Ana", outgoing, SENT);
         m.setType(type);
         if (type != MessageType.TEXT) {
@@ -74,6 +88,17 @@ class MessageActionsTest {
         assertTrue(MessageActions.of(gifv, f(WHATSAPP), SENT).contains(FAVORITE), "Discord's gifv");
         Message video = msg(false, MessageType.VIDEO, "video/mp4");
         assertFalse(MessageActions.of(video, f(WHATSAPP), SENT).contains(FAVORITE), "a plain video isn't a GIF");
+    }
+
+    /** A stranger's sticker or GIF without an address: a favourite of it would be kept with no address, and break the library. */
+    @Test
+    void aStickerOrGifWithoutAnAddressIsNoFavourite() throws Exception {
+        Message sticker = msg(false, MessageType.STICKER, "image/webp");
+        sticker.setMediaUrl(null);
+        assertFalse(MessageActions.of(sticker, f(WHATSAPP), SENT).contains(FAVORITE), "a sticker");
+        Message gif = msg(false, MessageType.IMAGE, "image/gif");
+        gif.setMediaUrl(null);
+        assertFalse(MessageActions.of(gif, f(WHATSAPP), SENT).contains(FAVORITE), "a GIF");
     }
 
     @Test

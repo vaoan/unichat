@@ -24,7 +24,7 @@ class ChatLiveFieldsTest {
 
         assertEquals(1, seen.size(), "neither the caller's list nor the next set reach it");
         assertTrue(c.members().isEmpty());
-        assertThrows(UnsupportedOperationException.class, () -> seen.clear());
+        assertThrows(UnsupportedOperationException.class, seen::clear);
     }
 
     @Test

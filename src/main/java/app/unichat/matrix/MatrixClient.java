@@ -1,9 +1,11 @@
 package app.unichat.matrix;
 
 import app.unichat.support.I18n;
+import app.unichat.support.PathParts;
 import app.unichat.support.Urls;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,13 +27,13 @@ final class MatrixClient {
 
     private volatile HttpClient http;
     private final String baseUrl;
-    private final String accessToken;
+    private final @Nullable String accessToken;
 
     MatrixClient(String baseUrl, String accessToken) {
         this(newHttpClient(), baseUrl, accessToken);
     }
 
-    MatrixClient(HttpClient http, String baseUrl, String accessToken) {
+    MatrixClient(HttpClient http, String baseUrl, @Nullable String accessToken) {
         this.http = http;
         this.baseUrl = stripSlash(baseUrl);
         this.accessToken = accessToken;
@@ -53,8 +55,8 @@ final class MatrixClient {
     }
 
     JsonNode get(String path) throws IOException { return request("GET", path, null, DEFAULT_TIMEOUT); }
-    JsonNode post(String path, Object body) throws IOException { return request("POST", path, body, DEFAULT_TIMEOUT); }
-    JsonNode put(String path, Object body) throws IOException { return request("PUT", path, body, DEFAULT_TIMEOUT); }
+    JsonNode post(String path, @Nullable Object body) throws IOException { return request("POST", path, body, DEFAULT_TIMEOUT); }
+    JsonNode put(String path, @Nullable Object body) throws IOException { return request("PUT", path, body, DEFAULT_TIMEOUT); }
     JsonNode delete(String path) throws IOException { return request("DELETE", path, null, DEFAULT_TIMEOUT); }
 
     /** Sends one event to a room; the answer holds its {@code event_id}. */
@@ -67,12 +69,12 @@ final class MatrixClient {
     }
 
     /** Sends a JSON request; {@code path} starts with {@code /_matrix/...}. Throws {@link MatrixException} on non-2xx. */
-    JsonNode request(String method, String path, Object body, Duration timeout) throws IOException {
+    JsonNode request(String method, String path, @Nullable Object given, Duration timeout) throws IOException {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(baseUrl + path))
                 .timeout(timeout)
                 .header("Accept", "application/json");
         if (accessToken != null) b.header("Authorization", "Bearer " + accessToken);
-        if (body == null && (method.equals("POST") || method.equals("PUT"))) body = JSON.createObjectNode();
+        Object body = given == null && (method.equals("POST") || method.equals("PUT")) ? JSON.createObjectNode() : given;
         if (body != null) {
             b.header("Content-Type", "application/json");
             b.method(method, HttpRequest.BodyPublishers.ofByteArray(JSON.writeValueAsBytes(body)));
@@ -106,12 +108,13 @@ final class MatrixClient {
      * Downloads {@code url} (absolute, or a path relative to the homeserver) into {@code target}.
      * Returns the response Content-Type (may be null).
      */
-    String download(String url, boolean authenticated, Path target) throws IOException {
+    @Nullable String download(String url, boolean authenticated, Path target) throws IOException {
         return download(url, authenticated, target, null);
     }
 
     /** The same, telling {@code progress} how much has arrived (0 to 1) when the server says the size. */
-    String download(String url, boolean authenticated, Path target, java.util.function.DoubleConsumer progress) throws IOException {
+    @Nullable String download(String url, boolean authenticated, Path target,
+            java.util.function.@Nullable DoubleConsumer progress) throws IOException {
         String full = url.startsWith("http://") || url.startsWith("https://") ? url : baseUrl + url;
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(full)).timeout(Duration.ofMinutes(5)).GET();
         if (authenticated && accessToken != null) b.header("Authorization", "Bearer " + accessToken);
@@ -121,7 +124,7 @@ final class MatrixClient {
                 parse(resp.statusCode(), in.readAllBytes());
                 throw new MatrixException(resp.statusCode(), null, "HTTP " + resp.statusCode());
             }
-            Files.createDirectories(target.getParent());
+            Files.createDirectories(PathParts.parent(target));
             Path tmp = target.resolveSibling(target.getFileName() + ".part" + Thread.currentThread().threadId());
             long size = resp.headers().firstValueAsLong("Content-Length").orElse(-1);
             try {
@@ -143,7 +146,8 @@ final class MatrixClient {
             byte[] buf = new byte[64 * 1024];
             long got = 0;
             int told = -1;
-            for (int n; (n = in.read(buf)) > 0; ) {
+            int n;
+            while ((n = in.read(buf)) > 0) {
                 out.write(buf, 0, n);
                 got += n;
                 int percent = (int) Math.min(100, got * 100 / size);
@@ -156,7 +160,7 @@ final class MatrixClient {
     }
 
     private <T> HttpResponse<T> send(HttpRequest req, HttpResponse.BodyHandler<T> handler) throws IOException {
-        HttpClient c = http;
+        HttpClient c = http; // NOPMD: CloseResource, the client's own, for its whole life
         try {
             return c.send(req, handler);
         } catch (IOException e) {
@@ -170,12 +174,12 @@ final class MatrixClient {
             throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new InterruptedIOException("interrupted");
+            throw new InterruptedIOException("interrupted"); // NOPMD: PreserveStackTrace, an interrupt has no trace worth keeping; a cause would be what LoginTexts.rootMessage shows
         }
     }
 
-    static JsonNode parse(int status, byte[] body) throws IOException {
-        JsonNode json = null;
+    static JsonNode parse(int status, byte @Nullable [] body) throws IOException {
+        @Nullable JsonNode json = null;
         if (body != null && body.length > 0) {
             try {
                 json = JSON.readTree(body);

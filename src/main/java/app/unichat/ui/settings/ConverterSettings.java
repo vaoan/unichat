@@ -15,6 +15,7 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 
@@ -32,7 +33,7 @@ final class ConverterSettings {
 
     private ConverterSettings() {}
 
-    static State state(Path found, boolean ours, boolean canInstall, boolean auto) {
+    static State state(@Nullable Path found, boolean ours, boolean canInstall, boolean auto) {
         if (found != null) return ours ? State.READY_OURS : State.READY_OWN;
         if (!canInstall) return State.NO_DOWNLOAD;
         return auto ? State.WILL_INSTALL : State.MISSING;

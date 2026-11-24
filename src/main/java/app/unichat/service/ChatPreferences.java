@@ -1,5 +1,7 @@
 package app.unichat.service;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 
@@ -25,7 +27,7 @@ public interface ChatPreferences {
     CompletableFuture<Void> setMuted(String chatId, boolean muted);
     CompletableFuture<Void> setPinned(String chatId, boolean pinned);
     /** null clears the reminder. */
-    CompletableFuture<Void> setReminder(String chatId, Instant at);
+    CompletableFuture<Void> setReminder(String chatId, @Nullable Instant at);
     CompletableFuture<Void> leaveChat(String chatId);
     /** Each chat's options and the folders, as {@code preferences.json} holds them (what the cloud keeps). */
     byte[] preferencesJson();

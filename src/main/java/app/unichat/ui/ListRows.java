@@ -15,6 +15,7 @@ import java.util.function.Function;
  */
 public final class ListRows {
     /** A cell that can draw its item again, keeping it. */
+    @FunctionalInterface
     public interface Redrawable {
         void redraw();
     }

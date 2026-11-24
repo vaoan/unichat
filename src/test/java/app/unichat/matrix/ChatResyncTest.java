@@ -2,7 +2,6 @@ package app.unichat.matrix;
 
 import app.unichat.bridge.BridgePorts;
 import app.unichat.model.Network;
-import app.unichat.server.BridgeConfig;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

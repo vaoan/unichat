@@ -20,7 +20,7 @@ public final class ReactionEmoji {
         label.getStyleClass().add("reaction-emoji");
         if (!Message.isCustomReaction(key)) return label;
         label.setMinSize(SIZE, SIZE);
-        ImageCache.load(key, media).whenComplete((image, err) -> Platform.runLater(() -> {
+        var _ = ImageCache.load(key, media).whenComplete((image, err) -> Platform.runLater(() -> {
             if (image == null) {
                 label.setText(PLACEHOLDER);
                 return;

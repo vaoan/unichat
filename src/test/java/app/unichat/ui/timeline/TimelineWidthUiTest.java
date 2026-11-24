@@ -17,6 +17,7 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
@@ -35,7 +36,7 @@ class TimelineWidthUiTest {
     @TempDir
     Path dir;
 
-    private static void toolkit() throws Exception {
+    private static void toolkit() throws InterruptedException {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
@@ -61,7 +62,7 @@ class TimelineWidthUiTest {
         ImageView again = new ImageView();
         // Right when the call returns, on the UI thread: no blank frame while it's decoded again.
         assertSame(first.getImage(), FxWait.fx(() -> {
-            MessageMedia.loadMedia(svc, again, m, 400, 300);
+            var _ = MessageMedia.loadMedia(svc, again, m, 400, 300);
             return again.getImage();
         }));
         svc.stop();
@@ -87,11 +88,11 @@ class TimelineWidthUiTest {
         FxWait.until("the photo's row shows", () -> row(thread, id) != null);
         FxWait.settled();
         Node before = FxWait.fx(() -> row(thread, id));
-        FxWait.fx(() -> { stage[0].setWidth(900); return null; });
+        FxWait.onFx(() -> stage[0].setWidth(900));
         FxWait.settled();
         assertSame(before, FxWait.fx(() -> row(thread, id)), "the same row: not rebuilt, its photo not loaded again");
         assertNotNull(before);
-        FxWait.fx(() -> { stage[0].close(); return null; });
+        FxWait.onFx(stage[0]::close);
         svc.stop();
     }
 
@@ -112,16 +113,16 @@ class TimelineWidthUiTest {
         });
         Message target = photo(svc);
         FxWait.until("the timeline shows", () -> row(thread, target.id()) != null || !thread.lookupAll(".row-cell").isEmpty());
-        FxWait.fx(() -> { thread.jumpToMessage(target); return null; });
+        FxWait.onFx(() -> thread.jumpToMessage(target));
         FxWait.settled();
         Object selected = FxWait.fx(() -> ((javafx.scene.control.ListView<?>) thread.lookup(".timeline")).getSelectionModel().getSelectedItem());
         assertTrue(selected instanceof ThreadRows.MessageRow r && r.message() == target, "selected: " + selected);
-        FxWait.fx(() -> { stage[0].close(); return null; });
+        FxWait.onFx(stage[0]::close);
         svc.stop();
     }
 
     /** What the timeline shows for message {@code id}. */
-    private static Node row(ThreadPane thread, String id) {
+    private static @Nullable Node row(ThreadPane thread, String id) {
         return thread.lookupAll(".row-cell").stream().map(n -> (ListCell<?>) n)
                 .filter(c -> c.getItem() instanceof ThreadRows.MessageRow r && r.message().id().equals(id))
                 .map(ListCell::getGraphic).findFirst().orElse(null);

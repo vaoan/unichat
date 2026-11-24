@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.Present;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.StickerPack;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -39,7 +41,7 @@ class BridgeStickerPacksTest {
 
     @BeforeEach
     void fakeBridge() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             uris.add(ex.getRequestMethod() + " " + ex.getRequestURI());
             String path = ex.getRequestURI().getPath();
@@ -77,7 +79,7 @@ class BridgeStickerPacksTest {
         assertEquals(MediaLibrary.Kind.STICKER, first.kind());
         assertEquals("image/webp", first.mime());
         assertEquals(512, first.width());
-        assertEquals("11", first.info().path("fi.mau.bridged_sticker").path("id").asText(), "kept, so Telegram gets its own sticker");
+        assertEquals("11", Present.of(first.info()).path("fi.mau.bridged_sticker").path("id").asText(), "kept, so Telegram gets its own sticker");
     }
 
     @Test

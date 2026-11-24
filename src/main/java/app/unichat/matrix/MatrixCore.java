@@ -3,6 +3,7 @@ package app.unichat.matrix;
 import app.unichat.support.Threads;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatService.Listener;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -46,7 +47,7 @@ final class MatrixCore {
         return "uc" + System.currentTimeMillis() + "." + txnCounter.incrementAndGet();
     }
 
-    Chat chat(String chatId) {
+    @Nullable Chat chat(String chatId) {
         synchronized (proc) {
             MatrixRoom r = proc.room(chatId);
             return r == null ? null : r.chat;
@@ -63,7 +64,8 @@ final class MatrixCore {
         }
     }
 
-    interface IoAction { void run() throws Exception; }
+    @FunctionalInterface
+    interface IoAction { void run() throws Exception; } // NOPMD: SignatureDeclareThrowsException, a callback: any request, failing as it does
 
     CompletableFuture<Void> run(IoAction action) {
         return CompletableFuture.runAsync(() -> {
@@ -77,7 +79,7 @@ final class MatrixCore {
         }, io);
     }
 
-    <T> CompletableFuture<T> call(java.util.concurrent.Callable<T> call) {
+    <T extends @Nullable Object> CompletableFuture<T> call(java.util.concurrent.Callable<T> call) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return call.call();

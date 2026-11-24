@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Saves what others send in a chat that has it on (its options, {@link ChatPreferences#setAutoSave}), each kind chosen
@@ -50,12 +51,15 @@ public final class AutoSave implements ChatService.Listener {
          * The video behind {@code url} saved into {@code dir}: null, or why not. {@code tag}: the message's id, which
          * goes in the name ({@link FileNames#tag}).
          */
-        Failure link(String url, Path dir, String tag, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException;
+        @Nullable Failure link(String url, Path dir, String tag, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException;
     }
 
     /** A file that can never be downloaded: deleted, expired, not on the server any more. */
     static final class Gone extends IOException {
-        Gone(String why, Throwable cause) {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
+        Gone(@Nullable String why, @Nullable Throwable cause) {
             super(why, cause);
         }
     }
@@ -72,7 +76,7 @@ public final class AutoSave implements ChatService.Listener {
          * {@code what} (a file's name, a link) from {@code chat} couldn't be saved, because {@code why}; {@code messageId}
          * is the message it came in (null when it's no one message: exploring stopped, files gone), for the notice to go to.
          */
-        void failed(String what, Chat chat, String messageId, String why);
+        void failed(String what, Chat chat, @Nullable String messageId, String why);
     }
 
     private static final Map<ChatSession, AutoSave> BY_SERVICE = new WeakHashMap<>();
@@ -81,15 +85,15 @@ public final class AutoSave implements ChatService.Listener {
     private final ChatReader chats;
     private final SavedUpTo savedUpTo;
     private volatile Progress progress = new Progress() {
-        @Override public void changed(int done, int total) { }
-        @Override public void finished(int saved, Chat chat) { }
-        @Override public void failed(String what, Chat chat, String messageId, String why) { }
+        @Override public void changed(int done, int total) { /* not needed here */ }
+        @Override public void finished(int saved, Chat chat) { /* not needed here */ }
+        @Override public void failed(String what, Chat chat, @Nullable String messageId, String why) { /* not needed here */ }
     };
     /** What {@link #progress} is now: the parts keep this one, {@link #setProgress} may change it later. */
     private final Progress tell = new Progress() {
         @Override public void changed(int done, int total) { progress.changed(done, total); }
         @Override public void finished(int saved, Chat chat) { progress.finished(saved, chat); }
-        @Override public void failed(String what, Chat chat, String messageId, String why) { progress.failed(what, chat, messageId, why); }
+        @Override public void failed(String what, Chat chat, @Nullable String messageId, String why) { progress.failed(what, chat, messageId, why); }
     };
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "autosave");
@@ -154,12 +158,12 @@ public final class AutoSave implements ChatService.Listener {
      * it can hold the person's own things); on the saving thread, so nothing is written meanwhile. Gives how many files
      * moved.
      */
-    public java.util.concurrent.CompletableFuture<Integer> setBase(Path folder) {
+    public java.util.concurrent.CompletableFuture<Integer> setBase(@Nullable Path folder) {
         return onWorker(() -> SavedMove.toBase(chats.chats(), folder));
     }
 
     /** A chat's own folder (null: under the base again), taking along what it saved where it was. */
-    public java.util.concurrent.CompletableFuture<Integer> setOwn(Chat chat, Path folder) {
+    public java.util.concurrent.CompletableFuture<Integer> setOwn(Chat chat, @Nullable Path folder) {
         return onWorker(() -> SavedMove.toOwn(chat, folder));
     }
 
@@ -247,10 +251,11 @@ public final class AutoSave implements ChatService.Listener {
         Set<String> out = new LinkedHashSet<>(Urls.in(m.body()));
         // A video that came with its page (Instagram's reels) is that page's video: downloading the page again saved
         // the same reel twice, the second one in VP9, which a Mac doesn't open.
-        if (m.externalUrl() != null && m.externalUrl().startsWith("http") && m.type() != app.unichat.model.MessageType.VIDEO) out.add(m.externalUrl());
+        String page = m.externalUrl();
+        if (page != null && page.startsWith("http") && m.type() != app.unichat.model.MessageType.VIDEO) out.add(page);
         // The same page in its text too (a reel one sends comes back as its video, its link written out): that's the
         // video it already is, and every reel was saved twice.
-        if (m.type() == app.unichat.model.MessageType.VIDEO && m.externalUrl() != null) out.removeIf(u -> Urls.samePage(u, m.externalUrl()));
+        if (m.type() == app.unichat.model.MessageType.VIDEO && page != null) out.removeIf(u -> Urls.samePage(u, page));
         return out;
     }
 
@@ -258,7 +263,7 @@ public final class AutoSave implements ChatService.Listener {
      * Why it failed, as a person reads it. No room is told by the space left where it was going (the system's own
      * words differ on each one), a folder that can't be written by the kind of error; else the error's own words.
      */
-    static String why(Exception e, Path dir, Path file) {
+    static String why(Exception e, Path dir, @Nullable Path file) {
         try {
             long needed = file != null && Files.isRegularFile(file) ? Files.size(file) : 0;
             Path existing = dir;
@@ -279,7 +284,8 @@ public final class AutoSave implements ChatService.Listener {
      * the beginning, what this run looked at, saved and found gone, and what it's doing right now (null when not
      * running): without that, "Buscando…" for minutes said nothing.
      */
-    public record Exploring(boolean running, Instant back, boolean start, int saved, int unavailable, int looked, Now now) {
+    public record Exploring(boolean running, @Nullable Instant back, boolean start, int saved, int unavailable, int looked,
+                            @Nullable Now now) {
         Exploring counted(boolean ok) {
             return new Exploring(running, back, start, saved + (ok ? 1 : 0), unavailable + (ok ? 0 : 1), looked, now);
         }
@@ -289,8 +295,8 @@ public final class AutoSave implements ChatService.Listener {
      * What exploring is doing: going through a message of {@code at}, downloading {@code what} from it ({@code done} of
      * it, 0 to 1; -1 while unknown), or asking the server for older ones.
      */
-    public record Now(Doing doing, Instant at, String what, double done) {
-        public Now(Doing doing, Instant at, String what) {
+    public record Now(Doing doing, @Nullable Instant at, @Nullable String what, double done) {
+        public Now(Doing doing, @Nullable Instant at, @Nullable String what) {
             this(doing, at, what, -1);
         }
     }
@@ -338,6 +344,11 @@ public final class AutoSave implements ChatService.Listener {
         worker.execute(then);
     }
 
+    /** For tests: runs {@code then} once the texts thread has written what it was given so far, and what that set off. */
+    void afterTexts(Runnable then) {
+        texts.afterPending(then);
+    }
+
     static Saver downloading(MediaSource media) {
         return new Saver() {
             @Override
@@ -345,13 +356,14 @@ public final class AutoSave implements ChatService.Listener {
                 try {
                     return media.media(mediaUrl, 0, 0, progress).get();
                 } catch (java.util.concurrent.ExecutionException e) {
-                    if (media.gone(e.getCause())) throw new Gone(e.getCause().getMessage(), e.getCause());
-                    throw new IOException(e.getCause());
+                    Throwable cause = e.getCause(); // a future's failure always has one
+                    if (cause != null && media.gone(cause)) throw new Gone(cause.getMessage(), cause); // NOPMD: PreserveStackTrace, the future's wrapper is dropped; its cause has the trace
+                    throw new IOException(cause); // NOPMD: PreserveStackTrace, as above
                 }
             }
 
             @Override
-            public Failure link(String url, Path dir, String tag, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
+            public @Nullable Failure link(String url, Path dir, String tag, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
                 return LinkSaver.save(url, dir, tag, progress, LinkSaver.tools(), LinkSaver.COOKIES);
             }
         };

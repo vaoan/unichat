@@ -17,6 +17,7 @@ import javafx.scene.text.TextFlow;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.TextNode;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -42,13 +43,11 @@ final class HtmlView {
     /** Far deeper than any real message, far shallower than the UI thread's stack (and the scene graph's) can take. */
     private static final int MAX_DEPTH = 64;
 
-    private final double available;
     private final MessageMedia media;
     private final Consumer<String> openLink;
     private int depth;
 
-    private HtmlView(double available, MessageMedia media, Consumer<String> openLink) {
-        this.available = available;
+    private HtmlView(MessageMedia media, Consumer<String> openLink) {
         this.media = media;
         this.openLink = openLink;
     }
@@ -57,7 +56,7 @@ final class HtmlView {
         VBox root = new VBox(4);
         root.getStyleClass().add("html");
         root.setMaxWidth(width);
-        new HtmlView(width, media, openLink).contents(Jsoup.parseBodyFragment(html).body(), root, width, Look.PLAIN);
+        new HtmlView(media, openLink).contents(Jsoup.parseBodyFragment(html).body(), root, width, Look.PLAIN);
         return root;
     }
 
@@ -80,7 +79,7 @@ final class HtmlView {
     }
 
     /** What's inherited from the tags around some text. */
-    private record Look(boolean bold, boolean italic, boolean underline, boolean strike, boolean code, boolean pre, double scale, String color) {
+    private record Look(boolean bold, boolean italic, boolean underline, boolean strike, boolean code, boolean pre, double scale, @Nullable String color) {
         static final Look PLAIN = new Look(false, false, false, false, false, false, 1, null);
 
         Look bolder() { return new Look(true, italic, underline, strike, code, pre, scale, color); }
@@ -94,10 +93,10 @@ final class HtmlView {
     }
 
     /** Blocks stack in {@code target}; text between them runs together in a flow, opened when the first of it arrives. */
-    private final class Blocks {
+    private static final class Blocks {
         final VBox target;
         final double width;
-        TextFlow run;
+        @Nullable TextFlow run;
 
         Blocks(VBox target, double width) {
             this.target = target;
@@ -145,10 +144,10 @@ final class HtmlView {
 
     private void text(TextNode t, Blocks b, Look look) {
         String s = look.pre() ? t.getWholeText() : t.getWholeText().replaceAll("\\s+", " ");
-        if (s.isBlank() && (b.run == null || !look.pre() && s.isEmpty())) return;
+        if (s.isBlank() && (b.run == null || (!look.pre() && s.isEmpty()))) return;
         for (RichText.Span span : RichText.addressSpans(s)) {
             if (span.kind() == RichText.Kind.LINK) b.inline(RichText.link(span.text(), span.text(), openLink, b.width));
-            else for (javafx.scene.Node n : EmojiInline.nodes(span.text(), run -> styled(run, look))) b.inline(n);
+            else for (Node n : EmojiInline.nodes(span.text(), run -> styled(run, look))) b.inline(n);
         }
     }
 
@@ -173,14 +172,28 @@ final class HtmlView {
             nested(e, b, look, null);
             return;
         }
+        Look text = textLook(tag, look);
+        if (text != null) walk(e, b, text);
+        else structure(e, b, look, tag);
+    }
+
+    /** How a tag of the text's own (bold, italic, code…) changes the look; null for any other tag. */
+    private static @Nullable Look textLook(String tag, Look look) {
+        return switch (tag) {
+            case "b", "strong", "th" -> look.bolder();
+            case "i", "em", "cite", "dfn", "var" -> look.slanted();
+            case "u", "ins" -> look.underlined();
+            case "s", "del", "strike" -> look.struck();
+            case "code", "kbd", "samp", "tt" -> look.coded();
+            case "sub", "sup", "small" -> look.scaled(0.8);
+            default -> null;
+        };
+    }
+
+    /** Headings, quotes, lists, tables, links, pictures and the rest: what isn't only a change of look. */
+    private void structure(Element e, Blocks b, Look look, String tag) {
         switch (tag) {
             case "br" -> b.inline(styled("\n", look));
-            case "b", "strong", "th" -> walk(e, b, look.bolder());
-            case "i", "em", "cite", "dfn", "var" -> walk(e, b, look.slanted());
-            case "u", "ins" -> walk(e, b, look.underlined());
-            case "s", "del", "strike" -> walk(e, b, look.struck());
-            case "code", "kbd", "samp", "tt" -> walk(e, b, look.coded());
-            case "sub", "sup", "small" -> walk(e, b, look.scaled(0.8));
             case "h1" -> heading(e, b, look, 1.5);
             case "h2" -> heading(e, b, look, 1.3);
             case "h3" -> heading(e, b, look, 1.15);
@@ -197,7 +210,7 @@ final class HtmlView {
         }
     }
 
-    private void nested(Element e, Blocks b, Look look, String style) {
+    private void nested(Element e, Blocks b, Look look, @Nullable String style) {
         VBox box = new VBox(4);
         if (style != null) box.getStyleClass().add(style);
         contents(e, box, b.width, look);
@@ -310,7 +323,7 @@ final class HtmlView {
         Hyperlink veil = new Hyperlink(reason.isBlank() ? I18n.t("html.spoiler") : I18n.t("html.spoilerReason", reason));
         veil.getStyleClass().addAll("msg-link", "html-spoiler");
         b.inline(veil);
-        TextFlow flow = b.run;
+        TextFlow flow = java.util.Objects.requireNonNull(b.run, "inline() has just put the veil in a run");
         veil.setOnAction(a -> {
             VBox holder = new VBox();
             Blocks hidden = new Blocks(holder, b.width);
@@ -324,7 +337,7 @@ final class HtmlView {
     }
 
     /** The first that's a plain color: these go into a style, and whoever wrote them isn't to be trusted with that. */
-    private static String color(String... candidates) {
+    private static @Nullable String color(String... candidates) {
         for (String c : candidates) if (c.matches("#[0-9A-Fa-f]{6}")) return c;
         return null;
     }

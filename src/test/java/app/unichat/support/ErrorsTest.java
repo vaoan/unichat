@@ -1,5 +1,6 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -19,6 +20,7 @@ class ErrorsTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "NP_NONNULL_PARAM_VIOLATION", justification = "CompletionException takes a null cause (the JDK allows it); the test checks that case")
     void aWrapperWithoutCauseStays() {
         CompletionException lonely = new CompletionException("sola", null);
         assertSame(lonely, Errors.unwrap(lonely));

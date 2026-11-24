@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LinkPreviewSettingTest {
     @Test
+    @SuppressWarnings("NullAway") // no homeserver: what this checks never reaches it
     void withPreviewsOffNoLinkIsOpened() throws Exception {
         Settings s = Settings.get();
         s.setLinkPreviews(false);

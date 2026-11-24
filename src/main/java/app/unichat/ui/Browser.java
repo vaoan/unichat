@@ -1,5 +1,8 @@
 package app.unichat.ui;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
+
 /** The person's web browser, and the system's file manager. */
 public final class Browser {
     private static final java.util.Set<String> WEB = java.util.Set.of("http", "https");
@@ -11,7 +14,7 @@ public final class Browser {
      * other schemes to whatever claims them ({@code file:} runs a program, {@code smb:} sends the Windows password's hash,
      * {@code ms-msdt:} was a remote-code hole), so nothing else ever leaves Unichat.
      */
-    static java.util.Optional<java.net.URI> web(String url) {
+    static java.util.Optional<java.net.URI> web(@Nullable String url) {
         if (url == null) return java.util.Optional.empty();
         try {
             java.net.URI uri = new java.net.URI(url.strip());
@@ -40,10 +43,10 @@ public final class Browser {
     /** How a file is opened with the system's app; tests put a recorder here. Runs on AWT's thread. */
     @FunctionalInterface
     interface Opener {
-        void open(java.nio.file.Path file) throws Exception;
+        void open(java.nio.file.Path file) throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: a test's recorder or the system, failing as they do
     }
 
-    static Opener opener = Browser::systemOpen;
+    static Opener opener = Browser::systemOpen; // NOPMD: MutableStaticState, a seam tests swap
 
     /**
      * Opens {@code file} with the system's app for it, through AWT's own thread (mistakes.md): called from wherever a
@@ -60,7 +63,8 @@ public final class Browser {
     }
 
     /** AWT's Desktop; where it can't (it isn't supported), the system's own command: open, start, xdg-open. */
-    private static void systemOpen(java.nio.file.Path file) throws Exception {
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the system's opener with one absolute path of ours (it starts with / or a drive, so it can't pass for an option), as a list, no shell")
+    private static void systemOpen(java.nio.file.Path file) throws java.io.IOException {
         if (java.awt.Desktop.isDesktopSupported() && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)) {
             java.awt.Desktop.getDesktop().open(file.toFile());
             return;

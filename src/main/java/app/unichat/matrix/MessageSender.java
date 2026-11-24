@@ -16,17 +16,21 @@ import app.unichat.service.ChatService.Listener;
 import app.unichat.service.SendAs;
 import app.unichat.service.StickerMode;
 import app.unichat.settings.Settings;
+import app.unichat.support.BoundedMap;
 import app.unichat.support.I18n;
 import app.unichat.support.ImageHeaders;
+import app.unichat.support.PathParts;
 import app.unichat.video.SendablePhotos;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.DoubleConsumer;
 import java.util.concurrent.CompletableFuture;
@@ -51,7 +55,7 @@ final class MessageSender {
         this.media = media;
     }
 
-    CompletableFuture<Void> sendText(String chatId, String text, String replyToId) {
+    CompletableFuture<Void> sendText(String chatId, String text, @Nullable String replyToId) {
         if (text == null || text.isBlank()) return CompletableFuture.completedFuture(null);
         String txn = core.newTxnId();
         ObjectNode content = MatrixClient.JSON.createObjectNode();
@@ -73,7 +77,7 @@ final class MessageSender {
         return sendEvent(chatId, "m.room.message", txn, content);
     }
 
-    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) {
+    CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, @Nullable String replyToId) {
         Chat c = core.chat(chatId);
         return sendStickerAs(chatId, item, c == null ? RoomFeatures.UNKNOWN : c.features(),
                 c == null ? StickerMode.STICKER : StickerMode.of(c.network()), replyToId);
@@ -84,8 +88,9 @@ final class MessageSender {
      * flagged as a GIF (it loops, like WhatsApp's GIFs) or as a plain video.
      */
     CompletableFuture<Void> sendStickerAs(String chatId, MediaLibrary.Item item,
-                                          RoomFeatures features, StickerMode mode, String replyToId) {
-        String mime = item.info() != null && item.info().hasNonNull("mimetype") ? item.info().path("mimetype").asText() : item.mime();
+                                          RoomFeatures features, StickerMode mode, @Nullable String replyToId) {
+        JsonNode info = item.info();
+        String mime = info != null && info.hasNonNull("mimetype") ? info.path("mimetype").asText() : item.mime();
         if (mode == StickerMode.STICKER || !"image/gif".equals(mime)) return sendStickerFor(chatId, item, features, replyToId);
         return media.media(item.url(), 0, 0).thenApplyAsync(src -> {
             try {
@@ -97,7 +102,7 @@ final class MessageSender {
                 mode == StickerMode.GIF).whenComplete((v, err) -> {
             try {
                 Files.deleteIfExists(r.file());
-                Files.deleteIfExists(r.file().getParent());
+                Files.deleteIfExists(PathParts.parent(r.file()));
             } catch (IOException ignored) {
                 // left in the cache folder
             }
@@ -105,7 +110,7 @@ final class MessageSender {
     }
 
     /** Sends {@code item}; when the chat refuses its format (a GIF on WhatsApp) a converted copy is uploaded first. */
-    CompletableFuture<Void> sendStickerFor(String chatId, MediaLibrary.Item item, RoomFeatures features, String replyToId) {
+    CompletableFuture<Void> sendStickerFor(String chatId, MediaLibrary.Item item, RoomFeatures features, @Nullable String replyToId) {
         Chat c = core.chat(chatId);
         return sendStickerEvent(chatId, item, features, c != null && needsCopy(item.url()), replyToId);
     }
@@ -129,13 +134,13 @@ final class MessageSender {
      * always goes as a copy on our server, whatever the chat: no guessing which bridge reads what. A network's own sticker
      * is still known by its {@code fi.mau.bridged_sticker} mark, not by its address.
      */
-    static boolean needsCopy(String url) {
+    static boolean needsCopy(@Nullable String url) {
         Mxc mxc = Mxc.parse(url);
         return mxc != null && BridgePorts.directMediaBase(mxc.server()) != null;
     }
 
     /** {@code copy}: uploads the file to our server first, whatever the chat accepts ({@link #needsCopy}). */
-    CompletableFuture<Void> sendStickerEvent(String chatId, MediaLibrary.Item item, RoomFeatures features, boolean copy, String replyToId) {
+    CompletableFuture<Void> sendStickerEvent(String chatId, MediaLibrary.Item item, RoomFeatures features, boolean copy, @Nullable String replyToId) {
         String txn = core.newTxnId();
         ObjectNode content = MatrixClient.JSON.createObjectNode();
         addReply(content, replyToId);
@@ -164,7 +169,7 @@ final class MessageSender {
         // Whether it may change (NetworkFormats decides with the file, once downloaded); a copy goes up anyway.
         String may = network == null ? NetworkFormats.byFeatures(mimeType, features) : NetworkFormats.sticker(network, mimeType, null, own, features);
         if (may == null && !copy) return sendEvent(chatId, "m.sticker", txn, content);
-        return media.media(item.url(), 0, 0).thenApplyAsync(src -> {
+        return sendWhenPrepared(chatId, txn, "m.sticker", "Sticker conversion", media.media(item.url(), 0, 0).thenApplyAsync(src -> {
             try {
                 Path dir = Settings.get().cacheDir().resolve("stickers");
                 StickerConverter.Result r = StickerConverter.forChat(src, mimeType, network, own, features, dir);
@@ -177,19 +182,26 @@ final class MessageSender {
                     info.put("size", Files.size(r.file()));
                     Files.deleteIfExists(r.file());
                 }
-                info.remove(java.util.List.of("thumbnail_url", "thumbnail_info")); // on the same bridge as the sticker
+                info.remove(List.of("thumbnail_url", "thumbnail_info")); // on the same bridge as the sticker
                 if (!own) info.remove("fi.mau.bridged_sticker"); // no longer that network's own sticker
                 info.set(MediaLibrary.ORIGINAL, MediaLibrary.json(item)); // seen back, it's still this sticker
                 return content;
             } catch (IOException e) {
                 throw new CompletionException(e);
             }
-        }, core.io).handle((c, err) -> sendPrepared(chatId, txn, "m.sticker", c, err, "Sticker conversion")).thenCompose(f -> f);
+        }, core.io));
+    }
+
+    /** Sends what {@code prepared} makes once it's ready, or fails the echo saying why ({@link #sendPrepared}). */
+    @SuppressWarnings("FutureReturnValueIgnored") // handle's result holds the send's future only until thenCompose unwraps it
+    private CompletableFuture<Void> sendWhenPrepared(String chatId, String txn, String type, String what, CompletableFuture<ObjectNode> prepared) {
+        return prepared.handle((c, err) -> sendPrepared(chatId, txn, type, c, err, what)).thenCompose(f -> f);
     }
 
     /** {@code content} once its file is ready, or the echo failed with why, for the log. */
-    private CompletableFuture<Void> sendPrepared(String chatId, String txn, String type, ObjectNode content, Throwable err, String what) {
-        if (err == null) return sendEvent(chatId, type, txn, content);
+    private CompletableFuture<Void> sendPrepared(String chatId, String txn, String type, @Nullable ObjectNode content,
+                                                 @Nullable Throwable err, String what) {
+        if (err == null) return sendEvent(chatId, type, txn, Objects.requireNonNull(content, "handle gives the content when there's no error"));
         Throwable root = err instanceof CompletionException && err.getCause() != null ? err.getCause() : err;
         System.err.println(what + " failed: " + root.getClass().getSimpleName() + ": " + root.getMessage());
         synchronized (proc) {
@@ -205,18 +217,20 @@ final class MessageSender {
      */
     CompletableFuture<Void> forward(String chatId, Message m, boolean gifs) {
         // Only a media address goes on: a stranger's message may name any other (a file: one, a web page).
-        if (m.isMedia() && Mxc.parse(m.mediaUrl()) == null) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
+        String url = m.mediaUrl();
+        if (m.isMedia() && Mxc.parse(url) == null) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
         if (m.type() == MessageType.STICKER) {
             JsonNode info = m.mediaInfo();
             if (!m.outgoing() && info instanceof ObjectNode o && o.has(MediaLibrary.ORIGINAL)) {
                 info = o.deepCopy().without(MediaLibrary.ORIGINAL); // a stranger's mark would be trusted once it's mine
             }
-            MediaLibrary.Item item = new MediaLibrary.Item(MediaLibrary.Kind.STICKER, m.mediaUrl(), m.mimeType(), m.width(), m.height(), info);
+            MediaLibrary.Item item = new MediaLibrary.Item(MediaLibrary.Kind.STICKER,
+                    Objects.requireNonNull(url, "a sticker is media, and its address was checked above"), m.mimeType(), m.width(), m.height(), info);
             return sendSticker(chatId, m.outgoing() ? MediaLibrary.original(item) : item, null);
         }
         Chat chat = core.chat(chatId);
         boolean gif = gifs && chat != null && !NetworkFormats.of(chat.network()).gifVideosAsIs() && app.unichat.video.GifVideos.fits(m);
-        boolean copy = m.isMedia() && (gif || needsCopy(m.mediaUrl()));
+        boolean copy = m.isMedia() && (gif || needsCopy(url));
         ObjectNode content = ForwardedContent.of(m, copy);
         keepVoice(content, m, chat);
         String txn = core.newTxnId();
@@ -225,7 +239,8 @@ final class MessageSender {
         }
         fireLocal(chatId);
         if (!copy) return sendEvent(chatId, "m.room.message", txn, content);
-        return media.media(m.mediaUrl(), 0, 0).thenApplyAsync(src -> {
+        String copied = Objects.requireNonNull(url, "only media is copied, and its address was checked above");
+        return sendWhenPrepared(chatId, txn, "m.room.message", "Forward", media.media(copied, 0, 0).thenApplyAsync(src -> {
             try {
                 // An animated WebP, as small as it takes to fit (Discord: 10 MB without Nitro), else the video, which still plays.
                 Path file = gif ? app.unichat.video.GifVideos.webpUnder(src, app.unichat.video.GifVideos.maxBytes()) : src;
@@ -233,30 +248,31 @@ final class MessageSender {
                     ForwardedContent.becomeWebp(content, Files.size(file));
                     content.put("url", client.upload(file, StickerConverter.WEBP, content.path("filename").asText("gif.webp")));
                 } else {
-                    content.put("url", client.upload(src, m.mimeType() != null ? m.mimeType() : "application/octet-stream", ForwardedContent.fileName(m)));
+                    String mime = m.mimeType();
+                    content.put("url", client.upload(src, mime != null ? mime : "application/octet-stream", ForwardedContent.fileName(m)));
                 }
                 return content;
             } catch (IOException e) {
                 throw new CompletionException(e);
             }
-        }, core.io).handle((c, err) -> sendPrepared(chatId, txn, "m.room.message", c, err, "Forward")).thenCompose(f -> f);
+        }, core.io));
+    }
+
+    /**
+     * The marks in {@code text} (*bold*, _italic_… {@link Markup}) as HTML, which each bridge writes its network's way;
+     * the body keeps them as written. Returns the HTML, or null when there are none (plain text, as always).
+     */
+    private static @Nullable String formatted(ObjectNode content, String text) {
+        String html = Markup.html(text);
+        if (html != null) content.put("format", "org.matrix.custom.html").put("formatted_body", html);
+        return html;
     }
 
     /**
      * Adds m.relates_to. No "> quote" in the body: Matrix dropped that fallback (v1.13) and bridges pass the body on as
      * it is, so the network would show the quote, Matrix ids included, under the real reply.
      */
-    /**
-     * The marks in {@code text} (*bold*, _italic_… {@link Markup}) as HTML, which each bridge writes its network's way;
-     * the body keeps them as written. Returns the HTML, or null when there are none (plain text, as always).
-     */
-    private static String formatted(ObjectNode content, String text) {
-        String html = Markup.html(text);
-        if (html != null) content.put("format", "org.matrix.custom.html").put("formatted_body", html);
-        return html;
-    }
-
-    private static void addReply(ObjectNode content, String replyToId) {
+    private static void addReply(ObjectNode content, @Nullable String replyToId) {
         if (replyToId == null || replyToId.startsWith(SyncProcessor.LOCAL_PREFIX)) return;
         content.putObject("m.relates_to").putObject("m.in_reply_to").put("event_id", replyToId);
     }
@@ -266,7 +282,7 @@ final class MessageSender {
     }
 
     /** As {@link #sendEvent}, giving the event's id. */
-    private CompletableFuture<String> sendEventId(String chatId, String type, String txn, ObjectNode content) {
+    private CompletableFuture<@Nullable String> sendEventId(String chatId, String type, String txn, ObjectNode content) {
         return CompletableFuture.supplyAsync(() -> {
             readOnReply(chatId);
             try {
@@ -291,16 +307,13 @@ final class MessageSender {
     /** What was sent lately, by its event id: sent again when a bridge refused it only because it wasn't connected yet. */
     private record Sent(String chatId, String type, ObjectNode content, int tries) {}
 
-    private static final int REMEMBERED = 200, MOST_TRIES = 3;
-    private final Map<String, Sent> recent = java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>(16, 0.75f, false) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String, Sent> eldest) {
-            return size() > REMEMBERED;
-        }
-    });
+    private static final int REMEMBERED = 200;
+    private static final int MOST_TRIES = 3;
+    private final Map<String, Sent> recent = java.util.Collections.synchronizedMap(BoundedMap.byAge(REMEMBERED));
     /** Seconds before each try again: a bridge that restarts with Unichat connects within seconds. Tests pass zeros. */
     private long[] retrySeconds = {15, 30, 60};
 
-    void retrySeconds(long... seconds) { this.retrySeconds = seconds; }
+    void retrySeconds(long... seconds) { this.retrySeconds = seconds.clone(); }
 
     /**
      * {@code eventId}, refused by its bridge only because it wasn't connected yet (a sticker sent as Unichat restarted
@@ -357,9 +370,9 @@ final class MessageSender {
      * makes a picture one the network shows as a photo first, MOVING a video or GIF an animated WebP picture
      * ({@link OutgoingPhotos}).
      */
-    CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, SendAs as, DoubleConsumer progress) {
+    CompletableFuture<Void> sendFile(String chatId, Path file, @Nullable String replyToId, SendAs as, DoubleConsumer progress) {
         String mime = MimeTypes.of(file);
-        CompletableFuture<String> sent = as == SendAs.MOVING
+        CompletableFuture<@Nullable String> sent = as == SendAs.MOVING
                 ? CompletableFuture.supplyAsync(() -> moving(file), core.io).thenCompose(p ->
                         sendMedia(chatId, p.file(), replyToId, new Kind(p.mime(), p.width(), p.height(), 0, false, progress), content -> { }))
                 : as == SendAs.PHOTO && SendablePhotos.convertible(mime)
@@ -367,7 +380,7 @@ final class MessageSender {
                         sendMedia(chatId, p.file(), replyToId, new Kind(p.mime(), p.width(), p.height(), 0, false, progress), content -> { }))
                 : sendMedia(chatId, file, replyToId, new Kind(mime, 0, 0, 0, as == SendAs.DOCUMENT, progress), content -> { });
         Chat c = core.chat(chatId);
-        if (c == null || c.network() == app.unichat.model.Network.MATRIX) return sent.thenApply(id -> null);
+        if (c == null || c.network() == Network.MATRIX) return sent.thenApply(id -> null);
         // Bridged: done when the network has it (a batch sends the next file only then), or failed if it refused it.
         return sent.thenCompose(id -> id == null ? CompletableFuture.completedFuture(null) : core.statuses.await(id, NETWORK_PATIENCE));
     }
@@ -376,10 +389,10 @@ final class MessageSender {
         try {
             return OutgoingPhotos.moving(file);
         } catch (IOException e) {
-            throw new java.util.concurrent.CompletionException(e);
+            throw new CompletionException(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new java.util.concurrent.CompletionException(e);
+            throw new CompletionException(e);
         }
     }
 
@@ -391,7 +404,7 @@ final class MessageSender {
      * an MP4 (a provider's, a favourite from Telegram or WhatsApp) goes where the bridge would show a video (Discord) as
      * the animated WebP a forward makes ({@code video/GifVideos}), else as it is.
      */
-    CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, String replyToId) {
+    CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, @Nullable String replyToId) {
         Chat chat = core.chat(chatId);
         boolean video = mime != null && mime.startsWith("video/");
         if (!video || chat == null || NetworkFormats.of(chat.network()).gifVideosAsIs()) {
@@ -406,12 +419,12 @@ final class MessageSender {
      * As a voice note where the chat has them: the flag and the waveform are what make a network show a player instead
      * of a file.
      */
-    CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) {
+    CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, @Nullable String replyToId) {
         Chat c = core.chat(chatId);
         RoomFeatures.VoiceSend how = (c == null ? RoomFeatures.UNKNOWN : c.features()).voiceSend();
         if (how == null) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("send.noVoice")));
         return sendMedia(chatId, note.file(), replyToId, new Kind(how.mime(), 0, 0, note.durationMs(), false, p -> { }), content -> {
-            content.with("info").put("duration", note.durationMs());
+            content.withObjectProperty("info").put("duration", note.durationMs());
             if (how.voice()) markVoice(content, note.durationMs(), note.waveform());
         }).thenApply(id -> null);
     }
@@ -429,18 +442,20 @@ final class MessageSender {
      * A forwarded voice note goes as one where the chat has them: Telegram's bridge takes Ogg only as a voice note, and
      * refused it as a plain audio file.
      */
-    private static void keepVoice(ObjectNode content, Message m, Chat chat) {
-        if (m.voiceWaveform() == null) return;
+    private static void keepVoice(ObjectNode content, Message m, @Nullable Chat chat) {
+        List<Integer> waveform = m.voiceWaveform();
+        if (waveform == null) return;
         RoomFeatures.VoiceSend how = (chat == null ? RoomFeatures.UNKNOWN : chat.features()).voiceSend();
         if (how == null || !how.voice()) return;
-        if (m.mimeType() != null && m.mimeType().startsWith("audio/ogg")) content.with("info").put("mimetype", how.mime());
-        markVoice(content, m.durationMs(), m.voiceWaveform());
+        String mime = m.mimeType();
+        if (mime != null && mime.startsWith("audio/ogg")) content.withObjectProperty("info").put("mimetype", how.mime());
+        markVoice(content, m.durationMs(), waveform);
     }
 
-    private CompletableFuture<Void> sendMedia(String chatId, Path file, String replyToId, String mime, int width, int height,
+    private CompletableFuture<Void> sendMedia(String chatId, Path file, @Nullable String replyToId, String mime, int width, int height,
                                               boolean gif) {
         return sendMedia(chatId, file, replyToId, new Kind(mime, width, height, 0, false, p -> { }), content -> {
-            if (gif) content.with("info").put("fi.mau.gif", true);
+            if (gif) content.withObjectProperty("info").put("fi.mau.gif", true);
         }).thenApply(id -> null);
     }
 
@@ -451,14 +466,16 @@ final class MessageSender {
         }
     }
 
-    /** @param extra adds what's particular to this kind of media to the event's content */
-    /** @return the event's id once our server has it */
-    private CompletableFuture<String> sendMedia(String chatId, Path file, String replyToId, Kind kind,
+    /**
+     * @param extra adds what's particular to this kind of media to the event's content
+     * @return the event's id once our server has it
+     */
+    private CompletableFuture<@Nullable String> sendMedia(String chatId, Path file, @Nullable String replyToId, Kind kind,
                                                 java.util.function.Consumer<ObjectNode> extra) {
         String mime = kind.mime();
         long durationMs = kind.durationMs();
         String txn = core.newTxnId();
-        String name = file.getFileName().toString();
+        String name = PathParts.name(file);
         MessageType type = kind.type();
         long size;
         try {

@@ -1,5 +1,7 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -46,7 +48,8 @@ class VaultSlotTest {
 
     @Test
     void passwordParamsCarryAFreshSalt() {
-        ObjectNode a = VaultSlot.newPasswordParams(), b = VaultSlot.newPasswordParams();
+        ObjectNode a = VaultSlot.newPasswordParams();
+        ObjectNode b = VaultSlot.newPasswordParams();
         assertEquals("argon2id", a.get("kdf").asText());
         assertEquals(65536, a.get("m").asInt());
         assertEquals(3, a.get("t").asInt());
@@ -59,7 +62,7 @@ class VaultSlotTest {
     void aSlotSurvivesItsJson() throws Exception {
         byte[] key = VaultCrypto.randomKey();
         VaultSlot slot = VaultSlot.wrap(VAULT, VaultSlot.Method.PASSWORD, "pw", 7, key, VaultSlot.newPasswordParams(), vk);
-        VaultSlot back = VaultSlot.parse(slot.toJson());
+        VaultSlot back = Present.of(VaultSlot.parse(slot.toJson()));
         assertEquals(slot.id(), back.id());
         assertEquals(VAULT, back.vault());
         assertEquals(VaultSlot.Method.PASSWORD, back.method());
@@ -120,12 +123,13 @@ class VaultSlotTest {
     }
 
     @Test
+    @SuppressWarnings("NullAway") // a missing label, params or vault on purpose: the slot refuses them
     void generationLabelAndParamsMustBeSane() {
         VaultSlot slot = VaultSlot.wrap(VAULT, VaultSlot.Method.COMPUTER, "x", 1, VaultCrypto.randomKey(), empty(), vk);
         String json = new String(slot.toJson(), StandardCharsets.UTF_8);
         for (String bad : new String[] {"\"generation\":1", "\"generation\":-1", "\"generation\":1.5", "\"generation\":1e30", "\"generation\":99999999999999999999"}) {
             String changed = json.replace("\"generation\":1", bad.equals("\"generation\":1") ? "\"generation\":1" : bad);
-            if (bad.equals("\"generation\":1")) assertEquals(1, VaultSlot.parse(changed.getBytes(StandardCharsets.UTF_8)).generation());
+            if (bad.equals("\"generation\":1")) assertEquals(1, Present.of(VaultSlot.parse(changed.getBytes(StandardCharsets.UTF_8))).generation());
             else assertNull(VaultSlot.parse(changed.getBytes(StandardCharsets.UTF_8)), bad);
         }
         assertNull(VaultSlot.parse(json.replace("\"label\":\"x\"", "\"label\":null").getBytes(StandardCharsets.UTF_8)));

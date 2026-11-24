@@ -25,14 +25,17 @@ final class HookInput {
         var m = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*\"").matcher(json);
         if (!m.find()) return null;
         var out = new StringBuilder();
-        for (int i = m.end(); i < json.length(); i++) {
+        int i = m.end();
+        while (i < json.length()) {
             char c = json.charAt(i);
             if (c == '"') return out.toString();
             if (c != '\\' || i + 1 >= json.length()) {
                 out.append(c);
+                i++;
                 continue;
             }
-            char e = json.charAt(++i);
+            i++; // past the backslash
+            char e = json.charAt(i);
             switch (e) {
                 case 'n' -> out.append('\n');
                 case 't' -> out.append('\t');
@@ -45,6 +48,7 @@ final class HookInput {
                 }
                 default -> out.append(e);
             }
+            i++;
         }
         return null;
     }

@@ -30,6 +30,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,10 +48,10 @@ public final class StickerGrid extends ScrollPane {
     /** The most a search shows (each tile loads its picture): a few screens; more words narrow it. */
     static final int MOST_FOUND = 60;
 
-    private final Supplier<String> takeReply;
+    private final Supplier<@Nullable String> takeReply;
     private final ChatService svc;
     private final MediaLibrary library;
-    private final Supplier<Chat> chat;
+    private final Supplier<@Nullable Chat> chat;
     private final Consumer<String> toast;
     private final VBox content = new VBox(10);
     private final TileCache tiles = new TileCache();
@@ -62,7 +63,7 @@ public final class StickerGrid extends ScrollPane {
     /** On top, kept across redraws (the focus stays in it while typing): a word or an emoji finds stickers. */
     private final TextField search = new TextField();
     private final Node searchBox;
-    private EmojiSearch names;
+    private @Nullable EmojiSearch names;
     /** Runs at each redraw (a set arrived, a favourite changed): the suggestions follow. */
     private Runnable refreshed = () -> { };
 
@@ -70,7 +71,7 @@ public final class StickerGrid extends ScrollPane {
         refreshed = r;
     }
 
-    public StickerGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Supplier<String> takeReply, Consumer<String> toast) {
+    public StickerGrid(ChatService svc, MediaLibrary library, Supplier<@Nullable Chat> chat, Supplier<@Nullable String> takeReply, Consumer<String> toast) {
         this.takeReply = takeReply;
         this.svc = svc;
         this.library = library;
@@ -87,7 +88,7 @@ public final class StickerGrid extends ScrollPane {
     }
 
     /** The look of a media tab; a favourite added or removed anywhere (chat, Favoritos tab) shows on it at once. */
-    static void setUp(javafx.scene.control.ScrollPane pane, javafx.scene.layout.Region content, MediaLibrary library, Runnable refresh) {
+    static void setUp(ScrollPane pane, Region content, MediaLibrary library, Runnable refresh) {
         content.getStyleClass().add("sticker-grid");
         pane.setContent(content);
         pane.setFitToWidth(true);
@@ -109,7 +110,8 @@ public final class StickerGrid extends ScrollPane {
             found(search.getText(), accepted);
             return;
         }
-        String favorite = I18n.t("library.stickerFavorite"), recent = I18n.t("library.stickerRecent");
+        String favorite = I18n.t("library.stickerFavorite");
+        String recent = I18n.t("library.stickerRecent");
         section(I18n.t("library.favorites"), library.favorites(MediaLibrary.Kind.STICKER), i -> favorite, accepted,
                 Icons.iconButton(Icons.REPLAY, I18n.t("library.rebuildFavorites"), () -> rebuild(false)));
         section(I18n.t("library.recents"), library.recents(MediaLibrary.Kind.STICKER), i -> recent, accepted, null);
@@ -156,8 +158,12 @@ public final class StickerGrid extends ScrollPane {
     }
 
     private EmojiSearch names() {
-        if (names == null) names = EmojiSearch.forLanguage(I18n.locale().getLanguage());
-        return names;
+        EmojiSearch n = names;
+        if (n == null) {
+            n = EmojiSearch.forLanguage(I18n.locale().getLanguage());
+            names = n;
+        }
+        return n;
     }
 
     /** Every emoji, in the picker's order. */
@@ -177,7 +183,7 @@ public final class StickerGrid extends ScrollPane {
         if (max > 0) setVvalue(Math.min(1, n.getBoundsInParent().getMinY() / max));
     }
 
-    private void section(String title, List<MediaLibrary.Item> items, Function<MediaLibrary.Item, String> what, boolean accepted, Node action) {
+    private void section(String title, List<MediaLibrary.Item> items, Function<MediaLibrary.Item, String> what, boolean accepted, @Nullable Node action) {
         if (items.isEmpty()) return;
         Label t = new Label(title);
         t.getStyleClass().add("emoji-category");
@@ -213,7 +219,7 @@ public final class StickerGrid extends ScrollPane {
         if (rebuilding) return;
         rebuilding = true;
         if (!once) toast.accept(I18n.t("library.rebuilding"));
-        FavoriteRefresh.run(svc, library).whenComplete((r, err) -> Platform.runLater(() -> {
+        var _ = FavoriteRefresh.run(svc, library).whenComplete((r, err) -> Platform.runLater(() -> {
             rebuilding = false;
             if (r == null) {
                 notBefore = System.currentTimeMillis() + RETRY_MS;
@@ -263,7 +269,7 @@ public final class StickerGrid extends ScrollPane {
             return;
         }
         Runnable after = afterSent.get(); // asked now: what the box holds at the click
-        svc.sendSticker(c.id(), item, takeReply.get()).whenComplete((v, err) -> Platform.runLater(() -> {
+        var _ = svc.sendSticker(c.id(), item, takeReply.get()).whenComplete((v, err) -> Platform.runLater(() -> {
             if (err != null) {
                 toast.accept(I18n.t("sticker.sendFailed"));
                 return;

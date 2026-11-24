@@ -2,8 +2,10 @@ package app.unichat.cloud;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +20,8 @@ final class FakeDav implements AutoCloseable {
     final Map<String, byte[]> files = new ConcurrentHashMap<>();
     final Set<String> dirs = ConcurrentHashMap.newKeySet();
     final Map<String, Integer> versions = new ConcurrentHashMap<>();
-    final AtomicInteger gets = new AtomicInteger(), puts = new AtomicInteger();
+    final AtomicInteger gets = new AtomicInteger();
+    final AtomicInteger puts = new AtomicInteger();
     /** Whether a listing gives whole addresses ("https://host/dav/…", as some servers do) rather than paths. */
     volatile boolean wholeHrefs;
     /** Paths whose next PUT fails (the network dropped), once each. */
@@ -63,7 +66,7 @@ final class FakeDav implements AutoCloseable {
 
     FakeDav(String user, String secret) throws IOException {
         auth = "Basic " + Base64.getEncoder().encodeToString((user + ":" + secret).getBytes(StandardCharsets.UTF_8));
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", this::handle);
         server.setExecutor(pool); // a request held never holds the others: as a real server, many at once
         server.start();
@@ -116,6 +119,7 @@ final class FakeDav implements AutoCloseable {
         x.sendResponseHeaders(201, -1);
     }
 
+    @SuppressFBWarnings(value = "POTENTIAL_XML_INJECTION", justification = "a fake server's page built from the test's own names")
     private void handle(HttpExchange x) throws IOException {
         try (x) {
             if (!auth.equals(x.getRequestHeaders().getFirst("Authorization"))) {
@@ -233,8 +237,8 @@ final class FakeDav implements AutoCloseable {
     }
 
     /** The names right in {@code dir}, as a server says them: each once. */
-    private java.util.Set<String> children(String dir) {
-        java.util.Set<String> out = new java.util.TreeSet<>();
+    private Set<String> children(String dir) {
+        Set<String> out = new java.util.TreeSet<>();
         for (String p : files.keySet()) if (p.startsWith(dir + "/")) out.add(p.substring(dir.length() + 1).split("/")[0]);
         for (String p : dirs) if (p.startsWith(dir + "/")) out.add(p.substring(dir.length() + 1).split("/")[0]);
         return out;

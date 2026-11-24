@@ -11,7 +11,6 @@ import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 
 import java.util.function.Supplier;
 
@@ -40,7 +39,7 @@ final class AudioControls extends HBox {
         position.setAccessibleText(I18n.t("audio.position"));
         position.setBlockIncrement(0.05);
         position.setMinWidth(60);
-        HBox.setHgrow(position, Priority.ALWAYS);
+        setHgrow(position, Priority.ALWAYS);
         position.valueProperty().addListener((o, a, v) -> {
             if (!updating && !position.isValueChanging()) playback.seek(v.doubleValue());
         });
@@ -48,7 +47,7 @@ final class AudioControls extends HBox {
             if (!moving && !updating) playback.seek(position.getValue());
         });
         time.getStyleClass().add("audio-time");
-        time.setMinWidth(Region.USE_PREF_SIZE);
+        time.setMinWidth(USE_PREF_SIZE);
         getChildren().addAll(toggle, position, time);
         sceneProperty().addListener((o, a, scene) -> {
             playback.removeListener(onChange);
@@ -83,7 +82,7 @@ final class AudioControls extends HBox {
         position.setDisable(!mine);
         double total = mine ? playback.duration() : m == null ? 0 : m.durationMs() / 1000.0;
         double now = mine ? playback.position() : 0;
-        updating = true;
+        updating = true; // NOPMD: UnusedAssignment, read by the listeners the change below fires
         if (!position.isValueChanging()) position.setValue(total > 0 ? Math.min(1, now / total) : 0);
         updating = false;
         // A length nobody reported isn't 0:00: that reads as an empty audio.

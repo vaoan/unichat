@@ -2,7 +2,10 @@ package app.unichat.ui.media;
 
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import java.io.IOException;
+import java.net.URISyntaxException;
 import org.junit.jupiter.api.Test;
+import app.unichat.Present;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
@@ -16,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Animated WebP stickers (WhatsApp) must keep all their frames instead of a static thumbnail. */
 class AnimatedImageTest {
-    private static Path fixture() throws Exception {
+    private static Path fixture() throws URISyntaxException {
         // 48x40, 4 frames at 4 fps, generated with ffmpeg's libwebp_anim (testsrc pattern).
         return Path.of(AnimatedImageTest.class.getResource("/app/unichat/ui/anim.webp").toURI());
     }
@@ -35,7 +38,8 @@ class AnimatedImageTest {
         assertTrue(AnimatedImage.isWebp(fixture()));
         AnimatedImage.RawFrames frames = AnimatedImage.composeWebp(fixture(), 24, 24);
         assertEquals(4, frames.images().size(), "all frames, not a static first frame");
-        BufferedImage a = frames.images().get(0), b = frames.images().get(1);
+        BufferedImage a = frames.images().get(0);
+        BufferedImage b = frames.images().get(1);
         assertTrue(a.getWidth() <= 24 && a.getHeight() <= 24, "scaled down: " + a.getWidth() + "x" + a.getHeight());
         assertEquals(a.getWidth(), b.getWidth(), "frames share the canvas size");
         assertFalse(same(a, b), "frames differ: the sticker moves");
@@ -107,7 +111,7 @@ class AnimatedImageTest {
     }
 
     /** A {@code frames}-frame 20x20 GIF. */
-    private static void writeGif(Path out, int frames) throws Exception {
+    private static void writeGif(Path out, int frames) throws IOException {
         app.unichat.TestPictures.gif(out, 20, 20, frames);
     }
 
@@ -134,7 +138,7 @@ class AnimatedImageTest {
             Files.copy(in, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
         AnimatedImage.RawFrames raw = AnimatedImage.composeWebp(f, 96, 96);
-        List<java.awt.image.BufferedImage> libwebp = app.unichat.video.AnimDump.frames(f);
+        List<BufferedImage> libwebp = Present.of(app.unichat.video.AnimDump.frames(f));
         assertEquals(libwebp.size(), raw.images().size());
         for (int i = 0; i < libwebp.size(); i++) {
             assertEquals(libwebp.get(i).getRGB(40, 32), raw.images().get(i).getRGB(40, 32), "frame " + i + " as libwebp has it");
@@ -151,8 +155,8 @@ class AnimatedImageTest {
         org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.video.AnimDump.find() != null, "no anim_dump");
         Path still = Path.of(AnimatedImageTest.class.getResource("/app/unichat/ui/still.webp").toURI());
         AnimatedImage.WebpOpener failing = file -> new AnimatedImage.WebpReader() {
-            @Override public java.awt.image.BufferedImage read(int i) throws java.io.IOException { throw new java.io.EOFException(); }
-            @Override public void close() { }
+            @Override public BufferedImage read(int i) throws IOException { throw new java.io.EOFException(); }
+            @Override public void close() { /* the fake ignores it */ }
         };
         AnimatedImage.RawFrames frames = AnimatedImage.composeWebp(still, 64, 64, failing);
         assertEquals(1, frames.images().size(), "libwebp read it");

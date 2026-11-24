@@ -1,5 +1,6 @@
 package app.unichat.service;
 
+import app.unichat.Present;
 import app.unichat.model.Chat;
 import org.junit.jupiter.api.Test;
 
@@ -16,34 +17,36 @@ class QuietRuleTest {
     void mutingAChatArchivesItAndUnarchivingUnmutesIt() throws Exception {
         MockChatService svc = new MockChatService();
         svc.setMuted("!mom:demo", true).get();
-        assertTrue(svc.chat("!mom:demo").archived());
+        assertTrue(Present.of(svc.chat("!mom:demo")).archived());
         svc.setArchived("!mom:demo", false).get();
-        assertFalse(svc.chat("!mom:demo").muted(), "back in the inbox, it notifies again");
+        assertFalse(Present.of(svc.chat("!mom:demo")).muted(), "back in the inbox, it notifies again");
         svc.setArchived("!mom:demo", true).get();
-        assertTrue(svc.chat("!mom:demo").muted(), "archived = silenced for good");
+        assertTrue(Present.of(svc.chat("!mom:demo")).muted(), "archived = silenced for good");
         svc.setMuted("!mom:demo", false).get();
-        assertFalse(svc.chat("!mom:demo").archived());
+        assertFalse(Present.of(svc.chat("!mom:demo")).archived());
     }
 
     @Test
     void archivingAServerSilencesItsChannelsButMutingAChannelLeavesTheServer() throws Exception {
         MockChatService svc = new MockChatService();
         svc.setMuted("!srv-memes:demo", true).get();
-        assertTrue(svc.chat("!srv-memes:demo").archived());
-        assertFalse(svc.chat("!server:demo").archived(), "one quiet channel doesn't hide its server");
+        assertTrue(Present.of(svc.chat("!srv-memes:demo")).archived());
+        assertFalse(Present.of(svc.chat("!server:demo")).archived(), "one quiet channel doesn't hide its server");
 
         svc.setArchived("!server:demo", true).get();
         for (String id : List.of("!server:demo", "!srv-general:demo", "!srv-memes:demo")) {
-            assertTrue(svc.chat(id).archived() && svc.chat(id).muted(), id);
+            assertTrue(Present.of(svc.chat(id)).archived() && Present.of(svc.chat(id)).muted(), id);
         }
         svc.setArchived("!server:demo", false).get();
-        assertFalse(svc.chat("!srv-general:demo").muted());
-        assertFalse(svc.chat("!srv-general:demo").archived());
+        assertFalse(Present.of(svc.chat("!srv-general:demo")).muted());
+        assertFalse(Present.of(svc.chat("!srv-general:demo")).archived());
     }
 
     @Test
     void chatsMutedElsewhereAreTheOnesToArchive() throws Exception {
-        Chat a = new Chat("!a"), b = new Chat("!b"), c = new Chat("!c");
+        Chat a = new Chat("!a");
+        Chat b = new Chat("!b");
+        Chat c = new Chat("!c");
         a.setMuted(true);
         b.setMuted(true);
         b.setArchived(true);
@@ -54,8 +57,11 @@ class QuietRuleTest {
 
     @Test
     void aChannelArrivingInAnArchivedServerGoesQuietToo() throws Exception {
-        Chat server = new Chat("!srv"), category = new Chat("!cat"), old = new Chat("!old"), fresh = new Chat("!new"),
-                elsewhere = new Chat("!dm");
+        Chat server = new Chat("!srv");
+        Chat category = new Chat("!cat");
+        Chat old = new Chat("!old");
+        Chat fresh = new Chat("!new");
+        Chat elsewhere = new Chat("!dm");
         server.setSpace(true);
         server.setArchived(true);
         server.setSpaceChildren(List.of("!cat"));

@@ -13,8 +13,10 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.DoubleConsumer;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -76,7 +78,9 @@ class CloakJobTest {
      */
     @Test
     void anOldJobStoppingLateDoesntWriteOverTheNewOne() throws Exception {
-        CountDownLatch firstInstalling = new CountDownLatch(1), letFirstGo = new CountDownLatch(1), firstReported = new CountDownLatch(1);
+        CountDownLatch firstInstalling = new CountDownLatch(1);
+        CountDownLatch letFirstGo = new CountDownLatch(1);
+        CountDownLatch firstReported = new CountDownLatch(1);
         CountDownLatch secondInstalling = new CountDownLatch(1);
         java.util.concurrent.atomic.AtomicInteger installs = new java.util.concurrent.atomic.AtomicInteger();
         AtomicReference<Path> sent = new AtomicReference<>();
@@ -164,14 +168,14 @@ class CloakJobTest {
         running.await();
         t.interrupt();
         t.join(); // lesson-ok: test-future-join (a thread)
-        assertTrue(ended.get() instanceof InterruptedException, String.valueOf(ended.get()));
+        assertInstanceOf(InterruptedException.class, ended.get(), String.valueOf(ended.get()));
     }
 
     /**
      * Installs at once and protects in a few steps; or, with {@code going}, reports half and blocks until stopped,
      * counting {@code stopped} down when it is.
      */
-    private static CloakJob.Runner fake(CountDownLatch going, CountDownLatch stopped, IOException failure) {
+    private static CloakJob.Runner fake(@Nullable CountDownLatch going, @Nullable CountDownLatch stopped, @Nullable IOException failure) {
         return new CloakJob.Runner() {
             @Override
             public void install(CloakTool.Progress progress) {
@@ -188,7 +192,7 @@ class CloakJobTest {
                     try {
                         new CountDownLatch(1).await();
                     } finally {
-                        stopped.countDown();
+                        if (stopped != null) stopped.countDown();
                     }
                 }
                 progress.accept(1);

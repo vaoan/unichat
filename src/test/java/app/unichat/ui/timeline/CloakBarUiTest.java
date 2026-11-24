@@ -3,6 +3,7 @@ package app.unichat.ui.timeline;
 import app.unichat.ui.FxWait;
 import app.unichat.cloak.CloakJob;
 import app.unichat.cloak.CloakLevel;
+import java.lang.reflect.InvocationTargetException;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Node;
@@ -14,7 +15,6 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-import java.io.File;
 import java.lang.reflect.Proxy;
 import java.nio.file.Path;
 import java.util.List;
@@ -60,7 +60,7 @@ class CloakBarUiTest {
             String shot = System.getProperty("unichat.barShot");
             if (shot != null) {
                 var img = FxWait.fx(() -> bar.snapshot(null, null));
-                ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", new File(shot + (int) px + ".png"));
+                ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", Path.of(shot + (int) px + ".png").toFile());
             }
             for (Node n : FxWait.fx(() -> List.copyOf(bar.lookupAll(".label")))) {
                 Labeled l = (Labeled) n;
@@ -73,15 +73,15 @@ class CloakBarUiTest {
             // them (headless measures and draws alike, so the cut doesn't show here). The number keeps room after it.
             javafx.scene.control.Label percent = FxWait.fx(() -> (javafx.scene.control.Label) bar.lookup(".upload-percent"));
             assertTrue(FxWait.fx(() -> percent.snappedRightInset() >= 0.15 * percent.getFont().getSize()), "room after the number at " + px + "px");
-            FxWait.fx(() -> { bar.getScene().getWindow().hide(); return null; });
+            FxWait.onFx(() -> bar.getScene().getWindow().hide());
         }
         job.cancel();
     }
 
     /** A job whose protection reports 37 % and then waits to be cancelled; installing is instant. */
-    private static CloakJob runningJob() throws Exception {
+    private static CloakJob runningJob() throws ClassNotFoundException, InstantiationException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
         Class<?> runner = Class.forName("app.unichat.cloak.CloakJob$Runner");
-        Object fake = Proxy.newProxyInstance(runner.getClassLoader(), new Class<?>[] {runner}, (p, m, args) -> {
+        Object fake = Proxy.newProxyInstance(runner.getClassLoader(), new Class<?>[] {runner}, (p, m, args) -> { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
             if (m.getName().equals("protect")) {
                 ((DoubleConsumer) args[3]).accept(0.37);
                 new CountDownLatch(1).await(); // until cancelled (interrupted)
@@ -89,7 +89,7 @@ class CloakBarUiTest {
             return null;
         });
         var c = CloakJob.class.getDeclaredConstructor(runner);
-        c.setAccessible(true);
+        c.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
         return c.newInstance(fake);
     }
 }

@@ -9,6 +9,7 @@ import app.unichat.service.MockChatService;
 import app.unichat.ui.FxWait;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.scene.Node;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import app.unichat.Present;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -58,7 +60,9 @@ class StickerSearchUiTest {
     private final AtomicInteger fetched = new AtomicInteger();
     private final List<MediaLibrary.Item> sent = new CopyOnWriteArrayList<>();
     private MediaLibrary library;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private StickerGrid grid;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
 
     @BeforeAll
@@ -73,7 +77,7 @@ class StickerSearchUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private MediaLibrary.Item sticker(String name, String emoji) throws Exception {
+    private MediaLibrary.Item sticker(String name, String emoji) throws IOException {
         Path f = dir.resolve(name + ".png");
         ImageIO.write(new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB), "png", f.toFile());
         ObjectNode info = JsonNodeFactory.instance.objectNode();
@@ -91,12 +95,12 @@ class StickerSearchUiTest {
         MockChatService mock = new MockChatService();
         Chat chat = mock.chats().stream().filter(c -> c.features().accepts(RoomFeatures.STICKER)).findFirst().orElseThrow();
         ChatService svc = (ChatService) java.lang.reflect.Proxy.newProxyInstance(
-                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) {
+                getClass().getClassLoader(), new Class<?>[]{ChatService.class}, (p, m, args) -> switch (m.getName()) { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                     case "stickerPacks" -> CompletableFuture.completedFuture(List.of(
                             new StickerPack.Ref("Gatitos felices", GATITOS), new StickerPack.Ref("Perros", PERROS)));
                     case "stickerPack" -> {
                         fetched.incrementAndGet();
-                        yield answers.get((String) args[0]).get();
+                        yield Present.of(answers.get((String) args[0])).get();
                     }
                     case "sendSticker" -> {
                         sent.add((MediaLibrary.Item) args[1]);
@@ -106,33 +110,32 @@ class StickerSearchUiTest {
                 });
         library = new MediaLibrary(dir.resolve("lib.json"));
         library.toggleFavorite(sticker("favorito", "😂"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             grid = new StickerGrid(svc, library, () -> chat, () -> null, t -> { });
             stage = new Stage();
             stage.setOpacity(0);
             stage.setScene(new Scene(grid, 400, 600));
             stage.show();
             grid.refresh();
-            return null;
         });
     }
 
     @AfterEach
     void close() throws Exception {
-        FxWait.fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
-    private TextField search() throws Exception {
+    private TextField search() throws InterruptedException {
         return FxWait.fx(() -> (TextField) grid.lookup(".emoji-search"));
     }
 
-    private void type(String text) throws Exception {
-        FxWait.fx(() -> { search().setText(text); return null; });
+    private void type(String text) throws InterruptedException {
+        FxWait.onFx(() -> search().setText(text));
         FxWait.settled();
     }
 
     /** The texts and the stickers shown under the search, in order: a label's text, or "sticker:<file>". */
-    private List<String> shown() throws Exception {
+    private List<String> shown() throws InterruptedException {
         return FxWait.fx(() -> {
             List<String> out = new ArrayList<>();
             for (Node n : ((VBox) grid.getContent()).getChildren()) {
@@ -144,7 +147,7 @@ class StickerSearchUiTest {
         });
     }
 
-    private List<Node> tiles() throws Exception {
+    private List<Node> tiles() throws InterruptedException {
         return FxWait.fx(() -> {
             List<Node> out = new ArrayList<>();
             for (Node n : ((VBox) grid.getContent()).getChildren()) if (n instanceof FlowPane f) out.addAll(f.getChildren());
@@ -153,10 +156,9 @@ class StickerSearchUiTest {
     }
 
     /** Enter on a tile, as the keyboard sends one. */
-    private static void send(Node tile) throws Exception {
-        FxWait.fx(() -> {
+    private static void send(Node tile) throws InterruptedException {
+        FxWait.onFx(() -> {
             Event.fireEvent(tile, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
     }
 
@@ -189,7 +191,7 @@ class StickerSearchUiTest {
     @Test
     void setsAreBroughtOneAfterAnother() throws Exception {
         CompletableFuture<StickerPack> slow = new CompletableFuture<>();
-        StickerPack gatitos = answers.get(GATITOS).get().get();
+        StickerPack gatitos = Present.of(answers.get(GATITOS)).get().get();
         answers.put(GATITOS, () -> slow);
         type("🐶"); // not "perro", which names the set "Perros" too
         FxWait.until("the first asked", () -> fetched.get() == 1);
@@ -201,10 +203,10 @@ class StickerSearchUiTest {
 
     @Test
     void aSetThatFailedIsAskedAgainAfterAWhile() throws Exception {
-        StickerPack gatitos = answers.get(GATITOS).get().get();
+        StickerPack gatitos = Present.of(answers.get(GATITOS)).get().get();
         answers.put(GATITOS, () -> CompletableFuture.failedFuture(new IllegalStateException("the bridge isn't ready")));
         long[] now = {1_000_000};
-        FxWait.fx(() -> { grid.sets.clock = () -> now[0]; return null; });
+        FxWait.onFx(() -> grid.sets.clock = () -> now[0]);
         type("gato");
         FxWait.until("both asked, the cats' failed", () -> fetched.get() == 2 && shown().stream().anyMatch(s -> s.contains("«gato»")));
         answers.put(GATITOS, () -> CompletableFuture.completedFuture(gatitos));

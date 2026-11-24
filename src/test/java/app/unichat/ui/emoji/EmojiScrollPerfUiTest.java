@@ -50,9 +50,8 @@ class EmojiScrollPerfUiTest {
         long t1 = System.nanoTime();
         for (int i = 1; i <= STEPS; i++) {
             double to = (double) i / STEPS;
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 bar.setValue(bar.getMin() + (bar.getMax() - bar.getMin()) * to);
-                return null;
             });
             FxWait.settled();
         }

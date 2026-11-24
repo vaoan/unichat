@@ -10,6 +10,7 @@ import javafx.scene.control.ProgressBar;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -43,8 +44,8 @@ class ExploreBarUiTest {
         Runnable changed = () -> listeners.forEach(Runnable::run);
         Stage[] stage = new Stage[1];
         ExploreBar bar = FxWait.fx(() -> {
-            ExploreBar b = new ExploreBar(() -> states.keySet().stream().filter(k -> states.get(k).running()).sorted().toList(),
-                    states::get, stopped::add, listeners::add, listeners::remove, svc, id -> { });
+            ExploreBar b = new ExploreBar(() -> states.keySet().stream().filter(k -> Present.of(states.get(k)).running()).sorted().toList(),
+                    k -> Present.of(states.get(k)), stopped::add, listeners::add, listeners::remove, svc, id -> { });
             stage[0] = new Stage();
             stage[0].setOpacity(0);
             stage[0].setScene(new Scene(b, 800, 120));
@@ -65,13 +66,16 @@ class ExploreBarUiTest {
 
         Button stop = FxWait.fx(() -> bar.lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> b.getText().equals("Detener")).findFirst().orElseThrow());
-        FxWait.fx(() -> { stop.fire(); return null; });
+        FxWait.onFx(stop::fire);
         assertEquals(List.of("!family:demo"), stopped);
 
         states.put("!family:demo", new AutoSave.Exploring(false, nov3, true, 8, 2, 120, null));
         changed.run();
         FxWait.until("over: the bar goes", () -> !bar.isVisible());
-        FxWait.fx(() -> { bar.dispose(); stage[0].close(); return null; });
+        FxWait.onFx(() -> {
+            bar.dispose();
+            stage[0].close();
+        });
         assertTrue(listeners.isEmpty(), "and stops listening");
         svc.stop();
     }

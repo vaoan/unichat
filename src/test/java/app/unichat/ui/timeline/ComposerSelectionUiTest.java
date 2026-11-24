@@ -26,12 +26,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ComposerSelectionUiTest {
     private static final String TEXT = "primera linea\nsegunda linea larga\ntercera";
-    private static final int LINE_2 = TEXT.indexOf("segunda"), LINE_3 = TEXT.indexOf("tercera");
+    private static final int LINE_2 = TEXT.indexOf("segunda");
+    private static final int LINE_3 = TEXT.indexOf("tercera");
 
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TextArea box;
 
-    private void open(String text, double width) throws Exception {
+    private void open(String text, double width) throws InterruptedException {
         try {
             CountDownLatch started = new CountDownLatch(1);
             Platform.startup(started::countDown);
@@ -57,10 +60,10 @@ class ComposerSelectionUiTest {
 
     @AfterEach
     void close() throws Exception {
-        if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
+        if (stage != null) FxWait.onFx(stage::close);
     }
 
-    private String shift(KeyCode arrow) throws Exception {
+    private String shift(KeyCode arrow) throws InterruptedException {
         return FxWait.fx(() -> {
             Event.fireEvent(box, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", arrow, true, false, false, false));
             return box.getSelectedText();
@@ -68,7 +71,7 @@ class ComposerSelectionUiTest {
     }
 
     /** ⇧⌘ and an arrow (⌘: the shortcut key, as the Mac sends it); where the selection is after it: "anchor-caret". */
-    private String shiftShortcut(KeyCode arrow) throws Exception {
+    private String shiftShortcut(KeyCode arrow) throws InterruptedException {
         return FxWait.fx(() -> {
             Event.fireEvent(box, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", arrow, true, false, false, true));
             return box.getAnchor() + "-" + box.getCaretPosition();
@@ -84,7 +87,8 @@ class ComposerSelectionUiTest {
     void shiftCommandUpAndDownSelectFromWhereItStartedAndStayThere() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.support.Os.mac(), "the Mac's keys");
         open(TEXT, 400);
-        int from = LINE_2 + 3, end = TEXT.length();
+        int from = LINE_2 + 3;
+        int end = TEXT.length();
         caretAt(from);
         assertEquals(from + "-0", shiftShortcut(KeyCode.UP));
         assertEquals(from + "-0", shiftShortcut(KeyCode.UP), "again: still from where it started");
@@ -93,8 +97,8 @@ class ComposerSelectionUiTest {
         assertEquals(from + "-0", shiftShortcut(KeyCode.UP));
     }
 
-    private void caretAt(int at) throws Exception {
-        FxWait.fx(() -> { box.positionCaret(at); return null; });
+    private void caretAt(int at) throws InterruptedException {
+        FxWait.onFx(() -> box.positionCaret(at));
     }
 
     @Test

@@ -1,5 +1,6 @@
 package app.unichat.ui.emoji;
 
+import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,7 +16,7 @@ final class EmojiRows {
     record Emojis(String key, List<String> emoji) implements Row {}
 
     /** A titled group; {@code hint} shows instead when it has none (null: then it isn't shown at all). */
-    record Section(String id, String title, List<String> emoji, String hint) {}
+    record Section(String id, String title, List<String> emoji, @Nullable String hint) {}
 
     private EmojiRows() {}
 
@@ -23,9 +24,10 @@ final class EmojiRows {
         int n = Math.max(1, columns);
         List<Row> out = new ArrayList<>();
         for (Section s : sections) {
-            if (s.emoji().isEmpty() && s.hint() == null) continue;
+            String hint = s.hint();
+            if (s.emoji().isEmpty() && hint == null) continue;
             out.add(new Title(s.title()));
-            if (s.emoji().isEmpty()) out.add(new Hint(s.hint()));
+            if (s.emoji().isEmpty() && hint != null) out.add(new Hint(hint));
             for (int i = 0; i < s.emoji().size(); i += n) {
                 out.add(new Emojis(s.id() + "/" + i / n, List.copyOf(s.emoji().subList(i, Math.min(i + n, s.emoji().size())))));
             }

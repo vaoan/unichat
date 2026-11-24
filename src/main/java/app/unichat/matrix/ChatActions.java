@@ -10,6 +10,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -114,7 +115,7 @@ final class ChatActions {
         return choose(chatId, Flag.FAVORITE, favorite);
     }
 
-    CompletableFuture<Void> setAutoSave(String chatId, boolean mine, java.util.Set<app.unichat.model.SaveKind> kinds) {
+    CompletableFuture<Void> setAutoSave(String chatId, boolean mine, Set<app.unichat.model.SaveKind> kinds) {
         return change(chatId, key -> prefs.chooseSaveKinds(key, mine, kinds));
     }
 
@@ -129,10 +130,10 @@ final class ChatActions {
         }
     }
 
-    java.util.Set<app.unichat.model.SaveKind> autoSaves(String chatId, boolean mine) {
+    Set<app.unichat.model.SaveKind> autoSaves(String chatId, boolean mine) {
         synchronized (proc) {
             MatrixRoom room = proc.room(chatId);
-            return room == null ? java.util.Set.of() : prefs.saveKinds(proc.prefKey(room), mine);
+            return room == null ? Set.of() : prefs.saveKinds(proc.prefKey(room), mine);
         }
     }
 
@@ -171,7 +172,7 @@ final class ChatActions {
         if (writes.isEmpty()) return chatNotFound();
         core.fire(Listener::chatsChanged);
         restChanged.run();
-        return CompletableFuture.allOf(writes.toArray(new CompletableFuture[0]));
+        return CompletableFuture.allOf(writes.toArray(new CompletableFuture<?>[0]));
     }
 
     /** Muted on the phone: archived too, as a rule and not a choice, so it never overrides what the person chose. */
@@ -216,9 +217,9 @@ final class ChatActions {
      */
     void applyMutes() {
         synchronized (proc) {
-            proc.mutesToApply().forEach(this::queueMuteWrite);
+            proc.mutesToApply().forEach((id, on) -> { var _ = queueMuteWrite(id, on); });
         }
-        discord.retryGuildPauses(Instant.now());
+        var _ = discord.retryGuildPauses(Instant.now());
     }
 
     /**
@@ -269,7 +270,7 @@ final class ChatActions {
         }
     }
 
-    CompletableFuture<Void> setReminder(String chatId, Instant at) {
+    CompletableFuture<Void> setReminder(String chatId, @Nullable Instant at) {
         return change(chatId, key -> prefs.chooseReminder(key, at));
     }
 

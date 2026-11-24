@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import app.unichat.Present;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -95,7 +96,7 @@ class BridgeInstallerTest {
     @Test
     void aSetupFailureSaysItsLastLine() {
         IOException e = assertThrows(IOException.class, () -> installer("broken-bridge").prepare("whatsapp", "t", "u", null, m -> { }));
-        assertTrue(e.getMessage().endsWith("no pudo prepararse: no database here"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).endsWith("no pudo prepararse: no database here"), e.getMessage());
     }
 
     @Test
@@ -114,7 +115,7 @@ class BridgeInstallerTest {
     @Test
     void telegramWithoutKeysIsAnError() {
         IOException e = assertThrows(IOException.class, () -> installer("bridge").prepare("telegram", "t", "u", null, m -> { }));
-        assertTrue(e.getMessage().contains("api_id"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("api_id"), e.getMessage());
         assertFalse(Files.exists(dir.resolve("appservices/telegram.yaml")));
     }
 

@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 import app.unichat.support.Urls;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -60,7 +61,7 @@ public final class DropboxLogin {
 
     /** The app's key: the one given in Ajustes, else Unichat's own. */
     public static String appKey() {
-        String own = Settings.get().getString("cloud.dropboxAppKey", null);
+        String own = Settings.get().getString("cloud.dropboxAppKey");
         return own != null && !own.isBlank() ? own.strip() : APP_KEY;
     }
 
@@ -107,22 +108,32 @@ public final class DropboxLogin {
             Loopback.reply(x, 200, "text/html; charset=utf-8", Loopback.page(I18n.t("cloud.dropbox.done")));
             result.complete(new CloudAccount(CloudAccount.Service.DROPBOX, "", "Dropbox", refresh));
         } catch (IOException e) {
-            Loopback.reply(x, 200, "text/html; charset=utf-8", Loopback.page(e.getMessage()));
+            Loopback.reply(x, 200, "text/html; charset=utf-8", page(e));
             result.completeExceptionally(e);
         }
+    }
+
+    /** The browser's page for a sign-in that failed: what went wrong, never empty (a message may be null or blank). */
+    static String page(IOException failed) {
+        return Loopback.page(Errors.message(failed));
     }
 
     /** The one-time code for the lasting permission (a refresh token), with this sign-in's own secret. */
     private String exchange(String code) throws IOException {
         String form = "code=" + Urls.enc(code) + "&grant_type=authorization_code&code_verifier=" + Urls.enc(verifier)
                 + "&client_id=" + Urls.enc(appKey) + "&redirect_uri=" + Urls.enc(redirect);
-        HttpResponse<String> r = Http.send(HTTP, HttpRequest.newBuilder(URI.create(tokenUrl)).timeout(Duration.ofSeconds(30))
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(form)).build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> r;
+        try {
+            r = Http.send(HTTP, HttpRequest.newBuilder(URI.create(tokenUrl)).timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .POST(HttpRequest.BodyPublishers.ofString(form)).build(), HttpResponse.BodyHandlers.ofString());
+        } catch (IOException e) { // no answer at all, not a refusal: Dropbox couldn't be reached
+            throw new IOException(I18n.t("cloud.dropbox.unreachable", Errors.message(e)), e);
+        }
         JsonNode n = JSON.readTree(r.body());
         String refresh = n.path("refresh_token").asText(null);
         if (r.statusCode() != 200 || refresh == null) {
-            throw new IOException(I18n.t("cloud.dropbox.failed", n.path("error_description").asText(n.path("error").asText(r.statusCode() + ""))));
+            throw new IOException(I18n.t("cloud.dropbox.failed", n.path("error_description").asText(n.path("error").asText(String.valueOf(r.statusCode())))));
         }
         return refresh;
     }

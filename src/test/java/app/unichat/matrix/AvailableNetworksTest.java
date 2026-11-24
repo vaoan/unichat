@@ -22,7 +22,7 @@ class AvailableNetworksTest {
     @Test
     void localServerOffersEveryNetworkItCanInstall() {
         MatrixChatService.setBridgeProvisioner(new BridgeProvisioner() {
-            @Override public void ensure(Network n) { }
+            @Override public void ensure(Network n) { /* the fake ignores it */ }
             @Override public boolean provides(Network n) { return n != Network.SIGNAL; }
         });
         List<Network> available = new MatrixChatService("http://127.0.0.1:8008", "@yo:localhost", "t").availableNetworks();

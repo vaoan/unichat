@@ -58,7 +58,8 @@ public final class RichText {
         String t = s.strip();
         if (t.isEmpty() || t.length() > 24) return false;
         int count = 0;
-        for (int i = 0; i < t.length(); ) {
+        int i = 0;
+        while (i < t.length()) {
             int cp = t.codePointAt(i);
             i += Character.charCount(cp);
             if (cp == 0x200D || cp == 0xFE0F || (cp >= 0x1F3FB && cp <= 0x1F3FF) || Character.isWhitespace(cp)) continue;
@@ -114,11 +115,10 @@ public final class RichText {
     public static List<Node> nodes(String s, Consumer<String> openLink, double width) {
         List<Node> nodes = new ArrayList<>();
         for (Span span : tokenize(s)) {
-            switch (span.kind()) {
-                case LINK -> {
-                    nodes.add(link(span.text(), span.text(), openLink, width));
-                }
-                default -> nodes.addAll(EmojiInline.nodes(span.text(), run -> {
+            if (span.kind() == Kind.LINK) {
+                nodes.add(link(span.text(), span.text(), openLink, width));
+            } else {
+                nodes.addAll(EmojiInline.nodes(span.text(), run -> {
                     Text t = new Text(run);
                     t.getStyleClass().add("msg-text");
                     if (span.kind() == Kind.BOLD) t.getStyleClass().add("bold");

@@ -1,8 +1,12 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -12,6 +16,7 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -23,7 +28,7 @@ class StickerConverterTest {
     @TempDir
     Path dir;
 
-    private static RoomFeatures features(String stickerMimes) throws Exception {
+    private static RoomFeatures features(String stickerMimes) throws JsonProcessingException {
         return RoomFeatures.parse(new ObjectMapper().readTree(
                 "{\"id\":\"x\",\"file\":{\"m.sticker\":{\"mime_types\":" + stickerMimes + "}}}"));
     }
@@ -66,9 +71,9 @@ class StickerConverterTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aWebmBecomesAnAnimatedWebpWithItsTransparency() throws Exception {
-        Path ffmpeg = app.unichat.video.Ffmpeg.find();
-        Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
         Assumptions.assumeTrue(app.unichat.video.AnimatedWebp.img2webp() != null, "no img2webp");
         Path webm = dir.resolve("s.webm");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10,format=yuva420p",
@@ -104,8 +109,8 @@ class StickerConverterTest {
         assertNotNull(telegram);
         assertEquals(NetworkFormats.LOTTIE, telegram.mime());
         org.junit.jupiter.api.Assertions.assertArrayEquals(json, Files.readAllBytes(telegram.file()), "its JSON, not gzipped twice");
-        assertEquals("image/png", StickerConverter.forChat(tgs, "application/x-tgsticker", Network.DISCORD, false,
-                features("{\"image/png\":2}"), dir).mime(), "a chat that takes only PNG gets its first frame");
+        assertEquals("image/png", Present.of(StickerConverter.forChat(tgs, "application/x-tgsticker", Network.DISCORD, false,
+                features("{\"image/png\":2}"), dir)).mime(), "a chat that takes only PNG gets its first frame");
     }
 
     @Test
@@ -119,7 +124,7 @@ class StickerConverterTest {
         assertEquals("image/webp", NetworkFormats.sticker(Network.WHATSAPP, "image/gif", true, false, wa), "WhatsApp: what its bridge says");
     }
 
-    private Path gif() throws Exception {
+    private Path gif() throws IOException {
         BufferedImage img = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);
         img.setRGB(3, 3, 0xff0000);
         Path f = dir.resolve("s.gif");
@@ -134,8 +139,8 @@ class StickerConverterTest {
         StickerConverter.Result r = StickerConverter.convert(gif(), "image/webp", dir);
         assertEquals("image/webp", r.mime());
         byte[] b = Files.readAllBytes(r.file());
-        assertEquals("RIFF", new String(b, 0, 4));
-        assertEquals("WEBP", new String(b, 8, 4));
+        assertEquals("RIFF", new String(b, 0, 4, UTF_8));
+        assertEquals("WEBP", new String(b, 8, 4, UTF_8));
     }
 
     @Test

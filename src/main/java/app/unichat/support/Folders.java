@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -47,7 +49,7 @@ public final class Folders {
     }
 
     /** Removes as much of {@code dir} as it can: a file that resists doesn't save the ones after it. Null is fine. */
-    public static void deleteQuietly(Path dir) {
+    public static void deleteQuietly(@Nullable Path dir) {
         if (dir != null) sweep(dir);
     }
 

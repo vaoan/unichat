@@ -3,6 +3,7 @@ package app.unichat.gif;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The GIF providers Unichat knows and which ones the user turned on (Ajustes → GIFs: {@code gif.<id>.enabled} and
@@ -23,7 +24,7 @@ public final class GifProviders {
     }
 
     /** Providers turned on that have a key; {@code setting} reads a settings value (null when unset). */
-    public static List<GifProvider> active(Function<String, String> setting) {
+    public static List<GifProvider> active(Function<String, @Nullable String> setting) {
         List<GifProvider> out = new ArrayList<>();
         for (Known k : KNOWN) {
             String key = setting.apply("gif." + k.id() + ".key");

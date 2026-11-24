@@ -1,5 +1,7 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -69,6 +71,7 @@ class PCloudTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aFileComesDownIntoAFileNeverWholeInMemory(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
         try (FakePCloud cloud = new FakePCloud("tok")) {
             byte[] video = new byte[300_000];
@@ -90,7 +93,8 @@ class PCloudTest {
     void theSettingsTravelThroughPCloudToo() throws Exception {
         try (FakePCloud cloud = new FakePCloud("tok")) {
             PCloudApi api = new PCloudApi(cloud.host(), "tok");
-            Map<String, String> a = new HashMap<>(Map.of("ui.theme", "DARK")), b = new HashMap<>();
+            Map<String, String> a = new HashMap<>(Map.of("ui.theme", "DARK"));
+            Map<String, String> b = new HashMap<>();
             SyncedPart pa = new SyncedPart(CloudAccount.SETTINGS_FILE, "test-pa", now -> Bundle.of("a", now, a, null), t -> { });
             SyncedPart pb = new SyncedPart(CloudAccount.SETTINGS_FILE, "test-pb", now -> Bundle.of("b", now, b, null), t -> {
                 b.clear();
@@ -108,7 +112,7 @@ class PCloudTest {
     }
 
     /** What the browser does after the person signs in: pCloud sends it to our page, which passes the "#" part on. */
-    private static Map<String, String> signIn(URI authorize, String hash) throws Exception {
+    private static Map<String, String> signIn(URI authorize, String hash) throws IOException, InterruptedException {
         Map<String, String> q = new HashMap<>();
         for (String pair : authorize.getRawQuery().split("&")) {
             int eq = pair.indexOf('=');
@@ -157,7 +161,7 @@ class PCloudTest {
     }
 
     private static String redirect(URI authorize) {
-        return Loopback.query(authorize.getRawQuery()).get("redirect_uri");
+        return Present.of(Loopback.query(authorize.getRawQuery()).get("redirect_uri"));
     }
 
     @Test
@@ -165,7 +169,7 @@ class PCloudTest {
         URI[] opened = {null};
         CompletableFuture<CloudAccount> login = PCloudLogin.start("APP", u -> opened[0] = u, 0, h -> "https://" + h, java.time.Duration.ZERO);
         var e = assertThrows(java.util.concurrent.ExecutionException.class, login::get); // get: a JUnit timeout can interrupt it
-        assertEquals(app.unichat.support.I18n.t("cloud.signIn.expired"), e.getCause().getMessage());
+        assertEquals(app.unichat.support.I18n.t("cloud.signIn.expired"), Present.of(e.getCause()).getMessage());
         portIsFree(redirect(opened[0]));
     }
 
@@ -205,7 +209,7 @@ class PCloudTest {
             PCloudApi api = new PCloudApi(cloud.host(), "tok");
             api.mkdirs("Unichat");
             api.put("Unichat/a.jpg", "12345".getBytes(StandardCharsets.UTF_8));
-            Storage.RemoteFile f = api.info("Unichat/a.jpg");
+            Storage.RemoteFile f = Present.of(api.info("Unichat/a.jpg"));
             assertEquals(5, f.size());
             assertEquals(Checksums.SHA1, f.kind());
             assertEquals(FakePCloud.sha1("12345".getBytes(StandardCharsets.UTF_8)), f.hash());

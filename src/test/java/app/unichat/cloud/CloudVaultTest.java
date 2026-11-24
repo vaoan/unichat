@@ -1,6 +1,9 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
+import app.unichat.support.PathParts;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,16 +31,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * here, and nothing personal while it's locked, declined or removed here. Media goes by its own switch in all of them.
  */
 class CloudVaultTest {
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
-        OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
-    private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl", TRANSCRIPT = "a".repeat(64) + ".txt";
-    private static final String SETTINGS = CloudAccount.SETTINGS_FILE, AI = "Unichat/Settings/unichat-ai.json",
-        PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
+    private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl";
+    private static final String TRANSCRIPT = "a".repeat(64) + ".txt";
+    private static final String SETTINGS = CloudAccount.SETTINGS_FILE;
+    private static final String AI = "Unichat/Settings/unichat-ai.json";
+    private static final String PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg";
 
     @TempDir
     Path dir;
     private FakeDav cloud;
-    private Map<String, String> portableWere, keysWere;
+    private Map<String, String> portableWere;
+    private Map<String, String> keysWere;
 
     @BeforeEach
     void start() throws Exception {
@@ -57,7 +64,7 @@ class CloudVaultTest {
         return new WebDav(cloud.url(), "u", "p");
     }
 
-    private VaultComputer computer(String machine) throws Exception {
+    private VaultComputer computer(String machine) throws IOException {
         return new VaultComputer(cloud, dir, machine);
     }
 
@@ -76,7 +83,7 @@ class CloudVaultTest {
         return !path.startsWith(Vault.ROOT + "/") && !path.startsWith(CloudAccount.MEDIA + "/");
     }
 
-    private VaultComputer withEverything(VaultComputer c) throws Exception {
+    private VaultComputer withEverything(VaultComputer c) throws IOException {
         return c.set("ui.theme", "DARK").write("writing-style.md", "escribo corto").write("texts/here/" + TEXT, "{}\n")
             .write("pinned-messages.json", "{\"!c\":[]}").write("transcripts/" + TRANSCRIPT, "hola");
     }
@@ -213,7 +220,7 @@ class CloudVaultTest {
         assertNull(desk.round().error());
         assertEquals("bien", desk.read("transcripts/" + "c".repeat(64) + ".txt"));
         try (var all = Files.walk(dir)) {
-            assertEquals(List.of(), all.filter(p -> p.getFileName().toString().contains("fuera")).toList());
+            assertEquals(List.of(), all.filter(p -> PathParts.name(p).contains("fuera")).toList());
         }
         try (var here = Files.list(desk.data.resolve("transcripts"))) {
             assertEquals(1, here.count(), "only a name of ours became a file");
@@ -305,7 +312,7 @@ class CloudVaultTest {
                 cloud.dirs.clear();
                 VaultComputer c = withEverything(computer(java.util.UUID.randomUUID().toString())).set("cloud.media", Boolean.toString(media));
                 if (vault) {
-                    Vault.Created made = Vault.create(dav(), c.get("cloud.machine"), "Este");
+                    Vault.Created made = Vault.create(dav(), Present.of(c.get("cloud.machine")), "Este");
                     c.opened(made.info(), made.computer());
                 }
                 Cloud.Status s = c.round();
@@ -401,7 +408,7 @@ class CloudVaultTest {
         launched.opened(made.info(), Vault.addComputer(dav(), made.vk(), DESK, "Escritorio"));
         assertNull(launched.round().error());
         assertTrue(cloud.files.containsKey(sealedText), "opened here: its texts go again, sealed");
-        int sent = cloud.versions.get(sealedText);
+        int sent = Present.of(cloud.versions.get(sealedText));
 
         VaultComputer again = computer(DESK);
         again.values.putAll(launched.values);
@@ -412,7 +419,7 @@ class CloudVaultTest {
     private static final String PUT_IN = "5f0e7d7c-4b5a-4a4c-9e95-0d6b1a5c6f88";
 
     /** {@code machine}'s plain texts in the account, as a computer without the vault sends them (or as someone puts them in). */
-    private void plainTexts(String machine, String text) throws java.io.IOException {
+    private void plainTexts(String machine, String text) throws IOException {
         String folder = TextSync.ROOT + "/" + machine;
         for (String d : new String[] {TextSync.ROOT, folder}) cloud.dirs.add(d);
         cloud.put(folder + "/" + TEXT, text.getBytes(StandardCharsets.UTF_8));
@@ -423,7 +430,7 @@ class CloudVaultTest {
     private static final String SEALED_LIST = Vault.ROOT + VaultMove.SENDERS.substring(CloudAccount.ROOT.length());
 
     /** The vault made on the desk, which moved in what was plain; then a folder put in through the account. */
-    private VaultComputer movedThenAFolderPutIn(Vault.Created made) throws Exception {
+    private VaultComputer movedThenAFolderPutIn(Vault.Created made) throws IOException, InterruptedException, java.util.concurrent.ExecutionException {
         plainTexts(OTHER, "{\"viejo\":1}\n"); // a computer of the person's, without the vault
         VaultComputer desk = computer(DESK).madeHere(made);
         assertNull(desk.round().error());
@@ -442,13 +449,13 @@ class CloudVaultTest {
         cloud.put(VaultMove.SENDERS, forged);
     }
 
-    private void neverTakenIn(VaultComputer c) throws Exception {
+    private void neverTakenIn(VaultComputer c) throws InterruptedException, java.util.concurrent.ExecutionException {
         c.round();
         assertFalse(cloud.files.containsKey(Vault.ROOT + "/Texts/" + PUT_IN + "/" + TEXT), "never sealed in");
         assertTrue(cloud.files.containsKey(TextSync.ROOT + "/" + PUT_IN + "/" + TEXT), "nor deleted");
     }
 
-    private VaultComputer laptop(Vault.Created made) throws Exception {
+    private VaultComputer laptop(Vault.Created made) throws IOException, InterruptedException, java.util.concurrent.ExecutionException {
         VaultComputer laptop = computer(LAPTOP).opened(made.info(), Vault.addComputer(dav(), made.vk(), LAPTOP, "Portátil"));
         assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
         return laptop;

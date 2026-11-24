@@ -3,11 +3,15 @@ package app.unichat.ui;
 import app.unichat.settings.Settings;
 import app.unichat.support.Os;
 import app.unichat.support.Processes;
+import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 /** Applies the stylesheet, light/dark palette, accent color and font scale to every app scene. */
@@ -16,9 +20,10 @@ public final class Theme {
 
     private static final List<Scene> SCENES = new ArrayList<>();
     private static final String CSS = Objects.requireNonNull(Theme.class.getResource("/app/unichat/css/app.css")).toExternalForm();
-    private static Boolean systemDark;
-    private static Boolean systemContrast;
-    private static Boolean systemReducedMotion;
+    /** What the system says, asked once until {@link #applyAll}; null: not asked yet. */
+    private static @Nullable Boolean systemDark;
+    private static @Nullable Boolean systemContrast;
+    private static @Nullable Boolean systemReducedMotion;
 
     /**
      * Styles {@code scene} and keeps it in step with theme changes while its window shows. A closed window keeps its
@@ -32,7 +37,8 @@ public final class Theme {
             if (w == null) SCENES.remove(scene);
             else followShowing(w, scene);
         });
-        if (scene.getWindow() != null) followShowing(scene.getWindow(), scene);
+        javafx.stage.Window shown = scene.getWindow();
+        if (shown != null) followShowing(shown, scene);
         apply(scene);
     }
 
@@ -102,7 +108,8 @@ public final class Theme {
 
     /** WCAG contrast ratio between two #RRGGBB colors. */
     static double contrast(String a, String b) {
-        double la = luminance(a), lb = luminance(b);
+        double la = luminance(a);
+        double lb = luminance(b);
         return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
     }
 
@@ -119,18 +126,21 @@ public final class Theme {
     /** Darkens {@code hex} until white text on it reaches 4.5:1 (WCAG AA). */
     static String accessibleAccent(String hex) {
         int rgb = Integer.parseInt(hex.substring(1), 16);
-        int r = (rgb >> 16) & 255, g = (rgb >> 8) & 255, b = rgb & 255;
+        int r = (rgb >> 16) & 255;
+        int g = (rgb >> 8) & 255;
+        int b = rgb & 255;
         String cur = hex;
         for (int i = 0; i < 40 && contrast(cur, "#FFFFFF") < 4.5; i++) {
             r = (int) (r * 0.93);
             g = (int) (g * 0.93);
             b = (int) (b * 0.93);
-            cur = String.format("#%02X%02X%02X", r, g, b);
+            cur = String.format(Locale.ROOT, "#%02X%02X%02X", r, g, b);
         }
         return cur;
     }
 
     /** Windows high-contrast theme / macOS "Aumentar contraste". */
+    @SuppressFBWarnings(value = "LI_LAZY_INIT_STATIC", justification = "on the FX thread only, like the rest of Theme")
     public static boolean systemHighContrast() {
         if (systemContrast != null) return systemContrast;
         try {
@@ -150,6 +160,7 @@ public final class Theme {
     }
 
     /** Windows "Mostrar animaciones" off / macOS "Reducir movimiento". */
+    @SuppressFBWarnings(value = "LI_LAZY_INIT_STATIC", justification = "on the FX thread only, like the rest of Theme")
     public static boolean systemReducedMotion() {
         if (systemReducedMotion != null) return systemReducedMotion;
         try {
@@ -168,6 +179,7 @@ public final class Theme {
     }
 
     /** Reads the OS appearance once per {@link #applyAll()}: Windows registry / macOS defaults / GTK theme. */
+    @SuppressFBWarnings(value = {"IMPROPER_UNICODE", "LI_LAZY_INIT_STATIC"}, justification = "macOS's own defaults output; it only picks dark or light; on the FX thread only, like the rest of Theme")
     static boolean systemDark() {
         if (systemDark != null) return systemDark;
         try {
@@ -186,7 +198,7 @@ public final class Theme {
         return systemDark;
     }
 
-    private static String run(String... cmd) throws Exception {
+    private static String run(String... cmd) throws IOException, InterruptedException {
         return Processes.capture(List.of(cmd), 3).out();
     }
 }

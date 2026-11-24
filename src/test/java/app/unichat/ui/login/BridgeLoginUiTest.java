@@ -5,6 +5,7 @@ import app.unichat.ui.Theme;
 import app.unichat.login.BridgeLogin;
 import app.unichat.model.Network;
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -17,8 +18,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
+import app.unichat.Present;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
@@ -27,6 +31,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * The dynamic login screen against a fake WhatsApp bridge: choose a method, see the QR, the bridge confirms,
@@ -36,11 +41,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BridgeLoginUiTest {
     private HttpServer server;
     private final CountDownLatch scanned = new CountDownLatch(1);
-    private volatile String submitted;
+    private volatile @Nullable String submitted;
 
     @BeforeEach
     void fakeBridge() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String p = ex.getRequestURI().getPath();
             String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
@@ -88,15 +93,15 @@ class BridgeLoginUiTest {
         scanned.countDown();
         server.stop(0);
         // A window left open goes on being drawn for every test after this one.
-        fx(() -> {
+        FxWait.onFx(() -> {
             if (stage != null) stage.close();
-            return null;
         });
     }
 
+    @SuppressWarnings("NullAway.Init") // open() sets it, and every test opens first
     private Stage stage;
 
-    private Scene open(AtomicBoolean connected) throws Exception {
+    private Scene open(AtomicBoolean connected) throws InterruptedException {
         BridgeLogin api = new BridgeLogin("http://127.0.0.1:" + server.getAddress().getPort() + "/_matrix/provision", "t", "@yo:localhost");
         return fx(() -> {
             stage = new Stage();
@@ -118,7 +123,7 @@ class BridgeLoginUiTest {
         assertTrue(text(scene).contains("¿Cómo quieres conectar WhatsApp?"));
         shot(scene, "1-elegir");
         assertTrue(text(scene).indexOf("Escanear un código QR") < text(scene).indexOf("Usar tu número de teléfono"), "QR first");
-        fx(() -> { buttonNow(scene, "Escanear un código QR").fire(); return null; });
+        FxWait.onFx(() -> Present.of(buttonNow(scene, "Escanear un código QR")).fire());
 
         await("the QR", () -> fx0(() -> scene.getRoot().lookupAll("*").stream().anyMatch(n -> n instanceof ImageView)));
         assertTrue(text(scene).contains("Escanea el código con tu teléfono"));
@@ -129,7 +134,7 @@ class BridgeLoginUiTest {
         await("connected", () -> button(scene, "Listo") != null);
         assertTrue(text(scene).contains("WhatsApp está conectado"));
         shot(scene, "3-listo");
-        fx(() -> { buttonNow(scene, "Listo").fire(); return null; });
+        FxWait.onFx(() -> Present.of(buttonNow(scene, "Listo")).fire());
         assertTrue(connected.get());
     }
 
@@ -137,15 +142,21 @@ class BridgeLoginUiTest {
     void phoneFlowValidatesThenShowsTheCode() throws Exception {
         Scene scene = open(new AtomicBoolean());
         await("the choice of methods", () -> button(scene, "Usar tu número de teléfono") != null);
-        fx(() -> { buttonNow(scene, "Usar tu número de teléfono").fire(); return null; });
+        FxWait.onFx(() -> Present.of(buttonNow(scene, "Usar tu número de teléfono")).fire());
         await("the phone field", () -> fx0(() -> field(scene) != null));
-        fx(() -> { field(scene).setText("300 123 4567"); buttonNow(scene, "Continuar").fire(); return null; });
+        FxWait.onFx(() -> {
+            Present.of(field(scene)).setText("300 123 4567");
+            Present.of(buttonNow(scene, "Continuar")).fire();
+        });
         await("the country code asked for", () -> text(scene).contains("código de país"));
         shot(scene, "4-telefono-error");
-        assertTrue(submitted == null, "nothing sent while invalid");
-        fx(() -> { field(scene).setText("+57 300 123 4567"); buttonNow(scene, "Continuar").fire(); return null; });
+        assertNull(submitted, "nothing sent while invalid");
+        FxWait.onFx(() -> {
+            Present.of(field(scene)).setText("+57 300 123 4567");
+            Present.of(buttonNow(scene, "Continuar")).fire();
+        });
         await("the pairing code", () -> text(scene).contains("ABCD-1234"));
-        assertTrue(submitted.contains("\"phone_number\":\"+573001234567\""), submitted);
+        assertTrue(Present.of(submitted).contains("\"phone_number\":\"+573001234567\""), submitted);
         assertTrue(text(scene).contains("Escribe este código en tu teléfono"));
         shot(scene, "5-codigo");
     }
@@ -153,15 +164,15 @@ class BridgeLoginUiTest {
     // ---------------------------------------------------------------- helpers
 
     /** -Dunichat.loginShots=<dir>: saves a PNG of the (invisible) window, for checking the design. */
-    private static void shot(Scene s, String name) throws Exception {
+    private static void shot(Scene s, String name) throws IOException, InterruptedException {
         String dir = System.getProperty("unichat.loginShots");
         if (dir == null) return;
         java.awt.image.BufferedImage img = fx(() -> javafx.embed.swing.SwingFXUtils.fromFXImage(s.snapshot(null), null));
-        javax.imageio.ImageIO.write(img, "png", new java.io.File(dir, name + ".png"));
+        javax.imageio.ImageIO.write(img, "png", java.nio.file.Path.of(dir, name + ".png").toFile());
     }
 
     /** From a test thread. */
-    private static Clickable button(Scene s, String startsWith) {
+    private static @Nullable Clickable button(Scene s, String startsWith) {
         try {
             return fx(() -> buttonNow(s, startsWith));
         } catch (Exception e) {
@@ -170,7 +181,7 @@ class BridgeLoginUiTest {
     }
 
     /** A Button or a card announced as a button, by text or screen-reader text. On the FX thread. */
-    private static Clickable buttonNow(Scene s, String startsWith) {
+    private static @Nullable Clickable buttonNow(Scene s, String startsWith) {
         for (Node n : s.getRoot().lookupAll("*")) {
             if (!n.isVisible()) continue;
             if (n instanceof Button b && ((b.getText() != null && b.getText().startsWith(startsWith))
@@ -189,7 +200,7 @@ class BridgeLoginUiTest {
         void fire();
     }
 
-    private static TextField field(Scene s) {
+    private static @Nullable TextField field(Scene s) {
         return s.getRoot().lookupAll("*").stream().filter(n -> n instanceof TextField).map(n -> (TextField) n).findFirst().orElse(null);
     }
 
@@ -213,11 +224,11 @@ class BridgeLoginUiTest {
         }
     }
 
-    private static <T> T fx(Supplier<T> s) throws Exception {
+    private static <T> T fx(Supplier<T> s) throws InterruptedException {
         return FxWait.fx(s::get);
     }
 
-    private static void await(String what, BooleanSupplier c) throws Exception {
+    private static void await(String what, BooleanSupplier c) {
         FxWait.until(what, c::getAsBoolean);
     }
 }

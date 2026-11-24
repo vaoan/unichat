@@ -14,11 +14,12 @@ import javafx.scene.control.ToggleButton;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -55,21 +56,21 @@ class FilterUiTest {
         ChatListPane list = fx(() -> (ChatListPane) scene.getRoot().lookupAll("*").stream()
                 .filter(n -> n instanceof ChatListPane).findFirst().orElseThrow());
 
-        click(scene, chip(scene, "Favoritos"));
-        click(scene, rail(scene, "WhatsApp"));
+        click(chip(scene, "Favoritos"));
+        click(rail(scene, "WhatsApp"));
         ChatFilter f = fx(() -> list.filterProperty().get());
         assertEquals(Network.WHATSAPP, f.network());
         assertEquals(ChatFilter.View.FAVORITES, f.view(), "Favoritos survives the network switch");
         assertTrue(fx(() -> chip(scene, "Favoritos").isSelected()));
 
-        click(scene, chip(scene, "Prioridad baja"));
-        click(scene, rail(scene, "Bandeja unificada"));
+        click(chip(scene, "Prioridad baja"));
+        click(rail(scene, "Bandeja unificada"));
         f = fx(() -> list.filterProperty().get());
-        assertEquals(null, f.network());
+        assertNull(f.network());
         assertEquals(ChatFilter.View.LOW_PRIORITY, f.view(), "Prioridad baja survives going back to the inbox");
 
-        click(scene, rail(scene, "Archivados"));
-        click(scene, rail(scene, "WhatsApp"));
+        click(rail(scene, "Archivados"));
+        click(rail(scene, "WhatsApp"));
         f = fx(() -> list.filterProperty().get());
         assertEquals(ChatFilter.View.INBOX, f.view(), "leaving the archive goes back to the inbox");
         assertTrue(fx(() -> chip(scene, "Todos").isSelected()), "chip follows the filter");
@@ -87,15 +88,14 @@ class FilterUiTest {
                 .filter(Node::isVisible).findFirst().orElseThrow(() -> new AssertionError("no rail button " + name));
     }
 
-    private static void click(Scene scene, ButtonBase b) throws Exception {
-        fx(() -> {
+    private static void click(ButtonBase b) throws InterruptedException {
+        FxWait.onFx(() -> {
             b.fire();
-            return null;
         });
         FxWait.settled();
     }
 
-    private static <T> T fx(Callable<T> c) throws Exception {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

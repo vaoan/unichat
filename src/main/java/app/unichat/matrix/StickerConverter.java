@@ -9,6 +9,8 @@ import app.unichat.support.I18n;
 import app.unichat.support.Processes;
 import app.unichat.video.LottieStickers;
 import app.unichat.video.WebmStickers;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -23,8 +25,11 @@ import java.util.List;
  * whose tool isn't there or fails gives the sticker as it is, or a still PNG. It knows formats, not networks.
  */
 public final class StickerConverter {
-    static final String WEBP = NetworkFormats.WEBP, PNG = NetworkFormats.PNG, WEBM = NetworkFormats.WEBM, GIF = NetworkFormats.GIF,
-            LOTTIE = NetworkFormats.LOTTIE;
+    static final String WEBP = NetworkFormats.WEBP;
+    static final String PNG = NetworkFormats.PNG;
+    static final String WEBM = NetworkFormats.WEBM;
+    static final String GIF = NetworkFormats.GIF;
+    static final String LOTTIE = NetworkFormats.LOTTIE;
 
     record Result(Path file, String mime) {}
 
@@ -37,10 +42,12 @@ public final class StickerConverter {
      * and odd sizes are padded to even, as H.264 needs. Written as {@code sticker.mp4} in a new folder under {@code dir}.
      */
     static Result toMp4(Path gif, Path dir) throws IOException {
-        java.util.List<GifFrames.Frame> frames = GifFrames.read(gif);
+        List<GifFrames.Frame> frames = GifFrames.read(gif);
         if (frames.isEmpty()) throw new IOException(I18n.t("sticker.noFrames"));
-        int w = frames.get(0).image().getWidth(), h = frames.get(0).image().getHeight();
-        int ew = w + (w & 1), eh = h + (h & 1);
+        int w = frames.get(0).image().getWidth();
+        int h = frames.get(0).image().getHeight();
+        int ew = w + (w & 1);
+        int eh = h + (h & 1);
         Files.createDirectories(dir);
         Path out = Files.createTempDirectory(dir, "sticker").resolve("sticker.mp4");
         org.jcodec.api.awt.AWTSequenceEncoder enc = org.jcodec.api.awt.AWTSequenceEncoder.createSequenceEncoder(out.toFile(), FPS);
@@ -69,7 +76,8 @@ public final class StickerConverter {
      * {@code network} gets it as ({@link NetworkFormats#sticker}; null network: what the chat's room_features take),
      * {@code own} when it's that network's own sticker.
      */
-    static Result forChat(Path src, String mime, Network network, boolean own, RoomFeatures f, Path dir) throws IOException {
+    static @Nullable Result forChat(Path src, @Nullable String mime, @Nullable Network network, boolean own, RoomFeatures f, Path dir)
+            throws IOException {
         if (!LOTTIE.equals(mime) && LottieStickers.isLottie(src)) { // a .tgs comes labelled application/x-tgsticker
             Result as = forChat(src, LOTTIE, network, own, f, dir);
             return as != null || own ? as : lottieJson(src, dir);
@@ -84,7 +92,7 @@ public final class StickerConverter {
         if (want == null) return null;
         Result r = to(src, mime, want, dir);
         boolean unmade = r != null && !want.equals(r.mime());
-        if (unmade && NetworkFormats.asIsIfUnmade(network, mime, moves)) {
+        if (r != null && unmade && NetworkFormats.asIsIfUnmade(network, mime, moves)) {
             Files.deleteIfExists(r.file());
             return null;
         }
@@ -92,12 +100,12 @@ public final class StickerConverter {
     }
 
     /** Whether the {@code mime} sticker {@code src} moves: a video sticker always, a GIF with more than one frame. */
-    static boolean animated(Path src, String mime) throws IOException {
-        return WEBM.equals(mime) || NetworkFormats.LOTTIE.equals(mime) || GIF.equals(mime) && GifFrames.count(src) > 1;
+    static boolean animated(Path src, @Nullable String mime) throws IOException {
+        return WEBM.equals(mime) || NetworkFormats.LOTTIE.equals(mime) || (GIF.equals(mime) && GifFrames.count(src) > 1);
     }
 
     /** {@code src} ({@code from}) made {@code want}, each way falling back to the next best; null: it goes as it is. */
-    static Result to(Path src, String from, String want, Path dir) throws IOException {
+    static @Nullable Result to(Path src, @Nullable String from, String want, Path dir) throws IOException {
         // Lottie only becomes an animated WebP, and from it a still PNG; without LottieConverter it goes as it is.
         if (LOTTIE.equals(from)) {
             Result webp = fromVideo(src, dir, ".webp", WEBP, LottieStickers::toWebp, "WebP");
@@ -123,7 +131,8 @@ public final class StickerConverter {
     }
 
     /** {@code in} made {@code mime} into a new file of {@code dir}; null when it can't be (no tool, or it failed: logged). */
-    private static Result fromVideo(Path in, Path dir, String extension, String mime, Making making, String what) throws IOException {
+    @SuppressFBWarnings(value = "PATH_TRAVERSAL_IN", justification = "a temp file in our own folder with a fixed prefix and a suffix of ours (.webp, .webm)")
+    private static @Nullable Result fromVideo(Path in, Path dir, String extension, String mime, Making making, String what) throws IOException {
         Files.createDirectories(dir);
         Path out = Files.createTempFile(dir, "sticker", extension);
         try {
@@ -168,7 +177,7 @@ public final class StickerConverter {
      * {@code gif2webp}: {@code -Dunichat.gif2webp} (development), the copy inside the app (app/server/), or one on
      * the PATH; null when there's none.
      */
-    static Path gif2webp() {
+    static @Nullable Path gif2webp() {
         return BundledTools.find("unichat.gif2webp", null, "gif2webp");
     }
 
@@ -177,7 +186,7 @@ public final class StickerConverter {
     }
 
     /** Converts {@code in} into {@code dir}; a WebP that can't be made (no tool, tool failed) becomes a PNG. */
-    static Result convert(Path in, String target, Path dir, Path tool) throws IOException {
+    static Result convert(Path in, String target, Path dir, @Nullable Path tool) throws IOException {
         Files.createDirectories(dir);
         if (WEBP.equals(target) && tool != null) {
             Path out = Files.createTempFile(dir, "sticker", ".webp");

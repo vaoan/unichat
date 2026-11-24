@@ -1,6 +1,7 @@
 package app.unichat.voice;
 
 import app.unichat.model.VoiceNote;
+import app.unichat.support.PathParts;
 import io.github.jaredmdobson.concentus.OpusApplication;
 import io.github.jaredmdobson.concentus.OpusEncoder;
 import io.github.jaredmdobson.concentus.OpusException;
@@ -26,7 +27,6 @@ final class VoiceEncoder implements AutoCloseable {
     private final OutputStream out;
     private final OpusEncoder encoder;
     private final OggOpusWriter ogg;
-    private final int rate;
     private final int frameSize;
     private final short[] frame;
     private final byte[] packet = new byte[MAX_PACKET];
@@ -37,7 +37,6 @@ final class VoiceEncoder implements AutoCloseable {
 
     VoiceEncoder(Path file, int rate) throws IOException {
         this.file = file;
-        this.rate = rate;
         this.frameSize = rate / FRAMES_PER_SECOND;
         this.frame = new short[frameSize];
         try {
@@ -48,7 +47,7 @@ final class VoiceEncoder implements AutoCloseable {
         encoder.setBitrate(BITRATE);
         encoder.setUseVBR(true);
         encoder.setSignalType(OpusSignal.OPUS_SIGNAL_VOICE);
-        Files.createDirectories(file.getParent());
+        Files.createDirectories(PathParts.parent(file));
         out = new BufferedOutputStream(Files.newOutputStream(file));
         ogg = new OggOpusWriter(out, rate, encoder.getLookahead() * (48_000 / rate));
     }
@@ -99,7 +98,9 @@ final class VoiceEncoder implements AutoCloseable {
         int bars = Math.min(WAVEFORM_BARS, peaks.size());
         List<Integer> out = new ArrayList<>(bars);
         for (int b = 0; b < bars; b++) {
-            int from = b * peaks.size() / bars, to = (b + 1) * peaks.size() / bars, max = 0;
+            int from = b * peaks.size() / bars;
+            int to = (b + 1) * peaks.size() / bars;
+            int max = 0;
             for (int i = from; i < to; i++) max = Math.max(max, peaks.get(i));
             out.add(max * 1024 / 32767);
         }

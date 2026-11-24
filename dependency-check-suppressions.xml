@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- OWASP Dependency-Check's false positives (build.yml, job dependency-check). Each <suppress> names one dependency and
+     one CVE, with <notes> saying why it doesn't apply here (WorkflowRulesTest fails on one without). A real finding is
+     fixed by upgrading, never suppressed. -->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+</suppressions>

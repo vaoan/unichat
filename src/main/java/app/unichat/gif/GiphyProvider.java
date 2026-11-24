@@ -40,8 +40,10 @@ public final class GiphyProvider implements GifProvider {
     static List<Gif> parse(JsonNode root) {
         List<Gif> out = new ArrayList<>();
         for (JsonNode d : root.path("data")) {
-            JsonNode small = d.path("images").path("fixed_width"), orig = d.path("images").path("original");
-            String preview = text(small.path("url")), gif = text(orig.path("url"));
+            JsonNode small = d.path("images").path("fixed_width");
+            JsonNode orig = d.path("images").path("original");
+            String preview = text(small.path("url"));
+            String gif = text(orig.path("url"));
             if (preview == null || gif == null) continue;
             out.add(new Gif("giphy", d.path("id").asText(), d.path("title").asText(""), preview, text(orig.path("mp4")), gif,
                     orig.path("width").asInt(0), orig.path("height").asInt(0)));

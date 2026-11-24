@@ -3,6 +3,7 @@ package app.unichat.matrix;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -17,7 +18,7 @@ import java.util.List;
 final class ForwardedContent {
     /** What {@code ui/timeline/HtmlView} never shows, contents and all: none of it goes out as one's own. */
     private static final String UNSHOWN = "mx-reply, script, style, head, title, meta, link, iframe, object, embed, noscript, template, video, audio";
-    /** Invisible marks that turn text around ("factura‮fdp.exe" shows as "facturaexe.pdf"). */
+    /** Invisible marks that turn text around ("factura" + U+202E + "fdp.exe" shows as "facturaexe.pdf"). */
     private static final String BIDI = "[\\u202A-\\u202E\\u2066-\\u2069\\u200E\\u200F]";
 
     private ForwardedContent() {}
@@ -57,14 +58,15 @@ final class ForwardedContent {
         String name = app.unichat.video.GifVideos.webpName(content.path("filename").asText(content.path("body").asText("gif")));
         if (content.path("body").asText().equals(content.path("filename").asText())) content.put("body", name);
         content.put("msgtype", "m.image").put("filename", name);
-        ObjectNode info = content.with("info");
+        ObjectNode info = content.withObjectProperty("info");
         info.put("mimetype", StickerConverter.WEBP).put("size", size);
         info.remove(List.of("duration", "thumbnail_url", "thumbnail_info"));
     }
 
     /** A file's name, its invisible marks taken out, or "file". */
     static String fileName(Message m) {
-        return m.fileName() == null ? "file" : m.fileName().replaceAll("\\p{Cf}", "");
+        String name = m.fileName();
+        return name == null ? "file" : name.replaceAll("\\p{Cf}", "");
     }
 
     /**
@@ -90,6 +92,7 @@ final class ForwardedContent {
     }
 
     /** Every form a bridge reads as a person: matrix:u/…, and matrix.to (any scheme or subdomain) whose #/ is a user. */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "lowercasing only widens what counts as a person (unwrapped, the safe side); the host comes from java.net.URI, ASCII only (a non-ASCII host reads as none)")
     private static boolean isPerson(String href) {
         String h = href.strip().toLowerCase(java.util.Locale.ROOT);
         if (h.startsWith("matrix:")) return h.startsWith("matrix:u/");

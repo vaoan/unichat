@@ -64,34 +64,34 @@ class ArchiveOpenUiTest {
 
         ChatListPane list = FxWait.fx(() -> (ChatListPane) view.lookupAll("*").stream()
                 .filter(n -> n instanceof ChatListPane).findFirst().orElseThrow());
-        FxWait.fx(() -> { list.filterProperty().set(list.filterProperty().get().withView(ChatFilter.View.ARCHIVE)); return null; });
+        FxWait.onFx(() -> list.filterProperty().set(list.filterProperty().get().withView(ChatFilter.View.ARCHIVE)));
         assertEquals(true, told.getLast(), "any way to the archive (the command bar, an archived chat opened)");
         app.unichat.model.Chat archived = svc.chats().stream().filter(c -> c.archived() && !c.space()).findFirst().orElseThrow();
-        FxWait.fx(() -> { view.openChat(archived); return null; });
+        FxWait.onFx(() -> view.openChat(archived));
         assertEquals(List.of(archived.id()), opened, "an archived chat opened in the archive");
         assertEquals(archived.id(), shown.getLast(), "the chat shown never rests");
         app.unichat.model.Chat space = svc.chats().stream().filter(app.unichat.model.Chat::space).findFirst().orElseThrow();
         svc.setArchived(space.id(), true).get();
-        FxWait.fx(() -> { list.open(space); return null; });
+        FxWait.onFx(() -> list.open(space));
         assertEquals(space.id(), opened.getLast(), "a server opened in the archive");
         FxWait.settled();
         assertEquals(true, told.getLast(), "still in the archive, its server's channels showing: " + told);
         int toldBefore = told.size();
-        FxWait.fx(() -> { stage.hide(); return null; });
+        FxWait.onFx(stage::hide);
         FxWait.settled();
         assertEquals(toldBefore, told.size(), "a hidden window doesn't leave the archive: " + told);
-        FxWait.fx(() -> { view.dispose(); return null; });
+        FxWait.onFx(view::dispose);
         svc.stop();
     }
 
-    private static ButtonBase rail(Node root, String name) throws Exception {
+    private static ButtonBase rail(Node root, String name) throws InterruptedException {
         return FxWait.fx(() -> (ButtonBase) root.lookupAll("*").stream()
                 .filter(n -> n instanceof ButtonBase b && b.getAccessibleText() != null && b.getAccessibleText().startsWith(name))
                 .filter(Node::isVisible).findFirst().orElseThrow(() -> new AssertionError("no rail button " + name)));
     }
 
-    private static void click(ButtonBase b) throws Exception {
-        FxWait.fx(() -> { b.fire(); return null; });
+    private static void click(ButtonBase b) throws InterruptedException {
+        FxWait.onFx(b::fire);
         FxWait.settled();
     }
 }

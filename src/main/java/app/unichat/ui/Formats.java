@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -14,8 +15,8 @@ import java.util.Locale;
 public final class Formats {
     private Formats() {}
 
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("d/M/yy");
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT);
+    private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("d/M/yy", Locale.ROOT);
 
     public static String time(Instant t, ZoneId zone) {
         return TIME.format(t.atZone(zone));
@@ -82,7 +83,7 @@ public final class Formats {
      * Two characters naming one of your accounts in a tiny avatar: the last two digits of a phone number
      * ("+57 300 111 2233" → "33"), otherwise the initials ("Work" → "W", "Ana Pérez" → "AP").
      */
-    public static String accountShort(String label) {
+    public static String accountShort(@Nullable String label) {
         if (label == null || label.isBlank()) return "?";
         String digits = label.replaceAll("\\D", "");
         if (label.trim().matches("[+\\d][\\d ()\\-]{5,}") && digits.length() >= 2) return digits.substring(digits.length() - 2);

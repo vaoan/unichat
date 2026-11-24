@@ -10,6 +10,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -24,7 +25,8 @@ final class LastLearnedBox {
     private final WritingStyle style;
     private final Consumer<String> restored;
     private final Label when = new Label();
-    private final Label added = Labels.help(""), removed = Labels.help("");
+    private final Label added = Labels.help("");
+    private final Label removed = Labels.help("");
     private final Button undo = new Button();
     private final Label pending = new Label();
     private final Node node;
@@ -82,7 +84,7 @@ final class LastLearnedBox {
     }
 
     /** {@code title} and a line per trait; hidden when there's no title. */
-    private static void show(Label l, String title, List<String> traits) {
+    private static void show(Label l, @Nullable String title, List<String> traits) {
         StringBuilder b = new StringBuilder(title == null ? "" : title);
         for (String t : traits) b.append("\n• ").append(t);
         l.setText(b.toString());

@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.skin.TextAreaSkin;
@@ -23,6 +24,7 @@ final class LineSelection {
         this.box = box;
     }
 
+    @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY", justification = "whether two places are on the same line: the same layout's exact values")
     void step(boolean towardsStart) {
         if (!(box.getSkin() instanceof TextAreaSkin skin) || box.getLength() == 0) return;
         int caret = box.getCaretPosition();

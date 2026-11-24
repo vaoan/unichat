@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.ui.FxWait;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
@@ -42,7 +43,7 @@ class PasteUiTest {
             Stage stage = new Stage();
             stage.setScene(new Scene(c, 700, 160));
             stage.show();
-            ClipboardContent picture = new ClipboardContent();
+            var picture = new ClipboardContent();
             picture.putImage(new WritableImage(64, 48)); // as Chrome's "Copy image" leaves it: a picture, no text
             Clipboard.getSystemClipboard().setContent(picture);
             c.paste();
@@ -51,11 +52,11 @@ class PasteUiTest {
         FxWait.until("the pasted picture in the chat", () -> svc.messages(CHAT).size() > before);
         Message sent = svc.messages(CHAT).get(svc.messages(CHAT).size() - 1);
         assertEquals(MessageType.IMAGE, sent.type());
-        assertTrue(sent.fileName().startsWith("image-") && sent.fileName().endsWith(".png"), sent.fileName());
+        assertTrue(Present.of(sent.fileName()).startsWith("image-") && Present.of(sent.fileName()).endsWith(".png"), sent.fileName());
 
         int after = svc.messages(CHAT).size();
         String box = FxWait.fx(() -> {
-            ClipboardContent text = new ClipboardContent();
+            var text = new ClipboardContent();
             text.putString("hola");
             Clipboard.getSystemClipboard().setContent(text);
             composer.paste();

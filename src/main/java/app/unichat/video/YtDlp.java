@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.DoubleConsumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * yt-dlp, which downloads the video behind a link (YouTube, Instagram, TikTok, X and hundreds more): the pinned
@@ -26,7 +27,7 @@ public final class YtDlp {
     private YtDlp() {}
 
     /** yt-dlp, downloading it when missing. Blocking; one at a time. Null when there's none for this computer. */
-    public static synchronized Path whenNeeded(DoubleConsumer progress) throws IOException, InterruptedException {
+    public static synchronized @Nullable Path whenNeeded(DoubleConsumer progress) throws IOException, InterruptedException {
         Path target = Settings.get().dir().resolve("tools").resolve("yt-dlp").resolve(EXE);
         if (Files.isExecutable(target)) return target;
         PinnedTool b = Os.pick(MAC, MAC, WINDOWS_AMD64);

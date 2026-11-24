@@ -9,6 +9,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.ProgressIndicator;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,6 +35,7 @@ public final class Showing {
     private Showing() {}
 
     /** What {@link #whileShowing} returns: stops watching (a node handed another animation). */
+    @FunctionalInterface
     public interface Watch {
         void cancel();
     }
@@ -44,7 +46,7 @@ public final class Showing {
     }
 
     /** Whether something in {@code w} can be seen: it shows, isn't minimised, and anyone can see Unichat. */
-    public static boolean seen(Window w) {
+    public static boolean seen(@Nullable Window w) {
         return w != null && w.isShowing() && !(w instanceof Stage st && st.isIconified()) && Seen.get().now();
     }
 
@@ -80,11 +82,18 @@ public final class Showing {
     public static final class Animated implements Watch {
         private final Animation animation;
         private final Watch watch;
-        private boolean wanted, shown;
+        private boolean wanted;
+        private boolean shown;
 
         private Animated(Node node, Animation animation) {
             this.animation = animation;
-            watch = whileShowing(node, () -> { shown = true; follow(); }, () -> { shown = false; follow(); });
+            watch = whileShowing(node, () -> {
+                shown = true;
+                follow();
+            }, () -> {
+                shown = false;
+                follow();
+            });
         }
 
         /** Whether it should run when it can be seen (a count going on), or not at all. */
@@ -139,7 +148,7 @@ public final class Showing {
         }
 
         private void set(double v) {
-            setting = true;
+            setting = true; // NOPMD: UnusedAssignment, read by the listeners the change below fires
             try {
                 p.setProgress(v);
             } finally {
@@ -150,12 +159,13 @@ public final class Showing {
 
     private static final class Watcher implements Watch {
         private final Node node;
-        private final Runnable start, stop;
+        private final Runnable start;
+        private final Runnable stop;
         private final ChangeListener<Scene> onScene = (o, a, s) -> scene(s);
         private final ChangeListener<Window> onWindow = (o, a, w) -> window(w);
         private final ChangeListener<Boolean> onChange = (o, a, s) -> update();
-        private Scene scene;
-        private Window window;
+        private @Nullable Scene scene;
+        private @Nullable Window window;
         private boolean shown;
 
         Watcher(Node node, Runnable start, Runnable stop) {
@@ -166,17 +176,19 @@ public final class Showing {
             scene(node.getScene());
         }
 
-        private void scene(Scene s) {
-            if (scene != null) scene.windowProperty().removeListener(onWindow);
+        private void scene(@Nullable Scene s) {
+            Scene old = scene;
+            if (old != null) old.windowProperty().removeListener(onWindow);
             scene = s;
             if (s != null) s.windowProperty().addListener(onWindow);
             window(s == null ? null : s.getWindow());
         }
 
-        private void window(Window w) {
-            if (window != null) {
-                window.showingProperty().removeListener(onChange);
-                if (window instanceof Stage st) st.iconifiedProperty().removeListener(onChange);
+        private void window(@Nullable Window w) {
+            Window old = window;
+            if (old != null) {
+                old.showingProperty().removeListener(onChange);
+                if (old instanceof Stage st) st.iconifiedProperty().removeListener(onChange);
             }
             window = w;
             if (w != null) {
@@ -187,9 +199,10 @@ public final class Showing {
         }
 
         private void update() {
-            if (window != null && window.isShowing()) SHOWN_WINDOWS.add(this);
+            Window w = window;
+            if (w != null && w.isShowing()) SHOWN_WINDOWS.add(this);
             else SHOWN_WINDOWS.remove(this);
-            boolean now = seen(window);
+            boolean now = seen(w);
             if (now == shown) return;
             shown = now;
             (now ? start : stop).run();

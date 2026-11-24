@@ -56,7 +56,7 @@ class TextCopyTest {
                 # What was said in this chat, copied by Unichat: each message, and each version if it was edited.
                 """, copy.substring(0, copy.indexOf("\n\n") + 1));
         assertEquals(List.of(" · written before AI correction · ", " · corrected with AI · ", " · edited · "),
-                copy.lines().filter(l -> l.startsWith("2026")).map(l -> l.substring(l.indexOf(" · Yo") + 5, l.indexOf("{"))).toList());
+                copy.lines().filter(l -> l.startsWith("2026")).map(l -> l.substring(l.indexOf(" · Yo") + 5, l.indexOf('{'))).toList());
     }
 
     @Test

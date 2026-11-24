@@ -1,5 +1,6 @@
 package app.unichat.settings;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VaultSecretsTest {
     @TempDir
     Path dir;
-    private Settings settings;
+    private @Nullable Settings settings;
 
     @AfterEach
     void done() {
@@ -58,16 +59,16 @@ class VaultSecretsTest {
         theirs.put("server.telegram.apiId", "12345");
         theirs.put("gif.giphy.key", "clave");
         s.adoptVaultSecrets(theirs);
-        assertEquals("say hola", s.getString("stt.command", null));
-        assertNull(s.getString("stt.engine", null));
-        assertEquals("/Users/ana/Fotos", s.getString("autosave.x", null));
-        assertEquals("token-de-aqui", s.getString("cloud.secret", null));
-        assertNull(s.getString("matrix.accessToken", null));
-        assertNull(s.getString("ui.theme", null), "the settings travel in their own part");
-        assertNull(s.getString("gif.a.b.key", null));
-        assertNull(s.getString("gif..key", null));
-        assertEquals("12345", s.getString("server.telegram.apiId", null), "the person's keys are taken");
-        assertEquals("clave", s.getString("gif.giphy.key", null));
+        assertEquals("say hola", s.getString("stt.command"));
+        assertNull(s.getString("stt.engine"));
+        assertEquals("/Users/ana/Fotos", s.getString("autosave.x"));
+        assertEquals("token-de-aqui", s.getString("cloud.secret"));
+        assertNull(s.getString("matrix.accessToken"));
+        assertNull(s.getString("ui.theme"), "the settings travel in their own part");
+        assertNull(s.getString("gif.a.b.key"));
+        assertNull(s.getString("gif..key"));
+        assertEquals("12345", s.getString("server.telegram.apiId"), "the person's keys are taken");
+        assertEquals("clave", s.getString("gif.giphy.key"));
     }
 
     @Test
@@ -90,9 +91,9 @@ class VaultSecretsTest {
             "gif.tenor.key", "t", "cloud.dropboxAppKey", "d", "cloud.pcloudClientId", "p"), s.vaultSecrets(),
             "the vault's win where both have one; what only this computer has stays");
         assertFalse(s.adoptVaultSecrets(s.vaultSecrets()), "the same as the vault's: nothing more to send");
-        assertEquals("never", s.getString("cloud.secret", null));
-        assertEquals("8008", s.getString("server.port", null));
-        assertEquals("DARK", s.getString("ui.theme", null));
+        assertEquals("never", s.getString("cloud.secret"));
+        assertEquals("8008", s.getString("server.port"));
+        assertEquals("DARK", s.getString("ui.theme"));
         assertTrue(Settings.vaultSecret("gif.giphy.key"));
         assertFalse(Settings.vaultSecret("gif.giphy.enabled"));
     }
@@ -103,10 +104,10 @@ class VaultSecretsTest {
         s.set("server.telegram.apiId", "12345");
         s.set("server.telegram.apiHash", "0123456789abcdef0123456789abcdef");
         assertTrue(s.adoptVaultSecrets(Map.of("server.telegram.apiId", "-1; rm", "server.telegram.apiHash", "no es un hash")));
-        assertEquals("12345", s.getString("server.telegram.apiId", null), "kept: what the vault had isn't a key");
-        assertEquals("0123456789abcdef0123456789abcdef", s.getString("server.telegram.apiHash", null));
+        assertEquals("12345", s.getString("server.telegram.apiId"), "kept: what the vault had isn't a key");
+        assertEquals("0123456789abcdef0123456789abcdef", s.getString("server.telegram.apiHash"));
         s.adoptVaultSecrets(Map.of("server.telegram.apiId", "777", "server.telegram.apiHash", "FEDCBA9876543210fedcba9876543210"));
-        assertEquals("777", s.getString("server.telegram.apiId", null));
-        assertEquals("FEDCBA9876543210fedcba9876543210", s.getString("server.telegram.apiHash", null));
+        assertEquals("777", s.getString("server.telegram.apiId"));
+        assertEquals("FEDCBA9876543210fedcba9876543210", s.getString("server.telegram.apiHash"));
     }
 }

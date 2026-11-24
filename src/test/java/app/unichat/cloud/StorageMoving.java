@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
@@ -21,7 +22,7 @@ final class StorageMoving {
      * A file and a folder with all in it move on the server, names with spaces and accents too; never over something
      * already there (both stay as they were); nothing there to move fails; a path that could reach more is refused.
      */
-    static void check(Storage storage) throws Exception {
+    static void check(Storage storage) throws IOException {
         storage.mkdirs("Unichat/Old/Mamá d");
         storage.put("Unichat/Old/Mamá d/video [1].mp4", bytes("video"));
         storage.put("Unichat/Old/one.json", bytes("{}"));
@@ -37,17 +38,17 @@ final class StorageMoving {
         assertEquals(Set.of("Mamá d"), Set.copyOf(storage.list("Unichat/New")));
 
         storage.put("Unichat/Other/three.json", bytes("tres"));
-        assertThrows(java.io.IOException.class, () -> storage.move("Unichat/Other/two.json", "Unichat/Other/three.json"), "never over a file");
+        assertThrows(IOException.class, () -> storage.move("Unichat/Other/two.json", "Unichat/Other/three.json"), "never over a file");
         assertArrayEquals(bytes("{}"), storage.get("Unichat/Other/two.json"));
         assertArrayEquals(bytes("tres"), storage.get("Unichat/Other/three.json"));
-        assertThrows(java.io.IOException.class, () -> storage.move("Unichat/New", "Unichat/Other"), "never over a folder");
+        assertThrows(IOException.class, () -> storage.move("Unichat/New", "Unichat/Other"), "never over a folder");
         assertTrue(storage.exists("Unichat/New/Mamá d/video [1].mp4"));
         assertTrue(storage.exists("Unichat/Other/two.json"));
 
-        assertThrows(java.io.IOException.class, () -> storage.move("Unichat/Nada", "Unichat/Algo"), "nothing there to move");
+        assertThrows(IOException.class, () -> storage.move("Unichat/Nada", "Unichat/Algo"), "nothing there to move");
         for (String bad : new String[] {"", "/", "a/../b", "Unichat/.."}) {
-            assertThrows(java.io.IOException.class, () -> storage.move(bad, "Unichat/X"), "refused: '" + bad + "'");
-            assertThrows(java.io.IOException.class, () -> storage.move("Unichat/New", bad), "refused: '" + bad + "'");
+            assertThrows(IOException.class, () -> storage.move(bad, "Unichat/X"), "refused: '" + bad + "'");
+            assertThrows(IOException.class, () -> storage.move("Unichat/New", bad), "refused: '" + bad + "'");
         }
         assertTrue(storage.exists("Unichat/New/Mamá d/video [1].mp4"), "a refused path moves nothing");
     }

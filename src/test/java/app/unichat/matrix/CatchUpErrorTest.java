@@ -1,11 +1,16 @@
 package app.unichat.matrix;
 
+import app.unichat.support.PathParts;
+
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -25,15 +30,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class CatchUpErrorTest {
     private static final String ME = "@yo:localhost";
 
+    @SuppressWarnings("NullAway.Init") // fakeHomeserver() sets it, and every test calls it first
     private HttpServer server;
     /** The {@code since} of each /sync asked for, "" for a full one. */
     private final BlockingQueue<String> syncs = new LinkedBlockingQueue<>();
     private final AtomicBoolean failedOnce = new AtomicBoolean();
     private final CountDownLatch testOver = new CountDownLatch(1);
-    private MatrixChatService svc;
+    private @Nullable MatrixChatService svc;
 
-    private void fakeHomeserver(int status, String errcode) throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    private void fakeHomeserver(int status, String errcode) throws IOException {
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             String path = ex.getRequestURI().getPath();
             String body = "{}";
@@ -89,7 +95,7 @@ class CatchUpErrorTest {
         svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), ME, "token");
         svc.pauseRetriesWith(millis -> { }); // which sync comes next is the point, not the wait before it
         Path f = svc.syncCacheFile();
-        Files.createDirectories(f.getParent());
+        Files.createDirectories(PathParts.parent(f));
         Files.writeString(f, "{\"next_batch\":\"s1\",\"rooms\":{}}");
         svc.start();
 

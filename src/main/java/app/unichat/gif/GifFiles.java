@@ -3,9 +3,12 @@ package app.unichat.gif;
 import app.unichat.model.MediaLibrary;
 import app.unichat.settings.Settings;
 import app.unichat.support.BoundedBody;
+import app.unichat.support.Folders;
 import app.unichat.support.I18n;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,6 +22,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Turning a provider's GIF into something to send and keep: the library item (with the small GIF preview, since
@@ -33,15 +37,16 @@ public final class GifFiles {
     private GifFiles() {}
 
     public static MediaLibrary.Item item(Gif g) {
-        boolean mp4 = g.mp4Url() != null;
+        String mp4 = g.mp4Url();
         ObjectNode info = JsonNodeFactory.instance.objectNode().put("preview", g.previewUrl()).put("title", g.title());
-        return new MediaLibrary.Item(MediaLibrary.Kind.GIF, mp4 ? g.mp4Url() : g.gifUrl(), mp4 ? "video/mp4" : "image/gif",
+        return new MediaLibrary.Item(MediaLibrary.Kind.GIF, mp4 != null ? mp4 : g.gifUrl(), mp4 != null ? "video/mp4" : "image/gif",
                 g.width(), g.height(), info);
     }
 
     /** The image to show for a library GIF: its saved preview, else the file itself (null when there's neither). */
-    public static String preview(MediaLibrary.Item i) {
-        String p = i.info() == null ? null : HttpJson.text(i.info().path("preview"));
+    public static @Nullable String preview(MediaLibrary.Item i) {
+        JsonNode info = i.info();
+        String p = info == null ? null : HttpJson.text(info.path("preview"));
         return p != null ? p : "video/mp4".equals(i.mime()) ? null : i.url();
     }
 
@@ -52,12 +57,14 @@ public final class GifFiles {
      * The address comes from the provider's answer, so it's a stranger's: https only (redirects never drop to http) and at
      * most {@link #MAX_BYTES}, within {@code timeout} for the headers and again for the body.
      */
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a java.net.URI scheme is ASCII letters only (URI refuses any other), so equalsIgnoreCase can't be fooled by a look-alike")
     public static Path download(String url, String ext, Duration timeout) throws IOException, InterruptedException {
         URI uri = URI.create(url);
         if (!"https".equalsIgnoreCase(uri.getScheme())) throw new IOException(I18n.t("link.notAllowed"));
         return fetch(uri, ext, timeout, MAX_BYTES);
     }
 
+    @SuppressFBWarnings(value = "PATH_TRAVERSAL_IN", justification = "a temp file in our own folder with a fixed prefix and a suffix of ours (.gif or .mp4, GifGrid); Files.createTempFile also refuses a suffix with a separator")
     static Path fetch(URI url, String ext, Duration timeout, long maxBytes) throws IOException, InterruptedException {
         HttpResponse<InputStream> r = HTTP.send(HttpRequest.newBuilder(url).timeout(timeout).build(),
                 HttpResponse.BodyHandlers.ofInputStream());
@@ -86,7 +93,7 @@ public final class GifFiles {
                 } catch (IOException e) {
                     return false;
                 }
-            }).forEach(f -> f.toFile().delete());
+            }).forEach(Folders::deleteQuietly);
         } catch (IOException ignored) {
             // Nothing to prune.
         }

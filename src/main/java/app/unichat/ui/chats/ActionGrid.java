@@ -64,10 +64,13 @@ final class ActionGrid extends Pane {
     @Override protected void layoutChildren() {
         var kids = getManagedChildren();
         if (kids.isEmpty()) return;
-        double w = inner(getWidth()), tile = tileWidth(), tileH = tileHeight();
+        double w = inner(getWidth());
+        double tile = tileWidth();
+        double tileH = tileHeight();
         int cols = columns(w);
         for (int i = 0; i < kids.size(); i++) {
-            int row = i / cols, col = i % cols;
+            int row = i / cols;
+            int col = i % cols;
             int inRow = Math.min(cols, kids.size() - row * cols);
             double rowWidth = inRow * tile + (inRow - 1) * gap;
             double x = snappedLeftInset() + (w - rowWidth) / 2 + col * (tile + gap);

@@ -25,7 +25,8 @@ public final class SyncedSettings {
         Notifier.notificationsChanged();
         UpdateChecker.get().settingChanged();
         redraw.run();
-        if (SettingsWindow.current() != null) SettingsWindow.select(SettingsWindow.currentPage()); // its controls show the new values
+        String page = SettingsWindow.currentPage(); // null: no window open
+        if (page != null) SettingsWindow.select(page); // its controls show the new values
         I18n.use(System.getProperty("unichat.language", Settings.get().language()));
     }
 }

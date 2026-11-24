@@ -1,6 +1,9 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.support.I18n;
+import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -15,6 +18,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -27,7 +31,7 @@ class PasskeyPageTest {
     private final List<PasskeyPage.Finding> found = new CopyOnWriteArrayList<>();
     private final URI[] opened = {null};
 
-    private CompletableFuture<Void> start() throws Exception {
+    private CompletableFuture<Void> start() throws IOException {
         return PasskeyPage.start(u -> opened[0] = u, found::add, 0, PCloudTest.NO_LIMIT);
     }
 
@@ -36,13 +40,13 @@ class PasskeyPageTest {
         return URI.create("http://127.0.0.1:" + opened[0].getPort() + path);
     }
 
-    private HttpResponse<String> post(String body) throws Exception {
+    private HttpResponse<String> post(String body) throws IOException, InterruptedException {
         return HTTP.send(HttpRequest.newBuilder(at("/passkey/result"))
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    private String state() throws Exception {
+    private String state() throws IOException, InterruptedException {
         String page = HTTP.send(HttpRequest.newBuilder(at("/passkey")).build(), HttpResponse.BodyHandlers.ofString()).body();
         var m = Pattern.compile("const STATE = \"([0-9a-f]+)\"").matcher(page);
         assertTrue(m.find(), "the page carries its state");
@@ -132,9 +136,9 @@ class PasskeyPageTest {
         try {
             HttpResponse<String> made = post("state=" + state() + "&step=create&prfEnabled=true");
             assertEquals(I18n.t("cloud.passkey.createdPrf"), made.body());
-            assertEquals(Boolean.TRUE, found.getFirst().prfEnabled());
+            assertEquals(true, found.getFirst().prfEnabled());
             post("state=" + state() + "&step=create&prfEnabled=false");
-            assertEquals(Boolean.FALSE, found.get(1).prfEnabled());
+            assertEquals(false, found.get(1).prfEnabled());
             assertEquals(I18n.t("cloud.passkey.createdNoPrf"), found.get(1).said());
             post("state=" + state() + "&step=create");
             assertNull(found.get(2).prfEnabled(), "the browser said nothing about it");
@@ -159,12 +163,14 @@ class PasskeyPageTest {
     }
 
     /** What a browser sends for another name (DNS rebinding: evil.example resolved to 127.0.0.1); HttpClient won't set Host. */
-    private int raw(String request) throws Exception {
-        try (java.net.Socket s = new java.net.Socket("127.0.0.1", opened[0].getPort())) {
+    @SuppressFBWarnings(value = "UNENCRYPTED_SOCKET", justification = "talks to the page under test on 127.0.0.1, inside the test")
+    private int raw(String request) throws IOException {
+        try (java.net.Socket s = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), opened[0].getPort())) {
             s.getOutputStream().write(request.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
             s.getOutputStream().flush();
             String status = new java.io.BufferedReader(new java.io.InputStreamReader(s.getInputStream(),
                     java.nio.charset.StandardCharsets.US_ASCII)).readLine();
+            if (status == null) throw new IOException("no answer");
             return Integer.parseInt(status.split(" ")[1]);
         }
     }
@@ -248,8 +254,8 @@ class PasskeyPageTest {
     void aProbeLeftInTheBrowserEndsAtItsDeadlineAndFreesThePort() throws Exception {
         CompletableFuture<Void> probe = PasskeyPage.start(u -> opened[0] = u, found::add, 0, Duration.ZERO);
         var e = assertThrows(ExecutionException.class, probe::get); // get: a JUnit timeout can interrupt it
-        assertEquals(I18n.t("cloud.passkey.expired"), e.getCause().getMessage(), "a probe, not a sign-in");
-        assertTrue(e.getCause() instanceof Loopback.Expired);
+        assertEquals(I18n.t("cloud.passkey.expired"), Present.of(e.getCause()).getMessage(), "a probe, not a sign-in");
+        assertInstanceOf(Loopback.Expired.class, e.getCause());
         PCloudTest.portIsFree(opened[0].toString());
     }
 

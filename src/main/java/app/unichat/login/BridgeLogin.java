@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 import static app.unichat.support.Urls.enc;
 
@@ -25,34 +26,38 @@ public final class BridgeLogin {
     public record Flow(String id, String name, String description) {}
 
     /** One input of a {@code user_input} step. {@code type}: phone_number, 2fa_code, password, username, email, token, url, domain, select, captcha_code. */
-    public record Field(String type, String id, String name, String description, String defaultValue, boolean optional,
-                        String pattern, List<String> options) {}
+    public record Field(String type, String id, String name, String description, @Nullable String defaultValue, boolean optional,
+                        @Nullable String pattern, List<String> options) {}
 
     /** Where a cookie-step value comes from; {@code type} is cookie, local_storage, request_header, request_body or special. */
-    public record Source(String type, String name, String cookieDomain) {}
+    public record Source(String type, String name, @Nullable String cookieDomain) {}
 
-    public record CookieField(String id, boolean required, List<Source> sources, String pattern) {
+    public record CookieField(String id, boolean required, List<Source> sources, @Nullable String pattern) {
         public CookieField(String id, boolean required, List<Source> sources) {
             this(id, required, sources, null);
         }
     }
 
-    public record CookieParams(String url, String userAgent, List<CookieField> fields, String extractJs, String waitForUrlPattern) {}
+    public record CookieParams(String url, @Nullable String userAgent, List<CookieField> fields, @Nullable String extractJs,
+                               @Nullable String waitForUrlPattern) {}
 
     /** What to show while the bridge waits: {@code type} qr, emoji, code or nothing. */
-    public record Display(String type, String data, String imageUrl, boolean canCancel) {}
+    public record Display(String type, @Nullable String data, @Nullable String imageUrl, boolean canCancel) {}
 
     /**
      * One step of a login. {@code type}: user_input, cookies, display_and_wait, complete (client_http and webauthn
      * are not supported by Unichat). Exactly the params matching {@code type} are set.
      */
     public record Step(String loginId, String type, String stepId, String instructions, List<Field> fields,
-                       Display display, CookieParams cookies, String userLoginId) {
+                       @Nullable Display display, @Nullable CookieParams cookies, @Nullable String userLoginId) {
         public boolean isComplete() { return "complete".equals(type); }
     }
 
     /** The bridge refused a request; {@code errcode} like M_FORBIDDEN, message from the bridge. */
     public static final class BridgeLoginException extends IOException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
         private final String errcode;
 
         public BridgeLoginException(String errcode, String message) {
@@ -76,7 +81,7 @@ public final class BridgeLogin {
     }
 
     /** An account signed in on this bridge; {@code state} like CONNECTED, CONNECTING, BAD_CREDENTIALS. */
-    public record Account(String id, String name, String state) {}
+    public record Account(String id, @Nullable String name, @Nullable String state) {}
 
     /** The accounts signed in on this bridge (whoami): the source of truth, no bot chat needed. */
     public List<Account> accounts() throws IOException, InterruptedException {
@@ -108,7 +113,7 @@ public final class BridgeLogin {
         ObjectNode body = JSON.createObjectNode();
         values.forEach(body::put);
         return step(call("POST", "/v3/login/step/" + enc(step.loginId()) + "/" + enc(step.stepId()) + "/" + enc(step.type()),
-                body, Duration.ofSeconds(120)));
+                body, Duration.ofMinutes(2)));
     }
 
     /** For display_and_wait: returns when the user did the thing (scanned the QR…) or the step changed (new QR). */
@@ -162,14 +167,14 @@ public final class BridgeLogin {
                 List.copyOf(fields), display, cookies, text(j.path("complete"), "user_login_id"));
     }
 
-    private static String text(JsonNode n, String key) {
+    private static @Nullable String text(JsonNode n, String key) {
         JsonNode v = n.path(key);
         return v.isMissingNode() || v.isNull() || v.asText().isEmpty() ? null : v.asText();
     }
 
     // ---------------------------------------------------------------- http
 
-    private JsonNode call(String method, String path, JsonNode body, Duration timeout) throws IOException, InterruptedException {
+    private JsonNode call(String method, String path, @Nullable JsonNode body, Duration timeout) throws IOException, InterruptedException {
         return Provisioning.call(http, method, base + path + "?user_id=" + enc(userId), accessToken, body, timeout).orThrow();
     }
 }

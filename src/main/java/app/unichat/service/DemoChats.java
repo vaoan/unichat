@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,10 +26,6 @@ final class DemoChats {
 
     private DemoChats() {}
 
-    /**
-     * Gives a demo chat its key and applies what the file has chosen. Only fields the file has override the demo's own
-     * values ({@link PreferencesFile#preview} falls back to them), so an empty file changes nothing.
-     */
     /** The phone's contacts the demo's WhatsApp offers. */
     static List<Contact> contacts() {
         return List.of(
@@ -40,11 +37,16 @@ final class DemoChats {
                 new Contact("c-pedro", I18n.t("demo.name.pedro"), List.of("tel:+573001110006"), null, null));
     }
 
+    /**
+     * Gives a demo chat its key and applies what the file has chosen. Only fields the file has override the demo's own
+     * values ({@link PreferencesFile#preview} falls back to them), so an empty file changes nothing.
+     */
     static void adopt(PreferencesFile prefs, Chat c) {
-        c.setPrefKey(ChatKeys.of(null, null, c.id()));
+        String key = ChatKeys.of(null, null, c.id());
+        c.setPrefKey(key);
         var demo = new PreferencesFile.ServerValues(c.archived(), c.muted(), c.favorite(), c.lowPriority(), c.pinned(),
                 c.reminderAt(), true);
-        var e = prefs.preview(c.prefKey(), demo);
+        var e = prefs.preview(key, demo);
         c.setArchived(e.archived());
         c.setMuted(e.muted());
         c.setFavorite(e.favorite());
@@ -55,7 +57,6 @@ final class DemoChats {
 
     static void seed(MockChatService svc) {
         Map<String, Account> accounts = svc.accounts;
-        Instant now = Instant.now();
         for (Network n : List.of(Network.WHATSAPP, Network.TELEGRAM, Network.INSTAGRAM, Network.SIGNAL,
                 Network.DISCORD, Network.SLACK, Network.MESSENGER, Network.GOOGLE_MESSAGES)) {
             if (n != Network.WHATSAPP) accounts.put(n.protocolId(), new Account(n, "demo_" + n.protocolId(), AccountStatus.CONNECTED, null));
@@ -204,7 +205,7 @@ final class DemoChats {
             chat.setGroup(group);
             List<Member> members = new ArrayList<>(List.of(new Member(ME, I18n.t("demo.me"), null)));
             for (String n : names) {
-                Member m = new Member("@" + network.protocolId() + "_" + n.toLowerCase().replaceAll("[^a-z0-9]", "") + ":demo.unichat", n, null);
+                Member m = new Member("@" + network.protocolId() + "_" + n.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "") + ":demo.unichat", n, null);
                 people.put(n, m);
                 members.add(m);
             }
@@ -219,12 +220,18 @@ final class DemoChats {
             return new ChatBuilder(svc, key, network, title, true, names);
         }
 
-        private Member single() { return people.values().iterator().next(); }
+        /** The one person of a direct chat, by the name they were given. */
+        private String single() { return people.keySet().iterator().next(); }
 
-        ChatBuilder in(long secs, String text) { return in(secs, single().name(), text); }
+        /** Someone given to this chat by name (a name it wasn't given is a mistake in the demo). */
+        private Member person(String name) {
+            return java.util.Objects.requireNonNull(people.get(name), name);
+        }
+
+        ChatBuilder in(long secs, String text) { return in(secs, single(), text); }
 
         ChatBuilder in(long secs, String who, String text) {
-            Member m = who.equals(I18n.t("demo.me")) ? new Member(ME, I18n.t("demo.me"), null) : people.get(who);
+            Member m = who.equals(I18n.t("demo.me")) ? new Member(ME, I18n.t("demo.me"), null) : person(who);
             Message msg = new Message(UUID.randomUUID().toString(), chat.id(), m.id(), m.name(), m.id().equals(ME), now.plusSeconds(secs));
             msg.setBody(text);
             list.add(msg);
@@ -280,7 +287,7 @@ final class DemoChats {
 
         ChatBuilder react(long secs, String emoji, String... who) {
             Message target = at(secs);
-            for (String w : who) target.toggleReaction(emoji, w.equals(I18n.t("demo.me")) ? ME : people.get(w).id());
+            for (String w : who) target.toggleReaction(emoji, w.equals(I18n.t("demo.me")) ? ME : person(w).id());
             return this;
         }
 
@@ -289,14 +296,38 @@ final class DemoChats {
             return list.stream().filter(m -> m.timestamp().equals(t)).findFirst().orElseThrow();
         }
 
-        ChatBuilder unread(int n) { chat.setUnreadCount(n); return this; }
-        ChatBuilder mention() { chat.setMentionCount(1); return this; }
-        ChatBuilder favorite() { chat.setFavorite(true); return this; }
-        ChatBuilder lowPriority() { chat.setLowPriority(true); return this; }
-        ChatBuilder archived() { chat.setArchived(true); return this; }
-        ChatBuilder muted() { chat.setMuted(true); return this; }
-        ChatBuilder pinned() { chat.setPinned(true); return this; }
-        ChatBuilder account(String id) { chat.setAccountId(id); return this; }
+        ChatBuilder unread(int n) {
+            chat.setUnreadCount(n);
+            return this;
+        }
+        ChatBuilder mention() {
+            chat.setMentionCount(1);
+            return this;
+        }
+        ChatBuilder favorite() {
+            chat.setFavorite(true);
+            return this;
+        }
+        ChatBuilder lowPriority() {
+            chat.setLowPriority(true);
+            return this;
+        }
+        ChatBuilder archived() {
+            chat.setArchived(true);
+            return this;
+        }
+        ChatBuilder muted() {
+            chat.setMuted(true);
+            return this;
+        }
+        ChatBuilder pinned() {
+            chat.setPinned(true);
+            return this;
+        }
+        ChatBuilder account(String id) {
+            chat.setAccountId(id);
+            return this;
+        }
 
         void done() {
             if (chat.accountId() == null) {

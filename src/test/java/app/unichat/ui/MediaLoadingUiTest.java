@@ -5,6 +5,7 @@ import app.unichat.model.MessageType;
 import app.unichat.service.ScriptedChatService;
 import app.unichat.settings.Settings;
 import app.unichat.ui.chats.SidePanel;
+import java.io.IOException;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.image.ImageView;
@@ -12,13 +13,13 @@ import javafx.stage.Window;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static app.unichat.ui.TimelineWindow.CHAT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A sticker or picture shows its download as it really goes (a ring with the share that arrived), and one that couldn't
@@ -26,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class MediaLoadingUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @AfterEach
@@ -33,7 +35,7 @@ class MediaLoadingUiTest {
         if (w != null) w.close();
     }
 
-    private String sticker() throws Exception {
+    private String sticker() throws IOException {
         Files.createDirectories(Settings.dataDir());
         Path p = Files.createTempFile(Settings.dataDir(), "sticker", ".png");
         return TestPictures.still(p, "png", 256, 256).toUri().toString();
@@ -47,18 +49,18 @@ class MediaLoadingUiTest {
         return (Button) in.lookup(".media-retry");
     }
 
-    /** The newest message's bubble. */
+    /** The newest message's bubble; it fails (a wait goes on) while there's none drawn. */
     private Node newestBubble() {
         javafx.scene.control.IndexedCell<?> last = w.flow().getLastVisibleCell();
-        return last == null ? null : last.getGraphic();
+        return Present.of(last == null ? null : last.getGraphic());
     }
 
     /** {@code -Dunichat.loadingShot=<prefix>} saves what {@code n} looks like (a load is too short for a snapshot run). */
-    private static void shot(Node n, String name) throws Exception {
+    private static void shot(Node n, String name) throws IOException, InterruptedException {
         String prefix = System.getProperty("unichat.loadingShot");
         if (prefix == null) return;
         var img = FxWait.fx(() -> n.snapshot(null, null));
-        javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(img, null), "png", new java.io.File(prefix + name + ".png"));
+        javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(img, null), "png", Path.of(prefix + name + ".png").toFile());
     }
 
     private boolean drawn(Node in) {
@@ -104,17 +106,16 @@ class MediaLoadingUiTest {
         FxWait.until("a way to try again", () -> retry(newestBubble()) != null && ring(newestBubble()) == null);
         shot(FxWait.fx(this::newestBubble), "retry");
         int windows = FxWait.fx(() -> Window.getWindows().size());
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             retry(newestBubble()).fireEvent(new javafx.scene.input.MouseEvent(javafx.scene.input.MouseEvent.MOUSE_CLICKED,
                     0, 0, 0, 0, javafx.scene.input.MouseButton.PRIMARY, 1, false, false, false, false, true, false, false, true,
                     false, true, null));
-            return null;
         });
         FxWait.settled();
         assertEquals(windows, FxWait.fx(() -> Window.getWindows().size()), "a click on it opens nothing else (the viewer)");
 
         ScriptedChatService.Gate again = w.svc.holdDownloads();
-        FxWait.fx(() -> { retry(newestBubble()).fire(); return null; });
+        FxWait.onFx(() -> retry(newestBubble()).fire());
         FxWait.until("loading again", () -> ring(newestBubble()) != null && retry(newestBubble()) == null);
         again.release();
         FxWait.until("the picture this time", () -> drawn(newestBubble()) && ring(newestBubble()) == null);
@@ -124,9 +125,9 @@ class MediaLoadingUiTest {
     void aStickerSetsTilesShowTheirLoadAndCanTryAgain() throws Exception {
         w = TimelineWindow.open(5);
         ScriptedChatService.Gate downloads = w.svc.holdDownloads();
-        FxWait.fx(() -> { w.view.showPanel(SidePanel.Tab.STICKERS); return null; });
+        FxWait.onFx(() -> w.view.showPanel(SidePanel.Tab.STICKERS));
         FxWait.until("the demo's set is listed", () -> w.scene.getRoot().lookup(".sticker-set") != null);
-        FxWait.fx(() -> { ((Button) w.scene.getRoot().lookup(".sticker-set")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) w.scene.getRoot().lookup(".sticker-set")).fire());
         FxWait.until("its tiles load", () -> w.scene.getRoot().lookupAll(".sticker-tile").stream().anyMatch(t -> ring(t) != null));
         downloads.fail();
         FxWait.until("each tile offers to try again", () -> w.scene.getRoot().lookupAll(".sticker-tile").stream()
@@ -134,7 +135,7 @@ class MediaLoadingUiTest {
         shot(FxWait.fx(() -> w.scene.getRoot().lookup(".sticker-set").getParent()), "set");
         ScriptedChatService.Gate again = w.svc.holdDownloads();
         Node tile = FxWait.fx(() -> w.scene.getRoot().lookupAll(".sticker-tile").stream().filter(t -> retry(t) != null).findFirst().orElseThrow());
-        FxWait.fx(() -> { retry(tile).fire(); return null; });
+        FxWait.onFx(() -> retry(tile).fire());
         again.release();
         FxWait.until("that tile's sticker shows", () -> drawn(tile) && retry(tile) == null && ring(tile) == null);
     }

@@ -1,5 +1,7 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -19,6 +21,7 @@ import java.util.concurrent.CompletionException;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -79,6 +82,7 @@ class DropboxTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aFileComesDownIntoAFileNeverWholeInMemoryWithATokenMadeAgainIfItExpired() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
             byte[] video = new byte[300_000];
@@ -114,6 +118,7 @@ class DropboxTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aBigFileGoesUpInPieces() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
             byte[] video = new byte[2500];
@@ -129,7 +134,8 @@ class DropboxTest {
     void theSettingsTravelThroughDropboxToo() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
             DropboxApi api = api(fake, DropboxApi.SINGLE, 1024);
-            Map<String, String> a = new HashMap<>(Map.of("ui.theme", "DARK")), b = new HashMap<>();
+            Map<String, String> a = new HashMap<>(Map.of("ui.theme", "DARK"));
+            Map<String, String> b = new HashMap<>();
             SyncedPart pa = new SyncedPart(CloudAccount.SETTINGS_FILE, "test-da", now -> Bundle.of("a", now, a, null), t -> { });
             SyncedPart pb = new SyncedPart(CloudAccount.SETTINGS_FILE, "test-db", now -> Bundle.of("b", now, b, null), t -> {
                 b.clear();
@@ -174,12 +180,40 @@ class DropboxTest {
         URI[] opened = {null};
         CompletableFuture<CloudAccount> login = DropboxLogin.start("APP", u -> opened[0] = u, 0, "http://127.0.0.1:9/token", java.time.Duration.ZERO);
         var e = assertThrows(java.util.concurrent.ExecutionException.class, login::get); // get: a JUnit timeout can interrupt it
-        assertEquals(app.unichat.support.I18n.t("cloud.signIn.expired"), e.getCause().getMessage());
-        PCloudTest.portIsFree(query(opened[0]).get("redirect_uri"));
+        assertEquals(app.unichat.support.I18n.t("cloud.signIn.expired"), Present.of(e.getCause()).getMessage());
+        PCloudTest.portIsFree(Present.of(query(opened[0]).get("redirect_uri")));
 
         login = DropboxLogin.start("APP", u -> opened[0] = u, 0, "http://127.0.0.1:9/token", NO_LIMIT);
         login.cancel(false);
-        PCloudTest.portIsFree(query(opened[0]).get("redirect_uri"));
+        PCloudTest.portIsFree(Present.of(query(opened[0]).get("redirect_uri")));
+    }
+
+    @Test
+    void aTokenServerThatCantBeReachedFailsTheSignInAndTheBrowserSaysSo() throws Exception {
+        URI[] opened = {null};
+        // Nothing listens on port 9: the exchange fails with a ConnectException, which has no message.
+        CompletableFuture<CloudAccount> login = DropboxLogin.start("APP", u -> opened[0] = u, 0, "http://127.0.0.1:9/token", NO_LIMIT);
+        Map<String, String> asked = query(opened[0]);
+        try {
+            HttpResponse<String> back = HTTP.send(HttpRequest.newBuilder(URI.create(asked.get("redirect_uri")
+                    + "?code=the-code&state=" + asked.get("state"))).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, back.statusCode(), "the browser is told, not left with a dropped connection");
+            String unreachable = app.unichat.support.I18n.t("cloud.dropbox.unreachable", "ConnectException");
+            assertTrue(back.body().contains(unreachable.replace("&", "&amp;").replace("<", "&lt;")), back.body());
+            var e = assertThrows(java.util.concurrent.ExecutionException.class, login::get);
+            assertEquals(unreachable, Present.message(e), "couldn't reach Dropbox, not a refusal");
+            assertInstanceOf(java.net.ConnectException.class, Present.of(e.getCause()).getCause());
+        } finally {
+            login.cancel(false);
+        }
+        PCloudTest.portIsFree(Present.of(asked.get("redirect_uri")));
+    }
+
+    @Test
+    void aFailureWithABlankMessageStillSaysWhatFailed() {
+        assertTrue(DropboxLogin.page(new IOException("")).contains("IOException"), "never an empty page");
+        assertTrue(DropboxLogin.page(new IOException(" \n")).contains("IOException"));
+        assertTrue(DropboxLogin.page(new IOException("Sin red")).contains("Sin red"), "a message there is the one shown");
     }
 
     @Test
@@ -204,7 +238,7 @@ class DropboxTest {
             DropboxApi api = api(fake, DropboxApi.SINGLE, 1024);
             Path file = Files.writeString(dir.resolve("a.jpg"), "12345");
             api.put("Unichat/a.jpg", file);
-            Storage.RemoteFile f = api.info("Unichat/a.jpg");
+            Storage.RemoteFile f = Present.of(api.info("Unichat/a.jpg"));
             assertEquals(5, f.size());
             assertEquals(Checksums.DROPBOX, f.kind());
             assertEquals(Checksums.of(file, Checksums.DROPBOX), f.hash(), "the same hash computed here and there");

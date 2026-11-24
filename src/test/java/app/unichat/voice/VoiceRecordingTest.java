@@ -1,7 +1,10 @@
 package app.unichat.voice;
 
+import app.unichat.Present;
 import app.unichat.model.VoiceNote;
 import app.unichat.stt.OggOpus;
+import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -13,10 +16,10 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class VoiceRecordingTest {
     @TempDir Path dir;
@@ -51,7 +54,7 @@ class VoiceRecordingTest {
         @Override public void close() { closed = true; }
     }
 
-    private VoiceNote record(PcmSource source) throws Exception {
+    private VoiceNote record(PcmSource source) throws IOException, IllegalAccessException, InterruptedException, NoSuchFieldException {
         VoiceRecorder r = new VoiceRecorder(source, dir.resolve("nota.ogg"));
         r.start();
         awaitEnd(r);
@@ -62,14 +65,14 @@ class VoiceRecordingTest {
      * Until the recording stops by itself (its source ran out, or the limit): joins its thread, which is what
      * {@link VoiceRecorder#ended} looks at.
      */
-    private static void awaitEnd(VoiceRecorder r) throws Exception {
+    private static void awaitEnd(VoiceRecorder r) throws IllegalAccessException, InterruptedException, NoSuchFieldException {
         // VoiceRecorder offers no way to wait for its end; a future it completed on ending would spare this reflection.
         Field thread = VoiceRecorder.class.getDeclaredField("thread");
-        thread.setAccessible(true);
+        thread.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
         ((Thread) thread.get(r)).join(); // lesson-ok: test-future-join (a thread)
     }
 
-    private static double rms(Path wav) throws Exception {
+    private static double rms(Path wav) throws IOException {
         ByteBuffer b = ByteBuffer.wrap(Files.readAllBytes(wav)).order(ByteOrder.LITTLE_ENDIAN);
         b.position(44);
         double sum = 0;
@@ -85,7 +88,7 @@ class VoiceRecordingTest {
     @Test
     void whatIsRecordedDecodesBackToTheSameLengthWithSound() throws Exception {
         VoiceNote note = record(new Tone(48_000, 440, 2));
-        assertEquals(2000, note.durationMs(), 40);
+        assertEquals(2000, (float) note.durationMs(), 40);
         assertTrue(OggOpus.isOggOpus(note.file()));
         Path wav = dir.resolve("vuelta.wav");
         OggOpus.toPlayableWav(note.file(), wav);
@@ -97,7 +100,7 @@ class VoiceRecordingTest {
     @Test
     void lowerMicrophoneRatesWorkToo() throws Exception {
         VoiceNote note = record(new Tone(16_000, 440, 1));
-        assertEquals(1000, note.durationMs(), 40);
+        assertEquals(1000, (float) note.durationMs(), 40);
         Path wav = dir.resolve("vuelta.wav");
         OggOpus.toPlayableWav(note.file(), wav);
         double seconds = (Files.size(wav) - 44) / 96_000.0;
@@ -106,12 +109,12 @@ class VoiceRecordingTest {
 
     /** Someone else's reader is the real proof: page checksums and headers have to be right. */
     @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void ffmpegAcceptsTheFileWithoutComplaint() throws Exception {
-        Path ffmpeg = app.unichat.video.Ffmpeg.find();
-        assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
         VoiceNote note = record(new Tone(48_000, 440, 1));
         Process p = new ProcessBuilder(ffmpeg.toString(), "-v", "error", "-i", note.file().toString(), "-f", "null", "-").redirectErrorStream(true).start();
-        String complaints = new String(p.getInputStream().readAllBytes());
+        String complaints = new String(p.getInputStream().readAllBytes(), UTF_8);
         assertEquals(0, p.waitFor(), complaints);
         assertEquals("", complaints.strip());
     }
@@ -142,7 +145,7 @@ class VoiceRecordingTest {
     @Test
     void cancellingLeavesNoFile() throws Exception {
         Path f = dir.resolve("c.ogg");
-        Tone tone = new Tone(48_000, 440, 60);
+        Tone tone = new Tone(48_000, 440, 60); // NOPMD: CloseResource, the recorder closes its source
         VoiceRecorder r = new VoiceRecorder(tone, f);
         r.start();
         tone.reading.await();
@@ -156,6 +159,6 @@ class VoiceRecordingTest {
         r.start();
         awaitEnd(r);
         assertTrue(r.ended());
-        assertEquals(1000, r.stop().durationMs(), 40);
+        assertEquals(1000, (float) r.stop().durationMs(), 40);
     }
 }

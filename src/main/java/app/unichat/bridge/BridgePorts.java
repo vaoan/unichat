@@ -1,6 +1,7 @@
 package app.unichat.bridge;
 
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 /** What the app and the local server agree on about each bridge: its port, its media name, its Telegram chat limit. */
 public final class BridgePorts {
@@ -27,7 +28,7 @@ public final class BridgePorts {
      * ({@link BridgeConfig#mediaServerName}): the bridge serves the client media API on its appservice port and
      * fetches the file from the network then. Null for any other server name. Static: needs no running server.
      */
-    public static String directMediaBase(String serverName) {
+    public static @Nullable String directMediaBase(String serverName) {
         for (Map.Entry<String, Integer> e : BRIDGE_PORTS.entrySet()) {
             if (mediaServerName(e.getKey()).equals(serverName)) return "http://127.0.0.1:" + e.getValue();
         }

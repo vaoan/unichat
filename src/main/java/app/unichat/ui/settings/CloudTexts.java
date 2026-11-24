@@ -3,6 +3,7 @@ package app.unichat.ui.settings;
 import app.unichat.ui.Formats;
 import app.unichat.cloud.Cloud;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -10,11 +11,12 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 
 /** What the cloud is doing, in words: Ajustes → Nube says it in a line, the tray's menu in a few. Pure. */
 public final class CloudTexts {
-    private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT);
 
     private CloudTexts() {}
 
@@ -126,11 +128,12 @@ public final class CloudTexts {
     }
 
     private static String retrying(Cloud.Status s) {
-        return s.retrying() > 0 && s.nextRetry() != null
-                ? " · " + I18n.n("settings.cloud.retrying", s.retrying(), HOUR.format(s.nextRetry().atZone(ZoneId.systemDefault()))) : "";
+        Instant next = s.nextRetry();
+        return s.retrying() > 0 && next != null
+                ? " · " + I18n.n("settings.cloud.retrying", s.retrying(), HOUR.format(next.atZone(ZoneId.systemDefault()))) : "";
     }
 
-    private static String when(Instant at, Instant now) {
+    private static String when(@Nullable Instant at, Instant now) {
         return at == null ? I18n.t("settings.cloud.never") : I18n.t("settings.cloud.ago", Math.max(0, Duration.between(at, now).toMinutes()));
     }
 }

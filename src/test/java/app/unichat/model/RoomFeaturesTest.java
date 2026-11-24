@@ -1,5 +1,6 @@
 package app.unichat.model;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -12,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RoomFeaturesTest {
-    private static JsonNode json(String s) throws Exception {
+    private static JsonNode json(String s) throws JsonProcessingException {
         return new ObjectMapper().readTree(s);
     }
 
@@ -109,9 +110,9 @@ class RoomFeaturesTest {
     @Test
     void theMenuOffersWhatTheNetworkShows() throws Exception {
         // Telegram's and LinkedIn's bridges as they publish it.
-        RoomFeatures tg = RoomFeatures.parse(new com.fasterxml.jackson.databind.ObjectMapper().readTree("""
+        RoomFeatures tg = RoomFeatures.parse(new ObjectMapper().readTree("""
             {"formatting":{"bold":2,"italic":2,"underline":2,"strikethrough":2,"inline_code":2,"code_block":2,"blockquote":2,"spoiler":2}}"""));
-        RoomFeatures li = RoomFeatures.parse(new com.fasterxml.jackson.databind.ObjectMapper().readTree("""
+        RoomFeatures li = RoomFeatures.parse(new ObjectMapper().readTree("""
             {"formatting":{"bold":-1,"italic":-1,"underline":-1,"user_link":2}}"""));
         for (TextFormat f : TextFormat.values()) assertTrue(tg.formats(f), f.name());
         for (TextFormat f : TextFormat.values()) assertFalse(li.formats(f), f.name());

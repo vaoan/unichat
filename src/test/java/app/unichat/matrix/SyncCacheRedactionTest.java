@@ -5,7 +5,10 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SyncCacheRedactionTest {
 
@@ -38,8 +41,8 @@ class SyncCacheRedactionTest {
         assertEquals(2, out.at("/rooms/join/!bot:s/unread_notifications/notification_count").asInt());
         assertTrue(MatrixClient.JSON.writeValueAsString(in).contains("SECRETVALUE"));
         // Thousands of rooms: only the bot room is copied, the rest is shared (a full copy exhausted the heap).
-        org.junit.jupiter.api.Assertions.assertSame(in.at("/rooms/join/!ok:s"), out.at("/rooms/join/!ok:s"));
-        org.junit.jupiter.api.Assertions.assertSame(in, SyncCache.redact(in, Set.of("!other:s")));
+        assertSame(in.at("/rooms/join/!ok:s"), out.at("/rooms/join/!ok:s"));
+        assertSame(in, SyncCache.redact(in, Set.of("!other:s")));
     }
 
     @Test

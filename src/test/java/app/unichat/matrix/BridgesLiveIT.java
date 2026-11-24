@@ -1,8 +1,10 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.ConnectionState;
 import app.unichat.model.Message;
 import app.unichat.model.Network;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -44,8 +46,8 @@ class BridgesLiveIT {
                 String cmd = BridgeProtocol.botCommand(n, BridgeProtocol.loginCommand(n));
                 String reply = awaitBotReply(svc, changes, roomId, cmd);
                 System.out.println("=== " + n + " <- " + cmd + "\n" + reply);
-                String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
-                if (reply == null || lower.contains("invalid login flow") || lower.contains("unknown command")) {
+                String lower = reply.toLowerCase(Locale.ROOT);
+                if (lower.contains("invalid login flow") || lower.contains("unknown command")) {
                     failures.append(n).append(": ").append(reply).append('\n');
                 }
                 svc.sendText(roomId, BridgeProtocol.botCommand(n, "cancel"), null).get();
@@ -74,15 +76,21 @@ class BridgesLiveIT {
      */
     private static String awaitBotReply(MatrixChatService svc, app.unichat.service.Changes changes, String roomId, String command)
             throws InterruptedException {
-        String[] reply = new String[1];
-        changes.until("the bot's reply to " + command, () -> (reply[0] = replyAfter(svc.messages(roomId), command)) != null);
-        return reply[0];
+        @Nullable String[] reply = new String[1];
+        changes.until("the bot's reply to " + command, () -> {
+            reply[0] = replyAfter(svc.messages(roomId), command);
+            return reply[0] != null;
+        });
+        return Present.of(reply[0]);
     }
 
-    private static String replyAfter(List<Message> msgs, String command) {
+    private static @Nullable String replyAfter(List<Message> msgs, String command) {
         int cmd = -1;
         for (int i = msgs.size() - 1; i >= 0; i--) {
-            if (msgs.get(i).outgoing() && command.equals(msgs.get(i).body())) { cmd = i; break; }
+            if (msgs.get(i).outgoing() && command.equals(msgs.get(i).body())) {
+                cmd = i;
+                break;
+            }
         }
         if (cmd < 0) return null;
         StringBuilder sb = new StringBuilder();

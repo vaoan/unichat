@@ -9,6 +9,7 @@ import javafx.beans.value.ObservableValue;
 import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -68,7 +69,7 @@ public final class StickerSuggestions {
     }
 
     /** The one emoji {@code text} is, or null when it's anything else (more emoji, a word, nothing). */
-    static String oneEmoji(String text) {
+    static @Nullable String oneEmoji(@Nullable String text) {
         String t = StickerFinder.plain(text == null ? "" : text);
         return EMOJI.contains(t) ? t : null;
     }

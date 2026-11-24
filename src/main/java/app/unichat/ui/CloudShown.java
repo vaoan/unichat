@@ -13,8 +13,10 @@ import java.util.function.Supplier;
  */
 public final class CloudShown implements Runnable {
     private final Supplier<Cloud.Status> status;
-    private final Consumer<Cloud.Status> tray, gear;
-    private final Executor trayThread, gearThread;
+    private final Consumer<Cloud.Status> tray;
+    private final Consumer<Cloud.Status> gear;
+    private final Executor trayThread;
+    private final Executor gearThread;
 
     /**
      * @param tray shows it on the tray, on {@code trayThread} (AWT's)

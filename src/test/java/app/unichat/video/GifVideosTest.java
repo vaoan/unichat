@@ -1,8 +1,12 @@
 package app.unichat.video;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -34,7 +38,7 @@ class GifVideosTest {
         GifVideos.setLargestSide(720);
     }
 
-    private static Message message(MessageType type, String mime, boolean gifMark) throws Exception {
+    private static Message message(MessageType type, String mime, boolean gifMark) throws JsonProcessingException {
         Message m = new Message("$1", "!c", "@x", "X", false, Instant.EPOCH);
         m.setType(type);
         m.setMimeType(mime);
@@ -43,7 +47,7 @@ class GifVideosTest {
         return m;
     }
 
-    private static Message lasting(int ms) throws Exception {
+    private static Message lasting(int ms) throws JsonProcessingException {
         Message m = message(MessageType.VIDEO, "video/mp4", true);
         m.setMediaInfo(new ObjectMapper().readTree("{\"fi.mau.gif\":true,\"duration\":" + ms + "}"));
         return m;
@@ -113,9 +117,9 @@ class GifVideosTest {
         assertTrue(webp.containsAll(List.of("-loop", "0", "-lossy", "f00001.pam", "f00002.pam")) && webp.getLast().equals("out.webp"), webp.toString());
     }
 
-    private Path mp4(String name, String size, boolean sound) throws Exception {
-        Path ffmpeg = Ffmpeg.find();
-        Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
+    private Path mp4(String name, String size, boolean sound) throws IOException, InterruptedException {
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "no ffmpeg");
         Assumptions.assumeTrue(AnimatedWebp.img2webp() != null, "no img2webp");
         Path mp4 = dir.resolve(name);
         List<String> c = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i",
@@ -145,7 +149,8 @@ class GifVideosTest {
         Path mp4 = mp4("big.mp4", "320x320", false); // within any largest side Ajustes offers (another test may be choosing one)
         Path webp = GifVideos.webpUnder(mp4, Long.MAX_VALUE);
         byte[] b = Files.readAllBytes(webp);
-        int w = 1 + ((b[24] & 0xff) | (b[25] & 0xff) << 8 | (b[26] & 0xff) << 16), h = 1 + ((b[27] & 0xff) | (b[28] & 0xff) << 8 | (b[29] & 0xff) << 16);
+        int w = 1 + ((b[24] & 0xff) | (b[25] & 0xff) << 8 | (b[26] & 0xff) << 16);
+        int h = 1 + ((b[27] & 0xff) | (b[28] & 0xff) << 8 | (b[29] & 0xff) << 16);
         assertEquals(List.of(320, 320), List.of(w, h), "its own size");
         assertEquals(30, new String(b, StandardCharsets.ISO_8859_1).split("ANMF", -1).length - 1, "its own 30 frames of a second");
         assertEquals(mp4, GifVideos.webpUnder(mp4, 10), "over 10 bytes: the video goes");

@@ -21,8 +21,8 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
@@ -41,11 +41,11 @@ import static app.unichat.ui.settings.SettingsForm.toggle;
  */
 public final class CloudPage {
     /** The app's sync, given when the window is built; null in a session without one (the demo). */
-    private static Cloud cloud;
+    private static @Nullable Cloud cloud;
 
     private CloudPage() {}
 
-    public static void use(Cloud c) {
+    public static void use(@Nullable Cloud c) {
         cloud = c;
     }
 
@@ -55,8 +55,11 @@ public final class CloudPage {
         VBox account = new VBox();
         Runnable[] redraw = {null};
         redraw[0] = () -> {
-            if (CloudAccount.saved() == null) account.getChildren().setAll(connectForm(toast, redraw[0]));
-            else account.getChildren().setAll(new VBox(16, connected(redraw[0]), VaultPage.build(cloud)));
+            Cloud now = cloud; // the session's now: the page may outlive the one it was built in
+            if (now == null) return;
+            CloudAccount saved = CloudAccount.saved();
+            if (saved == null) account.getChildren().setAll(connectForm(toast, redraw[0]));
+            else account.getChildren().setAll(new VBox(16, connected(now, saved, redraw[0]), VaultPage.build(now)));
         };
         redraw[0].run();
         return page(I18n.t("settings.nav.cloud"), intro, account,
@@ -77,18 +80,20 @@ public final class CloudPage {
         Nodes.show(status, false);
         Consumer<CloudAccount> tryIt = a -> {
             say(status, I18n.t("settings.cloud.trying"));
-            Cloud.verify(a).whenComplete((ok, err) -> Platform.runLater(() -> {
+            var _ = Cloud.verify(a).whenComplete((ok, err) -> Platform.runLater(() -> {
                 if (err != null) {
                     say(status, I18n.t("settings.cloud.failed", Errors.message(Errors.unwrap(err))));
                     return;
                 }
                 ok.save();
                 toast.accept(I18n.t("settings.cloud.connected", I18n.t("settings.cloud.service." + ok.service().name())));
-                cloud.syncNow();
+                Cloud now = cloud; // the session's when it connected
+                if (now != null) { var _ = now.syncNow(); }
                 redraw.run();
             }));
         };
-        Node pcloud = signInForm(PCLOUD, status, tryIt), dropbox = signInForm(DROPBOX, status, tryIt);
+        Node pcloud = signInForm(PCLOUD, status, tryIt);
+        Node dropbox = signInForm(DROPBOX, status, tryIt);
         Node dav = davForm(chosen, status, tryIt);
         Node services = chips(I18n.t("settings.cloud.service"), List.of(Service.values()),
                 s -> I18n.t("settings.cloud.service." + s.name()), Service.PCLOUD, s -> {
@@ -145,7 +150,7 @@ public final class CloudPage {
                 connect.setDisable(true);
                 Nodes.show(cancel, true);
                 say(status, I18n.t("settings.cloud.inBrowser"));
-                login.whenComplete((a, err) -> Platform.runLater(() -> {
+                var _ = login.whenComplete((a, err) -> Platform.runLater(() -> {
                     connect.setDisable(false);
                     Nodes.show(cancel, false);
                     if (err instanceof java.util.concurrent.CancellationException) say(status, "");
@@ -205,10 +210,11 @@ public final class CloudPage {
                 actions(connect));
     }
 
-    /** Who's connected, how the last round went (kept current while shown), "Sincronizar ahora" and "Desconectar". */
-    private static Node connected(Runnable redraw) {
-        Cloud c = cloud; // this page's: the field may be another session's (or none) by the time a round tells
-        CloudAccount a = CloudAccount.saved();
+    /**
+     * Who's connected, how the last round went (kept current while shown), "Sincronizar ahora" and "Desconectar". {@code c} is this
+     * page's: the field may be another session's (or none) by the time a round tells.
+     */
+    private static Node connected(Cloud c, CloudAccount a, Runnable redraw) {
         Label who = new Label(I18n.t("settings.cloud.as", I18n.t("settings.cloud.service." + a.service().name()), a.user()));
         who.setWrapText(true);
         who.setMinHeight(Region.USE_PREF_SIZE);
@@ -245,12 +251,12 @@ public final class CloudPage {
         now.setOnAction(e -> {
             now.setDisable(true);
             state.setText(I18n.t("settings.cloud.syncing"));
-            c.syncNow();
+            var _ = c.syncNow();
         });
         verify.setOnAction(e -> {
             verify.setDisable(true);
             now.setDisable(true);
-            c.verifyNow();
+            var _ = c.verifyNow();
         });
         Button off = new Button(I18n.t("settings.cloud.disconnect"));
         off.getStyleClass().add("secondary-button");

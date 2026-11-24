@@ -1,5 +1,8 @@
 package app.unichat.cloud;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -13,7 +16,9 @@ import java.util.HexFormat;
  * SHA-256 (pCloud), or Dropbox's own content hash (SHA-256 of the SHA-256 of each 4 MB block).
  */
 final class Checksums {
-    static final String SHA1 = "sha1", SHA256 = "sha256", DROPBOX = "dropbox";
+    static final String SHA1 = "sha1";
+    static final String SHA256 = "sha256";
+    static final String DROPBOX = "dropbox";
     private static final int DROPBOX_BLOCK = 4 * 1024 * 1024;
 
     private Checksums() {}
@@ -23,13 +28,15 @@ final class Checksums {
         try (InputStream in = Files.newInputStream(file)) {
             if (DROPBOX.equals(kind)) {
                 MessageDigest all = MessageDigest.getInstance("SHA-256");
-                byte[] block;
-                while ((block = in.readNBytes(DROPBOX_BLOCK)).length > 0) all.update(MessageDigest.getInstance("SHA-256").digest(block));
+                for (byte[] block = in.readNBytes(DROPBOX_BLOCK); block.length > 0; block = in.readNBytes(DROPBOX_BLOCK)) {
+                    all.update(MessageDigest.getInstance("SHA-256").digest(block));
+                }
                 return HexFormat.of().formatHex(all.digest());
             }
             MessageDigest d = MessageDigest.getInstance(SHA1.equals(kind) ? "SHA-1" : "SHA-256");
             byte[] buf = new byte[1 << 16];
-            for (int n; (n = in.read(buf)) > 0; ) d.update(buf, 0, n);
+            int n;
+            while ((n = in.read(buf)) > 0) d.update(buf, 0, n);
             return HexFormat.of().formatHex(d.digest());
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
@@ -45,12 +52,14 @@ final class Checksums {
      * bigger, bring it back here and never touch it there. Same size, different content: neither is known to be right,
      * so neither is touched.
      */
-    static Verdict decide(long localSize, String localHash, Storage.RemoteFile remote) {
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "compares two hex checksums the services give; hex is ASCII, and a wrong answer only means a file is checked again")
+    static Verdict decide(long localSize, @Nullable String localHash, Storage.@Nullable RemoteFile remote) {
         if (remote == null) return Verdict.UPLOAD;
-        if (remote.hash() != null && localHash != null && remote.hash().equalsIgnoreCase(localHash)) return Verdict.SAME;
+        String remoteHash = remote.hash();
+        if (remoteHash != null && localHash != null && remoteHash.equalsIgnoreCase(localHash)) return Verdict.SAME;
         if (remote.size() < 0) return Verdict.SAME; // it only says the file is there
         if (localSize > remote.size()) return Verdict.UPLOAD;
         if (localSize < remote.size()) return Verdict.RESTORE_LOCAL;
-        return remote.hash() == null ? Verdict.SAME : Verdict.CONFLICT;
+        return remoteHash == null ? Verdict.SAME : Verdict.CONFLICT;
     }
 }

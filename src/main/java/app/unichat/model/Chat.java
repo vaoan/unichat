@@ -1,5 +1,7 @@
 package app.unichat.model;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -14,11 +16,11 @@ public final class Chat {
     private final String id;
     private Network network = Network.MATRIX;
     /** {@link Account#id()} of the login this chat comes through; null when unknown. */
-    private String accountId;
+    private @Nullable String accountId;
     /** Identity of this chat in the preferences file ({@link app.unichat.service.ChatKeys}); null until computed. */
-    private String prefKey;
+    private @Nullable String prefKey;
     private String title = "";
-    private String avatarUrl;
+    private @Nullable String avatarUrl;
     private boolean group;
     private int unreadCount;
     private int mentionCount;
@@ -30,12 +32,12 @@ public final class Chat {
     /** Invited, not joined yet. */
     private boolean invite;
     private boolean pinned;
-    private Instant reminderAt;
+    private @Nullable Instant reminderAt;
     private Instant lastActivity = Instant.EPOCH;
     private String lastPreview = "";
-    private String lastSenderName;
+    private @Nullable String lastSenderName;
     private boolean lastOutgoing;
-    private String topic;
+    private @Nullable String topic;
     /** True for the DM with a bridge bot (account management), hidden from the inbox. */
     private boolean bridgeBot;
     /** What this chat's network supports (from its bridge); UNKNOWN offers everything. */
@@ -54,17 +56,17 @@ public final class Chat {
 
     public String id() { return id; }
     public Network network() { return network; }
-    public void setNetwork(Network network) { this.network = network == null ? Network.MATRIX : network; }
-    public String accountId() { return accountId; }
-    public void setAccountId(String accountId) { this.accountId = accountId; }
+    public void setNetwork(@Nullable Network network) { this.network = network == null ? Network.MATRIX : network; }
+    public @Nullable String accountId() { return accountId; }
+    public void setAccountId(@Nullable String accountId) { this.accountId = accountId; }
     public boolean invite() { return invite; }
     public void setInvite(boolean invite) { this.invite = invite; }
-    public String prefKey() { return prefKey; }
-    public void setPrefKey(String prefKey) { this.prefKey = prefKey; }
+    public @Nullable String prefKey() { return prefKey; }
+    public void setPrefKey(@Nullable String prefKey) { this.prefKey = prefKey; }
     public String title() { return title; }
-    public void setTitle(String title) { this.title = title == null ? "" : title; }
-    public String avatarUrl() { return avatarUrl; }
-    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    public void setTitle(@Nullable String title) { this.title = title == null ? "" : title; }
+    public @Nullable String avatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(@Nullable String avatarUrl) { this.avatarUrl = avatarUrl; }
     public boolean group() { return group; }
     public void setGroup(boolean group) { this.group = group; }
     public int unreadCount() { return unreadCount; }
@@ -83,17 +85,17 @@ public final class Chat {
     public void setMuted(boolean muted) { this.muted = muted; }
     public boolean pinned() { return pinned; }
     public void setPinned(boolean pinned) { this.pinned = pinned; }
-    public Instant reminderAt() { return reminderAt; }
-    public void setReminderAt(Instant reminderAt) { this.reminderAt = reminderAt; }
+    public @Nullable Instant reminderAt() { return reminderAt; }
+    public void setReminderAt(@Nullable Instant reminderAt) { this.reminderAt = reminderAt; }
     public Instant lastActivity() { return lastActivity; }
-    public void setLastActivity(Instant lastActivity) { this.lastActivity = lastActivity == null ? Instant.EPOCH : lastActivity; }
+    public void setLastActivity(@Nullable Instant lastActivity) { this.lastActivity = lastActivity == null ? Instant.EPOCH : lastActivity; }
     public String lastPreview() { return lastPreview; }
-    public void setLastPreview(String lastPreview) { this.lastPreview = lastPreview == null ? "" : lastPreview; }
-    public String lastSenderName() { return lastSenderName; }
-    public void setLastSenderName(String lastSenderName) { this.lastSenderName = lastSenderName; }
+    public void setLastPreview(@Nullable String lastPreview) { this.lastPreview = lastPreview == null ? "" : lastPreview; }
+    public @Nullable String lastSenderName() { return lastSenderName; }
+    public void setLastSenderName(@Nullable String lastSenderName) { this.lastSenderName = lastSenderName; }
     public boolean lastOutgoing() { return lastOutgoing; }
-    public String topic() { return topic; }
-    public void setTopic(String topic) { this.topic = topic; }
+    public @Nullable String topic() { return topic; }
+    public void setTopic(@Nullable String topic) { this.topic = topic; }
     public boolean bridgeBot() { return bridgeBot; }
     public void setBridgeBot(boolean bridgeBot) { this.bridgeBot = bridgeBot; }
     public List<Member> members() { return members; }
@@ -114,7 +116,7 @@ public final class Chat {
     }
 
     public RoomFeatures features() { return features; }
-    public void setFeatures(RoomFeatures f) { this.features = f == null ? RoomFeatures.UNKNOWN : f; }
+    public void setFeatures(@Nullable RoomFeatures f) { this.features = f == null ? RoomFeatures.UNKNOWN : f; }
 
     public boolean space() { return space; }
     public void setSpace(boolean space) { this.space = space; }

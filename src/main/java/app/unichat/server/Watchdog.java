@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import app.unichat.bridge.BridgeStates;
 import app.unichat.support.Storage;
+import org.jspecify.annotations.Nullable;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.HashMap;
@@ -56,14 +57,14 @@ final class Watchdog {
     private static final SessionKeeper NO_KEEPER = new SessionKeeper() {
         @Override public boolean fragile(String bridge) { return false; }
         @Override public boolean safeToRestart(String bridge) { return true; }
-        @Override public void tick(boolean online, long now) { }
+        @Override public void tick(boolean online, long now) { /* not needed here */ }
     };
 
     /** What's known about one process. {@code troubledSince}: -1 when every account is fine. */
     record Health(int probeFailures, long troubledSince, int drops) {}
 
     /** Why to restart, or null to leave it alone. */
-    static String reason(Health h, long now) {
+    static @Nullable String reason(Health h, long now) {
         if (h.probeFailures() >= PROBE_FAILURES) return "not responding";
         if (h.drops() >= FLAPS) return h.drops() + " disconnections in 10 min";
         if (h.troubledSince() >= 0 && now - h.troubledSince() >= STUCK_MS) return "disconnected for over 10 min";
@@ -71,7 +72,7 @@ final class Watchdog {
     }
 
     /** {@link #reason(Health, long)} knowing whether there's internet: without it, only a hung process counts. */
-    static String reason(Health h, long now, boolean online) {
+    static @Nullable String reason(Health h, long now, boolean online) {
         return online || h.probeFailures() >= PROBE_FAILURES ? reason(h, now) : null;
     }
 
@@ -93,7 +94,7 @@ final class Watchdog {
     private final Map<String, Long> lastRestart = new HashMap<>();
     private final Map<String, Integer> inARow = new HashMap<>();
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
-    private ScheduledExecutorService timer;
+    private @Nullable ScheduledExecutorService timer;
 
     /**
      * @param ports   process name → port it answers HTTP on ("tuwunel" and every bridge)
@@ -134,7 +135,7 @@ final class Watchdog {
             t.setDaemon(true);
             return t;
         });
-        timer.scheduleWithFixedDelay(this::check, PROBE_EVERY_MS, PROBE_EVERY_MS, TimeUnit.MILLISECONDS);
+        var _ = timer.scheduleWithFixedDelay(this::check, PROBE_EVERY_MS, PROBE_EVERY_MS, TimeUnit.MILLISECONDS);
     }
 
     synchronized void stop() {
@@ -146,7 +147,7 @@ final class Watchdog {
     private record Round(long now, boolean online, boolean internetBack, boolean low, boolean roomBack, Set<String> failing) {}
 
     /** Why to restart {@code name} this round: with the disk low only a hung one, as a restart can't help the rest. */
-    private static String why(String name, Health h, Round r) {
+    private static @Nullable String why(String name, Health h, Round r) {
         if (r.low()) return h.probeFailures() >= PROBE_FAILURES ? reason(h, r.now(), r.online()) : null;
         if (r.failing().contains(name)) return "it couldn't write to the disk";
         return reason(h, r.now(), r.online());
@@ -162,31 +163,7 @@ final class Watchdog {
             wasLow = round.low();
             for (String name : running.get()) {
                 Integer port = ports.get(name);
-                if (port == null) continue;
-                int f = HttpProbe.answers(http, port, Duration.ofSeconds(10), HttpProbe.Up.ALIVE) ? 0 : failures.getOrDefault(name, 0) + 1;
-                failures.put(name, f);
-                Health h = name.equals("tuwunel") ? new Health(f, -1, 0)
-                        : new Health(f, states.troubledSince(name), states.dropsWithin(name, FLAP_WINDOW_MS, now));
-                boolean bridge = !name.equals("tuwunel");
-                // Things that happen once (the internet or room on the disk back): no waiting after the last restart.
-                String once = round.roomBack() ? "the disk has room again"
-                        : round.internetBack() && bridge && !keeper.fragile(name) ? "internet is back" : null;
-                String why = once != null ? once : why(name, h, round);
-                Long last = lastRestart.get(name);
-                int row = inARow.getOrDefault(name, 0);
-                // A long quiet run since the last restart: the next one starts with a short wait again.
-                if (last != null && why == null && now - last > MAX_COOLDOWN_MS) inARow.put(name, row = 0);
-                if (once != null) inARow.put(name, row = 0);
-                else if (why == null || (last != null && now - last < cooldown(row))) continue;
-                // A hung process can't lose more than it has; anything else waits until a restart can't cost its session.
-                if (h.probeFailures() < PROBE_FAILURES && !keeper.safeToRestart(name)) continue;
-                System.err.println("Watchdog: restarting " + name + " (" + why + ")");
-                lastRestart.put(name, now);
-                inARow.put(name, row + 1);
-                failures.put(name, 0);
-                if (bridge) states.restarting(name, now);
-                storage.startedOver(name);
-                restart.accept(name, why);
+                if (port != null) checkProcess(name, port, round);
             }
             keeper.tick(online, now);
             states.tick();
@@ -197,5 +174,36 @@ final class Watchdog {
             // The watchdog itself must never stop.
             System.err.println("Watchdog check failed: " + t);
         }
+    }
+
+    /** One process this round: probed, and started over when it should be. */
+    private void checkProcess(String name, int port, Round round) throws InterruptedException {
+        long now = round.now();
+        int f = HttpProbe.answers(http, port, Duration.ofSeconds(10), HttpProbe.Up.ALIVE) ? 0 : failures.getOrDefault(name, 0) + 1;
+        failures.put(name, f);
+        Health h = name.equals("tuwunel") ? new Health(f, -1, 0)
+                : new Health(f, states.troubledSince(name), states.dropsWithin(name, FLAP_WINDOW_MS, now));
+        boolean bridge = !name.equals("tuwunel");
+        // Things that happen once (the internet or room on the disk back): no waiting after the last restart.
+        String once = round.roomBack() ? "the disk has room again"
+                : round.internetBack() && bridge && !keeper.fragile(name) ? "internet is back" : null;
+        String why = once != null ? once : why(name, h, round);
+        Long last = lastRestart.get(name);
+        int row = inARow.getOrDefault(name, 0);
+        // Once, or a long quiet run since the last restart: the next one starts with a short wait again.
+        if (once != null || (last != null && why == null && now - last > MAX_COOLDOWN_MS)) {
+            row = 0;
+            inARow.put(name, row);
+        }
+        if (once == null && (why == null || (last != null && now - last < cooldown(row)))) return;
+        // A hung process can't lose more than it has; anything else waits until a restart can't cost its session.
+        if (h.probeFailures() < PROBE_FAILURES && !keeper.safeToRestart(name)) return;
+        System.err.println("Watchdog: restarting " + name + " (" + why + ")");
+        lastRestart.put(name, now);
+        inARow.put(name, row + 1);
+        failures.put(name, 0);
+        if (bridge) states.restarting(name, now);
+        storage.startedOver(name);
+        restart.accept(name, why);
     }
 }

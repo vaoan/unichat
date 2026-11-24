@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -21,7 +23,7 @@ public final class Seen {
     private boolean windows = true;
     private boolean away;
     /** {@code windows && !away}, read without the lock the listeners are called under. */
-    private volatile boolean seen = true;
+    private volatile boolean seenNow = true;
     /** What the listeners last heard, and whether they're being told now (a set from inside a listener). */
     private boolean heard = true;
     private boolean notifying;
@@ -30,7 +32,7 @@ public final class Seen {
 
     public static Seen get() { return INSTANCE; }
 
-    public boolean now() { return seen; }
+    public boolean now() { return seenNow; }
 
     public void addListener(Consumer<Boolean> l) { listeners.add(l); }
 
@@ -46,15 +48,15 @@ public final class Seen {
     public static void reset(boolean seen) { INSTANCE.set(seen, false); }
 
     /** Under the lock with the listeners, so two threads setting at once are heard in the order they took effect. */
-    private synchronized void set(Boolean someWindowShown, Boolean screenAway) {
+    private synchronized void set(@Nullable Boolean someWindowShown, @Nullable Boolean screenAway) {
         if (someWindowShown != null) windows = someWindowShown;
         if (screenAway != null) away = screenAway;
-        seen = windows && !away;
+        seenNow = windows && !away;
         if (notifying) return; // a listener set it: told below, once everyone heard the value at hand
-        notifying = true;
+        notifying = true; // NOPMD: UnusedAssignment, read by the listeners the change below fires
         try {
-            while (seen != heard) {
-                boolean now = seen;
+            while (seenNow != heard) {
+                boolean now = seenNow;
                 heard = now;
                 for (Consumer<Boolean> l : listeners) tell(l, now);
             }
@@ -68,7 +70,7 @@ public final class Seen {
             l.accept(now);
         } catch (RuntimeException e) {
             System.err.println("Seen listener failed: " + e);
-            e.printStackTrace();
+            e.printStackTrace(System.err); // the log (AppLog): what printStackTrace() wrote to as well
         }
     }
 }

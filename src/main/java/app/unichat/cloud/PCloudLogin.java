@@ -5,10 +5,10 @@ import app.unichat.support.I18n;
 import app.unichat.support.Urls;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -32,15 +32,15 @@ public final class PCloudLogin {
     private final String redirect;
     private final String state = Loopback.random(16);
     /** Where the API is for the host pCloud names; null for one that isn't pCloud's (the token never goes there). */
-    private final java.util.function.UnaryOperator<String> apiOf;
+    private final java.util.function.UnaryOperator<@Nullable String> apiOf;
     private final CompletableFuture<CloudAccount> result = new CompletableFuture<>();
 
     /** pCloud's own API hosts only ("api.pcloud.com", Europe's "eapi.pcloud.com"). */
-    static String pcloudApi(String hostname) {
+    static @Nullable String pcloudApi(@Nullable String hostname) {
         return hostname != null && hostname.matches("[a-z0-9-]+\\.pcloud\\.com") ? "https://" + hostname : null;
     }
 
-    private PCloudLogin(int port, java.util.function.UnaryOperator<String> apiOf, Duration deadline) throws IOException {
+    private PCloudLogin(int port, java.util.function.UnaryOperator<@Nullable String> apiOf, Duration deadline) throws IOException {
         this.apiOf = apiOf;
         server = Loopback.server(port);
         redirect = "http://localhost:" + server.getAddress().getPort() + "/pcloud";
@@ -52,7 +52,7 @@ public final class PCloudLogin {
 
     /** The app's Client ID: the one given in Ajustes, else Unichat's own. */
     public static String clientId() {
-        String own = Settings.get().getString("cloud.pcloudClientId", null);
+        String own = Settings.get().getString("cloud.pcloudClientId");
         return own != null && !own.isBlank() ? own.strip() : CLIENT_ID;
     }
 
@@ -65,7 +65,7 @@ public final class PCloudLogin {
     }
 
     static CompletableFuture<CloudAccount> start(String clientId, Consumer<URI> browser, int port,
-                                                 java.util.function.UnaryOperator<String> apiOf, Duration deadline) throws IOException {
+                                                 java.util.function.UnaryOperator<@Nullable String> apiOf, Duration deadline) throws IOException {
         PCloudLogin login = new PCloudLogin(port, apiOf, deadline);
         browser.accept(URI.create("https://my.pcloud.com/oauth2/authorize?client_id=" + Urls.enc(clientId)
                 + "&response_type=token&redirect_uri=" + Urls.enc(login.redirect) + "&state=" + login.state));
@@ -95,13 +95,14 @@ public final class PCloudLogin {
             return; // someone else's answer: keep waiting for ours
         }
         String api = apiOf.apply(q.get("hostname"));
-        if (q.get("access_token") == null || api == null) {
+        String token = q.get("access_token");
+        if (token == null || api == null) {
             Loopback.reply(x, 200, "text/plain; charset=utf-8", I18n.t("cloud.pcloud.declined"));
             result.completeExceptionally(new IOException(I18n.t("cloud.pcloud.declined")));
             return;
         }
         Loopback.reply(x, 200, "text/plain; charset=utf-8", I18n.t("cloud.pcloud.done"));
-        result.complete(new CloudAccount(CloudAccount.Service.PCLOUD, api, "pCloud", q.get("access_token")));
+        result.complete(new CloudAccount(CloudAccount.Service.PCLOUD, api, "pCloud", token));
     }
 
 }

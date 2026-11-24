@@ -1,18 +1,21 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Network;
-import app.unichat.service.ArchiveWaking.Step;
 import app.unichat.service.ArchiveWaking.Waking;
 import app.unichat.service.PreferencesFile;
 import app.unichat.settings.Settings;
+import java.util.concurrent.ExecutionException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -22,7 +25,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import com.fasterxml.jackson.databind.JsonNode;
 
-import static app.unichat.matrix.RestServer.*;
+import static app.unichat.matrix.RestServer.ME;
+import static app.unichat.matrix.RestServer.botNotice;
+import static app.unichat.matrix.RestServer.botRoom;
+import static app.unichat.matrix.RestServer.category;
+import static app.unichat.matrix.RestServer.channel;
+import static app.unichat.matrix.RestServer.dm;
+import static app.unichat.matrix.RestServer.message;
+import static app.unichat.matrix.RestServer.server;
+import static app.unichat.matrix.RestServer.sync;
+import static app.unichat.matrix.RestServer.telegramGroup;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -44,9 +56,11 @@ class ArchiveRestTest {
     private boolean discordConnected = true;
     /** Each time the sync loop was asked to go round (its long poll dropped). */
     private final AtomicInteger wakes = new AtomicInteger();
-    private volatile Thread loopThread;
+    private volatile @Nullable Thread loopThread;
     /** Interrupts the rounds left for the request after them (a waking not swallowed). */
     private final AtomicInteger interruptsLeft = new AtomicInteger();
+    /** Rounds of the loop under way: a future completes inside one (in beforeRequest), before its request is logged. */
+    private final AtomicInteger rounds = new AtomicInteger();
     private volatile java.time.Instant now = java.time.Instant.parse("2026-11-23T12:00:00Z");
     private MatrixClient client;
     private RestServer server;
@@ -65,11 +79,11 @@ class ArchiveRestTest {
         MatrixCore core = new MatrixCore(client, proc, ME, "example.org", "tok");
         core.running = true;
         core.initialSyncDone = true;
-        BotChat bots = new BotChat(core, new MessageSender(core, null));
+        BotChat bots = new BotChat(core, new MessageSender(core, new MediaDownloader(core.client, core.io)));
         DiscordServers discord = new DiscordServers(core, bots, () -> discordConnected
                 ? List.of(new Account(Network.DISCORD, "me", AccountStatus.CONNECTED, "")) : List.of());
         filter = new SyncFilter(client, ME);
-        rest = new ArchiveRest(core, filter, discord, (r, rooms) -> { }, () -> server.point());
+        rest = new ArchiveRest(core, filter, discord, (r, rooms) -> { }, server::point);
         rest.onWake(() -> {
             wakes.incrementAndGet();
             loop.execute(this::round);
@@ -95,12 +109,28 @@ class ArchiveRestTest {
     /** The sync loop's turn: what rests and a part of the catch-up, then its request; again while more is left. */
     private void round() {
         loopThread = Thread.currentThread();
+        rounds.incrementAndGet();
+        try {
+            turns();
+        } finally {
+            rounds.decrementAndGet();
+            server.changes.changed();
+        }
+    }
+
+    private void turns() {
         boolean more;
         do {
             more = rest.beforeRequest();
             if (Thread.interrupted()) interruptsLeft.incrementAndGet(); // the request after it takes a waking's interrupt, as the real loop's does
             server.log.add("request " + filter.forRequest(false));
         } while (more);
+    }
+
+    /** {@code f} done, and the loop's round that completed it ended too (its request logged). */
+    private void settled(CompletableFuture<?> f) throws InterruptedException, ExecutionException {
+        f.get();
+        server.changes.until("the loop's round ended", () -> rounds.get() == 0);
     }
 
     private void process(String json) {
@@ -126,17 +156,17 @@ class ArchiveRestTest {
 
     private void archive(boolean on, String... ids) {
         synchronized (proc) {
-            for (String id : ids) prefs.chooseQuiet(proc.prefKey(proc.room(id)), on);
+            for (String id : ids) prefs.chooseQuiet(proc.prefKey(Present.of(proc.room(id))), on);
             proc.settlePreferences();
         }
     }
 
-    private static TreeSet<String> set(String... ids) {
+    private static SortedSet<String> set(String... ids) {
         return new TreeSet<>(List.of(ids));
     }
 
     /** Waits for the loop to have sent its request with the filter as it is now. */
-    private void requestSent() throws Exception {
+    private void requestSent() throws InterruptedException, ExecutionException {
         CompletableFuture<Void> f = new CompletableFuture<>();
         loop.execute(() -> f.complete(null));
         f.get();
@@ -236,7 +266,7 @@ class ArchiveRestTest {
     @Test
     void aChatOpenedOutsideTheArchiveBringsNoServerBack() throws Exception {
         everyKind();
-        rest.archivedChanged().get();
+        settled(rest.archivedChanged());
         int before = server.log.size();
         rest.archivedChatOpened("!c1:x").get();
         assertEquals(before, server.log.size(), server.log.toString());
@@ -258,7 +288,7 @@ class ArchiveRestTest {
         leaving.get();
         requestSent();
         synchronized (proc) {
-            assertTrue(proc.room("!c1:x").byId.containsKey("$late"), "what it missed came in");
+            assertTrue(Present.of(proc.room("!c1:x")).byId.containsKey("$late"), "what it missed came in");
         }
         assertEquals("request " + idOf(0), server.log.reversed().stream().filter(l -> l.startsWith("request")).findFirst().orElseThrow(),
                 "then it rests again: " + server.log);
@@ -379,7 +409,7 @@ class ArchiveRestTest {
         assertTrue(server.log.stream().anyMatch(l -> l.startsWith("tags ")), server.log.toString());
         assertTrue(server.catchUps().contains(set("!lone:x")), "it woke: " + server.log);
         synchronized (proc) {
-            assertTrue(proc.room("!c1:x").byId.containsKey("$old"), "a tags sync never resets a timeline");
+            assertTrue(Present.of(proc.room("!c1:x")).byId.containsKey("$old"), "a tags sync never resets a timeline");
         }
     }
 
@@ -492,7 +522,7 @@ class ArchiveRestTest {
     private String idOf(int n) {
         int seen = 0;
         for (String id : server.filters.keySet().stream().sorted((a, b) -> Integer.compare(num(a), num(b))).toList()) {
-            if (!server.filters.get(id).path("room").has("not_rooms")) continue;
+            if (!Present.of(server.filters.get(id)).path("room").has("not_rooms")) continue;
             if (seen++ == n) return id;
         }
         throw new AssertionError("no filter " + n + ": " + server.log);
@@ -534,7 +564,7 @@ class ArchiveRestTest {
         now = now.plus(ArchiveRest.TAGS_EVERY);
         rest.update().get();
         synchronized (proc) {
-            assertTrue(proc.room("!c1:x").chat.favorite(), "heard, not skipped by the jump to the main sync's point: " + server.log);
+            assertTrue(Present.of(proc.room("!c1:x")).chat.favorite(), "heard, not skipped by the jump to the main sync's point: " + server.log);
         }
     }
 
@@ -552,7 +582,7 @@ class ArchiveRestTest {
         now = now.plus(ArchiveRest.TAGS_EVERY);
         rest.update().get();
         synchronized (proc) {
-            assertTrue(proc.room("!open:x").chat.favorite(), "heard: the next tags sync started over: " + server.log);
+            assertTrue(Present.of(proc.room("!open:x")).chat.favorite(), "heard: the next tags sync started over: " + server.log);
         }
     }
 
@@ -565,8 +595,8 @@ class ArchiveRestTest {
         CompletableFuture<Void> round = rest.update();
         server.changes.until("the tags sync asked", () -> server.log.stream().anyMatch(l -> l.startsWith("tags ")));
         int before = interruptsLeft.get();
-        loopThread.interrupt();
-        round.get();
+        Present.of(loopThread).interrupt();
+        settled(round); // done inside beforeRequest: the loop takes the interrupt just after, on its own thread
         assertEquals(before + 1, interruptsLeft.get(), "left for the request after it");
         server.tagsGate.countDown();
         rest.update().get(); // the clock unmoved
@@ -583,8 +613,8 @@ class ArchiveRestTest {
         int asked = (int) server.log.stream().filter(l -> l.equals("filter asked")).count();
         server.changes.until("the post asked", () -> server.log.stream().filter(l -> l.equals("filter asked")).count() > asked);
         int before = interruptsLeft.get();
-        loopThread.interrupt();
-        round.get();
+        Present.of(loopThread).interrupt();
+        settled(round); // done inside beforeRequest: the loop takes the interrupt just after, on its own thread
         assertEquals(before + 1, interruptsLeft.get(), "left for the request after it");
         server.filterGate.countDown();
         rest.update().get(); // the clock unmoved: no retry waits
@@ -629,7 +659,7 @@ class ArchiveRestTest {
         server.catchUpGate = new CountDownLatch(1);
         CompletableFuture<Void> opening = rest.setArchiveOpen(true);
         server.changes.until("the catch-up asked", () -> !server.catchUps().isEmpty());
-        loopThread.interrupt(); // what MatrixChatService.wake does to drop what the sync thread waits on
+        Present.of(loopThread).interrupt(); // what MatrixChatService.wake does to drop what the sync thread waits on
         server.changes.until("asked again, the clock unmoved", () -> server.catchUps().size() == 2);
         server.catchUpGate.countDown();
         opening.get();

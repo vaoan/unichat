@@ -5,6 +5,7 @@ import app.unichat.service.PreferencesFile.Flag;
 import app.unichat.service.PreferencesFile.ServerValues;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,7 +19,14 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class PreferencesFileTest {
@@ -141,7 +149,7 @@ class PreferencesFileTest {
     @Test
     void muteChosenHereIsReported() {
         var p = open();
-        assertTrue(p.reconcile(K, off()).muteChosenHere() == false);
+        assertFalse(p.reconcile(K, off()).muteChosenHere());
         p.choose(K, Flag.MUTED, true);
         assertTrue(p.current(K).muteChosenHere());
         var q = PreferencesFile.inMemory();
@@ -201,7 +209,8 @@ class PreferencesFileTest {
     @Test
     void aChatCanBeInSeveralFolders() {
         var p = open();
-        String a = p.createFolder("A"), b = p.createFolder("B");
+        String a = p.createFolder("A");
+        String b = p.createFolder("B");
         p.setInFolder(a, K, true);
         p.setInFolder(b, K, true);
         assertTrue(p.folders().stream().allMatch(f -> f.chatKeys().contains(K)));
@@ -265,6 +274,7 @@ class PreferencesFileTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     void aFailedWriteKeepsTheOldFileAndMemory() throws IOException {
         var p = open();
         p.choose(K, Flag.MUTED, true);
@@ -338,6 +348,7 @@ class PreferencesFileTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "OVERLY_PERMISSIVE_FILE_PERMISSION", justification = "the test opens a file's or folder's permissions on purpose, to see what the code does with it")
     void anUnmovableDamagedFileIsNeverOverwritten() throws IOException {
         Files.writeString(prefs(), "{roto");
         assumeTrue(dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
@@ -497,7 +508,7 @@ class PreferencesFileTest {
     }
 
     @Test
-    void savingKindsAllUnlessLeftOutAndWhatWasOnStaysAll(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp) {
+    void savingKindsAllUnlessLeftOutAndWhatWasOnStaysAll(@TempDir Path tmp) {
         PreferencesFile p = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
         assertTrue(p.saveKinds("k", false).isEmpty(), "nothing saved at first");
         p.choose("k", PreferencesFile.Flag.AUTO_SAVE, true); // turned on before there were kinds
@@ -515,7 +526,7 @@ class PreferencesFileTest {
     }
 
     @Test
-    void whatISendHasItsOwnKinds(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp) {
+    void whatISendHasItsOwnKinds(@TempDir Path tmp) {
         PreferencesFile p = new PreferencesFile(tmp.resolve("preferences.json"), tmp.resolve("server-seen.json"));
         p.chooseSaveKinds("k", false, java.util.EnumSet.of(app.unichat.model.SaveKind.PHOTOS));
         assertTrue(p.saveKinds("k", true).isEmpty(), "what I send isn't saved unless chosen");

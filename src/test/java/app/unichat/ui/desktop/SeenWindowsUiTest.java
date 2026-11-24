@@ -44,10 +44,9 @@ class SeenWindowsUiTest {
 
     @AfterEach
     void close() throws Exception {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             opened.forEach(Stage::close);
             stopWatching.run();
-            return null;
         });
         Seen.reset(true);
     }
@@ -62,11 +61,10 @@ class SeenWindowsUiTest {
     }
 
     /** Closes whatever other tests left showing, so only this test's windows count; then starts watching. */
-    private void watchFromNothing() throws Exception {
-        FxWait.fx(() -> {
+    private void watchFromNothing() throws InterruptedException {
+        FxWait.onFx(() -> {
             for (javafx.stage.Window w : new ArrayList<>(javafx.stage.Window.getWindows())) w.hide();
             stopWatching = AppWindows.watchShown(Seen.get()::windows);
-            return null;
         });
         assertFalse(Seen.get().now(), "nothing showing");
     }
@@ -76,7 +74,7 @@ class SeenWindowsUiTest {
         Stage main = FxWait.fx(() -> stage("main"));
         watchFromNothing();
         List<Boolean> got = new ArrayList<>();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             main.show();
             got.add(Seen.get().now());
             main.hide();
@@ -86,7 +84,6 @@ class SeenWindowsUiTest {
             got.add(Seen.get().now());
             main.setIconified(false);
             got.add(Seen.get().now());
-            return null;
         });
         assertEquals(List.of(true, false, false, true), got, "shown, hidden, minimised, restored");
     }
@@ -136,9 +133,8 @@ class SeenWindowsUiTest {
                 return Seen.get().now();
             }), "a card nobody looks at isn't someone seeing Unichat");
         } finally {
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 toast.hide();
-                return null;
             });
         }
     }
@@ -156,18 +152,16 @@ class SeenWindowsUiTest {
         });
         try {
             FxWait.until("the chat list shows", () -> !view.lookupAll(".chat-list .list-cell").isEmpty());
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 opened.get(0).hide();
-                return null;
             });
             Seen.reset(false);
             svc.receive("!andres:demo", "¿Estás?");
             FxWait.until("the notification posted", () -> "!andres:demo".equals(notifier.lastChatId()));
         } finally {
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 view.dispose();
                 notifier.dispose();
-                return null;
             });
             svc.stop();
         }

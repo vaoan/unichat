@@ -7,8 +7,8 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Each guard of `.claude/guards.tsv` stops what it was written for, and lets the everyday commands run. */
 class GuardTest {
@@ -34,7 +34,7 @@ class GuardTest {
     void eachGuardStopsItsExample() {
         for (Guard.Rule r : GUARD.all()) {
             String command = STOPPED.get(r.id());
-            assertTrue(command != null, "Guard " + r.id() + " needs an example in GuardTest.STOPPED");
+            assertNotNull(command, "Guard " + r.id() + " needs an example in GuardTest.STOPPED");
             Guard.Rule judged = GUARD.judge(command);
             assertEquals(r.id(), judged == null ? null : judged.id(), command);
         }

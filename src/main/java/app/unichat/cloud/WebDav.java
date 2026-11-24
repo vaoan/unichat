@@ -2,6 +2,8 @@ package app.unichat.cloud;
 
 import app.unichat.support.I18n;
 import app.unichat.support.Urls;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
@@ -59,16 +61,17 @@ public final class WebDav implements Storage {
      * when there's none. Each check asks only this, and downloads the file when it changed.
      */
     @Override
-    public String stamp(String path) throws IOException {
+    public @Nullable String stamp(String path) throws IOException {
         String xml = properties(path);
         if (xml == null) return null;
-        String etag = prop(xml, "getetag"), date = prop(xml, "getlastmodified");
+        String etag = prop(xml, "getetag");
+        String date = prop(xml, "getlastmodified");
         return etag != null ? etag : date != null ? date : xml;
     }
 
     /** WebDAV says a file's size, not a checksum. */
     @Override
-    public RemoteFile info(String path) throws IOException {
+    public @Nullable RemoteFile info(String path) throws IOException {
         String xml = properties(path);
         if (xml == null) return null;
         String size = prop(xml, "getcontentlength");
@@ -76,7 +79,7 @@ public final class WebDav implements Storage {
     }
 
     /** What the server says of {@code path} (its PROPFIND answer), or null when there's nothing there. */
-    private String properties(String path) throws IOException {
+    private @Nullable String properties(String path) throws IOException {
         HttpResponse<String> r = Http.send(http, HttpRequest.newBuilder(uri(path)).timeout(answer).header("Authorization", auth)
                 .header("Depth", "0").method("PROPFIND", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
         if (r.statusCode() == 404) return null;
@@ -84,8 +87,8 @@ public final class WebDav implements Storage {
         return r.body();
     }
 
-    private static String prop(String xml, String name) {
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("<(?:[A-Za-z0-9]+:)?" + name + "[^>]*>([^<]*)<").matcher(xml);
+    static @Nullable String prop(CharSequence xml, String name) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("<(?:[A-Za-z0-9]+:)?" + name + "[^<>]*>([^<]*)<").matcher(xml);
         return m.find() ? m.group(1).strip() : null;
     }
 
@@ -99,14 +102,21 @@ public final class WebDav implements Storage {
         if (r.statusCode() != 207 && r.statusCode() != 200) throw failure(r.statusCode());
         String own = trimmed(decoded(self.getRawPath()));
         java.util.Set<String> out = new java.util.LinkedHashSet<>();
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("<(?:[A-Za-z0-9]+:)?href[^>]*>([^<]*)<").matcher(r.body());
-        while (m.find()) {
-            String href = m.group(1).strip().replace("&amp;", "&");
+        for (String href : hrefs(r.body())) {
             String path = trimmed(decoded(href.contains("://") ? URI.create(href).getRawPath() : href));
             if (path.equals(own) || path.isEmpty()) continue; // the folder itself
             out.add(path.substring(path.lastIndexOf('/') + 1));
         }
         return java.util.List.copyOf(out);
+    }
+
+    /** Each {@code href} of a PROPFIND answer, as written. */
+    @SuppressFBWarnings(value = "REDOS", justification = "linear: each class stops at the next < or >, so no scan runs past another tag (WebDavTest.aServersAnswerIsReadInLinearTimeWhateverItHolds)")
+    static java.util.List<String> hrefs(CharSequence xml) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("<(?:[A-Za-z0-9]+:)?href[^<>]*>([^<]*)<").matcher(xml);
+        while (m.find()) out.add(m.group(1).strip().replace("&amp;", "&"));
+        return out;
     }
 
     private static String decoded(String rawPath) {
@@ -156,7 +166,7 @@ public final class WebDav implements Storage {
     }
 
     @Override
-    public void put(String path, Path file, java.util.function.LongConsumer sent) throws IOException {
+    public void put(String path, Path file, java.util.function.@Nullable LongConsumer sent) throws IOException {
         int code = send("PUT", path, CountingBody.of(HttpRequest.BodyPublishers.ofFile(file), sent), false).statusCode();
         if (code != 201 && code != 204 && code != 200) throw failure(code);
     }
@@ -181,7 +191,7 @@ public final class WebDav implements Storage {
     }
 
     @Override
-    public byte[] get(String path) throws IOException {
+    public byte @Nullable [] get(String path) throws IOException {
         HttpResponse<byte[]> r = download(path, HttpResponse.BodyHandlers.ofByteArray());
         if (r.statusCode() == 404) return null;
         if (r.statusCode() != 200) throw failure(r.statusCode());
@@ -202,10 +212,10 @@ public final class WebDav implements Storage {
     private URI uri(String path) {
         StringBuilder u = new StringBuilder(base).append('/');
         String[] parts = path.split("/");
-        for (int i = 0; i < parts.length; i++) {
-            if (parts[i].isEmpty()) continue;
+        for (String part : parts) {
+            if (part.isEmpty()) continue;
             if (u.charAt(u.length() - 1) != '/') u.append('/');
-            u.append(Urls.enc(parts[i]));
+            u.append(Urls.enc(part));
         }
         return URI.create(u.toString());
     }
