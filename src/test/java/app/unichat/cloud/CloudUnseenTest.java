@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
 import app.unichat.support.Seen;
 import java.util.concurrent.ExecutionException;
@@ -133,7 +134,7 @@ class CloudUnseenTest {
         assertTrue(account.files.containsKey(PHOTO));
         assertFalse(account.files.containsKey(SECOND));
         assertEquals(1, s.waiting(), "the second still waits");
-        assertNull(Settings.get().getString("cloud.lastVerify", null), "the day's check, due, waits too");
+        assertNull(Settings.get().getString("cloud.lastVerify"), "the day's check, due, waits too");
         Seen.reset(true);
         assertNull(desk.cloud.syncNow().get().error());
         assertTrue(account.files.containsKey(SECOND), "seen again, it went");
@@ -206,11 +207,11 @@ class CloudUnseenTest {
         Seen.reset(false);
         Cloud.Status unseen = desk.cloud.syncNow().get();
         assertEquals(old, unseen.lastVerified(), "due, and still due");
-        assertEquals(old.toString(), Settings.get().getString("cloud.lastVerify", null));
+        assertEquals(old.toString(), Settings.get().getString("cloud.lastVerify"));
         assertEquals("fo", new String(account.files.get(PHOTO), StandardCharsets.UTF_8), "nothing checked while unseen");
         Seen.reset(true);
         Cloud.Status seen = desk.cloud.syncNow().get();
-        assertTrue(seen.lastVerified().isAfter(old), "the check ran once seen");
+        assertTrue(Present.of(seen.lastVerified()).isAfter(old), "the check ran once seen");
         assertEquals("foto", new String(account.files.get(PHOTO), StandardCharsets.UTF_8), "and repaired it");
     }
 
@@ -232,7 +233,7 @@ class CloudUnseenTest {
         assertEquals("otra", new String(account.files.get(SECOND), StandardCharsets.UTF_8), "the next file waited");
         Seen.reset(true);
         int from = account.asked.size();
-        assertTrue(desk.cloud.syncNow().get().lastVerified().isAfter(old));
+        assertTrue(Present.of(desk.cloud.syncNow().get().lastVerified()).isAfter(old));
         List<String> again = account.asked.subList(from, account.asked.size());
         assertFalse(again.contains("PROPFIND " + PHOTO), "it went on from where it stopped: " + again);
         assertTrue(again.contains("PROPFIND " + SECOND), "with the next: " + again);

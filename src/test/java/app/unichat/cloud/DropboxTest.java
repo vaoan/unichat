@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -20,6 +21,7 @@ import java.util.concurrent.CompletionException;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -178,12 +180,26 @@ class DropboxTest {
         URI[] opened = {null};
         CompletableFuture<CloudAccount> login = DropboxLogin.start("APP", u -> opened[0] = u, 0, "http://127.0.0.1:9/token", java.time.Duration.ZERO);
         var e = assertThrows(java.util.concurrent.ExecutionException.class, login::get); // get: a JUnit timeout can interrupt it
-        assertEquals(app.unichat.support.I18n.t("cloud.signIn.expired"), e.getCause().getMessage());
-        PCloudTest.portIsFree(query(opened[0]).get("redirect_uri"));
+        assertEquals(app.unichat.support.I18n.t("cloud.signIn.expired"), Present.of(e.getCause()).getMessage());
+        PCloudTest.portIsFree(Present.of(query(opened[0]).get("redirect_uri")));
 
         login = DropboxLogin.start("APP", u -> opened[0] = u, 0, "http://127.0.0.1:9/token", NO_LIMIT);
         login.cancel(false);
-        PCloudTest.portIsFree(query(opened[0]).get("redirect_uri"));
+        PCloudTest.portIsFree(Present.of(query(opened[0]).get("redirect_uri")));
+    }
+
+    @Test
+    void aTokenServerThatCantBeReachedFailsTheSignInAndTheBrowserSaysSo() throws Exception {
+        URI[] opened = {null};
+        // Nothing listens on port 9: the exchange fails with a ConnectException, which has no message.
+        CompletableFuture<CloudAccount> login = DropboxLogin.start("APP", u -> opened[0] = u, 0, "http://127.0.0.1:9/token", NO_LIMIT);
+        Map<String, String> asked = query(opened[0]);
+        HttpResponse<String> back = HTTP.send(HttpRequest.newBuilder(URI.create(asked.get("redirect_uri")
+                + "?code=the-code&state=" + asked.get("state"))).build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, back.statusCode(), "the browser is told, not left with a dropped connection");
+        assertTrue(back.body().contains(app.unichat.support.I18n.t("cloud.dropbox.failed", "ConnectException")), back.body());
+        var e = assertThrows(java.util.concurrent.ExecutionException.class, login::get);
+        assertInstanceOf(java.net.ConnectException.class, e.getCause());
     }
 
     @Test
@@ -208,7 +224,7 @@ class DropboxTest {
             DropboxApi api = api(fake, DropboxApi.SINGLE, 1024);
             Path file = Files.writeString(dir.resolve("a.jpg"), "12345");
             api.put("Unichat/a.jpg", file);
-            Storage.RemoteFile f = api.info("Unichat/a.jpg");
+            Storage.RemoteFile f = Present.of(api.info("Unichat/a.jpg"));
             assertEquals(5, f.size());
             assertEquals(Checksums.DROPBOX, f.kind());
             assertEquals(Checksums.of(file, Checksums.DROPBOX), f.hash(), "the same hash computed here and there");

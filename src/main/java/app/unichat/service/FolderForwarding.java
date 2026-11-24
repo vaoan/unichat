@@ -1,6 +1,7 @@
 package app.unichat.service;
 
 import app.unichat.model.Chat;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -19,6 +20,6 @@ public interface FolderForwarding extends ChatFolders {
     @Override default void deleteFolder(String id) { folderActions().deleteFolder(id); }
     @Override default void setFolderFavorite(String id, boolean favorite) { folderActions().setFolderFavorite(id, favorite); }
     @Override default void setInFolder(String folderId, Chat chat, boolean in) { folderActions().setInFolder(folderId, chat, in); }
-    @Override default String preferencesWarning() { return folderActions().preferencesWarning(); }
-    @Override default void onSaveFailure(Consumer<String> warn) { folderActions().onSaveFailure(warn); }
+    @Override default @Nullable String preferencesWarning() { return folderActions().preferencesWarning(); }
+    @Override default void onSaveFailure(@Nullable Consumer<String> warn) { folderActions().onSaveFailure(warn); }
 }

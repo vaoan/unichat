@@ -1,5 +1,7 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -58,7 +60,7 @@ class RecoveryCodeTest {
     void itNeverPrintsItself() {
         RecoveryCode code = RecoveryCode.random();
         for (int i = 1; i <= 8; i++) assertFalse(code.toString().contains(code.group(i)));
-        assertEquals(code.hashCode(), RecoveryCode.parse(code.shown()).hashCode());
+        assertEquals(code.hashCode(), Present.of(RecoveryCode.parse(code.shown())).hashCode());
     }
 
     @Test
@@ -77,6 +79,7 @@ class RecoveryCodeTest {
     }
 
     @Test
+    @SuppressWarnings("NullAway") // no bytes on purpose: the code refuses them
     void aCodeNeedsExactlyTwentyBytes() {
         assertThrows(IllegalArgumentException.class, () -> new RecoveryCode(new byte[19]));
         assertThrows(IllegalArgumentException.class, () -> new RecoveryCode(null));

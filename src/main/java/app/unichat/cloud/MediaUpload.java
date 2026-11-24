@@ -3,6 +3,7 @@ package app.unichat.cloud;
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 import app.unichat.support.PathParts;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -164,8 +165,9 @@ final class MediaUpload {
         };
     }
 
-    private static String localHash(Path file, Storage.RemoteFile there) throws IOException {
-        return there.kind() == null ? null : Checksums.of(file, there.kind());
+    private static @Nullable String localHash(Path file, Storage.RemoteFile there) throws IOException {
+        String kind = there.kind();
+        return kind == null ? null : Checksums.of(file, kind);
     }
 
     /**
@@ -193,7 +195,7 @@ final class MediaUpload {
     /** Files waiting for another try, and the soonest one (null when none). */
     int retrying() { return retries.size(); }
 
-    Instant nextRetry() {
+    @Nullable Instant nextRetry() {
         return retries.values().stream().map(Retry::next).min(Instant::compareTo).orElse(null);
     }
 

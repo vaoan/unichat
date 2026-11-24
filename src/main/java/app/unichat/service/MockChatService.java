@@ -14,6 +14,7 @@ import app.unichat.model.Network;
 import app.unichat.model.VoiceNote;
 import app.unichat.support.I18n;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -57,7 +59,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     /** Account id -> account, in connection order. */
     final Map<String, Account> accounts = new LinkedHashMap<>();
     private final Random random = new Random(7);
-    private volatile ScheduledExecutorService scheduler; // made under the lock (start), read by scheduler() from any thread
+    private volatile @Nullable ScheduledExecutorService scheduler; // made under the lock (start), read by scheduler() from any thread
     private volatile ConnectionState state = ConnectionState.CONNECTING;
 
     private final PreferencesFile prefs;
@@ -262,7 +264,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     @Override
-    public CompletableFuture<Contact> resolveContact(Account account, String identifier) {
+    public CompletableFuture<@Nullable Contact> resolveContact(Account account, String identifier) {
         String digits = identifier.replaceAll("[^0-9]", "");
         return CompletableFuture.completedFuture(digits.length() >= 7
                 ? new Contact("c-" + digits, identifier.strip(), List.of("tel:+" + digits), null, null) : null);
@@ -283,7 +285,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     @Override public List<Chat> chats() { return new ArrayList<>(chats.values()); }
-    @Override public Chat chat(String chatId) { return chats.get(chatId); }
+    @Override public @Nullable Chat chat(String chatId) { return chats.get(chatId); }
 
     @Override
     public List<Message> messages(String chatId) {
@@ -302,7 +304,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     // ---------------------------------------------------------------- sending
 
     @Override
-    public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) {
+    public CompletableFuture<Void> sendText(String chatId, String text, @Nullable String replyToId) {
         CompletableFuture<Void> sent = sendLocal(chatId, replyToId, m -> {
             m.setBody(Message.withoutEmoteCommand(text));
             m.setHtml(app.unichat.model.Markup.html(m.body()));
@@ -327,7 +329,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     public CompletableFuture<app.unichat.model.StickerPack> stickerPack(String url) { return DemoStickers.pack(url); }
 
     @Override
-    public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) {
+    public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, @Nullable String replyToId) {
         return sendLocal(chatId, replyToId, m -> {
             m.setType(MessageType.STICKER);
             m.setMediaUrl(item.url());
@@ -338,7 +340,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     @Override
-    public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) {
+    public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, @Nullable String replyToId) {
         return sendLocal(chatId, replyToId, m -> {
             m.setType(MessageType.AUDIO);
             m.setFileName(app.unichat.support.PathParts.name(note.file()));
@@ -355,7 +357,7 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     /** Shows at once like the real one; the "upload" takes half a second, so the upload bar can be seen. */
     @Override
-    public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, SendAs as,
+    public CompletableFuture<Void> sendFile(String chatId, Path file, @Nullable String replyToId, SendAs as,
                                             java.util.function.DoubleConsumer progress) {
         CompletableFuture<Void> shown = sendLocal(chatId, replyToId, m -> {
             String name = app.unichat.support.PathParts.name(file);
@@ -385,7 +387,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     }
 
     /** What sending anything has in common: a new outgoing message that {@code fill} completes, then its delivery. */
-    private CompletableFuture<Void> sendLocal(String chatId, String replyToId, Consumer<Message> fill) {
+    private CompletableFuture<Void> sendLocal(String chatId, @Nullable String replyToId, Consumer<Message> fill) {
         Chat chat = chats.get(chatId);
         if (chat == null) return CompletableFuture.failedFuture(new IllegalArgumentException(I18n.t("error.chatNotFound")));
         Message m = outgoing(chatId);
@@ -402,7 +404,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         if (m != null && m.outgoing()) {
             m.setBody(newText);
             m.setEdited(true);
-            refreshPreview(chats.get(chatId));
+            refreshPreview(Objects.requireNonNull(chats.get(chatId), chatId)); // its messages were found
             fireMessages(chatId);
         }
         return CompletableFuture.completedFuture(null);
@@ -413,7 +415,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         Message m = find(chatId, messageId);
         if (m != null) {
             m.markDeleted();
-            refreshPreview(chats.get(chatId));
+            refreshPreview(Objects.requireNonNull(chats.get(chatId), chatId)); // its messages were found
             fireMessages(chatId);
         }
         return CompletableFuture.completedFuture(null);
@@ -450,16 +452,24 @@ public class MockChatService implements ChatService, FolderForwarding {
     @Override public CompletableFuture<Void> setFavorite(String id, boolean v) { return choose(id, PreferencesFile.Flag.FAVORITE, v, c -> c.setFavorite(v)); }
     @Override public CompletableFuture<Void> setLowPriority(String id, boolean v) { return choose(id, PreferencesFile.Flag.LOW_PRIORITY, v, c -> c.setLowPriority(v)); }
     @Override public CompletableFuture<Void> setAutoSave(String id, boolean mine, java.util.Set<app.unichat.model.SaveKind> kinds) {
-        return update(id, c -> { if (c.prefKey() != null) prefs.chooseSaveKinds(c.prefKey(), mine, kinds); });
+        return update(id, c -> {
+            String key = c.prefKey();
+            if (key != null) prefs.chooseSaveKinds(key, mine, kinds);
+        });
     }
     @Override public CompletableFuture<Void> setMediaHidden(String id, boolean v) { return choose(id, PreferencesFile.Flag.MEDIA_HIDDEN, v, c -> { }); }
     @Override public boolean mediaHidden(String id) {
-        Chat c = chat(id);
-        return c != null && c.prefKey() != null && prefs.isOn(c.prefKey(), PreferencesFile.Flag.MEDIA_HIDDEN);
+        String key = prefKey(id);
+        return key != null && prefs.isOn(key, PreferencesFile.Flag.MEDIA_HIDDEN);
     }
     @Override public java.util.Set<app.unichat.model.SaveKind> autoSaves(String id, boolean mine) {
-        Chat c = chat(id);
-        return c == null || c.prefKey() == null ? java.util.Set.of() : prefs.saveKinds(c.prefKey(), mine);
+        String key = prefKey(id);
+        return key == null ? java.util.Set.of() : prefs.saveKinds(key, mine);
+    }
+
+    private @Nullable String prefKey(String chatId) {
+        Chat c = chat(chatId);
+        return c == null ? null : c.prefKey();
     }
     @Override public CompletableFuture<Void> setArchived(String id, boolean v) { return quiet(id, v); }
     @Override public CompletableFuture<Void> setMuted(String id, boolean v) { return quiet(id, v); }
@@ -469,7 +479,8 @@ public class MockChatService implements ChatService, FolderForwarding {
         for (String t : QuietRule.targets(this, id)) {
             Chat c = chats.get(t);
             if (c == null) continue;
-            if (c.prefKey() != null) prefs.chooseQuiet(c.prefKey(), v);
+            String key = c.prefKey();
+            if (key != null) prefs.chooseQuiet(key, v);
             c.setArchived(v);
             c.setMuted(v);
         }
@@ -477,8 +488,9 @@ public class MockChatService implements ChatService, FolderForwarding {
         return CompletableFuture.completedFuture(null);
     }
     @Override public CompletableFuture<Void> setPinned(String id, boolean v) { return choose(id, PreferencesFile.Flag.PINNED, v, c -> c.setPinned(v)); }
-    @Override public CompletableFuture<Void> setReminder(String id, Instant at) { return update(id, c -> {
-        if (c.prefKey() != null) prefs.chooseReminder(c.prefKey(), at);
+    @Override public CompletableFuture<Void> setReminder(String id, @Nullable Instant at) { return update(id, c -> {
+        String key = c.prefKey();
+        if (key != null) prefs.chooseReminder(key, at);
         c.setReminderAt(at);
     }); }
 
@@ -493,7 +505,8 @@ public class MockChatService implements ChatService, FolderForwarding {
     private CompletableFuture<Void> choose(String id, PreferencesFile.Flag flag, boolean v,
                                            Consumer<Chat> change) {
         return update(id, c -> {
-            if (c.prefKey() != null) prefs.choose(c.prefKey(), flag, v);
+            String key = c.prefKey();
+            if (key != null) prefs.choose(key, flag, v);
             change.accept(c);
         });
     }
@@ -569,7 +582,7 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     final ScheduledExecutorService scheduler() {
         if (scheduler == null) start();
-        return scheduler;
+        return Objects.requireNonNull(scheduler, "stopped meanwhile");
     }
 
     private Message outgoing(String chatId) {
@@ -633,7 +646,8 @@ public class MockChatService implements ChatService, FolderForwarding {
     private void checkReminders() {
         Instant now = Instant.now();
         for (Chat c : chats.values()) {
-            if (c.reminderAt() != null && !c.reminderAt().isAfter(now)) {
+            Instant at = c.reminderAt();
+            if (at != null && !at.isAfter(now)) {
                 c.setReminderAt(null);
                 c.setMarkedUnread(true);
                 listeners.forEach(l -> l.reminderDue(c));
@@ -672,7 +686,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         fireChats();
     }
 
-    private Message find(String chatId, String messageId) {
+    private @Nullable Message find(String chatId, String messageId) {
         for (Message m : messages(chatId)) if (m.id().equals(messageId)) return m;
         return null;
     }

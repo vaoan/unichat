@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.support.I18n;
 import java.io.IOException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -253,7 +254,7 @@ class PasskeyPageTest {
     void aProbeLeftInTheBrowserEndsAtItsDeadlineAndFreesThePort() throws Exception {
         CompletableFuture<Void> probe = PasskeyPage.start(u -> opened[0] = u, found::add, 0, Duration.ZERO);
         var e = assertThrows(ExecutionException.class, probe::get); // get: a JUnit timeout can interrupt it
-        assertEquals(I18n.t("cloud.passkey.expired"), e.getCause().getMessage(), "a probe, not a sign-in");
+        assertEquals(I18n.t("cloud.passkey.expired"), Present.of(e.getCause()).getMessage(), "a probe, not a sign-in");
         assertInstanceOf(Loopback.Expired.class, e.getCause());
         PCloudTest.portIsFree(opened[0].toString());
     }

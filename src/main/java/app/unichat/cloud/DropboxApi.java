@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,7 +43,7 @@ public final class DropboxApi implements Storage {
     private final long single;
     private final int chunk;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
-    private volatile String access;
+    private volatile @Nullable String access;
 
     public DropboxApi(String appKey, String refreshToken) {
         this(appKey, refreshToken, "https://api.dropboxapi.com", "https://content.dropboxapi.com", DropboxLogin.TOKEN, SINGLE, CHUNK);
@@ -74,21 +75,21 @@ public final class DropboxApi implements Storage {
     }
 
     @Override
-    public String stamp(String path) throws IOException {
+    public @Nullable String stamp(String path) throws IOException {
         JsonNode m = metadata(path);
         return m == null ? null : m.path("rev").asText(m.path("id").asText(""));
     }
 
     /** Dropbox gives a file's size and its own content hash ({@link Checksums#DROPBOX}). */
     @Override
-    public RemoteFile info(String path) throws IOException {
+    public @Nullable RemoteFile info(String path) throws IOException {
         JsonNode m = metadata(path);
         if (m == null) return null;
         String hash = m.path("content_hash").asText(null);
         return new RemoteFile(m.path("size").asLong(-1), hash == null ? null : Checksums.DROPBOX, hash);
     }
 
-    private JsonNode metadata(String path) throws IOException {
+    private @Nullable JsonNode metadata(String path) throws IOException {
         try {
             return rpc("/2/files/get_metadata", JSON.createObjectNode().put("path", abs(path)));
         } catch (Missing gone) {
@@ -154,7 +155,7 @@ public final class DropboxApi implements Storage {
     }
 
     @Override
-    public void put(String path, Path file, java.util.function.LongConsumer sent) throws IOException {
+    public void put(String path, Path file, java.util.function.@Nullable LongConsumer sent) throws IOException {
         long size = Files.size(file);
         if (size <= single) {
             upload(path, CountingBody.of(HttpRequest.BodyPublishers.ofFile(file), sent));
@@ -178,7 +179,7 @@ public final class DropboxApi implements Storage {
     }
 
     /** One piece of a session upload, counting on from the {@code before} bytes already gone. */
-    private static HttpRequest.BodyPublisher piece(byte[] data, long before, java.util.function.LongConsumer sent) {
+    private static HttpRequest.BodyPublisher piece(byte[] data, long before, java.util.function.@Nullable LongConsumer sent) {
         return CountingBody.of(HttpRequest.BodyPublishers.ofByteArray(data), sent == null ? null : n -> sent.accept(before + n));
     }
 
@@ -208,7 +209,7 @@ public final class DropboxApi implements Storage {
     }
 
     @Override
-    public byte[] get(String path) throws IOException {
+    public byte @Nullable [] get(String path) throws IOException {
         try {
             return call(download(path), HttpResponse.BodyHandlers.ofByteArray());
         } catch (Missing gone) {
@@ -223,7 +224,7 @@ public final class DropboxApi implements Storage {
     }
 
     /** A call with JSON in and out (or no arguments: {@code null}). */
-    private JsonNode rpc(String endpoint, ObjectNode args) throws IOException {
+    private JsonNode rpc(String endpoint, @Nullable ObjectNode args) throws IOException {
         byte[] out = call(HttpRequest.newBuilder(URI.create(api + endpoint)).timeout(WebDav.ANSWER)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(args == null ? "null" : JSON.writeValueAsString(args))),

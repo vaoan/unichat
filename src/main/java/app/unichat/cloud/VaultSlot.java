@@ -3,6 +3,7 @@ package app.unichat.cloud;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -52,7 +53,7 @@ record VaultSlot(String id, String vault, Method method, String label, Instant c
         return VaultCrypto.argon2id(password, salt);
     }
 
-    private static byte[] salt(ObjectNode params) {
+    private static byte @Nullable [] salt(ObjectNode params) {
         if (!params.path("salt").isTextual()) return null;
         try {
             byte[] salt = Base64.getDecoder().decode(params.get("salt").asText());
@@ -86,7 +87,7 @@ record VaultSlot(String id, String vault, Method method, String label, Instant c
     }
 
     /** The slot in these bytes, or null for anything that isn't one. */
-    static VaultSlot parse(byte[] json) {
+    static @Nullable VaultSlot parse(byte[] json) {
         try {
             JsonNode n = JSON.readTree(json);
             if (n == null || !n.isObject() || !n.path("id").isTextual() || !n.path("vault").isTextual() || !n.path("label").isTextual()

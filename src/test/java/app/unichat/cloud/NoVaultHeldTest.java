@@ -32,7 +32,7 @@ class NoVaultHeldTest {
     @Test
     @Order(2)
     void theNextStartsWithNoneOfThem() {
-        for (String k : NoVaultHeld.KEYS) assertNull(Settings.get().getString(k, null), k);
+        for (String k : NoVaultHeld.KEYS) assertNull(Settings.get().getString(k), k);
     }
 
     @Test

@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -52,7 +53,7 @@ final class VaultNext {
     }
 
     /** The slot's public key when {@code vk} sealed it for that vault and id (in the slot or its offer), or null: one put in by anyone else. */
-    static byte[] publicKey(VaultSlot slot, byte[] vk) {
+    static byte @Nullable [] publicKey(VaultSlot slot, byte[] vk) {
         byte[] shown = bytes(slot.params(), PUBLIC);
         if (shown == null) return null;
         byte[] mine = opened(vk, slot, bytes(slot.params(), PUBLIC_SEALED));
@@ -60,7 +61,7 @@ final class VaultNext {
         return mine != null && Arrays.equals(mine, shown) ? mine : null;
     }
 
-    private static byte[] opened(byte[] vk, VaultSlot slot, byte[] sealed) {
+    private static byte @Nullable [] opened(byte[] vk, VaultSlot slot, byte @Nullable [] sealed) {
         if (sealed == null) return null;
         try {
             return VaultCrypto.open(vk, publicPath(slot.vault(), slot.id()), sealed);
@@ -171,7 +172,7 @@ final class VaultNext {
     }
 
     /** The public half of an X25519 private key (PKCS #8), as X.509: its agreement with the base point; null when it isn't one. */
-    static byte[] publicOf(byte[] privateKey) {
+    static byte @Nullable [] publicOf(byte[] privateKey) {
         try {
             KeyFactory keys = KeyFactory.getInstance("X25519");
             KeyAgreement agreement = KeyAgreement.getInstance("X25519");
@@ -224,7 +225,7 @@ final class VaultNext {
         }
     }
 
-    private static byte[] bytes(ObjectNode n, String field) {
+    private static byte @Nullable [] bytes(ObjectNode n, String field) {
         if (!n.path(field).isTextual()) return null;
         try {
             return Base64.getDecoder().decode(n.get(field).asText());

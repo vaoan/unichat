@@ -5,6 +5,7 @@ import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 import app.unichat.support.SafeFile;
 import app.unichat.support.Seen;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -46,26 +47,28 @@ public final class Cloud {
      * For the settings page: connected or not, when the last round worked, why the last one didn't, what went up, and
      * whether the last round left media waiting because nobody could see Unichat ({@link Seen}).
      */
-    public record Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
-                         int retrying, Instant nextRetry, int conflicts, Instant lastVerified, VaultState vault, Moving moving,
-                         Notice vaultNotice, boolean mediaPaused) {
+    public record Status(boolean connected, @Nullable Instant lastSync, @Nullable String error, int uploaded, int waiting,
+                         @Nullable Activity now, int retrying, @Nullable Instant nextRetry, int conflicts,
+                         @Nullable Instant lastVerified, VaultState vault, Moving moving, @Nullable Notice vaultNotice,
+                         boolean mediaPaused) {
         static final Status OFF = new Status(false, null, null, 0, 0);
 
         @SuppressWarnings("PMD.ExcessiveParameterList") // the record's own components, less the last
-        public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
-                      int retrying, Instant nextRetry, int conflicts, Instant lastVerified, VaultState vault, Moving moving,
-                      Notice vaultNotice) {
+        public Status(boolean connected, @Nullable Instant lastSync, @Nullable String error, int uploaded, int waiting,
+                      @Nullable Activity now, int retrying, @Nullable Instant nextRetry, int conflicts,
+                      @Nullable Instant lastVerified, VaultState vault, Moving moving, @Nullable Notice vaultNotice) {
             this(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts, lastVerified, vault, moving,
                 vaultNotice, false);
         }
 
-        public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting) {
+        public Status(boolean connected, @Nullable Instant lastSync, @Nullable String error, int uploaded, int waiting) {
             this(connected, lastSync, error, uploaded, waiting, null, 0, null, 0, null);
         }
 
         @SuppressWarnings("PMD.ExcessiveParameterList") // the record's own components, before the vault's
-        public Status(boolean connected, Instant lastSync, String error, int uploaded, int waiting, Activity now,
-                      int retrying, Instant nextRetry, int conflicts, Instant lastVerified) {
+        public Status(boolean connected, @Nullable Instant lastSync, @Nullable String error, int uploaded, int waiting,
+                      @Nullable Activity now, int retrying, @Nullable Instant nextRetry, int conflicts,
+                      @Nullable Instant lastVerified) {
             this(connected, lastSync, error, uploaded, waiting, now, retrying, nextRetry, conflicts, lastVerified, VaultState.NONE, Moving.NONE, null);
         }
 
@@ -98,7 +101,7 @@ public final class Cloud {
         }
 
         /** The part kept in {@code file}; null for none of ours. */
-        static Part of(String file) {
+        static @Nullable Part of(String file) {
             for (Part p : values()) if (p.file.equals(file)) return p;
             return null;
         }
@@ -118,7 +121,7 @@ public final class Cloud {
      * What came into the vault from the plain copies here (how many files, and when the last did), and the computers still
      * sending plain, each machine with its computer's name in the vault ("" for one that has none there).
      */
-    public record Moving(int files, Instant at, Map<String, String> strays) {
+    public record Moving(int files, @Nullable Instant at, Map<String, String> strays) {
         static final Moving NONE = new Moving(0, null, Map.of());
 
         /** A stray's name to show: its computer's in the vault, "" when unknown. */
@@ -144,8 +147,8 @@ public final class Cloud {
     static final Duration VERIFY_EVERY = Duration.ofDays(1);
 
     /** What a round is doing right now, for the page to say: checking a part, or uploading file {@code done} of {@code total}. */
-    public record Activity(Step step, int done, int total, String item, long sent, long size, long bytesPerSecond) {
-        public Activity(Step step, int done, int total, String item) {
+    public record Activity(Step step, int done, int total, @Nullable String item, long sent, long size, long bytesPerSecond) {
+        public Activity(Step step, int done, int total, @Nullable String item) {
             this(step, done, total, item, 0, 0, 0);
         }
     }
@@ -154,7 +157,8 @@ public final class Cloud {
 
     private static final String STYLE_FILE = "writing-style.md";
 
-    private final Supplier<CloudAccount> account;
+    /** The account connected now; null when none is. */
+    private final Supplier<@Nullable CloudAccount> account;
     private final List<SyncedPart> parts;
     private final SyncedPart settingsPart;
     private final MediaUpload media;
@@ -164,7 +168,7 @@ public final class Cloud {
     private final CloudVault vaultJobs = new CloudVault(this);
     private final CloudRenames renames;
     /** The vault's state last read: when it changes, what was seen of the account is another storage's. */
-    private VaultState lastVault;
+    private @Nullable VaultState lastVault;
     private final Object vaultLock = new Object();
     /**
      * Held by a round's vault part (everything but media) and by every vault job: a job never runs alongside what reads or
@@ -184,7 +188,7 @@ public final class Cloud {
         return t;
     });
     /** The texts' turn asked and not started yet: more asks meanwhile join it. */
-    private CompletableFuture<Void> textsPending;
+    private @Nullable CompletableFuture<Void> textsPending;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "cloud");
         t.setDaemon(true);
@@ -206,11 +210,11 @@ public final class Cloud {
     private final java.util.function.Consumer<Boolean> onSeen = seen -> {
         if (seen) queueRound("the round on being seen");
     };
-    private ScheduledExecutorService timer;
+    private @Nullable ScheduledExecutorService timer;
     /** A round and a vault job both tell it: what changes a part of it does so in one step ({@code updateAndGet}). */
     private final java.util.concurrent.atomic.AtomicReference<Status> status = new java.util.concurrent.atomic.AtomicReference<>(Status.OFF);
     /** Tests: runs once, after a vault job read the status to tell its state and before it's told (a round may publish meanwhile). */
-    volatile Runnable beforeTold;
+    volatile @Nullable Runnable beforeTold;
     private int uploaded;
     private Moving moving = Moving.NONE;
 
@@ -232,7 +236,7 @@ public final class Cloud {
      */
     public record Personal(Supplier<byte[]> pins, java.util.function.Consumer<byte[]> adoptPins, Path transcripts) {}
 
-    Cloud(Supplier<CloudAccount> account, SyncedPart settingsPart, SyncedPart stylePart, MediaUpload media, TextSync texts,
+    Cloud(Supplier<@Nullable CloudAccount> account, SyncedPart settingsPart, SyncedPart stylePart, MediaUpload media, TextSync texts,
           java.util.function.Consumer<java.util.Set<String>> textsArrived, VaultParts vaultParts) {
         this.texts = texts;
         this.vaultParts = vaultParts;
@@ -261,7 +265,7 @@ public final class Cloud {
     }
 
     /** The same with the account given (tests: one that isn't this computer's saved one). */
-    static Cloud create(Supplier<CloudAccount> account, Path dataDir, Supplier<byte[]> preferences, Predicate<byte[]> adoptPreferences,
+    static Cloud create(Supplier<@Nullable CloudAccount> account, Path dataDir, Supplier<byte[]> preferences, Predicate<byte[]> adoptPreferences,
                         Runnable settingsAdopted, Supplier<List<Path>> mediaFolders, Texts texts, Personal personal) {
         SyncedPart settings = new SyncedPart(CloudAccount.SETTINGS_FILE, "settings",
                 now -> Bundle.of(machine(), now, Settings.get().portable(), Bundle.readPreferences(preferences.get())),
@@ -288,7 +292,7 @@ public final class Cloud {
 
     /** This computer, as the account's files say who wrote them. */
     static String machine() {
-        String id = Settings.get().getString("cloud.machine", null);
+        String id = Settings.get().getString("cloud.machine");
         if (id == null) {
             id = UUID.randomUUID().toString();
             Settings.get().set("cloud.machine", id);
@@ -386,7 +390,7 @@ public final class Cloud {
     }
 
     /** What a round's vault part found: the state, why the texts or the move failed (or null), and what the vault left. */
-    private record VaultPass(VaultState state, String textsFailed, Notice notice, long jobsSeen) {}
+    private record VaultPass(VaultState state, @Nullable String textsFailed, @Nullable Notice notice, long jobsSeen) {}
 
     /**
      * Everything of a round but media: the vault's state, the personal parts, the texts and the move in, under
@@ -399,7 +403,7 @@ public final class Cloud {
             Storage at = VaultNames.at(dav); // the vault under its old names until it's moved
             try (VaultParts.Round vault = stateOf(at)) {
                 if (vault.open() && (at != dav || VaultNames.left(dav))) {
-                    String[] why = {null};
+                    @Nullable String[] why = {null};
                     at = renames.vault(dav, at, vault, failed -> why[0] = failed);
                     if (renameFailed == null) renameFailed = why[0];
                     if (at == null) return new VaultPass(vault.state(), renameFailed, null, vaultJobsDone); // with another key now
@@ -423,7 +427,7 @@ public final class Cloud {
                     }
                 }
                 if (vault.open()) {
-                    String moveFailed = moveIn(at, personal, vault.info().id(), now);
+                    String moveFailed = moveIn(at, java.util.Objects.requireNonNull(personal), vault.info().id(), now); // open: the vault
                     if (textsFailed == null) textsFailed = moveFailed;
                 }
                 return new VaultPass(vault.state(), textsFailed, notice(at, vault), vaultJobsDone);
@@ -490,7 +494,7 @@ public final class Cloud {
     }
 
     /** What the vault left or replaced this round; null when nothing. */
-    private Notice notice(Storage dav, VaultParts.Round vault) {
+    private @Nullable Notice notice(Storage dav, VaultParts.Round vault) {
         java.util.Set<String> damagedTexts = vault.open() ? this.texts.damaged() : java.util.Set.of();
         Map<String, String> named = new java.util.TreeMap<>();
         if (!damagedTexts.isEmpty()) {
@@ -531,7 +535,7 @@ public final class Cloud {
     }
 
     /** The texts go sealed while the vault is open here, plain by media's switch without one, and nowhere otherwise. */
-    private static Storage textsTo(VaultParts.Round vault, Storage personal) {
+    private static @Nullable Storage textsTo(VaultParts.Round vault, @Nullable Storage personal) {
         return personal != null && (vault.open() || CloudAccount.media()) ? personal : null;
     }
 
@@ -539,7 +543,7 @@ public final class Cloud {
      * What's still plain goes into the vault, after the vault's own parts and texts went (so they're never copied over),
      * and who still sends plain is named; why it couldn't, or null.
      */
-    private String moveIn(Storage dav, Storage sealed, String vaultId, Instant now) {
+    private @Nullable String moveIn(Storage dav, Storage sealed, String vaultId, Instant now) {
         try {
             VaultMove.Result r;
             synchronized (texts) { // TextSync.run's own lock: never alongside textsNow, which writes this computer's texts
@@ -596,12 +600,12 @@ public final class Cloud {
     public CloudVault vault() { return vaultJobs; }
 
     @FunctionalInterface
-    interface Job<T> {
+    interface Job<T extends @Nullable Object> {
         T run(Storage dav) throws IOException;
     }
 
     /** {@code job}, which only reads the vault or changes nothing of its files and keys, as {@link #onWorker(Job, boolean)} says. */
-    <T> CompletableFuture<T> onWorker(Job<T> job) {
+    <T extends @Nullable Object> CompletableFuture<T> onWorker(Job<T> job) {
         return onWorker(job, false);
     }
 
@@ -612,7 +616,7 @@ public final class Cloud {
      * vault is moved first where it's open here, or after where the job opened it ({@link CloudRenames#forJob}); any other
      * sees the vault where it is, and never runs the move (the page opening reads it).
      */
-    <T> CompletableFuture<T> onWorker(Job<T> job, boolean writes) {
+    <T extends @Nullable Object> CompletableFuture<T> onWorker(Job<T> job, boolean writes) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 vaultPart.lock();
@@ -655,14 +659,15 @@ public final class Cloud {
         return CompletableFuture.runAsync(() -> { }, vaultWorker);
     }
 
-    private Status finished(Instant lastSync, String error, VaultState vault, Notice vaultNotice, boolean mediaPaused) {
+    private Status finished(@Nullable Instant lastSync, @Nullable String error, VaultState vault, @Nullable Notice vaultNotice,
+                            boolean mediaPaused) {
         int waiting;
         try {
             waiting = media.waiting();
         } catch (IOException ignored) {
             waiting = status().waiting();
         }
-        String verified = Settings.get().getString(MediaTurn.LAST_VERIFY, null);
+        String verified = Settings.get().getString(MediaTurn.LAST_VERIFY);
         return new Status(true, lastSync, error, uploaded, waiting, null, media.retrying(), media.nextRetry(), media.conflicts(),
                 verified == null ? null : Instant.parse(verified), vault, moving, vaultNotice, mediaPaused);
     }

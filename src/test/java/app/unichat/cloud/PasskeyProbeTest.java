@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -57,7 +58,7 @@ class PasskeyProbeTest {
     void withTheFlagItOpensThePage() throws Exception {
         System.setProperty(PasskeyProbe.FLAG, "true");
         URI[] opened = {null};
-        CompletableFuture<Void> probe = PasskeyProbe.onStart(u -> opened[0] = u, 0, dir.resolve("probe.txt"), log::add);
+        CompletableFuture<Void> probe = Present.of(PasskeyProbe.onStart(u -> opened[0] = u, 0, dir.resolve("probe.txt"), log::add));
         assertEquals("/passkey", opened[0].getPath());
         assertFalse(probe.isDone());
         assertTrue(log.stream().anyMatch(l -> l.contains(opened[0].toString())), "the address is in the log, for no browser: " + log);
@@ -72,7 +73,7 @@ class PasskeyProbeTest {
         var taken = Loopback.server(0);
         try {
             int port = taken.getAddress().getPort();
-            CompletableFuture<Void> probe = PasskeyProbe.onStart(u -> { }, port, dir.resolve("probe.txt"), log::add);
+            CompletableFuture<Void> probe = Present.of(PasskeyProbe.onStart(u -> { }, port, dir.resolve("probe.txt"), log::add));
             org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class, probe::get);
             assertTrue(log.stream().anyMatch(l -> l.contains(app.unichat.support.I18n.t("settings.cloud.portBusy", port))),
                     "the port busy is told, not swallowed: " + log);
@@ -84,7 +85,7 @@ class PasskeyProbeTest {
     @Test
     void aProbeLeftToItsDeadlineAtLaunchSaysNothingMore() throws Exception {
         System.setProperty(PasskeyProbe.FLAG, "true");
-        CompletableFuture<Void> probe = PasskeyProbe.onStart(u -> { }, 0, dir.resolve("probe.txt"), log::add, java.time.Duration.ZERO);
+        CompletableFuture<Void> probe = Present.of(PasskeyProbe.onStart(u -> { }, 0, dir.resolve("probe.txt"), log::add, java.time.Duration.ZERO));
         assertInstanceOf(Loopback.Expired.class, org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class, probe::get).getCause());
         assertEquals(1, log.size(), "only the address: " + log);
     }

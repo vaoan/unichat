@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.support.SafeFile;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,7 +19,7 @@ public interface Storage {
     boolean exists(String path) throws IOException;
 
     /** What tells this version of {@code path} from the next, without downloading it; null when there's none. */
-    String stamp(String path) throws IOException;
+    @Nullable String stamp(String path) throws IOException;
 
     /** Makes {@code dir} and the folders above it that are missing. */
     void mkdirs(String dir) throws IOException;
@@ -57,14 +58,14 @@ public interface Storage {
     void put(String path, Path file) throws IOException;
 
     /** The same, telling {@code sent} the running total of bytes gone out (null: nobody listens). */
-    default void put(String path, Path file, java.util.function.LongConsumer sent) throws IOException {
+    default void put(String path, Path file, java.util.function.@Nullable LongConsumer sent) throws IOException {
         put(path, file);
     }
 
     void put(String path, byte[] data) throws IOException;
 
     /** The file at {@code path}, or null when there's none: for small files (the settings); media goes {@link #get(String, Path)}. */
-    byte[] get(String path) throws IOException;
+    byte @Nullable [] get(String path) throws IOException;
 
     /**
      * The file at {@code path} into {@code target}, as it arrives, never whole in memory (a video can be gigabytes): through
@@ -84,9 +85,9 @@ public interface Storage {
      * What the account knows of a file there: its size (-1 unknown) and, where the service gives one, its checksum
      * ({@link Checksums} kinds). Null when there's none.
      */
-    record RemoteFile(long size, String kind, String hash) {}
+    record RemoteFile(long size, @Nullable String kind, @Nullable String hash) {}
 
-    default RemoteFile info(String path) throws IOException {
+    default @Nullable RemoteFile info(String path) throws IOException {
         return exists(path) ? new RemoteFile(-1, null, null) : null;
     }
 }

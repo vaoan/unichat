@@ -1,5 +1,7 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -20,6 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,7 +63,7 @@ class VaultTest {
         assertNull(Vault.info(storage), "no vault yet");
         Vault.Created made = Vault.create(storage, MAC, "Mac de Ana");
 
-        Vault.Info info = Vault.info(storage);
+        Vault.Info info = Present.of(Vault.info(storage));
         assertEquals(made.info(), info);
         assertEquals(0, info.generation());
         assertEquals(0, Vault.generation(storage));
@@ -68,11 +71,11 @@ class VaultTest {
 
         Map<VaultSlot.Method, VaultSlot> slots = byMethod(Vault.slots(storage));
         assertEquals(Set.of(VaultSlot.Method.RECOVERY, VaultSlot.Method.COMPUTER), slots.keySet());
-        VaultSlot computer = slots.get(VaultSlot.Method.COMPUTER);
+        VaultSlot computer = Present.of(slots.get(VaultSlot.Method.COMPUTER));
         assertEquals(MAC, computer.id(), "one slot per computer, under its machine's id");
         assertEquals("Mac de Ana", computer.label());
         assertTrue(cloud.files.containsKey(Vault.SLOTS + "/" + MAC + ".json"));
-        assertTrue(cloud.files.containsKey(Vault.SLOTS + "/" + slots.get(VaultSlot.Method.RECOVERY).id() + ".json"));
+        assertTrue(cloud.files.containsKey(Vault.SLOTS + "/" + Present.of(slots.get(VaultSlot.Method.RECOVERY)).id() + ".json"));
 
         byte[] published = Base64.getDecoder().decode(computer.params().get("x25519").asText());
         assertArrayEquals(made.computer().pair().getPublic().getEncoded(), published, "its X25519 public key, for a new key later");
@@ -88,16 +91,16 @@ class VaultTest {
         VaultSlot password = Vault.addPassword(storage, made.vk(), pw);
         Map<VaultSlot.Method, VaultSlot> slots = byMethod(Vault.slots(storage));
 
-        assertArrayEquals(made.vk(), Vault.open(slots.get(VaultSlot.Method.RECOVERY), VaultSlot.recoveryKey(made.code())));
-        assertArrayEquals(made.vk(), Vault.open(slots.get(VaultSlot.Method.COMPUTER), made.computer().key()));
-        VaultSlot stored = slots.get(VaultSlot.Method.PASSWORD);
+        assertArrayEquals(made.vk(), Vault.open(Present.of(slots.get(VaultSlot.Method.RECOVERY)), VaultSlot.recoveryKey(made.code())));
+        assertArrayEquals(made.vk(), Vault.open(Present.of(slots.get(VaultSlot.Method.COMPUTER)), made.computer().key()));
+        VaultSlot stored = Present.of(slots.get(VaultSlot.Method.PASSWORD));
         assertEquals(password, stored);
         assertArrayEquals(made.vk(), Vault.open(stored, VaultSlot.passwordKey(pw, stored.params())));
-        RecoveryCode typed = RecoveryCode.parse(made.code().shown().toLowerCase(java.util.Locale.ROOT));
-        assertArrayEquals(made.vk(), Vault.open(slots.get(VaultSlot.Method.RECOVERY), VaultSlot.recoveryKey(typed)));
+        RecoveryCode typed = Present.of(RecoveryCode.parse(made.code().shown().toLowerCase(java.util.Locale.ROOT)));
+        assertArrayEquals(made.vk(), Vault.open(Present.of(slots.get(VaultSlot.Method.RECOVERY)), VaultSlot.recoveryKey(typed)));
 
         assertThrows(VaultCrypto.Broken.class,
-            () -> Vault.open(slots.get(VaultSlot.Method.COMPUTER), VaultCrypto.randomKey()));
+            () -> Vault.open(Present.of(slots.get(VaultSlot.Method.COMPUTER)), VaultCrypto.randomKey()));
         assertThrows(VaultCrypto.Broken.class,
             () -> Vault.open(stored, VaultSlot.passwordKey("otra clave muy larga".toCharArray(), stored.params())));
     }
@@ -161,7 +164,7 @@ class VaultTest {
         assertEquals(Set.of(), slotFiles());
         Vault.Created made = Vault.create(storage, MAC, "Mac");
         assertEquals(2, Vault.slots(storage).size());
-        assertArrayEquals(made.vk(), Vault.open(byMethod(Vault.slots(storage)).get(VaultSlot.Method.RECOVERY),
+        assertArrayEquals(made.vk(), Vault.open(Present.of(byMethod(Vault.slots(storage)).get(VaultSlot.Method.RECOVERY)),
             VaultSlot.recoveryKey(made.code())));
     }
 
@@ -209,7 +212,7 @@ class VaultTest {
         assertNull(Vault.info(storage));
         String good = UUID.randomUUID().toString();
         cloud.put(Vault.INFO, ("{\"id\":\"" + good + "\",\"created\":\"2026-11-19T10:00:00Z\",\"generation\":0}").getBytes(StandardCharsets.UTF_8));
-        assertEquals(good, Vault.info(storage).id());
+        assertEquals(good, Present.of(Vault.info(storage)).id());
     }
 
     @Test
@@ -227,7 +230,7 @@ class VaultTest {
         String path = Vault.SLOTS + "/" + MAC + ".json";
         cloud.put(path, new String(cloud.files.get(path), StandardCharsets.UTF_8).replace("\"COMPUTER\"", "\"PASSKEY\"")
             .getBytes(StandardCharsets.UTF_8));
-        VaultSlot changed = byMethod(Vault.slots(storage)).get(VaultSlot.Method.PASSKEY);
+        VaultSlot changed = Present.of(byMethod(Vault.slots(storage)).get(VaultSlot.Method.PASSKEY));
         assertThrows(VaultCrypto.Broken.class, () -> Vault.open(changed, made.computer().key()));
     }
 
@@ -305,7 +308,7 @@ class VaultTest {
         Vault.Created made = Vault.create(storage, MAC, "Mac");
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
             () -> Vault.addPassword(storage, made.vk(), "corta123456".toCharArray()));
-        assertFalse(e.getMessage().contains("corta123456"));
+        assertFalse(Present.of(e.getMessage()).contains("corta123456"));
         assertEquals(2, Vault.slots(storage).size());
         Vault.addPassword(storage, made.vk(), "exactamente1".toCharArray()); // 12 is enough
     }
@@ -317,7 +320,7 @@ class VaultTest {
         cloud.put(Vault.SLOTS + "/" + stranger + ".json", "{not json".getBytes(StandardCharsets.UTF_8));
         cloud.put(Vault.SLOTS + "/notes.txt", "hola".getBytes(StandardCharsets.UTF_8));
         // A slot moved under another name: its id is its sealing path, so the name must say the same.
-        byte[] moved = cloud.files.get(Vault.SLOTS + "/" + MAC + ".json");
+        byte[] moved = Present.of(cloud.files.get(Vault.SLOTS + "/" + MAC + ".json"));
         cloud.put(Vault.SLOTS + "/" + UUID.randomUUID() + ".json", moved);
 
         assertEquals(Set.of(VaultSlot.Method.RECOVERY, VaultSlot.Method.COMPUTER), byMethod(Vault.slots(storage)).keySet());
@@ -380,7 +383,7 @@ class VaultTest {
 
         @Override public void check() throws IOException { s.check(); }
         @Override public boolean exists(String path) throws IOException { return s.exists(path); }
-        @Override public String stamp(String path) throws IOException { return s.stamp(path); }
+        @Override public @Nullable String stamp(String path) throws IOException { return s.stamp(path); }
         @Override public void mkdirs(String dir) throws IOException { s.mkdirs(dir); }
         @Override public List<String> list(String dir) throws IOException { return s.list(dir); }
         @Override public void delete(String path) throws IOException {
@@ -389,7 +392,7 @@ class VaultTest {
         }
         @Override public void move(String from, String to) throws IOException { s.move(from, to); }
         @Override public void put(String path, Path file) throws IOException { s.put(path, file); }
-        @Override public byte[] get(String path) throws IOException {
+        @Override public byte @Nullable [] get(String path) throws IOException {
             beforeGet.at(path);
             return s.get(path);
         }

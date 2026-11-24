@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.support.Lines;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.List;
@@ -26,7 +27,7 @@ public record VaultView(Cloud.VaultState state, Set<Way> ways, List<Computer> co
      * @param newSinceRemoval it came after the last computer removed here
      * @param unseen this computer hasn't seen it before (not yet in a round): a key change would pin it as it is now
      */
-    public record Computer(String machine, String label, Instant firstSeen, boolean here, boolean keyChanged, boolean newSinceRemoval,
+    public record Computer(String machine, String label, @Nullable Instant firstSeen, boolean here, boolean keyChanged, boolean newSinceRemoval,
                            boolean unseen) {}
 
     private static final int LABEL = 64;

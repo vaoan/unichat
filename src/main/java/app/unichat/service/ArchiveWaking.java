@@ -1,5 +1,7 @@
 package app.unichat.service;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Archived chats that rest out of the sync while the archive is closed (archived Discord servers and channels, behind
  * Matrix), and waking them while it's open. The demo has none: nothing rests, nothing wakes.
@@ -12,7 +14,7 @@ public interface ArchiveWaking {
     enum Step { SERVER, CHATS, RETRYING, DONE }
 
     /** {@code done} of {@code total} chats; {@code server}: the server's name in {@link Step#SERVER}, else null. */
-    record Waking(Step step, int done, int total, String server) {
+    record Waking(Step step, int done, int total, @Nullable String server) {
         public Waking(Step step, int done, int total) { this(step, done, total, null); }
 
         public double fraction() { return total <= 0 ? 1 : Math.min(1, (double) done / total); }
@@ -28,7 +30,7 @@ public interface ArchiveWaking {
     default void setOpenChat(String chatId) { /* nothing by default */ }
 
     /** What waking is at; null when nothing has woken in this run. */
-    default Waking waking() { return null; }
+    default @Nullable Waking waking() { return null; }
 
     /** Told on any thread each time {@link #waking} changes. */
     default void addWakingListener(Runnable listener) { /* nothing by default */ }

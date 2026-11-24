@@ -1,9 +1,11 @@
 package app.unichat.service;
 
+import app.unichat.Present;
 import app.unichat.service.PreferencesFile.Flag;
 import app.unichat.support.PathParts;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -47,7 +49,7 @@ class PreferencesBackupTest {
         opened.forEach(PreferencesFile::flush);
     }
 
-    private static String warning(PreferencesFile p) { return new FolderActions(p, () -> { }).preferencesWarning(); }
+    private static @Nullable String warning(PreferencesFile p) { return new FolderActions(p, () -> { }).preferencesWarning(); }
 
     /** The last write is in the main file, the one before it in the backup. */
     private void twoSaves() {
@@ -83,7 +85,7 @@ class PreferencesBackupTest {
         assertFalse(p.current(B).favorite(), "the last change is what's missing");
         assertTrue(p.recoveredFromBackup());
         assertEquals("", Files.readString(dir.resolve(p.setAside())), "the damaged file is set aside, not overwritten");
-        String said = warning(p);
+        String said = Present.of(warning(p));
         assertTrue(said.contains("copia anterior") && said.contains("último cambio") && said.contains(p.setAside()), said);
     }
 
@@ -129,7 +131,7 @@ class PreferencesBackupTest {
         assertFalse(p.recoveredFromBackup());
         assertFalse(p.current(A).muted());
         assertEquals("{roto", Files.readString(dir.resolve(p.setAside())));
-        assertTrue(warning(p).contains("empiezan vacías"), warning(p));
+        assertTrue(Present.of(warning(p)).contains("empiezan vacías"), warning(p));
     }
 
     @Test
@@ -166,7 +168,7 @@ class PreferencesBackupTest {
             p = open();
             assertTrue(p.current(A).muted());
             assertTrue(p.unreadable());
-            assertTrue(warning(p).contains("no se guardará nada"), warning(p));
+            assertTrue(Present.of(warning(p)).contains("no se guardará nada"), warning(p));
             p.choose(B, Flag.PINNED, true);
             p.flush();
             assertEquals("{roto", Files.readString(prefs()));

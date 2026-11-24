@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -64,7 +65,7 @@ final class SealedStorage implements Storage {
 
     /** Changes with every seal (new nonce): callers decide on the opened content, not on this. */
     @Override
-    public String stamp(String path) throws IOException {
+    public @Nullable String stamp(String path) throws IOException {
         return plain.stamp(stored(path));
     }
 
@@ -95,7 +96,7 @@ final class SealedStorage implements Storage {
     }
 
     @Override
-    public void put(String path, Path file, LongConsumer sent) throws IOException {
+    public void put(String path, Path file, @Nullable LongConsumer sent) throws IOException {
         byte[] sealed = seal(path, Files.readAllBytes(file));
         plain.put(stored(path), sealed);
         written.accept(path);
@@ -109,7 +110,7 @@ final class SealedStorage implements Storage {
     }
 
     @Override
-    public byte[] get(String path) throws IOException {
+    public byte @Nullable [] get(String path) throws IOException {
         byte[] sealed = plain.get(stored(path));
         if (sealed == null) return null;
         try {
@@ -129,7 +130,7 @@ final class SealedStorage implements Storage {
     }
 
     @Override
-    public RemoteFile info(String path) throws IOException {
+    public @Nullable RemoteFile info(String path) throws IOException {
         return exists(path) ? new RemoteFile(-1, null, null) : null;
     }
 

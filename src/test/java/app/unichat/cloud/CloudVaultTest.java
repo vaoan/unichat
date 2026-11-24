@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
 import app.unichat.support.PathParts;
 import java.io.IOException;
@@ -311,7 +312,7 @@ class CloudVaultTest {
                 cloud.dirs.clear();
                 VaultComputer c = withEverything(computer(java.util.UUID.randomUUID().toString())).set("cloud.media", Boolean.toString(media));
                 if (vault) {
-                    Vault.Created made = Vault.create(dav(), c.get("cloud.machine"), "Este");
+                    Vault.Created made = Vault.create(dav(), Present.of(c.get("cloud.machine")), "Este");
                     c.opened(made.info(), made.computer());
                 }
                 Cloud.Status s = c.round();
@@ -407,7 +408,7 @@ class CloudVaultTest {
         launched.opened(made.info(), Vault.addComputer(dav(), made.vk(), DESK, "Escritorio"));
         assertNull(launched.round().error());
         assertTrue(cloud.files.containsKey(sealedText), "opened here: its texts go again, sealed");
-        int sent = cloud.versions.get(sealedText);
+        int sent = Present.of(cloud.versions.get(sealedText));
 
         VaultComputer again = computer(DESK);
         again.values.putAll(launched.values);

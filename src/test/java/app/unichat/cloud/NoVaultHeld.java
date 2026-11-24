@@ -29,6 +29,6 @@ public final class NoVaultHeld implements BeforeEachCallback, AfterEachCallback 
 
     private static void clear() {
         Settings s = Settings.get();
-        for (String k : KEYS) if (s.getString(k, null) != null) s.set(k, null);
+        for (String k : KEYS) if (s.getString(k) != null) s.set(k, null);
     }
 }

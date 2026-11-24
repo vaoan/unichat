@@ -1,6 +1,8 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +55,7 @@ class VaultMoveTest {
         cloud = new FakeDav("u", "p");
         were = new HashMap<>();
         for (String k : KEYS) {
-            were.put(k, Settings.get().getString(k, null));
+            were.put(k, Settings.get().getString(k));
             Settings.get().set(k, null);
         }
         vault = Vault.create(dav(), DESK, "Escritorio");
@@ -77,7 +79,7 @@ class VaultMoveTest {
     /** The vault over the account: each read of a sealed file goes through {@link #beforeSealedGet}. */
     private SealedStorage sealed() {
         return new SealedStorage(new Through(dav()) {
-            @Override public byte[] get(String path) throws IOException {
+            @Override public byte @Nullable [] get(String path) throws IOException {
                 beforeSealedGet.at(path);
                 return super.get(path);
             }
@@ -126,7 +128,7 @@ class VaultMoveTest {
         s.put(folder + "/index.json", TextIndex.write(Map.of(TEXT, (long) text.getBytes(StandardCharsets.UTF_8).length)));
     }
 
-    private String opened(String path) throws IOException {
+    private @Nullable String opened(String path) throws IOException {
         byte[] b = sealed().get(path);
         return b == null ? null : new String(b, StandardCharsets.UTF_8);
     }
@@ -154,8 +156,8 @@ class VaultMoveTest {
         assertTrue(failed[0], "the read-back was asked");
         assertTrue(cloud.files.containsKey(text), "not read back: the plain copy stays");
         assertFalse(first.moved().contains(text));
-        assertTrue(first.error().contains("se cortó"), "and why is told: " + first.error());
-        assertNull(Settings.get().getString(VaultMove.MOVED_AT, null), "the move isn't done until everything went");
+        assertTrue(Present.of(first.error()).contains("se cortó"), "and why is told: " + first.error());
+        assertNull(Settings.get().getString(VaultMove.MOVED_AT), "the move isn't done until everything went");
 
         VaultMove.Result second = run(T.plusSeconds(60));
         assertFalse(cloud.files.containsKey(text), "read back the next round: it goes");
@@ -163,7 +165,7 @@ class VaultMoveTest {
         assertEquals("{\"a\":1}\n", opened(text));
         assertEquals(List.of(), second.strays(), "what was left of the move is no stray");
         assertNull(second.error());
-        assertNotNull(Settings.get().getString(VaultMove.MOVED_AT, null));
+        assertNotNull(Settings.get().getString(VaultMove.MOVED_AT));
 
         // A sealed copy that doesn't open (damaged) keeps the plain one too.
         Settings.get().set(VaultMove.MOVED_AT, null);
@@ -193,12 +195,12 @@ class VaultMoveTest {
         assertEquals(new TreeSet<>(Set.of(NOTES, PHOTO, TextSync.ROOT + "/" + LAPTOP + "/rm -rf.jsonl",
             TextSync.ROOT + "/no-es-una-maquina/" + TEXT)), plainLeft(), "only media and what isn't ours stay plain");
         assertEquals(7, r.moved().size(), "each plain file of ours: " + r.moved());
-        assertEquals("LIGHT", Bundle.parse(s.get(SETTINGS)).settings().get("ui.theme"), "the vault's newer settings kept");
-        assertEquals("x", Bundle.parse(s.get(AI)).settings().get("ui.theme"), "a part the vault lacked came in");
+        assertEquals("LIGHT", Present.of(Bundle.parse(s.get(SETTINGS))).settings().get("ui.theme"), "the vault's newer settings kept");
+        assertEquals("x", Present.of(Bundle.parse(s.get(AI))).settings().get("ui.theme"), "a part the vault lacked came in");
         assertEquals("{\"version\":1}", opened("Unichat/Settings/unichat-pinned.json"));
         assertEquals("{\"suyo\":1}\n", opened(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT), "a computer without the vault's are brought in");
-        assertTrue(opened(TextSync.ROOT + "/" + LAPTOP + "/index.json").contains(TEXT), "and its index says so, for the others");
-        assertEquals(T.toString(), Settings.get().getString(VaultMove.MOVED_AT, null));
+        assertTrue(Present.of(opened(TextSync.ROOT + "/" + LAPTOP + "/index.json")).contains(TEXT), "and its index says so, for the others");
+        assertEquals(T.toString(), Settings.get().getString(VaultMove.MOVED_AT));
 
         int puts = cloud.puts.get();
         int gets = cloud.gets.get();
@@ -225,7 +227,7 @@ class VaultMoveTest {
         assertEquals(List.of(), r.moved(), "a stray's plain copies aren't deleted over and over");
         assertEquals(List.of(new VaultMove.Stray(LAPTOP, T.plusSeconds(30)), new VaultMove.Stray(OLD, T.plusSeconds(60))), r.strays());
         assertTrue(cloud.files.containsKey(SETTINGS));
-        assertEquals("LIGHT", Bundle.parse(s.get(SETTINGS)).settings().get("ui.theme"), "a stray's settings never over the vault's");
+        assertEquals("LIGHT", Present.of(Bundle.parse(s.get(SETTINGS))).settings().get("ui.theme"), "a stray's settings never over the vault's");
         assertEquals(next, opened(TextSync.ROOT + "/" + OLD + "/" + NEXT), "its new texts come in all the same: nothing lost");
         assertEquals(first, opened(TextSync.ROOT + "/" + OLD + "/" + TEXT));
         assertEquals(Map.of(LAPTOP, "Portátil", OLD, ""), VaultMove.names(dav(), r.strays()), "named from its computer slot, or unknown");
@@ -251,12 +253,12 @@ class VaultMoveTest {
         plainTexts(OLD, Map.of(NEXT, next), Map.of(TEXT, first, NEXT, next));
         Instant start = T.plusSeconds(60);
         run(start);
-        assertEquals(start.toString(), Settings.get().getString(VaultMove.QUIET_SINCE, null));
+        assertEquals(start.toString(), Settings.get().getString(VaultMove.QUIET_SINCE));
         run(start.plus(Duration.ofHours(12)));
         plainTexts(OLD, Map.of(NEXT, next, LATER, later), Map.of(TEXT, first, NEXT, next, LATER, later)); // something new halfway
         Instant changed = start.plus(Duration.ofHours(13));
         run(changed);
-        assertEquals(changed.toString(), Settings.get().getString(VaultMove.QUIET_SINCE, null));
+        assertEquals(changed.toString(), Settings.get().getString(VaultMove.QUIET_SINCE));
         run(start.plus(VaultMove.QUIET));
         assertTrue(cloud.files.containsKey(SETTINGS), "a day since the first, not since the last: still there");
 
@@ -265,7 +267,7 @@ class VaultMoveTest {
         String folder = TextSync.ROOT + "/" + OLD;
         assertEquals(new TreeSet<>(Set.of(SETTINGS, folder + "/" + NEXT, folder + "/" + LATER, folder + "/index.json")), new TreeSet<>(quiet.moved()));
         assertEquals(List.of(), quiet.strays());
-        assertNull(Settings.get().getString(VaultMove.QUIET_SINCE, null));
+        assertNull(Settings.get().getString(VaultMove.QUIET_SINCE));
         assertEquals(later, opened(folder + "/" + LATER), "kept, sealed");
     }
 
@@ -302,7 +304,7 @@ class VaultMoveTest {
         String longer = "{\"viejo\":1}\n{\"viejo\":2}\n";
         int[] stamps = {0};
         Storage plain = new Through(dav()) {
-            @Override public String stamp(String path) throws IOException {
+            @Override public @Nullable String stamp(String path) throws IOException {
                 // Asked once before reading it and once right before deleting it: the older computer sends a longer one between.
                 if (path.equals(text) && ++stamps[0] == 2) plainFile(text, longer);
                 return super.stamp(path);
@@ -311,7 +313,7 @@ class VaultMoveTest {
         VaultMove.run(plain, sealed(), vault.info().id(), T);
         assertEquals(2, stamps[0]);
         assertArrayEquals(longer.getBytes(StandardCharsets.UTF_8), cloud.files.get(text), "the longer one isn't lost");
-        assertNull(Settings.get().getString(VaultMove.MOVED_AT, null), "nor the move done");
+        assertNull(Settings.get().getString(VaultMove.MOVED_AT), "nor the move done");
         VaultMove.run(plain(), sealed(), vault.info().id(), T.plusSeconds(60));
         assertEquals("{\"viejo\":1}\n", opened(text), "never written over the sealed one");
         assertArrayEquals(longer.getBytes(StandardCharsets.UTF_8), cloud.files.get(text), "so it stays plain: still not lost");
@@ -324,13 +326,13 @@ class VaultMoveTest {
         String longer = "{\"suyo\":1}\n{\"suyo\":2}\n";
         plainTexts(LAPTOP, "{\"suyo\":1}\n");
         sealedTexts(LAPTOP, "{}\n"); // it hasn't sent all of it sealed yet
-        int versions = cloud.versions.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT);
+        int versions = Present.of(cloud.versions.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT));
         VaultMove.Result r = run(T);
         assertNull(r.error());
         assertTrue(cloud.files.containsKey(text), "its sealed copy is shorter: the plain one stays");
         assertEquals("{}\n", opened(text), "and the move never writes its texts");
         assertEquals(versions, cloud.versions.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT));
-        assertNull(Settings.get().getString(VaultMove.MOVED_AT, null), "the move waits for it");
+        assertNull(Settings.get().getString(VaultMove.MOVED_AT), "the move waits for it");
 
         boolean[] sent = {false};
         beforeSealedGet = p -> {
@@ -352,7 +354,7 @@ class VaultMoveTest {
         String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT;
         int[] stamps = {0};
         Storage plain = new Through(dav()) {
-            @Override public String stamp(String path) throws IOException {
+            @Override public @Nullable String stamp(String path) throws IOException {
                 // The vault turned off by another computer right as the plain copy is about to go (its stamp read again).
                 if (path.equals(text) && ++stamps[0] == 2) cloud.files.remove(Vault.INFO);
                 return super.stamp(path);
@@ -372,7 +374,7 @@ class VaultMoveTest {
         assertTrue(cloud.files.containsKey(SETTINGS));
         assertTrue(cloud.files.containsKey(TextSync.ROOT + "/" + OLD + "/" + TEXT));
         assertEquals("{\"viejo\":1}\n", opened(TextSync.ROOT + "/" + OLD + "/" + TEXT), "though copied in");
-        assertNull(Settings.get().getString(VaultMove.MOVED_AT, null), "nor the move done");
+        assertNull(Settings.get().getString(VaultMove.MOVED_AT), "nor the move done");
 
         Settings.get().set(VaultActions.UNCONFIRMED, null); // kept
         run(T.plusSeconds(60));

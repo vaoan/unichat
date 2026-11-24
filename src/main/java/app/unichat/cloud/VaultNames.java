@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -31,8 +32,8 @@ import java.util.Set;
 final class VaultNames {
     // Tests: each runs once, on the migrating thread holding what it holds: right before Vault#INFO is written (every
     // file and slot copied), and right after the old one is deleted (before the old files go).
-    static volatile Runnable beforeSwitch; // NOPMD: MutableStaticState, a seam tests swap
-    static volatile Runnable afterSwitch; // NOPMD: MutableStaticState, a seam tests swap
+    static volatile @Nullable Runnable beforeSwitch; // NOPMD: MutableStaticState, a seam tests swap
+    static volatile @Nullable Runnable afterSwitch; // NOPMD: MutableStaticState, a seam tests swap
 
     private VaultNames() {}
 
@@ -61,7 +62,7 @@ final class VaultNames {
      */
     static boolean left(Storage dav) throws IOException {
         if (!dav.exists(CloudNames.OLD_VAULT)) return false;
-        String known = Settings.get().getString(LEFT, null);
+        String known = Settings.get().getString(LEFT);
         if (known == null) return true;
         for (String line : known.split("\n")) {
             String[] f = line.split("\t", 2);
@@ -101,7 +102,7 @@ final class VaultNames {
         }
         StringBuilder known = new StringBuilder();
         unopened.forEach((path, stamp) -> known.append(known.isEmpty() ? "" : "\n").append(path).append('\t').append(stamp));
-        if (!known.toString().equals(Settings.get().getString(LEFT, null))) {
+        if (!known.toString().equals(Settings.get().getString(LEFT))) {
             System.err.println("Cloud: " + unopened.size() + " file(s) of the vault don't open with its key: left under the old names");
             Settings.get().set(LEFT, known.toString());
         }

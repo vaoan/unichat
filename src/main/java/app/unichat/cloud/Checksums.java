@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,12 +53,13 @@ final class Checksums {
      * so neither is touched.
      */
     @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "compares two hex checksums the services give; hex is ASCII, and a wrong answer only means a file is checked again")
-    static Verdict decide(long localSize, String localHash, Storage.RemoteFile remote) {
+    static Verdict decide(long localSize, @Nullable String localHash, Storage.@Nullable RemoteFile remote) {
         if (remote == null) return Verdict.UPLOAD;
-        if (remote.hash() != null && localHash != null && remote.hash().equalsIgnoreCase(localHash)) return Verdict.SAME;
+        String remoteHash = remote.hash();
+        if (remoteHash != null && localHash != null && remoteHash.equalsIgnoreCase(localHash)) return Verdict.SAME;
         if (remote.size() < 0) return Verdict.SAME; // it only says the file is there
         if (localSize > remote.size()) return Verdict.UPLOAD;
         if (localSize < remote.size()) return Verdict.RESTORE_LOCAL;
-        return remote.hash() == null ? Verdict.SAME : Verdict.CONFLICT;
+        return remoteHash == null ? Verdict.SAME : Verdict.CONFLICT;
     }
 }

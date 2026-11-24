@@ -60,7 +60,7 @@ public final class DropboxLogin {
 
     /** The app's key: the one given in Ajustes, else Unichat's own. */
     public static String appKey() {
-        String own = Settings.get().getString("cloud.dropboxAppKey", null);
+        String own = Settings.get().getString("cloud.dropboxAppKey");
         return own != null && !own.isBlank() ? own.strip() : APP_KEY;
     }
 
@@ -107,7 +107,10 @@ public final class DropboxLogin {
             Loopback.reply(x, 200, "text/html; charset=utf-8", Loopback.page(I18n.t("cloud.dropbox.done")));
             result.complete(new CloudAccount(CloudAccount.Service.DROPBOX, "", "Dropbox", refresh));
         } catch (IOException e) {
-            Loopback.reply(x, 200, "text/html; charset=utf-8", Loopback.page(e.getMessage()));
+            // A ConnectException has no message: the page then names what failed, rather than dropping the browser.
+            String why = e.getMessage();
+            Loopback.reply(x, 200, "text/html; charset=utf-8", Loopback.page(why != null ? why
+                    : I18n.t("cloud.dropbox.failed", e.getClass().getSimpleName())));
             result.completeExceptionally(e);
         }
     }

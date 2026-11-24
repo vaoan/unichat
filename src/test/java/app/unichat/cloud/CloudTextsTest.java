@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,12 +48,14 @@ class CloudTextsTest {
         cloud.close();
     }
 
-    private Cloud cloud(CloudAccount account, Path media) {
+    private Cloud cloud(@Nullable CloudAccount account, @Nullable Path media) {
         return cloud(() -> account, media);
     }
 
-    private Cloud cloud(java.util.function.Supplier<CloudAccount> account, Path media) {
-        SyncedPart unused = new SyncedPart("Unichat/Settings/x.json", "x", now -> null, b -> { });
+    private Cloud cloud(java.util.function.Supplier<@Nullable CloudAccount> account, @Nullable Path media) {
+        SyncedPart unused = new SyncedPart("Unichat/Settings/x.json", "x", now -> {
+            throw new AssertionError("only the texts run here");
+        }, b -> { });
         return new Cloud(account, unused, unused,
                 new MediaUpload(dir.resolve("cloud-uploaded.txt"), () -> media == null ? List.of() : List.of(media), p -> false),
                 new TextSync(dir.resolve("texts"), dir.resolve("cloud-texts.json"), Cloud.machine()), arrived::add,

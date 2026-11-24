@@ -3,6 +3,7 @@ package app.unichat.cloud;
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -30,9 +31,9 @@ final class VaultOut {
     /** What a run left plain: each path's content, and what was there before each it wrote (null: nothing), to take it back. */
     private static final class Written {
         final Map<String, byte[]> now = new LinkedHashMap<>();
-        final Map<String, byte[]> before = new LinkedHashMap<>();
+        final Map<String, byte @Nullable []> before = new LinkedHashMap<>();
 
-        void put(Storage plain, String path, byte[] data, byte[] was) throws IOException {
+        void put(Storage plain, String path, byte[] data, byte @Nullable [] was) throws IOException {
             plain.mkdirs(path.substring(0, path.lastIndexOf('/')));
             if (!before.containsKey(path)) before.put(path, was);
             now.put(path, data);
@@ -163,7 +164,7 @@ final class VaultOut {
     }
 
     /** The vault's copy opened; null for none, or for one that doesn't open with this key. */
-    private static byte[] openOrNull(Storage sealed, String path) throws IOException {
+    private static byte @Nullable [] openOrNull(Storage sealed, String path) throws IOException {
         try {
             return sealed.get(path);
         } catch (SealedStorage.Damaged e) {

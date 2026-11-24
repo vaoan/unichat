@@ -1,7 +1,9 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
 import java.io.IOException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,8 +44,11 @@ class VaultNamesTest {
     private FakeDav cloud;
     private Map<String, String> portableWere;
     private Map<String, String> keysWere;
+    @SuppressWarnings("NullAway.Init") // made by anOldVault(), which each test calls first
     private Vault.Created made;
+    @SuppressWarnings("NullAway.Init") // made by anOldVault(), which each test calls first
     private VaultComputer desk;
+    @SuppressWarnings("NullAway.Init") // made by anOldVault(), which each test calls first
     private VaultComputer laptop;
 
     @BeforeEach
@@ -112,7 +117,7 @@ class VaultNamesTest {
             if (!p.startsWith(Vault.ROOT + "/")) continue;
             byte[] bytes = f.getValue();
             if (p.equals(Vault.INFO)) {
-                Vault.Info info = Vault.parse(bytes);
+                Vault.Info info = Present.of(Vault.parse(bytes));
                 bytes = ("{\"id\":\"" + info.id() + "\",\"created\":\"" + info.created() + "\",\"generation\":" + info.generation() + "}")
                     .getBytes(StandardCharsets.UTF_8);
             } else if (!p.startsWith(Vault.SLOTS + "/")) {
@@ -149,7 +154,7 @@ class VaultNamesTest {
         held.forEach((p, b) -> assertArrayEquals(b, now.get(p), p));
         assertFalse(new com.fasterxml.jackson.databind.ObjectMapper().readTree(cloud.files.get(Vault.INFO)).has("names"),
             "the vault's file being there is the mark: nothing in it says the names");
-        assertEquals(made.info().id(), Vault.info(dav()).id());
+        assertEquals(made.info().id(), Present.of(Vault.info(dav())).id());
         assertEquals(java.util.Set.of(DESK, LAPTOP), Vault.computers(dav()).keySet(), "every way in moved");
         assertEquals(2, Vault.slots(dav()).size() - 1, "and the recovery code's");
         for (Map.Entry<String, byte[]> e : before.entrySet()) {
@@ -256,7 +261,7 @@ class VaultNamesTest {
         VaultNames.migrate(dav(), new OldVault(dav()), made.info(), made.vk()); // another computer moves the names meanwhile
         go.countDown();
         job.get();
-        assertEquals(made.info().generation() + 1, Vault.info(dav()).generation(), "the key changed under the new names");
+        assertEquals(made.info().generation() + 1, Present.of(Vault.info(dav())).generation(), "the key changed under the new names");
         assertFalse(Vault.computers(dav()).containsKey(LAPTOP), "and the computer removed there");
         assertFalse(anyUnder(CloudNames.OLD_VAULT), "nothing stranded under the old names: " + cloud.files.keySet());
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
@@ -268,7 +273,7 @@ class VaultNamesTest {
         Map<String, byte[]> held = anOldVault();
         String text = "Unichat/Texts/" + DESK + "/" + TEXT;
         String stored = Vault.ROOT + "/Texts/" + DESK + "/" + TEXT;
-        AtomicReference<Vault.Info> oldNames = new AtomicReference<>();
+        AtomicReference<Vault.@Nullable Info> oldNames = new AtomicReference<>();
         VaultNames.afterSwitch = () -> {
             try {
                 oldNames.set(Vault.info(new OldVault(dav()))); // a computer still reading the old names
@@ -279,7 +284,7 @@ class VaultNamesTest {
         };
         assertNull(laptop.round().error());
         assertNull(oldNames.get(), "between the switch and the deletes, the old names open nothing");
-        assertArrayEquals(held.get(text), VaultCrypto.open(made.vk(), text, cloud.files.get(stored)), "the longer old copy kept");
+        assertArrayEquals(held.get(text), VaultCrypto.open(made.vk(), text, Present.of(cloud.files.get(stored))), "the longer old copy kept");
         assertFalse(anyUnder(CloudNames.OLD_VAULT));
     }
 
@@ -328,8 +333,8 @@ class VaultNamesTest {
         cloud.failOnce.add("Unichat/Vault/Texts/" + DESK + "/index.json");
         java.util.concurrent.ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class,
             () -> desk.as(() -> desk.cloud.vault().rotateKey()));
-        assertTrue(e.getCause().getMessage().contains("próxima ronda"), e.getCause().getMessage());
-        assertEquals(made.info().generation(), Vault.info(new OldVault(dav())).generation(), "the key unchanged");
+        assertTrue(Present.message(e).contains("próxima ronda"), Present.message(e));
+        assertEquals(made.info().generation(), Present.of(Vault.info(new OldVault(dav()))).generation(), "the key unchanged");
         assertFalse(cloud.files.containsKey(Vault.INFO), "still under the old names, as it opens");
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault(), "the next round moves it");
         assertTrue(cloud.files.containsKey(Vault.INFO));
@@ -375,7 +380,7 @@ class VaultNamesTest {
         desk.round(); // finishes what the move left
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault(), "its old slot never went back over the new one");
         assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
-        assertEquals(made.info().generation() + 1, Vault.info(dav()).generation());
+        assertEquals(made.info().generation() + 1, Present.of(Vault.info(dav())).generation());
         assertFalse(anyUnder(CloudNames.OLD_SLOTS));
     }
 

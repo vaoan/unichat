@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
 import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
@@ -171,7 +172,7 @@ class CloudVaultJobsTest {
         desk.cloud.textsNow().get(); // reads the vault's state (open now) and tells no status of its own
         holds[2].countDown();
         holds[1].await(); // the second photo's upload told before it went
-        assertEquals(Cloud.Step.UPLOADING, desk.cloud.status().now().step(), "mid-round");
+        assertEquals(Cloud.Step.UPLOADING, Present.of(desk.cloud.status().now()).step(), "mid-round");
         assertEquals(Cloud.VaultState.OPEN, desk.cloud.status().vault(), "each progress tick says the state last read, never the round's first");
         holds[0].countDown();
         assertEquals(Cloud.VaultState.OPEN, round.get().vault());
@@ -202,7 +203,7 @@ class CloudVaultJobsTest {
         desk.connected = false; // Ajustes → Nube → Desconectar meanwhile
         letGo.countDown();
         java.util.concurrent.ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class, made::get);
-        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultNotOpen"), e.getCause().getMessage());
+        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultNotOpen"), Present.of(e.getCause()).getMessage());
         assertFalse(account.files.containsKey(Vault.INFO), "no vault made in an account no longer this computer's");
         round.get();
     }

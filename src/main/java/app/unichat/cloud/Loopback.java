@@ -4,6 +4,7 @@ import app.unichat.support.I18n;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -66,7 +67,7 @@ final class Loopback {
     }
 
     /** Whether the {@code state} that came back is ours, in constant time: how long it takes says nothing of ours. */
-    static boolean ours(String state, String back) {
+    static boolean ours(String state, @Nullable String back) {
         return back != null && MessageDigest.isEqual(state.getBytes(StandardCharsets.UTF_8), back.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -77,7 +78,7 @@ final class Loopback {
         return HexFormat.of().formatHex(b);
     }
 
-    static Map<String, String> query(String raw) {
+    static Map<String, String> query(@Nullable String raw) {
         Map<String, String> q = new HashMap<>();
         if (raw == null) return q;
         for (String pair : raw.split("&")) {

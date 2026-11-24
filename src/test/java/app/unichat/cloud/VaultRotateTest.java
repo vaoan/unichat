@@ -1,9 +1,11 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,7 +82,11 @@ class VaultRotateTest {
     }
 
     private VaultSlot slot(String id) throws IOException {
-        return Vault.slot(dav(), Vault.info(dav()), id);
+        return Present.of(slotOrNull(id));
+    }
+
+    private @Nullable VaultSlot slotOrNull(String id) throws IOException {
+        return Vault.slot(dav(), Present.of(Vault.info(dav())), id);
     }
 
     /** Every file the vault keeps as a file of the account's (not its slots nor its own file), by its logical path. */
@@ -105,14 +111,14 @@ class VaultRotateTest {
 
     /** The vault's key as {@code c} holds it now, from its own slot and its key. */
     private byte[] keyOf(VaultComputer c) throws VaultCrypto.Broken, IOException {
-        return slot(c.get("cloud.machine")).unwrap(Base64.getDecoder().decode(c.get(VaultParts.KEY)));
+        return slot(Present.of(c.get("cloud.machine"))).unwrap(Base64.getDecoder().decode(c.get(VaultParts.KEY)));
     }
 
     @Test
     void anotherComputerGoesOnAfterTheKeyChanges() throws Exception {
         Cloud.KeyChanged changed = rotate(desk);
         assertNotNull(changed.code());
-        assertEquals(1, Vault.info(dav()).generation(), "the generation rises");
+        assertEquals(1, Present.of(Vault.info(dav())).generation(), "the generation rises");
         assertEquals(1, slot(DESK).generation(), "the one that changed it took it at once");
         assertFalse(slot(DESK).params().has("next"));
         assertTrue(slot(LAPTOP).params().has("next"), "the other is offered the new key");
@@ -137,7 +143,7 @@ class VaultRotateTest {
     @Test
     void aRemovedComputerReadsNothingNew() throws Exception {
         desk.as(() -> desk.cloud.vault().removeComputer(LAPTOP));
-        assertNull(slot(LAPTOP), "its slot gone");
+        assertNull(slotOrNull(LAPTOP), "its slot gone");
         rotate(desk);
         byte[] oldVk = made.vk();
         for (VaultSlot s : Vault.slots(dav())) {
@@ -183,8 +189,8 @@ class VaultRotateTest {
     void forgettingHereLeavesTheOthersAlone() throws Exception {
         laptop.set(VaultParts.DECLINED, "true");
         laptop.as(laptop.cloud.vault()::forgetHere);
-        assertNull(slot(LAPTOP), "its slot gone");
-        assertNotNull(slot(DESK), "the other's stays");
+        assertNull(slotOrNull(LAPTOP), "its slot gone");
+        assertNotNull(slotOrNull(DESK), "the other's stays");
         for (String k : new String[] {VaultParts.ID, VaultParts.KEY, VaultParts.PRIVATE, VaultPeers.KEY, VaultMove.MOVED_AT}) assertNull(laptop.get(k), k);
         assertEquals("true", laptop.get(VaultParts.DECLINED), "declining is left as it was");
         assertEquals(Cloud.VaultState.DECLINED, laptop.round().vault(), "closed here, never removed: it can open again later");
@@ -204,7 +210,7 @@ class VaultRotateTest {
         List<VaultSlot> recovery = slots.stream().filter(s -> s.method() == VaultSlot.Method.RECOVERY).toList();
         assertEquals(1, recovery.size(), "one recovery slot, the new one");
         assertEquals(1, recovery.getFirst().generation());
-        assertArrayEquals(keyOf(desk), recovery.getFirst().unwrap(VaultSlot.recoveryKey(RecoveryCode.parse(changed.code()))));
+        assertArrayEquals(keyOf(desk), recovery.getFirst().unwrap(VaultSlot.recoveryKey(Present.of(RecoveryCode.parse(changed.code())))));
         assertThrows(VaultCrypto.Broken.class, () -> recovery.getFirst().unwrap(VaultSlot.recoveryKey(made.code())), "the old code opens nothing");
     }
 
@@ -235,8 +241,8 @@ class VaultRotateTest {
         old.put(VaultParts.SECRETS_FILE, secrets.toBytes());
 
         assertNull(laptop.round().error(), "never taken for damaged");
-        assertTrue(opens(keyOf(laptop), text, cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT)), "its text sealed again");
-        assertTrue(opens(keyOf(laptop), VaultParts.SECRETS_FILE, cloud.files.get(Vault.ROOT + "/Settings/unichat-secrets.json")),
+        assertTrue(opens(keyOf(laptop), text, Present.of(cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT))), "its text sealed again");
+        assertTrue(opens(keyOf(laptop), VaultParts.SECRETS_FILE, Present.of(cloud.files.get(Vault.ROOT + "/Settings/unichat-secrets.json"))),
             "and the part it agreed on");
         assertNull(desk.round().error());
     }
@@ -253,9 +259,9 @@ class VaultRotateTest {
         assertNull(desk.round().error());
         assertNotEquals(laptop.get("gif.giphy.key"), "falsa", "no computer of the vault takes it in");
         assertNotEquals(desk.get("gif.giphy.key"), "falsa");
-        byte[] now = VaultCrypto.open(keyOf(laptop), VaultParts.SECRETS_FILE, cloud.files.get(Vault.ROOT + "/Settings/unichat-secrets.json"));
-        assertEquals(LAPTOP, Bundle.parse(now).machine(), "this computer's own copy went up in its place, with the new key");
-        assertFalse(Bundle.parse(now).settings().containsKey("gif.giphy.key"));
+        byte[] now = VaultCrypto.open(keyOf(laptop), VaultParts.SECRETS_FILE, Present.of(cloud.files.get(Vault.ROOT + "/Settings/unichat-secrets.json")));
+        assertEquals(LAPTOP, Present.of(Bundle.parse(now)).machine(), "this computer's own copy went up in its place, with the new key");
+        assertFalse(Present.of(Bundle.parse(now)).settings().containsKey("gif.giphy.key"));
     }
 
     @Test
@@ -265,7 +271,7 @@ class VaultRotateTest {
             VaultParts.open(dav(), (p, b) -> false, () -> { })))) {
             rotate(desk); // meanwhile: every part sealed again at the next generation
             byte[] sealedNow = cloud.files.get(stored);
-            Storage personal = old.personal(dav());
+            Storage personal = Present.of(old.personal(dav()));
             assertThrows(SealedStorage.Damaged.class, () -> personal.get(VaultParts.SECRETS_FILE), "fails as before");
             assertArrayEquals(sealedNow, cloud.files.get(stored), "and nothing written over it");
         }
@@ -279,7 +285,7 @@ class VaultRotateTest {
         int before = cloud.puts.get();
         Cloud.Status s = desk.round();
         assertNull(s.error());
-        assertEquals(Map.of(OTHER, ""), s.vaultNotice().textsDamaged(), "named: " + s.vaultNotice());
+        assertEquals(Map.of(OTHER, ""), Present.of(s.vaultNotice()).textsDamaged(), "named: " + s.vaultNotice());
         assertArrayEquals("dañado".getBytes(StandardCharsets.UTF_8), cloud.files.get(folder + "/index.json"), "never written over");
         assertTrue(cloud.puts.get() >= before);
     }
@@ -298,9 +304,9 @@ class VaultRotateTest {
         old.put(folder + "/index.json", TextIndex.write(Map.of(TEXT, (long) forged.length())));
         assertNull(laptop.round().error());
         assertEquals(mine, new String(VaultCrypto.open(keyOf(laptop), folder + "/" + TEXT,
-            cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT)), StandardCharsets.UTF_8),
+            Present.of(cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT))), StandardCharsets.UTF_8),
             "not what this computer has: never sealed again, its own sent in its place");
-        assertTrue(opens(keyOf(laptop), folder + "/index.json", cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/index.json")),
+        assertTrue(opens(keyOf(laptop), folder + "/index.json", Present.of(cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/index.json"))),
             "its index sent anew");
         desk.round();
         assertEquals(mine, desk.read("texts/" + LAPTOP + "/" + TEXT), "and no other computer takes the forged one in");
@@ -387,7 +393,7 @@ class VaultRotateTest {
             VaultCrypto.randomKey(), params, made.vk()).toJson());
         Cloud.KeyChanged changed = rotate(desk);
         assertEquals(Map.of(OTHER, "Raro"), changed.refused());
-        assertEquals(1, Vault.info(dav()).generation(), "the change went on for the others");
+        assertEquals(1, Present.of(Vault.info(dav())).generation(), "the change went on for the others");
         assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
     }
 
@@ -423,7 +429,7 @@ class VaultRotateTest {
     void aChangeTakenBackBeforeTheGenerationRoseLeavesNoCodeToConfirm() throws Exception {
         cloud.failOnce.add(Vault.INFO);
         assertThrows(ExecutionException.class, () -> rotate(desk));
-        assertEquals(0, Vault.info(dav()).generation(), "taken back");
+        assertEquals(0, Present.of(Vault.info(dav())).generation(), "taken back");
         assertNull(desk.get(VaultActions.UNCONFIRMED), "no new code came of it: nothing to confirm, no plain copy held back");
     }
 
@@ -451,7 +457,7 @@ class VaultRotateTest {
     void aChangeCutBeforeTheGenerationRoseLeavesEveryoneOnTheOldKey() throws Exception {
         cloud.failOnce.add(Vault.INFO);
         assertThrows(ExecutionException.class, () -> rotate(desk));
-        assertEquals(0, Vault.info(dav()).generation());
+        assertEquals(0, Present.of(Vault.info(dav())).generation());
         assertTrue(Vault.slots(dav()).stream().noneMatch(s -> s.params().has("next")), "its offers taken back");
         assertEquals(1, Vault.slots(dav()).stream().filter(s -> s.method() == VaultSlot.Method.RECOVERY).count(), "and its new code");
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
@@ -477,7 +483,7 @@ class VaultRotateTest {
         cloud.failAfterOnce.add(Vault.INFO);
         Cloud.KeyChanged changed = rotate(desk);
         assertNotNull(changed.code(), "the new code is shown");
-        assertEquals(1, Vault.info(dav()).generation());
+        assertEquals(1, Present.of(Vault.info(dav())).generation());
         assertEquals(Cloud.VaultState.OPEN, laptop.round().vault());
         assertArrayEquals(keyOf(desk), keyOf(laptop));
     }
@@ -486,7 +492,7 @@ class VaultRotateTest {
     void twoChangesWhileAComputerIsOffAndItStillGoesOn() throws Exception {
         rotate(desk);
         rotate(desk);
-        assertEquals(2, Vault.info(dav()).generation());
+        assertEquals(2, Present.of(Vault.info(dav())).generation());
         Cloud.Status s = laptop.round();
         assertNull(s.error());
         assertEquals(Cloud.VaultState.OPEN, s.vault());
@@ -498,7 +504,7 @@ class VaultRotateTest {
         rotate(desk);
         assertNull(laptop.round().error());
         rotate(laptop);
-        assertEquals(2, Vault.info(dav()).generation());
+        assertEquals(2, Present.of(Vault.info(dav())).generation());
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
         assertArrayEquals(keyOf(laptop), keyOf(desk));
     }
@@ -522,13 +528,13 @@ class VaultRotateTest {
         int puts = cloud.puts.get();
         assertThrows(ExecutionException.class, () -> rotate(other));
         assertEquals(puts, cloud.puts.get());
-        assertEquals(0, Vault.info(dav()).generation());
+        assertEquals(0, Present.of(Vault.info(dav())).generation());
     }
 
     @Test
     void aWrongKeyChangesNothing() throws Exception {
         assertThrows(IOException.class, () -> Vault.rotate(dav(), VaultCrypto.randomKey(), DESK, VaultPeers.load(made.info().id())));
-        assertEquals(0, Vault.info(dav()).generation());
+        assertEquals(0, Present.of(Vault.info(dav())).generation());
         assertFalse(slot(LAPTOP).params().has("next"));
     }
 
@@ -569,7 +575,7 @@ class VaultRotateTest {
         assertNull(s.error());
         assertEquals("{}\n{\"b\":1}\n", desk.read("texts/" + LAPTOP + "/" + second), "the one after it still comes");
         assertEquals("{}\n", desk.read("texts/" + LAPTOP + "/" + first), "the forged one never");
-        assertEquals(Map.of(LAPTOP, "Portátil"), s.vaultNotice().textsDamaged(), "named by its computer's name: " + s.vaultNotice());
+        assertEquals(Map.of(LAPTOP, "Portátil"), Present.of(s.vaultNotice()).textsDamaged(), "named by its computer's name: " + s.vaultNotice());
 
         assertNull(laptop.round().error());
         assertNull(desk.round().error());
@@ -582,7 +588,7 @@ class VaultRotateTest {
         tamperWithoutTheVaultKey(LAPTOP);
         for (String id : new String[] {OTHER, recovery, LAPTOP}) {
             ExecutionException e = assertThrows(ExecutionException.class, () -> desk.as(() -> desk.cloud.vault().acceptKey(id)), id);
-            assertEquals(app.unichat.support.I18n.t("cloud.error.vaultNoSuchKey"), e.getCause().getMessage(), id);
+            assertEquals(app.unichat.support.I18n.t("cloud.error.vaultNoSuchKey"), Present.of(e.getCause()).getMessage(), id);
         }
     }
 
@@ -619,7 +625,7 @@ class VaultRotateTest {
         String index = "Unichat/Texts/" + LAPTOP + "/index.json";
         new SealedStorage(dav(), () -> made.vk().clone()).put(index, TextIndex.write(Map.of(TEXT, 99L)));
         assertNull(laptop.round().error());
-        assertEquals(Map.of(TEXT, 3L), TextIndex.read(VaultCrypto.open(keyOf(laptop), index, cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/index.json"))),
+        assertEquals(Map.of(TEXT, 3L), TextIndex.read(VaultCrypto.open(keyOf(laptop), index, Present.of(cloud.files.get(Vault.ROOT + "/Texts/" + LAPTOP + "/index.json")))),
             "never sealed again: what it has, sent anew");
     }
 
@@ -692,7 +698,7 @@ class VaultRotateTest {
         assertNotNull(changed.code(), "the new code is shown: it's the only time it can be");
         assertEquals(made.info().id(), desk.get(VaultActions.UNCONFIRMED), "and is to be confirmed as kept");
         cloud.unreadableAfterPut.clear();
-        assertEquals(1, Vault.info(dav()).generation());
+        assertEquals(1, Present.of(Vault.info(dav())).generation());
     }
 
     @Test
@@ -702,9 +708,9 @@ class VaultRotateTest {
         ExecutionException e = assertThrows(ExecutionException.class,
             () -> desk.as(() -> desk.cloud.vault().removeAndChangeKey(LAPTOP, Set.of())));
         String kept = app.unichat.support.I18n.t("cloud.error.vaultRemovedKeyKept", "");
-        assertFalse(e.getCause().getMessage().startsWith(kept.substring(0, kept.indexOf('('))), e.getCause().getMessage());
+        assertFalse(Present.message(e).startsWith(kept.substring(0, kept.indexOf('('))), Present.message(e));
         assertEquals(made.info().id(), desk.get(VaultActions.UNCONFIRMED), "a new code may be the vault's now: the page says it isn't kept");
         cloud.unreadableAfterPut.clear();
-        assertEquals(1, Vault.info(dav()).generation(), "it had gone through");
+        assertEquals(1, Present.of(Vault.info(dav())).generation(), "it had gone through");
     }
 }

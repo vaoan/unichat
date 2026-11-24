@@ -3,6 +3,7 @@ package app.unichat.cloud;
 import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
 import app.unichat.support.Hashes;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -61,7 +62,7 @@ final class VaultMove {
     record Stray(String machine, Instant seen) {}
 
     /** What a round did: the plain paths it removed, the computers still sending plain (by machine), and the first failure (or null). */
-    record Result(List<String> moved, List<Stray> strays, String error) {}
+    record Result(List<String> moved, List<Stray> strays, @Nullable String error) {}
 
     /**
      * What a pass does: moving in (each file comes in where the vault lacks it, and goes once held), taking a stray's
@@ -87,7 +88,7 @@ final class VaultMove {
     private static final class Tally {
         final List<String> moved = new ArrayList<>();
         final String vault;
-        String error;
+        @Nullable String error;
 
         Tally(String vault) {
             this.vault = vault;
@@ -112,7 +113,7 @@ final class VaultMove {
     static void forget() {
         Settings s = Settings.get();
         for (String k : new String[] {MOVED_AT, QUIET_SINCE, STRAYS_SEEN, KNOWN}) {
-            if (s.getString(k, null) != null) s.set(k, null);
+            if (s.getString(k) != null) s.set(k, null);
         }
     }
 
@@ -132,7 +133,7 @@ final class VaultMove {
                 let = t.failed(e);
             }
         }
-        if (s.getString(MOVED_AT, null) == null) {
+        if (s.getString(MOVED_AT) == null) {
             if (carry(plain, sealed, found, Pass.MOVE, t) && let) s.set(MOVED_AT, now.toString());
             return t.result(List.of());
         }
@@ -142,8 +143,8 @@ final class VaultMove {
             return t.result(List.of());
         }
         String seen = signature(plain, found);
-        Instant quiet = instant(s.getString(QUIET_SINCE, null));
-        if (quiet == null || !seen.equals(s.getString(STRAYS_SEEN, null))) {
+        Instant quiet = instant(s.getString(QUIET_SINCE));
+        if (quiet == null || !seen.equals(s.getString(STRAYS_SEEN))) {
             quiet = now; // something new from a stray: a day from now, and what it wrote comes in
             s.set(QUIET_SINCE, now.toString());
             s.set(STRAYS_SEEN, seen);
@@ -195,7 +196,7 @@ final class VaultMove {
             }
         }
         // Recorded on the first pass, nothing plain or not; read only when some texts are plain.
-        boolean recording = t.vault.equals(Settings.get().getString(RECORD, null));
+        boolean recording = t.vault.equals(Settings.get().getString(RECORD));
         Set<String> senders = texts.isEmpty() && !recording ? Set.of() : senders(sealed, recording, texts.keySet(), t);
         for (String machine : List.copyOf(texts.keySet())) {
             if (!senders.contains(machine)) unknown.put(machine, texts.remove(machine));
@@ -224,16 +225,16 @@ final class VaultMove {
             kept = machines(sealed.get(SENDERS));
         }
         if (kept == null) {
-            if (file != null || t.vault.equals(s.getString(KNOWN, null))) t.said(app.unichat.support.I18n.t("cloud.error.vaultSendersDamaged"));
+            if (file != null || t.vault.equals(s.getString(KNOWN))) t.said(app.unichat.support.I18n.t("cloud.error.vaultSendersDamaged"));
             return Set.of();
         }
-        if (!t.vault.equals(s.getString(KNOWN, null))) s.set(KNOWN, t.vault);
+        if (!t.vault.equals(s.getString(KNOWN))) s.set(KNOWN, t.vault);
         if (mine) s.set(RECORD, null); // written, or another computer of the vault's was first: adopted
         return kept;
     }
 
     /** The machine ids in a list of {@link #SENDERS}; null for none, or what isn't one (only ids of ours are kept). */
-    private static Set<String> machines(byte[] json) {
+    private static @Nullable Set<String> machines(byte @Nullable [] json) {
         if (json == null) return null;
         try {
             com.fasterxml.jackson.databind.JsonNode n = JSON.readTree(json);
@@ -309,7 +310,7 @@ final class VaultMove {
                 String stamp = plain.stamp(path);
                 byte[] mine = stamp == null ? null : plain.get(path);
                 byte[] kept = mine == null ? null : sealed.get(path);
-                all &= kept != null && kept.length >= mine.length && deleteIfSame(plain, path, stamp, t);
+                all &= mine != null && kept != null && kept.length >= mine.length && deleteIfSame(plain, path, stamp, t);
             } catch (IOException e) {
                 all = t.failed(e);
             }
@@ -377,9 +378,9 @@ final class VaultMove {
      * the vault moved into is gone meanwhile (turned off elsewhere: the plain copy is the only one). Asked right before
      * the delete; one request apart, a vault turned off in between still loses this copy (its writer sends its own again).
      */
-    private static boolean deleteIfSame(Storage plain, String path, String stamp, Tally t) throws IOException {
+    private static boolean deleteIfSame(Storage plain, String path, @Nullable String stamp, Tally t) throws IOException {
         // Its code not yet confirmed kept: this computer may be the vault's only way in, and the plain copy the only one left.
-        if (t.vault.equals(Settings.get().getString(VaultActions.UNCONFIRMED, null))) return false;
+        if (t.vault.equals(Settings.get().getString(VaultActions.UNCONFIRMED))) return false;
         if (stamp == null || !stamp.equals(plain.stamp(path))) return false;
         Vault.Info now = Vault.info(plain);
         if (now == null || !now.id().equals(t.vault)) return false;
@@ -413,7 +414,7 @@ final class VaultMove {
         return out;
     }
 
-    private static Instant instant(String s) {
+    private static @Nullable Instant instant(@Nullable String s) {
         try {
             return s == null ? null : Instant.parse(s);
         } catch (java.time.format.DateTimeParseException e) {

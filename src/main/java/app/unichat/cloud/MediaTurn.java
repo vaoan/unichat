@@ -88,7 +88,7 @@ final class MediaTurn {
 
     private boolean due(Instant now) {
         if (asked.get() > 0) return true;
-        String last = Settings.get().getString(LAST_VERIFY, null);
+        String last = Settings.get().getString(LAST_VERIFY);
         return last == null || Instant.parse(last).plus(Cloud.VERIFY_EVERY).isBefore(now);
     }
 }

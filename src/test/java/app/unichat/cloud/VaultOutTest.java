@@ -1,7 +1,9 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
 import java.io.IOException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,7 +72,7 @@ class VaultOutTest {
             .set("server.telegram.apiId", "12345");
     }
 
-    private String plain(String path) {
+    private @Nullable String plain(String path) {
         byte[] b = cloud.files.get(path);
         return b == null ? null : new String(b, StandardCharsets.UTF_8);
     }
@@ -99,9 +101,9 @@ class VaultOutTest {
 
         cloud.failOnce.add(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT); // the network drops on the last plain copy
         ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud.vault()::turnOffVault));
-        assertNotNull(failed.getCause().getMessage(), "the failure is told");
-        assertTrue(failed.getCause().getMessage().contains(app.unichat.support.I18n.t("cloud.error.vaultOffUndone", "")),
-            "says the vault is as it was: " + failed.getCause().getMessage());
+        assertNotNull(Present.of(failed.getCause()).getMessage(), "the failure is told");
+        assertTrue(Present.message(failed).contains(app.unichat.support.I18n.t("cloud.error.vaultOffUndone", "")),
+            "says the vault is as it was: " + Present.of(failed.getCause()).getMessage());
         before.forEach((p, b) -> assertArrayEquals(b, cloud.files.get(p), "as it was: " + p));
         assertEquals(before.keySet(), cloud.files.keySet(), "and what was copied plain before the failure taken back");
         assertEquals(made.info().id(), desk.get(VaultParts.ID), "still held here");
@@ -112,12 +114,12 @@ class VaultOutTest {
         Bundle settings = Bundle.parse(cloud.files.get(SETTINGS));
         assertNotNull(settings, "the settings back plain");
         assertEquals("DARK", settings.settings().get("ui.theme"));
-        assertTrue(plain(AI).contains("escribo corto"), "what the AI learned");
+        assertTrue(Present.of(plain(AI)).contains("escribo corto"), "what the AI learned");
         assertEquals("{\"d\":1}\n", plain(TextSync.ROOT + "/" + DESK + "/" + TEXT), "this computer's texts");
         assertEquals("{\"l\":1}\n", plain(TextSync.ROOT + "/" + LAPTOP + "/" + TEXT), "an offline computer's texts survive");
         assertEquals(Map.of(TEXT, 8L), TextIndex.read(cloud.files.get(TextSync.ROOT + "/" + LAPTOP + "/index.json")), "with its index");
         assertArrayEquals(before.get(PHOTO), cloud.files.get(PHOTO), "media untouched");
-        assertEquals(before.get(PHOTO).length, cloud.files.get(PHOTO).length);
+        assertEquals(Present.of(before.get(PHOTO)).length, Present.of(cloud.files.get(PHOTO)).length);
         for (String p : cloud.files.keySet()) {
             assertFalse(p.contains("secrets") || p.contains("pinned") || p.contains("transcripts"), "the vault's own parts never go plain: " + p);
             assertFalse(new String(cloud.files.get(p), StandardCharsets.ISO_8859_1).contains("12345"), "no secret plain: " + p);
@@ -128,7 +130,7 @@ class VaultOutTest {
         }
 
         String own = TextSync.ROOT + "/" + DESK + "/" + TEXT;
-        int sent = cloud.versions.get(own);
+        int sent = Present.of(cloud.versions.get(own));
         Cloud.Status s = desk.round();
         assertNull(s.error());
         assertEquals(Cloud.VaultState.NONE, s.vault(), "today's plain round");
@@ -169,7 +171,7 @@ class VaultOutTest {
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
         cloud.failDeleteOnce.add(Vault.ROOT);
         ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud.vault()::turnOffVault));
-        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultLeftovers"), failed.getCause().getMessage(), "told apart");
+        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultLeftovers"), Present.of(failed.getCause()).getMessage(), "told apart");
         assertFalse(cloud.files.containsKey(Vault.INFO), "its file gone: no computer finds a vault");
         assertNotNull(cloud.files.get(SETTINGS), "everything plain");
         assertNull(desk.get(VaultParts.ID), "forgotten here all the same");
@@ -183,7 +185,7 @@ class VaultOutTest {
         cloud.failDeleteOnce.add(Vault.ROOT);
         cloud.failDeleteOnce.add(Vault.INFO);
         ExecutionException failed = assertThrows(ExecutionException.class, () -> desk.as(desk.cloud.vault()::turnOffVault));
-        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultPartlyGone"), failed.getCause().getMessage(), "never \"as it was\"");
+        assertEquals(app.unichat.support.I18n.t("cloud.error.vaultPartlyGone"), Present.of(failed.getCause()).getMessage(), "never \"as it was\"");
         assertNotNull(cloud.files.get(SETTINGS), "everything plain");
         assertEquals("{\"d\":1}\n", plain(TextSync.ROOT + "/" + DESK + "/" + TEXT));
     }

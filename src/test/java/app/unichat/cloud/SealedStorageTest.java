@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.cloud.SyncedPart.Action;
 import app.unichat.settings.Settings;
 import app.unichat.support.PathParts;
@@ -56,13 +57,13 @@ class SealedStorageTest {
             sealed.mkdirs("Unichat/Settings");
             sealed.put(PATH, secret);
 
-            byte[] there = cloud.files.get(STORED);
+            byte[] there = Present.of(cloud.files.get(STORED));
             assertFalse(new String(there, StandardCharsets.ISO_8859_1).contains("DARK"), "unreadable in the account");
             assertFalse(cloud.files.containsKey(PATH), "kept under the vault's folder");
             assertArrayEquals(secret, sealed.get(PATH));
             assertTrue(sealed.exists(PATH));
             assertEquals(List.of("prueba.json"), sealed.list("Unichat/Settings"));
-            assertEquals(-1, sealed.info(PATH).size());
+            assertEquals(-1, Present.of(sealed.info(PATH)).size());
             assertNull(sealed.info("Unichat/Settings/otra.json"));
             assertNull(sealed.get("Unichat/Settings/otra.json"));
             assertFalse(sealed.get("Unichat/Settings/otra.json", dir.resolve("x")));
@@ -117,7 +118,7 @@ class SealedStorageTest {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             SealedStorage sealed = over(new WebDav(cloud.url(), "u", "p"));
             sealed.put(PATH, "hello".getBytes(StandardCharsets.UTF_8));
-            byte[] bad = cloud.files.get(STORED).clone();
+            byte[] bad = Present.of(cloud.files.get(STORED)).clone();
             bad[bad.length - 1] ^= 1;
             cloud.files.put(STORED, bad);
 
@@ -157,7 +158,7 @@ class SealedStorageTest {
             assertEquals("#FF0000", sa.get("ui.accent"));
 
             String before = sealed.stamp(PATH);
-            sealed.put(PATH, sealed.get(PATH)); // sealed again: a new nonce, a new stamp, the same content
+            sealed.put(PATH, Present.of(sealed.get(PATH))); // sealed again: a new nonce, a new stamp, the same content
             assertNotEquals(before, sealed.stamp(PATH));
             int puts = cloud.puts.get();
             assertEquals(Action.NOTHING, a.sync(sealed, T.plusSeconds(120)));

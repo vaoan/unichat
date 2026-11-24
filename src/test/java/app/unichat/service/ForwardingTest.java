@@ -1,7 +1,9 @@
 package app.unichat.service;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -49,15 +51,16 @@ class ForwardingTest {
     void aNoteGoesBeforeEachRunOfMessagesItDescribes() throws Exception {
         MockChatService svc = svc();
         List<Message> picked = svc.messages(FROM).stream().filter(m -> m.type() == MessageType.TEXT).limit(4).toList();
-        Function<Message, String> bySender = m -> "↪ " + m.senderName();
+        Function<Message, @Nullable String> bySender = m -> "↪ " + m.senderName();
         int to = svc.messages(TO).size();
         Forwarding.send(svc, picked, List.of(TO), bySender, true).done().get();
         List<String> expected = new java.util.ArrayList<>();
         String last = null;
         for (Message m : picked) {
-            if (!bySender.apply(m).equals(last)) {
-                last = bySender.apply(m);
-                expected.add(last);
+            String line = Present.of(bySender.apply(m));
+            if (!line.equals(last)) {
+                last = line;
+                expected.add(line);
             }
             expected.add(m.body());
         }

@@ -4,6 +4,7 @@ import app.unichat.settings.Settings;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -54,7 +55,7 @@ final class VaultPeers {
         Map<String, Integer> after = new TreeMap<>();
         Set<String> removed = new TreeSet<>();
         int removals = 0;
-        String saved = Settings.get().getString(KEY, null);
+        String saved = Settings.get().getString(KEY);
         if (saved != null) {
             try {
                 JsonNode n = JSON.readTree(saved);
@@ -124,7 +125,7 @@ final class VaultPeers {
     }
 
     /** When {@code machine} was first pinned here; null when unknown (never, or pinned before this was kept). */
-    Instant firstSeen(String machine) {
+    @Nullable Instant firstSeen(String machine) {
         try {
             String at = seen.get(machine);
             return at == null ? null : Instant.parse(at);
@@ -137,7 +138,7 @@ final class VaultPeers {
      * Whether the next key would be refused to {@code machine}, whose slot shows {@code publicKey} (null: none the vault
      * key sealed): removed here, or another key than the one pinned.
      */
-    boolean keyChanged(String machine, byte[] publicKey) {
+    boolean keyChanged(String machine, byte @Nullable [] publicKey) {
         if (removed.contains(machine) || publicKey == null) return true;
         String pinned = pins.get(machine);
         return pinned != null && !pinned.equals(NOT_A_COMPUTER) && !Arrays.equals(Base64.getDecoder().decode(pinned), publicKey);

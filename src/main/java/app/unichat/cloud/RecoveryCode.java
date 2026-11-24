@@ -1,5 +1,7 @@
 package app.unichat.cloud;
 
+import org.jspecify.annotations.Nullable;
+
 import java.security.SecureRandom;
 import java.util.Arrays;
 
@@ -47,7 +49,7 @@ record RecoveryCode(byte[] bits) {
     }
 
     /** What was typed, or null when it isn't exactly 160 bits of this alphabet. */
-    static RecoveryCode parse(String typed) {
+    static @Nullable RecoveryCode parse(@Nullable String typed) {
         if (typed == null) return null;
         char[] chars = typed.toCharArray();
         try {
@@ -58,7 +60,7 @@ record RecoveryCode(byte[] bits) {
     }
 
     /** The same from the characters as typed, never made into a {@code String} (one stays in memory until collected). */
-    static RecoveryCode parse(char[] typed) {
+    static @Nullable RecoveryCode parse(char @Nullable [] typed) {
         if (typed == null) return null;
         char[] chars = new char[CHARS];
         try {

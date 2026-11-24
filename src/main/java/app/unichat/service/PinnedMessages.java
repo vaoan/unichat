@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -33,7 +34,7 @@ public final class PinnedMessages {
     /** Pins per chat: the oldest go past this. */
     static final int MAX_PER_CHAT = 50;
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static PinnedMessages shared;
+    private static @Nullable PinnedMessages shared;
 
     private final Path file;
     /** Per chat, newest pin first. */
@@ -95,8 +96,10 @@ public final class PinnedMessages {
                 ArrayNode a = root.putArray(chat);
                 for (PinnedMessage p : list) {
                     ObjectNode o = a.addObject().put("id", p.messageId()).put("sender", p.sender()).put("preview", p.preview());
-                    if (p.sentAt() != null) o.put("sentAt", p.sentAt().toEpochMilli());
-                    if (p.pinnedAt() != null) o.put("pinnedAt", p.pinnedAt().toEpochMilli());
+                    Instant sent = p.sentAt();
+                    Instant pinned = p.pinnedAt();
+                    if (sent != null) o.put("sentAt", sent.toEpochMilli());
+                    if (pinned != null) o.put("pinnedAt", pinned.toEpochMilli());
                 }
             });
         }
@@ -158,7 +161,7 @@ public final class PinnedMessages {
         });
     }
 
-    private static Instant instant(JsonNode n) {
+    private static @Nullable Instant instant(JsonNode n) {
         return n.isNumber() ? Instant.ofEpochMilli(n.asLong()) : null;
     }
 

@@ -2,6 +2,7 @@ package app.unichat.service;
 
 import app.unichat.login.BridgeLogin;
 import app.unichat.model.Network;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -15,7 +16,7 @@ public interface BridgeAccess {
      * The bridge's own login API for {@code n} (dynamic login: the bridge says which methods and steps it has),
      * or null when only the bot chat can be used (external servers). Call {@link #prepareBridge} first.
      */
-    BridgeLogin bridgeLogin(Network n);
+    @Nullable BridgeLogin bridgeLogin(Network n);
 
     /** Installs and starts {@code n}'s bridge when the local server provides it. Blocking. */
     void prepareBridge(Network n) throws Exception; // NOPMD: SignatureDeclareThrowsException, passes on what BridgeProvisioner throws

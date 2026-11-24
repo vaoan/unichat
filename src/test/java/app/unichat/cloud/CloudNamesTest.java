@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -152,7 +153,7 @@ class CloudNamesTest {
         VaultComputer desk = new VaultComputer(cloud, dir, DESK);
         assertNotNull(desk.round().error(), "told");
         assertTrue(cloud.files.containsKey(OLD_SETTINGS), "cut short before the old folder went");
-        assertEquals("DARK", Bundle.parse(cloud.files.get(SETTINGS)).settings().get("ui.theme"), "the newer copy already under the new name");
+        assertEquals("DARK", Present.of(Bundle.parse(cloud.files.get(SETTINGS))).settings().get("ui.theme"), "the newer copy already under the new name");
         assertNull(desk.get("ui.theme"), "and the settings waited: one was still under its old name");
         assertNull(desk.round().error());
         assertEquals("DARK", desk.get("ui.theme"));

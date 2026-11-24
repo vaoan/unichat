@@ -42,10 +42,11 @@ final class DemoChats {
      * values ({@link PreferencesFile#preview} falls back to them), so an empty file changes nothing.
      */
     static void adopt(PreferencesFile prefs, Chat c) {
-        c.setPrefKey(ChatKeys.of(null, null, c.id()));
+        String key = ChatKeys.of(null, null, c.id());
+        c.setPrefKey(key);
         var demo = new PreferencesFile.ServerValues(c.archived(), c.muted(), c.favorite(), c.lowPriority(), c.pinned(),
                 c.reminderAt(), true);
-        var e = prefs.preview(c.prefKey(), demo);
+        var e = prefs.preview(key, demo);
         c.setArchived(e.archived());
         c.setMuted(e.muted());
         c.setFavorite(e.favorite());
@@ -219,12 +220,18 @@ final class DemoChats {
             return new ChatBuilder(svc, key, network, title, true, names);
         }
 
-        private Member single() { return people.values().iterator().next(); }
+        /** The one person of a direct chat, by the name they were given. */
+        private String single() { return people.keySet().iterator().next(); }
 
-        ChatBuilder in(long secs, String text) { return in(secs, single().name(), text); }
+        /** Someone given to this chat by name (a name it wasn't given is a mistake in the demo). */
+        private Member person(String name) {
+            return java.util.Objects.requireNonNull(people.get(name), name);
+        }
+
+        ChatBuilder in(long secs, String text) { return in(secs, single(), text); }
 
         ChatBuilder in(long secs, String who, String text) {
-            Member m = who.equals(I18n.t("demo.me")) ? new Member(ME, I18n.t("demo.me"), null) : people.get(who);
+            Member m = who.equals(I18n.t("demo.me")) ? new Member(ME, I18n.t("demo.me"), null) : person(who);
             Message msg = new Message(UUID.randomUUID().toString(), chat.id(), m.id(), m.name(), m.id().equals(ME), now.plusSeconds(secs));
             msg.setBody(text);
             list.add(msg);
@@ -280,7 +287,7 @@ final class DemoChats {
 
         ChatBuilder react(long secs, String emoji, String... who) {
             Message target = at(secs);
-            for (String w : who) target.toggleReaction(emoji, w.equals(I18n.t("demo.me")) ? ME : people.get(w).id());
+            for (String w : who) target.toggleReaction(emoji, w.equals(I18n.t("demo.me")) ? ME : person(w).id());
             return this;
         }
 

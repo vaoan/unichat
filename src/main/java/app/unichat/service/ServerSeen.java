@@ -4,6 +4,7 @@ import app.unichat.service.PreferencesFile.Flag;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,11 +23,11 @@ import java.util.Set;
  */
 final class ServerSeen {
     private final Map<String, Set<Flag>> seen = new HashMap<>();
-    private String server;
+    private @Nullable String server;
     private boolean dirty;
 
     /** What {@code file} remembers; nothing when it's missing or damaged (it's only a hint). */
-    static ServerSeen load(Path file) {
+    static ServerSeen load(@Nullable Path file) {
         ServerSeen s = new ServerSeen();
         if (file == null || !Files.exists(file)) return s;
         try {

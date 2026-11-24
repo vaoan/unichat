@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -27,7 +28,7 @@ final class FakeDropbox implements AutoCloseable {
     final AtomicInteger tokensMade = new AtomicInteger();
     final AtomicInteger sessionCalls = new AtomicInteger();
     /** The PKCE challenge the browser was sent with, and the code Dropbox gives back for it. */
-    volatile String challenge;
+    volatile @Nullable String challenge;
     private final HttpServer server;
     private final String appKey;
     private final String refresh;

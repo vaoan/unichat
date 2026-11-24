@@ -1,5 +1,7 @@
 package app.unichat.cloud;
 
+import org.jspecify.annotations.Nullable;
+
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Flow;
@@ -16,7 +18,7 @@ final class CountingBody implements HttpRequest.BodyPublisher {
     }
 
     /** {@code inner}, telling {@code sent} the running total of bytes handed to the network. */
-    static HttpRequest.BodyPublisher of(HttpRequest.BodyPublisher inner, LongConsumer sent) {
+    static HttpRequest.BodyPublisher of(HttpRequest.BodyPublisher inner, @Nullable LongConsumer sent) {
         return sent == null ? inner : new CountingBody(inner, sent);
     }
 

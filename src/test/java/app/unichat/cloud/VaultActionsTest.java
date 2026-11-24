@@ -1,9 +1,11 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,12 +76,12 @@ class VaultActionsTest {
         return c.as(c.cloud.vault()::createVault);
     }
 
-    private <T> T as(VaultComputer c, java.util.function.Supplier<CompletableFuture<T>> call) throws InterruptedException, ExecutionException {
+    private <T extends @Nullable Object> T as(VaultComputer c, java.util.function.Supplier<CompletableFuture<T>> call) throws InterruptedException, ExecutionException {
         return c.as(call::get);
     }
 
     private static String message(ExecutionException e) {
-        return e.getCause().getMessage();
+        return Present.message(e);
     }
 
     @Test
@@ -155,7 +157,7 @@ class VaultActionsTest {
         String old = create(desk);
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
         String oldSlot = cloud.files.keySet().stream().filter(p -> p.startsWith(Vault.SLOTS + "/") && !p.contains(DESK)).findFirst().orElseThrow();
-        byte[] stale = cloud.files.get(oldSlot);
+        byte[] stale = Present.of(cloud.files.get(oldSlot));
         Cloud.KeyChanged changed = as(desk, desk.cloud.vault()::rotateKey);
         cloud.put(oldSlot, stale); // put back by someone who kept it
         ExecutionException e = assertThrows(ExecutionException.class,
@@ -171,7 +173,7 @@ class VaultActionsTest {
      * account she puts it back in place of the new password's, its generation as {@code claims} (null: as it was), and
      * strips {@code vault.json}'s vouch.
      */
-    private void oldPasswordSlotPutBack(Long claims) throws JsonProcessingException, IOException, InterruptedException, ExecutionException {
+    private void oldPasswordSlotPutBack(@Nullable Long claims) throws JsonProcessingException, IOException, InterruptedException, ExecutionException {
         create(desk);
         as(desk, () -> desk.cloud.vault().addPassword(PASSWORD.toCharArray()));
         String slotPath = passwordSlot();
@@ -259,7 +261,7 @@ class VaultActionsTest {
         Cloud.KeyChanged changed = as(desk, () -> desk.cloud.vault().removeAndChangeKey(LAPTOP, Set.of(DESK, LAPTOP)));
         assertNotNull(RecoveryCode.parse(changed.code()));
         assertEquals(Set.of("PASSWORD"), changed.dropped(), "said, to add again");
-        assertEquals(1, Vault.info(dav()).generation(), "the key changed");
+        assertEquals(1, Present.of(Vault.info(dav())).generation(), "the key changed");
         assertEquals(Cloud.VaultState.REMOVED, laptop.round().vault());
         assertEquals(Cloud.VaultState.OPEN, desk.round().vault());
         assertEquals(List.of(DESK), view(desk).computers().stream().map(VaultView.Computer::machine).toList());
@@ -286,9 +288,9 @@ class VaultActionsTest {
 
         Map<String, VaultView.Computer> listed = new HashMap<>();
         view(desk).computers().forEach(c -> listed.put(c.machine(), c));
-        assertTrue(listed.get(third.get("cloud.machine")).newSinceRemoval(), "came after the last removal");
-        assertFalse(listed.get(LAPTOP).newSinceRemoval(), "seen before it");
-        assertTrue(listed.get(LAPTOP).keyChanged(), "its key isn't the one first seen");
+        assertTrue(Present.of(listed.get(third.get("cloud.machine"))).newSinceRemoval(), "came after the last removal");
+        assertFalse(Present.of(listed.get(LAPTOP)).newSinceRemoval(), "seen before it");
+        assertTrue(Present.of(listed.get(LAPTOP)).keyChanged(), "its key isn't the one first seen");
         as(desk, () -> desk.cloud.vault().acceptKey(LAPTOP));
         assertFalse(view(desk).computers().stream().filter(c -> c.machine().equals(LAPTOP)).findFirst().orElseThrow().keyChanged(),
             "accepted by the person");
@@ -335,7 +337,7 @@ class VaultActionsTest {
         String said = I18n.t("cloud.error.vaultRemovedKeyKept", "");
         assertTrue(message(e).startsWith(said.substring(0, said.indexOf('('))), message(e));
         assertFalse(Vault.computers(dav()).containsKey(LAPTOP), "removed all the same");
-        assertEquals(0, Vault.info(dav()).generation(), "the key didn't change");
+        assertEquals(0, Present.of(Vault.info(dav())).generation(), "the key didn't change");
     }
 
     @Test

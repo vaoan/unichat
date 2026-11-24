@@ -124,7 +124,8 @@ class BuildRulesTest {
      * The packages NullAway checks so far, each with its subpackages: a package joins with its {@code package-info.java}
      * marked {@code @NullMarked}, and its name goes here. Once every package has, this is {@code app.unichat} alone.
      */
-    private static final List<String> NULL_MARKED = List.of("app.unichat.support", "app.unichat.model", "app.unichat.settings");
+    private static final List<String> NULL_MARKED = List.of("app.unichat.support", "app.unichat.model", "app.unichat.settings",
+            "app.unichat.service", "app.unichat.cloud");
 
     @Test
     void nullAwayFailsTheBuildOnTheMarkedPackages() {

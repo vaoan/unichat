@@ -2,6 +2,7 @@ package app.unichat.service;
 
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.StickerPack;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -41,7 +42,8 @@ public final class FavoriteRefresh {
                     return null;
                 }
                 for (MediaLibrary.Item old : e.getValue()) {
-                    MediaLibrary.Item now = inSet(pack, MediaLibrary.bridgeId(old));
+                    String id = MediaLibrary.bridgeId(old); // never null: bySet takes only stickers with one
+                    MediaLibrary.Item now = id == null ? null : inSet(pack, id);
                     if (now == null) missing[0]++;
                     else replacements.add(new MediaLibrary.Replacement(old, rebuilt(old, now)));
                 }
@@ -54,7 +56,7 @@ public final class FavoriteRefresh {
         });
     }
 
-    private static MediaLibrary.Item inSet(StickerPack pack, String id) {
+    private static MediaLibrary.@Nullable Item inSet(StickerPack pack, String id) {
         return pack.stickers().stream().filter(s -> id.equals(MediaLibrary.bridgeId(s))).findFirst().orElse(null);
     }
 

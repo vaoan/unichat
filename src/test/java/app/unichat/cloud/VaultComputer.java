@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 import app.unichat.support.PathParts;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -25,7 +26,7 @@ final class VaultComputer {
         "server.telegram.apiId", "server.telegram.apiHash", "gif.giphy.key", "cloud.dropboxAppKey", "cloud.pcloudClientId", "stt.command",
         "ui.theme", VaultPeers.KEY, VaultActions.UNCONFIRMED, VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultOff.KEY, VaultMove.RECORD, VaultParts.SEEN, VaultMove.KNOWN);
 
-    final Map<String, String> values = new HashMap<>();
+    final Map<String, @Nullable String> values = new HashMap<>();
     final Path data;
     final Cloud cloud;
     final AtomicInteger pinnedAdopted = new AtomicInteger();
@@ -55,7 +56,7 @@ final class VaultComputer {
     /** The settings {@link #KEYS} as they are, to put back after the test. */
     static Map<String, String> kept() {
         Map<String, String> out = new HashMap<>();
-        for (String k : KEYS) out.put(k, Settings.get().getString(k, null));
+        for (String k : KEYS) out.put(k, Settings.get().getString(k));
         return out;
     }
 
@@ -74,15 +75,15 @@ final class VaultComputer {
     }
 
     private void out() {
-        for (String k : KEYS) values.put(k, Settings.get().getString(k, null));
+        for (String k : KEYS) values.put(k, Settings.get().getString(k));
     }
 
-    VaultComputer set(String key, String value) {
+    VaultComputer set(String key, @Nullable String value) {
         values.put(key, value);
         return this;
     }
 
-    String get(String key) {
+    @Nullable String get(String key) {
         return values.get(key);
     }
 
@@ -93,7 +94,7 @@ final class VaultComputer {
         return this;
     }
 
-    String read(String file) throws IOException {
+    @Nullable String read(String file) throws IOException {
         Path p = data.resolve(file);
         return Files.exists(p) ? Files.readString(p) : null;
     }
@@ -105,7 +106,7 @@ final class VaultComputer {
     }
 
     /** What {@code call} gives, run as this computer: its settings in while it runs. */
-    <T, E extends Exception> T as(Call<Future<T>, E> call) throws E, InterruptedException, java.util.concurrent.ExecutionException {
+    <T extends @Nullable Object, E extends Exception> T as(Call<Future<T>, E> call) throws E, InterruptedException, java.util.concurrent.ExecutionException {
         in();
         try {
             return call.call().get();

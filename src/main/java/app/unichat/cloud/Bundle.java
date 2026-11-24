@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -22,7 +23,7 @@ import java.util.TreeMap;
  * chat's {@code fromServer}), which every computer gets from the server anyway. Emoji favorites, recents and reaction
  * counts (media-library.json) change at every use, so they don't travel.
  */
-public record Bundle(String machine, Instant savedAt, Map<String, String> settings, JsonNode preferences) {
+public record Bundle(String machine, Instant savedAt, Map<String, String> settings, @Nullable JsonNode preferences) {
     private static final ObjectMapper JSON = new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
     /** A setting that changes as the person moves around the window, not by choosing anything. */
@@ -30,7 +31,7 @@ public record Bundle(String machine, Instant savedAt, Map<String, String> settin
         return !key.startsWith("panel.");
     }
 
-    public static Bundle of(String machine, Instant savedAt, Map<String, String> settings, JsonNode preferences) {
+    public static Bundle of(String machine, Instant savedAt, Map<String, String> settings, @Nullable JsonNode preferences) {
         Map<String, String> kept = new TreeMap<>();
         settings.forEach((k, v) -> { if (travels(k)) kept.put(k, v); });
         return new Bundle(machine, savedAt, kept, preferences);
@@ -49,7 +50,7 @@ public record Bundle(String machine, Instant savedAt, Map<String, String> settin
     }
 
     /** The preferences without what only follows the server. */
-    private static JsonNode chosen(JsonNode prefs) {
+    private static JsonNode chosen(@Nullable JsonNode prefs) {
         if (prefs == null || !prefs.isObject()) return JSON.nullNode();
         ObjectNode copy = prefs.deepCopy();
         if (copy.get("chats") instanceof ObjectNode chats) {
@@ -71,7 +72,7 @@ public record Bundle(String machine, Instant savedAt, Map<String, String> settin
     }
 
     /** Null for a file that isn't one of these. */
-    public static Bundle parse(byte[] data) {
+    public static @Nullable Bundle parse(byte @Nullable [] data) {
         try {
             JsonNode n = JSON.readTree(data);
             if (n == null || n.path("version").asInt() != 1 || !n.path("settings").isObject()) return null;
@@ -84,7 +85,7 @@ public record Bundle(String machine, Instant savedAt, Map<String, String> settin
         }
     }
 
-    static JsonNode readPreferences(byte[] data) {
+    static @Nullable JsonNode readPreferences(byte @Nullable [] data) {
         try {
             return data == null ? null : JSON.readTree(data);
         } catch (IOException e) {

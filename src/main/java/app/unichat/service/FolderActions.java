@@ -2,6 +2,7 @@ package app.unichat.service;
 
 import app.unichat.model.Chat;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -51,11 +52,11 @@ public final class FolderActions implements ChatFolders {
     }
 
     @Override
-    public String preferencesWarning() {
+    public @Nullable String preferencesWarning() {
         String aside = prefs.setAside();
         if (prefs.recoveredFromBackup()) {
             String kept = prefs.unreadable() ? I18n.t("folders.warn.keptNot")
-                    : I18n.t("folders.warn.keptAs", aside);
+                    : I18n.t("folders.warn.keptAs", String.valueOf(aside)); // read again, so it was set aside
             return I18n.t("folders.warn.recovered", kept);
         }
         if (prefs.unreadable()) {
@@ -65,7 +66,7 @@ public final class FolderActions implements ChatFolders {
     }
 
     @Override
-    public void onSaveFailure(Consumer<String> warn) {
+    public void onSaveFailure(@Nullable Consumer<String> warn) {
         // One toast at a time, and a failure right at start would replace the recovery's: it says both.
         prefs.onSaveFailure(warn == null ? null
                 : () -> warn.accept(prefs.recoveredFromBackup() ? preferencesWarning() + " " + I18n.t("folders.saveFailed") : I18n.t("folders.saveFailed")));

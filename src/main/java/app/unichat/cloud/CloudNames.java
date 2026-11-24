@@ -2,6 +2,7 @@ package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -74,13 +75,13 @@ final class CloudNames {
     }
 
     /** What's after {@code root + "/"} in {@code path} ("" for the root itself), or null when it isn't under it. */
-    private static String under(String path, String root) {
+    private static @Nullable String under(String path, String root) {
         if (path.equals(root)) return "";
         return path.startsWith(root + "/") ? path.substring(root.length() + 1) : null;
     }
 
     /** The first entry of {@code table} whose {@code from} name {@code path}'s rest is, or starts as, swapped for its {@code to}. */
-    private static String swap(String path, String root, String toRoot, String[][] table, int from, int to) {
+    private static String swap(String path, @Nullable String root, @Nullable String toRoot, String[][] table, int from, int to) {
         String rest = root == null ? path : under(path, root);
         if (rest == null) return path;
         for (String[] names : table) {
@@ -99,7 +100,7 @@ final class CloudNames {
      * whose two copies differ the newer one ({@link Bundle#savedAt}); anything else the old one when {@code oldLive} (the
      * old names are still the ones in use), else the new one.
      */
-    static byte[] winner(String path, byte[] old, byte[] now, boolean oldLive) throws IOException {
+    static byte @Nullable [] winner(String path, byte[] old, byte @Nullable [] now, boolean oldLive) throws IOException {
         if (now == null) return old;
         if (Arrays.equals(old, now)) return null;
         String name = path.substring(path.lastIndexOf('/') + 1);
@@ -213,7 +214,7 @@ final class CloudNames {
      */
     private static boolean media(Storage dav) throws IOException {
         if (!dav.exists(OLD_MEDIA)) return true;
-        if (still(dav, Settings.get().getString(KEPT, null))) return false;
+        if (still(dav, Settings.get().getString(KEPT))) return false;
         if (!dav.exists(CloudAccount.MEDIA)) {
             moveInto(dav, OLD_MEDIA, CloudAccount.MEDIA);
             return true;
@@ -236,7 +237,7 @@ final class CloudNames {
     }
 
     /** Whether the file {@link #KEPT} says and its new copy have the stamps they had then. */
-    private static boolean still(Storage dav, String kept) throws IOException {
+    private static boolean still(Storage dav, @Nullable String kept) throws IOException {
         String[] parts = kept == null ? new String[0] : kept.split("\n", 3);
         return parts.length == 3 && parts[1].equals(String.valueOf(dav.stamp(parts[0])))
             && parts[2].equals(String.valueOf(dav.stamp(renamed(parts[0]))));
@@ -248,7 +249,7 @@ final class CloudNames {
      * there ({@link #winner}). One that isn't is kept with its folder, and said in the log. Null once it's gone, else the
      * first path there that isn't held.
      */
-    private static String confirmed(Storage dav, String dir, int depth) throws IOException {
+    private static @Nullable String confirmed(Storage dav, String dir, int depth) throws IOException {
         if (!dav.exists(dir)) return null;
         String kept = unconfirmed(dav, dir, depth);
         if (kept != null) {
@@ -260,7 +261,7 @@ final class CloudNames {
     }
 
     /** The first path under {@code dir} that isn't held under its new name (a name not ours: its folder), or null. */
-    private static String unconfirmed(Storage dav, String dir, int depth) throws IOException {
+    private static @Nullable String unconfirmed(Storage dav, String dir, int depth) throws IOException {
         for (String name : dav.list(dir)) {
             if (!Storage.plainName(name)) return dir;
             String path = dir + "/" + name;
@@ -287,7 +288,9 @@ final class CloudNames {
     @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "compares two hex checksums the services give; hex is ASCII")
     private static boolean same(Storage.RemoteFile a, Storage.RemoteFile b) {
         if (a.size() < 0 || a.size() != b.size()) return false;
-        return a.kind() == null || b.kind() == null || !a.kind().equals(b.kind()) || a.hash().equalsIgnoreCase(b.hash());
+        String kind = a.kind();
+        if (kind == null || !kind.equals(b.kind())) return true;
+        return java.util.Objects.requireNonNull(a.hash(), "a checksum's kind comes with it").equalsIgnoreCase(b.hash());
     }
 
     /** {@code from} moved to {@code to}, the folder above it made first. */

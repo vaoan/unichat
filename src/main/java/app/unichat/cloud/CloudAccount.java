@@ -1,6 +1,7 @@
 package app.unichat.cloud;
 
 import app.unichat.settings.Settings;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The person's storage account: which service, its WebDAV address, the login and the password or access key. Kept on
@@ -16,9 +17,10 @@ public record CloudAccount(Service service, String url, String user, String secr
         ICEDRIVE("https://webdav.icedrive.io"),
         OTHER(null);
 
-        public final String url;
+        /** Null where the person types it, or none is needed. */
+        public final @Nullable String url;
 
-        Service(String url) {
+        Service(@Nullable String url) {
             this.url = url;
         }
     }
@@ -31,11 +33,11 @@ public record CloudAccount(Service service, String url, String user, String secr
     public static final String SETTINGS_FILE = Cloud.Part.SETTINGS.path();
 
     /** The account saved on this computer, or null when none is connected. */
-    public static CloudAccount saved() {
+    public static @Nullable CloudAccount saved() {
         Settings s = Settings.get();
-        String url = s.getString("cloud.url", null);
-        String user = s.getString("cloud.user", null);
-        String secret = s.getString("cloud.secret", null);
+        String url = s.getString("cloud.url");
+        String user = s.getString("cloud.user");
+        String secret = s.getString("cloud.secret");
         if (url == null || user == null || secret == null) return null;
         return new CloudAccount(s.getEnum("cloud.service", Service.OTHER), url, user, secret);
     }

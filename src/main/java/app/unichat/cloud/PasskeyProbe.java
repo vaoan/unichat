@@ -4,6 +4,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
 import app.unichat.support.PathParts;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.BindException;
@@ -28,7 +29,7 @@ public final class PasskeyProbe {
     public static final String ARGUMENT = "--passkey-probe";
 
     /** The one probe running: the port is one, so a new one ends it first. */
-    private static CompletableFuture<Void> current;
+    private static @Nullable CompletableFuture<Void> current;
 
     private PasskeyProbe() {}
 
@@ -50,15 +51,15 @@ public final class PasskeyProbe {
      * (no browser opened: it can be typed), and so does why it couldn't start (the port busy); the future ends once
      * anything is told.
      */
-    public static CompletableFuture<Void> onStart(Consumer<URI> browser) {
+    public static @Nullable CompletableFuture<Void> onStart(Consumer<URI> browser) {
         return onStart(browser, Loopback.PORT, file(), System.err::println);
     }
 
-    static CompletableFuture<Void> onStart(Consumer<URI> browser, int port, Path file, Consumer<String> log) {
+    static @Nullable CompletableFuture<Void> onStart(Consumer<URI> browser, int port, Path file, Consumer<String> log) {
         return onStart(browser, port, file, log, Loopback.DEADLINE);
     }
 
-    static CompletableFuture<Void> onStart(Consumer<URI> browser, int port, Path file, Consumer<String> log, Duration deadline) {
+    static @Nullable CompletableFuture<Void> onStart(Consumer<URI> browser, int port, Path file, Consumer<String> log, Duration deadline) {
         if (!asked()) return null;
         Consumer<URI> told = uri -> {
             log.accept("Passkey probe: open " + uri + " in the browser");

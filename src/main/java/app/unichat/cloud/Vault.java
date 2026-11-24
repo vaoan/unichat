@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.security.KeyPair;
 import java.time.Instant;
@@ -39,7 +40,7 @@ final class Vault {
      * generation ({@link #vouched}: sealed with the key it replaced; null before any change, or when it isn't one).
      */
     @SuppressWarnings("ArrayRecordComponent") // the vouch is a seal; vaults compare ids and generations, never Info
-    record Info(String id, Instant created, long generation, byte[] vouch) {
+    record Info(String id, Instant created, long generation, byte @Nullable [] vouch) {
         Info(String id, Instant created, long generation) {
             this(id, created, generation, null);
         }
@@ -94,12 +95,12 @@ final class Vault {
     }
 
     /** The vault in the account, or null when there's none (or what's there isn't one). */
-    static Info info(Storage s) throws IOException {
+    static @Nullable Info info(Storage s) throws IOException {
         return parse(s.get(INFO));
     }
 
     /** The vault {@code json} says, or null when it says none (null) or isn't one. */
-    static Info parse(byte[] json) {
+    static @Nullable Info parse(byte @Nullable [] json) {
         if (json == null) return null;
         try {
             JsonNode n = JSON.readTree(json);
@@ -107,7 +108,7 @@ final class Vault {
                 || !n.path("generation").isIntegralNumber() || !n.get("generation").canConvertToLong() || n.get("generation").asLong() < 0) {
                 return null;
             }
-            byte[] vouch = null;
+            byte @Nullable [] vouch = null;
             if (n.path(VOUCH).isTextual()) {
                 try {
                     vouch = java.util.Base64.getDecoder().decode(n.get(VOUCH).asText());
@@ -185,7 +186,7 @@ final class Vault {
     }
 
     /** The slot {@code id} of {@code vault}; null when there's none, it isn't one, or it is another vault's or another id's. */
-    static VaultSlot slot(Storage s, Info vault, String id) throws IOException {
+    static @Nullable VaultSlot slot(Storage s, Info vault, String id) throws IOException {
         if (!Ids.ours(id)) return null;
         byte[] json = s.get(path(id));
         VaultSlot slot = json == null ? null : VaultSlot.parse(json);
@@ -273,7 +274,7 @@ final class Vault {
         VaultSlot own = slots.stream().filter(slot -> slot.id().equals(machine) && slot.method() == VaultSlot.Method.COMPUTER)
             .findFirst().orElse(null);
         byte[] ownKey = own == null ? null : VaultNext.publicKey(own, oldVk);
-        if (ownKey == null || !peers.trusts(own, ownKey)) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
+        if (own == null || ownKey == null || !peers.trusts(own, ownKey)) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
         Info now = new Info(was.id(), was.created(), was.generation() + 1, null);
         now = new Info(now.id(), now.created(), now.generation(), VaultCrypto.seal(oldVk, vouchPath(now), vouched(now)));
         byte[] vk = VaultCrypto.randomKey();
@@ -339,9 +340,10 @@ final class Vault {
      * through the account alone never is.
      */
     static boolean vouched(Storage s, Info vault, byte[] held) throws IOException {
-        if (vault.vouch() != null) {
+        byte[] vouch = vault.vouch();
+        if (vouch != null) {
             try {
-                if (java.security.MessageDigest.isEqual(vouched(vault), VaultCrypto.open(held, vouchPath(vault), vault.vouch()))) return true;
+                if (java.security.MessageDigest.isEqual(vouched(vault), VaultCrypto.open(held, vouchPath(vault), vouch))) return true;
             } catch (VaultCrypto.Broken e) {
                 // Not this key's: an offer may still say so.
             }
@@ -386,7 +388,7 @@ final class Vault {
      * This computer's slot wrapped again with its own key for {@code vk}, at the vault's generation, no offer left, showing
      * {@code publicKey} (its own, from its private key) sealed with {@code vk}.
      */
-    static void rewrap(Storage s, Info vault, VaultSlot own, byte[] slotKey, byte[] vk, byte[] publicKey) throws IOException {
+    static void rewrap(Storage s, Info vault, VaultSlot own, byte[] slotKey, byte[] vk, byte @Nullable [] publicKey) throws IOException {
         if (publicKey == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
         ObjectNode params = own.params().deepCopy();
         params.remove(VaultNext.NEXT);
@@ -423,7 +425,7 @@ final class Vault {
      * Deletes the slots {@code written} and, when {@code mine} is given and the account's vault is still it, the vault's
      * file too; what can't be deleted is told with {@code cause}, which is returned to be thrown.
      */
-    private static <E extends Exception> E undo(Storage s, List<String> written, Info mine, E cause) {
+    private static <E extends Exception> E undo(Storage s, List<String> written, @Nullable Info mine, E cause) {
         for (String path : written) {
             try {
                 s.delete(path);

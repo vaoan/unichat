@@ -1,6 +1,8 @@
 package app.unichat.cloud;
 
+import app.unichat.Present;
 import app.unichat.settings.Settings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -31,13 +33,13 @@ public final class VaultFixture implements AutoCloseable {
     private final Cloud cloud;
     private final Path photos;
     private final List<java.util.concurrent.CountDownLatch> held = new java.util.concurrent.CopyOnWriteArrayList<>();
-    private byte[] vk;
+    private byte @Nullable [] vk;
 
     public VaultFixture(Path dir) throws IOException {
         dav = new FakeDav("u", "p");
         portableWere = Settings.get().portable();
         were.putAll(VaultComputer.kept());
-        for (String k : ACCOUNT) were.put(k, Settings.get().getString(k, null));
+        for (String k : ACCOUNT) were.put(k, Settings.get().getString(k));
         for (String k : VaultComputer.KEYS) Settings.get().set(k, null);
         Settings.get().set("cloud.machine", HERE);
         Settings.get().set("cloud.media", "false");
@@ -58,7 +60,7 @@ public final class VaultFixture implements AutoCloseable {
     }
 
     /** Another computer made the vault (and gave it {@code password}, unless null); its recovery code as printed. */
-    public String otherComputerMadeIt(String password) throws IOException, Vault.Exists {
+    public String otherComputerMadeIt(@Nullable String password) throws IOException, Vault.Exists {
         Vault.Created made = Vault.create(storage(), OTHER, "Escritorio");
         vk = made.vk();
         if (password != null) Vault.addPassword(storage(), vk, password.toCharArray());
@@ -67,17 +69,17 @@ public final class VaultFixture implements AutoCloseable {
 
     /** One more computer of the vault's, under {@code label} (needs the vault made by {@link #otherComputerMadeIt}). */
     public void anotherComputer(String machine, String label) throws IOException {
-        Vault.addComputer(storage(), vk, machine, label);
+        Vault.addComputer(storage(), Present.of(vk), machine, label);
     }
 
     /** This computer's way in deleted by another computer: removed from the vault. */
     public void removeHere() throws IOException {
-        Vault.removeComputer(storage(), Vault.info(storage()), HERE);
+        Vault.removeComputer(storage(), Present.of(Vault.info(storage())), HERE);
     }
 
     /** {@code vault.json}'s generation raised by someone with only the account: nothing vouches for it. */
     public void raiseGenerationByHand() throws IOException {
-        Vault.Info info = Vault.info(storage());
+        Vault.Info info = Present.of(Vault.info(storage()));
         dav.put(Vault.INFO, ("{\"id\":\"" + info.id() + "\",\"created\":\"" + info.created() + "\",\"generation\":"
             + (info.generation() + 1) + "}").getBytes(UTF_8));
     }
@@ -89,7 +91,7 @@ public final class VaultFixture implements AutoCloseable {
 
     /** Whether {@code machine}'s slot holds an offer of the vault's current key (it takes it on its next round). */
     public boolean offeredTheKey(String machine) throws IOException {
-        Vault.Info info = Vault.info(storage());
+        Vault.Info info = Present.of(Vault.info(storage()));
         VaultSlot slot = Vault.slot(storage(), info, machine);
         return slot != null && slot.params().has(VaultNext.NEXT);
     }

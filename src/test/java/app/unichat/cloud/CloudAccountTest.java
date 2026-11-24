@@ -16,12 +16,12 @@ class CloudAccountTest {
     @Test
     void disconnectingForgetsTheVaultHeldOrSeenHere() {
         Map<String, String> were = new HashMap<>();
-        for (String k : ACCOUNT) were.put(k, Settings.get().getString(k, null));
+        for (String k : ACCOUNT) were.put(k, Settings.get().getString(k));
         try {
             for (String k : NoVaultHeld.KEYS) Settings.get().set(k, "x");
             CloudAccount.forget();
             // Another account connected next has another vault, or none: what this one held would keep it MISSING.
-            for (String k : NoVaultHeld.KEYS) assertNull(Settings.get().getString(k, null), k);
+            for (String k : NoVaultHeld.KEYS) assertNull(Settings.get().getString(k), k);
         } finally {
             were.forEach(Settings.get()::set);
         }
@@ -30,13 +30,13 @@ class CloudAccountTest {
     @Test
     void disconnectingForgetsThatTheOldNamesWereMovedHere() {
         Map<String, String> were = new HashMap<>();
-        for (String k : ACCOUNT) were.put(k, Settings.get().getString(k, null));
+        for (String k : ACCOUNT) were.put(k, Settings.get().getString(k));
         List<String> keys = List.of(CloudNames.DONE, CloudNames.KEPT, VaultNames.LEFT);
-        for (String k : keys) were.put(k, Settings.get().getString(k, null));
+        for (String k : keys) were.put(k, Settings.get().getString(k));
         try {
             for (String k : keys) Settings.get().set(k, "x");
             CloudAccount.forget();
-            for (String k : keys) assertNull(Settings.get().getString(k, null), "another account may still have the old names: " + k);
+            for (String k : keys) assertNull(Settings.get().getString(k), "another account may still have the old names: " + k);
         } finally {
             were.forEach(Settings.get()::set);
         }
