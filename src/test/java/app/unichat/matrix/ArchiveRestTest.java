@@ -57,6 +57,8 @@ class ArchiveRestTest {
     private volatile Thread loopThread;
     /** Interrupts the rounds left for the request after them (a waking not swallowed). */
     private final AtomicInteger interruptsLeft = new AtomicInteger();
+    /** Rounds of the loop under way: a future completes inside one (in beforeRequest), before its request is logged. */
+    private final AtomicInteger rounds = new AtomicInteger();
     private volatile java.time.Instant now = java.time.Instant.parse("2026-11-23T12:00:00Z");
     private MatrixClient client;
     private RestServer server;
@@ -105,12 +107,28 @@ class ArchiveRestTest {
     /** The sync loop's turn: what rests and a part of the catch-up, then its request; again while more is left. */
     private void round() {
         loopThread = Thread.currentThread();
+        rounds.incrementAndGet();
+        try {
+            turns();
+        } finally {
+            rounds.decrementAndGet();
+            server.changes.changed();
+        }
+    }
+
+    private void turns() {
         boolean more;
         do {
             more = rest.beforeRequest();
             if (Thread.interrupted()) interruptsLeft.incrementAndGet(); // the request after it takes a waking's interrupt, as the real loop's does
             server.log.add("request " + filter.forRequest(false));
         } while (more);
+    }
+
+    /** {@code f} done, and the loop's round that completed it ended too (its request logged). */
+    private void settled(CompletableFuture<?> f) throws InterruptedException, ExecutionException {
+        f.get();
+        server.changes.until("the loop's round ended", () -> rounds.get() == 0);
     }
 
     private void process(String json) {
@@ -246,7 +264,7 @@ class ArchiveRestTest {
     @Test
     void aChatOpenedOutsideTheArchiveBringsNoServerBack() throws Exception {
         everyKind();
-        rest.archivedChanged().get();
+        settled(rest.archivedChanged());
         int before = server.log.size();
         rest.archivedChatOpened("!c1:x").get();
         assertEquals(before, server.log.size(), server.log.toString());
@@ -576,7 +594,7 @@ class ArchiveRestTest {
         server.changes.until("the tags sync asked", () -> server.log.stream().anyMatch(l -> l.startsWith("tags ")));
         int before = interruptsLeft.get();
         loopThread.interrupt();
-        round.get();
+        settled(round); // done inside beforeRequest: the loop takes the interrupt just after, on its own thread
         assertEquals(before + 1, interruptsLeft.get(), "left for the request after it");
         server.tagsGate.countDown();
         rest.update().get(); // the clock unmoved
@@ -594,7 +612,7 @@ class ArchiveRestTest {
         server.changes.until("the post asked", () -> server.log.stream().filter(l -> l.equals("filter asked")).count() > asked);
         int before = interruptsLeft.get();
         loopThread.interrupt();
-        round.get();
+        settled(round); // done inside beforeRequest: the loop takes the interrupt just after, on its own thread
         assertEquals(before + 1, interruptsLeft.get(), "left for the request after it");
         server.filterGate.countDown();
         rest.update().get(); // the clock unmoved: no retry waits
