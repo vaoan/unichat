@@ -18,12 +18,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Every check turned off for one line or member says why, on that line: {@code // NOPMD: why},
- * {@code @SuppressWarnings("x") // why}, or SpotBugs' {@code justification}. A suppression without one hides a finding
- * nobody decided on.
+ * {@code @SuppressWarnings("x") // why}, SpotBugs' {@code justification}, or CodeQL's mark at the end of the line (its
+ * rule in brackets, then why; .github/codeql/alert-suppression.qls). A suppression without one hides a finding nobody
+ * decided on.
  */
 class SuppressionsHaveReasonsTest {
     // Built from parts, so this file's own text doesn't match them.
     private static final String NOPMD = "NO" + "PMD";
+    private static final String LGTM = "lg" + "tm";
+    /** What CodeQL reads as a suppression in a comment (any case): its old mark, or its new one with a rule. */
+    private static final Pattern CODEQL_MARK = Pattern.compile("(?i)\\b(?:lgtm\\b|codeql\\s*\\[)");
+    /** The one form taken: on the line itself, java rules by name, then the reason. */
+    private static final Pattern CODEQL_SAYS_WHY = codeqlRules("\\s*:?\\s*[^\\s*/:].*");
+    private static final Pattern CODEQL_RULES = codeqlRules("");
     private static final Pattern WARNINGS = Pattern.compile("@\\s*(?:java\\.lang\\.)?" + "SuppressWarnings\\s*\\(");
     private static final Pattern FB_WARNINGS = fbWarnings();
     private static final Pattern JUSTIFIED = Pattern.compile("justification\\s*=\\s*\"[^\"]*\\S[^\"]*\"");
@@ -31,6 +38,11 @@ class SuppressionsHaveReasonsTest {
     @SuppressFBWarnings(value = "REDOS", justification = "reads the repo's own sources; the optional prefix ends at a literal dot")
     private static Pattern fbWarnings() {
         return Pattern.compile("@\\s*(?:[\\w.]+\\.)?" + "SuppressFBWarnings\\b");
+    }
+
+    /** CodeQL's mark with its java rules in brackets, then {@code after}. */
+    private static Pattern codeqlRules(String after) {
+        return Pattern.compile("lgtm\\[java/[\\w-]+(?:,\\s*java/[\\w-]+)*]" + after);
     }
 
     @Test
@@ -57,6 +69,9 @@ class SuppressionsHaveReasonsTest {
         assertEquals(1, unexplained("A.java", "@" + "SuppressFBWarnings(value = \"X\")\n").size(), "no justification");
         assertEquals(1, unexplained("A.java", "@" + "SuppressFBWarnings(value = \"X\", justification = \" \")\n").size(),
                 "a blank justification");
+        assertEquals(1, unexplained("A.java", "int a = f(); // " + LGTM + "[java/x]\n").size(), "CodeQL's, no reason");
+        assertEquals(1, unexplained("A.java", "int a = f(); // " + LGTM + "[java/x]:  \n").size(), "CodeQL's, a colon only");
+        assertEquals(1, unexplained("A.java", "int a = f(); /* " + LGTM + "[java/x] */\n").size(), "CodeQL's, nothing but the close");
     }
 
     @Test
@@ -72,6 +87,18 @@ class SuppressionsHaveReasonsTest {
         assertEquals(1, unexplained("A.java", "@" + "SuppressWarnings(\"checkstyle\") // why\n").size(), "every Checkstyle check");
         assertEquals(1, unexplained("A.java", "String s = \"\"\"\n  text\n  \"\"\"; @" + "SuppressWarnings(\"x\") int b;\n").size(),
                 "after a text block");
+        assertEquals(1, unexplained("A.java", "int a = f(); // " + LGTM + " it's fine\n").size(), "CodeQL's every rule at once");
+        assertEquals(1, unexplained("A.java", "int a = f(); // why; " + LGTM + "\n").size(), "every rule, after a semicolon");
+        assertEquals(1, unexplained("A.java", "int a = f(); // " + LGTM.toUpperCase(Locale.ROOT) + " why\n").size(), "in capitals");
+        assertEquals(1, unexplained("A.java", "int a = f(); // " + LGTM + "[] why\n").size(), "no rule named");
+        assertEquals(1, unexplained("A.java", "// codeql[java/x] why\nint a = f();\n").size(), "the mark for the next line");
+        assertEquals(1, unexplained("A.java", "/** " + LGTM + "[java/x] why */\nvoid f() {}\n").size(), "in a block comment");
+        assertEquals(1, unexplained("A.java", "@" + "SuppressWarnings(\"" + LGTM + "\") // why\nvoid f() {}\n").size(),
+                "CodeQL's every rule on a member");
+        assertEquals(1, unexplained("A.java", "@" + "SuppressWarnings(\"codeql[java/x]\") // why\nvoid f() {}\n").size(),
+                "the other mark on a member");
+        assertEquals(1, unexplained("A.java", "@" + "SuppressWarnings(\"" + LGTM + "[java/x]\") // why\nfinal class A {}\n").size(),
+                "CodeQL's on a whole type");
     }
 
     @Test
@@ -125,6 +152,11 @@ class SuppressionsHaveReasonsTest {
                 "nor inside a block comment over lines");
         assertTrue(unexplained("A.java", "String s = \"// " + NOPMD + " @" + "SuppressWarnings(x)\";\n").isEmpty(), "nor in a string");
         assertEquals(List.of(), unexplained("A.java", "@" + "SuppressWarnings({\"PMD.A\",\n    \"PMD.B\"}) // why, for both\n"));
+        assertEquals(List.of(), unexplained("A.java", "int a = f(); // " + LGTM + "[java/x] the API demands it\n"));
+        assertEquals(List.of(), unexplained("A.java", "int a = f(); // " + LGTM + "[java/x, java/y]: why\n"));
+        assertEquals(List.of(), unexplained("A.java", "int a = f(); // " + NOPMD + ": CloseResource, why; " + LGTM + "[java/x] the same\n"));
+        assertEquals(List.of(), unexplained("A.java", "@" + "SuppressWarnings(\"" + LGTM + "[java/x]\") // why\nvoid f() {}\n"));
+        assertEquals(List.of(), unexplained("A.java", "/** What CodeQL's unused-parameter misreads. */\n"), "the name in prose");
     }
 
     /**
@@ -140,7 +172,8 @@ class SuppressionsHaveReasonsTest {
         List<String> out = new ArrayList<>();
         for (int i = 0; i < lines.length; i++) {
             String comment = lineComment(text, kinds, i);
-            if (comment.contains(NOPMD) && !comment.matches(".*" + NOPMD + ":\\s*\\S.*")) out.add(at(name, lines, i));
+            boolean pmd = comment.contains(NOPMD) && !comment.matches(".*" + NOPMD + ":\\s*\\S.*");
+            if (pmd || !codeqlSaysWhy(comment) || CODEQL_MARK.matcher(blockComments(text, kinds, i)).find()) out.add(at(name, lines, i));
         }
         Matcher w = WARNINGS.matcher(code);
         while (w.find()) {
@@ -149,9 +182,10 @@ class SuppressionsHaveReasonsTest {
             boolean blanket = args.matches("(?s).*\"\\s*(PMD|all|checkstyle|checkstyle:all)\\s*\".*");
             List<String> checks = checkstyleChecks(args);
             boolean sizes = checks.stream().anyMatch(SIZES::contains);
-            boolean wholeFile = !checks.isEmpty() && depth(code, w.start()) == 0
-                    && TYPE.matcher(declarationAfter(code, close + 1)).find();
-            if (blanket || sizes || wholeFile || !lineComment(text, kinds, lineOf(text, close)).matches("//\\s*\\S.*")) {
+            boolean onType = TYPE.matcher(declarationAfter(code, close + 1)).find();
+            boolean wholeFile = !checks.isEmpty() && depth(code, w.start()) == 0 && onType;
+            boolean codeql = CODEQL_MARK.matcher(args).find() && (onType || !codeqlRulesOnly(args));
+            if (blanket || sizes || wholeFile || codeql || !lineComment(text, kinds, lineOf(text, close)).matches("//\\s*\\S.*")) {
                 out.add(at(name, lines, lineOf(text, w.start())));
             }
         }
@@ -165,6 +199,34 @@ class SuppressionsHaveReasonsTest {
             }
         }
         return out;
+    }
+
+    /** Each CodeQL mark in a line comment is the one form: its java rules in brackets, then why. */
+    private static boolean codeqlSaysWhy(String comment) {
+        Matcher m = CODEQL_MARK.matcher(comment);
+        while (m.find()) {
+            if (!CODEQL_SAYS_WHY.matcher(comment).region(m.start(), comment.length()).lookingAt()) return false;
+        }
+        return true;
+    }
+
+    /** Each quoted name in an annotation's arguments that CodeQL reads is its old mark with java rules in brackets. */
+    private static boolean codeqlRulesOnly(String args) {
+        Matcher q = QUOTED.matcher(args);
+        while (q.find()) {
+            if (CODEQL_MARK.matcher(q.group(1)).find() && !CODEQL_RULES.matcher(q.group(1).strip()).matches()) return false;
+        }
+        return true;
+    }
+
+    /** The parts of block comments on line {@code line}: CodeQL reads a mark in one too, which never carries its reason. */
+    private static String blockComments(String text, String kinds, int line) {
+        int start = 0;
+        for (int n = 0; n < line; n++) start = text.indexOf('\n', start) + 1;
+        int end = text.indexOf('\n', start) < 0 ? text.length() : text.indexOf('\n', start);
+        StringBuilder out = new StringBuilder();
+        for (int k = start; k < end; k++) out.append(kinds.charAt(k) == BLOCK ? text.charAt(k) : ' ');
+        return out.toString();
     }
 
     private static final char CODE = 'c';
