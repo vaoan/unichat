@@ -90,8 +90,9 @@ class BuildRulesTest {
     void errorProneTurnsNothingOffQuietly() {
         List<String> flags = errorProneFlags();
         for (String flag : flags) {
-            assertTrue(flag.matches("-Xep:\\w+:(ERROR|OFF)"), flag + ": only a check made an error or turned off, nothing that"
-                    + " demotes, skips paths or patches (-XepAllErrorsAsWarnings, -XepExcludedPaths, ...)");
+            assertTrue(flag.matches("-Xep:\\w+:(ERROR|OFF)") || NULLAWAY_OPTIONS.contains(flag), flag + ": only a check made an"
+                    + " error or turned off, or one of NullAway's options, nothing that demotes, skips paths or patches"
+                    + " (-XepAllErrorsAsWarnings, -XepExcludedPaths, -XepOpt:NullAway:ExcludedClasses, ...)");
         }
         String why = comments(plugin("maven-compiler-plugin"));
         for (String flag : flags) {
@@ -109,6 +110,62 @@ class BuildRulesTest {
                 "ComparisonContractViolated", "TransientMisuse", "VoidUsed", "AssertFalse", "TypeToString", "IterablePathParameter",
                 "FunctionalInterfaceClash", "LongLiteralLowerCaseSuffix", "DepAnn")) {
             assertTrue(flags.contains("-Xep:" + check + ":ERROR"), check + " is on: " + flags);
+        }
+    }
+
+    /**
+     * NullAway's options, exactly: it checks the {@code @NullMarked} packages (so they join one by one), reads JSpecify's
+     * generics and arrays, and takes JUnit's {@code assertNotNull} as a check. Nothing that leaves a class or a field out.
+     */
+    private static final Set<String> NULLAWAY_OPTIONS = Set.of("-XepOpt:NullAway:OnlyNullMarked=true",
+            "-XepOpt:NullAway:JSpecifyMode=true", "-XepOpt:NullAway:HandleTestAssertionLibraries=true");
+
+    /**
+     * The packages NullAway checks so far, each with its subpackages: a package joins with its {@code package-info.java}
+     * marked {@code @NullMarked}, and its name goes here. Once every package has, this is {@code app.unichat} alone.
+     */
+    private static final List<String> NULL_MARKED = List.of("app.unichat.support", "app.unichat.model", "app.unichat.settings");
+
+    @Test
+    void nullAwayFailsTheBuildOnTheMarkedPackages() {
+        List<String> flags = errorProneFlags();
+        assertTrue(flags.contains("-Xep:NullAway:ERROR"), "NullAway's findings are errors: " + flags);
+        assertEquals(NULLAWAY_OPTIONS, flags.stream().filter(f -> f.startsWith("-XepOpt:")).collect(TreeSet::new, Set::add,
+                Set::addAll), "NullAway's options, and no other");
+        Element path = elements(child(configuration("maven-compiler-plugin"), "annotationProcessorPaths"), "path").stream()
+                .filter(p -> "com.uber.nullaway".equals(text(p, "groupId")) && "nullaway".equals(text(p, "artifactId")))
+                .findFirst().orElseThrow(() -> new AssertionError("nullaway is on javac's processor path, beside Error Prone"));
+        assertTrue(text(path, "version").matches("\\d+\\.\\d+\\.\\d+"), "pinned: " + text(path, "version"));
+        Element jspecify = elements(child(POM.getDocumentElement(), "dependencies"), "dependency").stream()
+                .filter(d -> "org.jspecify".equals(text(d, "groupId")) && "jspecify".equals(text(d, "artifactId")))
+                .findFirst().orElseThrow(() -> new AssertionError("JSpecify's annotations are a dependency"));
+        assertTrue(text(jspecify, "version").matches("\\d+\\.\\d+\\.\\d+"), "pinned: " + text(jspecify, "version"));
+        assertNull(text(jspecify, "scope"), "main code is marked with them, so they're no test-only dependency");
+    }
+
+    @Test
+    void everyPackageDoneIsNullMarked() throws IOException {
+        Set<String> marked = new TreeSet<>();
+        for (String pkg : mainPackages()) {
+            Path info = Path.of("src/main/java", pkg.split("\\.")).resolve("package-info.java");
+            String text = Files.exists(info) ? Files.readString(info) : "";
+            boolean isMarked = text.contains("\n@NullMarked\n") && text.contains("import org.jspecify.annotations.NullMarked;");
+            if (isMarked) marked.add(pkg);
+            boolean done = NULL_MARKED.stream().anyMatch(d -> pkg.equals(d) || pkg.startsWith(d + "."));
+            assertEquals(done, isMarked, pkg + (done ? " is done, so its package-info.java is @NullMarked (each subpackage has"
+                    + " its own)" : " is marked: add it to NULL_MARKED"));
+        }
+        assertFalse(marked.isEmpty(), "the packages done so far are marked");
+    }
+
+    @Test
+    void noClassLeavesNullAwayOut() throws IOException {
+        try (Stream<Path> files = Files.walk(Path.of("src"))) {
+            for (Path f : files.filter(p -> p.toString().endsWith(".java")).toList()) {
+                String text = Files.readString(f);
+                assertFalse(text.contains("Null" + "Unmarked"), f + " leaves code out of NullAway: a finding is fixed, or"
+                        + " suppressed on one member with its reason");
+            }
         }
     }
 

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,7 +23,7 @@ public final class MediaLibrary {
     public enum Kind { STICKER, GIF, EMOJI }
 
     /** {@code info}: the original event's info (keeps e.g. fi.mau.bridged_sticker so bridges resend the native sticker). */
-    public record Item(Kind kind, String url, String mime, int width, int height, JsonNode info) {}
+    public record Item(Kind kind, String url, @Nullable String mime, int width, int height, @Nullable JsonNode info) {}
 
     /**
      * In the info of a sticker sent as a converted copy (a GIF for Discord, a copy on our server): the item it was made
@@ -114,7 +115,7 @@ public final class MediaLibrary {
     public synchronized List<String> mostReacted(int count, List<String> usual) {
         List<String> keys = new ArrayList<>(reactions.keySet());
         java.util.Collections.reverse(keys); // newest first, so a stable sort keeps the newest ahead among equals
-        keys.sort((a, b) -> reactions.get(b) - reactions.get(a));
+        keys.sort((a, b) -> reactions.getOrDefault(b, 0) - reactions.getOrDefault(a, 0)); // keys are its own: never the 0
         List<String> out = new ArrayList<>(keys.subList(0, Math.min(count, keys.size())));
         for (String u : usual) if (out.size() < count && !out.contains(u)) out.add(u);
         return out;
@@ -199,7 +200,7 @@ public final class MediaLibrary {
     }
 
     /** The bridge's own id of the sticker ({@code fi.mau.bridged_sticker}), null when it has none. */
-    public static String bridgeId(Item i) {
+    public static @Nullable String bridgeId(Item i) {
         JsonNode sticker = i.info() == null ? null : i.info().get("fi.mau.bridged_sticker");
         return sticker == null ? null : sticker.path("id").asText(null);
     }

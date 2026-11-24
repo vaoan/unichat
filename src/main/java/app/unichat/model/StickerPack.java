@@ -1,6 +1,7 @@
 package app.unichat.model;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.regex.Pattern;
@@ -20,12 +21,12 @@ public record StickerPack(String title, String url, List<MediaLibrary.Item> stic
         stickers = List.copyOf(stickers);
     }
 
-    public static boolean isLink(String url) {
+    public static boolean isLink(@Nullable String url) {
         return url != null && LINK.matcher(url).matches();
     }
 
     /** The set a sticker comes from ({@code fi.mau.bridged_sticker} in its info), or null. */
-    public static String urlOf(JsonNode info) {
+    public static @Nullable String urlOf(@Nullable JsonNode info) {
         String url = info == null ? null : info.path("fi.mau.bridged_sticker").path("pack_url").asText(null);
         return isLink(url) ? url : null;
     }

@@ -1,11 +1,13 @@
 package app.unichat.model;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * What a link is, shown under its message as a card: the site, a title, some text, and a picture or the video it holds
  * (a GIF plays by itself). Empty texts are "", sizes 0 when unknown, {@code image} and {@code video} null when it has none.
  */
-public record LinkPreview(String url, String site, String title, String description, String image, int width, int height,
-                          LinkMedia video, boolean gif) {
+public record LinkPreview(String url, String site, String title, String description, @Nullable String image, int width,
+                          int height, @Nullable LinkMedia video, boolean gif) {
     public LinkPreview {
         site = site == null ? "" : site.strip();
         title = title == null ? "" : title.strip();
@@ -15,7 +17,7 @@ public record LinkPreview(String url, String site, String title, String descript
     }
 
     /** A link that is only a file: a video, a sound or a picture. */
-    public static LinkPreview of(String url, LinkMedia media, String picture) {
+    public static LinkPreview of(String url, @Nullable LinkMedia media, @Nullable String picture) {
         return new LinkPreview(url, "", "", "", picture, 0, 0, media, false);
     }
 
@@ -24,7 +26,7 @@ public record LinkPreview(String url, String site, String title, String descript
         return title.isEmpty() && description.isEmpty() && image == null && video == null;
     }
 
-    public LinkPreview withVideo(LinkMedia media, boolean isGif) {
+    public LinkPreview withVideo(@Nullable LinkMedia media, boolean isGif) {
         return new LinkPreview(url, site, title, description, image, width, height, media, isGif);
     }
 }

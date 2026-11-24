@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +14,7 @@ import java.util.Properties;
 public final class AppVersion {
     /** A run without Maven's resources (an IDE that skipped them): never offered an update, since it's no release. */
     static final String UNKNOWN = "dev";
-    private static volatile String current;
+    private static volatile @Nullable String current;
 
     private AppVersion() {}
 
@@ -39,14 +41,14 @@ public final class AppVersion {
     }
 
     /** True when {@code candidate} is a later version than {@code current}. Anything unreadable on either side: false. */
-    public static boolean isNewer(String candidate, String than) {
+    public static boolean isNewer(@Nullable String candidate, @Nullable String than) {
         Parsed a = parse(candidate);
         Parsed b = parse(than);
         return a != null && b != null && compare(a, b) > 0;
     }
 
     /** True when both name the same version ("v1.2" and "1.2.0"). */
-    public static boolean same(String a, String b) {
+    public static boolean same(@Nullable String a, @Nullable String b) {
         Parsed x = parse(a);
         Parsed y = parse(b);
         return x != null && y != null && compare(x, y) == 0;
@@ -55,7 +57,7 @@ public final class AppVersion {
     /** The numbers before the first '-' and what follows it (empty for a release); build metadata after '+' is ignored. */
     private record Parsed(List<Integer> numbers, String pre) {}
 
-    private static Parsed parse(String v) {
+    private static @Nullable Parsed parse(@Nullable String v) {
         if (v == null) return null;
         String s = v.strip();
         if (s.startsWith("v") || s.startsWith("V")) s = s.substring(1);

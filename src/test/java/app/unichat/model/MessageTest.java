@@ -79,7 +79,9 @@ class MessageTest {
         Message m = message();
         m.addReaction("👍", "@a");
         assertThrows(UnsupportedOperationException.class, () -> m.reactions().clear());
-        assertThrows(UnsupportedOperationException.class, () -> m.reactions().get("👍").add("@b"));
+        Set<String> users = m.reactions().get("👍");
+        assertNotNull(users, "the reaction is there");
+        assertThrows(UnsupportedOperationException.class, () -> users.add("@b"));
     }
 
     @Test

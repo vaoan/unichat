@@ -1,6 +1,7 @@
 package app.unichat.support;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -49,7 +50,7 @@ public final class Processes {
      * @param dir where it runs; null: wherever Unichat does
      */
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the one place programs start: callers pass argument lists, never a shell, so each value is one argument whatever it holds; a file from other people reaches ffmpeg only through Ffmpeg.input (only that file, only Unichat's formats)")
-    public static Result quiet(List<String> cmd, Path dir, long seconds) throws IOException, InterruptedException {
+    public static Result quiet(List<String> cmd, @Nullable Path dir, long seconds) throws IOException, InterruptedException {
         ProcessBuilder b = new ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
         if (dir != null) b.directory(dir.toFile());
         return capture(b, seconds);
@@ -67,7 +68,7 @@ public final class Processes {
     }
 
     /** The same, handing {@code eachLine} every line of output as it comes (a download's progress); null: none. */
-    public static Result capture(ProcessBuilder command, long seconds, Consumer<String> eachLine)
+    public static Result capture(ProcessBuilder command, long seconds, @Nullable Consumer<String> eachLine)
             throws IOException, InterruptedException {
         return capture(command, Limit.of(seconds), null, eachLine);
     }
@@ -77,8 +78,8 @@ public final class Processes {
      * comes, and past {@code limit} it's stopped with its children. Interrupting the waiting thread stops it the same
      * way, and this throws {@link InterruptedException}.
      */
-    public static Result capture(ProcessBuilder command, Limit limit, String input, Consumer<String> eachLine)
-            throws IOException, InterruptedException {
+    public static Result capture(ProcessBuilder command, Limit limit, @Nullable String input,
+                                 @Nullable Consumer<String> eachLine) throws IOException, InterruptedException {
         Ran r = run(command, limit, input, eachLine);
         return new Result(r.finished(), r.exit(), r.out().toString(StandardCharsets.UTF_8));
     }
@@ -116,7 +117,7 @@ public final class Processes {
 
     private record Ran(boolean finished, int exit, ByteArrayOutputStream out) {}
 
-    private static Ran run(ProcessBuilder command, Limit limit, String input, Consumer<String> eachLine)
+    private static Ran run(ProcessBuilder command, Limit limit, @Nullable String input, @Nullable Consumer<String> eachLine)
             throws IOException, InterruptedException {
         Process p = command.start();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -157,7 +158,7 @@ public final class Processes {
     }
 
     /** Reads to the end whatever happens to the rest: a process nobody reads from stops in write(). */
-    private static void read(Process p, ByteArrayOutputStream out, Consumer<String> eachLine, AtomicLong heard) {
+    private static void read(Process p, ByteArrayOutputStream out, @Nullable Consumer<String> eachLine, AtomicLong heard) {
         try (InputStream in = p.getInputStream()) {
             ByteArrayOutputStream line = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];

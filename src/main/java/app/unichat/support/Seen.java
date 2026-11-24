@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -46,7 +48,7 @@ public final class Seen {
     public static void reset(boolean seen) { INSTANCE.set(seen, false); }
 
     /** Under the lock with the listeners, so two threads setting at once are heard in the order they took effect. */
-    private synchronized void set(Boolean someWindowShown, Boolean screenAway) {
+    private synchronized void set(@Nullable Boolean someWindowShown, @Nullable Boolean screenAway) {
         if (someWindowShown != null) windows = someWindowShown;
         if (screenAway != null) away = screenAway;
         seenNow = windows && !away;

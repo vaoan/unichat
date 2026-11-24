@@ -67,7 +67,7 @@ class SettingsSplitTest {
         assertTrue(read("session.properties").contains("TOKEN"));
         assertTrue(read("session.properties").contains("gif.tenor.key"));
         assertEquals("TOKEN", made(new Settings(dir)).accessToken());
-        assertEquals("DARK", made(new Settings(dir)).getString("ui.theme", null));
+        assertEquals("DARK", made(new Settings(dir)).getString("ui.theme"));
     }
 
     /**
@@ -91,7 +91,7 @@ class SettingsSplitTest {
             var s = made(new Settings(dir));
             s.flush();
             assertEquals("TOKEN", s.accessToken());
-            assertEquals("DARK", s.getString("ui.theme", null));
+            assertEquals("DARK", s.getString("ui.theme"));
             assertTrue(read("session.properties").contains("TOKEN"));
             assertFalse(read("settings.properties").contains("TOKEN"));
             assertTrue(read("settings.properties").contains("ui.theme"));
@@ -179,7 +179,7 @@ class SettingsSplitTest {
         s.flush();
         Files.setPosixFilePermissions(settings, open);
         Files.setPosixFilePermissions(session, open);
-        assertEquals("DARK", made(new Settings(dir)).getString("ui.theme", null));
+        assertEquals("DARK", made(new Settings(dir)).getString("ui.theme"));
         assertEquals("TOKEN", made(new Settings(dir)).accessToken());
 
         // Readable again by the next save: what was there and what changed meanwhile, both kept.
@@ -189,7 +189,7 @@ class SettingsSplitTest {
         later.set("ui.accent", "#654321");
         later.flush();
         var again = made(new Settings(dir));
-        assertEquals("DARK", again.getString("ui.theme", null));
-        assertEquals("#654321", again.getString("ui.accent", null));
+        assertEquals("DARK", again.getString("ui.theme"));
+        assertEquals("#654321", again.getString("ui.accent"));
     }
 }

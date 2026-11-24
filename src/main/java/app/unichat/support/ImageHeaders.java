@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
+
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
@@ -42,7 +44,7 @@ public final class ImageHeaders {
      * The picture's type told by its first bytes (GIF, WebP, PNG, JPEG), or null for anything else. Labels lie: a
      * bridge that converts a WebM sticker to a GIF can still call it video/webm.
      */
-    public static String pictureMime(Path file) throws java.io.IOException {
+    public static @Nullable String pictureMime(Path file) throws java.io.IOException {
         byte[] h = new byte[12];
         int n;
         try (var in = java.nio.file.Files.newInputStream(file)) {

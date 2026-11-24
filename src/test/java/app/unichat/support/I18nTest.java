@@ -10,6 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class I18nTest {
@@ -17,6 +18,7 @@ class I18nTest {
     void everyLanguageHasEveryTextWithTheSamePlaceholders() {
         Map<String, Set<String>> keys = I18n.keysByLanguage();
         Set<String> english = keys.get("en");
+        assertNotNull(english, "English is there");
         for (var e : keys.entrySet()) {
             Set<String> missing = new TreeSet<>(english);
             missing.removeAll(e.getValue());

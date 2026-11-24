@@ -2,6 +2,7 @@ package app.unichat.model;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -35,7 +36,7 @@ public final class RoomFeatures {
     private final int reply;
     private final int reaction;
     private final int reactionCount;
-    private final List<String> allowedReactions;
+    private final @Nullable List<String> allowedReactions;
     /** msgtype → max size in bytes (0 = not stated); only types with some MIME offered. */
     private final Map<String, Long> files;
     private final boolean anyFile;
@@ -45,8 +46,9 @@ public final class RoomFeatures {
     private final Set<TextFormat> formats;
 
     private RoomFeatures(boolean unrestricted, int edit, long editMaxAgeSec, int delete, long deleteMaxAgeSec, boolean deleteForMe,
-                         int reply, int reaction, int reactionCount, List<String> allowedReactions, Map<String, Long> files,
-                         boolean anyFile, Map<String, Set<String>> mimes, Set<TextFormat> formats) {
+                         int reply, int reaction, int reactionCount, @Nullable List<String> allowedReactions,
+                         @Nullable Map<String, Long> files, boolean anyFile, @Nullable Map<String, Set<String>> mimes,
+                         Set<TextFormat> formats) {
         this.unrestricted = unrestricted;
         this.edit = edit;
         this.editMaxAgeSec = editMaxAgeSec;
@@ -63,7 +65,7 @@ public final class RoomFeatures {
         this.formats = Set.copyOf(formats);
     }
 
-    public static RoomFeatures parse(JsonNode c) {
+    public static RoomFeatures parse(@Nullable JsonNode c) {
         if (c == null || c.isEmpty()) return UNKNOWN; // redacted or emptied: don't strip every option
         Map<String, Long> files = new HashMap<>();
         Map<String, Set<String>> mimes = new HashMap<>();
@@ -110,7 +112,7 @@ public final class RoomFeatures {
 
     /** Whether {@code type} messages may carry a {@code mime} file (exact, {@code image/*} or {@code *}{@code /*}). */
     @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "only decides how a file is sent (as it is or converted); the bridge checks what it takes again")
-    public boolean acceptsMime(String type, String mime) {
+    public boolean acceptsMime(String type, @Nullable String mime) {
         if (anyFile) return true;
         if (!accepts(type)) return false;
         Set<String> m = mimes.get(type);
@@ -131,7 +133,7 @@ public final class RoomFeatures {
     private static final String OPUS_WITH_CODEC = "audio/ogg; codecs=opus";
     private static final String OGG = "audio/ogg";
 
-    public VoiceSend voiceSend() {
+    public @Nullable VoiceSend voiceSend() {
         if (anyFile) return new VoiceSend(OGG, true);
         Set<String> voice = mimes.get(VOICE);
         if (voice != null && voice.contains(OPUS_WITH_CODEC)) return new VoiceSend(OPUS_WITH_CODEC, true);
@@ -140,11 +142,11 @@ public final class RoomFeatures {
     }
 
     /** Edit offered for a message sent at {@code sent}, judged at {@code now} (limits count from the send time). */
-    public boolean canEdit(Instant sent, Instant now) {
+    public boolean canEdit(@Nullable Instant sent, Instant now) {
         return edit >= 1 && withinAge(sent, now, editMaxAgeSec);
     }
 
-    public boolean canDeleteForEveryone(Instant sent, Instant now) {
+    public boolean canDeleteForEveryone(@Nullable Instant sent, Instant now) {
         return delete >= 1 && withinAge(sent, now, deleteMaxAgeSec);
     }
 
@@ -165,7 +167,7 @@ public final class RoomFeatures {
 
     public boolean isUnknown() { return unrestricted; }
 
-    private static boolean withinAge(Instant sent, Instant now, long maxAgeSec) {
+    private static boolean withinAge(@Nullable Instant sent, Instant now, long maxAgeSec) {
         return maxAgeSec <= 0 || sent == null || Duration.between(sent, now).toSeconds() <= maxAgeSec;
     }
 

@@ -1,12 +1,13 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class OsTest {
-    private static String on(String os, String arch) {
+    private static @Nullable String on(String os, String arch) {
         String wasOs = System.getProperty("os.name");
         String wasArch = System.getProperty("os.arch");
         System.setProperty("os.name", os);

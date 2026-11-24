@@ -1,6 +1,7 @@
 package app.unichat.model;
 
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -18,18 +19,18 @@ public final class Message {
     private final String id;
     private final String chatId;
     private final String senderId;
-    private final String senderName;
+    private final @Nullable String senderName;
     private final boolean outgoing;
     private final Instant timestamp;
     private MessageType type = MessageType.TEXT;
     private String body = "";
-    private String mediaUrl;
-    private String fileName;
-    private String mimeType;
+    private @Nullable String mediaUrl;
+    private @Nullable String fileName;
+    private @Nullable String mimeType;
     private long fileSize;
     private int width;
     private int height;
-    private String replyToId;
+    private @Nullable String replyToId;
     private boolean edited;
     private boolean deleted;
     private MessageStatus status = MessageStatus.SENT;
@@ -38,7 +39,7 @@ public final class Message {
 
     private static final String EMOTE_COMMAND = "/me ";
 
-    public Message(String id, String chatId, String senderId, String senderName, boolean outgoing, Instant timestamp) {
+    public Message(String id, String chatId, String senderId, @Nullable String senderName, boolean outgoing, Instant timestamp) {
         this.id = id;
         this.chatId = chatId;
         this.senderId = senderId;
@@ -56,14 +57,14 @@ public final class Message {
     public MessageType type() { return type; }
     public void setType(MessageType type) { this.type = type; }
     public String body() { return body; }
-    public void setBody(String body) { this.body = body == null ? "" : body; }
-    public String mediaUrl() { return mediaUrl; }
-    public void setMediaUrl(String mediaUrl) { this.mediaUrl = mediaUrl; }
+    public void setBody(@Nullable String body) { this.body = body == null ? "" : body; }
+    public @Nullable String mediaUrl() { return mediaUrl; }
+    public void setMediaUrl(@Nullable String mediaUrl) { this.mediaUrl = mediaUrl; }
     /** The event's original {@code info} (e.g. fi.mau.bridged_sticker), kept so a sticker can be sent again natively. */
-    private String externalUrl;
+    private @Nullable String externalUrl;
     /** Where the message lives on its network, when the bridge says (an Instagram reel's page). */
-    public String externalUrl() { return externalUrl; }
-    public void setExternalUrl(String url) { this.externalUrl = url; }
+    public @Nullable String externalUrl() { return externalUrl; }
+    public void setExternalUrl(@Nullable String url) { this.externalUrl = url; }
 
     /** Past this, a video waits to be opened: it may be a whole clip, and it would download by itself. */
     private static final long INLINE_MAX_BYTES = 2L * 1024 * 1024;
@@ -100,20 +101,20 @@ public final class Message {
         return mediaInfo == null ? 0 : mediaInfo.path("duration").asLong(0);
     }
 
-    private com.fasterxml.jackson.databind.JsonNode mediaInfo;
-    public com.fasterxml.jackson.databind.JsonNode mediaInfo() { return mediaInfo; }
-    public void setMediaInfo(com.fasterxml.jackson.databind.JsonNode info) { this.mediaInfo = info; }
+    private com.fasterxml.jackson.databind.@Nullable JsonNode mediaInfo;
+    public com.fasterxml.jackson.databind.@Nullable JsonNode mediaInfo() { return mediaInfo; }
+    public void setMediaInfo(com.fasterxml.jackson.databind.@Nullable JsonNode info) { this.mediaInfo = info; }
 
-    private List<Integer> voiceWaveform;
+    private @Nullable List<Integer> voiceWaveform;
     /** A voice note's waveform (empty when it came without one), or null when the audio isn't a voice note. */
-    public List<Integer> voiceWaveform() { return voiceWaveform; }
-    public void setVoiceWaveform(List<Integer> waveform) { this.voiceWaveform = waveform == null ? null : List.copyOf(waveform); }
+    public @Nullable List<Integer> voiceWaveform() { return voiceWaveform; }
+    public void setVoiceWaveform(@Nullable List<Integer> waveform) { this.voiceWaveform = waveform == null ? null : List.copyOf(waveform); }
 
-    public String fileName() { return fileName; }
-    public void setFileName(String fileName) { this.fileName = fileName; }
+    public @Nullable String fileName() { return fileName; }
+    public void setFileName(@Nullable String fileName) { this.fileName = fileName; }
     /** MIME type of the media (e.g. {@code image/webp}), or null when unknown. */
-    public String mimeType() { return mimeType; }
-    public void setMimeType(String mimeType) { this.mimeType = mimeType; }
+    public @Nullable String mimeType() { return mimeType; }
+    public void setMimeType(@Nullable String mimeType) { this.mimeType = mimeType; }
     public long fileSize() { return fileSize; }
     public void setFileSize(long fileSize) { this.fileSize = fileSize; }
     public int width() { return width; }
@@ -122,8 +123,8 @@ public final class Message {
         this.width = w;
         this.height = h;
     }
-    public String replyToId() { return replyToId; }
-    public void setReplyToId(String replyToId) { this.replyToId = replyToId; }
+    public @Nullable String replyToId() { return replyToId; }
+    public void setReplyToId(@Nullable String replyToId) { this.replyToId = replyToId; }
     public boolean edited() { return edited; }
     public void setEdited(boolean edited) { this.edited = edited; }
     public boolean deleted() { return deleted; }
@@ -217,20 +218,20 @@ public final class Message {
         return reactionNames.getOrDefault(key, I18n.t("message.customEmoji"));
     }
 
-    public static boolean isCustomReaction(String key) { return key != null && key.startsWith("mxc://"); }
+    public static boolean isCustomReaction(@Nullable String key) { return key != null && key.startsWith("mxc://"); }
 
-    private String html;
+    private @Nullable String html;
     private List<LinkPreview> linkPreviews = List.of();
-    private String htmlText;
+    private @Nullable String htmlText;
     /** The message as HTML, when it came so ({@code ui.HtmlView} draws it); {@link #body()} remains its plain text. */
-    public String html() { return html; }
-    public void setHtml(String html) { this.html = html; }
+    public @Nullable String html() { return html; }
+    public void setHtml(@Nullable String html) { this.html = html; }
     /** The link previews its bridge sent, each a card under the message. */
     public List<LinkPreview> linkPreviews() { return linkPreviews; }
     public void setLinkPreviews(List<LinkPreview> linkPreviews) { this.linkPreviews = List.copyOf(linkPreviews); }
     /** In words, what the HTML shows that the body doesn't say (an embed); null if nothing. */
-    public String htmlText() { return htmlText; }
-    public void setHtmlText(String htmlText) { this.htmlText = htmlText; }
+    public @Nullable String htmlText() { return htmlText; }
+    public void setHtmlText(@Nullable String htmlText) { this.htmlText = htmlText; }
 
     public boolean isMedia() {
         return type == MessageType.IMAGE || type == MessageType.VIDEO || type == MessageType.AUDIO

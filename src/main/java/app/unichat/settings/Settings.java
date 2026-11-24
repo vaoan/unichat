@@ -4,6 +4,7 @@ import app.unichat.support.BackgroundWriter;
 import app.unichat.support.Os;
 import app.unichat.support.SafeFile;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -243,29 +244,32 @@ public final class Settings {
 
     public synchronized String getString(String key, String def) { return holder(key).getProperty(key, def); }
 
-    public synchronized void set(String key, String value) {
+    /** The stored value, or null when there's none. */
+    public synchronized @Nullable String getString(String key) { return holder(key).getProperty(key); }
+
+    public synchronized void set(String key, @Nullable String value) {
         if (value == null) holder(key).remove(key);
         else holder(key).setProperty(key, value);
         save();
         changed(key);
     }
 
-    private final java.util.List<java.util.function.Consumer<String>> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final java.util.List<java.util.function.Consumer<@Nullable String>> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     /**
      * Told each key that changes, or null when many may have (settings from the cloud). Called with this object's lock
      * held: a listener only schedules its work, never waits on another lock.
      */
-    public void addListener(java.util.function.Consumer<String> l) { listeners.add(l); }
+    public void addListener(java.util.function.Consumer<@Nullable String> l) { listeners.add(l); }
 
-    public void removeListener(java.util.function.Consumer<String> l) { listeners.remove(l); }
+    public void removeListener(java.util.function.Consumer<@Nullable String> l) { listeners.remove(l); }
 
-    private void changed(String key) {
-        for (java.util.function.Consumer<String> l : listeners) l.accept(key);
+    private void changed(@Nullable String key) {
+        for (java.util.function.Consumer<@Nullable String> l : listeners) l.accept(key);
     }
 
     public boolean getBool(String key, boolean def) {
-        String v = getString(key, null);
+        String v = getString(key);
         return v == null ? def : Boolean.parseBoolean(v);
     }
 
@@ -274,7 +278,7 @@ public final class Settings {
     /** A number of at least {@code min}; {@code def} when missing or not a number. */
     public int getInt(String key, int def, int min) {
         try {
-            String v = getString(key, null);
+            String v = getString(key);
             return v == null ? def : Math.max(min, Integer.parseInt(v.strip()));
         } catch (NumberFormatException e) {
             return def;
@@ -310,7 +314,7 @@ public final class Settings {
 
     public double getDouble(String key, double def) {
         try {
-            String v = getString(key, null);
+            String v = getString(key);
             return v == null ? def : Double.parseDouble(v);
         } catch (NumberFormatException e) {
             return def;
@@ -319,14 +323,14 @@ public final class Settings {
 
     // --- Session ---
     /** "matrix" or "demo"; null when not logged in. */
-    public String backend() { return getString("session.backend", null); }
-    public void setBackend(String backend) { set("session.backend", backend); }
-    public String homeserver() { return getString("matrix.homeserver", null); }
-    public String userId() { return getString("matrix.userId", null); }
-    public String accessToken() { return getString("matrix.accessToken", null); }
-    public String deviceId() { return getString("matrix.deviceId", null); }
+    public @Nullable String backend() { return getString("session.backend"); }
+    public void setBackend(@Nullable String backend) { set("session.backend", backend); }
+    public @Nullable String homeserver() { return getString("matrix.homeserver"); }
+    public @Nullable String userId() { return getString("matrix.userId"); }
+    public @Nullable String accessToken() { return getString("matrix.accessToken"); }
+    public @Nullable String deviceId() { return getString("matrix.deviceId"); }
 
-    public synchronized void setMatrixSession(String homeserver, String userId, String accessToken, String deviceId) {
+    public synchronized void setMatrixSession(String homeserver, String userId, String accessToken, @Nullable String deviceId) {
         machine.setProperty("matrix.homeserver", homeserver);
         machine.setProperty("matrix.userId", userId);
         machine.setProperty("matrix.accessToken", accessToken);
@@ -436,8 +440,8 @@ public final class Settings {
     public void setSendTypingNotifications(boolean v) { setBool("privacy.typing", v); }
     // --- Accounts ---
     /** User-chosen name for an account ("Trabajo"), or null. */
-    public String accountAlias(String accountId) { return getString("account.alias." + accountId, null); }
-    public void setAccountAlias(String accountId, String alias) {
+    public @Nullable String accountAlias(String accountId) { return getString("account.alias." + accountId); }
+    public void setAccountAlias(String accountId, @Nullable String alias) {
         set("account.alias." + accountId, alias == null || alias.isBlank() ? null : alias.strip());
     }
 

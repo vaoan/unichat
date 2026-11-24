@@ -1,6 +1,7 @@
 package app.unichat.model;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +27,7 @@ public final class Markup {
     private Markup() {}
 
     /** The HTML for {@code text}, or null when it has no marks (it then goes as plain text, as always). */
-    public static String html(String text) {
+    public static @Nullable String html(@Nullable String text) {
         if (text == null || text.isEmpty()) return null;
         String[] lines = text.split("\n", -1);
         List<String[]> parts = new ArrayList<>(); // {kind, html}: kind "line" or "block"

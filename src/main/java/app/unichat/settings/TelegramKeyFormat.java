@@ -1,5 +1,7 @@
 package app.unichat.settings;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * What a Telegram API key looks like (my.telegram.org): a positive number for the id, 32 hex digits for the hash. Pure;
  * {@code server.TelegramKeys} says what's wrong in words, and keys from the vault that aren't ones are never taken.
@@ -10,7 +12,7 @@ public final class TelegramKeyFormat {
 
     private TelegramKeyFormat() {}
 
-    public static boolean id(String apiId) {
+    public static boolean id(@Nullable String apiId) {
         try {
             return apiId != null && Integer.parseInt(apiId.strip()) > 0;
         } catch (NumberFormatException e) {
@@ -18,7 +20,7 @@ public final class TelegramKeyFormat {
         }
     }
 
-    public static boolean hash(String apiHash) {
+    public static boolean hash(@Nullable String apiHash) {
         return apiHash != null && apiHash.strip().matches("[0-9a-fA-F]{32}");
     }
 

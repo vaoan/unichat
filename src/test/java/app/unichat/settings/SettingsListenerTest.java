@@ -1,5 +1,6 @@
 package app.unichat.settings;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -16,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /** Whoever follows a setting hears it change, whether it changed here or came from the cloud. */
 class SettingsListenerTest {
     @TempDir Path dir;
-    private Settings s;
+    private @Nullable Settings s;
 
     @AfterEach
     void writesEnd() {
@@ -26,8 +27,8 @@ class SettingsListenerTest {
     @Test
     void aChangedKeyIsTold() {
         s = new Settings(dir);
-        List<String> heard = new ArrayList<>();
-        Consumer<String> l = heard::add;
+        List<@Nullable String> heard = new ArrayList<>();
+        Consumer<@Nullable String> l = heard::add;
         s.addListener(l);
         s.setNotifyArchived(true);
         s.removeListener(l);
@@ -38,7 +39,7 @@ class SettingsListenerTest {
     @Test
     void settingsFromTheCloudAreToldAsEverything() {
         s = new Settings(dir);
-        List<String> heard = new ArrayList<>();
+        List<@Nullable String> heard = new ArrayList<>();
         s.addListener(heard::add);
         s.replacePortable(Map.of(Settings.NOTIFY_ARCHIVED, "true"), k -> false);
         assertEquals(Arrays.asList((String) null), heard, "null: any key may have changed");

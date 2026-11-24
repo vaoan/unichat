@@ -1,6 +1,7 @@
 package app.unichat.model;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Locale;
 
@@ -23,11 +24,11 @@ public enum Network {
 
     private final String displayName;
     private final String color;
-    private final String botLocalpart;
-    private final String puppetPrefix;
+    private final @Nullable String botLocalpart;
+    private final @Nullable String puppetPrefix;
     private final String protocolId;
 
-    Network(String displayName, String color, String botLocalpart, String puppetPrefix, String protocolId) {
+    Network(String displayName, String color, @Nullable String botLocalpart, @Nullable String puppetPrefix, String protocolId) {
         this.displayName = displayName;
         this.color = color;
         this.botLocalpart = botLocalpart;
@@ -39,9 +40,9 @@ public enum Network {
     /** Brand color as a CSS hex string. */
     public String color() { return color; }
     /** Localpart of the bridge bot (e.g. {@code whatsappbot}); null for native Matrix. */
-    public String botLocalpart() { return botLocalpart; }
+    public @Nullable String botLocalpart() { return botLocalpart; }
     /** Localpart prefix of puppeted remote users (e.g. {@code whatsapp_}); null for native Matrix. */
-    public String puppetPrefix() { return puppetPrefix; }
+    public @Nullable String puppetPrefix() { return puppetPrefix; }
     /** Protocol id used in {@code m.bridge} state events. */
     public String protocolId() { return protocolId; }
     public boolean isBridged() { return botLocalpart != null; }
@@ -50,7 +51,7 @@ public enum Network {
     public String badgeLetter() { return displayName.substring(0, 1).toUpperCase(Locale.ROOT); }
 
     @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a bridge's protocol id, lowered (a Kelvin sign becomes k, so a look-alike may match one of ours) and looked up among our own: what comes out is always one of our networks, and only labels the account")
-    public static Network fromProtocolId(String id) {
+    public static @Nullable Network fromProtocolId(@Nullable String id) {
         if (id == null) return null;
         String p = id.toLowerCase(Locale.ROOT);
         for (Network n : values()) if (n.protocolId.equals(p)) return n;
@@ -63,11 +64,11 @@ public enum Network {
     }
 
     /** Guesses the network from a Matrix user id like {@code @whatsapp_5730000:example.org}. */
-    public static Network fromUserId(String userId) {
+    public static @Nullable Network fromUserId(@Nullable String userId) {
         if (userId == null || !userId.startsWith("@")) return null;
         String local = userId.substring(1, userId.indexOf(':') > 0 ? userId.indexOf(':') : userId.length());
         for (Network n : values()) {
-            if (!n.isBridged()) continue;
+            if (n.botLocalpart == null || n.puppetPrefix == null) continue; // not bridged: both null together
             if (local.equals(n.botLocalpart) || local.startsWith(n.puppetPrefix)) return n;
         }
         return null;

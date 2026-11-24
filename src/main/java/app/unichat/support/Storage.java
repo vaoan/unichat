@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,7 +37,7 @@ public final class Storage {
     private volatile long free = Long.MAX_VALUE;
     private final Map<String, Long> failedAt = new ConcurrentHashMap<>();
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
-    private ScheduledExecutorService timer;
+    private @Nullable ScheduledExecutorService timer;
 
     /**
      * Measures with {@code measure} until {@link #watch} gives it a folder.

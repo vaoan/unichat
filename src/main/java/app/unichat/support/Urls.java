@@ -1,6 +1,7 @@
 package app.unichat.support;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -39,7 +40,7 @@ public final class Urls {
     private static final java.util.regex.Pattern ADDRESSES = java.util.regex.Pattern.compile(ADDRESS);
 
     /** The web addresses in {@code text}, in order; none for null. */
-    public static java.util.List<String> in(String text) {
+    public static java.util.List<String> in(@Nullable String text) {
         if (text == null) return java.util.List.of();
         return ADDRESSES.matcher(text).results().map(java.util.regex.MatchResult::group).toList();
     }

@@ -67,11 +67,11 @@ class SettingsValuesTest {
         s.addToSet("k", "b");
         s.addToSet("k", "a");
         s.addToSet("k", "b");
-        assertEquals("b,a", s.getString("k", null));
+        assertEquals("b,a", s.getString("k"));
         assertEquals(List.of("b", "a"), List.copyOf(s.getSet("k")));
         s.removeFromSet("k", "b");
         s.removeFromSet("k", "a");
-        assertNull(s.getString("k", null));
+        assertNull(s.getString("k"));
     }
 
     @Test

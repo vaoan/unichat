@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,7 +14,7 @@ public final class BundledTools {
      * {@code name} (".exe" added on Windows): {@code -D<property>} (development), the copy inside the app at
      * {@code app/server/<subdir>}, or one on the PATH; null when there's none.
      */
-    public static Path find(String property, String subdir, String name) {
+    public static @Nullable Path find(String property, @Nullable String subdir, String name) {
         String exe = Os.windows() ? name + ".exe" : name;
         String o = System.getProperty(property);
         if (o != null) return Files.isExecutable(Path.of(o)) ? Path.of(o) : null;
@@ -24,7 +26,7 @@ public final class BundledTools {
      * Where a file shipped under {@code app/server/} is (Unichat.app/Contents/app/server on macOS, Unichat\\app\\server
      * on Windows), whether or not it's there; null when this isn't a packaged app.
      */
-    public static Path appFile(String relative) {
+    public static @Nullable Path appFile(String relative) {
         String launcher = System.getProperty("jpackage.app-path");
         if (launcher == null) return null;
         Path l = Path.of(launcher);
@@ -33,7 +35,7 @@ public final class BundledTools {
     }
 
     /** {@code exe} (exact file name) in a PATH folder, or null. */
-    public static Path onPath(String exe) {
+    public static @Nullable Path onPath(String exe) {
         for (String d : System.getenv().getOrDefault("PATH", "").split(File.pathSeparator)) {
             if (d.isBlank()) continue;
             Path f = Path.of(d, exe);

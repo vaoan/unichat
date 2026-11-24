@@ -122,6 +122,12 @@
       <artifactId>sqlite-jdbc</artifactId>
       <version>3.46.1.3</version>
     </dependency>
+    <dependency>
+      <!-- @NullMarked and @Nullable, which NullAway reads (the annotations only, no code). -->
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+      <version>1.0.1</version>
+    </dependency>
     <!-- Pure-Java H.264/MP4 encoder: animated stickers sent to WhatsApp as GIF or video (BSD-2). -->
     <dependency>
       <groupId>org.jcodec</groupId>
@@ -200,6 +206,10 @@
            turned off only with -Xlint:-name and the reason beside it. -->
       <!-- Error Prone runs inside javac on main and test code; -Werror makes its warnings errors too (.mvn/jvm.config
            opens javac to it). Besides its defaults, checks that are off by default and catch real defects are on.
+           NullAway (on the processor path beside it) fails the build on a null that can reach a dereference, in the
+           packages whose package-info.java is @NullMarked (OnlyNullMarked: they join one by one, BuildRulesTest lists
+           them). JSpecifyMode reads @Nullable inside generics and arrays (List<@Nullable String>), which JDK 25 keeps
+           in class files; HandleTestAssertionLibraries takes JUnit's assertNotNull as the check it is.
            Off, each one noise here (BuildRulesTest wants every :OFF named in this comment):
            StringSplitter: 58 sites read, none depends on trailing empty parts (each takes the first, checks the
              length, skips blanks or reads lines); the fix needs Guava, not a dependency.
@@ -208,7 +218,9 @@
            InterruptedExceptionSwallowed: flags every JUnit test that "throws Exception" (345); its 19 main-code sites
              are parked as a follow-up, because restoring the interrupt there changes behaviour.
            AddNullMarkedToClass, FieldMissingNullable, ParameterMissingNullable, ReturnMissingNullable,
-             ReturnsNullCollection: nullness is NullAway's, Task 7 (ParameterMissingNullable also crashes 2.53.0).
+             ReturnsNullCollection: NullAway covers it. On, they found nothing in the @NullMarked packages that NullAway
+             hadn't; elsewhere they'd ask for every package at once, and AddNullMarkedToClass doesn't see a package's
+             mark (ParameterMissingNullable also crashes 2.53.0).
            Interruption: Thread.interrupt() is how workers are cancelled here (7, all meant).
            NonFinalStaticField: UI-thread caches and test seams on purpose (25); making them final is a redesign.
            SystemExitOutsideMain: Recovery's restart must exit the JVM.
@@ -234,13 +246,18 @@
             <arg>-Werror</arg>
             <arg>-XDcompilePolicy=simple</arg>
             <arg>--should-stop=ifError=FLOW</arg>
-            <arg>-Xplugin:ErrorProne -Xep:NullableOptional:ERROR -Xep:FieldCanBeFinal:ERROR -Xep:UnnecessaryDefaultInEnumSwitch:ERROR -Xep:UnusedException:ERROR -Xep:UseEnumSwitch:ERROR -Xep:DefaultLocale:ERROR -Xep:EqualsBrokenForNull:ERROR -Xep:TimeUnitMismatch:ERROR -Xep:PrimitiveArrayPassedToVarargsMethod:ERROR -Xep:ComparisonContractViolated:ERROR -Xep:TransientMisuse:ERROR -Xep:VoidUsed:ERROR -Xep:AssertFalse:ERROR -Xep:TypeToString:ERROR -Xep:IterablePathParameter:ERROR -Xep:FunctionalInterfaceClash:ERROR -Xep:LongLiteralLowerCaseSuffix:ERROR -Xep:DepAnn:ERROR -Xep:StringSplitter:OFF -Xep:ReferenceEquality:OFF</arg>
+            <arg>-Xplugin:ErrorProne -Xep:NullableOptional:ERROR -Xep:FieldCanBeFinal:ERROR -Xep:UnnecessaryDefaultInEnumSwitch:ERROR -Xep:UnusedException:ERROR -Xep:UseEnumSwitch:ERROR -Xep:DefaultLocale:ERROR -Xep:EqualsBrokenForNull:ERROR -Xep:TimeUnitMismatch:ERROR -Xep:PrimitiveArrayPassedToVarargsMethod:ERROR -Xep:ComparisonContractViolated:ERROR -Xep:TransientMisuse:ERROR -Xep:VoidUsed:ERROR -Xep:AssertFalse:ERROR -Xep:TypeToString:ERROR -Xep:IterablePathParameter:ERROR -Xep:FunctionalInterfaceClash:ERROR -Xep:LongLiteralLowerCaseSuffix:ERROR -Xep:DepAnn:ERROR -Xep:StringSplitter:OFF -Xep:ReferenceEquality:OFF -Xep:NullAway:ERROR -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:HandleTestAssertionLibraries=true</arg>
           </compilerArgs>
           <annotationProcessorPaths>
             <path>
               <groupId>com.google.errorprone</groupId>
               <artifactId>error_prone_core</artifactId>
               <version>2.53.0</version>
+            </path>
+            <path>
+              <groupId>com.uber.nullaway</groupId>
+              <artifactId>nullaway</artifactId>
+              <version>0.14.4</version>
             </path>
           </annotationProcessorPaths>
         </configuration>

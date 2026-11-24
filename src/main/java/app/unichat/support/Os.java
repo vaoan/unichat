@@ -1,5 +1,7 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Locale;
 
 /** Which operating system this runs on. */
@@ -14,7 +16,7 @@ public final class Os {
      * The download for this computer among those a tool has: Apple-chip Macs, Intel Macs, 64-bit Windows (null where
      * there's none); null for any other computer.
      */
-    public static <T> T pick(T appleChip, T intelMac, T windows64) {
+    public static <T extends @Nullable Object> @Nullable T pick(T appleChip, T intelMac, T windows64) {
         String arch = System.getProperty("os.arch", "");
         boolean arm = arch.equals("aarch64") || arch.equals("arm64");
         boolean x64 = arch.equals("amd64") || arch.equals("x86_64");

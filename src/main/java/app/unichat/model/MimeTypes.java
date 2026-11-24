@@ -1,6 +1,7 @@
 package app.unichat.model;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -42,7 +43,7 @@ public final class MimeTypes {
 
     /** The extension for a type, whatever parameters it carries ({@code audio/ogg; codecs=opus}); "" when unknown. */
     @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a message's MIME type, lowered (a Kelvin sign becomes k, so a look-alike may match one of ours) and looked up in our own table: what comes out is always one of our extensions, which only names the saved file")
-    public static String extension(String mimeType) {
+    public static String extension(@Nullable String mimeType) {
         if (mimeType == null) return "";
         int parameters = mimeType.indexOf(';');
         String type = (parameters < 0 ? mimeType : mimeType.substring(0, parameters)).strip().toLowerCase(Locale.ROOT);
@@ -50,7 +51,7 @@ public final class MimeTypes {
     }
 
     /** The type a file's name says it is, whatever its case; null when the extension is unknown or missing. */
-    public static String ofFileName(String name) {
+    public static @Nullable String ofFileName(@Nullable String name) {
         if (name == null) return null;
         int dot = name.lastIndexOf('.');
         if (dot < 0) return null;

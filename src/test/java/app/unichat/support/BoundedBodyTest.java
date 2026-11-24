@@ -1,5 +1,6 @@
 package app.unichat.support;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -63,7 +64,7 @@ class BoundedBodyTest {
     }
 
     /** What a read gets when the deadline comes while it waits; the stream then throws {@code thrown} or, if null, gives a byte. */
-    private static IOException whileReading(IOException thrown) throws IOException, InterruptedException {
+    private static IOException whileReading(@Nullable IOException thrown) throws IOException, InterruptedException {
         CountDownLatch hold = new CountDownLatch(1);
         CountDownLatch timerHeld = new CountDownLatch(1);
         // Its deadline at once: the timer thread runs its close and stays there until hold.
@@ -99,11 +100,11 @@ class BoundedBodyTest {
     /** A stream whose read waits until it's closed, then throws {@code thrown} or gives a byte. */
     private static final class Gate extends InputStream {
         private final CountDownLatch closed;
-        private final IOException thrown;
+        private final @Nullable IOException thrown;
         private Runnable onRead = () -> { };
         private int reads;
 
-        Gate(CountDownLatch closed, IOException thrown) {
+        Gate(CountDownLatch closed, @Nullable IOException thrown) {
             this.closed = closed;
             this.thrown = thrown;
         }

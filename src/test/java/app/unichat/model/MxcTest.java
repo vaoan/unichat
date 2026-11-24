@@ -3,6 +3,7 @@ package app.unichat.model;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -10,6 +11,7 @@ class MxcTest {
     @Test
     void readsTheServerAndTheMediaId() {
         Mxc m = Mxc.parse("mxc://localhost:8448/AbC-12_x");
+        assertNotNull(m);
         assertEquals("localhost:8448", m.server());
         assertEquals("AbC-12_x", m.mediaId());
         assertEquals("mxc://localhost:8448/AbC-12_x", m.toString());
@@ -24,6 +26,7 @@ class MxcTest {
     }
 
     @Test
+    @SuppressWarnings("NullAway") // a null part on purpose: the record refuses it
     void cannotBeBuiltFromBadParts() {
         assertThrows(IllegalArgumentException.class, () -> new Mxc("", "id"));
         assertThrows(IllegalArgumentException.class, () -> new Mxc("s", "a/b"));

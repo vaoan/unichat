@@ -1,5 +1,6 @@
 package app.unichat.model;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -118,7 +119,7 @@ class MediaLibraryTest {
         assertEquals(1, new MediaLibrary(f).favorites(MediaLibrary.Kind.STICKER).size());
     }
 
-    private static MediaLibrary.Item telegram(String url, String id, int size) {
+    private static MediaLibrary.Item telegram(String url, @Nullable String id, int size) {
         var info = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("size", size);
         if (id != null) info.putObject("fi.mau.bridged_sticker").put("network", "telegram").put("id", id);
         return new MediaLibrary.Item(MediaLibrary.Kind.STICKER, url, "image/webp", 256, 256, info);
