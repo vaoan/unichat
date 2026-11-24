@@ -124,7 +124,7 @@ class FoldersServiceTest {
             assertTrue(warning.contains("no se guardará"), warning);
             assertFalse(warning.contains("Se guardó aparte"), warning);
         } finally {
-            locked.toFile().setWritable(true);
+            assertTrue(locked.toFile().setWritable(true), "writable again, so the temp folder can be deleted");
         }
     }
 }

@@ -123,7 +123,7 @@ class SettingsSplitTest {
             });
             assertEquals(before, read("settings.properties"));
         } finally {
-            dir.toFile().setWritable(true);
+            assertTrue(dir.toFile().setWritable(true), "writable again, so the temp folder can be deleted");
         }
     }
 
