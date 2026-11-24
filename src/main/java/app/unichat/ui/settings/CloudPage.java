@@ -51,14 +51,15 @@ public final class CloudPage {
 
     static Node build(Consumer<String> toast) {
         Label intro = Labels.help(I18n.t("settings.cloud.intro"));
-        Cloud shown = cloud; // the session's when the window is built
-        if (shown == null) return page(I18n.t("settings.nav.cloud"), intro, Labels.help(I18n.t("settings.cloud.unavailable")));
+        if (cloud == null) return page(I18n.t("settings.nav.cloud"), intro, Labels.help(I18n.t("settings.cloud.unavailable")));
         VBox account = new VBox();
         Runnable[] redraw = {null};
         redraw[0] = () -> {
+            Cloud now = cloud; // the session's now: the page may outlive the one it was built in
+            if (now == null) return;
             CloudAccount saved = CloudAccount.saved();
-            if (saved == null) account.getChildren().setAll(connectForm(shown, toast, redraw[0]));
-            else account.getChildren().setAll(new VBox(16, connected(shown, saved, redraw[0]), VaultPage.build(shown)));
+            if (saved == null) account.getChildren().setAll(connectForm(toast, redraw[0]));
+            else account.getChildren().setAll(new VBox(16, connected(now, saved, redraw[0]), VaultPage.build(now)));
         };
         redraw[0].run();
         return page(I18n.t("settings.nav.cloud"), intro, account,
@@ -73,7 +74,7 @@ public final class CloudPage {
      * Which service. pCloud: "Conectar con pCloud" signs in in the browser (works with two-step verification); the rest:
      * address (typed only for "Otro"), login and password or key, tried by "Conectar".
      */
-    private static Node connectForm(Cloud c, Consumer<String> toast, Runnable redraw) {
+    private static Node connectForm(Consumer<String> toast, Runnable redraw) {
         Service[] chosen = {Service.PCLOUD};
         Label status = Labels.help("");
         Nodes.show(status, false);
@@ -86,7 +87,8 @@ public final class CloudPage {
                 }
                 ok.save();
                 toast.accept(I18n.t("settings.cloud.connected", I18n.t("settings.cloud.service." + ok.service().name())));
-                var _ = c.syncNow();
+                Cloud now = cloud; // the session's when it connected
+                if (now != null) { var _ = now.syncNow(); }
                 redraw.run();
             }));
         };

@@ -500,18 +500,45 @@ class BuildRulesTest {
     }
 
     /** Null checks that stay on: SpotBugs' second look at a {@code @Nullable} value dereferenced, beside NullAway's. */
-    private static final List<String> NULL_PATTERNS_KEPT = List.of("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE");
+    private static final String NULL_PATTERN_KEPT = "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE";
 
     @Test
     void spotBugsNullChecksAreNeverLeftOut() {
         for (Element m : elements(read("spotbugs-exclude.xml").getDocumentElement(), "Match")) {
-            for (Element bug : elements(m, "Bug")) {
-                for (String pattern : bug.getAttribute("pattern").split(",")) {
-                    assertFalse(NULL_PATTERNS_KEPT.contains(pattern.strip()), pattern + " stays on: a getter read twice goes through a"
-                            + " local (.claude/rules/nullness.md), never a pattern left out");
-                }
-            }
+            for (Element bug : elements(m, "Bug")) assertFalse(leavesOutTheNullCheck(bug), NULL_PATTERN_KEPT + " stays on: a getter"
+                    + " read twice goes through a local (.claude/rules/nullness.md), never a pattern, its code or category left out");
         }
+    }
+
+    /** Whether a filter's {@code <Bug>} takes the null check out, by any of the ways SpotBugs reads one. */
+    static boolean leavesOutTheNullCheck(Element bug) {
+        String pattern = bug.getAttribute("pattern").strip();
+        boolean byPattern = pattern.startsWith("~") ? java.util.regex.Pattern.matches(pattern.substring(1), NULL_PATTERN_KEPT)
+                : List.of(pattern.split("\\s*,\\s*")).contains(NULL_PATTERN_KEPT);
+        boolean byCode = List.of(bug.getAttribute("code").strip().split("\\s*,\\s*")).contains("NP");
+        boolean byCategory = List.of(bug.getAttribute("category").strip().split("\\s*,\\s*")).contains("CORRECTNESS");
+        return byPattern || byCode || byCategory;
+    }
+
+    @Test
+    void everyWayBackOfTheNullCheckIsSeen() throws javax.xml.parsers.ParserConfigurationException {
+        String kept = NULL_PATTERN_KEPT;
+        for (String[] bug : List.of(new String[] {"pattern", kept}, new String[] {"pattern", "DM_GC, " + kept},
+                new String[] {"pattern", "~NP_.*"}, new String[] {"code", "NP"}, new String[] {"code", "DMI,NP"},
+                new String[] {"category", "CORRECTNESS"})) {
+            assertTrue(leavesOutTheNullCheck(bugOf(bug[0], bug[1])), bug[0] + "=" + bug[1]);
+        }
+        for (String[] bug : List.of(new String[] {"pattern", "DM_GC"}, new String[] {"pattern", "~DLS_.*"},
+                new String[] {"code", "NPM"}, new String[] {"category", "STYLE"})) {
+            assertFalse(leavesOutTheNullCheck(bugOf(bug[0], bug[1])), bug[0] + "=" + bug[1]);
+        }
+    }
+
+    /** A filter's {@code <Bug>} with one attribute, made in memory. */
+    private static Element bugOf(String attribute, String value) throws javax.xml.parsers.ParserConfigurationException {
+        Element bug = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument().createElement("Bug");
+        bug.setAttribute(attribute, value);
+        return bug;
     }
 
     @Test

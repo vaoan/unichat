@@ -118,7 +118,6 @@ public final class ThreadPane extends BorderPane {
         media = new MessageMedia(svc, openLink, toast, library, this::getScene, audio);
         messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, library, this::getScene, this::member,
                 this::jumpTo);
-
         favButton = Icons.iconButton(Icons.STAR, I18n.t("thread.favorite"), () -> {
             Chat c = chat; // the header's buttons show only with a chat open
             if (c != null) { var _ = svc.setFavorite(c.id(), !c.favorite()); }
@@ -169,7 +168,8 @@ public final class ThreadPane extends BorderPane {
             if (savedTextSheet != null) savedTextSheet.show(app.unichat.autosave.AutoSave.of(svc).said(m));
         });
         scroll = new TimelineScroll(list, rows, this, () -> chat != null, this::loadOlder);
-        Node top = buildHeader();
+        headerButtons = headerButtons();
+        header = buildHeader(headerButtons);
         messageRows = new MessageRowView(svc, media, messageActions, openLink, () -> chat, this::member, scroll::jumpTo);
         redrawOnTranscriptProgress();
         StackPane.setAlignment(scroll.indicator(), Pos.BOTTOM_RIGHT);
@@ -179,7 +179,7 @@ public final class ThreadPane extends BorderPane {
         typing.getStyleClass().add("typing-line");
         VBox bottom = new VBox(typing, composer);
 
-        content.setTop(new VBox(top, selection.ends(), pinnedBar.node()));
+        content.setTop(new VBox(header, selection.ends(), pinnedBar.node()));
         content.setCenter(timeline);
         content.setBottom(bottom);
 
@@ -207,12 +207,10 @@ public final class ThreadPane extends BorderPane {
         });
     }
 
-    @SuppressWarnings("NullAway.Init") // buildHeader(), which the constructor calls, makes it
-    private HBox header;
-    @SuppressWarnings("NullAway.Init") // buildHeader(), which the constructor calls, makes it
-    private HBox headerButtons;
+    private final HBox header;
+    private final HBox headerButtons;
 
-    private Node buildHeader() {
+    private HBox buildHeader(HBox buttons) {
         headerTitle.getStyleClass().add("thread-title");
         headerSubtitle.getStyleClass().add("thread-subtitle");
         serverLink.getStyleClass().add("thread-server");
@@ -229,6 +227,15 @@ public final class ThreadPane extends BorderPane {
         titles.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(titles, Priority.ALWAYS);
         titles.setMinWidth(0);
+        HBox row = new HBox(10, headerAvatar, titles, buttons);
+        row.getStyleClass().add("thread-header");
+        row.setAlignment(Pos.CENTER_LEFT);
+        titles.setOnMouseClicked(e -> toggleInfo.run());
+        return row;
+    }
+
+    /** The header's buttons: following, favourite, archive, the info panel and the chat's menu. */
+    private HBox headerButtons() {
         infoButton.setGraphic(Icons.icon(Icons.INFO, 18));
         infoButton.getStyleClass().add("icon-button");
         infoButton.setTooltip(new javafx.scene.control.Tooltip(I18n.t("thread.chatInfo")));
@@ -239,13 +246,9 @@ public final class ThreadPane extends BorderPane {
             Chat c = chat;
             if (c != null) ChatMenus.forChat(c, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4);
         });
-        headerButtons = new HBox(10, scroll.following(), favButton, archiveButton, infoButton, more);
-        headerButtons.setAlignment(Pos.CENTER_LEFT);
-        header = new HBox(10, headerAvatar, titles, headerButtons);
-        header.getStyleClass().add("thread-header");
-        header.setAlignment(Pos.CENTER_LEFT);
-        titles.setOnMouseClicked(e -> toggleInfo.run());
-        return header;
+        HBox buttons = new HBox(10, scroll.following(), favButton, archiveButton, infoButton, more);
+        buttons.setAlignment(Pos.CENTER_LEFT);
+        return buttons;
     }
 
     private void configureTimeline() {

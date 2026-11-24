@@ -141,6 +141,7 @@ class AutoSaveTest {
         // The texts thread writes into the temp folder (texts/, the chat's readable copy) after a round has ended: done
         // before JUnit deletes the folder, or that failed now and then ("Failed to delete temp directory").
         for (AutoSave a : made) { // a test may have started it again (closed and opened): each has its own threads
+            a.stopExploring(chat.id()); // a test that failed mid-explore ends now, not at JUnit's limit
             CountDownLatch saving = new CountDownLatch(1);
             a.afterPending(saving::countDown); // the round may hand the texts thread more
             saving.await();
