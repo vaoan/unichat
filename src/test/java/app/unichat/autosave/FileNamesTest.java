@@ -1,5 +1,6 @@
 package app.unichat.autosave;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -29,6 +30,7 @@ class FileNamesTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void aFolderUnderHomeReadsFromTilde() {
         Path home = Path.of(System.getProperty("user.home"));
         assertEquals("~" + java.io.File.separator + "Downloads" + java.io.File.separator + "Unichat",

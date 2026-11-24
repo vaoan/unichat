@@ -4,6 +4,7 @@ import app.unichat.model.Network;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
@@ -55,6 +56,7 @@ class ChromeLoginTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void chromeIsNeverToldItsAutomatedAndKeepsItsOwnIdentityForGoogle() {
         List<String> c = ChromeLogin.command(Path.of("/x/chrome"), Path.of("/p"), 9333, false);
         assertTrue(c.contains("--remote-debugging-port=9333"), "port 0 turns navigator.webdriver on");
@@ -95,6 +97,7 @@ class ChromeLoginTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void aGuestSessionIsNotASession() {
         ChromeLogin login = new ChromeLogin(Network.LINKEDIN, params("https://www.linkedin.com/login"), Path.of("/x"), dir);
         String feed = "https://www.linkedin.com/feed/";
@@ -110,6 +113,7 @@ class ChromeLoginTest {
         assertTrue(ChromeLogin.MAX_WAIT.compareTo(Duration.ofMinutes(5)) <= 0, ChromeLogin.MAX_WAIT.toString());
     }
 
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     private ChromeLogin waiting(Duration maxWait) {
         return new ChromeLogin(Network.LINKEDIN, params("https://www.linkedin.com/login"), Path.of("/x"), dir, true, maxWait, NO_LIMIT);
     }

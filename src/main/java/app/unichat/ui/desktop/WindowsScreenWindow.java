@@ -206,19 +206,30 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
     @Structure.FieldOrder({"cbSize", "style", "lpfnWndProc", "cbClsExtra", "cbWndExtra", "hInstance", "hIcon",
         "hCursor", "hbrBackground", "lpszMenuName", "lpszClassName", "hIconSm"})
     @SuppressWarnings("PMD.PublicMemberInNonPublicType") // JNA reads a Structure's public fields, by reflection
-    @SuppressFBWarnings(value = {"URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD", "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD"}, justification = "a JNA structure: Windows reads its fields; a JNA structure: every field of WNDCLASSEXW is laid out, used or not")
     public static final class WndClassEx extends Structure {
+        @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD", justification = "set here, read by Windows from the JNA structure")
         public int cbSize;
+        @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
         public int style;
+        @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD", justification = "set here, read by Windows from the JNA structure")
         public WindowProc lpfnWndProc;
+        @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
         public int cbClsExtra;
+        @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
         public int cbWndExtra;
+        @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD", justification = "set here, read by Windows from the JNA structure")
         public Pointer hInstance;
+        @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
         public Pointer hIcon;
+        @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
         public Pointer hCursor;
+        @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
         public Pointer hbrBackground;
+        @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
         public WString lpszMenuName;
+        @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD", justification = "set here, read by Windows from the JNA structure")
         public WString lpszClassName;
+        @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
         public Pointer hIconSm;
     }
 

@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -133,6 +134,7 @@ class BridgeConfigTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void homeserverConfigIsLocalOnlyWithTokenRegistration() {
         String toml = HomeserverConfig.toml(Path.of("/srv/u"), 8008, "localhost", "tok\"en");
         assertTrue(toml.contains("server_name = \"localhost\""));
@@ -205,6 +207,7 @@ class BridgeConfigTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void bridgesReportTheirStateToUnichat() throws Exception {
         BridgeConfig.Settings with = new BridgeConfig.Settings("whatsapp", 29318, "localhost", "@yo:localhost",
                 "http://127.0.0.1:8008", Path.of("/data/whatsapp"), "dp", null, null, "http://127.0.0.1:5000/status/whatsapp");
@@ -271,6 +274,7 @@ class BridgeConfigTest {
 
     /** One place says where a bridge's database is: its config, the account check, the session keeper and the prunes read it. */
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void aBridgesDatabaseIsItsNameInItsFolder() {
         assertEquals(Path.of("/data/signal/signal.db"), BridgeConfig.database(Path.of("/data/signal"), "signal"));
     }

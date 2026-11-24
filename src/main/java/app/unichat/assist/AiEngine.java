@@ -3,6 +3,7 @@ package app.unichat.assist;
 import app.unichat.support.BundledTools;
 import app.unichat.support.Os;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -92,6 +93,7 @@ public enum AiEngine {
     }
 
     /** A Mac app opened from Finder doesn't get the shell's PATH. */
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "where Homebrew and the usual installers put the AI programs, looked in when they aren't on the PATH")
     static List<Path> usualFolders() {
         Path home = Path.of(System.getProperty("user.home"));
         if (Os.windows()) {

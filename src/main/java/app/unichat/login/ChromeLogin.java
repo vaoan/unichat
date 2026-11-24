@@ -100,6 +100,7 @@ public final class ChromeLogin {
         return null;
     }
 
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "where Chrome, Edge and Brave install on a Mac, looked in to find the person's browser")
     private static List<Path> candidates() {
         List<Path> out = new ArrayList<>();
         if (Os.windows()) {

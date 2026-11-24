@@ -3,6 +3,7 @@ package app.unichat.video;
 import app.unichat.support.Os;
 import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,7 +18,12 @@ import java.util.List;
  */
 final class PartFile {
     /** macOS's own picture tool: always there on a Mac, nothing to download. */
-    static final Path SIPS = Path.of("/usr/bin/sips");
+    static final Path SIPS = sips();
+
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "where macOS keeps its own sips, always")
+    private static Path sips() {
+        return Path.of("/usr/bin/sips");
+    }
 
     /** One way to make it: the command that writes {@code into}; null when this way isn't there (no ffmpeg). */
     @FunctionalInterface

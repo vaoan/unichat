@@ -1,6 +1,7 @@
 package app.unichat.video;
 
 import app.unichat.support.Os;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +19,7 @@ public final class GalleryDl {
     private GalleryDl() {}
 
     /** {@code -Dunichat.galleryDl} is the only one considered when set. */
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "where Homebrew and the usual installers put gallery-dl, looked in when it isn't on the PATH")
     public static Path find() {
         String forced = System.getProperty("unichat.galleryDl");
         if (forced != null) return Files.isExecutable(Path.of(forced)) ? Path.of(forced) : null;

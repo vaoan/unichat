@@ -72,6 +72,20 @@ class SuppressionsHaveReasonsTest {
     }
 
     @Test
+    void spotBugsSuppressionsSitOnOneMemberNeverAType() {
+        String ok = "@" + "SuppressFBWarnings(value = \"X\", justification = \"why\")";
+        for (String type : List.of("class A {}", "public static final class A extends B {}", "interface A {}", "enum A { B }",
+                "record A(int b) {}", "@interface A {}", "@Structure.FieldOrder({\"a\"})\n@Deprecated public final class A {}")) {
+            assertEquals(1, unexplained("A.java", ok + "\n" + type + "\n").size(), "on a type: " + type);
+        }
+        for (String member : List.of("void f() {}", "@Override\npublic int f(int a) { return a; }", "private int a;",
+                "static final Pattern P = p();", "A(String b) {}", "<T> T f(Class<T> c) { return null; }",
+                "public WString lpszClassName;")) {
+            assertEquals(List.of(), unexplained("A.java", ok + "\n" + member + "\n"), "on a member: " + member);
+        }
+    }
+
+    @Test
     void aSuppressionWithItsReasonPasses() {
         assertEquals(List.of(), unexplained("A.java", "int a = 1; // " + NOPMD + ": UnusedAssignment, read by the listener\n"));
         assertEquals(List.of(), unexplained("A.java", "@" + "SuppressWarnings(\"unchecked\") // the map holds only lists\n"));
@@ -115,7 +129,10 @@ class SuppressionsHaveReasonsTest {
         while (fb.find()) {
             int open = skipBlanks(code, fb.end());
             String inside = open < code.length() && code.charAt(open) == '(' ? text.substring(open, closing(code, open) + 1) : "";
-            if (!JUSTIFIED.matcher(inside).find()) out.add(at(name, lines, lineOf(text, fb.start())));
+            int after = inside.isEmpty() ? fb.end() : open + inside.length();
+            if (!JUSTIFIED.matcher(inside).find() || TYPE.matcher(declarationAfter(code, after)).find()) {
+                out.add(at(name, lines, lineOf(text, fb.start())));
+            }
         }
         return out;
     }
@@ -179,6 +196,24 @@ class SuppressionsHaveReasonsTest {
             else if (code.charAt(k) == ')' && --depth == 0) return k;
         }
         return code.length() - 1;
+    }
+
+    /** A type's declaration: SpotBugs' suppression goes on the one member it's about, never a whole class. */
+    private static final Pattern TYPE = Pattern.compile("(^|\\s)(class|interface|enum|record|@interface)\\s");
+
+    /** What's declared after {@code from}, past any other annotations: up to its body, its parameters or its value. */
+    private static String declarationAfter(String code, int from) {
+        int k = skipBlanks(code, from);
+        while (k < code.length() && code.charAt(k) == '@' && !code.startsWith("@interface", k)) {
+            k++;
+            while (k < code.length() && (Character.isJavaIdentifierPart(code.charAt(k)) || code.charAt(k) == '.')) k++;
+            int open = skipBlanks(code, k);
+            if (open < code.length() && code.charAt(open) == '(') k = closing(code, open) + 1;
+            k = skipBlanks(code, k);
+        }
+        int end = k;
+        while (end < code.length() && "{;=(".indexOf(code.charAt(end)) < 0) end++;
+        return " " + code.substring(k, end) + " ";
     }
 
     private static int skipBlanks(String code, int from) {

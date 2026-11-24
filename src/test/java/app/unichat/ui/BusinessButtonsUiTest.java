@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -21,6 +22,7 @@ class BusinessButtonsUiTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     void anOrderShowsItsButtonsAndANote() throws Exception {
         w = TimelineWindow.open(5);
         w.svc.receive(CHAT, m -> {

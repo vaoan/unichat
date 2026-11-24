@@ -2,6 +2,7 @@ package app.unichat.ui;
 
 import app.unichat.TestPictures;
 import app.unichat.model.MediaLibrary;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.geometry.Bounds;
 import javafx.scene.Node;
 import javafx.scene.layout.VBox;
@@ -32,6 +33,7 @@ class ReplyAlignUiTest {
     void close() throws Exception { if (w != null) w.close(); }
 
     @Test
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     void aStickerAnsweringALongerMessageSitsAtTheBubblesEdge() throws Exception {
         w = TimelineWindow.open(5);
         w.svc.receive(CHAT, "un mensaje bastante más largo que el sticker que lo va a responder");

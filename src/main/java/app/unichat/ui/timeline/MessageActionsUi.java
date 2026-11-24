@@ -19,6 +19,7 @@ import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
 import app.unichat.stt.Transcripts;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Node;
@@ -282,6 +283,7 @@ final class MessageActionsUi {
     }
 
     /** The menu's items for {@code act}, which {@code m} allows. */
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "the fixer is optional (setFixer): the item is offered only when it isn't null, and it's never set back to null")
     private List<MenuItem> itemsFor(MessageActions.Action act, Message m) {
         return switch (act) {
             case SAVE_LINK -> AutoSave.links(m).stream().limit(MENU_LINKS)

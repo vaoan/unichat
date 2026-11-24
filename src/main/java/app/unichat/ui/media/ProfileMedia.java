@@ -11,6 +11,7 @@ import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
 import app.unichat.support.I18n;
 import app.unichat.support.Urls;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -268,6 +269,7 @@ public final class ProfileMedia {
     }
 
     /** Who and when (and the name, for music), over its own player. */
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "the player is optional (setAudio): this method tests it for null before building the controls whose lambda uses it, and it's never set back to null")
     private Node audio(Message m) {
         if (audio == null || shownChat == null) return file(m);
         boolean voiceNote = m.mimeType() != null && m.mimeType().startsWith("audio/ogg");

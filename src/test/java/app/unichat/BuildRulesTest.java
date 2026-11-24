@@ -156,7 +156,8 @@ class BuildRulesTest {
         for (String property : List.of("enforcer.skip", "modernizer.skip", "maven.compiler.failOnWarning", "pmd.skip", "cpd.skip",
                 "pmd.failOnViolation", "pmd.failurePriority", "spotbugs.skip", "spotbugs.failOnError", "spotbugs.effort",
                 "spotbugs.threshold", "spotbugs.includeTests", "spotbugs.onlyAnalyze", "spotbugs.omitVisitors",
-                "spotbugs.maxAllowedViolations", "spotbugs.excludeFilterFile")) {
+                "spotbugs.maxAllowedViolations", "spotbugs.excludeFilterFile", "spotbugs.classFilesDirectory",
+                "spotbugs.testClassFilesDirectory")) {
             assertEquals(0, POM.getElementsByTagName(property).getLength(), property + " isn't set in pom.xml");
         }
     }
@@ -216,7 +217,8 @@ class BuildRulesTest {
         for (Element e : elements(child(plugin("spotbugs-maven-plugin"), "executions"), "execution")) configs.addAll(elements(e, "configuration"));
         for (Element c : configs) {
             for (String weaker : List.of("skip", "onlyAnalyze", "omitVisitors", "visitors", "includeFilterFile", "excludeBugsFile",
-                    "excludeBugsFiles", "maxRank", "failThreshold", "maxAllowedViolations", "skipEmptyReport")) {
+                    "excludeBugsFiles", "maxRank", "failThreshold", "maxAllowedViolations", "skipEmptyReport", "classFilesDirectory",
+                    "testClassFilesDirectory")) {
                 assertTrue(elements(c, weaker).isEmpty(), "no <" + weaker + ">: it would leave code, detectors or findings out");
             }
         }

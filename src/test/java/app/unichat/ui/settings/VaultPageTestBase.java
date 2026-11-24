@@ -5,6 +5,7 @@ import app.unichat.cloud.VaultFixture;
 import app.unichat.support.I18n;
 import app.unichat.ui.FxWait;
 import java.util.concurrent.ExecutionException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -83,6 +84,7 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
     }
 
     @AfterEach
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     void stop() throws Exception {
         app.unichat.support.Seen.reset(true);
         if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
@@ -94,6 +96,7 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
     }
 
     /** The section alone in a window of its own (a new one each time: the page as it's opened again). */
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     protected void page() throws InterruptedException {
         if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
         stage = FxWait.fx(() -> {
@@ -105,6 +108,7 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
         });
     }
 
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     protected Parent root() {
         return stage.getScene().getRoot();
     }

@@ -29,6 +29,7 @@ class ReplyWriterTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void theToolsAreOnlyWhatEachProgramAllowsAtTheLeast() {
         Path bin = Path.of("/x/claude");
         List<String> none = AiEngine.CLAUDE.command(bin, null, dir, dir.resolve("r"));
@@ -50,6 +51,7 @@ class ReplyWriterTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void gapsToLookUpAddWebSearchAndNothingElse() {
         Path bin = Path.of("/x/claude");
         assertFalse(String.join(" ", AiEngine.CLAUDE.command(bin, null, dir, dir.resolve("r"))).contains("Web"), "no web unless asked");
@@ -66,6 +68,7 @@ class ReplyWriterTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void permissionRulesWriteAbsolutePathsTheirWay() {
         assertEquals("//Users/ana/CV", AiEngine.claudePath(Path.of("/Users/ana/CV/")));
     }

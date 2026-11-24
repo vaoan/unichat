@@ -37,6 +37,7 @@ class WakeSyncTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     void wakingUpAsksAgainAtOnceAndConnectingLastsUntilTheAnswer() throws Exception {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.setExecutor(Executors.newCachedThreadPool());
@@ -79,6 +80,7 @@ class WakeSyncTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     void anErrorInsideTheSyncDoesNotEndIt() throws Exception {
         // After waking (2026-11-13) the heap ran out in the sync thread: it ended, and "Conectando…" stayed for good.
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);

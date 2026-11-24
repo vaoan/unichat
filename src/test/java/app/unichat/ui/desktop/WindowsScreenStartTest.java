@@ -1,5 +1,6 @@
 package app.unichat.ui.desktop;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -42,6 +43,7 @@ class WindowsScreenStartTest {
         List<Boolean> told = new CopyOnWriteArrayList<>();
         List<String> log = new CopyOnWriteArrayList<>();
         WindowsScreen screen = new WindowsScreen(new WindowsScreen.MessageWindow() {
+            @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set by open(), which WindowsScreen calls before run()")
             private WindowsScreen.Handler handler;
 
             @Override
@@ -72,6 +74,7 @@ class WindowsScreenStartTest {
     void aListenerThatThrowsDoesNotEndTheWatch() throws Exception {
         List<Boolean> told = new CopyOnWriteArrayList<>();
         WindowsScreen screen = new WindowsScreen(new WindowsScreen.MessageWindow() {
+            @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set by open(), which WindowsScreen calls before run()")
             private WindowsScreen.Handler handler;
 
             @Override
@@ -102,6 +105,7 @@ class WindowsScreenStartTest {
         List<Boolean> told = new CopyOnWriteArrayList<>();
         List<String> log = new CopyOnWriteArrayList<>();
         WindowsScreen screen = new WindowsScreen(new WindowsScreen.MessageWindow() {
+            @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set by open(), which WindowsScreen calls before run()")
             private WindowsScreen.Handler handler;
 
             @Override

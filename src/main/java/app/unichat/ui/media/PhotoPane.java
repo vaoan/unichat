@@ -5,6 +5,7 @@ import javafx.beans.property.ReadOnlyIntegerProperty;
 import javafx.beans.property.ReadOnlyIntegerWrapper;
 import javafx.geometry.Point2D;
 import javafx.scene.Cursor;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
@@ -27,6 +28,10 @@ final class PhotoPane extends Pane {
 
     /** {@code close}: a plain click beside the picture. */
     @SuppressFBWarnings(value = "FE_FLOATING_POINT_EQUALITY", justification = "whether the picture's size changed at all: the exact values JavaFX gave, compared as they are")
+    private static boolean otherSize(Image old, Image img) {
+        return old == null || old.getWidth() != img.getWidth() || old.getHeight() != img.getHeight();
+    }
+
     PhotoPane(String description, Runnable close) {
         view.setManaged(false);
         view.setAccessibleText(description);
@@ -39,7 +44,7 @@ final class PhotoPane extends Pane {
         heightProperty().addListener((o, a, b) -> change(z -> z.resize(getWidth(), getHeight())));
         // Every frame of an animation arrives here too: only another size is a new picture.
         view.imageProperty().addListener((o, old, img) -> {
-            if (img != null && (old == null || old.getWidth() != img.getWidth() || old.getHeight() != img.getHeight())) {
+            if (img != null && otherSize(old, img)) {
                 change(z -> z.setImage(img.getWidth(), img.getHeight()));
             }
         });
