@@ -19,6 +19,35 @@
     <maven.build.timestamp.format>yyyyMMdd-HHmmss-SSS</maven.build.timestamp.format>
     <!-- The headless-ui profile sets it; surefire adds the temp folder to it. -->
     <argLine></argLine>
+    <!-- JaCoCo's floors, each package's least line coverage (the jacoco-maven-plugin's comment says how they're set);
+         headless-ui raises the packages its UI tests reach further. -->
+    <jacoco.floor.app.unichat>0.10</jacoco.floor.app.unichat>
+    <jacoco.floor.app.unichat.assist>0.85</jacoco.floor.app.unichat.assist>
+    <jacoco.floor.app.unichat.autosave>0.85</jacoco.floor.app.unichat.autosave>
+    <jacoco.floor.app.unichat.bridge>0.95</jacoco.floor.app.unichat.bridge>
+    <jacoco.floor.app.unichat.cloak>0.65</jacoco.floor.app.unichat.cloak>
+    <jacoco.floor.app.unichat.cloud>0.90</jacoco.floor.app.unichat.cloud>
+    <jacoco.floor.app.unichat.gif>0.85</jacoco.floor.app.unichat.gif>
+    <jacoco.floor.app.unichat.links>0.85</jacoco.floor.app.unichat.links>
+    <jacoco.floor.app.unichat.login>0.70</jacoco.floor.app.unichat.login>
+    <jacoco.floor.app.unichat.matrix>0.80</jacoco.floor.app.unichat.matrix>
+    <jacoco.floor.app.unichat.model>0.95</jacoco.floor.app.unichat.model>
+    <jacoco.floor.app.unichat.server>0.70</jacoco.floor.app.unichat.server>
+    <jacoco.floor.app.unichat.service>0.75</jacoco.floor.app.unichat.service>
+    <jacoco.floor.app.unichat.settings>0.65</jacoco.floor.app.unichat.settings>
+    <jacoco.floor.app.unichat.stt>0.80</jacoco.floor.app.unichat.stt>
+    <jacoco.floor.app.unichat.support>0.90</jacoco.floor.app.unichat.support>
+    <jacoco.floor.app.unichat.ui>0.10</jacoco.floor.app.unichat.ui>
+    <jacoco.floor.app.unichat.ui.chats>0.10</jacoco.floor.app.unichat.ui.chats>
+    <jacoco.floor.app.unichat.ui.desktop>0.25</jacoco.floor.app.unichat.ui.desktop>
+    <jacoco.floor.app.unichat.ui.emoji>0.05</jacoco.floor.app.unichat.ui.emoji>
+    <jacoco.floor.app.unichat.ui.login>0.00</jacoco.floor.app.unichat.ui.login>
+    <jacoco.floor.app.unichat.ui.media>0.10</jacoco.floor.app.unichat.ui.media>
+    <jacoco.floor.app.unichat.ui.settings>0.00</jacoco.floor.app.unichat.ui.settings>
+    <jacoco.floor.app.unichat.ui.timeline>0.10</jacoco.floor.app.unichat.ui.timeline>
+    <jacoco.floor.app.unichat.update>0.60</jacoco.floor.app.unichat.update>
+    <jacoco.floor.app.unichat.video>0.80</jacoco.floor.app.unichat.video>
+    <jacoco.floor.app.unichat.voice>0.80</jacoco.floor.app.unichat.voice>
   </properties>
 
   <!-- InstaTray's download engine (instatray.core: sites, per-site cookies, yt-dlp/gallery-dl): the user's own library,
@@ -295,14 +324,16 @@
       <!-- JaCoCo: the agent goes on surefire's command line (@{argLine} above), the report (target/site/jacoco) is written
            on every build that runs the tests, and check fails verify when a package's line coverage falls below its floor.
            The exec file is this run's own (maven.build.timestamp): a build with -DskipTests has none, so report and check
-           skip, and never read an earlier run's numbers. Earlier runs' files in target/jacoco are never merged; clean removes them. Only app.unichat's classes are instrumented (the libraries'
-           coverage isn't ours to keep); nothing of ours is left out of the report or the check.
-           The floors: each package's line coverage measured at 067a1bd, the lower of `verify` and `verify -Pheadless-ui`
-           (the two builds CI runs; measured on macOS), rounded down to the nearest 0.05. The ui packages' floors are the
-           plain build's, which runs no UI test (ui.login and ui.settings: 0.00). To raise one: run both builds, read
-           target/site/jacoco/index.html, round down to 0.05, and write it here and in BuildRulesTest.FLOORS. Never lower
-           one without the reason in the commit. A run of part of the tests (-Dtest=…) goes to `test`, not `verify`: its
-           coverage is a part's. BuildRulesTest keeps all of this on. -->
+           skip, and never read an earlier run's numbers. Earlier runs' files in target/jacoco are never merged; clean
+           removes them. Only app.unichat's classes are instrumented (the libraries' coverage isn't ours to keep); nothing
+           of ours is left out of the report or the check.
+           The floors, the jacoco.floor.<package> properties: each package's line coverage measured at 067a1bd on macOS,
+           rounded down to the nearest 0.05. The base ones are the lower of `verify` and `verify -Pheadless-ui` (the plain
+           build runs no UI test: ui.login and ui.settings are 0.00 there); headless-ui sets its own for the packages its
+           UI tests reach further. To raise one: run that build, read target/site/jacoco/index.html, round down to 0.05,
+           and write it in the property and in BuildRulesTest's FLOORS_PLAIN or FLOORS_HEADLESS. Never lower one without
+           the reason in the commit. A run of part of the tests (-Dtest=…) goes to `test`, not `verify`: its coverage is a
+           part's. BuildRulesTest keeps all of this on. -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -333,33 +364,33 @@
               <dataFile>${project.build.directory}/jacoco/${maven.build.timestamp}.exec</dataFile>
               <haltOnFailure>true</haltOnFailure>
               <rules>
-                <rule><element>PACKAGE</element><includes><include>app.unichat</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.10</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.assist</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.85</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.autosave</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.85</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.bridge</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.95</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.cloak</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.65</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.cloud</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.90</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.gif</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.85</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.links</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.85</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.login</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.70</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.matrix</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.80</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.model</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.95</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.server</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.70</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.service</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.75</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.settings</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.65</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.stt</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.80</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.support</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.90</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.ui</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.10</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.chats</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.10</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.desktop</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.25</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.emoji</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.05</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.login</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.00</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.media</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.10</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.settings</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.00</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.timeline</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.10</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.update</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.60</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.video</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.80</minimum></limit></limits></rule>
-                <rule><element>PACKAGE</element><includes><include>app.unichat.voice</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.80</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.assist</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.assist}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.autosave</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.autosave}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.bridge</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.bridge}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.cloak</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.cloak}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.cloud</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.cloud}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.gif</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.gif}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.links</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.links}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.login</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.login}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.matrix</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.matrix}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.model</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.model}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.server</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.server}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.service</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.service}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.settings</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.settings}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.stt</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.stt}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.support</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.support}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.ui</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.ui}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.chats</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.ui.chats}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.desktop</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.ui.desktop}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.emoji</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.ui.emoji}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.login</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.ui.login}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.media</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.ui.media}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.settings</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.ui.settings}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.ui.timeline</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.ui.timeline}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.update</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.update}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.video</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.video}</minimum></limit></limits></rule>
+                <rule><element>PACKAGE</element><includes><include>app.unichat.voice</include></includes><limits><limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>${jacoco.floor.app.unichat.voice}</minimum></limit></limits></rule>
               </rules>
             </configuration>
           </execution>
@@ -562,6 +593,21 @@
       <id>headless-ui</id>
       <properties>
         <argLine>-Dunichat.uiTests=true -Dunichat.headless=true -Dglass.platform=Headless -Dprism.order=sw -Djava.awt.headless=true</argLine>
+        <!-- The floors of the packages the UI tests reach further, at their headless coverage (BuildRulesTest.FLOORS_HEADLESS). -->
+        <jacoco.floor.app.unichat.assist>0.90</jacoco.floor.app.unichat.assist>
+        <jacoco.floor.app.unichat.service>0.90</jacoco.floor.app.unichat.service>
+        <jacoco.floor.app.unichat.settings>0.80</jacoco.floor.app.unichat.settings>
+        <jacoco.floor.app.unichat.stt>0.85</jacoco.floor.app.unichat.stt>
+        <jacoco.floor.app.unichat.ui>0.80</jacoco.floor.app.unichat.ui>
+        <jacoco.floor.app.unichat.ui.chats>0.90</jacoco.floor.app.unichat.ui.chats>
+        <jacoco.floor.app.unichat.ui.desktop>0.50</jacoco.floor.app.unichat.ui.desktop>
+        <jacoco.floor.app.unichat.ui.emoji>0.80</jacoco.floor.app.unichat.ui.emoji>
+        <jacoco.floor.app.unichat.ui.login>0.35</jacoco.floor.app.unichat.ui.login>
+        <jacoco.floor.app.unichat.ui.media>0.85</jacoco.floor.app.unichat.ui.media>
+        <jacoco.floor.app.unichat.ui.settings>0.75</jacoco.floor.app.unichat.ui.settings>
+        <jacoco.floor.app.unichat.ui.timeline>0.85</jacoco.floor.app.unichat.ui.timeline>
+        <jacoco.floor.app.unichat.update>0.70</jacoco.floor.app.unichat.update>
+        <jacoco.floor.app.unichat.video>0.85</jacoco.floor.app.unichat.video>
       </properties>
     </profile>
   </profiles>

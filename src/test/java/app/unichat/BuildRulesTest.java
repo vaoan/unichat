@@ -159,6 +159,12 @@ class BuildRulesTest {
                     "properties-maven-plugin", "SpotBugsCache", "maven-checkstyle-plugin", "checkstyle.xml", "jacoco")) {
                 assertFalse(profile.getTextContent().contains(plugin), text(profile, "id") + " leaves " + plugin + " as it is");
             }
+            assertEquals(List.of("id", "properties"), childNames(profile), text(profile, "id") + " only sets properties");
+            for (Element property : elements(child(profile, "properties"), null)) {
+                String name = property.getTagName();
+                assertTrue("argLine".equals(name) || (name.startsWith(FLOOR) && mainPackages().contains(name.substring(FLOOR.length()))),
+                        text(profile, "id") + " sets only the tests' command line and a package's coverage floor, not " + name);
+            }
         }
     }
 
@@ -208,8 +214,8 @@ class BuildRulesTest {
     }
 
     @Test
-    void everyPackageHasACoverageFloorNeverBelowTheOneRecorded() {
-        Map<String, BigDecimal> floors = new TreeMap<>();
+    void everyPackageHasACoverageFloorInItsProperty() {
+        List<String> packages = new ArrayList<>();
         for (Element rule : elements(child(child(execution("jacoco-maven-plugin", "check"), "configuration"), "rules"), "rule")) {
             assertEquals(List.of("element", "includes", "limits"), childNames(rule), "a rule is a package and its floor, no excludes");
             assertEquals("PACKAGE", text(rule, "element"));
@@ -219,60 +225,110 @@ class BuildRulesTest {
             assertEquals(List.of("counter", "value", "minimum"), childNames(limit), pkg + ": a floor, no maximum");
             assertEquals("LINE", text(limit, "counter"), pkg.getFirst());
             assertEquals("COVEREDRATIO", text(limit, "value"), pkg.getFirst());
-            assertNull(floors.put(pkg.getFirst(), new BigDecimal(text(limit, "minimum"))), pkg + " has one rule");
+            assertEquals("${" + FLOOR + pkg.getFirst() + "}", text(limit, "minimum"), pkg + "'s floor is its property");
+            assertFalse(packages.contains(pkg.getFirst()), pkg + " has one rule");
+            packages.add(pkg.getFirst());
         }
-        assertEquals(mainPackages(), floors.keySet(), "every package with main code has its floor, and only those");
-        assertEquals(FLOORS.keySet(), floors.keySet(), "FLOORS records every package's floor");
-        for (Map.Entry<String, BigDecimal> floor : floors.entrySet()) {
-            String pkg = floor.getKey();
-            BigDecimal min = floor.getValue();
-            assertEquals(0, min.remainder(new BigDecimal("0.05")).signum(), pkg + "'s floor is a multiple of 0.05: " + min);
-            assertTrue(min.compareTo(BigDecimal.ONE) <= 0, pkg + "'s floor is a ratio: " + min);
-            assertTrue(min.compareTo(new BigDecimal(FLOORS.get(pkg))) >= 0,
-                    pkg + "'s floor " + min + " is below the one recorded, " + FLOORS.get(pkg) + ": lowering one needs its reason");
-            assertEquals(ZERO_IN_THE_PLAIN_BUILD.contains(pkg), min.signum() == 0,
-                    pkg + ": a floor of 0 only where the plain build covers under 5 % (its tests are UI tests)");
+        assertEquals(mainPackages(), new TreeSet<>(packages), "every package with main code has its floor, and only those");
+    }
+
+    @Test
+    void theFloorsAreTheOnesRecorded() {
+        Map<String, String> plain = floorProperties(child(POM.getDocumentElement(), "properties"));
+        assertEquals(FLOORS_PLAIN, plain, "the floors: a change here is one in FLOORS_PLAIN, lowering one with its reason");
+        assertEquals(mainPackages(), plain.keySet(), "every package with main code has its floor, and only those");
+        for (Map.Entry<String, String> floor : plain.entrySet()) {
+            assertAFloor(floor.getKey(), floor.getValue());
+            assertEquals(ZERO_IN_THE_PLAIN_BUILD.contains(floor.getKey()), new BigDecimal(floor.getValue()).signum() == 0,
+                    floor.getKey() + ": a floor of 0 only where the plain build covers under 5 % (its tests are UI tests)");
+        }
+        Element profile = elements(child(POM.getDocumentElement(), "profiles"), "profile").stream()
+                .filter(p -> "headless-ui".equals(text(p, "id"))).findFirst().orElseThrow();
+        Map<String, String> headless = floorProperties(child(profile, "properties"));
+        assertEquals(FLOORS_HEADLESS, headless, "headless-ui's floors: a change here is one in FLOORS_HEADLESS");
+        for (Map.Entry<String, String> floor : headless.entrySet()) {
+            assertAFloor(floor.getKey(), floor.getValue());
+            assertTrue(new BigDecimal(floor.getValue()).compareTo(new BigDecimal(plain.get(floor.getKey()))) > 0,
+                    floor.getKey() + ": headless-ui raises a floor, never lowers it: " + floor.getValue() + " against " + plain.get(floor.getKey()));
         }
     }
 
+    /** A ratio that is a multiple of 0.05. */
+    private static void assertAFloor(String pkg, String value) {
+        BigDecimal min = new BigDecimal(value);
+        assertEquals(0, min.remainder(new BigDecimal("0.05")).signum(), pkg + "'s floor is a multiple of 0.05: " + min);
+        assertTrue(min.signum() >= 0 && min.compareTo(BigDecimal.ONE) <= 0, pkg + "'s floor is a ratio: " + min);
+    }
+
+    /** The {@code jacoco.floor.<package>} properties among {@code properties}, by package. */
+    private static Map<String, String> floorProperties(Element properties) {
+        Map<String, String> floors = new TreeMap<>();
+        for (Element p : elements(properties, null)) {
+            if (p.getTagName().startsWith(FLOOR)) floors.put(p.getTagName().substring(FLOOR.length()), p.getTextContent().trim());
+        }
+        return floors;
+    }
+
+    private static final String FLOOR = "jacoco.floor.";
+
     /**
-     * Each package's floor as measured at 067a1bd: the lower line coverage of {@code verify} and {@code verify -Pheadless-ui},
-     * rounded down to 0.05. A floor in the pom may go up from here; one below it needs this changed, and its reason.
+     * Each package's floor as measured at 067a1bd on macOS: the lower line coverage of {@code verify} and
+     * {@code verify -Pheadless-ui}, rounded down to 0.05. Raising one is a change here too; lowering one needs its reason.
      */
-    private static final Map<String, String> FLOORS = floors();
+    private static final Map<String, String> FLOORS_PLAIN = floors(true);
+
+    /** headless-ui's own floors, for the packages its UI tests reach further: its coverage at 067a1bd, rounded down to 0.05. */
+    private static final Map<String, String> FLOORS_HEADLESS = floors(false);
 
     /** Packages whose tests are UI tests, which the plain build doesn't run: under 5 % there, so a floor of 0. */
     private static final List<String> ZERO_IN_THE_PLAIN_BUILD = List.of("app.unichat.ui.login", "app.unichat.ui.settings");
 
-    private static Map<String, String> floors() {
+    private static Map<String, String> floors(boolean plain) {
         Map<String, String> m = new TreeMap<>();
-        m.put("app.unichat", "0.10");
-        m.put("app.unichat.assist", "0.85");
-        m.put("app.unichat.autosave", "0.85");
-        m.put("app.unichat.bridge", "0.95");
-        m.put("app.unichat.cloak", "0.65");
-        m.put("app.unichat.cloud", "0.90");
-        m.put("app.unichat.gif", "0.85");
-        m.put("app.unichat.links", "0.85");
-        m.put("app.unichat.login", "0.70");
-        m.put("app.unichat.matrix", "0.80");
-        m.put("app.unichat.model", "0.95");
-        m.put("app.unichat.server", "0.70");
-        m.put("app.unichat.service", "0.75");
-        m.put("app.unichat.settings", "0.65");
-        m.put("app.unichat.stt", "0.80");
-        m.put("app.unichat.support", "0.90");
-        m.put("app.unichat.ui", "0.10");
-        m.put("app.unichat.ui.chats", "0.10");
-        m.put("app.unichat.ui.desktop", "0.25");
-        m.put("app.unichat.ui.emoji", "0.05");
-        m.put("app.unichat.ui.login", "0.00");
-        m.put("app.unichat.ui.media", "0.10");
-        m.put("app.unichat.ui.settings", "0.00");
-        m.put("app.unichat.ui.timeline", "0.10");
-        m.put("app.unichat.update", "0.60");
-        m.put("app.unichat.video", "0.80");
-        m.put("app.unichat.voice", "0.80");
+        if (plain) {
+            m.put("app.unichat", "0.10");
+            m.put("app.unichat.assist", "0.85");
+            m.put("app.unichat.autosave", "0.85");
+            m.put("app.unichat.bridge", "0.95");
+            m.put("app.unichat.cloak", "0.65");
+            m.put("app.unichat.cloud", "0.90");
+            m.put("app.unichat.gif", "0.85");
+            m.put("app.unichat.links", "0.85");
+            m.put("app.unichat.login", "0.70");
+            m.put("app.unichat.matrix", "0.80");
+            m.put("app.unichat.model", "0.95");
+            m.put("app.unichat.server", "0.70");
+            m.put("app.unichat.service", "0.75");
+            m.put("app.unichat.settings", "0.65");
+            m.put("app.unichat.stt", "0.80");
+            m.put("app.unichat.support", "0.90");
+            m.put("app.unichat.ui", "0.10");
+            m.put("app.unichat.ui.chats", "0.10");
+            m.put("app.unichat.ui.desktop", "0.25");
+            m.put("app.unichat.ui.emoji", "0.05");
+            m.put("app.unichat.ui.login", "0.00");
+            m.put("app.unichat.ui.media", "0.10");
+            m.put("app.unichat.ui.settings", "0.00");
+            m.put("app.unichat.ui.timeline", "0.10");
+            m.put("app.unichat.update", "0.60");
+            m.put("app.unichat.video", "0.80");
+            m.put("app.unichat.voice", "0.80");
+        } else {
+            m.put("app.unichat.assist", "0.90");
+            m.put("app.unichat.service", "0.90");
+            m.put("app.unichat.settings", "0.80");
+            m.put("app.unichat.stt", "0.85");
+            m.put("app.unichat.ui", "0.80");
+            m.put("app.unichat.ui.chats", "0.90");
+            m.put("app.unichat.ui.desktop", "0.50");
+            m.put("app.unichat.ui.emoji", "0.80");
+            m.put("app.unichat.ui.login", "0.35");
+            m.put("app.unichat.ui.media", "0.85");
+            m.put("app.unichat.ui.settings", "0.75");
+            m.put("app.unichat.ui.timeline", "0.85");
+            m.put("app.unichat.update", "0.70");
+            m.put("app.unichat.video", "0.85");
+        }
         return m;
     }
 
