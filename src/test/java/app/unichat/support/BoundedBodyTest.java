@@ -82,11 +82,16 @@ class BoundedBodyTest {
                 }
             }
         }, 10, Duration.ZERO)) {
-            timerHeld.await();
-            Gate gate = new Gate(new CountDownLatch(1), thrown);
-            gate.onRead = hold::countDown;
-            try (BoundedBody second = new BoundedBody(gate, 10, Duration.ZERO)) {
-                return assertThrows(IOException.class, second::read);
+            // Let go of the timer whatever happens, before the first body closes: held, it parks every later deadline.
+            try {
+                timerHeld.await();
+                Gate gate = new Gate(new CountDownLatch(1), thrown);
+                gate.onRead = hold::countDown;
+                try (BoundedBody second = new BoundedBody(gate, 10, Duration.ZERO)) {
+                    return assertThrows(IOException.class, second::read);
+                }
+            } finally {
+                hold.countDown();
             }
         }
     }
