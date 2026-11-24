@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Folders end to end on the real window: rail, list of names, inside a folder, menus and dialogs.
- * {@code ./mvnw verify -Pheadless-ui -Dtest=FoldersUiTest}: no display, no windows.
+ * {@code ./mvnw test -Pheadless-ui -Dtest=FoldersUiTest}: no display, no windows.
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class FoldersUiTest {

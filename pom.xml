@@ -295,7 +295,7 @@
       <!-- JaCoCo: the agent goes on surefire's command line (@{argLine} above), the report (target/site/jacoco) is written
            on every build that runs the tests, and check fails verify when a package's line coverage falls below its floor.
            The exec file is this run's own (maven.build.timestamp): a build with -DskipTests has none, so report and check
-           skip, and never read an earlier run's numbers. Only app.unichat's classes are instrumented (the libraries'
+           skip, and never read an earlier run's numbers. Earlier runs' files in target/jacoco are never merged; clean removes them. Only app.unichat's classes are instrumented (the libraries'
            coverage isn't ours to keep); nothing of ours is left out of the report or the check.
            The floors: each package's line coverage measured at 067a1bd, the lower of `verify` and `verify -Pheadless-ui`
            (the two builds CI runs; measured on macOS), rounded down to the nearest 0.05. The ui packages' floors are the
