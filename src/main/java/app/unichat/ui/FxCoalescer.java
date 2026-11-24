@@ -29,4 +29,9 @@ public final class FxCoalescer {
             }
         });
     }
+
+    /** Whether a run is asked for and still to come: this one's own, where {@link Redraws#PENDING} is everyone's. */
+    boolean queued() {
+        return queued.get();
+    }
 }
