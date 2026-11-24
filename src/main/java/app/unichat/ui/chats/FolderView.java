@@ -1,6 +1,7 @@
 package app.unichat.ui.chats;
 
 import app.unichat.ui.Formats;
+import app.unichat.ui.FxCoalescer;
 import app.unichat.ui.Icons;
 import app.unichat.ui.ListRows;
 import app.unichat.ui.Nodes;
@@ -63,6 +64,8 @@ final class FolderView extends VBox {
     private @Nullable String selectedChatId;
     private boolean updating;
     private List<Chat> all = List.of();
+    /** The open chat brought into view, later (counted, so tests wait for it). */
+    private final FxCoalescer revealOpen = new FxCoalescer(() -> reveal(Math.max(0, chatList.getSelectionModel().getSelectedIndex())));
 
     FolderView(ChatFolders folders, FolderDialogs dialogs, Supplier<ListCell<Chat>> cells, Consumer<Chat> open) {
         this.folders = folders;
@@ -175,7 +178,7 @@ final class FolderView extends VBox {
         refresh(all);
         focus();
         // After the layout: the list was hidden and empty until now, so it can't yet tell how far a row is.
-        Platform.runLater(() -> reveal(Math.max(0, chatList.getSelectionModel().getSelectedIndex())));
+        revealOpen.request();
     }
 
     /** Back from a server: on its row, though a channel of it is what's open. */
@@ -297,7 +300,7 @@ final class FolderView extends VBox {
     /** The chats on show, for moving through them with Alt+arrows; none while on the names. */
     List<Chat> rows() { return chats; }
 
-    void reveal(int row) { chatList.scrollTo(row); }
+    void reveal(int row) { ListRows.scrollTo(chatList, row); }
 
     /** Inside a folder, a chat's menu can also take it out, right after the Carpetas submenu. */
     void offerRemoval(ContextMenu menu, Chat c) {

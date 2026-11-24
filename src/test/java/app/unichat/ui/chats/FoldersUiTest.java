@@ -547,6 +547,24 @@ class FoldersUiTest {
 
     @Test
     void reenteringALongFolderShowsTheOpenChat() throws Exception {
+        reentersOnTheOpenChat();
+    }
+
+    /** What the Mac needs to show what Linux's fonts did on CI: the open chat, last, stayed below the list. */
+    @Test
+    void reenteringALongFolderShowsTheOpenChatWithLargerText() throws Exception {
+        double scale = app.unichat.settings.Settings.get().fontScale();
+        app.unichat.settings.Settings.get().setFontScale(1.3);
+        try {
+            FxWait.onFx(Theme::applyAll);
+            FxWait.settled();
+            reentersOnTheOpenChat();
+        } finally {
+            app.unichat.settings.Settings.get().setFontScale(scale);
+        }
+    }
+
+    private void reentersOnTheOpenChat() throws Exception {
         String work = svc.createFolder("Trabajo");
         for (Chat c : svc.chats()) if (!c.space() && !c.bridgeBot()) svc.setInFolder(work, c, true);
         fire(railButton("Carpetas"));
@@ -560,7 +578,8 @@ class FoldersUiTest {
 
         clickCell(".folder-list", "Trabajo");
         assertEquals(last, fx(() -> folderChats().getSelectionModel().getSelectedItem()));
-        eventually("the open chat comes into view", () -> texts0(".folder-chats").stream().anyMatch(t -> t.startsWith(last.title())));
+        // clickCell waited for the list to settle, the reveal it asks for included: in view now, or never.
+        assertTrue(texts(".folder-chats").stream().anyMatch(t -> t.startsWith(last.title())), "the open chat comes into view: " + texts(".folder-chats"));
     }
 
     @Test
