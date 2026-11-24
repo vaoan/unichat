@@ -1,7 +1,6 @@
 package app.unichat.cloud;
 
 import app.unichat.Present;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -82,11 +81,9 @@ class DropboxTest {
     }
 
     @Test
-    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aFileComesDownIntoAFileNeverWholeInMemoryWithATokenMadeAgainIfItExpired() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
-            byte[] video = new byte[300_000];
-            new java.util.Random(3).nextBytes(video);
+            byte[] video = app.unichat.SeededBytes.noise(300_000, 3);
             fake.put("/Unichat/Media/Mamá/video [1].mp4", video);
             DropboxApi api = api(fake, DropboxApi.SINGLE, 1024);
             api.check();
@@ -118,11 +115,9 @@ class DropboxTest {
     }
 
     @Test
-    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aBigFileGoesUpInPieces() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
-            byte[] video = new byte[2500];
-            new java.util.Random(7).nextBytes(video);
+            byte[] video = app.unichat.SeededBytes.noise(2500, 7);
             Path file = Files.write(dir.resolve("video.mp4"), video);
             api(fake, 1000, 1000).put("Unichat/Media/video.mp4", file); // over the single-call limit
             assertArrayEquals(video, fake.files.get("/Unichat/Media/video.mp4"), "whole, in order");

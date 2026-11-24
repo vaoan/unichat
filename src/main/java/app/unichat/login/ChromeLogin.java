@@ -238,7 +238,7 @@ public final class ChromeLogin {
             if (socket == null) pause(Duration.ofMillis(100));
         }
         if (socket == null) throw new IOException(I18n.t("login.chrome.noStart"));
-        DevTools tab = new DevTools(socket); // NOPMD: CloseResource, kept as siteTab; run() closes it
+        DevTools tab = new DevTools(http, socket); // NOPMD: CloseResource, kept as siteTab; run() closes it
         siteTab = tab;
         String agent = params.userAgent();
         if (agent != null && !agent.isBlank()) tab.call(identity(agent));
@@ -338,18 +338,18 @@ public final class ChromeLogin {
 
     /** One request to the browser over its debugging socket, connected only for this. */
     private String send(int port, String message) throws IOException, InterruptedException {
-        try (DevTools browser = new DevTools(JSON.readTree(get(port, "/json/version")).path("webSocketDebuggerUrl").asText())) {
+        try (DevTools browser = new DevTools(http, JSON.readTree(get(port, "/json/version")).path("webSocketDebuggerUrl").asText())) {
             return browser.call(message);
         }
     }
 
     /** A debugging connection, one request at a time: no events are asked for, so all that arrives is the answer. */
-    private final class DevTools implements WebSocket.Listener, AutoCloseable {
+    private static final class DevTools implements WebSocket.Listener, AutoCloseable {
         private final StringBuilder text = new StringBuilder(); // NOPMD: AvoidStringBufferField, one message's parts, emptied once it is whole
         private final WebSocket socket;
         private volatile CompletableFuture<String> answer = new CompletableFuture<>();
 
-        DevTools(String url) throws IOException, InterruptedException {
+        DevTools(HttpClient http, String url) throws IOException, InterruptedException {
             try {
                 socket = http.newWebSocketBuilder().buildAsync(URI.create(url), this).get(5, TimeUnit.SECONDS);
             } catch (ExecutionException | TimeoutException e) {

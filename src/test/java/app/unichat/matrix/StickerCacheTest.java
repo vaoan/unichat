@@ -12,8 +12,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -57,8 +55,7 @@ class StickerCacheTest {
         try (ExecutorService io = Executors.newSingleThreadExecutor()) {
             var media = new MediaDownloader(new MatrixClient("http://127.0.0.1:" + server.getAddress().getPort(), "t"), io);
             String id = "s" + System.nanoTime();
-            List<Double> seen = new ArrayList<>();
-            Path sticker = media.sticker("mxc://example.org/" + id, seen::add).get();
+            Path sticker = media.sticker("mxc://example.org/" + id, p -> { }).get();
             assertEquals(cache("sticker-cache"), sticker.getParent());
             Path photo = media.media("mxc://example.org/p" + id, 0, 0).get();
             assertEquals(cache("media"), photo.getParent());

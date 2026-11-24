@@ -76,8 +76,8 @@ public final class ChromiumCookies {
         try {
             byte[] iv = new byte[16];
             Arrays.fill(iv, (byte) 0x20);
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding"); // lgtm[java/weak-cryptographic-algorithm] Chromium's v10 cookies are AES-128-CBC: its format, not our choice
+            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv)); // lgtm[java/static-initialization-vector] Chromium's v10 fixed IV; this decrypts, never encrypts
             byte[] plain = cipher.doFinal(encrypted, 3, encrypted.length - 3);
             int start = plain.length > 32 && !printableAscii(plain, 32) ? 32 : 0;
             return new String(plain, start, plain.length - start, StandardCharsets.UTF_8);

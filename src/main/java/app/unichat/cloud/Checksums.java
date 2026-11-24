@@ -33,7 +33,7 @@ final class Checksums {
                 }
                 return HexFormat.of().formatHex(all.digest());
             }
-            MessageDigest d = MessageDigest.getInstance(SHA1.equals(kind) ? "SHA-1" : "SHA-256");
+            MessageDigest d = MessageDigest.getInstance(SHA1.equals(kind) ? "SHA-1" : "SHA-256"); // lgtm[java/potentially-weak-cryptographic-algorithm] pCloud's API gives a file's SHA-1: it tells a changed file, it guards nothing
             byte[] buf = new byte[1 << 16];
             int n;
             while ((n = in.read(buf)) > 0) d.update(buf, 0, n);

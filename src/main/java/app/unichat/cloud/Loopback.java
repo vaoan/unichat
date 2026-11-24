@@ -3,7 +3,6 @@ package app.unichat.cloud;
 import app.unichat.support.I18n;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -28,6 +27,8 @@ import java.util.Map;
 final class Loopback {
     /** Fixed: a service only sends the browser back to the address registered with its app. */
     static final int PORT = 43117;
+    /** One for every state: a SecureRandom is safe to share between threads, and its strength doesn't come from a new one. */
+    private static final SecureRandom RANDOM = new SecureRandom();
     /** How long a sign-in waits for the browser: one left there gives the port back by itself. */
     static final Duration DEADLINE = Duration.ofMinutes(10);
 
@@ -58,7 +59,8 @@ final class Loopback {
 
     /** As above, the deadline told with {@code expiredKey}'s words. */
     static void until(HttpServer server, CompletableFuture<?> result, Duration deadline, String expiredKey) {
-        var _ = result.whenComplete((a, e) -> server.stop(0));
+        // allOf: the same ending, as a typed future (a lambda on a CompletableFuture<?> is misread by CodeQL's unused-parameter)
+        var _ = CompletableFuture.allOf(result).whenComplete((_, _) -> server.stop(0));
         CompletableFuture.delayedExecutor(deadline.toNanos(), TimeUnit.NANOSECONDS).execute(() -> {
             if (result.isDone()) return;
             server.stop(0);
@@ -71,10 +73,9 @@ final class Loopback {
         return back != null && MessageDigest.isEqual(state.getBytes(StandardCharsets.UTF_8), back.getBytes(StandardCharsets.UTF_8));
     }
 
-    @SuppressFBWarnings(value = "DMI_RANDOM_USED_ONLY_ONCE", justification = "a SecureRandom made for one state: its strength doesn't come from reuse")
     static String random(int bytes) {
         byte[] b = new byte[bytes];
-        new SecureRandom().nextBytes(b);
+        RANDOM.nextBytes(b);
         return HexFormat.of().formatHex(b);
     }
 

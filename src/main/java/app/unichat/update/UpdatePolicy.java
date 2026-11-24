@@ -21,7 +21,8 @@ public final class UpdatePolicy {
     public static @Nullable Release parse(String json) {
         try {
             JsonNode root = JSON.readTree(json);
-            String tag = root == null ? "" : root.path("tag_name").asText("").strip();
+            if (root == null) return null;
+            String tag = root.path("tag_name").asText("").strip();
             if (tag.isEmpty()) return null;
             String url = root.path("html_url").asText("");
             // The page opens in the browser: only ever GitHub's own, never whatever an answer could put there.

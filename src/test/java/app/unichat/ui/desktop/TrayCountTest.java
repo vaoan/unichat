@@ -1,7 +1,6 @@
 package app.unichat.ui.desktop;
 
 import app.unichat.ui.Formats;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -36,11 +35,9 @@ class TrayCountTest {
     @SuppressWarnings("NullAway") // headless: no AWT menu can be made, and this helper is never asked for one
     @Test
     @DisabledOnOs(OS.WINDOWS)
-    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void theHelperIsToldTheCountAndWhenThereIsNone() throws Exception {
         // A pipe, not a file: each line is read the moment the helper passes it on, and its end says it has no more.
-        Path told = dir.resolve("recibido");
-        assertEquals(0, new ProcessBuilder("mkfifo", told.toString()).inheritIO().start().waitFor(), "mkfifo");
+        Path told = app.unichat.Fifos.at(dir.resolve("recibido"));
         Path helper = Files.writeString(dir.resolve("helper"),
                 "#!/bin/sh\nexec 3>'" + told + "'\nwhile IFS= read -r a; do echo \"$a\" >&3; done\n");
         assertTrue(helper.toFile().setExecutable(true));

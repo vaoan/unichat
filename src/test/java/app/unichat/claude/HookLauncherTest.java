@@ -24,7 +24,7 @@ class HookLauncherTest {
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the repo's own hook script with a file this test wrote")
     void theLessonsCheckStartsAsTheHooksRunIt() throws IOException, InterruptedException {
         Path clean = Files.writeString(dir.resolve("Clean.java"), "final class Clean {\n}\n");
-        Process p = new ProcessBuilder("bash", ".claude/hooks/java.sh", "Lessons", clean.toString())
+        Process p = new ProcessBuilder("bash", ".claude/hooks/java.sh", "Lessons", clean.toString()) // lgtm[java/relative-path-command] bash from PATH, as Claude Code runs the hooks
                 .redirectErrorStream(true).start();
         String said = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertEquals(0, p.waitFor(), "java.sh Lessons on a clean file: " + said);

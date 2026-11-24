@@ -28,15 +28,24 @@ class SupervisorTest {
     private final app.unichat.service.Changes changes = new app.unichat.service.Changes();
     /** Each exit the Supervisor handled: "name:true" when it scheduled a restart. */
     private final List<String> exits = new java.util.concurrent.CopyOnWriteArrayList<>();
+    /** Whose lines were handed to their logs, and who was started again, in order. */
+    private final List<String> logged = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<String> restarted = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     SupervisorTest() {
         sup.listen(new Supervisor.Listener() {
-            @Override public void logged(String name) { changes.changed(); }
+            @Override public void logged(String name) {
+                logged.add(name);
+                changes.changed();
+            }
             @Override public void exited(String name, boolean restarting) {
                 exits.add(name + ":" + restarting);
                 changes.changed();
             }
-            @Override public void restarted(String name) { changes.changed(); }
+            @Override public void restarted(String name) {
+                restarted.add(name);
+                changes.changed();
+            }
         });
     }
 
@@ -75,6 +84,8 @@ class SupervisorTest {
         sup.start("svc", dir, fake("run"), log);
         assertTrue(sup.isRunning("svc"));
         await(() -> contains(log, "started"));
+        await(() -> !logged.isEmpty());
+        assertEquals(java.util.Set.of("svc"), java.util.Set.copyOf(logged), "the listener is told whose line was logged");
         sup.stopAll();
         assertFalse(sup.isRunning("svc"));
     }
@@ -140,6 +151,8 @@ class SupervisorTest {
         Path log = dir.resolve("crash.log");
         sup.start("crash", dir, fake("crash"), log);
         await(() -> sup.restarts("crash") >= 2);
+        await(() -> !restarted.isEmpty());
+        assertEquals(java.util.Set.of("crash"), java.util.Set.copyOf(restarted), "the listener is told whose process came back");
         assertTrue(Files.readString(log).split("started", -1).length - 1 >= 2, "log is appended across restarts");
     }
 

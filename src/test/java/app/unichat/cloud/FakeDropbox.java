@@ -160,12 +160,18 @@ final class FakeDropbox implements AutoCloseable {
                 case "/2/files/upload_session/append_v2", "/2/files/upload_session/finish" -> {
                     sessionCalls.incrementAndGet();
                     ByteArrayOutputStream s = sessions.get(arg.path("cursor").path("session_id").asText());
-                    if (s == null || s.size() != arg.path("cursor").path("offset").asLong()) {
+                    if (s == null) {
                         reply(x, 409, "{\"error_summary\": \"incorrect_offset/..\"}");
                         return;
                     }
-                    s.write(body);
-                    if (path.endsWith("finish")) put(arg.path("commit").path("path").asText(), s.toByteArray());
+                    synchronized (s) { // the offset checked, the part added and the file kept as one, as Dropbox does
+                        if (s.size() != arg.path("cursor").path("offset").asLong()) {
+                            reply(x, 409, "{\"error_summary\": \"incorrect_offset/..\"}");
+                            return;
+                        }
+                        s.write(body);
+                        if (path.endsWith("finish")) put(arg.path("commit").path("path").asText(), s.toByteArray());
+                    }
                     reply(x, 200, "{}");
                 }
                 case "/2/files/delete_v2" -> {

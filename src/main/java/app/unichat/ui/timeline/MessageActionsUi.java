@@ -145,7 +145,7 @@ final class MessageActionsUi {
         return mem == null ? userId : mem.displayName();
     }
 
-    HBox hoverActions(Message m, Node bubble) {
+    HBox hoverActions(Message m) {
         HBox box = new HBox(2);
         box.getStyleClass().add("hover-actions");
         box.setAlignment(Pos.CENTER);

@@ -53,7 +53,8 @@ public final class CloudTexts {
             case REMOVED -> out.add(I18n.t("settings.vault.line.REMOVED"));
             case UNRECOGNIZED -> out.add(I18n.t("settings.vault.line.UNRECOGNIZED"));
             case MISSING -> out.add(I18n.t("settings.vault.line.MISSING"));
-            case NONE, OPEN -> { }
+            case NONE -> { }
+            case OPEN -> { }
         }
         Cloud.Moving m = s.moving();
         if (m != null && m.files() > 0) out.add(I18n.n("settings.vault.line.moved", m.files(), when(m.at(), now)));

@@ -43,7 +43,8 @@ public final class MediaLoading {
         ring.setAccessibleText(I18n.t("media.loading"));
         StackPane.setAlignment(ring, Pos.CENTER);
         box.getChildren().add(ring);
-        var _ = loading.whenComplete((v, err) -> Platform.runLater(() -> {
+        // allOf: the same ending, as a typed future (a lambda on a CompletableFuture<?> is misread by CodeQL's unused-parameter)
+        var _ = CompletableFuture.allOf(loading).whenComplete((_, err) -> Platform.runLater(() -> {
             box.getChildren().remove(ring);
             if (err != null) offerRetry(box, load);
         }));

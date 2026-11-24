@@ -3,7 +3,6 @@ package app.unichat.cloud;
 import app.unichat.Present;
 import app.unichat.support.PathParts;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -247,10 +246,8 @@ class MediaUploadTest {
     }
 
     @Test
-    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void dropboxsContentHashIsTheHashOfEachBlocksHash(@TempDir Path tmp) throws Exception {
-        byte[] data = new byte[5 * 1024 * 1024]; // two blocks: 4 MB and 1 MB
-        new java.util.Random(3).nextBytes(data);
+        byte[] data = app.unichat.SeededBytes.noise(5 * 1024 * 1024, 3); // two blocks: 4 MB and 1 MB
         Path f = Files.write(tmp.resolve("x.bin"), data);
         java.security.MessageDigest all = java.security.MessageDigest.getInstance("SHA-256");
         all.update(java.security.MessageDigest.getInstance("SHA-256").digest(java.util.Arrays.copyOfRange(data, 0, 4 * 1024 * 1024)));

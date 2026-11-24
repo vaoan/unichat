@@ -150,7 +150,7 @@ public final class Message {
     public MessageStatus status() { return status; }
     public void setStatus(MessageStatus status) { this.status = status; }
     /** A snapshot: later reactions don't change it. */
-    public Map<String, Set<String>> reactions() { return reactions; }
+    public Map<String, Set<String>> reactions() { return reactions; } // lgtm[java/internal-representation-exposure] unmodifiable all through: MessageTest's change is it throwing
 
     /** Changes when anything drawn from this message does. Rows ask it for every message each time one arrives, so it stays cheap. */
     public int revision() {

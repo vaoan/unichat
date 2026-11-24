@@ -1,7 +1,7 @@
 package app.unichat.ui.desktop;
 
 import app.unichat.ui.MainView;
-import com.sun.glass.ui.Application;
+import com.sun.glass.ui.Application; // lgtm[java/jdk-internal-api-access] JavaFX has no public way to hear macOS's Quit (see below)
 
 import java.util.Map;
 
@@ -19,6 +19,7 @@ public final class MacQuit {
      *
      * @param onActive the app was activated: the Dock icon clicked, or the app opened again
      */
+    @SuppressWarnings("lgtm[java/jdk-internal-api-access]") // JavaFX has no public way to hear macOS's Quit; a change of it is caught below
     public static void install(Runnable onQuit, Runnable onActive) {
         if (!MainView.MAC) return;
         try {

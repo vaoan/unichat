@@ -436,7 +436,7 @@ public final class ChatListPane extends VBox {
         boolean show = ofNetwork.size() > 1 && !f.searching() && attributed;
         Nodes.show(accountRow, show);
         accountRow.getChildren().clear();
-        if (!show || n == null) return;
+        if (n == null || !show) return;
         ToggleGroup group = new ToggleGroup();
         accountRow.getChildren().add(accountChip(I18n.t("chatList.allAccounts"), f.accountId() == null, group,
                 () -> filter.set(filter.get().withAccount(n, null))));

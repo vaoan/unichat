@@ -168,7 +168,7 @@ final class FakePCloud implements AutoCloseable {
     @SuppressFBWarnings(value = "WEAK_MESSAGE_DIGEST_SHA1", justification = "pCloud's API gives a file's SHA-1; the fake answers as pCloud does")
     static String sha1(byte[] data) {
         try {
-            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-1").digest(data));
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-1").digest(data)); // lgtm[java/potentially-weak-cryptographic-algorithm] pCloud's API gives a file's SHA-1; the fake answers as pCloud does
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }

@@ -16,7 +16,7 @@ import java.util.stream.Stream;
  * outside Maven (an IDE), the temp folder is the system's and is left alone.
  */
 public final class TestTemp implements BeforeAllCallback { // NOPMD: TestClassWithoutTestCases, a helper for tests, not one
-    private static final Path FOLDER = Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath();
+    private static final Path FOLDER = Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath(); // lgtm[java/local-temp-file-or-directory-information-disclosure] made only when it's target/test-tmp (OURS), never the system's
     private static final boolean OURS = FOLDER.endsWith(Path.of("target", "test-tmp"));
 
     static {

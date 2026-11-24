@@ -170,7 +170,7 @@ final class MessageRowView {
         column.getChildren().add(bubble);
         if (!m.reactions().isEmpty()) column.getChildren().add(actions.reactions(m));
 
-        HBox hover = actions.hoverActions(m, bubble);
+        HBox hover = actions.hoverActions(m);
         MessageLine line = new MessageLine(hover);
         if (out) {
             Region grow = new Region();

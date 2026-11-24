@@ -35,9 +35,9 @@ final class AppLog {
             OutputStream file = open(log); // NOPMD: CloseResource, the log stays open while the app runs
             String header = "\n=== Unichat " + LocalDateTime.now(ZoneId.systemDefault()) + " ===\n";
             file.write(header.getBytes(StandardCharsets.UTF_8));
-            OutputStream redacted = new RedactingLines(file); // NOPMD: CloseResource, System.out and err write to it from now on
-            System.setOut(new PrintStream(new Tee(System.out, redacted), true, StandardCharsets.UTF_8));
-            System.setErr(new PrintStream(new Tee(System.err, redacted), true, StandardCharsets.UTF_8));
+            OutputStream redacted = new RedactingLines(file); // NOPMD: CloseResource, System.out and err write to it from now on; lgtm[java/output-resource-leak] the same
+            System.setOut(new PrintStream(new Tee(System.out, redacted), true, StandardCharsets.UTF_8)); // lgtm[java/output-resource-leak] System.out from now on, open while the app runs
+            System.setErr(new PrintStream(new Tee(System.err, redacted), true, StandardCharsets.UTF_8)); // lgtm[java/output-resource-leak] System.err from now on, open while the app runs
         } catch (IOException e) {
             System.err.println("No log file: " + e);
         }

@@ -29,6 +29,18 @@ class BoundedMapTest {
     }
 
     @Test
+    void aCopyKeepsItsBoundAndOrder() {
+        Map<String, Integer> m = BoundedMap.byUse(2);
+        m.put("a", 1);
+        m.put("b", 2);
+        Map<String, Integer> copy = ((BoundedMap<String, Integer>) m).clone();
+        var _ = copy.get("a");
+        copy.put("c", 3);
+        assertEquals(List.of("a", "c"), List.copyOf(copy.keySet()), "bounded and by use, as the original");
+        assertEquals(List.of("a", "b"), List.copyOf(m.keySet()), "the original untouched");
+    }
+
+    @Test
     void itNeverHoldsMoreThanItsMax() {
         Map<Integer, Integer> m = BoundedMap.byAge(3);
         for (int i = 0; i < 10; i++) m.put(i, i);
