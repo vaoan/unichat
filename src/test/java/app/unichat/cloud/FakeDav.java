@@ -22,6 +22,8 @@ final class FakeDav implements AutoCloseable {
     final Map<String, Integer> versions = new ConcurrentHashMap<>();
     final AtomicInteger gets = new AtomicInteger();
     final AtomicInteger puts = new AtomicInteger();
+    /** What PROPFIND says a file's size is, instead of its length (a server answering something that isn't a number). */
+    volatile @org.jspecify.annotations.Nullable String sizeSaid;
     /** Whether a listing gives whole addresses ("https://host/dav/…", as some servers do) rather than paths. */
     volatile boolean wholeHrefs;
     /** Paths whose next PUT fails (the network dropped), once each. */
@@ -154,7 +156,7 @@ final class FakeDav implements AutoCloseable {
                             + (wholeHrefs ? url() + "/" : "/dav/") + href(path)
                             + "/</d:href><d:propstat><d:prop>"
                             + (files.containsKey(path) ? "<d:getetag>\"" + versions.get(path) + "\"</d:getetag><d:getcontentlength>"
-                                    + files.get(path).length + "</d:getcontentlength>" : "")
+                                    + sizeOf(path) + "</d:getcontentlength>" : "")
                             + "</d:prop></d:propstat></d:response>" + listed + "</d:multistatus>").getBytes(StandardCharsets.UTF_8);
                     x.sendResponseHeaders(207, xml.length);
                     x.getResponseBody().write(xml);
@@ -258,5 +260,10 @@ final class FakeDav implements AutoCloseable {
     @Override public void close() {
         server.stop(0);
         pool.shutdownNow();
+    }
+
+    private String sizeOf(String path) {
+        String said = sizeSaid;
+        return said != null ? said : Integer.toString(app.unichat.Present.of(files.get(path)).length);
     }
 }

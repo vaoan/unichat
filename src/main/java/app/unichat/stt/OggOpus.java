@@ -152,12 +152,13 @@ public final class OggOpus {
             }
             int pageSerial = ByteBuffer.wrap(ogg, pos + 14, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
             int segments = ogg[pos + 26] & 0xFF;
-            int dataPos = pos + 27 + segments;
-            if (dataPos > ogg.length) break;
+            int tableEnd = pos + 27 + segments; // the segment table, one length a byte; the data follows it
+            if (tableEnd > ogg.length) break;
+            int dataPos = tableEnd;
             boolean ours = serial == null || serial == pageSerial;
             if (serial == null) serial = pageSerial;
-            for (int s = 0; s < segments; s++) {
-                int len = ogg[pos + 27 + s] & 0xFF;
+            for (int t = pos + 27; t < tableEnd; t++) {
+                int len = ogg[t] & 0xFF;
                 if (dataPos + len > ogg.length) return out; // truncated file: keep what's complete
                 if (ours) {
                     cur.write(ogg, dataPos, len);

@@ -30,7 +30,7 @@ public final class Seen {
 
     private Seen() {}
 
-    public static Seen get() { return INSTANCE; }
+    public static Seen get() { return INSTANCE; } // lgtm[java/unsynchronized-getter] the one instance, a final field: not the getter of set(windows, away)
 
     public boolean now() { return seenNow; }
 

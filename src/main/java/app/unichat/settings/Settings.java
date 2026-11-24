@@ -100,7 +100,7 @@ public final class Settings {
         }
     }
 
-    public static Settings get() { return INSTANCE; }
+    public static Settings get() { return INSTANCE; } // lgtm[java/unsynchronized-getter] the one instance, a final field: not the getter of set(key, value)
 
     public static Path dataDir() {
         String override = System.getProperty("unichat.dataDir");

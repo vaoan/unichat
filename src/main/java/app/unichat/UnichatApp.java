@@ -319,7 +319,7 @@ public final class UnichatApp extends Application {
 
     private void loadIcons() {
         for (String size : new String[]{"16", "32", "64", "128", "256"}) {
-            try (InputStream in = getClass().getResourceAsStream("/app/unichat/icons/app-" + size + ".png")) {
+            try (InputStream in = UnichatApp.class.getResourceAsStream("/app/unichat/icons/app-" + size + ".png")) {
                 if (in != null) stage.getIcons().add(new Image(in));
             } catch (Exception ignored) {
                 // Icons are optional.

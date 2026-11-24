@@ -98,10 +98,10 @@ public final class Chat {
     public void setTopic(@Nullable String topic) { this.topic = topic; }
     public boolean bridgeBot() { return bridgeBot; }
     public void setBridgeBot(boolean bridgeBot) { this.bridgeBot = bridgeBot; }
-    public List<Member> members() { return members; }
+    public List<Member> members() { return members; } // lgtm[java/internal-representation-exposure] List.copyOf's, unmodifiable: ChatLiveFieldsTest's change is it throwing
     public void setMembers(List<Member> members) { this.members = List.copyOf(members); }
     /** Display names of members currently typing. */
-    public Set<String> typing() { return typing; }
+    public Set<String> typing() { return typing; } // lgtm[java/internal-representation-exposure] unmodifiable: ChatLiveFieldsTest's change is it throwing
     /** In the order given: that's how they're named on screen. */
     public void setTyping(Set<String> names) { this.typing = Collections.unmodifiableSet(new LinkedHashSet<>(names)); }
 

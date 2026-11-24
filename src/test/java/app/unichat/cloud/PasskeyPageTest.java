@@ -165,13 +165,14 @@ class PasskeyPageTest {
     /** What a browser sends for another name (DNS rebinding: evil.example resolved to 127.0.0.1); HttpClient won't set Host. */
     @SuppressFBWarnings(value = "UNENCRYPTED_SOCKET", justification = "talks to the page under test on 127.0.0.1, inside the test")
     private int raw(String request) throws IOException {
-        try (java.net.Socket s = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), opened[0].getPort())) {
+        try (java.net.Socket s = new java.net.Socket(java.net.InetAddress.getLoopbackAddress(), opened[0].getPort());
+             java.io.BufferedReader answer = new java.io.BufferedReader(new java.io.InputStreamReader(s.getInputStream(),
+                     java.nio.charset.StandardCharsets.US_ASCII))) {
             s.getOutputStream().write(request.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
             s.getOutputStream().flush();
-            String status = new java.io.BufferedReader(new java.io.InputStreamReader(s.getInputStream(),
-                    java.nio.charset.StandardCharsets.US_ASCII)).readLine();
+            String status = answer.readLine();
             if (status == null) throw new IOException("no answer");
-            return Integer.parseInt(status.split(" ")[1]);
+            return Present.of(app.unichat.support.Numbers.intOf(status.split(" ")[1]));
         }
     }
 

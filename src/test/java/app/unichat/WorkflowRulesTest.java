@@ -36,6 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WorkflowRulesTest {
     private static final Path WORKFLOWS = Path.of(".github/workflows");
     private static final Path SUPPRESSIONS = Path.of("dependency-check-suppressions.xml");
+    /** CodeQL's suppression queries, run beside security-and-quality so that a suppression in the code counts. */
+    private static final String CODEQL_SUPPRESSIONS = ".github/codeql/alert-suppression.qls";
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
     /** A {@code uses:} line: an action at its commit's full SHA, the tag it was in a comment after it. */
     private static final Pattern PINNED = Pattern.compile("\\s*(?:- )?uses: [\\w.-]+/[\\w./-]+@[0-9a-f]{40} # v\\d+(?:\\.\\d+)*");
@@ -148,13 +150,74 @@ class WorkflowRulesTest {
         List<JsonNode> steps = steps(workflow, "analyze");
         JsonNode init = step(steps, "github/codeql-action/init@");
         assertEquals("java-kotlin", init.path("with").path("languages").asText());
-        assertEquals("security-and-quality", init.path("with").path("queries").asText());
+        assertEquals(List.of("security-and-quality", "./" + CODEQL_SUPPRESSIONS),
+                List.of(init.path("with").path("queries").asText().split(",")),
+                "security-and-quality, and the suppression queries beside it (nothing else, nothing in their place)");
+        assertFalse(init.path("with").has("config"), "a rule left out goes in a config file, where each says why");
+        assertEquals(yamlTree("""
+                - query: AlertSuppression.ql
+                  from: codeql/java-queries
+                - query: AlertSuppressionAnnotations.ql
+                  from: codeql/java-queries
+                """), read(Path.of(CODEQL_SUPPRESSIONS)), "exactly CodeQL's own two suppression queries");
+        String config = init.path("with").path("config-file").asText("");
+        if (!config.isEmpty()) {
+            assertEquals(List.of(), leftOutWithoutReason(readText(Path.of(config.replaceFirst("^\\./", "")))), config);
+        }
         JsonNode analyze = step(steps, "github/codeql-action/analyze@");
         assertEquals("sarif", analyze.path("with").path("output").asText(), "the results are written where the next step reads them");
         String gate = steps.get(steps.indexOf(analyze) + 1).path("run").asText();
         assertTrue(gate.contains("sarif/*.sarif") && gate.contains("exit 1"), "the step after the analysis fails on a result: " + gate);
         assertTrue(gate.contains("suppressions"), "a result suppressed in the code with its reason doesn't count: " + gate);
         assertEquals(List.of(), errorsLetThrough(workflow.path("jobs").path("analyze")), "a failing analysis fails the run");
+    }
+
+    @Test
+    void aCodeqlRuleLeftOutSaysWhyAndIsOneRule() {
+        String good = "query-filters:\n  # noise here: why\n  - exclude:\n      id: java/a-rule\n";
+        assertEquals(List.of(), leftOutWithoutReason(good));
+        assertEquals(List.of(), leftOutWithoutReason("name: x\n" + good + "  # and why\n  - exclude:\n      id: java/b\n"));
+        assertEquals(1, leftOutWithoutReason(good.replace("  # noise here: why\n", "")).size(), "no reason");
+        assertEquals(1, leftOutWithoutReason(good.replace("# noise here: why", "#")).size(), "an empty reason");
+        assertEquals(1, leftOutWithoutReason(good.replace("id: java/a-rule", "id: /java/.*/")).size(), "a pattern");
+        assertEquals(1, leftOutWithoutReason(good.replace("id: java/a-rule", "tags: security")).size(), "a whole tag");
+        assertEquals(1, leftOutWithoutReason(good.replace("      id: java/a-rule\n", "      id: java/a-rule\n      precision: high\n"))
+                .size(), "more than the rule");
+        assertEquals(1, leftOutWithoutReason(good.replace("- exclude:", "- include:")).size(), "only exclusions");
+        assertEquals(1, leftOutWithoutReason(good + "paths-ignore:\n  - src/test\n").size(), "whole files");
+        assertEquals(1, leftOutWithoutReason(good + "disable-default-queries: true\n").size(), "the queries themselves");
+    }
+
+    /**
+     * What's wrong with a CodeQL config file: it only leaves rules out ({@code query-filters} and a {@code name}), each
+     * an {@code exclude} of one rule by its {@code id}, with a comment saying why on the line before it.
+     */
+    private static List<String> leftOutWithoutReason(String yaml) {
+        List<String> problems = new ArrayList<>();
+        JsonNode tree = yamlTree(yaml);
+        tree.properties().forEach(p -> {
+            if (!Set.of("name", "query-filters").contains(p.getKey())) problems.add(p.getKey() + ": a config file only leaves rules out");
+        });
+        JsonNode filters = tree.path("query-filters");
+        filters.forEach(f -> {
+            JsonNode exclude = f.path("exclude");
+            boolean oneRule = f.size() == 1 && exclude.size() == 1 && exclude.path("id").isTextual()
+                    && exclude.path("id").asText().matches("java/[\\w-]+");
+            if (!oneRule) problems.add(f + ": an exclude of one rule by its id");
+        });
+        String[] lines = yaml.split("\n", -1);
+        int written = 0;
+        for (int i = 0; i < lines.length; i++) {
+            if (!lines[i].matches("\\s*-\\s*(exclude|include):.*")) continue;
+            written++;
+            int before = i - 1;
+            while (before >= 0 && lines[before].isBlank()) before--;
+            if (before < 0 || !lines[before].matches("\\s*#\\s*\\S.*")) {
+                problems.add(lines[i].strip() + ": its reason in a comment on the line before");
+            }
+        }
+        if (written != filters.size()) problems.add("each filter written as \"- exclude:\" on its own line, its reason above it");
+        return problems;
     }
 
     @Test
@@ -243,6 +306,14 @@ class WorkflowRulesTest {
             List<Path> all = files.filter(f -> f.toString().endsWith(".yml")).sorted().toList();
             assertTrue(all.contains(WORKFLOWS.resolve("codeql.yml")) && all.contains(WORKFLOWS.resolve("build.yml")), all::toString);
             return all;
+        }
+    }
+
+    private static String readText(Path file) {
+        try {
+            return Files.readString(file);
+        } catch (IOException e) {
+            throw new IllegalStateException(file + " can't be read", e);
         }
     }
 

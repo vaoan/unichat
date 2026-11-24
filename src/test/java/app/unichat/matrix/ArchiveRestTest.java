@@ -528,7 +528,7 @@ class ArchiveRestTest {
         throw new AssertionError("no filter " + n + ": " + server.log);
     }
 
-    private static int num(String id) { return Integer.parseInt(id.substring(1)); }
+    private static int num(String id) { return Present.of(app.unichat.support.Numbers.intOf(id.substring(1))); }
 
     @Test
     void roomsThatStartRestingHaveTheirTagsAskedFromTheMainSyncsPoint() throws Exception {

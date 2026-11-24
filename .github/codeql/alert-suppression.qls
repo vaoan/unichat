@@ -1,0 +1,9 @@
+# CodeQL's in-source suppressions, which security-and-quality doesn't run: codeql.yml runs them beside it, so a result
+# under one is marked suppressed in the SARIF (and the gate after the analysis lets it through). One line: it ends in
+# "// lgtm[java/rule] why". One member: @SuppressWarnings("lgtm[java/rule]") // why. SuppressionsHaveReasonsTest
+# makes each say why; a whole rule left out goes in a config file's query-filters, each with its reason
+# (WorkflowRulesTest).
+- query: AlertSuppression.ql
+  from: codeql/java-queries
+- query: AlertSuppressionAnnotations.ql
+  from: codeql/java-queries

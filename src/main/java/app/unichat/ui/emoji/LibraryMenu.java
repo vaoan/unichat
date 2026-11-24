@@ -39,7 +39,7 @@ public final class LibraryMenu {
                 menu.getItems().add(use == null ? 0 : 1, ChatMenus.item(I18n.t("library.enlarge"), () -> enlarge(tile, from, item, toast)));
             }
             String set = showSet == null ? null : app.unichat.model.StickerPack.urlOf(item.info());
-            if (set != null && showSet != null) {
+            if (showSet != null && set != null) {
                 Consumer<String> show = showSet;
                 menu.getItems().add(use == null ? 1 : 2, ChatMenus.item(I18n.t("sticker.showSet"), () -> show.accept(set)));
             }

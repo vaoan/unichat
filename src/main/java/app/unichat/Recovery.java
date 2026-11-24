@@ -47,9 +47,14 @@ final class Recovery {
             List<String> rest = new ArrayList<>();
             for (String a : args) {
                 if (a.startsWith(MARK)) {
+                    // Written by the run before; one that doesn't read as "<pid>:<count>" is taken as no mark at all.
                     String[] v = a.substring(MARK.length()).split(":");
-                    after = Long.parseLong(v[0]);
-                    restarts = Integer.parseInt(v[1]);
+                    Long pid = v.length == 2 ? app.unichat.support.Numbers.longOf(v[0]) : null;
+                    Integer count = v.length == 2 ? app.unichat.support.Numbers.intOf(v[1]) : null;
+                    if (pid != null && count != null) {
+                        after = pid;
+                        restarts = count;
+                    }
                 } else {
                     rest.add(a);
                 }

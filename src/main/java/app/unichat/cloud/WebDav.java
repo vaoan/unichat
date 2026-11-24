@@ -75,7 +75,11 @@ public final class WebDav implements Storage {
         String xml = properties(path);
         if (xml == null) return null;
         String size = prop(xml, "getcontentlength");
-        return new RemoteFile(size == null ? -1 : Long.parseLong(size.strip()), null, null);
+        if (size == null) return new RemoteFile(-1, null, null);
+        // A size that isn't a number is a broken answer, never "no size": that reads as the same file, and nothing went up.
+        Long bytes = app.unichat.support.Numbers.longOf(size.strip());
+        if (bytes == null) throw new IOException("the server's size isn't a number");
+        return new RemoteFile(bytes, null, null);
     }
 
     /** What the server says of {@code path} (its PROPFIND answer), or null when there's nothing there. */

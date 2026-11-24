@@ -20,4 +20,10 @@ class ThemeTest {
         }
         assertEquals("#1C2024", Theme.accessibleAccent("#1C2024"), "already dark colors are kept");
     }
+
+    /** An accent that isn't a #RRGGBB color (a settings file edited by hand) is left as it is, never an error drawing the window. */
+    @Test
+    void anAccentThatIsntAColorIsLeftAsItIs() {
+        for (String bad : new String[]{"morado", "#12345", "#GGGGGG", ""}) assertEquals(bad, Theme.accessibleAccent(bad), bad);
+    }
 }

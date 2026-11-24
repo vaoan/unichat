@@ -26,6 +26,13 @@ public final class BoundedMap<K, V> extends LinkedHashMap<K, V> {
         return new BoundedMap<>(max, false);
     }
 
+    /** A copy that keeps the same bound and order (LinkedHashMap's clone gives this class back, its fields with it). */
+    @Override
+    @SuppressWarnings("unchecked") // HashMap.clone is Object.clone's copy of this very class
+    public BoundedMap<K, V> clone() {
+        return (BoundedMap<K, V>) super.clone();
+    }
+
     @Override
     protected boolean removeEldestEntry(Map.Entry<K, V> eldest) { // lesson-ok: bounded-map (the one place)
         return size() > max;

@@ -3,7 +3,6 @@ package app.unichat.cloud;
 import app.unichat.Present;
 import app.unichat.support.PathParts;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -114,6 +113,21 @@ class MediaUploadTest {
         Path c = chat("a.jpg", "Chat (WhatsApp) 3f2a9c1b2d4e.txt");
         assertEquals(1, uploader(c).run(acc, (d, t, n) -> { }, () -> true));
         assertEquals(Set.of(remote("a.jpg")), acc.files.keySet(), "the texts' copy stays here: it grows, and its source goes up");
+    }
+
+    /** A WebDAV server whose size isn't a number: the file failed, and is tried again, never taken as backed up. */
+    @Test
+    void aFileWhoseSizeThereIsntANumberIsNeverTakenAsBackedUp() throws Exception {
+        try (FakeDav cloud = new FakeDav("u", "p")) {
+            WebDav dav = new WebDav(cloud.url(), "u", "p");
+            Path c = chat("a.jpg");
+            dav.mkdirs(CloudAccount.MEDIA + "/Ana");
+            dav.put(remote("a.jpg"), "otra cosa".getBytes(StandardCharsets.UTF_8));
+            cloud.sizeSaid = "doce";
+            MediaUpload up = uploader(c);
+            assertEquals(0, up.run(dav, (d, t, n) -> { }, () -> true));
+            assertEquals(1, up.retrying(), "it failed: tried again later, not marked as up there");
+        }
     }
 
     @Test
@@ -247,10 +261,8 @@ class MediaUploadTest {
     }
 
     @Test
-    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void dropboxsContentHashIsTheHashOfEachBlocksHash(@TempDir Path tmp) throws Exception {
-        byte[] data = new byte[5 * 1024 * 1024]; // two blocks: 4 MB and 1 MB
-        new java.util.Random(3).nextBytes(data);
+        byte[] data = app.unichat.SeededBytes.noise(5 * 1024 * 1024, 3); // two blocks: 4 MB and 1 MB
         Path f = Files.write(tmp.resolve("x.bin"), data);
         java.security.MessageDigest all = java.security.MessageDigest.getInstance("SHA-256");
         all.update(java.security.MessageDigest.getInstance("SHA-256").digest(java.util.Arrays.copyOfRange(data, 0, 4 * 1024 * 1024)));

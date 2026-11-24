@@ -15,6 +15,7 @@ import org.jspecify.annotations.Nullable;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -86,6 +87,13 @@ class AnimDumpTest {
     void notAWebpIsNoFrames() throws Exception {
         assumeTrue(tool() != null, "no anim_dump here");
         assertNull(AnimDump.frames(Files.writeString(dir.resolve("roto.webp"), "esto no es una imagen")));
+    }
+
+    /** A header number that isn't one is no PAM file: an IOException, as the callers handle, never a NumberFormatException. */
+    @Test
+    void aPamHeaderThatIsntANumberIsNoPamFile() throws Exception {
+        Path pam = Files.writeString(dir.resolve("bad.pam"), "P7\nWIDTH dos\nHEIGHT 1\nDEPTH 4\nENDHDR\n");
+        assertThrows(IOException.class, () -> AnimDump.readPam(pam));
     }
 
     @Test

@@ -143,11 +143,8 @@ class ReplyWriterTest {
         assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false), "the program was left running");
     }
 
-    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     private Path fifo(String name) throws IOException, InterruptedException {
-        Path f = dir.resolve(name);
-        assertEquals(0, new ProcessBuilder("mkfifo", f.toString()).inheritIO().start().waitFor());
-        return f;
+        return app.unichat.Fifos.at(dir.resolve(name));
     }
 
     @Test

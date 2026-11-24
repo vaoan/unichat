@@ -20,12 +20,10 @@ class WebDavTest {
     java.nio.file.Path dir;
 
     @Test
-    @SuppressFBWarnings(value = {"DMI_RANDOM_USED_ONLY_ONCE", "PREDICTABLE_RANDOM"}, justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aFileComesDownIntoAFileNeverWholeInMemory() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
-            byte[] video = new byte[300_000];
-            new java.util.Random(3).nextBytes(video);
+            byte[] video = app.unichat.SeededBytes.noise(300_000, 3);
             cloud.put("Unichat/Media/Ana/video [1].mp4", video);
             StorageDownloads.check(dav, "Unichat/Media/Ana/video [1].mp4", video, dir);
         }
@@ -104,6 +102,17 @@ class WebDavTest {
             dav.put("a.jpg", "12345".getBytes(StandardCharsets.UTF_8));
             assertEquals(new Storage.RemoteFile(5, null, null), dav.info("a.jpg"), "WebDAV gives the size, no checksum");
             assertNull(dav.info("nada.jpg"));
+        }
+    }
+
+    /** A size that isn't a number is a broken answer: an IOException, which the callers handle and try again. */
+    @Test
+    void aSizeThatIsntANumberIsAnIoError() throws Exception {
+        try (FakeDav cloud = new FakeDav("u", "p")) {
+            WebDav dav = new WebDav(cloud.url(), "u", "p");
+            dav.put("a.jpg", "12345".getBytes(StandardCharsets.UTF_8));
+            cloud.sizeSaid = "cinco";
+            assertThrows(IOException.class, () -> dav.info("a.jpg"));
         }
     }
 

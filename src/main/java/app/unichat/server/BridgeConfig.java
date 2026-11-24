@@ -123,8 +123,10 @@ public final class BridgeConfig {
                 }
                 case "telegram" -> {
                     ObjectNode net = obj(c, "/network");
-                    net.put("api_id", Integer.parseInt(java.util.Objects.requireNonNull(s.telegramApiId(),
-                            "Telegram is set up only with its keys (BridgeInstaller.prepare refuses it without)")));
+                    String apiId = java.util.Objects.requireNonNull(s.telegramApiId(),
+                            "Telegram is set up only with its keys (BridgeInstaller.prepare refuses it without)");
+                    net.put("api_id", java.util.Objects.requireNonNull(app.unichat.support.Numbers.intOf(apiId),
+                            "a Telegram id is a number (TelegramKeys.saved checks it before a bridge is set up)"));
                     net.put("api_hash", s.telegramApiHash());
                     // Animated stickers as they are: Lottie as its JSON, video stickers as the WebM. Unichat draws both
                     // and forwards them as an animated WebP with their transparency (video/LottieStickers, WebmStickers).

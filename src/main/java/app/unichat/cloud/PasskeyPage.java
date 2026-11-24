@@ -170,7 +170,8 @@ public final class PasskeyPage {
     }
 
     private static int length(@Nullable String s) {
-        return s != null && s.matches("\\d{1,4}") ? Integer.parseInt(s) : -1;
+        Integer n = s != null && s.matches("\\d{1,4}") ? app.unichat.support.Numbers.intOf(s) : null;
+        return n == null ? -1 : n;
     }
 
     /** {@code s} if it's only what such a value is made of, else "?". */

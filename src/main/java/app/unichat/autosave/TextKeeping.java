@@ -150,7 +150,8 @@ final class TextKeeping {
         } catch (RuntimeException e) {
             fresh = CompletableFuture.completedFuture(null);
         }
-        return fresh.handle((r, e) -> null).completeOnTimeout(null, fetchWait.toMillis(), TimeUnit.MILLISECONDS)
+        // allOf: the same ending, as a typed future (a lambda on a CompletableFuture<?> is misread by CodeQL's unused-parameter)
+        return CompletableFuture.allOf(fresh).handle((_, _) -> null).completeOnTimeout(null, fetchWait.toMillis(), TimeUnit.MILLISECONDS)
                 .thenApplyAsync(x -> {
                     try {
                         return log.versions(m.chatId(), m.id());

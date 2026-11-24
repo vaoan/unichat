@@ -1,7 +1,6 @@
 package app.unichat.stt;
 
 import app.unichat.Present;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -58,10 +57,8 @@ class TranscriberRunTest {
     }
 
     @Test
-    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void interruptingStopsTheProgram() throws Exception {
-        Path started = dir.resolve("started");
-        assertEquals(0, new ProcessBuilder("mkfifo", started.toString()).inheritIO().start().waitFor());
+        Path started = app.unichat.Fifos.at(dir.resolve("started"));
         // It says its own process id, then never ends on its own: only being stopped ends it.
         List<String> cmd = sh("echo $$ > '" + started + "'; exec tail -f /dev/null");
         AtomicReference<Throwable> ended = new AtomicReference<>();

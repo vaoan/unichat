@@ -1,7 +1,7 @@
 name: codeql
 
 # CodeQL's security-and-quality queries on the Java code. CI only. The results go to code scanning, and any result
-# fails the run: a finding is fixed, or suppressed in the code with its reason.
+# fails the run: a finding is fixed, or suppressed in the code with its reason (codeql/alert-suppression.qls says how).
 on:
   push:
     branches: [main]
@@ -28,7 +28,8 @@ jobs:
         with:
           languages: java-kotlin
           build-mode: none
-          queries: security-and-quality
+          # The suppression queries beside it: without them, no "// lgtm[java/rule] why" in the code counts.
+          queries: security-and-quality,./.github/codeql/alert-suppression.qls
       - uses: github/codeql-action/analyze@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
         with:
           category: /language:java-kotlin

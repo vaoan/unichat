@@ -106,7 +106,7 @@ class ScrollPerfUiTest {
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     private static Path video(Path gif) throws IOException, InterruptedException {
         Path out = Path.of(gif + ".mp4");
-        new ProcessBuilder("ffmpeg", "-y", "-loglevel", "error", "-i", gif.toString(), "-pix_fmt", "yuv420p", "-c:v", "libx264",
+        new ProcessBuilder("ffmpeg", "-y", "-loglevel", "error", "-i", gif.toString(), "-pix_fmt", "yuv420p", "-c:v", "libx264", // lgtm[java/relative-path-command] the person's ffmpeg on PATH: a perf test only they run
                 "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", out.toString())
                 .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start().waitFor();
         return out;
@@ -277,7 +277,7 @@ class ScrollPerfUiTest {
     }
 
     private static void histogram() throws IOException {
-        Process p = new ProcessBuilder("jcmd", Long.toString(ProcessHandle.current().pid()), "GC.class_histogram").redirectErrorStream(true).start();
+        Process p = new ProcessBuilder("jcmd", Long.toString(ProcessHandle.current().pid()), "GC.class_histogram").redirectErrorStream(true).start(); // lgtm[java/relative-path-command] the JDK's jcmd on PATH: a perf test only the person runs
         List<String> lines = new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).lines().skip(2).limit(14).toList();
         lines.forEach(l -> System.out.println("PERF heap " + l));
     }

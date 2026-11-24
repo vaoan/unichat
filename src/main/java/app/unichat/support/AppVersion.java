@@ -69,7 +69,9 @@ public final class AppVersion {
         List<Integer> numbers = new ArrayList<>();
         for (String part : core.split("\\.", -1)) {
             if (part.isEmpty() || !part.chars().allMatch(Character::isDigit) || part.length() > 9) return null;
-            numbers.add(Integer.parseInt(part));
+            Integer n = Numbers.intOf(part);
+            if (n == null) return null;
+            numbers.add(n);
         }
         String pre = dash < 0 ? "" : s.substring(dash + 1);
         return new Parsed(numbers, pre);
@@ -92,10 +94,10 @@ public final class AppVersion {
         String[] x = a.split("\\.");
         String[] y = b.split("\\.");
         for (int i = 0; i < Math.min(x.length, y.length); i++) {
-            boolean xn = x[i].matches("\\d{1,9}");
-            boolean yn = y[i].matches("\\d{1,9}");
-            int c = xn && yn ? Integer.compare(Integer.parseInt(x[i]), Integer.parseInt(y[i]))
-                    : xn != yn ? (xn ? -1 : 1) : x[i].compareTo(y[i]);
+            Integer xn = x[i].matches("\\d{1,9}") ? Numbers.intOf(x[i]) : null;
+            Integer yn = y[i].matches("\\d{1,9}") ? Numbers.intOf(y[i]) : null;
+            int c = xn != null && yn != null ? Integer.compare(xn, yn)
+                    : (xn != null) != (yn != null) ? (xn != null ? -1 : 1) : x[i].compareTo(y[i]);
             if (c != 0) return c;
         }
         return Integer.compare(x.length, y.length);

@@ -73,7 +73,9 @@ public final class StyleLearner {
                     System.err.println("Writing style not learned: " + v.problem());
                     return current;
                 }
-                if (!store.commit(current, file, corrections.size(), chatId, newest)) return store.text();
+                synchronized (store) { // the commit and, when it was refused, the text it lost to, read as one
+                    if (!store.commit(current, file, corrections.size(), chatId, newest)) return store.text();
+                }
                 System.out.println(learned(StyleDiff.between(current, file), corrections.size(), mine.size()));
                 return file;
             } catch (ReplyWriter.Failure e) {
