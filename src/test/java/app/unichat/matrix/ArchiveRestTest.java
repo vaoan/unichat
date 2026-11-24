@@ -217,11 +217,11 @@ class ArchiveRestTest {
     @Test
     void openingTheArchiveWakesTheFilterAtOnceAndSendsNoBridgeCommand() throws Exception {
         everyKind();
-        rest.archivedChanged().get();
+        settled(rest.archivedChanged()); // its round's request logged before the count below, not among the waking's
         assertTrue(server.log.contains("bot guilds bridging-mode " + GUILD + " nothing"), "an archived server brings nothing: " + server.log);
         int before = server.log.size();
 
-        rest.setArchiveOpen(true).get();
+        settled(rest.setArchiveOpen(true)); // done inside beforeRequest: the request with the filter is logged just after
         List<String> waking = new ArrayList<>(server.log.subList(before, server.log.size()));
         int caught = waking.indexOf("catch-up " + set("!s:x", "!c1:x", "!c2:x", "!lone:x"));
         int filtered = waking.indexOf("request " + SyncFilter.BASE);

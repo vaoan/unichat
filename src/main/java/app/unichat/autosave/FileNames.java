@@ -17,6 +17,10 @@ import org.jspecify.annotations.Nullable;
 public final class FileNames {
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT);
     private static final Pattern RESERVED = Pattern.compile("(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\\..*)?");
+    /** What {@link #safe} keeps of a name, in UTF-8 bytes. */
+    private static final int SAFE_BYTES = 200;
+    /** The most a whole name takes, in UTF-8 bytes: Linux's 255 (the strictest; APFS and NTFS count 255 UTF-16 units), less room for {@link #free}'s " (2)". */
+    private static final int NAME_BYTES = 245;
 
     private FileNames() {}
 
@@ -50,10 +54,10 @@ public final class FileNames {
     public static String forSaving(Message m, ZoneId zone) {
         String name = forMessage(m, zone);
         int dot = name.lastIndexOf('.');
-        String tag = " [" + tag(m) + "]";
         String ext = dot > 0 ? name.substring(dot) : "";
-        String saved = dot > 0 ? name.substring(0, dot) + tag + ext : name + tag;
-        return SHELL_ACTIVE.contains(ext.toLowerCase(Locale.ROOT)) ? saved + ".txt" : saved;
+        String after = " [" + tag(m) + "]" + ext + (SHELL_ACTIVE.contains(ext.toLowerCase(Locale.ROOT)) ? ".txt" : "");
+        // The name shortened, never the tag: savedIn knows the file by it.
+        return cut(dot > 0 ? name.substring(0, dot) : name, NAME_BYTES - bytes(after)) + after;
     }
 
     /**
@@ -88,7 +92,9 @@ public final class FileNames {
 
     /**
      * Windows reads "C:x" as relative to drive C and "a:b" as a hidden stream, rejects {@code <>"|?*}, control
-     * characters, trailing dots/spaces and DOS device names: clean all of those, slashes too, and keep it under 200.
+     * characters, trailing dots/spaces and DOS device names: clean all of those, slashes too, and keep it under 200 bytes
+     * of UTF-8, whole characters only: Linux takes 255 bytes a name, and an emoji is 4 there (2 on the Mac, which let a
+     * name that Linux refuses through), with room left for what callers add (a date, an id, " (2)").
      * Invisible format characters go ({@code \p{Cf}}: a right-to-left override, U+202E, showed "invoice[RLO]fdp.exe" as a PDF),
      * and leading dots too: a hidden file was skipped by {@link #savedIn} and folder moves, so saved again each time.
      */
@@ -96,12 +102,31 @@ public final class FileNames {
         String n = name.replaceAll("\\p{Cf}", "").replaceAll("[<>:\"|?*/\\\\\\x00-\\x1F%]", "_")
                 .replaceAll("[. ]+$", "").replaceAll("^[. ]+", "").strip();
         if (RESERVED.matcher(n).matches()) n = "_" + n;
-        if (n.length() > 200) {
+        if (bytes(n) > SAFE_BYTES) {
             int dot = n.lastIndexOf('.');
             String ext = dot > 0 && n.length() - dot <= 10 ? n.substring(dot) : "";
-            n = n.substring(0, 200 - ext.length()) + ext;
+            n = cut(n.substring(0, n.length() - ext.length()), SAFE_BYTES - bytes(ext)).replaceAll("[. ]+$", "") + ext;
         }
         return n;
+    }
+
+    /** {@code s}'s first whole characters that take at most {@code max} bytes of UTF-8. */
+    static String cut(String s, int max) {
+        int used = 0;
+        for (int i = 0; i < s.length(); i += Character.charCount(s.codePointAt(i))) {
+            used += utf8(s.codePointAt(i));
+            if (used > max) return s.substring(0, i);
+        }
+        return s;
+    }
+
+    /** How many bytes {@code s} takes in UTF-8, as file systems count a name. */
+    static int bytes(String s) {
+        return s.codePoints().map(FileNames::utf8).sum();
+    }
+
+    private static int utf8(int codePoint) {
+        return codePoint < 0x80 ? 1 : codePoint < 0x800 ? 2 : codePoint < 0x10000 ? 3 : 4;
     }
 
     /** A folder named after a chat: {@link #safe}, and never empty nor "..". */

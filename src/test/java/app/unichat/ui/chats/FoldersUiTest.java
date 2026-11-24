@@ -545,22 +545,33 @@ class FoldersUiTest {
         assertEquals("!srv-general:demo", fx(() -> Present.of(thread().chat()).id()), "going back closes nothing");
     }
 
-    @Test
-    void reenteringALongFolderShowsTheOpenChat() throws Exception {
-        String work = svc.createFolder("Trabajo");
-        for (Chat c : svc.chats()) if (!c.space() && !c.bridgeBot()) svc.setInFolder(work, c, true);
-        fire(railButton("Carpetas"));
-        clickCell(".folder-list", "Trabajo");
-        Chat last = fx(() -> folderChats().getItems().getLast());
-        assertTrue(texts(".folder-chats").stream().noneMatch(t -> t.startsWith(last.title())), "the folder must be longer than the window");
-        FxWait.onFx(() -> {
-            pane.setSelected(last.id());
-        });
-        fire(fx(() -> buttons("Volver a carpetas").get(0)));
+    /** 1.3: what the Mac needs to show what Linux's fonts did on CI, the open chat (last) left below the list. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(doubles = {1.0, 1.3})
+    void reenteringALongFolderShowsTheOpenChat(double textSize) throws Exception {
+        double scale = app.unichat.settings.Settings.get().fontScale();
+        app.unichat.settings.Settings.get().setFontScale(textSize);
+        try {
+            FxWait.onFx(Theme::applyAll);
+            FxWait.settled();
+            String work = svc.createFolder("Trabajo");
+            for (Chat c : svc.chats()) if (!c.space() && !c.bridgeBot()) svc.setInFolder(work, c, true);
+            fire(railButton("Carpetas"));
+            clickCell(".folder-list", "Trabajo");
+            Chat last = fx(() -> folderChats().getItems().getLast());
+            assertTrue(texts(".folder-chats").stream().noneMatch(t -> t.startsWith(last.title())), "the folder must be longer than the window");
+            FxWait.onFx(() -> {
+                pane.setSelected(last.id());
+            });
+            fire(fx(() -> buttons("Volver a carpetas").get(0)));
 
-        clickCell(".folder-list", "Trabajo");
-        assertEquals(last, fx(() -> folderChats().getSelectionModel().getSelectedItem()));
-        eventually("the open chat comes into view", () -> texts0(".folder-chats").stream().anyMatch(t -> t.startsWith(last.title())));
+            clickCell(".folder-list", "Trabajo");
+            assertEquals(last, fx(() -> folderChats().getSelectionModel().getSelectedItem()));
+            // clickCell waited for the list to settle, the reveal it asks for included: in view now, or never.
+            assertTrue(texts(".folder-chats").stream().anyMatch(t -> t.startsWith(last.title())), "the open chat comes into view: " + texts(".folder-chats"));
+        } finally {
+            app.unichat.settings.Settings.get().setFontScale(scale);
+        }
     }
 
     @Test
